@@ -27,6 +27,7 @@ add_swift_host_library(swiftIDE STATIC
   REPLCodeCompletion.cpp
   SwiftSourceDocInfo.cpp
   SyntaxModel.cpp
+  UnresolvedMemberCompletion.cpp
   Utils.cpp
   IDETypeChecking.cpp
   ImportDepth.cpp

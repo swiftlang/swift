@@ -781,27 +781,6 @@ swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }
 
-void UnresolvedMemberTypeCheckCompletionCallback::
-fallbackTypeCheck(DeclContext *DC) {
-  assert(!gotCallback());
-
-  CompletionContextFinder finder(DC);
-  if (!finder.hasCompletionExpr())
-    return;
-
-  auto fallback = finder.getFallbackCompletionExpr();
-  if (!fallback)
-    return;
-
-
-  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
-  TypeChecker::typeCheckForCodeCompletion(
-      completionTarget, /*needsPrecheck*/true,
-      [&](const Solution &S) { sawSolution(S); });
-}
-
 Type swift::getTypeForCompletion(const constraints::Solution &S, Expr *E) {
   if (!S.hasType(E)) {
     assert(false && "Expression wasn't type checked?");
@@ -870,104 +849,6 @@ bool swift::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
     }
   }
   return false;
-}
-
-/// If the code completion variable occurs in a pattern matching position, we
-/// have an AST that looks like this.
-/// \code
-/// (binary_expr implicit type='$T3'
-///   (overloaded_decl_ref_expr function_ref=compound decls=[
-///     Swift.(file).~=,
-///     Swift.(file).Optional extension.~=])
-///   (argument_list implicit
-///     (argument
-///       (code_completion_expr implicit type='$T1'))
-///     (argument
-///       (declref_expr implicit decl=swift_ide_test.(file).foo(x:).$match))))
-/// \endcode
-/// If the code completion expression occurs in such an AST, return the
-/// declaration of the \c $match variable, otherwise return \c nullptr.
-VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
-                                     ConstraintSystem &CS) {
-  auto &Context = CS.getASTContext();
-
-  auto *Binary = dyn_cast_or_null<BinaryExpr>(CS.getParentExpr(CompletionExpr));
-  if (!Binary || !Binary->isImplicit() || Binary->getLHS() != CompletionExpr) {
-    return nullptr;
-  }
-
-  auto CalledOperator = Binary->getFn();
-  if (!CalledOperator || !CalledOperator->isImplicit()) {
-    return nullptr;
-  }
-  // The reference to the ~= operator might be an OverloadedDeclRefExpr or a
-  // DeclRefExpr, depending on how many ~= operators are viable.
-  if (auto Overloaded =
-          dyn_cast_or_null<OverloadedDeclRefExpr>(CalledOperator)) {
-    if (!llvm::all_of(Overloaded->getDecls(), [&Context](ValueDecl *D) {
-          return D->getBaseName() == Context.Id_MatchOperator;
-        })) {
-      return nullptr;
-    }
-  } else if (auto Ref = dyn_cast_or_null<DeclRefExpr>(CalledOperator)) {
-    if (Ref->getDecl()->getBaseName() != Context.Id_MatchOperator) {
-      return nullptr;
-    }
-  } else {
-    return nullptr;
-  }
-
-  auto MatchArg = dyn_cast_or_null<DeclRefExpr>(Binary->getRHS());
-  if (!MatchArg || !MatchArg->isImplicit()) {
-    return nullptr;
-  }
-
-  auto MatchVar = MatchArg->getDecl();
-  if (MatchVar && MatchVar->isImplicit() &&
-      MatchVar->getBaseName() == Context.Id_PatternMatchVar) {
-    return dyn_cast<VarDecl>(MatchVar);
-  } else {
-    return nullptr;
-  }
-}
-
-void UnresolvedMemberTypeCheckCompletionCallback::
-sawSolution(const constraints::Solution &S) {
-  GotCallback = true;
-
-  auto &CS = S.getConstraintSystem();
-  Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
-  // If the type couldn't be determined (e.g. because there isn't any context
-  // to derive it from), let's not attempt to do a lookup since it wouldn't
-  // produce any useful results anyway.
-  if (ExpectedTy && !ExpectedTy->is<UnresolvedType>()) {
-    // If ExpectedTy is a duplicate of any other result, ignore this solution.
-    if (!llvm::any_of(ExprResults, [&](const ExprResult &R) {
-          return R.ExpectedTy->isEqual(ExpectedTy);
-        })) {
-      bool SingleExprBody =
-          isImplicitSingleExpressionReturn(CS, CompletionExpr);
-      ExprResults.push_back({ExpectedTy, SingleExprBody});
-    }
-  }
-
-  if (auto MatchVar = getMatchVarIfInPatternMatch(CompletionExpr, CS)) {
-    Type MatchVarType;
-    // If the MatchVar has an explicit type, it's not part of the solution. But
-    // we can look it up in the constraint system directly.
-    if (auto T = S.getConstraintSystem().getVarType(MatchVar)) {
-      MatchVarType = T;
-    } else {
-      MatchVarType = S.getResolvedType(MatchVar);
-    }
-    if (MatchVarType && !MatchVarType->is<UnresolvedType>()) {
-      if (!llvm::any_of(EnumPatternTypes, [&](const Type &R) {
-            return R->isEqual(MatchVarType);
-          })) {
-        EnumPatternTypes.push_back(MatchVarType);
-      }
-    }
-  }
 }
 
 void KeyPathTypeCheckCompletionCallback::sawSolution(

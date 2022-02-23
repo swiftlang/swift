@@ -39,6 +39,7 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/CompletionOverrideLookup.h"
 #include "swift/IDE/DotExprCompletion.h"
+#include "swift/IDE/UnresolvedMemberCompletion.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
@@ -1317,61 +1318,6 @@ void swift::ide::deliverCompletionResults(
                      /*Sink=*/nullptr);
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
-}
-
-void deliverUnresolvedMemberResults(
-    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::ExprResult> Results,
-    ArrayRef<Type> EnumPatternTypes, DeclContext *DC, SourceLoc DotLoc,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
-  ASTContext &Ctx = DC->getASTContext();
-  CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
-                          &CompletionCtx);
-
-  assert(DotLoc.isValid());
-  Lookup.setHaveDot(DotLoc);
-  Lookup.shouldCheckForDuplicates(Results.size() + EnumPatternTypes.size() > 1);
-
-  // Get the canonical versions of the top-level types
-  SmallPtrSet<CanType, 4> originalTypes;
-  for (auto &Result: Results)
-    originalTypes.insert(Result.ExpectedTy->getCanonicalType());
-
-  for (auto &Result: Results) {
-    Lookup.setExpectedTypes({Result.ExpectedTy},
-                            Result.IsImplicitSingleExpressionReturn,
-                            /*expectsNonVoid*/true);
-    Lookup.setIdealExpectedType(Result.ExpectedTy);
-
-    // For optional types, also get members of the unwrapped type if it's not
-    // already equivalent to one of the top-level types. Handling it via the top
-    // level type and not here ensures we give the correct type relation
-    // (identical, rather than convertible).
-    if (Result.ExpectedTy->getOptionalObjectType()) {
-      Type Unwrapped = Result.ExpectedTy->lookThroughAllOptionalTypes();
-      if (originalTypes.insert(Unwrapped->getCanonicalType()).second)
-        Lookup.getUnresolvedMemberCompletions(Unwrapped);
-    }
-    Lookup.getUnresolvedMemberCompletions(Result.ExpectedTy);
-  }
-
-  // Offer completions when interpreting the pattern match as an
-  // EnumElementPattern.
-  for (auto &Ty : EnumPatternTypes) {
-    Lookup.setExpectedTypes({Ty}, /*IsImplicitSingleExpressionReturn=*/false,
-                            /*expectsNonVoid=*/true);
-    Lookup.setIdealExpectedType(Ty);
-
-    // We can pattern match MyEnum against Optional<MyEnum>
-    if (Ty->getOptionalObjectType()) {
-      Type Unwrapped = Ty->lookThroughAllOptionalTypes();
-      Lookup.getEnumElementPatternCompletions(Unwrapped);
-    }
-
-    Lookup.getEnumElementPatternCompletions(Ty);
-  }
-
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
 }
 
 void deliverKeyPathResults(

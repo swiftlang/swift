@@ -44,43 +44,6 @@ namespace swift {
   };
 
 
-  /// Used to collect and store information needed to perform unresolved member
-  /// completion (\c CompletionKind::UnresolvedMember ) from the solutions
-  /// formed during expression type-checking.
-  class UnresolvedMemberTypeCheckCompletionCallback: public TypeCheckCompletionCallback {
-  public:
-    struct ExprResult {
-      Type ExpectedTy;
-      bool IsImplicitSingleExpressionReturn;
-    };
-
-  private:
-    CodeCompletionExpr *CompletionExpr;
-    SmallVector<ExprResult, 4> ExprResults;
-    SmallVector<Type, 1> EnumPatternTypes;
-    bool GotCallback = false;
-
-  public:
-    UnresolvedMemberTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr)
-    : CompletionExpr(CompletionExpr) {}
-
-    ArrayRef<ExprResult> getExprResults() const { return ExprResults; }
-
-    /// If we are completing in a pattern matching position, the types of all
-    /// enums for whose cases are valid as an \c EnumElementPattern.
-    ArrayRef<Type> getEnumPatternTypes() const { return EnumPatternTypes; }
-
-    /// True if at least one solution was passed via the \c sawSolution
-    /// callback.
-    bool gotCallback() const { return GotCallback; }
-
-    /// Typecheck the code completion expression in its outermost expression
-    /// context, calling \c sawSolution for each solution formed.
-    void fallbackTypeCheck(DeclContext *DC);
-
-    void sawSolution(const constraints::Solution &solution) override;
-  };
-
   class KeyPathTypeCheckCompletionCallback
       : public TypeCheckCompletionCallback {
   public:
