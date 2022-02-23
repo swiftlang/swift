@@ -822,8 +822,8 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
         // class type to use _ContiguousArrayStorage<AnyObject> when we bridge
         // to objective-c we need to set the correct Element type so that when
         // we bridge back we can use O(1) bridging i.e we can adopt the storage.
-        _swift_setClassMetadata(_ContiguousArrayStorage<Element>.self,
-                                onObject: _storage)
+        _ = _swift_setClassMetadata(_ContiguousArrayStorage<Element>.self,
+                                    onObject: _storage)
       }
       return _storage
     }
