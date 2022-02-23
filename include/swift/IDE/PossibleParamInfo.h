@@ -15,7 +15,8 @@
 
 #include "swift/AST/Types.h"
 
-using namespace swift;
+namespace swift {
+namespace ide {
 
 struct PossibleParamInfo {
   /// Expected parameter.
@@ -33,5 +34,8 @@ struct PossibleParamInfo {
            "nullptr with required flag is not allowed");
   };
 };
+
+} // end namespace ide
+} // end namespace swift
 
 #endif // SWIFT_IDE_POSSIBLEPARAMINFO_H
