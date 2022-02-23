@@ -847,7 +847,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     f->setBare(IsBare);
     f->setThunk(IsThunk);
 
-    SILGenFunction(*this, *f, dc).emitDistributedThunk(constant);
+    SILGenFunction(*this, *f, dc).emitDistributedThunk(constant); // TODO: remove
 
     postEmitFunction(constant, f);
     return;
@@ -1397,8 +1397,10 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 
   if (AFD->isDistributed()) {
-    auto thunk = SILDeclRef(AFD).asDistributed();
-    emitDistributedThunk(thunk);
+    auto thunk = AFD->getDistributedThunk();
+    thunk->dump();
+//    auto thunk = SILDeclRef(AFD).asDistributed();
+//    emitDistributedThunk(thunk);
   }
 
   if (AFD->isBackDeployed()) {

@@ -125,6 +125,9 @@ SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationDecoderDecodeNextArgume
 SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest,
               AbstractFunctionDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetDistributedThunkRequest,
+              FuncDecl *(AbstractFunctionDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorIDPropertyRequest,
               VarDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)

@@ -70,18 +70,13 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
   auto *DC = member->getDeclContext();
   auto DA = C.getDistributedActorDecl();
 
-  // === When declared inside a n actor, we can get the type directly
-  if (auto classDecl = dyn_cast<ClassDecl>(DC)) {
+  // === When declared inside an actor, we can get the type directly
+  if (auto classDecl = DC->getSelfClassDecl()) {
     return getDistributedActorSystemType(classDecl);
   }
 
   /// === Maybe the value is declared in a protocol?
-  ProtocolDecl *protocol = dyn_cast<ProtocolDecl>(member);
-  if (!protocol) {
-    protocol = DC->getSelfProtocolDecl();
-  }
-
-  if (protocol) {
+  if (auto protocol = DC->getSelfProtocolDecl()) {
     GenericSignature signature;
     if (auto *genericContext = member->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();
@@ -137,6 +132,21 @@ Type swift::getDistributedActorSystemActorIDRequirementType(NominalTypeDecl *sys
   return conformance.getTypeWitnessByName(selfType, ctx.Id_ActorID);
 }
 
+Type swift::getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *system) {
+  assert(!system->isDistributedActor());
+  auto &ctx = system->getASTContext();
+
+  auto protocol = ctx.getDistributedActorSystemDecl();
+  if (!protocol)
+    return Type();
+
+  // Dig out the serialization requirement type.
+  auto module = system->getParentModule();
+  Type selfType = system->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, protocol);
+  return conformance.getTypeWitnessByName(selfType, ctx.Id_InvocationEncoder);
+}
+
 Type swift::getDistributedSerializationRequirementType(
     NominalTypeDecl *nominal, ProtocolDecl *protocol) {
   assert(protocol);
@@ -185,11 +195,10 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
       actorProtocol, selfType, conformance));
 }
 
-//Type ASTContext::getDistributedSerializationRequirementType(
-//    NominalTypeDecl *nominal) {
-//  return getAssociatedTypeOfDistributedSystemOfActor(nominal,
-//                                              Id_SerializationRequirement);
-//}
+/******************************************************************************/
+/******** Functions on DistributedActorSystem and friends *********************/
+/******************************************************************************/
+
 
 FuncDecl*
 ASTContext::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
@@ -1089,6 +1098,19 @@ AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
 /******************************************************************************/
 /********************** Distributed Actor Properties **************************/
 /******************************************************************************/
+
+FuncDecl*
+AbstractFunctionDecl::getDistributedThunk() const {
+  if (!isDistributed())
+    return nullptr;
+
+  fprintf(stderr, "[%s:%d] (%s) GET DIST THUNK\n", __FILE__, __LINE__, __FUNCTION__);
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedThunkRequest{mutableThis},
+      nullptr);
+}
 
 VarDecl*
 NominalTypeDecl::getDistributedActorSystemProperty() const {

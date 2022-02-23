@@ -529,6 +529,14 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
     return true;
   }
 
+  // === Finally, ensure the distributed thunk is emitted
+  auto thunk = func->getDistributedThunk();
+  fprintf(stderr, "[%s:%d] (%s) THUNK >>>>\n", __FILE__, __LINE__, __FUNCTION__);
+  thunk->dump();
+  fprintf(stderr, "[%s:%d] (%s) THUNK BODY >>>>\n", __FILE__, __LINE__, __FUNCTION__);
+  thunk->getBody(true);
+  thunk->dump();
+
   return false;
 }
 
@@ -645,7 +653,7 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
 
 // ==== ------------------------------------------------------------------------
 
-void TypeChecker::checkDistributedActor(ClassDecl *decl) {
+void TypeChecker::checkDistributedActor(SourceFile *SF, ClassDecl *decl) {
   if (!decl)
     return;
 
@@ -661,8 +669,18 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
 
   for (auto member : decl->getMembers()) {
     // --- Check all constructors
-    if (auto ctor = dyn_cast<ConstructorDecl>(member))
+    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
       checkDistributedActorConstructor(decl, ctor);
+    }
+
+    // --- Ensure all thunks
+    if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (!func->isDistributed())
+        continue;
+
+      auto thunk = func->getDistributedThunk();
+      SF->DelayedFunctions.push_back(thunk);
+    }
   }
 
   // ==== Properties
