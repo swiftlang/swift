@@ -158,7 +158,9 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -1396,9 +1398,10 @@ struct DataflowState {
         applySiteToPromotedArgIndices(applySiteToPromotedArgIndices),
         closureConsumes(closureConsumes) {}
   void init();
-  bool process(
-      SILValue address,
-      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
+  bool
+  process(SILValue address,
+          SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
+          SmallSetVector<SILInstruction *, 8> &debugInfoBlockSplitPoints);
   bool handleSingleBlockClosure(SILArgument *address,
                                 ClosureOperandState &state);
   bool cleanupAllDestroyAddr(
@@ -1406,7 +1409,8 @@ struct DataflowState {
       SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
       BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
       BasicBlockSet &blocksWithMovesThatAreNowTakes,
-      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
+      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
+      SmallSetVector<SILInstruction *, 8> &debugInfoBlockSplitPoints);
   void clear() {
     useBlocks.clear();
     initBlocks.clear();
@@ -1425,7 +1429,8 @@ bool DataflowState::cleanupAllDestroyAddr(
     SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
     BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
     BasicBlockSet &blocksWithMovesThatAreNowTakes,
-    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
+    SmallSetVector<SILInstruction *, 8> &debugInfoBlockSplitPoints) {
   bool madeChange = false;
   BasicBlockWorklist worklist(fn);
 
@@ -1538,8 +1543,13 @@ bool DataflowState::cleanupAllDestroyAddr(
     if (debugVarInst) {
       if (auto varInfo = debugVarInst.getVarInfo()) {
         SILBuilderWithScope reinitBuilder(*reinit);
-        reinitBuilder.createDebugValue(debugVarInst.inst->getLoc(), address,
-                                       *varInfo, false, /*was moved*/ true);
+        reinitBuilder.setCurrentDebugScope(debugVarInst->getDebugScope());
+        auto *dvi =
+            reinitBuilder.createDebugValue(debugVarInst.inst->getLoc(), address,
+                                           *varInfo, false, /*was moved*/ true);
+        // After we are done processing, we are going to split at the reinit
+        // point.
+        debugInfoBlockSplitPoints.insert(dvi);
       }
     }
     madeChange = true;
@@ -1581,7 +1591,8 @@ bool DataflowState::cleanupAllDestroyAddr(
 
 bool DataflowState::process(
     SILValue address,
-    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
+    SmallSetVector<SILInstruction *, 8> &debugInfoBlockSplitPoints) {
   SILFunction *fn = address->getFunction();
   assert(fn);
 
@@ -1778,9 +1789,9 @@ bool DataflowState::process(
         debug.markAsMoved();
         if (auto varInfo = debug.getVarInfo()) {
           SILBuilderWithScope undefBuilder(builder);
-          undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
+          undefBuilder.setCurrentDebugScope(debug->getDebugScope());
           undefBuilder.createDebugValue(
-              debug.inst->getLoc(),
+              debug->getLoc(),
               SILUndef::get(address->getType(), builder.getModule()), *varInfo,
               false /*poison*/, true /*was moved*/);
         }
@@ -1800,13 +1811,25 @@ bool DataflowState::process(
   if (!convertedMarkMoveToTake)
     return madeChange;
 
+  // Now if we had a debug var carrying inst for our address, add the debug var
+  // carrying inst to debugInfoBlockSplitPoints so when we are done processing
+  // we can break blocks at those locations. This is done to ensure that we
+  // don't have to worry about the CFG changing while we are processing. The
+  // reason why we do this is that we are working around a bug in SelectionDAG
+  // that results in llvm.dbg.addr being sunk to the end of blocks. This can
+  // cause the value to appear to not be available after it is initialized. By
+  // breaking the block here, we guarantee that SelectionDAG's sinking has no
+  // effect since we are the end of the block.
+  if (auto debug = DebugVarCarryingInst::getFromValue(address))
+    debugInfoBlockSplitPoints.insert(*debug);
+
   // Now that we have processed all of our mark_moves, eliminate all of the
   // destroy_addr.
   madeChange |= cleanupAllDestroyAddr(
       address, fn, getIndicesOfPairedDestroys(), getIndicesOfPairedReinits(),
       getIndicesOfPairedConsumingClosureUses(),
       blocksVisitedWhenProcessingNewTakes, blocksWithMovesThatAreNowTakes,
-      postDominatingConsumingUsers);
+      postDominatingConsumingUsers, debugInfoBlockSplitPoints);
 
   return madeChange;
 }
@@ -1892,234 +1915,6 @@ void DataflowState::init() {
   }
 }
 
-// Returns true if we emitted a diagnostic and handled the single block
-// case. Returns false if we visited all of the uses and seeded the UseState
-// struct with the information needed to perform our interprocedural dataflow.
-static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
-                                            SILValue address,
-                                            MarkUnresolvedMoveAddrInst *mvi) {
-  // First scan downwards to make sure we are move out of this block.
-  auto &useState = dataflowState.useState;
-  auto &applySiteToPromotedArgIndices =
-      dataflowState.applySiteToPromotedArgIndices;
-  auto &closureConsumes = dataflowState.closureConsumes;
-
-  SILInstruction *interestingUser = nullptr;
-  Operand *interestingUse = nullptr;
-  TinyPtrVector<SILInstruction *> interestingClosureUsers;
-  switch (downwardScanForMoveOut(mvi, useState, &interestingUser,
-                                 &interestingUse, interestingClosureUsers)) {
-  case DownwardScanResult::Invalid:
-    llvm_unreachable("invalid");
-  case DownwardScanResult::Destroy: {
-    assert(!interestingUse);
-    assert(interestingUser);
-
-    // If we found a destroy, then we found a single block case that we can
-    // handle. Remove the destroy and convert the mark_unresolved_move_addr
-    // into a true move.
-    auto *dvi = cast<DestroyAddrInst>(interestingUser);
-    SILBuilderWithScope builder(mvi);
-    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
-                           IsInitialization);
-    // Also, mark the alloc_stack as being moved at some point.
-    if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
-      if (auto varInfo = debug.getVarInfo()) {
-        SILBuilderWithScope undefBuilder(builder);
-        undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
-        undefBuilder.createDebugValue(
-            debug.inst->getLoc(),
-            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-            false,
-            /*was moved*/ true);
-      }
-      debug.markAsMoved();
-    }
-
-    useState.destroys.erase(dvi);
-    mvi->eraseFromParent();
-    dvi->eraseFromParent();
-    return false;
-  }
-  case DownwardScanResult::ClosureUse: {
-    assert(interestingUse);
-    assert(interestingUser);
-
-    // Then check if we found a user that violated our dataflow rules. In such
-    // a case, emit an error, cleanup our mark_unresolved_move_addr, and
-    // finally continue.
-    auto &astCtx = mvi->getFunction()->getASTContext();
-    {
-      auto diag =
-          diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
-      StringRef name = getDebugVarName(address);
-      diagnose(astCtx, getSourceLocFromValue(address), diag, name);
-    }
-
-    auto diag = diag::sil_movekillscopyablevalue_move_here;
-    diagnose(astCtx, mvi->getLoc().getSourceLoc(), diag);
-
-    {
-      auto diag = diag::sil_movekillscopyablevalue_use_here;
-      for (auto *user : interestingClosureUsers) {
-        diagnose(astCtx, user->getLoc().getSourceLoc(), diag);
-      }
-    }
-
-    // We purposely continue to see if at least in simple cases, we can flag
-    // mistakes from other moves. Since we are setting emittedDiagnostic to
-    // true, we will not perform the actual dataflow due to a check after
-    // the loop.
-    //
-    // We also clean up mvi by converting it to a copy_addr init so we do not
-    // emit fail errors later.
-    //
-    // TODO: Can we handle multiple errors in the same block for a single
-    // move?
-    SILBuilderWithScope builder(mvi);
-    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
-                           IsNotTake, IsInitialization);
-    mvi->eraseFromParent();
-    return true;
-  }
-  case DownwardScanResult::UseForDiagnostic: {
-    assert(!interestingUse);
-    assert(interestingUser);
-
-    // Then check if we found a user that violated our dataflow rules. In such
-    // a case, emit an error, cleanup our mark_unresolved_move_addr, and
-    // finally continue.
-    auto &astCtx = mvi->getFunction()->getASTContext();
-    {
-      auto diag =
-          diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
-      StringRef name = getDebugVarName(address);
-      diagnose(astCtx, getSourceLocFromValue(address), diag, name);
-    }
-
-    {
-      auto diag = diag::sil_movekillscopyablevalue_move_here;
-      diagnose(astCtx, mvi->getLoc().getSourceLoc(), diag);
-    }
-
-    {
-      auto diag = diag::sil_movekillscopyablevalue_use_here;
-      diagnose(astCtx, interestingUser->getLoc().getSourceLoc(), diag);
-    }
-
-    // We purposely continue to see if at least in simple cases, we can flag
-    // mistakes from other moves. Since we are setting emittedDiagnostic to
-    // true, we will not perform the actual dataflow due to a check after
-    // the loop.
-    //
-    // We also clean up mvi by converting it to a copy_addr init so we do not
-    // emit fail errors later.
-    //
-    // TODO: Can we handle multiple errors in the same block for a single
-    // move?
-    SILBuilderWithScope builder(mvi);
-    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
-                           IsNotTake, IsInitialization);
-    mvi->eraseFromParent();
-    return true;
-  }
-  case DownwardScanResult::Reinit: {
-    assert(!interestingUse);
-    assert(interestingUser);
-
-    // If we have a reinit, then we have a successful move.
-    convertMemoryReinitToInitForm(interestingUser);
-    useState.reinits.erase(interestingUser);
-    SILBuilderWithScope builder(mvi);
-    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
-                           IsInitialization);
-    if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
-      if (auto varInfo = debug.getVarInfo()) {
-        {
-          SILBuilderWithScope undefBuilder(builder);
-          undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
-          undefBuilder.createDebugValue(
-              debug.inst->getLoc(),
-              SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-              false,
-            /*was moved*/ true);
-        }
-        {
-          // Make sure at the reinit point to create a new debug value after the
-          // reinit instruction so we reshow the variable.
-          auto *next = interestingUser->getNextInstruction();
-          SILBuilderWithScope reinitBuilder(next);
-          reinitBuilder.createDebugValue(debug.inst->getLoc(), address,
-                                         *varInfo, false, /*was moved*/ true);
-        }
-      }
-      debug.markAsMoved();
-    }
-    mvi->eraseFromParent();
-    return false;
-  }
-  case DownwardScanResult::ClosureConsume: {
-    assert(interestingUse);
-    assert(interestingUser);
-
-    // If we found a closure consume, then we found a single block case that we
-    // can handle. Remove the destroys/reinit, register the specific.
-    SILBuilderWithScope builder(mvi);
-    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
-                           IsInitialization);
-
-    // This is correct today due to us only supporting defer. When we handle
-    // partial apply, we will need to do more work ehre.
-    FullApplySite fas(interestingUser);
-    assert(fas);
-    auto &bitVector = applySiteToPromotedArgIndices[fas];
-    auto conventions = fas.getSubstCalleeConv();
-    unsigned numNonResultArgs = conventions.getNumSILArguments();
-    if (bitVector.size() < numNonResultArgs)
-      bitVector.resize(numNonResultArgs);
-    bitVector.set(fas.getAppliedArgIndex(*interestingUse));
-    for (auto *user : interestingClosureUsers) {
-      closureConsumes.insert(user);
-    }
-    LLVM_DEBUG(llvm::dbgs() << "Found apply site to clone: " << **fas);
-    LLVM_DEBUG(llvm::dbgs() << "BitVector: ";
-               dumpBitVector(llvm::dbgs(), bitVector); llvm::dbgs() << '\n');
-    if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
-      if (auto varInfo = debug.getVarInfo()) {
-        SILBuilderWithScope undefBuilder(builder);
-        undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
-        undefBuilder.createDebugValue(
-            debug.inst->getLoc(),
-            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-            false,
-            /*was moved*/ true);
-      }
-      debug.markAsMoved();
-    }
-    mvi->eraseFromParent();
-    return false;
-  }
-  case DownwardScanResult::MoveOut:
-    assert(!interestingUse);
-    assert(!interestingUser);
-    break;
-  }
-
-  // If we did not found any uses later in the block that was an interesting
-  // use, we need to perform dataflow.
-  LLVM_DEBUG(llvm::dbgs() << "Our move is live out, so we need to process "
-                             "it with the dataflow.\n");
-  dataflowState.markMovesThatPropagateDownwards.emplace_back(mvi);
-
-  // Now scan up to see if mvi is also a use to seed the dataflow. This could
-  // happen if we have an earlier move.
-  if (upwardScanForUseOut(mvi, dataflowState.useState)) {
-    LLVM_DEBUG(llvm::dbgs() << "MVI projects a use up");
-    dataflowState.useBlocks[mvi->getParent()] = mvi;
-  }
-  return false;
-}
-
 //===----------------------------------------------------------------------===//
 //                              Address Checker
 //===----------------------------------------------------------------------===//
@@ -2137,6 +1932,19 @@ struct MoveKillsCopyableAddressesChecker {
       applySiteToPromotedArgIndices;
   SmallBlotSetVector<SILInstruction *, 8> closureConsumes;
 
+  /// A list of instructions where to work around the behavior of SelectionDAG,
+  /// we break the block. These are debug var carrying insts or debug_value
+  /// associated with reinits. This is initialized when we process all of the
+  /// addresses. Then as a final step after wards we use this as a worklist and
+  /// break blocks at each of these instructions. We update DebugInfo, LoopInfo
+  /// if we found that they already exist.
+  ///
+  /// We on purpose use a set vector to ensure that we only ever split a block
+  /// once.
+  SmallSetVector<SILInstruction *, 8> debugInfoBlockSplitPoints;
+  DominanceInfo *dominanceToUpdate = nullptr;
+  SILLoopInfo *loopInfoToUpdate = nullptr;
+
   MoveKillsCopyableAddressesChecker(SILFunction *fn,
                                     SILOptFunctionBuilder &funcBuilder)
       : fn(fn), useState(),
@@ -2144,6 +1952,12 @@ struct MoveKillsCopyableAddressesChecker {
                       closureConsumes),
         closureUseState(), closureUseDataflowState(closureUseState),
         funcBuilder(funcBuilder) {}
+
+  void setDominanceToUpdate(DominanceInfo *newInfo) {
+    dominanceToUpdate = newInfo;
+  }
+
+  void setLoopInfoToUpdate(SILLoopInfo *newInfo) { loopInfoToUpdate = newInfo; }
 
   void cloneDeferCalleeAndRewriteUses(
       SmallVectorImpl<SILValue> &temporaryStorage,
@@ -2156,6 +1970,22 @@ struct MoveKillsCopyableAddressesChecker {
 
   void emitDiagnosticForMove(SILValue borrowedValue,
                              StringRef borrowedValueName, MoveValueInst *mvi);
+  bool splitBlocksAfterDebugInfoCarryingInst(SILModule &mod) {
+    if (debugInfoBlockSplitPoints.empty())
+      return false;
+
+    SILBuilderContext ctx(mod);
+    do {
+      auto *next = debugInfoBlockSplitPoints.pop_back_val();
+      splitBasicBlockAndBranch(ctx, next->getNextInstruction(),
+                               dominanceToUpdate, loopInfoToUpdate);
+    } while (!debugInfoBlockSplitPoints.empty());
+
+    return true;
+  }
+
+  bool performSingleBasicBlockAnalysis(SILValue address,
+                                       MarkUnresolvedMoveAddrInst *mvi);
 
   ASTContext &getASTContext() const { return fn->getASTContext(); }
 };
@@ -2268,6 +2098,239 @@ bool MoveKillsCopyableAddressesChecker::performClosureDataflow(
                                          closureConsumes);
 }
 
+// Returns true if we emitted a diagnostic and handled the single block
+// case. Returns false if we visited all of the uses and seeded the UseState
+// struct with the information needed to perform our interprocedural dataflow.
+bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
+    SILValue address, MarkUnresolvedMoveAddrInst *mvi) {
+  // First scan downwards to make sure we are move out of this block.
+  auto &useState = dataflowState.useState;
+  auto &applySiteToPromotedArgIndices =
+      dataflowState.applySiteToPromotedArgIndices;
+  auto &closureConsumes = dataflowState.closureConsumes;
+
+  SILInstruction *interestingUser = nullptr;
+  Operand *interestingUse = nullptr;
+  TinyPtrVector<SILInstruction *> interestingClosureUsers;
+  switch (downwardScanForMoveOut(mvi, useState, &interestingUser,
+                                 &interestingUse, interestingClosureUsers)) {
+  case DownwardScanResult::Invalid:
+    llvm_unreachable("invalid");
+  case DownwardScanResult::Destroy: {
+    assert(!interestingUse);
+    assert(interestingUser);
+
+    // If we found a destroy, then we found a single block case that we can
+    // handle. Remove the destroy and convert the mark_unresolved_move_addr
+    // into a true move.
+    auto *dvi = cast<DestroyAddrInst>(interestingUser);
+    SILBuilderWithScope builder(mvi);
+    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
+                           IsInitialization);
+    // Also, mark the alloc_stack as being moved at some point.
+    if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
+      if (auto varInfo = debug.getVarInfo()) {
+        SILBuilderWithScope undefBuilder(builder);
+        debugInfoBlockSplitPoints.insert(*debug);
+        undefBuilder.setCurrentDebugScope(debug->getDebugScope());
+        undefBuilder.createDebugValue(
+            debug->getLoc(),
+            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
+            false,
+            /*was moved*/ true);
+      }
+      debug.markAsMoved();
+    }
+
+    useState.destroys.erase(dvi);
+    mvi->eraseFromParent();
+    dvi->eraseFromParent();
+    return false;
+  }
+  case DownwardScanResult::ClosureUse: {
+    assert(interestingUse);
+    assert(interestingUser);
+
+    // Then check if we found a user that violated our dataflow rules. In such
+    // a case, emit an error, cleanup our mark_unresolved_move_addr, and
+    // finally continue.
+    auto &astCtx = mvi->getFunction()->getASTContext();
+    {
+      auto diag =
+          diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+      StringRef name = getDebugVarName(address);
+      diagnose(astCtx, getSourceLocFromValue(address), diag, name);
+    }
+
+    auto diag = diag::sil_movekillscopyablevalue_move_here;
+    diagnose(astCtx, mvi->getLoc().getSourceLoc(), diag);
+
+    {
+      auto diag = diag::sil_movekillscopyablevalue_use_here;
+      for (auto *user : interestingClosureUsers) {
+        diagnose(astCtx, user->getLoc().getSourceLoc(), diag);
+      }
+    }
+
+    // We purposely continue to see if at least in simple cases, we can flag
+    // mistakes from other moves. Since we are setting emittedDiagnostic to
+    // true, we will not perform the actual dataflow due to a check after
+    // the loop.
+    //
+    // We also clean up mvi by converting it to a copy_addr init so we do not
+    // emit fail errors later.
+    //
+    // TODO: Can we handle multiple errors in the same block for a single
+    // move?
+    SILBuilderWithScope builder(mvi);
+    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
+                           IsNotTake, IsInitialization);
+    mvi->eraseFromParent();
+    return true;
+  }
+  case DownwardScanResult::UseForDiagnostic: {
+    assert(!interestingUse);
+    assert(interestingUser);
+
+    // Then check if we found a user that violated our dataflow rules. In such
+    // a case, emit an error, cleanup our mark_unresolved_move_addr, and
+    // finally continue.
+    auto &astCtx = mvi->getFunction()->getASTContext();
+    {
+      auto diag =
+          diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+      StringRef name = getDebugVarName(address);
+      diagnose(astCtx, getSourceLocFromValue(address), diag, name);
+    }
+
+    {
+      auto diag = diag::sil_movekillscopyablevalue_move_here;
+      diagnose(astCtx, mvi->getLoc().getSourceLoc(), diag);
+    }
+
+    {
+      auto diag = diag::sil_movekillscopyablevalue_use_here;
+      diagnose(astCtx, interestingUser->getLoc().getSourceLoc(), diag);
+    }
+
+    // We purposely continue to see if at least in simple cases, we can flag
+    // mistakes from other moves. Since we are setting emittedDiagnostic to
+    // true, we will not perform the actual dataflow due to a check after
+    // the loop.
+    //
+    // We also clean up mvi by converting it to a copy_addr init so we do not
+    // emit fail errors later.
+    //
+    // TODO: Can we handle multiple errors in the same block for a single
+    // move?
+    SILBuilderWithScope builder(mvi);
+    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
+                           IsNotTake, IsInitialization);
+    mvi->eraseFromParent();
+    return true;
+  }
+  case DownwardScanResult::Reinit: {
+    assert(!interestingUse);
+    assert(interestingUser);
+
+    // If we have a reinit, then we have a successful move.
+    convertMemoryReinitToInitForm(interestingUser);
+    useState.reinits.erase(interestingUser);
+    SILBuilderWithScope builder(mvi);
+    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
+                           IsInitialization);
+    if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
+      if (auto varInfo = debug.getVarInfo()) {
+        {
+          debugInfoBlockSplitPoints.insert(*debug);
+          SILBuilderWithScope undefBuilder(builder);
+          undefBuilder.setCurrentDebugScope(debug->getDebugScope());
+          undefBuilder.createDebugValue(
+              debug->getLoc(),
+              SILUndef::get(address->getType(), builder.getModule()), *varInfo,
+              false,
+            /*was moved*/ true);
+        }
+        {
+          // Make sure at the reinit point to create a new debug value after the
+          // reinit instruction so we reshow the variable.
+          auto *next = interestingUser->getNextInstruction();
+          SILBuilderWithScope reinitBuilder(next);
+          reinitBuilder.setCurrentDebugScope(debug->getDebugScope());
+          auto *dvi = reinitBuilder.createDebugValue(debug->getLoc(),
+                                                     address, *varInfo, false,
+                                                     /*was moved*/ true);
+          debugInfoBlockSplitPoints.insert(dvi);
+        }
+      }
+      debug.markAsMoved();
+    }
+    mvi->eraseFromParent();
+    return false;
+  }
+  case DownwardScanResult::ClosureConsume: {
+    assert(interestingUse);
+    assert(interestingUser);
+
+    // If we found a closure consume, then we found a single block case that we
+    // can handle. Remove the destroys/reinit, register the specific.
+    SILBuilderWithScope builder(mvi);
+    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
+                           IsInitialization);
+
+    // This is correct today due to us only supporting defer. When we handle
+    // partial apply, we will need to do more work ehre.
+    FullApplySite fas(interestingUser);
+    assert(fas);
+    auto &bitVector = applySiteToPromotedArgIndices[fas];
+    auto conventions = fas.getSubstCalleeConv();
+    unsigned numNonResultArgs = conventions.getNumSILArguments();
+    if (bitVector.size() < numNonResultArgs)
+      bitVector.resize(numNonResultArgs);
+    bitVector.set(fas.getAppliedArgIndex(*interestingUse));
+    for (auto *user : interestingClosureUsers) {
+      closureConsumes.insert(user);
+    }
+    LLVM_DEBUG(llvm::dbgs() << "Found apply site to clone: " << **fas);
+    LLVM_DEBUG(llvm::dbgs() << "BitVector: ";
+               dumpBitVector(llvm::dbgs(), bitVector); llvm::dbgs() << '\n');
+    if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
+      if (auto varInfo = debug.getVarInfo()) {
+        debugInfoBlockSplitPoints.insert(*debug);
+        SILBuilderWithScope undefBuilder(builder);
+        undefBuilder.setCurrentDebugScope(debug->getDebugScope());
+        undefBuilder.createDebugValue(
+            debug->getLoc(),
+            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
+            false,
+            /*was moved*/ true);
+      }
+      debug.markAsMoved();
+    }
+    mvi->eraseFromParent();
+    return false;
+  }
+  case DownwardScanResult::MoveOut:
+    assert(!interestingUse);
+    assert(!interestingUser);
+    break;
+  }
+
+  // If we did not found any uses later in the block that was an interesting
+  // use, we need to perform dataflow.
+  LLVM_DEBUG(llvm::dbgs() << "Our move is live out, so we need to process "
+                             "it with the dataflow.\n");
+  dataflowState.markMovesThatPropagateDownwards.emplace_back(mvi);
+
+  // Now scan up to see if mvi is also a use to seed the dataflow. This could
+  // happen if we have an earlier move.
+  if (upwardScanForUseOut(mvi, dataflowState.useState)) {
+    LLVM_DEBUG(llvm::dbgs() << "MVI projects a use up");
+    dataflowState.useBlocks[mvi->getParent()] = mvi;
+  }
+  return false;
+}
+
 bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   auto accessPathWithBase = AccessPathWithBase::compute(address);
   auto accessPath = accessPathWithBase.accessPath;
@@ -2332,8 +2395,7 @@ bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   // diagnostic.
   bool emittedSingleBBDiagnostic = false;
   for (auto *mvi : useState.markMoves) {
-    emittedSingleBBDiagnostic |=
-        performSingleBasicBlockAnalysis(dataflowState, address, mvi);
+    emittedSingleBBDiagnostic |= performSingleBasicBlockAnalysis(address, mvi);
   }
 
   if (emittedSingleBBDiagnostic) {
@@ -2353,7 +2415,8 @@ bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   // Ok, we need to perform global dataflow for one of our moves. Initialize our
   // dataflow state engine and then run the dataflow itself.
   dataflowState.init();
-  bool result = dataflowState.process(address, closureConsumes);
+  bool result = dataflowState.process(address, closureConsumes,
+                                      debugInfoBlockSplitPoints);
   return result;
 }
 
@@ -2405,9 +2468,19 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
         llvm::makeArrayRef(addressesToCheck.begin(), addressesToCheck.end());
 
     SILOptFunctionBuilder funcBuilder(*this);
-    MoveKillsCopyableAddressesChecker checker(getFunction(), funcBuilder);
-    bool madeChange = false;
 
+    MoveKillsCopyableAddressesChecker checker(getFunction(), funcBuilder);
+
+    // If we already had dominance or loop info generated, update them when
+    // splitting blocks.
+    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+    if (dominanceAnalysis->hasFunctionInfo(fn))
+      checker.setDominanceToUpdate(dominanceAnalysis->get(fn));
+    auto *loopAnalysis = getAnalysis<SILLoopAnalysis>();
+    if (loopAnalysis->hasFunctionInfo(fn))
+      checker.setLoopInfoToUpdate(loopAnalysis->get(fn));
+
+    bool madeChange = false;
     while (!addressToProcess.empty()) {
       auto address = addressToProcess.front();
       addressToProcess = addressToProcess.drop_front(1);
@@ -2417,6 +2490,13 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
 
     if (madeChange) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
+
+    // We update debug info/loop info here, so we just invalidate instructions.
+    if (checker.splitBlocksAfterDebugInfoCarryingInst(fn->getModule())) {
+      AnalysisPreserver preserveDominance(dominanceAnalysis);
+      AnalysisPreserver preserveLoop(loopAnalysis);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
 
     // Now go through and clone any apply sites that we need to clone.
