@@ -5930,6 +5930,14 @@ public:
                                DeclContext *Parent,
                                GenericParamList *GenericParams);
 
+  static SubscriptDecl *create(ASTContext &Context, DeclName Name,
+                               SourceLoc StaticLoc,
+                               StaticSpellingKind StaticSpelling,
+                               SourceLoc SubscriptLoc, ParameterList *Indices,
+                               SourceLoc ArrowLoc, Type ElementTy,
+                               DeclContext *Parent,
+                               GenericParamList *GenericParams);
+
   static SubscriptDecl *createImported(ASTContext &Context, DeclName Name,
                                        SourceLoc SubscriptLoc,
                                        ParameterList *Indices,

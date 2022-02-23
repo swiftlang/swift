@@ -7357,6 +7357,20 @@ SubscriptDecl *SubscriptDecl::create(ASTContext &Context, DeclName Name,
   return SD;
 }
 
+SubscriptDecl *SubscriptDecl::create(ASTContext &Context, DeclName Name,
+                                     SourceLoc StaticLoc,
+                                     StaticSpellingKind StaticSpelling,
+                                     SourceLoc SubscriptLoc,
+                                     ParameterList *Indices, SourceLoc ArrowLoc,
+                                     Type ElementTy, DeclContext *Parent,
+                                     GenericParamList *GenericParams) {
+  auto *const SD = new (Context)
+      SubscriptDecl(Name, StaticLoc, StaticSpelling, SubscriptLoc, Indices,
+                    ArrowLoc, nullptr, Parent, GenericParams);
+  SD->setElementInterfaceType(ElementTy);
+  return SD;
+}
+
 SubscriptDecl *SubscriptDecl::createImported(ASTContext &Context, DeclName Name,
                                              SourceLoc SubscriptLoc,
                                              ParameterList *Indices,
