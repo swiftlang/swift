@@ -18,8 +18,9 @@
 #ifndef SWIFT_SEMA_CODECOMPLETIONTYPECHECKING_H
 #define SWIFT_SEMA_CODECOMPLETIONTYPECHECKING_H
 
-#include "swift/Basic/LLVM.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 
