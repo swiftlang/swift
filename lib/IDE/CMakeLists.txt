@@ -13,6 +13,7 @@ add_swift_host_library(swiftIDE STATIC
   CompileInstance.cpp
   CompletionInstance.cpp
   CompletionLookup.cpp
+  CompletionOverrideLookup.cpp
   ConformingMethodList.cpp
   DependencyChecking.cpp
   ExprContextAnalysis.cpp
