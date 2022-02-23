@@ -13,28 +13,10 @@
 #ifndef SWIFT_IDE_CODECOMPLETION_H
 #define SWIFT_IDE_CODECOMPLETION_H
 
-#include "CodeCompletionResultType.h"
-#include "swift/AST/Identifier.h"
-#include "swift/Basic/Debug.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/OptionSet.h"
-#include "swift/Basic/StringExtras.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
-#include "swift/IDE/CodeCompletionString.h"
-#include "swift/IDE/ImportDepth.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Allocator.h"
-#include "llvm/Support/TrailingObjects.h"
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
 
 namespace swift {
 class CodeCompletionCallbacksFactory;
@@ -47,9 +29,6 @@ class SourceFile;
 namespace ide {
 
 class CodeCompletionCache;
-class CodeCompletionContext;
-class CodeCompletionResultBuilder;
-struct CodeCompletionResultSink;
 struct RequestedCachedModule;
 
 /// A routine to remove code completion tokens from code completion
@@ -78,12 +57,6 @@ ArrayRef<T> copyArray(llvm::BumpPtrAllocator &Allocator,
   std::copy(Arr.begin(), Arr.end(), Buffer);
   return llvm::makeArrayRef(Buffer, Arr.size());
 }
-
-struct SwiftCompletionInfo {
-  swift::ASTContext *swiftASTContext = nullptr;
-  const swift::CompilerInvocation *invocation = nullptr;
-  CodeCompletionContext *completionContext = nullptr;
-};
 
 void postProcessResults(MutableArrayRef<CodeCompletionResult *> results,
                         CompletionKind Kind, DeclContext *DC,

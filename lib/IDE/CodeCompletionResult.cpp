@@ -13,8 +13,8 @@
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
+#include "swift/IDE/CodeCompletionResultSink.h"
 
 using namespace swift;
 using namespace swift::ide;

@@ -13,6 +13,7 @@
 #include "swift/IDE/CompletionOverrideLookup.h"
 
 #include "CodeCompletionResultBuilder.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/IDE/CodeCompletionString.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"

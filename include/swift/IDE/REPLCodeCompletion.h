@@ -18,7 +18,6 @@
 #define SWIFT_IDE_REPL_CODE_COMPLETION_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"

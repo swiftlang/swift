@@ -13,9 +13,14 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Syntax/SyntaxKind.h"
+#include "swift/Syntax/TokenKinds.h"
 
 using namespace swift;
 using namespace swift::ide;
+using swift::syntax::SyntaxKind;
 
 namespace {
 

@@ -13,6 +13,7 @@
 #ifndef SWIFT_IDE_COMPLETIONLOOKUP_H
 #define SWIFT_IDE_COMPLETIONLOOKUP_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
@@ -20,11 +21,14 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/IDE/CodeCompletion.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IDE/CodeCompletionContext.h"
+#include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/PossibleParamInfo.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
+#include "swift/Syntax/SyntaxKind.h"
 
 namespace swift {
 namespace ide {
@@ -544,7 +548,7 @@ public:
 
   void collectPrecedenceGroups();
 
-  void getPrecedenceGroupCompletions(SyntaxKind SK);
+  void getPrecedenceGroupCompletions(syntax::SyntaxKind SK);
 
   void getPoundAvailablePlatformCompletions();
 

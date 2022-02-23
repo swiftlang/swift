@@ -13,6 +13,8 @@
 #ifndef SWIFT_IDE_CODECOMPLETIONRESULTSINK
 #define SWIFT_IDE_CODECOMPLETIONRESULTSINK
 
+#include "swift/IDE/CodeCompletionResult.h"
+
 namespace swift {
 namespace ide {
 

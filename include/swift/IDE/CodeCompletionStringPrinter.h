@@ -14,7 +14,7 @@
 #define SWIFT_IDE_CODECOMPLETIONRESULTSTRINGPRINTER_H
 
 #include "swift/AST/ASTPrinter.h"
-#include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionString.h"
 
 namespace swift {
 namespace ide {
