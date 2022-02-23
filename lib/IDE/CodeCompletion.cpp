@@ -38,6 +38,7 @@
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/CompletionOverrideLookup.h"
+#include "swift/IDE/DotExprCompletion.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
@@ -653,7 +654,7 @@ void CodeCompletionCallbacksImpl::completeTypeAttrBeginning() {
   Kind = CompletionKind::TypeAttrBeginning;
 }
 
-static bool isDynamicLookup(Type T) {
+bool swift::ide::isDynamicLookup(Type T) {
   return T->getRValueType()->isAnyObject();
 }
 
@@ -1198,10 +1199,9 @@ void swift::ide::postProcessResults(
   }
 }
 
-static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
-                                     CompletionLookup &Lookup,
-                                     DeclContext *DC,
-                                     CodeCompletionConsumer &Consumer) {
+void swift::ide::deliverCompletionResults(
+    CodeCompletionContext &CompletionContext, CompletionLookup &Lookup,
+    DeclContext *DC, CodeCompletionConsumer &Consumer) {
   auto &SF = *DC->getParentSourceFile();
   llvm::SmallPtrSet<Identifier, 8> seenModuleNames;
   std::vector<RequestedCachedModule> RequestedModules;
@@ -1391,46 +1391,6 @@ void deliverKeyPathResults(
   for (auto &Result : Results) {
     Lookup.setIsSwiftKeyPathExpr(Result.OnRoot);
     Lookup.getValueExprCompletions(Result.BaseType);
-  }
-
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
-}
-
-void deliverDotExprResults(
-    ArrayRef<DotExprTypeCheckCompletionCallback::Result> Results,
-    Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc, bool IsInSelector,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
-  ASTContext &Ctx = DC->getASTContext();
-  CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
-                          &CompletionCtx);
-
-  if (DotLoc.isValid())
-    Lookup.setHaveDot(DotLoc);
-
-  Lookup.setIsSuperRefExpr(isa<SuperRefExpr>(BaseExpr));
-
-  if (auto *DRE = dyn_cast<DeclRefExpr>(BaseExpr))
-    Lookup.setIsSelfRefExpr(DRE->getDecl()->getName() == Ctx.Id_self);
-
-  if (isa<BindOptionalExpr>(BaseExpr) || isa<ForceValueExpr>(BaseExpr))
-    Lookup.setIsUnwrappedOptional(true);
-
-  if (IsInSelector) {
-    Lookup.includeInstanceMembers();
-    Lookup.setPreferFunctionReferencesToCalls();
-  }
-
-  Lookup.shouldCheckForDuplicates(Results.size() > 1);
-  for (auto &Result: Results) {
-    Lookup.setIsStaticMetatype(Result.BaseIsStaticMetaType);
-    Lookup.getPostfixKeywordCompletions(Result.BaseTy, BaseExpr);
-    Lookup.setExpectedTypes(Result.ExpectedTypes,
-                            Result.IsImplicitSingleExpressionReturn,
-                            Result.ExpectsNonVoid);
-    if (isDynamicLookup(Result.BaseTy))
-      Lookup.setIsDynamicLookup();
-    Lookup.getValueExprCompletions(Result.BaseTy, Result.BaseDecl);
   }
 
   deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);

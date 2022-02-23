@@ -44,47 +44,6 @@ namespace swift {
   };
 
 
-  /// Used to collect and store information needed to perform member completion
-  /// (\c CompletionKind::DotExpr ) from the solutions formed during expression
-  /// type-checking.
-  class DotExprTypeCheckCompletionCallback: public TypeCheckCompletionCallback {
-  public:
-    struct Result {
-      Type BaseTy;
-      ValueDecl* BaseDecl;
-      SmallVector<Type, 4> ExpectedTypes;
-      bool ExpectsNonVoid;
-      bool BaseIsStaticMetaType;
-      bool IsImplicitSingleExpressionReturn;
-    };
-
-  private:
-    DeclContext *DC;
-    CodeCompletionExpr *CompletionExpr;
-    SmallVector<Result, 4> Results;
-    llvm::DenseMap<std::pair<Type, Decl*>, size_t> BaseToSolutionIdx;
-    bool GotCallback = false;
-
-  public:
-    DotExprTypeCheckCompletionCallback(DeclContext *DC,
-                                       CodeCompletionExpr *CompletionExpr)
-      : DC(DC), CompletionExpr(CompletionExpr) {}
-
-    /// Get the results collected from any sawSolutions() callbacks recevied so
-    /// far.
-    ArrayRef<Result> getResults() const { return Results; }
-
-    /// True if at least one solution was passed via the \c sawSolution
-    /// callback.
-    bool gotCallback() const { return GotCallback; }
-
-    /// Typecheck the code completion expression in isolation, calling
-    /// \c sawSolution for each solution formed.
-    void fallbackTypeCheck();
-
-    void sawSolution(const constraints::Solution &solution) override;
-  };
-
   /// Used to collect and store information needed to perform unresolved member
   /// completion (\c CompletionKind::UnresolvedMember ) from the solutions
   /// formed during expression type-checking.

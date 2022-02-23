@@ -781,30 +781,6 @@ swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }
 
-void DotExprTypeCheckCompletionCallback::fallbackTypeCheck() {
-  assert(!gotCallback());
-
-  // Default to checking the completion expression in isolation.
-  Expr *fallbackExpr = CompletionExpr;
-  DeclContext *fallbackDC = DC;
-
-  CompletionContextFinder finder(DC);
-  if (finder.hasCompletionExpr()) {
-    if (auto fallback = finder.getFallbackCompletionExpr()) {
-      fallbackExpr = fallback->E;
-      fallbackDC = fallback->DC;
-    }
-  }
-
-  SolutionApplicationTarget completionTarget(fallbackExpr, fallbackDC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
-
-  TypeChecker::typeCheckForCodeCompletion(
-      completionTarget, /*needsPrecheck*/true,
-      [&](const Solution &S) { sawSolution(S); });
-}
-
 void UnresolvedMemberTypeCheckCompletionCallback::
 fallbackTypeCheck(DeclContext *DC) {
   assert(!gotCallback());
@@ -826,7 +802,7 @@ fallbackTypeCheck(DeclContext *DC) {
       [&](const Solution &S) { sawSolution(S); });
 }
 
-static Type getTypeForCompletion(const constraints::Solution &S, Expr *E) {
+Type swift::getTypeForCompletion(const constraints::Solution &S, Expr *E) {
   if (!S.hasType(E)) {
     assert(false && "Expression wasn't type checked?");
     return nullptr;
@@ -880,16 +856,7 @@ static Type getTypeForCompletion(const constraints::Solution &S, Expr *E) {
   return S.getResolvedType(E);
 }
 
-/// Whether the given completion expression is the only expression in its
-/// containing closure or function body and its value is implicitly returned.
-///
-/// If these conditions are met, code completion needs to avoid penalizing
-/// completion results that don't match the expected return type when computing
-/// type relations, as since no return statement was explicitly written by the
-/// user, it's possible they intend the single expression not as the return
-/// value but merely the first entry in a multi-statement body they just haven't
-/// finished writing yet.
-static bool isImplicitSingleExpressionReturn(ConstraintSystem &CS,
+bool swift::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
                                              Expr *CompletionExpr) {
   Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
   if (!ParentExpr)
@@ -903,53 +870,6 @@ static bool isImplicitSingleExpressionReturn(ConstraintSystem &CS,
     }
   }
   return false;
-}
-
-void DotExprTypeCheckCompletionCallback::
-sawSolution(const constraints::Solution &S) {
-  GotCallback = true;
-  auto &CS = S.getConstraintSystem();
-  auto *ParsedExpr = CompletionExpr->getBase();
-  auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
-
-  auto BaseTy = getTypeForCompletion(S, ParsedExpr);
-  // If base type couldn't be determined (e.g. because base expression
-  // is an invalid reference), let's not attempt to do a lookup since
-  // it wouldn't produce any useful results anyway.
-  if (!BaseTy || BaseTy->getRValueType()->is<UnresolvedType>())
-    return;
-
-  auto *Locator = CS.getConstraintLocator(SemanticExpr);
-  Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
-  Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
-  if (!ParentExpr)
-    ExpectedTy = CS.getContextualType(CompletionExpr, /*forConstraint=*/false);
-
-  auto *CalleeLocator = S.getCalleeLocator(Locator);
-  ValueDecl *ReferencedDecl = nullptr;
-  if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator))
-    ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
-
-  auto Key = std::make_pair(BaseTy, ReferencedDecl);
-  auto Ret = BaseToSolutionIdx.insert({Key, Results.size()});
-  if (Ret.second) {
-    bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
-    bool ImplicitReturn = isImplicitSingleExpressionReturn(CS, CompletionExpr);
-    bool DisallowVoid = ExpectedTy
-                            ? !ExpectedTy->isVoid()
-                            : !ParentExpr && CS.getContextualTypePurpose(
-                                                 CompletionExpr) != CTP_Unused;
-
-    Results.push_back(
-        {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, ImplicitReturn});
-    if (ExpectedTy)
-      Results.back().ExpectedTypes.push_back(ExpectedTy);
-  } else if (ExpectedTy) {
-    auto &ExpectedTys = Results[Ret.first->getSecond()].ExpectedTypes;
-    auto IsEqual = [&](Type Ty) { return ExpectedTy->isEqual(Ty); };
-    if (!llvm::any_of(ExpectedTys, IsEqual))
-      ExpectedTys.push_back(ExpectedTy);
-  }
 }
 
 /// If the code completion variable occurs in a pattern matching position, we

@@ -17,6 +17,7 @@
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
+#include "swift/IDE/CompletionLookup.h"
 
 namespace swift {
 class CodeCompletionCallbacksFactory;
@@ -58,10 +59,15 @@ ArrayRef<T> copyArray(llvm::BumpPtrAllocator &Allocator,
   return llvm::makeArrayRef(Buffer, Arr.size());
 }
 
+bool isDynamicLookup(Type T);
+
 void postProcessResults(MutableArrayRef<CodeCompletionResult *> results,
                         CompletionKind Kind, DeclContext *DC,
                         CodeCompletionResultSink *Sink);
 
+void deliverCompletionResults(CodeCompletionContext &CompletionContext,
+                              CompletionLookup &Lookup, DeclContext *DC,
+                              CodeCompletionConsumer &Consumer);
 
 /// Create a factory for code completion callbacks.
 CodeCompletionCallbacksFactory *
