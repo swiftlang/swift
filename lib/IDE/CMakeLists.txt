@@ -23,6 +23,7 @@ add_swift_host_library(swiftIDE STATIC
   Formatting.cpp
   FuzzyStringMatcher.cpp
   Refactoring.cpp
+  KeyPathCompletion.cpp
   ModuleInterfacePrinting.cpp
   REPLCodeCompletion.cpp
   SwiftSourceDocInfo.cpp

@@ -39,6 +39,7 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/CompletionOverrideLookup.h"
 #include "swift/IDE/DotExprCompletion.h"
+#include "swift/IDE/KeyPathCompletion.h"
 #include "swift/IDE/UnresolvedMemberCompletion.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -1318,28 +1319,6 @@ void swift::ide::deliverCompletionResults(
                      /*Sink=*/nullptr);
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
-}
-
-void deliverKeyPathResults(
-    ArrayRef<KeyPathTypeCheckCompletionCallback::Result> Results,
-    DeclContext *DC, SourceLoc DotLoc,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
-  ASTContext &Ctx = DC->getASTContext();
-  CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
-                          &CompletionCtx);
-
-  if (DotLoc.isValid()) {
-    Lookup.setHaveDot(DotLoc);
-  }
-  Lookup.shouldCheckForDuplicates(Results.size() > 1);
-
-  for (auto &Result : Results) {
-    Lookup.setIsSwiftKeyPathExpr(Result.OnRoot);
-    Lookup.getValueExprCompletions(Result.BaseType);
-  }
-
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
 }
 
 bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
