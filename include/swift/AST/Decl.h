@@ -6304,6 +6304,10 @@ public:
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
 
+  /// For a 'distributed' target (func or computed property),
+  /// get the 'thunk' responsible for performing the 'remoteCall'.
+  FuncDecl *getDistributedThunk() const;
+  
   /// Returns 'true' if the function has the @c @_backDeploy attribute.
   bool isBackDeployed() const;
 

@@ -151,9 +151,9 @@ extension DistributedActor {
 // ==== isRemote / isLocal -----------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
+public func __isRemoteActor(_ actor: AnyObject) -> Bool
 
-func __isLocalActor(_ actor: AnyObject) -> Bool {
+public func __isLocalActor(_ actor: AnyObject) -> Bool {
   return !__isRemoteActor(actor)
 }
 

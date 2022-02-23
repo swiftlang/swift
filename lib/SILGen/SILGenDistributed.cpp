@@ -831,7 +831,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   auto effectiveErrorTy = fd->hasThrows() ? errorTy : neverTy;
 
   // === `ActorSystem` type
-  auto systemTy = getConcreteReplacementForProtocolActorSystemType(fd);
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(fd); // OK
   auto systemSILTy = getLoweredType(systemTy);
 
   // === `InvocationEncoder` types
