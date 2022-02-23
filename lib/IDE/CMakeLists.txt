@@ -9,6 +9,7 @@ add_swift_host_library(swiftIDE STATIC
   CommentConversion.cpp
   CompileInstance.cpp
   CompletionInstance.cpp
+  CompletionLookup.cpp
   ConformingMethodList.cpp
   DependencyChecking.cpp
   ExprContextAnalysis.cpp
