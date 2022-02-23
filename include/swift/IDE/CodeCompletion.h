@@ -21,6 +21,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CodeCompletionResult.h"
+#include "swift/IDE/CodeCompletionResultSink.h"
 #include "swift/IDE/CodeCompletionString.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
@@ -74,42 +75,6 @@ ArrayRef<T> copyArray(llvm::BumpPtrAllocator &Allocator,
   std::copy(Arr.begin(), Arr.end(), Buffer);
   return llvm::makeArrayRef(Buffer, Arr.size());
 }
-
-struct CodeCompletionResultSink {
-  using AllocatorPtr = std::shared_ptr<llvm::BumpPtrAllocator>;
-
-  /// The allocator used to allocate results "native" to this sink.
-  AllocatorPtr Allocator;
-
-  /// Allocators that keep alive "foreign" results imported into this sink from
-  /// other sinks.
-  std::vector<AllocatorPtr> ForeignAllocators;
-
-  /// Whether to annotate the results with XML.
-  bool annotateResult = false;
-
-  /// Whether to emit object literals if desired.
-  bool includeObjectLiterals = true;
-
-  /// Whether to emit type initializers in addition to type names in expression
-  /// position.
-  bool addInitsToTopLevel = false;
-
-  /// Whether to perform "call pettern heuristics".
-  bool enableCallPatternHeuristics = false;
-
-  /// Whether to include an item without any default arguments.
-  bool addCallWithNoDefaultArgs = true;
-
-  std::vector<CodeCompletionResult *> Results;
-
-  /// A single-element cache for module names stored in Allocator, keyed by a
-  /// clang::Module * or swift::ModuleDecl *.
-  std::pair<void *, NullTerminatedStringRef> LastModule;
-
-  CodeCompletionResultSink()
-      : Allocator(std::make_shared<llvm::BumpPtrAllocator>()) {}
-};
 
 /// A utility for calculating the import depth of a given module. Direct imports
 /// have depth 1, imports of those modules have depth 2, etc.
