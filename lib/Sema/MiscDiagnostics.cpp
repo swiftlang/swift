@@ -4748,19 +4748,20 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
           if (auto typeContext = DC->getInnermostTypeContext()) {
             // self() is not easily confusable
             if (!isa<CallExpr>(Parent.getAsExpr())) {
-
               auto baseType = typeContext->getDeclaredInterfaceType();
-              auto baseTypeString = baseType.getString();
+              if (!baseType->getEnumOrBoundGenericEnum()) {
+                auto baseTypeString = baseType.getString();
 
-              Ctx.Diags.diagnose(E->getLoc(), diag::self_refers_to_method,
-                                 baseTypeString);
+                Ctx.Diags.diagnose(E->getLoc(), diag::self_refers_to_method,
+                    baseTypeString);
 
-              Ctx.Diags
+                Ctx.Diags
                   .diagnose(E->getLoc(),
-                            diag::fix_unqualified_access_member_named_self,
-                            baseTypeString)
+                      diag::fix_unqualified_access_member_named_self,
+                      baseTypeString)
                   .fixItInsert(E->getLoc(), diag::insert_type_qualification,
-                               baseType);
+                      baseType);
+              }
             }
           }
         }

@@ -116,3 +116,13 @@ struct TypeWithSelfProperty {
     
     let `self`: () = ()
 }
+
+enum EnumCaseNamedSelf {
+    case `self`
+
+    init() {
+        self = .self // OK
+        self = .`self` // OK
+        self = EnumCaseNamedSelf.`self` // OK
+    }
+}
