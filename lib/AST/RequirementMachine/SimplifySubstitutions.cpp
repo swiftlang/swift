@@ -1,4 +1,4 @@
-//===--- PropertyUnification.cpp - Rules added w/ building property map ---===//
+//===--- SimplifySubstitutions.cpp - Simplify concrete type rules ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -7,6 +7,57 @@
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// Implements a pass for simplifying substitutions in concrete type symbols.
+// Substitutions can be simplifed in one of two ways; either a substitution
+// term can be replaced by a more canonical term, or it can be replaced by a
+// concrete type.
+//
+// For example, given pair of rewrite rules:
+//
+//    T.[concrete: G<Y>] => T
+//    Y => X
+//
+// We can apply (Y => X) to the term appearing in the concrete type symbol
+// [concrete: G<Y>] to obtain the rule:
+//
+//    T.[concrete: G<X>] => T
+//
+// Similarly, if we have a pair of rewrite rules:
+//
+//    T.[concrete: G<Y>] => T
+//    Y.[concrete: Int] => Y
+//
+// We can obtain the new rule:
+//
+//    T.[concrete: G<Int>] => T
+//
+// Substitution simplification occurs during the Knuth-Bendix completion
+// procedure, and after property map construction.
+//
+// In the first case, no property map is available yet, so substitution terms
+// are simplified to other terms, but concrete type replacement is not
+// performed. In the second case, the property map is consulted to perform
+// concrete type replacement where appropriate.
+//
+// Either the new rule or the old rule can become redundant; they are related
+// by rewrite loops. Additionally, rewrite loops are introduced for each
+// transformation applied to the substitutions to relate them to the concrete
+// type rules via "projections".
+//
+// These rewrite loops are in a sense dual to the property map's concrete type
+// unification, and share a lot of the code; whereas the property map will
+// relate two rules (T.[concrete: G<X>] => T) with (T.[concrete: G<Y>] => T)
+// and add the induced rule (Y => X), substitution simplification will use
+// (Y => X) to transform (T.[concrete: G<Y>] => T) into
+// (T.[concrete: G<X>] => T).
+//
+// This logic (and concrete type unification) heavily relies on the "type
+// difference" abstraction implemented in TypeDifference.cpp. Technical details
+// about the various rewrite loops introduced here can be found in comments at
+// the top of various functions below.
 //
 //===----------------------------------------------------------------------===//
 

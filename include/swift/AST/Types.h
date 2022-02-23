@@ -696,7 +696,7 @@ public:
   ///
   /// "Unresolved" dependent member types have no known associated type,
   /// and are only used transiently in the type checker.
-  const DependentMemberType *findUnresolvedDependentMemberType();
+  DependentMemberType *findUnresolvedDependentMemberType();
 
   /// Return the root generic parameter of this type parameter type.
   GenericTypeParamType *getRootGenericParam();
