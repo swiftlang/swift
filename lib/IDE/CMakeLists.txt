@@ -28,6 +28,7 @@ add_swift_host_library(swiftIDE STATIC
   SyntaxModel.cpp
   Utils.cpp
   IDETypeChecking.cpp
+  ImportDepth.cpp
   APIDigesterData.cpp
   SourceEntityWalker.cpp
   TypeContextInfo.cpp
