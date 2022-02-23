@@ -20,6 +20,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
@@ -103,30 +104,10 @@ struct SwiftCompletionInfo {
   CodeCompletionContext *completionContext = nullptr;
 };
 
-/// An abstract base class for consumers of code completion results.
-/// \see \c SimpleCachingCodeCompletionConsumer.
-class CodeCompletionConsumer {
-public:
-  virtual ~CodeCompletionConsumer() {}
-  virtual void
-  handleResultsAndModules(CodeCompletionContext &context,
-                          ArrayRef<RequestedCachedModule> requestedModules,
-                          DeclContext *DC) = 0;
-};
+void postProcessResults(MutableArrayRef<CodeCompletionResult *> results,
+                        CompletionKind Kind, DeclContext *DC,
+                        CodeCompletionResultSink *Sink);
 
-/// A simplified code completion consumer interface that clients can use to get
-/// CodeCompletionResults with automatic caching of top-level completions from
-/// imported modules.
-struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
-
-  // Implement the CodeCompletionConsumer interface.
-  void handleResultsAndModules(CodeCompletionContext &context,
-                               ArrayRef<RequestedCachedModule> requestedModules,
-                               DeclContext *DCForModules) override;
-
-  /// Clients should override this method to receive \p Results.
-  virtual void handleResults(CodeCompletionContext &context) = 0;
-};
 
 /// Create a factory for code completion callbacks.
 CodeCompletionCallbacksFactory *

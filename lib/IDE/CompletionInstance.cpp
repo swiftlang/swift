@@ -27,6 +27,7 @@
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
