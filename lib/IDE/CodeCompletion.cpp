@@ -95,30 +95,6 @@ std::string swift::ide::removeCodeCompletionTokens(
   return CleanFile;
 }
 
-StringRef CodeCompletionContext::copyString(StringRef Str) {
-  return Str.copy(*CurrentResults.Allocator);
-}
-
-std::vector<CodeCompletionResult *>
-CodeCompletionContext::sortCompletionResults(
-    ArrayRef<CodeCompletionResult *> Results) {
-  std::vector<CodeCompletionResult *> SortedResults(Results.begin(),
-                                                    Results.end());
-
-  std::sort(SortedResults.begin(), SortedResults.end(),
-            [](const auto &LHS, const auto &RHS) {
-              int Result = StringRef(LHS->getFilterName())
-                               .compare_insensitive(RHS->getFilterName());
-              // If the case insensitive comparison is equal, then secondary
-              // sort order should be case sensitive.
-              if (Result == 0)
-                Result = LHS->getFilterName().compare(RHS->getFilterName());
-              return Result < 0;
-            });
-
-  return SortedResults;
-}
-
 namespace {
 
 class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
