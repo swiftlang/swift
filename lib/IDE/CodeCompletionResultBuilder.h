@@ -25,15 +25,13 @@ namespace clang {
 class Module;
 }
 
-namespace {
-class CodeCompletionStringPrinter;
-}
-
 namespace swift {
 class Decl;
 class ModuleDecl;
 
 namespace ide {
+
+class CodeCompletionStringPrinter;
 
 class CodeCompletionResultBuilder {
   friend CodeCompletionStringPrinter;

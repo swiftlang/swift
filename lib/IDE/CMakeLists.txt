@@ -5,6 +5,7 @@ add_swift_host_library(swiftIDE STATIC
   CodeCompletionDiagnostics.cpp
   CodeCompletionResultPrinter.cpp
   CodeCompletionResultType.cpp
+  CodeCompletionStringPrinter.cpp
   CommentConversion.cpp
   CompileInstance.cpp
   CompletionInstance.cpp
@@ -23,7 +24,8 @@ add_swift_host_library(swiftIDE STATIC
   APIDigesterData.cpp
   SourceEntityWalker.cpp
   TypeContextInfo.cpp
-  IDERequests.cpp)
+  IDERequests.cpp
+  )
 target_link_libraries(swiftIDE PRIVATE
   swiftAST
   swiftClangImporter

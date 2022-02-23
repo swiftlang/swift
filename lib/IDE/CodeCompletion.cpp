@@ -17,9 +17,9 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -32,15 +32,16 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
-#include "swift/Syntax/SyntaxKind.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
+#include "swift/Syntax/SyntaxKind.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Comment.h"
@@ -51,8 +52,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <string>
 
@@ -759,214 +760,6 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
     setBriefDocComment(AssociatedDecl->getBriefComment());
   }
 }
-
-namespace {
-
-/// 'ASTPrinter' printing to 'CodeCompletionString' with appropriate ChunkKind.
-/// This is mainly used for printing types and override completions.
-class CodeCompletionStringPrinter : public ASTPrinter {
-protected:
-  using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
-
-private:
-  CodeCompletionResultBuilder &Builder;
-  SmallString<16> Buffer;
-  ChunkKind CurrChunkKind = ChunkKind::Text;
-  ChunkKind NextChunkKind = ChunkKind::Text;
-  SmallVector<PrintStructureKind, 2> StructureStack;
-  unsigned int TypeDepth = 0;
-  bool InPreamble = false;
-
-  bool isCurrentStructureKind(PrintStructureKind Kind) const {
-    return !StructureStack.empty() && StructureStack.back() == Kind;
-  }
-
-  bool isInType() const {
-    return TypeDepth > 0;
-  }
-
-  Optional<ChunkKind>
-  getChunkKindForPrintNameContext(PrintNameContext context) const {
-    switch (context) {
-    case PrintNameContext::Keyword:
-      if(isCurrentStructureKind(PrintStructureKind::EffectsSpecifiers)) {
-        return ChunkKind::EffectsSpecifierKeyword;
-      }
-      return ChunkKind::Keyword;
-    case PrintNameContext::IntroducerKeyword:
-      return ChunkKind::DeclIntroducer;
-    case PrintNameContext::Attribute:
-      return ChunkKind::Attribute;
-    case PrintNameContext::FunctionParameterExternal:
-      if (isInType()) {
-        return None;
-      }
-      return ChunkKind::ParameterDeclExternalName;
-    case PrintNameContext::FunctionParameterLocal:
-      if (isInType()) {
-        return None;
-      }
-      return ChunkKind::ParameterDeclLocalName;
-    default:
-      return None;
-    }
-  }
-
-  Optional<ChunkKind>
-  getChunkKindForStructureKind(PrintStructureKind Kind) const {
-    switch (Kind) {
-    case PrintStructureKind::FunctionParameter:
-      if (isInType()) {
-        return None;
-      }
-      return ChunkKind::ParameterDeclBegin;
-    case PrintStructureKind::DefaultArgumentClause:
-      return ChunkKind::DefaultArgumentClauseBegin;
-    case PrintStructureKind::DeclGenericParameterClause:
-      return ChunkKind::GenericParameterClauseBegin;
-    case PrintStructureKind::DeclGenericRequirementClause:
-      return ChunkKind::GenericRequirementClauseBegin;
-    case PrintStructureKind::EffectsSpecifiers:
-      return ChunkKind::EffectsSpecifierClauseBegin;
-    case PrintStructureKind::DeclResultTypeClause:
-      return ChunkKind::DeclResultTypeClauseBegin;
-    case PrintStructureKind::FunctionParameterType:
-      return ChunkKind::ParameterDeclTypeBegin;
-    default:
-      return None;
-    }
-  }
-
-  void startNestedGroup(ChunkKind Kind) {
-    flush();
-    Builder.CurrentNestingLevel++;
-    Builder.addSimpleChunk(Kind);
-  }
-
-  void endNestedGroup() {
-    flush();
-    Builder.CurrentNestingLevel--;
-  }
-
-protected:
-  void setNextChunkKind(ChunkKind Kind) {
-    NextChunkKind = Kind;
-  }
-
-public:
-  CodeCompletionStringPrinter(CodeCompletionResultBuilder &Builder) : Builder(Builder) {}
-
-  ~CodeCompletionStringPrinter() {
-    // Flush the remainings.
-    flush();
-  }
-
-  void flush() {
-    if (Buffer.empty())
-      return;
-    Builder.addChunkWithText(CurrChunkKind, Buffer);
-    Buffer.clear();
-  }
-
-  /// Start \c AttributeAndModifierListBegin group. This must be called before
-  /// any attributes/modifiers printed to the output when printing an override
-  /// compleion.
-  void startPreamble() {
-    assert(!InPreamble);
-    startNestedGroup(ChunkKind::AttributeAndModifierListBegin);
-    InPreamble = true;
-  }
-
-  /// End the current \c AttributeAndModifierListBegin group if it's still open.
-  /// This is automatically called before the main part of the signature.
-  void endPremable() {
-    if (!InPreamble)
-      return;
-    InPreamble = false;
-    endNestedGroup();
-  }
-
-  /// Implement \c ASTPrinter .
-public:
-  void printText(StringRef Text) override {
-    // Detect ': ' and ', ' in parameter clauses.
-    // FIXME: Is there a better way?
-    if (isCurrentStructureKind(PrintStructureKind::FunctionParameter) &&
-        Text == ": ") {
-      setNextChunkKind(ChunkKind::ParameterDeclColon);
-    } else if (
-        isCurrentStructureKind(PrintStructureKind::FunctionParameterList) &&
-        Text == ", ") {
-      setNextChunkKind(ChunkKind::Comma);
-    }
-
-    if (CurrChunkKind != NextChunkKind) {
-      // If the next desired kind is different from the current buffer, flush
-      // the current buffer.
-      flush();
-      CurrChunkKind = NextChunkKind;
-    }
-    Buffer.append(Text);
-  }
-
-  void printTypeRef(
-      Type T, const TypeDecl *TD, Identifier Name,
-      PrintNameContext NameContext = PrintNameContext::Normal) override {
-
-    NextChunkKind = TD->getModuleContext()->isSystemModule()
-      ? ChunkKind::TypeIdSystem
-      : ChunkKind::TypeIdUser;
-
-    ASTPrinter::printTypeRef(T, TD, Name, NameContext);
-    NextChunkKind = ChunkKind::Text;
-  }
-
-  void printDeclLoc(const Decl *D) override {
-    endPremable();
-    setNextChunkKind(ChunkKind::BaseName);
-  }
-
-  void printDeclNameEndLoc(const Decl *D) override {
-    setNextChunkKind(ChunkKind::Text);
-  }
-
-  void printNamePre(PrintNameContext context) override {
-    if (context == PrintNameContext::IntroducerKeyword)
-      endPremable();
-    if (auto Kind = getChunkKindForPrintNameContext(context))
-      setNextChunkKind(*Kind);
-  }
-
-  void printNamePost(PrintNameContext context) override {
-    if (getChunkKindForPrintNameContext(context))
-      setNextChunkKind(ChunkKind::Text);
-  }
-
-  void printTypePre(const TypeLoc &TL) override {
-    ++TypeDepth;
-  }
-
-  void printTypePost(const TypeLoc &TL) override {
-    assert(TypeDepth > 0);
-    --TypeDepth;
-  }
-
-  void printStructurePre(PrintStructureKind Kind, const Decl *D) override {
-    StructureStack.push_back(Kind);
-
-    if (auto chunkKind = getChunkKindForStructureKind(Kind))
-      startNestedGroup(*chunkKind);
-  }
-
-  void printStructurePost(PrintStructureKind Kind, const Decl *D) override {
-    if (getChunkKindForStructureKind(Kind))
-      endNestedGroup();
-
-    assert(Kind == StructureStack.back());
-    StructureStack.pop_back();
-  }
-};
-} // namespcae
 
 void CodeCompletionResultBuilder::addCallArgument(
     Identifier Name, Identifier LocalName, Type Ty, Type ContextTy,
