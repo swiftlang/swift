@@ -490,8 +490,7 @@ bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
   assert(llvm::all_of(block->getArguments(),
                       [&](auto argument) { return PhiValue(argument); }));
   return llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-    return result.classificationIsBarrier(
-        result.classifyInstruction(predecessor->getTerminator()));
+    return result.isBarrier(predecessor->getTerminator());
   });
 }
 
