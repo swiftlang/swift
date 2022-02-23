@@ -21,7 +21,6 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include <memory>
 #include <tuple>
 
@@ -46,6 +45,12 @@ namespace swift {
   class Type;
   class ValueDecl;
   struct PrintOptions;
+
+  namespace constraints {
+  class ConstraintSystem;
+  class Solution;
+  class SolutionApplicationTarget;
+  }
 
   /// Typecheck binding initializer at \p bindingIndex.
   void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex,
