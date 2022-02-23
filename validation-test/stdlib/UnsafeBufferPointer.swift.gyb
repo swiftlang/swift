@@ -429,6 +429,10 @@ UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable
 }
 
 UnsafeMutableRawBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    return
+  }
+
   for test in subscriptRangeTests {
     let c = test.collection.map({ UInt8($0.value/1000) })
     let buffer = UnsafeMutableRawBufferPointer.allocate(

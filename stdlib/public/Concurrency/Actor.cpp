@@ -1031,6 +1031,8 @@ static Job *
 preprocessQueue(JobRef unprocessedStart, JobRef unprocessedEnd, Job *existingProcessedJobsToMergeInto)
 {
   assert(existingProcessedJobsToMergeInto != NULL);
+  assert(unprocessedStart.needsPreprocessing());
+  assert(unprocessedStart.getAsJob() != unprocessedEnd.getAsJob());
 
   // Build up a list of jobs we need to preprocess
   using ListMerger = swift::ListMerger<Job*, JobQueueTraits>;
@@ -1421,6 +1423,11 @@ Job * DefaultActorImpl::drainOne() {
       SWIFT_TASK_DEBUG_LOG("Drained first job %p from actor %p", firstJob, this);
       traceActorStateTransition(this, oldState, newState);
       return firstJob;
+    }
+
+    // We failed the weak cmpxchg spuriously, go through loop again.
+    if (oldState.getFirstJob().getAsJob() == jobToPreprocessFrom.getAsJob()) {
+      continue;
     }
 
     // There were new items concurrently added to the queue. We need to
