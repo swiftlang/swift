@@ -1540,7 +1540,7 @@ static void swift_job_runImpl(Job *job, ExecutorRef executor) {
   SWIFT_TASK_DEBUG_LOG("%s(%p)", __func__, job);
   runJobInEstablishedExecutorContext(job);
 
-  concurrency::trace::job_run_end(job, &executor, traceHandle);
+  concurrency::trace::job_run_end(&executor, traceHandle);
   trackingInfo.leave();
 
   // Give up the current executor if this is a switching context

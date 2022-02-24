@@ -60,9 +60,9 @@ inline void job_enqueue_global_with_delay(unsigned long long delay, Job *job) {}
 
 inline void job_enqueue_main_executor(Job *job) {}
 
-inline uint64_t job_run_begin(Job *job, ExecutorRef *executor) { return 0; }
+inline job_run_info job_run_begin(Job *job, ExecutorRef *executor) { return {}; }
 
-inline void job_run_end(Job *job, ExecutorRef *executor, uint64_t beginHandle) {
+inline void job_run_end(ExecutorRef *executor, job_run_info info) {
 }
 
 } // namespace trace
