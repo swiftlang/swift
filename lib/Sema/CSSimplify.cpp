@@ -1626,10 +1626,42 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       continue;
     }
 
-    // Skip unfulfilled parameters. There's nothing to do for them.
-    if (parameterBindings[paramIdx].empty())
+    // If type inference from default arguments is enabled, let's
+    // add a constraint from the parameter if necessary, otherwise
+    // there is nothing to do but move to the next parameter.
+    if (parameterBindings[paramIdx].empty()) {
+      auto &ctx = cs.getASTContext();
+
+      if (ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments) {
+        auto *paramList = getParameterList(callee);
+        auto *PD = paramList->get(paramIdx);
+
+        // There is nothing to infer if parameter doesn't have any
+        // generic parameters in its type.
+        if (!PD->getInterfaceType()->hasTypeParameter())
+          continue;
+
+        auto defaultExprType = PD->getTypeOfDefaultExpr();
+
+        // A caller side default.
+        if (!defaultExprType || defaultExprType->hasError())
+          continue;
+
+        // If this is just a regular default type that should
+        // work for all substitutions of generic parameter,
+        // let's continue.
+        if (defaultExprType->hasArchetype())
+          continue;
+
+        cs.addConstraint(
+            ConstraintKind::ArgumentConversion, paramTy, defaultExprType,
+            locator.withPathElement(LocatorPathElt::ApplyArgToParam(
+                paramIdx, paramIdx, param.getParameterFlags())));
+      }
+
       continue;
-    
+    }
+
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::ApplyArgToParam(
@@ -4845,6 +4877,25 @@ bool ConstraintSystem::repairFailures(
     // apply arg to param locator, so let's skip the default argument mismatch.
     if (hasFixFor(loc, FixKind::RemoveExtraneousArguments))
       return true;
+
+    // If the argument couldn't be found, this could be a default value
+    // type mismatch.
+    if (!simplifyLocatorToAnchor(loc)) {
+      auto *calleeLocator = getCalleeLocator(loc);
+      unsigned paramIdx =
+          loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>()
+              .getParamIdx();
+
+      if (auto overload = findSelectedOverloadFor(calleeLocator)) {
+        if (auto *decl = overload->choice.getDeclOrNull()) {
+          if (getParameterList(decl)->get(paramIdx)->getTypeOfDefaultExpr()) {
+            conversionsOrFixes.push_back(
+                IgnoreDefaultExprTypeMismatch::create(*this, lhs, rhs, loc));
+            break;
+          }
+        }
+      }
+    }
 
     conversionsOrFixes.push_back(
         AllowArgumentMismatch::create(*this, lhs, rhs, loc));
@@ -12414,7 +12465,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                : SolutionKind::Solved;
   }
 
-  case FixKind::AllowArgumentTypeMismatch: {
+  case FixKind::AllowArgumentTypeMismatch:
+  case FixKind::IgnoreDefaultExprTypeMismatch: {
     auto impact = 2;
     // If there are any other argument mismatches already detected for this
     // call, we increase the score even higher so more argument fixes means

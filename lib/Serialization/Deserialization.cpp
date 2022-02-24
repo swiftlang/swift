@@ -3197,13 +3197,15 @@ public:
     bool isIsolated;
     bool isCompileTimeConst;
     uint8_t rawDefaultArg;
+    TypeID defaultExprType;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
                                          isCompileTimeConst,
-                                         rawDefaultArg);
+                                         rawDefaultArg,
+                                         defaultExprType);
 
     auto argName = MF.getIdentifier(argNameID);
     auto paramName = MF.getIdentifier(paramNameID);
@@ -3244,6 +3246,10 @@ public:
     // FIXME: Default argument expression, if available.
     if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg)) {
       param->setDefaultArgumentKind(*defaultArg);
+
+      if (auto exprType = MF.getType(defaultExprType))
+        param->setDefaultExprType(exprType);
+
       if (!blobData.empty())
         param->setDefaultValueStringRepresentation(blobData);
     }

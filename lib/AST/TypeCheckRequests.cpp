@@ -1207,6 +1207,27 @@ void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
 }
 
 //----------------------------------------------------------------------------//
+// DefaultArgumentTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type> DefaultArgumentTypeRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  auto *defaultInfo = param->DefaultValueAndFlags.getPointer();
+  if (!defaultInfo)
+    return None;
+
+  if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
+    return None;
+
+  return defaultInfo->ExprType;
+}
+
+void DefaultArgumentTypeRequest::cacheResult(Type type) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultExprType(type);
+}
+
+//----------------------------------------------------------------------------//
 // CallerSideDefaultArgExprRequest computation.
 //----------------------------------------------------------------------------//
 

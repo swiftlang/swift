@@ -431,10 +431,251 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             DeclContext *DC, Type paramType,
                                             bool isAutoClosure) {
   assert(paramType && !paramType->hasError());
-  return typeCheckExpression(defaultValue, DC, /*contextualInfo=*/
-                             {paramType, isAutoClosure
-                                             ? CTP_AutoclosureDefaultParameter
-                                             : CTP_DefaultParameter});
+
+  auto &ctx = DC->getASTContext();
+
+  // First, let's try to type-check default expression using interface
+  // type of the parameter, if that succeeds - we are done.
+  SolutionApplicationTarget defaultExprTarget(
+      defaultValue, DC,
+      isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter,
+      paramType, /*isDiscarded=*/false);
+
+  auto paramInterfaceTy = paramType->mapTypeOutOfContext();
+
+  {
+    // Buffer all of the diagnostics produced by \c typeCheckExpression
+    // since in some cases we need to try type-checking again with a
+    // different contextual type, see below.
+    DiagnosticTransaction diagnostics(ctx.Diags);
+
+    // First, let's try to type-check default expression using
+    // archetypes, which guarantees that it would work for any
+    // substitution of the generic parameter (if they are involved).
+    if (auto result = typeCheckExpression(defaultExprTarget)) {
+      defaultValue = result->getAsExpr();
+      return defaultValue->getType();
+    }
+
+    // If inference is disabled, fail.
+    if (!ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments)
+      return Type();
+
+    // Parameter type doesn't have any generic parameters mentioned
+    // in it, so there is nothing to infer.
+    if (!paramInterfaceTy->hasTypeParameter())
+      return Type();
+
+    // Ignore any diagnostics emitted by the original type-check.
+    diagnostics.abort();
+  }
+
+  // Let's see whether it would be possible to use default expression
+  // for generic parameter inference.
+  //
+  // First, let's check whether:
+  //  - Parameter type is a generic parameter; and
+  //  - It's only used in the current position in the parameter list
+  //    or result. This check makes sure that that generic argument
+  //    could only come from an explicit argument or this expression.
+  //
+  // If both of aforementioned conditions are true, let's attempt
+  // to open generic parameter and infer the type of this default
+  // expression.
+  OpenedTypeMap genericParameters;
+
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::AllowFixes;
+
+  ConstraintSystem cs(DC, options);
+
+  auto *locator = cs.getConstraintLocator(
+      defaultValue, LocatorPathElt::ContextualType(
+                        defaultExprTarget.getExprContextualTypePurpose()));
+
+  auto getCanonicalGenericParamTy = [](GenericTypeParamType *GP) {
+    return cast<GenericTypeParamType>(GP->getCanonicalType());
+  };
+
+  // Find and open all of the generic parameters used by the parameter
+  // and replace them with type variables.
+  auto contextualTy = paramInterfaceTy.transform([&](Type type) -> Type {
+    assert(!type->is<UnboundGenericType>());
+
+    if (auto *GP = type->getAs<GenericTypeParamType>()) {
+      return cs.openGenericParameter(DC->getParent(), GP, genericParameters,
+                                     locator);
+    }
+    return type;
+  });
+
+  auto containsTypes = [&](Type type, OpenedTypeMap &toFind) {
+    return type.findIf([&](Type nested) {
+      if (auto *GP = nested->getAs<GenericTypeParamType>())
+        return toFind.count(getCanonicalGenericParamTy(GP)) > 0;
+      return false;
+    });
+  };
+
+  auto containsGenericParamsExcluding = [&](Type type,
+                                            OpenedTypeMap &exclusions) -> bool {
+    return type.findIf([&](Type type) {
+      if (auto *GP = type->getAs<GenericTypeParamType>())
+        return !exclusions.count(getCanonicalGenericParamTy(GP));
+      return false;
+    });
+  };
+
+  // Anchor of this default expression i.e. function, subscript
+  // or enum case.
+  auto *anchor = cast<ValueDecl>(DC->getParent()->getAsDecl());
+
+  // Check whether generic parameters are only mentioned once in
+  // the anchor's signature.
+  {
+    auto anchorTy = anchor->getInterfaceType()->castTo<GenericFunctionType>();
+
+    // Reject if generic parameters are used in multiple different positions
+    // in the parameter list.
+
+    llvm::SmallVector<unsigned, 2> affectedParams;
+    for (unsigned i : indices(anchorTy->getParams())) {
+      const auto &param = anchorTy->getParams()[i];
+
+      if (containsTypes(param.getPlainType(), genericParameters))
+        affectedParams.push_back(i);
+    }
+
+    if (affectedParams.size() > 1) {
+      SmallString<32> paramBuf;
+      llvm::raw_svector_ostream params(paramBuf);
+
+      interleave(
+          affectedParams, [&](const unsigned index) { params << "#" << index; },
+          [&] { params << ", "; });
+
+      ctx.Diags.diagnose(
+          defaultValue->getLoc(),
+          diag::
+              cannot_default_generic_parameter_inferrable_from_another_parameter,
+          paramInterfaceTy, params.str());
+      return Type();
+    }
+  }
+
+  auto signature = DC->getGenericSignatureOfContext();
+  assert(signature && "generic parameter without signature?");
+
+  auto *requirementBaseLocator = cs.getConstraintLocator(
+      locator, LocatorPathElt::OpenedGeneric(signature));
+
+  // Let's check all of the requirements this parameter is invoved in,
+  // If it's connected to any other generic types (directly or through
+  // a dependent member type), that means it could be inferred through
+  // them e.g. `T: X.Y` or `T == U`.
+  {
+    auto recordRequirement = [&](unsigned index, Requirement requirement,
+                                 ConstraintLocator *locator) {
+      cs.openGenericRequirement(DC->getParent(), index, requirement,
+                                /*skipSelfProtocolConstraint=*/false, locator,
+                                [&](Type type) -> Type {
+                                  return cs.openType(type, genericParameters);
+                                });
+    };
+
+    auto diagnoseInvalidRequirement = [&](Requirement requirement) {
+      SmallString<32> reqBuf;
+      llvm::raw_svector_ostream req(reqBuf);
+
+      requirement.print(req, PrintOptions());
+
+      ctx.Diags.diagnose(
+          defaultValue->getLoc(),
+          diag::cannot_default_generic_parameter_invalid_requirement,
+          paramInterfaceTy, req.str());
+    };
+
+    auto requirements = signature.getRequirements();
+    for (unsigned reqIdx = 0; reqIdx != requirements.size(); ++reqIdx) {
+      auto &requirement = requirements[reqIdx];
+
+      switch (requirement.getKind()) {
+      case RequirementKind::SameType: {
+        auto lhsTy = requirement.getFirstType();
+        auto rhsTy = requirement.getSecondType();
+
+        // Unrelated requirement.
+        if (!containsTypes(lhsTy, genericParameters) &&
+            !containsTypes(rhsTy, genericParameters))
+          continue;
+
+        // Allow a subset of generic same-type requirements that only mention
+        // "in scope" generic parameters e.g. `T.X == Int` or `T == U.Z`
+        if (!containsGenericParamsExcluding(lhsTy, genericParameters) &&
+            !containsGenericParamsExcluding(rhsTy, genericParameters)) {
+          recordRequirement(reqIdx, requirement, requirementBaseLocator);
+          continue;
+        }
+
+        // If there is a same-type constraint that involves out of scope
+        // generic parameters mixed with in-scope ones, fail the type-check
+        // since the type could be inferred through other positions.
+        {
+          diagnoseInvalidRequirement(requirement);
+          return Type();
+        }
+      }
+
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
+      case RequirementKind::Layout:
+        auto adheringTy = requirement.getFirstType();
+
+        // Unrelated requirement.
+        if (!containsTypes(adheringTy, genericParameters))
+          continue;
+
+        // If adhering type has a mix or in- and out-of-scope parameters
+        // mentioned we need to diagnose.
+        if (containsGenericParamsExcluding(adheringTy, genericParameters)) {
+          diagnoseInvalidRequirement(requirement);
+          return Type();
+        }
+
+        if (requirement.getKind() == RequirementKind::Superclass) {
+          auto superclassTy = requirement.getSecondType();
+
+          if (containsGenericParamsExcluding(superclassTy, genericParameters)) {
+            diagnoseInvalidRequirement(requirement);
+            return Type();
+          }
+        }
+
+        recordRequirement(reqIdx, requirement, requirementBaseLocator);
+        break;
+      }
+    }
+  }
+
+  defaultExprTarget.setExprConversionType(contextualTy);
+  cs.setContextualType(defaultValue,
+                       defaultExprTarget.getExprContextualTypeLoc(),
+                       defaultExprTarget.getExprContextualTypePurpose());
+
+  auto viable = cs.solve(defaultExprTarget, FreeTypeVariableBinding::Disallow);
+  if (!viable)
+    return Type();
+
+  auto &solution = (*viable)[0];
+
+  cs.applySolution(solution);
+
+  if (auto result = cs.applySolution(solution, defaultExprTarget)) {
+    defaultValue = result->getAsExpr();
+    return defaultValue->getType();
+  }
+
+  return Type();
 }
 
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
