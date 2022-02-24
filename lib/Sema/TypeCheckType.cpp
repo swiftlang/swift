@@ -431,18 +431,17 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
     if (selfType->is<GenericTypeParamType>()) {
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-        auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl);
-        if (getStage() == TypeResolutionStage::Structural &&
-            aliasDecl && !aliasDecl->isGeneric()) {
-          return aliasDecl->getStructuralType();
-        }
-
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-          typeDecl = assocType->getAssociatedTypeAnchor();
+        if (isa<AssociatedTypeDecl>(typeDecl) ||
+            (isa<TypeAliasDecl>(typeDecl) &&
+             !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
+          if (getStage() == TypeResolutionStage::Structural) {
+            return DependentMemberType::get(selfType, typeDecl->getName());
+          } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+            typeDecl = assocType->getAssociatedTypeAnchor();
+          }
         }
       }
 
-      // FIXME: Remove this once the above FIXME is addressed.
       if (typeDecl->getDeclContext()->getSelfClassDecl()) {
         // We found a member of a class from a protocol or protocol
         // extension.
@@ -2638,7 +2637,14 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // context, and then set isNoEscape if @escaping is not present.
   if (!ty) ty = resolveType(repr, instanceOptions);
   if (!ty || ty->hasError()) return ty;
-  
+
+  // Type aliases inside protocols are not yet resolved in the structural
+  // stage of type resolution
+  if (ty->is<DependentMemberType>() &&
+      resolution.getStage() == TypeResolutionStage::Structural) {
+    return ty;
+  }
+
   // Handle @escaping
   if (ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
