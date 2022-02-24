@@ -729,6 +729,12 @@ bool hoistDestroys(SILValue root, bool ignoreDeinitBarriers,
   // The algorithm assumes no critical edges.
   assert(function->hasOwnership() && "requires OSSA");
 
+  // If lexical lifetimes aren't enabled, then deinit barriers aren't respected.
+  auto &module = function->getModule();
+  auto enableLexicalLifetimes =
+      module.getASTContext().SILOpts.supportsLexicalLifetimes(module);
+  ignoreDeinitBarriers = ignoreDeinitBarriers || !enableLexicalLifetimes;
+
   return HoistDestroys(root, ignoreDeinitBarriers, remainingDestroyAddrs,
                        deleter)
       .perform();
