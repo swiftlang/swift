@@ -212,7 +212,15 @@ static void checkInheritanceClause(
       inheritedAnyObject = { i, inherited.getSourceRange() };
     }
 
-    if (inheritedTy->isExistentialType()) {
+    if (inheritedTy->is<ParameterizedProtocolType>()) {
+      if (!isa<ProtocolDecl>(decl)) {
+        decl->diagnose(diag::inheritance_from_parameterized_protocol,
+                       inheritedTy);
+      }
+      continue;
+    }
+
+    if (inheritedTy->isConstraintType()) {
       auto layout = inheritedTy->getExistentialLayout();
 
       // Subclass existentials are not allowed except on classes and
@@ -227,10 +235,7 @@ static void checkInheritanceClause(
       // AnyObject is not allowed except on protocols.
       if (layout.hasExplicitAnyObject &&
           !isa<ProtocolDecl>(decl)) {
-        decl->diagnose(canHaveSuperclass
-                       ? diag::inheritance_from_non_protocol_or_class
-                       : diag::inheritance_from_non_protocol,
-                       inheritedTy);
+        decl->diagnose(diag::inheritance_from_anyobject);
         continue;
       }
 
@@ -247,14 +252,6 @@ static void checkInheritanceClause(
       assert(isa<ClassDecl>(decl));
       assert(canHaveSuperclass);
       inheritedTy = layout.explicitSuperclass;
-    }
-
-    if (inheritedTy->is<ParameterizedProtocolType>()) {
-      if (!isa<ProtocolDecl>(decl)) {
-        decl->diagnose(diag::inheritance_from_parameterized_protocol,
-                       inheritedTy);
-      }
-      continue;
     }
 
     // If this is an enum inheritance clause, check for a raw type.
@@ -338,11 +335,19 @@ static void checkInheritanceClause(
       }
     }
 
+    // FIXME: The inherited type is printed directly here because
+    // the current default is to not print `any` for existential
+    // types, but this error message is super confusing without `any`
+    // if the user wrote it explicitly.
+    PrintOptions options;
+    options.PrintExplicitAny = true;
+    auto inheritedTyString = inheritedTy.getString(options);
+
     // We can't inherit from a non-class, non-protocol type.
     decl->diagnose(canHaveSuperclass
                    ? diag::inheritance_from_non_protocol_or_class
                    : diag::inheritance_from_non_protocol,
-                   inheritedTy);
+                   inheritedTyString);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
   }
 }
