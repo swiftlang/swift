@@ -3710,8 +3710,7 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
   llvm::SmallDenseMap<TypeVariableType *,
                       std::pair<GenericTypeParamType *, SourceLoc>, 4>
       genericParams;
-  // Consider only representative type variables shared across
-  // all of the solutions.
+  // Consider all representative type variables across all solutions.
   for (auto &solution : solutions) {
     for (auto &typeBinding : solution.typeBindings) {
       auto *typeVar = typeBinding.first;
@@ -3748,10 +3747,9 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
     for (const auto &solution : solutions) {
       auto type = solution.typeBindings.lookup(typeVar);
       // Type variables gathered from a solution's type binding context may not
-      // exist in another given solution because each solution could have a
-      // different set of overload choices picked, which implies that some of
-      // the generic parameters, and type variables that represent them, would
-      // be unique to that solution.
+      // exist in another given solution because some solutions may have
+      // additional type variables not present in other solutions due to taking
+      // different paths in the solver.
       if (!type)
         continue;
 
