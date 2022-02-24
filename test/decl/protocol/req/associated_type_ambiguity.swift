@@ -1,17 +1,17 @@
 // RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on -requirement-machine-protocol-signatures=on
-// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
 
 protocol P1 {
-  typealias T = Int // expected-note {{found this candidate}}
+  typealias T = Int
 }
 
 protocol P2 {
-  associatedtype T // expected-note {{found this candidate}}
+  associatedtype T
 }
 
 // CHECK: ExtensionDecl line={{.*}} base=P1
 // CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2>
-extension P1 where Self : P2, T == Int { // expected-error {{'T' is ambiguous for type lookup in this context}}
+extension P1 where Self : P2, T == Int {
   func takeT11(_: T) {}
   func takeT12(_: Self.T) {}
 }
