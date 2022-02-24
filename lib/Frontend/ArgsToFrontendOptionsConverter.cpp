@@ -297,6 +297,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     auto SplitMap = StringRef(A).split('=');
     Opts.serializedPathObfuscator.addMapping(SplitMap.first, SplitMap.second);
   }
+  Opts.emptyABIDescriptor = Args.hasArg(OPT_empty_abi_descriptor);
   return false;
 }
 
