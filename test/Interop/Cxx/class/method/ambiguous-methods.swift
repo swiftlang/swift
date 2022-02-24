@@ -11,23 +11,7 @@ var CxxAmbiguousMethodTestSuite = TestSuite("CxxAmbiguousMethods")
 // It's important to check that both calling the const version first
 // and the mutable version first pass. This helps confirm that the lookup
 // table is being properly seeded.
-CxxAmbiguousMethodTestSuite.test("ping const first") {
-  var instance = HasAmbiguousMethods()
-
-  instance.ping()
-  instance.pingMutable()
-  expectEqual(1, instance.numberOfMutableMethodsCalled())
-}
-
-CxxAmbiguousMethodTestSuite.test("ping mutable first") {
-  var instance = HasAmbiguousMethods()
-
-  instance.pingMutable()
-  instance.ping()
-  expectEqual(1, instance.numberOfMutableMethodsCalled())
-}
-
-CxxAmbiguousMethodTestSuite.test("numberOfMutableMethodsCalled: () -> Int") {
+CxxAmbiguousMethodTestSuite.test("[Const First] numberOfMutableMethodsCalled: () -> Int") {
   var instance = HasAmbiguousMethods()
 
   // Sanity check. Make sure we start at 0
@@ -39,6 +23,15 @@ CxxAmbiguousMethodTestSuite.test("numberOfMutableMethodsCalled: () -> Int") {
   // Check that mutable version _does_ change the mutable call count
   expectEqual(0, instance.numberOfMutableMethodsCalled())
   expectEqual(1, instance.numberOfMutableMethodsCalledMutating())
+}
+
+CxxAmbiguousMethodTestSuite.test("[Mutable First] numberOfMutableMethodsCalled: () -> Int") {
+  var instance = HasAmbiguousMethods()
+
+  // Call mutable first
+  expectEqual(1, instance.numberOfMutableMethodsCalledMutating())
+  expectEqual(1, instance.numberOfMutableMethodsCalled())
+
 }
 
 CxxAmbiguousMethodTestSuite.test("Basic Increment: (Int) -> Int") {
