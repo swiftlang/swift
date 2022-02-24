@@ -1942,6 +1942,11 @@ ERROR(type_does_not_conform,none,
 WARNING(type_does_not_conform_swiftui_warning,none,
         "type %0 does not conform to protocol %1", (Type, Type))
 
+ERROR(non_final_class_cannot_conform_to_self_same_type,none,
+      "non-final class %0 cannot safely conform to protocol %1, "
+      "which requires that 'Self' is exactly equal to %2",
+      (Type, Type, Type))
+
 ERROR(cannot_use_nil_with_this_type,none,
       "'nil' cannot be used in context expecting type %0", (Type))
 
