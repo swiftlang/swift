@@ -1599,25 +1599,11 @@ WARNING(option_set_zero_constant,none,
 NOTE(option_set_empty_set_init,none,
      "use [] to silence this warning", ())
 
-// FIXME(backDeploy): Refactor to share with back deployment attr
-ERROR(originally_defined_in_dupe_platform,none,
-      "duplicate version number for platform %0", (StringRef))
-
 ERROR(originally_definedin_topleve_decl,none,
       "@%0 is only applicable to top-level decl", (StringRef))
 
-// FIXME(backDeploy): Refactor to share with back deployment attr
-ERROR(originally_definedin_need_available,none,
-      "need @available attribute for @%0", (StringRef))
-
 ERROR(originally_definedin_must_not_before_available_version,none,
       "symbols are moved to the current module before they were available in the OSs", (StringRef))
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-WARNING(originally_defined_in_on_non_public,
-       none, "@%0 does not have any effect on "
-       "%select{private|fileprivate|internal|%error|%error}1 declarations",
-       (StringRef, AccessLevel))
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -3140,8 +3126,24 @@ ERROR(attr_not_on_variadic_parameters,none,
 ERROR(attr_not_on_subscript_parameters,none,
       "'%0' must not be used on subscript parameters", (StringRef))
 
+WARNING(attr_has_no_effect_on_decl_with_access_level,none,
+       "'%0' does not have any effect on "
+       "%select{private|fileprivate|internal|%error|%error}1 declarations",
+       (DeclAttribute, AccessLevel))
+ERROR(attr_not_on_decl_with_invalid_access_level,none,
+      "'%0' may not be used on "
+      "%select{private|fileprivate|internal|%error|%error}1 declarations",
+      (DeclAttribute, AccessLevel))
+
+ERROR(attr_has_no_effect_decl_not_available_before,none,
+      "'%0' has no effect because %1 is not available before %2 %3",
+      (DeclAttribute, DeclName, StringRef, llvm::VersionTuple))
+
 ERROR(attr_ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 in '@%1' attribute", (DeclNameRef, StringRef))
+
+ERROR(attr_contains_multiple_versions_for_platform,none,
+      "'%0' contains multiple versions for %1", (DeclAttribute, StringRef))
 
 ERROR(override_final,none,
       "%0 overrides a 'final' %1", (DescriptiveDeclKind, DescriptiveDeclKind))
@@ -5614,6 +5616,14 @@ ERROR(availability_macro_in_inlinable, none,
       "availability macro cannot be used in inlinable %0",
       (DescriptiveDeclKind))
 
+ERROR(attr_requires_decl_availability_for_platform,none,
+      "'%0' requires that %1 have explicit availability for %2",
+      (DeclAttribute, DeclName, StringRef))
+
+ERROR(attr_requires_availability_for_platform,none,
+      "'%0' requires explicit availability for %1",
+      (DeclAttribute, StringRef))
+
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked
 // unavailable, so it seems appropriate to put it here.
@@ -6163,6 +6173,10 @@ ERROR(differentiable_programming_attr_used_without_required_module, none,
       "'@%0' attribute used without importing module %1",
       (StringRef, Identifier))
 
+//------------------------------------------------------------------------------
+// MARK: OSLog
+//------------------------------------------------------------------------------
+
 ERROR(oslog_arg_must_be_bool_literal, none,
       "argument must be a bool literal", ())
 ERROR(oslog_arg_must_be_integer_literal, none,
@@ -6269,6 +6283,13 @@ ERROR(cannot_default_generic_parameter_invalid_requirement, none,
 ERROR(cannot_convert_default_value_type_to_argument_type, none,
       "cannot convert default value of type %0 to expected argument type %1 for parameter #%2",
       (Type, Type, unsigned))
+
+//------------------------------------------------------------------------------
+// MARK: Back deployment
+//------------------------------------------------------------------------------
+
+ERROR(attr_incompatible_with_back_deploy,none,
+      "'%0' cannot be applied to back deployed declarations", (DeclAttribute))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

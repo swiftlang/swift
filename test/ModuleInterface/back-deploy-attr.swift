@@ -25,7 +25,7 @@ public struct TopLevelStruct {
   // CHECK: @_backDeploy(iOS 15.0)
   // FROMSOURCE: public func backDeployedFunc2_MultiPlatform() -> Swift.Int { return 43 }
   // FROMMODULE: public func backDeployedFunc2_MultiPlatform() -> Swift.Int
-  @available(macOS 11.0, *)
+  @available(macOS 11.0, iOS 14.0, *)
   @_backDeploy(macOS 12.0, iOS 15.0)
   public func backDeployedFunc2_MultiPlatform() -> Int { return 43 }
 }

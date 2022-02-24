@@ -66,6 +66,45 @@ public:
                                         std::forward<ArgTypes>(Args)...);
   }
 
+  /// Emits a diagnostic with a fixit to remove the attribute if the attribute
+  /// is applied to a non-public declaration. Returns true if a diagnostic was
+  /// emitted.
+  bool diagnoseAndRemoveAttrIfDeclIsNonPublic(DeclAttribute *attr,
+                                              bool isError) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      auto access =
+          VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                   /*treatUsableFromInlineAsPublic=*/true);
+      if (!access.isPublic()) {
+        diagnoseAndRemoveAttr(
+            attr,
+            isError ? diag::attr_not_on_decl_with_invalid_access_level
+                    : diag::attr_has_no_effect_on_decl_with_access_level,
+            attr, VD->getFormalAccess());
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Emits a diagnostic if there is no availability specified for the given
+  /// platform, as required by the given attribute. Returns true if a diagnostic
+  /// was emitted.
+  bool diagnoseMissingAvailability(DeclAttribute *attr, PlatformKind platform) {
+    auto IntroVer = D->getIntroducedOSVersion(platform);
+    if (IntroVer.hasValue())
+      return false;
+
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      diagnose(attr->AtLoc, diag::attr_requires_decl_availability_for_platform,
+               attr, VD->getName(), prettyPlatformString(platform));
+    } else {
+      diagnose(attr->AtLoc, diag::attr_requires_availability_for_platform, attr,
+               prettyPlatformString(platform));
+    }
+    return true;
+  }
+
   template <typename... ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes &&... Args) const {
     return Ctx.Diags.diagnose(std::forward<ArgTypes>(Args)...);
@@ -256,7 +295,7 @@ public:
 
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
   void visitNonEphemeralAttr(NonEphemeralAttr *attr);
-  void checkOriginalDefinedInAttrs(Decl *D, ArrayRef<OriginallyDefinedInAttr*> Attrs);
+  void checkOriginalDefinedInAttrs(ArrayRef<OriginallyDefinedInAttr *> Attrs);
 
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDerivativeAttr(DerivativeAttr *attr);
@@ -279,7 +318,7 @@ public:
 
   void visitPrimaryAssociatedTypeAttr(PrimaryAssociatedTypeAttr *attr);
 
-  void checkBackDeployAttrs(Decl *D, ArrayRef<BackDeployAttr *> Attrs);
+  void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
 };
 
 } // end anonymous namespace
@@ -1268,8 +1307,9 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     TypeChecker::applyAccessNote(VD);
 
   AttributeChecker Checker(D);
-  // We need to check all OriginallyDefinedInAttr relative to each other, so
-  // collect them and check in batch later.
+  // We need to check all OriginallyDefinedInAttr and BackDeployAttr relative
+  // to each other, so collect them and check in batch later.
+  llvm::SmallVector<BackDeployAttr *, 4> backDeployAttrs;
   llvm::SmallVector<OriginallyDefinedInAttr*, 4> ODIAttrs;
   for (auto attr : D->getAttrs()) {
     if (!attr->isValid()) continue;
@@ -1279,6 +1319,8 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     if (attr->canAppearOnDecl(D)) {
       if (auto *ODI = dyn_cast<OriginallyDefinedInAttr>(attr)) {
         ODIAttrs.push_back(ODI);
+      } else if (auto *BD = dyn_cast<BackDeployAttr>(attr)) {
+        backDeployAttrs.push_back(BD);
       } else {
         // Otherwise, check it.
         Checker.visit(attr);
@@ -1319,7 +1361,8 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     else
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
-  Checker.checkOriginalDefinedInAttrs(D, ODIAttrs);
+  Checker.checkBackDeployAttrs(backDeployAttrs);
+  Checker.checkOriginalDefinedInAttrs(ODIAttrs);
 }
 
 /// Returns true if the given method is an valid implementation of a
@@ -3409,8 +3452,8 @@ void AttributeChecker::visitNonEphemeralAttr(NonEphemeralAttr *attr) {
   attr->setInvalid();
 }
 
-void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
-    ArrayRef<OriginallyDefinedInAttr*> Attrs) {
+void AttributeChecker::checkOriginalDefinedInAttrs(
+    ArrayRef<OriginallyDefinedInAttr *> Attrs) {
   if (Attrs.empty())
     return;
   auto &Ctx = D->getASTContext();
@@ -3421,20 +3464,9 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
   for (auto *Attr: Attrs) {
     static StringRef AttrName = "_originallyDefinedIn";
 
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      // This attribute does not make sense on private declarations since
-      // clients can't use them.
-      auto access =
-        VD->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*treatUsableFromInlineAsPublic=*/true);
-      if (!access.isPublic()) {
-        diagnoseAndRemoveAttr(Attr,
-                              diag::originally_defined_in_on_non_public,
-                              AttrName, VD->getFormalAccess());
-        continue;
-      }
-    }
-    
+    if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/false))
+      continue;
+
     if (!Attr->isActivePlatform(Ctx))
       continue;
     auto AtLoc = Attr->AtLoc;
@@ -3443,7 +3475,7 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
       // We've seen the platform before, emit error to the previous one which
       // comes later in the source order.
       diagnose(seenPlatforms[Platform],
-               diag::originally_defined_in_dupe_platform,
+               diag::attr_contains_multiple_versions_for_platform, Attr,
                platformString(Platform));
       return;
     }
@@ -3451,12 +3483,11 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
       diagnose(AtLoc, diag::originally_definedin_topleve_decl, AttrName);
       return;
     }
-    auto IntroVer = D->getIntroducedOSVersion(Platform);
-    if (!IntroVer.hasValue()) {
-      diagnose(AtLoc, diag::originally_definedin_need_available,
-               AttrName);
+
+    if (diagnoseMissingAvailability(Attr, Platform))
       return;
-    }
+
+    auto IntroVer = D->getIntroducedOSVersion(Platform);
     if (IntroVer.getValue() > Attr->MovedVersion) {
       diagnose(AtLoc,
                diag::originally_definedin_must_not_before_available_version,
@@ -3466,9 +3497,64 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
   }
 }
 
-void AttributeChecker::checkBackDeployAttrs(Decl *D,
-    ArrayRef<BackDeployAttr *> Attrs) {
-  // FIXME(backDeploy): Diagnose incompatible uses of `@_backDeploy
+void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
+  if (Attrs.empty())
+    return;
+
+  // Diagnose conflicting attributes. @_alwaysEmitIntoClient, @inlinable, and
+  // @_transparent all conflict with back deployment because they each cause the
+  // body of a function to be copied into the client under certain conditions
+  // and would defeat the goal of back deployment, which is to always use the
+  // ABI version of the declaration when it is available.
+  if (auto *AEICA = D->getAttrs().getAttribute<AlwaysEmitIntoClientAttr>()) {
+    diagnoseAndRemoveAttr(AEICA, diag::attr_incompatible_with_back_deploy,
+                          AEICA);
+  }
+
+  if (auto *IA = D->getAttrs().getAttribute<InlinableAttr>()) {
+    diagnoseAndRemoveAttr(IA, diag::attr_incompatible_with_back_deploy, IA);
+  }
+
+  if (auto *TA = D->getAttrs().getAttribute<TransparentAttr>()) {
+    diagnoseAndRemoveAttr(TA, diag::attr_incompatible_with_back_deploy, TA);
+  }
+
+  std::map<PlatformKind, SourceLoc> seenPlatforms;
+
+  for (auto *Attr : Attrs) {
+    // Back deployment only makes sense for public declarations.
+    if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/true))
+      continue;
+
+    auto AtLoc = Attr->AtLoc;
+    auto Platform = Attr->Platform;
+
+    if (!seenPlatforms.insert({Platform, AtLoc}).second) {
+      // We've seen the platform before, emit error to the previous one which
+      // comes later in the source order.
+      diagnose(seenPlatforms[Platform],
+               diag::attr_contains_multiple_versions_for_platform, Attr,
+               platformString(Platform));
+      continue;
+    }
+
+    // Require explicit availability for back deployed decls.
+    if (diagnoseMissingAvailability(Attr, Platform))
+      continue;
+
+    // Verify that the decl is available before the back deployment boundary.
+    // If it's not, the attribute doesn't make sense since the back deployment
+    // fallback could never be executed at runtime.
+    auto IntroVer = D->getIntroducedOSVersion(Platform);
+    if (Attr->Version <= IntroVer.getValue()) {
+      // Only functions, methods, computed properties, and subscripts are
+      // back-deployable.
+      auto *VD = cast<ValueDecl>(D);
+      diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before, Attr,
+               VD->getName(), prettyPlatformString(Platform), Attr->Version);
+      continue;
+    }
+  }
 }
 
 Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,

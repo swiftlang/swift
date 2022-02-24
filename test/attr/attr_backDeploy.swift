@@ -6,12 +6,18 @@
 @_backDeploy(macOS 12.0)
 public func backDeployedTopLevelFunc() {}
 
+// OK: @usableFromInline decls may be back deployed
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0)
+@usableFromInline
+internal func backDeployedUsableFromInlineTopLevelFunc() {}
+
 // FIXME(backDeploy): Availability macros should be supported
 
 public class TopLevelClass {
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
-  public func backDeployedMemberFunc() {}
+  final public func backDeployedFinalMethod() {}
 
   // FIXME(backDeploy): Computed properties should be supported
   @available(macOS 11.0, *)
@@ -25,6 +31,12 @@ public class TopLevelClass {
     get { return 1 }
     set(newValue) {}
   }
+}
+
+public struct TopLevelStruct {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public func backDeployedMethod() {}
 }
 
 // MARK: - Unsupported declaration types
@@ -53,12 +65,69 @@ public enum CannotBackDeployEnum {
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public var cannotBackDeployTopLevelVar = 79
 
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
+extension TopLevelStruct {}
+
 // MARK: - Incompatible declarations
 
-// FIXME(backDeploy): Test explicit @available is required
-// FIXME(backDeploy): Test @available is compatible
-// FIXME(backDeploy): Test public is required
-// FIXME(backDeploy): Test @inlinable, @_alwaysEmitIntoClient, @transparent are rejected
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' may not be used on fileprivate declarations}}
+fileprivate func filePrivateFunc() {}
+
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' may not be used on private declarations}}
+private func privateFunc() {}
+
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' may not be used on internal declarations}}
+internal func internalFunc() {}
+
+// FIXME(backDeploy): back deployed methods must be final
+public class TopLevelClass2 {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public func backDeployedNonFinalMethod() {}
+}
+
+@_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' requires that 'missingAllAvailabilityFunc()' have explicit availability for macOS}}
+public func missingAllAvailabilityFunc() {}
+
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0, iOS 15.0) // expected-error {{'@_backDeploy' requires that 'missingiOSAvailabilityFunc()' have explicit availability for iOS}}
+public func missingiOSAvailabilityFunc() {}
+
+@available(macOS 12.0, *)
+@_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' has no effect because 'availableSameVersionAsBackDeployment()' is not available before macOS 12.0}}
+public func availableSameVersionAsBackDeployment() {}
+
+@available(macOS 12.1, *)
+@_backDeploy(macOS 12.0) // expected-error {{'availableAfterBackDeployment()' is not available before macOS 12.0}}
+public func availableAfterBackDeployment() {}
+
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0, macOS 13.0) // expected-error {{'@_backDeploy' contains multiple versions for macOS}}
+public func duplicatePlatformsFunc1() {}
+
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0)
+@_backDeploy(macOS 13.0) // expected-error {{'@_backDeploy' contains multiple versions for macOS}}
+public func duplicatePlatformsFunc2() {}
+
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0)
+@_alwaysEmitIntoClient // expected-error {{'@_alwaysEmitIntoClient' cannot be applied to back deployed declarations}}
+public func alwaysEmitIntoClientFunc() {}
+
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0)
+@inlinable // expected-error {{'@inlinable' cannot be applied to back deployed declarations}}
+public func inlinableFunc() {}
+
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0)
+@_transparent // expected-error {{'@_transparent' cannot be applied to back deployed declarations}}
+public func transparentFunc() {}
 
 // MARK: - Attribute parsing
 
@@ -86,8 +155,8 @@ public func missingVersionFunc2() {}
 @_backDeploy(macOS, iOS) // expected-error 2{{expected version number in '@_backDeploy' attribute}}
 public func missingVersionFunc3() {}
 
-@available(macOS 11.0, *)
-@_backDeploy(macOS 12.0, iOS 14.0,) // expected-error {{unexpected ',' separator}}
+@available(macOS 11.0, iOS 14.0, *)
+@_backDeploy(macOS 12.0, iOS 15.0,) // expected-error {{unexpected ',' separator}}
 public func unexpectedSeparatorFunc() {}
 
 @available(macOS 11.0, *)
@@ -102,20 +171,9 @@ public func wildcardWithVersionFunc() {}
 @_backDeploy(macOS 12.0, *) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
 public func trailingWildcardFunc() {}
 
-@available(macOS 11.0, *)
-@_backDeploy(macOS 12.0, *, iOS 14.0) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
+@available(macOS 11.0, iOS 14.0, *)
+@_backDeploy(macOS 12.0, *, iOS 15.0) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
 public func embeddedWildcardFunc() {}
-
-// FIXME(backDeploy): Expect error for duplicate platforms in same attribute
-@available(macOS 11.0, *)
-@_backDeploy(macOS 12.0, macOS 13.0)
-public func duplicatePlatformsFunc1() {}
-
-// FIXME(backDeploy): Expect error for duplicate platforms accross multiple attributes
-@available(macOS 11.0, *)
-@_backDeploy(macOS 12.0)
-@_backDeploy(macOS 13.0)
-public func duplicatePlatformsFunc2() {}
 
 @available(macOS 11.0, *)
 @_backDeploy() // expected-error {{expected at least one platform version in '@_backDeploy' attribute}}
