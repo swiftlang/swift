@@ -161,4 +161,24 @@ struct UTF8Str {
   void setUTF8Str(int) {}
 };
 
+struct MethodWithSameName {
+    int value();
+    int getValue() const;
+    void setValue(int i);
+};
+
+struct PropertyWithSameName {
+    int value;
+    int getValue() const;
+    void setValue(int i);
+};
+
+class PrivatePropertyWithSameName {
+    int value;
+
+public:
+    int getValue() const;
+    void setValue(int i);
+};
+
 #endif // SWIFT_IMPLICIT_COMPUTED_PROPERTIES_H

@@ -7,24 +7,29 @@ import ImplicitComputedProperties
 
 var ImplicitComputedPropertiesTestSuite = TestSuite("ImplicitComputedProperties")
 
+// TODO: Omar, please rename "VoidGetter"
+// TODO: Omar, please add setter tests for all of these.
 ImplicitComputedPropertiesTestSuite.test("LongNameAllLower") {
     var VoidGetter = LongNameAllLower()
 
     expectEqual(VoidGetter.foo, 42)
 
 }
+
 ImplicitComputedPropertiesTestSuite.test("LongNameAllUpper") {
     var VoidGetter = LongNameAllUpper()
 
     expectEqual(VoidGetter.foo, 42)
 
 }
+
 ImplicitComputedPropertiesTestSuite.test("LongNameMix") {
     var VoidGetter = LongNameMix()
 
     expectEqual(VoidGetter.foo, 42)
 
 }
+
 ImplicitComputedPropertiesTestSuite.test("GetterOnly") {
     var VoidGetter = GetterOnly()
     expectEqual(VoidGetter.foo, 42)

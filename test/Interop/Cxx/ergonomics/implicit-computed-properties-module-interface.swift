@@ -1,7 +1,7 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=ImplicitComputedProperties -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
 
 // CHECK:      struct VoidGetter {
-// CHECK-NOT:     var // 
+// CHECK-NOT:     var
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    mutating func getXMutating()
 // CHECK-NEXT:    mutating func setXMutating(_: Int32)
@@ -220,4 +220,29 @@
 // CHECK-NEXT:    var utf8Str: Int32
 // CHECK-NEXT:    func getUTF8Str() -> Int32
 // CHECK-NEXT:    mutating func setUTF8Str(_: Int32)
+// CHECK-NEXT: }
+
+
+// CHECK:      struct MethodWithSameName {
+// CHECK-NEXT:    init()
+// CHECK-NOT:     var value: Int32
+// CHECK-NEXT:    mutating func value() -> Int32
+// CHECK-NEXT:    func getValue() -> Int32
+// CHECK-NEXT:    mutating func setValue(_ i: Int32)
+// CHECK-NEXT: }
+
+// CHECK:      struct PropertyWithSameName {
+// CHECK-NEXT:    init()
+// CHECK-NEXT:    init(value: Int32)
+// CHECK-NOT:     var value: Int32
+// CHECK-NEXT:    func getValue() -> Int32
+// CHECK-NEXT:    mutating func setValue(_ i: Int32)
+// CHECK-NEXT:    var value: Int32
+// CHECK-NEXT: }
+
+// CHECK:      struct PrivatePropertyWithSameName {
+// CHECK-NEXT:    init()
+// CHECK-NEXT:    var value: Int32
+// CHECK-NEXT:    func getValue() -> Int32
+// CHECK-NEXT:    mutating func setValue(_ i: Int32)
 // CHECK-NEXT: }
