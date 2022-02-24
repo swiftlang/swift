@@ -2784,9 +2784,11 @@ WARNING(anyobject_class_inheritance_deprecated,Deprecation,
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,
-  "inheritance from non-protocol, non-class type %0", (Type))
+  "inheritance from non-protocol, non-class type '%0'", (StringRef))
 ERROR(inheritance_from_non_protocol,none,
-  "inheritance from non-protocol type %0", (Type))
+  "inheritance from non-protocol type '%0'", (StringRef))
+ERROR(inheritance_from_anyobject,none,
+  "only protocols can inherit from 'AnyObject'", ())
 ERROR(inheritance_from_parameterized_protocol,none,
   "cannot inherit from protocol type with generic argument %0", (Type))
 ERROR(superclass_not_first,none,

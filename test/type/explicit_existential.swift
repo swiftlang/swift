@@ -257,3 +257,24 @@ func testConstraintAlias(x: Constraint) {} // expected-warning{{'Constraint' (ak
 
 typealias Existential = any Input
 func testExistentialAlias(x: Existential, y: any Constraint) {}
+
+// Reject explicit existential types in inheritance clauses
+protocol Empty {}
+
+struct S : any Empty {} // expected-error {{inheritance from non-protocol type 'any Empty'}}
+class C : any Empty {} // expected-error {{inheritance from non-protocol, non-class type 'any Empty'}}
+
+// FIXME: Diagnostics are not great in the enum case because we confuse this with a raw type
+
+enum E : any Empty { // expected-error {{raw type 'Empty' is not expressible by a string, integer, or floating-point literal}}
+// expected-error@-1 {{'E' declares raw type 'Empty', but does not conform to RawRepresentable and conformance could not be synthesized}}
+// expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'Empty' is not Equatable}}
+  case hack
+}
+
+enum EE : Equatable, any Empty { // expected-error {{raw type 'Empty' is not expressible by a string, integer, or floating-point literal}}
+// expected-error@-1 {{'EE' declares raw type 'Empty', but does not conform to RawRepresentable and conformance could not be synthesized}}
+// expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'Empty' is not Equatable}}
+// expected-error@-3 {{raw type 'Empty' must appear first in the enum inheritance clause}}
+  case hack
+}
