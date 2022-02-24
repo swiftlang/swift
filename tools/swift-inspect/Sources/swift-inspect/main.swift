@@ -77,6 +77,7 @@ internal struct SwiftInspect: ParsableCommand {
     DumpRawMetadata.self,
     DumpGenericMetadata.self,
     DumpCacheNodes.self,
+    DumpArrays.self,
   ]
 #endif
 
