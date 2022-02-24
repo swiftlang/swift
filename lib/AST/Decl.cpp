@@ -377,6 +377,18 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
   return None;
 }
 
+Optional<llvm::VersionTuple>
+Decl::getBackDeployBeforeOSVersion(PlatformKind Kind) const {
+  for (auto *attr : getAttrs()) {
+    if (auto *backDeployAttr = dyn_cast<BackDeployAttr>(attr)) {
+      if (backDeployAttr->Platform == Kind && backDeployAttr->Version) {
+        return backDeployAttr->Version;
+      }
+    }
+  }
+  return None;
+}
+
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      StaticSpellingKind SSK) {
   switch (SSK) {

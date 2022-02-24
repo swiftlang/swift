@@ -15,7 +15,7 @@
 // CHECK-LABEL: sil non_abi [serialized] [thunk] [available 10.51] [ossa] @$s11back_deploy12throwingFuncyyKFTwb : $@convention(thin) () -> @error Error
 // CHECK: bb0:
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
-// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 51
+// CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
 // CHECK:   [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK:   [[OSVFN:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK:   [[AVAIL:%.*]] = apply [[OSVFN]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
