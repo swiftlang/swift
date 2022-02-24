@@ -3257,8 +3257,7 @@ void CallEmission::setFromCallee() {
 
   // Set up the args array.
   assert(Args.empty());
-  Args.reserve(numArgs);
-  Args.set_size(numArgs);
+  Args.resize_for_overwrite(numArgs);
   LastArgWritten = numArgs;
 }
 

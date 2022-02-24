@@ -91,7 +91,7 @@ using Convert = ConvertForWcharSize<sizeof(wchar_t)>;
 static void convertFromUTF8(llvm::StringRef utf8,
                             llvm::SmallVectorImpl<wchar_t> &out) {
   size_t reserve = out.size() + utf8.size();
-  out.reserve(reserve);
+  out.resize_for_overwrite(reserve);
   const char *utf8_begin = utf8.begin();
   wchar_t *wide_begin = out.end();
   auto res = Convert::ConvertFromUTF8(&utf8_begin, utf8.end(),
@@ -99,13 +99,13 @@ static void convertFromUTF8(llvm::StringRef utf8,
                                       lenientConversion);
   assert(res == conversionOK && "utf8-to-wide conversion failed!");
   (void)res;
-  out.set_size(wide_begin - out.begin());
+  out.truncate(wide_begin - out.begin());
 }
 
 static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
                           llvm::SmallVectorImpl<char> &out) {
   size_t reserve = out.size() + wide.size()*4;
-  out.reserve(reserve);
+  out.resize_for_overwrite(reserve);
   const wchar_t *wide_begin = wide.begin();
   char *utf8_begin = out.end();
   auto res = Convert::ConvertToUTF8(&wide_begin, wide.end(),
@@ -113,7 +113,7 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
                                     lenientConversion);
   assert(res == conversionOK && "wide-to-utf8 conversion failed!");
   (void)res;
-  out.set_size(utf8_begin - out.begin());
+  out.truncate(utf8_begin - out.begin());
 }
 } // end anonymous namespace
 
