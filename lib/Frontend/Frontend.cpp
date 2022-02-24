@@ -158,7 +158,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       getIRGenOptions().PublicLinkLibraries;
   serializationOpts.SDKName = getLangOptions().SDKName;
   serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
-  
+  serializationOpts.emptyABIDescriptor = opts.emptyABIDescriptor;
+
   if (!getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;
 

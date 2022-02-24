@@ -5810,10 +5810,11 @@ bool Serializer::allowCompilerErrors() const {
 
 static void emitABIDescriptor(ModuleOrSourceFile DC,
                               const SerializationOptions &options) {
+  using namespace swift::ide::api;
   if (!options.ABIDescriptorPath.empty()) {
     if (DC.is<ModuleDecl*>()) {
-      swift::ide::api::dumpModuleContent(DC.get<ModuleDecl*>(),
-                                         options.ABIDescriptorPath, true);
+      dumpModuleContent(DC.get<ModuleDecl*>(), options.ABIDescriptorPath, true,
+                        options.emptyABIDescriptor);
     }
   }
 }

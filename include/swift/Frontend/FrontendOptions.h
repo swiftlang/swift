@@ -447,6 +447,11 @@ public:
   /// to encode the actual paths into the .swiftmodule file.
   PathObfuscator serializedPathObfuscator;
 
+  /// Avoid printing actual module content into the ABI descriptor file.
+  /// This should only be used as a workaround when emitting ABI descriptor files
+  /// crashes the compiler.
+  bool emptyABIDescriptor = false;
+
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
