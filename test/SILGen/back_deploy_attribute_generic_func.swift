@@ -39,13 +39,13 @@
 // -- Original definition of genericFunc()
 // CHECK-LABEL: sil [serialized] [available 10.51] [ossa] @$s11back_deploy11genericFuncyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 @available(macOS 10.51, *)
-@_backDeploy(macOS 10.50)
+@_backDeploy(macOS 10.52)
 public func genericFunc<T>(_ t: T) -> T {
   return t
 }
 
 // CHECK-LABEL: sil hidden [available 10.51] [ossa] @$s11back_deploy6calleryyF : $@convention(thin) () -> ()
-@available(macOS 10.51, *) // FIXME(backDeploy): remove once typechecking allows
+@available(macOS 10.51, *)
 func caller() {
   // -- Verify the thunk is called
   // CHECK: {{%.*}} = function_ref @$s11back_deploy11genericFuncyxxlFTwb : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0

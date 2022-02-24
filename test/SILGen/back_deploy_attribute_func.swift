@@ -38,7 +38,7 @@
 // -- Original definition of trivialFunc()
 // CHECK-LABEL: sil [serialized] [available 10.51] [ossa] @$s11back_deploy11trivialFuncyyF : $@convention(thin) () -> ()
 @available(macOS 10.51, *)
-@_backDeploy(macOS 10.50)
+@_backDeploy(macOS 10.52)
 public func trivialFunc() {}
 
 // -- Fallback definition of isNumber(_:)
@@ -73,13 +73,13 @@ public func trivialFunc() {}
 // -- Original definition of isNumber(_:)
 // CHECK-LABEL: sil [serialized] [available 10.51] [ossa] @$s11back_deploy8isNumberySbSiF : $@convention(thin) (Int) -> Bool
 @available(macOS 10.51, *)
-@_backDeploy(macOS 10.50)
+@_backDeploy(macOS 10.52)
 public func isNumber(_ x: Int) -> Bool {
   return true
 }
 
 // CHECK-LABEL: sil hidden [available 10.51] [ossa] @$s11back_deploy6calleryyF : $@convention(thin) () -> ()
-@available(macOS 10.51, *) // FIXME(backDeploy): remove once typechecking allows
+@available(macOS 10.51, *)
 func caller() {
   // -- Verify the thunk is called
   // CHECK: {{%.*}} = function_ref @$s11back_deploy11trivialFuncyyFTwb : $@convention(thin) () -> ()
