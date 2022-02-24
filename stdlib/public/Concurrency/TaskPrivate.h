@@ -280,6 +280,12 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// actor. This bit is cleared when a starts running on a thread, suspends
     /// or is completed.
     IsEnqueued = 0x1000,
+
+#ifndef NDEBUG
+    /// Task has been completed.  This is purely used to enable an assertion
+    /// that the task is completed when we destroy it.
+    IsComplete = 0x2000,
+#endif
   };
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
@@ -392,6 +398,20 @@ public:
                                               : (Flags & ~IsRunning));
 #endif
   }
+
+#ifndef NDEBUG
+  bool isComplete() const {
+    return Flags & IsComplete;
+  }
+
+  ActiveTaskStatus withComplete() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags | IsComplete, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags | IsComplete);
+#endif
+  }
+#endif
 
   /// Is there a lock on the linked list of status records?
   bool isStatusRecordLocked() const { return Flags & IsStatusRecordLocked; }
@@ -564,6 +584,9 @@ struct AsyncTask::PrivateStorage {
       auto newStatus = oldStatus.withRunning(false);
       newStatus = newStatus.withoutStoredPriorityEscalation();
       newStatus = newStatus.withoutEnqueued();
+#ifndef NDEBUG
+      newStatus = newStatus.withComplete();
+#endif
 
       // This can fail since the task can still get concurrently cancelled or
       // escalated.
@@ -650,6 +673,7 @@ retry:;
   while (true) {
     // We can get here from being suspended or being enqueued
     assert(!oldStatus.isRunning());
+    assert(!oldStatus.isComplete());
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     // Task's priority is greater than the thread's - do a self escalation
