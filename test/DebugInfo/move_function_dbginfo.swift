@@ -240,6 +240,24 @@ public func addressOnlyVarTest<T : P>(_ x: T) {
 // Conditional Tests //
 ///////////////////////
 
+// CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo23copyableValueCCFlowTestyyF"(
+// CHECK: call void @llvm.dbg.addr(metadata %T21move_function_dbginfo5KlassC** %k.debug, metadata ![[K_COPYABLE_LET_CCFLOW_METADATA:[0-9]+]], metadata !DIExpression()), !dbg ![[ADDR_LOC:[0-9]+]]
+// CHECK-NEXT: br label %[[NEXT_BB:[0-9]+]],
+//
+// CHECK: [[NEXT_BB]]:
+// CHECK:    br i1 {{%[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
+//
+// CHECK: [[LHS]]:
+// CHECK:    call void @llvm.dbg.value(metadata %T21move_function_dbginfo5KlassC* undef, metadata ![[K_COPYABLE_LET_CCFLOW_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+public func copyableValueCCFlowTest() {
+    let k = Klass()
+    k.doSomething()
+    if trueValue {
+        let m = _move(k)
+        m.doSomething()
+    }
+}
+
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo037copyableVarTestCCFlowReinitOutOfBlockF0yyF"(
 // CHECK: call void @llvm.dbg.declare(metadata %T21move_function_dbginfo5KlassC** %m.debug,
 // CHECK: call void @llvm.dbg.addr(metadata %T21move_function_dbginfo5KlassC** %k, metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], metadata !DIExpression()), !dbg ![[ADDR_LOC:[0-9]*]]
@@ -385,3 +403,4 @@ public func addressOnlyVarTestCCFlowReinitInBlockTest<T : P>(_ x: T.Type) {
 // CHECK-DAG: ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]] = !DILocalVariable(name: "k",
 // CHECK-DAG: ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]] = !DILocalVariable(name: "k",
 // CHECK-DAG: ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]] = !DILocalVariable(name: "k",
+// CHECK-DAG: ![[K_COPYABLE_LET_CCFLOW_METADATA]] = !DILocalVariable(name: "k",

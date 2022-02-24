@@ -264,7 +264,7 @@ void MemoryLifetimeVerifier::require(const Bits &wrongBits,
 void MemoryLifetimeVerifier::requireBitsClear(const Bits &bits, SILValue addr,
                                              SILInstruction *where) {
   if (auto *loc = locations.getLocation(addr)) {
-    require(bits & loc->subLocations, "memory is initialized, but shouldn't",
+    require(bits & loc->subLocations, "memory is initialized, but shouldn't be",
             where, /*excludeTrivialEnums*/ true);
   }
 }
@@ -273,7 +273,7 @@ void MemoryLifetimeVerifier::requireBitsSet(const Bits &bits, SILValue addr,
                                            SILInstruction *where) {
   if (auto *loc = locations.getLocation(addr)) {
     require(~bits & loc->subLocations,
-            "memory is not initialized, but should", where);
+            "memory is not initialized, but should be", where);
   }
 }
 

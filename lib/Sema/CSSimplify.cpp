@@ -4563,6 +4563,14 @@ bool ConstraintSystem::repairFailures(
         break;
       }
 
+      // If this is a problem with result type of a subscript setter,
+      // let's re-attempt to repair without l-value conversion in the
+      // locator to fix underlying type mismatch.
+      if (path.back().is<LocatorPathElt::FunctionResult>()) {
+        return repairFailures(lhs, rhs, matchKind, conversionsOrFixes,
+                              getConstraintLocator(anchor, path));
+      }
+
       // If this is a function type param type mismatch in any position,
       // the mismatch we want to report is for the whole structural type.
       auto last = std::find_if(

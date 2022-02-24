@@ -27,12 +27,11 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
    // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
 
   // Make sure we error on the following in Swift 6 mode.
-
-  // FIXME: Bad diagnostics (SR-15843)
-  _ = id(arr) as [String] // expected-error {{type of expression is ambiguous without more context}}
-  _ = (arr ?? []) as [String] // expected-error {{type of expression is ambiguous without more context}}
-  _ = (arr ?? [] ?? []) as [String] // expected-error {{type of expression is ambiguous without more context}}
-  _ = (optArr ?? []) as [String] // expected-error {{type of expression is ambiguous without more context}}
+  _ = id(arr) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]')}}
+  _ = (arr ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
+  _ = (arr ?? [] ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
+  // expected-error@-1{{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
+  _ = (optArr ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]'}}
 
   _ = (arr ?? []) as [String]? // expected-error {{'[Int]' is not convertible to '[String]?'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}}

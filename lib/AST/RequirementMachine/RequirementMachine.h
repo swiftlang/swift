@@ -88,12 +88,14 @@ class RequirementMachine final {
   RequirementMachine &operator=(const RequirementMachine &) = delete;
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
-  void initWithGenericSignature(CanGenericSignature sig);
+  void checkCompletionResult(CompletionResult result) const;
+
+  std::pair<CompletionResult, unsigned>
+  initWithGenericSignature(CanGenericSignature sig);
+
   std::pair<CompletionResult, unsigned>
   initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
-  void initWithAbstractRequirements(
-      ArrayRef<GenericTypeParamType *> genericParams,
-      ArrayRef<Requirement> requirements);
+
   std::pair<CompletionResult, unsigned>
   initWithWrittenRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,

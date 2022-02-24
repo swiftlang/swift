@@ -9,6 +9,16 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// A mechanism for working with types that are related via the transformation
+// of replacing a type parameter term with another type parameter term or
+// concrete type.
+//
+// Used by concrete type unification (in PropertyUnification.cpp) and for
+// substitution simplification (SimplifySubstitutions.cpp) to define rewrite
+// loops relating various rules for rewrite system minimization.
+//
+//===----------------------------------------------------------------------===//
 
 #include "TypeDifference.h"
 #include "swift/AST/Types.h"

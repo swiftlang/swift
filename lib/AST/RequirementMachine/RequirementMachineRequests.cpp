@@ -473,9 +473,9 @@ AbstractGenericSignatureRequestRQM::evaluate(
     return GenericSignatureWithError(result, /*hadError=*/false);
   }
 
-  SmallVector<Requirement, 4> requirements(
-      baseSignature.getRequirements().begin(),
-      baseSignature.getRequirements().end());
+  SmallVector<StructuralRequirement, 4> requirements;
+  for (auto req : baseSignature.getRequirements())
+    requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
 
   // We need to create this errors vector to pass to
   // desugarRequirement, but this request should never
@@ -492,14 +492,20 @@ AbstractGenericSignatureRequestRQM::evaluate(
   // Desugaring converts these kinds of requirements into "proper"
   // requirements where the subject type is always a type parameter,
   // which is what the RuleBuilder expects.
-  for (auto req : addedRequirements)
-    desugarRequirement(req, requirements, errors);
+  for (auto req : addedRequirements) {
+    SmallVector<Requirement, 2> reqs;
+    desugarRequirement(req, reqs, errors);
+    for (auto req : reqs)
+      requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
+  }
 
   // Heap-allocate the requirement machine to save stack space.
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
       ctx.getRewriteContext()));
 
-  machine->initWithAbstractRequirements(genericParams, requirements);
+  auto status =
+      machine->initWithWrittenRequirements(genericParams, requirements);
+  machine->checkCompletionResult(status.first);
 
   auto minimalRequirements =
     machine->computeMinimalGenericSignatureRequirements();
@@ -611,7 +617,8 @@ InferredGenericSignatureRequestRQM::evaluate(
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
       ctx.getRewriteContext()));
 
-  auto status = machine->initWithWrittenRequirements(genericParams, requirements);
+  auto status =
+      machine->initWithWrittenRequirements(genericParams, requirements);
   if (status.first != CompletionResult::Success) {
     ctx.Diags.diagnose(loc,
                        diag::requirement_machine_completion_failed,
