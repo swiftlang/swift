@@ -80,6 +80,8 @@ Optional<constraints::SolutionApplicationTarget>
 typeCheckExpression(constraints::SolutionApplicationTarget &target,
                     OptionSet<TypeCheckExprFlags> options);
 
+Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool);
+
 } // end namespace TypeChecker
 
 } // end namespace swift
@@ -3045,6 +3047,10 @@ private:
   swift::TypeChecker::typeCheckExpression(
       SolutionApplicationTarget &target, OptionSet<TypeCheckExprFlags> options);
 
+  friend Type swift::TypeChecker::typeCheckParameterDefault(Expr *&,
+                                                            DeclContext *, Type,
+                                                            bool);
+
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(const Solution &solution);
@@ -4167,6 +4173,13 @@ public:
                              OpenedTypeMap &replacements,
                              ConstraintLocatorBuilder locator);
 
+  /// Open a generic parameter into a type variable and record
+  /// it in \c replacements.
+  TypeVariableType *openGenericParameter(DeclContext *outerDC,
+                                         GenericTypeParamType *parameter,
+                                         OpenedTypeMap &replacements,
+                                         ConstraintLocatorBuilder locator);
+
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
   /// constraint system for further processing.
@@ -4175,6 +4188,14 @@ public:
                                bool skipProtocolSelfConstraint,
                                ConstraintLocatorBuilder locator,
                                llvm::function_ref<Type(Type)> subst);
+
+  // Record the given requirement in the constraint system.
+  void openGenericRequirement(DeclContext *outerDC,
+                              unsigned index,
+                              const Requirement &requirement,
+                              bool skipProtocolSelfConstraint,
+                              ConstraintLocatorBuilder locator,
+                              llvm::function_ref<Type(Type)> subst);
 
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(

@@ -1068,6 +1068,13 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   return initExpr;
 }
 
+Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
+                                          ParamDecl *param) const {
+  if (auto expr = param->getTypeCheckedDefaultExpr())
+    return expr->getType();
+  return Type();
+}
+
 Initializer *
 DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
                                             ParamDecl *param) const {

@@ -38,6 +38,8 @@ NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 NOTE(opaque_return_type_declared_here,none,
      "opaque return type declared here", ())
+NOTE(default_value_declared_here,none,
+     "default value declared here", ())
 
 //------------------------------------------------------------------------------
 // MARK: Constraint solver diagnostics
@@ -6239,6 +6241,29 @@ ERROR(noimplicitcopy_attr_invalid_in_generic_context,
 ERROR(type_sequence_on_non_generic_param, none,
       "'@_typeSequence' must appear on a generic parameter",
       ())
+
+//------------------------------------------------------------------------------
+// MARK: Type inference from default expressions
+//------------------------------------------------------------------------------
+
+ERROR(cannot_default_generic_parameter_inferrable_from_another_parameter, none,
+      "cannot use default expression for inference of %0 because it "
+      "is inferrable from parameters %1",
+      (Type, StringRef))
+
+ERROR(cannot_default_generic_parameter_inferrable_through_same_type, none,
+      "cannot use default expression for inference of %0 because it "
+      "is inferrable through same-type requirement: '%1'",
+      (Type, StringRef))
+
+ERROR(cannot_default_generic_parameter_invalid_requirement, none,
+      "cannot use default expression for inference of %0 because "
+      "requirement '%1' refers to other generic parameters",
+      (Type, StringRef))
+
+ERROR(cannot_convert_default_value_type_to_argument_type, none,
+      "cannot convert default value of type %0 to expected argument type %1 for parameter #%2",
+      (Type, Type, unsigned))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

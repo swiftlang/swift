@@ -257,6 +257,11 @@ ValueDecl *RequirementFailure::getDeclRef() const {
       return cast<ValueDecl>(getDC()->getAsDecl());
     }
 
+    if (contextualPurpose == CTP_DefaultParameter ||
+        contextualPurpose == CTP_AutoclosureDefaultParameter) {
+      return cast<ValueDecl>(getDC()->getParent()->getAsDecl());
+    }
+
     return getAffectedDeclFromType(contextualTy);
   }
 
@@ -8085,5 +8090,29 @@ bool SwiftToCPointerConversionInInvalidContext::diagnoseAsError() {
 
   emitDiagnostic(diag::cannot_convert_argument_value_for_swift_func, argType,
                  paramType, callee->getDescriptiveKind(), callee->getName());
+  return true;
+}
+
+bool DefaultExprTypeMismatch::diagnoseAsError() {
+  auto *locator = getLocator();
+
+  unsigned paramIdx =
+      locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>()
+          .getParamIdx();
+
+  emitDiagnostic(diag::cannot_convert_default_value_type_to_argument_type,
+                 getFromType(), getToType(), paramIdx);
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(locator);
+  assert(overload);
+
+  auto *PD = getParameterList(overload->choice.getDecl())->get(paramIdx);
+
+  auto note = emitDiagnosticAt(PD->getLoc(), diag::default_value_declared_here);
+
+  if (auto *defaultExpr = PD->getTypeCheckedDefaultExpr()) {
+    note.highlight(defaultExpr->getSourceRange());
+  }
+
   return true;
 }

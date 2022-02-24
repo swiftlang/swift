@@ -2456,8 +2456,16 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      TypeConverter &TC,
                                                      SILDeclRef c) {
   auto *vd = c.getDecl();
-  auto resultTy = getParameterAt(vd,
-                                 c.defaultArgIndex)->getInterfaceType();
+  auto *pd = getParameterAt(vd, c.defaultArgIndex);
+
+  Type resultTy;
+
+  if (auto type = pd->getTypeOfDefaultExpr()) {
+    resultTy = type->mapTypeOutOfContext();
+  } else {
+    resultTy = pd->getInterfaceType();
+  }
+
   assert(resultTy && "Didn't find default argument?");
 
   // The result type might be written in terms of type parameters
