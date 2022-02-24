@@ -635,6 +635,7 @@ Types
   type ::= protocol-list 'p'                 // existential type
   type ::= protocol-list superclass 'Xc'     // existential type with superclass
   type ::= protocol-list 'Xl'                // existential type with AnyObject
+  type ::= protocol-list 'y' (type* '_')* type* retroactive-conformance* 'Xp'   // parameterized protocol type
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0

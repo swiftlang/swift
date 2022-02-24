@@ -6417,9 +6417,10 @@ inline bool TypeBase::isAnyExistentialType() {
 }
 
 inline bool CanType::isExistentialTypeImpl(CanType type) {
-  return (isa<ProtocolType>(type) ||
-          isa<ProtocolCompositionType>(type) ||
-          isa<ExistentialType>(type));
+  return isa<ProtocolType>(type) ||
+         isa<ProtocolCompositionType>(type) ||
+         isa<ExistentialType>(type) ||
+         isa<ParameterizedProtocolType>(type);
 }
 
 inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
@@ -6515,6 +6516,8 @@ inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
     return Ty->getDecl();
   if (auto Ty = dyn_cast<ExistentialType>(*this))
     return Ty->getConstraintType()->getNominalOrBoundGenericNominal();
+  if (auto Ty = dyn_cast<ParameterizedProtocolType>(*this))
+    return Ty->getBaseType()->getNominalOrBoundGenericNominal();
   return nullptr;
 }
 
