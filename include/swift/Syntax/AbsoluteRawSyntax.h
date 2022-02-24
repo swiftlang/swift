@@ -397,11 +397,11 @@ public:
 
   bool hasValue() const { return !Storage.isNull(); }
 
-  AbsoluteRawSyntax &getValue() LLVM_LVALUE_FUNCTION {
+  AbsoluteRawSyntax &getValue() & {
     assert(hasValue());
     return Storage;
   }
-  AbsoluteRawSyntax const &getValue() const LLVM_LVALUE_FUNCTION {
+  AbsoluteRawSyntax const &getValue() const & {
     assert(hasValue());
     return Storage;
   }
