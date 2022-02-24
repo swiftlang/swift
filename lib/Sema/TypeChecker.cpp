@@ -488,6 +488,13 @@ bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
                             true);
 }
 
+bool swift::typeCheckForCodeCompletion(
+    constraints::SolutionApplicationTarget &target, bool needsPrecheck,
+    llvm::function_ref<void(const constraints::Solution &)> callback) {
+  return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
+                                                 callback);
+}
+
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
   if (C.TypeCheckerOpts.DebugForbidTypecheckPrefix.empty())
     return;

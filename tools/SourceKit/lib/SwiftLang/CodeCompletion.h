@@ -15,7 +15,8 @@
 
 #include "SourceKit/Core/LLVM.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/IDE/CodeCompletionResultSink.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"

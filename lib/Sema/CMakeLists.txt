@@ -18,6 +18,7 @@ add_swift_host_library(swiftSema STATIC
   ConstraintGraph.cpp
   ConstraintLocator.cpp
   ConstraintSystem.cpp
+  CompletionContextFinder.cpp
   DebuggerTestingTransform.cpp
   DerivedConformanceActor.cpp
   DerivedConformanceDistributedActor.cpp
