@@ -90,6 +90,7 @@
 #define DEBUG_TYPE "ssa-destroy-hoisting"
 
 #include "swift/Basic/GraphNodeWorklist.h"
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -192,11 +193,11 @@ class DeinitBarriers {
 public:
   // Data flow state: blocks whose beginning is backward reachable from a
   // destroy without first reaching a barrier or storage use.
-  BasicBlockSetVector destroyReachesBeginBlocks;
+  SmallPtrSetVector<SILBasicBlock *, 4> destroyReachesBeginBlocks;
 
   // Data flow state: blocks whose end is backward reachable from a destroy
   // without first reaching a barrier or storage use.
-  BasicBlockSet destroyReachesEndBlocks;
+  SmallPtrSet<SILBasicBlock *, 4> destroyReachesEndBlocks;
 
   // Deinit barriers or storage uses within a block, reachable from a destroy.
   SmallVector<SILInstruction *, 4> barriers;
@@ -215,8 +216,7 @@ public:
   explicit DeinitBarriers(bool ignoreDeinitBarriers,
                           const KnownStorageUses &knownUses,
                           SILFunction *function)
-      : destroyReachesBeginBlocks(function), destroyReachesEndBlocks(function),
-        ignoreDeinitBarriers(ignoreDeinitBarriers), knownUses(knownUses) {
+      : ignoreDeinitBarriers(ignoreDeinitBarriers), knownUses(knownUses) {
     auto rootValue = knownUses.getStorage().getRoot();
     assert(rootValue && "HoistDestroys requires a single storage root");
     // null for function args
@@ -225,6 +225,12 @@ public:
 
   void compute() {
     FindBarrierAccessScopes(*this).solveBackward();
+    if (barrierAccessScopes.size() == 0)
+      return;
+    destroyReachesBeginBlocks.clear();
+    destroyReachesEndBlocks.clear();
+    barriers.clear();
+    deadUsers.clear();
     DestroyReachability(*this).solveBackward();
   }
 
@@ -289,7 +295,6 @@ private:
   // open access scopes in the block's predecessors.
   class FindBarrierAccessScopes {
     DeinitBarriers &result;
-    BasicBlockSetVector destroyReachesBeginBlocks;
     llvm::DenseMap<SILBasicBlock *, llvm::SmallPtrSet<BeginAccessInst *, 2>>
         liveInAccessScopes;
     llvm::SmallPtrSet<BeginAccessInst *, 2> runningLiveAccessScopes;
@@ -298,9 +303,7 @@ private:
 
   public:
     FindBarrierAccessScopes(DeinitBarriers &result)
-        : result(result),
-          destroyReachesBeginBlocks(result.knownUses.getFunction()),
-          reachability(result.knownUses.getFunction(), *this) {
+        : result(result), reachability(result.knownUses.getFunction(), *this) {
       // Seed backward reachability with destroy points.
       for (SILInstruction *destroy : result.knownUses.originalDestroys) {
         reachability.initLastUse(destroy);
@@ -314,17 +317,18 @@ private:
     }
 
     bool hasReachableBegin(SILBasicBlock *block) {
-      return destroyReachesBeginBlocks.contains(block);
+      return result.destroyReachesBeginBlocks.contains(block);
     }
 
     void markReachableBegin(SILBasicBlock *block) {
-      destroyReachesBeginBlocks.insert(block);
+      result.destroyReachesBeginBlocks.insert(block);
       if (!runningLiveAccessScopes.empty()) {
         liveInAccessScopes[block] = runningLiveAccessScopes;
       }
     }
 
     void markReachableEnd(SILBasicBlock *block) {
+      result.destroyReachesEndBlocks.insert(block);
       runningLiveAccessScopes.clear();
       for (auto *predecessor : block->getPredecessorBlocks()) {
         auto iterator = liveInAccessScopes.find(predecessor);
@@ -347,7 +351,9 @@ private:
       } else if (auto *bai = dyn_cast<BeginAccessInst>(inst)) {
         runningLiveAccessScopes.erase(bai);
       }
-      bool isBarrier = result.isBarrier(inst);
+      auto classification = result.classifyInstruction(inst);
+      result.visitedInstruction(inst, classification);
+      auto isBarrier = result.classificationIsBarrier(classification);
       if (isBarrier) {
         markLiveAccessScopesAsBarriers();
       }
@@ -361,7 +367,7 @@ private:
     bool checkReachablePhiBarrier(SILBasicBlock *block) {
       bool isBarrier =
           llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-            return result.isBarrier(block->getTerminator());
+            return result.isBarrier(predecessor->getTerminator());
           });
       if (isBarrier) {
         // If there's a barrier preventing us from hoisting out of this block,
@@ -484,8 +490,7 @@ bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
   assert(llvm::all_of(block->getArguments(),
                       [&](auto argument) { return PhiValue(argument); }));
   return llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-    return result.classificationIsBarrier(
-        result.classifyInstruction(predecessor->getTerminator()));
+    return result.isBarrier(predecessor->getTerminator());
   });
 }
 
