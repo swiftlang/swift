@@ -2619,9 +2619,11 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
         getDeclContext()->getSelfProtocolDecl()) {
       diagnoseInvalid(repr, attrs.getLoc(TAK_unchecked),
                       diag::unchecked_not_inheritance_clause);
+      ty = ErrorType::get(getASTContext());
     } else if (!ty->isConstraintType()) {
       diagnoseInvalid(repr, attrs.getLoc(TAK_unchecked),
                       diag::unchecked_not_existential, ty);
+      ty = ErrorType::get(getASTContext());
     }
 
     // Nothing to record in the type. Just clear the attribute.
