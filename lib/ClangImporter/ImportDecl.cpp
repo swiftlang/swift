@@ -3651,16 +3651,6 @@ namespace {
         }
       }
 
-      //
-//      for (auto &cxxMethod : Impl.cxxMethods) {
-//        for (auto &mutFuncPtr : cxxMethod.getSecond().second) {
-//          Decl *member =
-//              Impl.importDecl(mutFuncPtr->getUnderlyingDecl(),
-//                              getActiveSwiftVersion());
-//            if(member)
-//              result->addMemberToLookupTable(member);
-//        }
-//      }
       result->setMemberLoader(&Impl, 0);
       return result;
     }
