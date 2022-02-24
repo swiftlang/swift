@@ -2612,6 +2612,23 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     }
   }
 
+  if (attrs.has(TAK_unchecked)) {
+    ty = resolveType(repr, options);
+    if (!ty || ty->hasError()) return ty;
+
+    if (!options.is(TypeResolverContext::Inherited) ||
+        getDeclContext()->getSelfProtocolDecl()) {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_unchecked),
+                      diag::unchecked_not_inheritance_clause);
+    } else if (!ty->isConstraintType()) {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_unchecked),
+                      diag::unchecked_not_existential, ty);
+    }
+
+    // Nothing to record in the type. Just clear the attribute.
+    attrs.clearAttribute(TAK_unchecked);
+  }
+
   auto instanceOptions = options;
   instanceOptions.setContext(None);
 
@@ -2776,20 +2793,6 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     if (fnRepr != nullptr) {
       attrs.clearAttribute(TAK_async);
     }
-  }
-
-  if (attrs.has(TAK_unchecked)) {
-    if (!options.is(TypeResolverContext::Inherited) ||
-        getDeclContext()->getSelfProtocolDecl()) {
-      diagnoseInvalid(repr, attrs.getLoc(TAK_unchecked),
-                      diag::unchecked_not_inheritance_clause);
-    } else if (!ty->isExistentialType()) {
-      diagnoseInvalid(repr, attrs.getLoc(TAK_unchecked),
-                      diag::unchecked_not_existential, ty);
-    }
-
-    // Nothing to record in the type. Just clear the attribute.
-    attrs.clearAttribute(TAK_unchecked);
   }
 
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
