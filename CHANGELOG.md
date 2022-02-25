@@ -5,6 +5,48 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* The compiler now emits a warning when a non-final class conforms to a protocol that imposes a same-type requirement between `Self` and an associated type. This is because such a requirement makes the conformance unsound for subclasses.
+
+For example, Swift 5.6 would allow the following code, which at runtime would construct an instanec of `C` and not `SubC` as expected:
+
+  ```swift
+  protocol P {
+    associatedtype A : Q where Self == Self.A.B
+  }
+  
+  protocol Q {
+    associatedtype B
+  
+    static func getB() -> B
+  }
+  
+  class C : P {
+    typealias A = D
+  }
+  
+  class D : Q {
+    typealias B = C
+  
+    static func getB() -> C { return C() }
+  }
+  
+  extension P {
+    static func getAB() -> Self {
+      // This is well-typed, because `Self.A.getB()` returns
+      // `Self.A.B`, which is equivalent to `Self`.
+      return Self.A.getB()
+    }
+  }
+  
+  class SubC : C {}
+  
+  // P.getAB() declares a return type of `Self`, so it should
+  // return `SubC`, but it actually returns a `C`.
+  print(SubC.getAB())
+  ```
+
+  To make the above example correct, either the class `C` needs to become `final` (in which case `SubC` cannot be declared) or protocol `P` needs to be re-designed to not include the same-type requirement `Self == Self.A.B`.
+
 * [SE-0341][]:
 
   Opaque types can now be used in the parameters of functions and subscripts, wher they provide a shorthand syntax for the introduction of a generic parameter. For example, the following:
