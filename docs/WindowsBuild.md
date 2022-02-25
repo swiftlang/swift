@@ -105,6 +105,8 @@ Set up the `ucrt`, `visualc`, and `WinSDK` modules by:
 - copying `winsdk.modulemap` located at `swift/stdlib/public/Platform/winsdk.modulemap` into `${UniversalCRTSdkDir}/Include/${UCRTVersion}/um`
 - and setup the `visualc.apinotes` located at `swift/stdlib/public/Platform/visualc.apinotes` into `${VCToolsInstallDir}/include` as `visualc.apinotes`
 
+You're recommended to create symbolic links to avoid manual copying every time you modified these files.
+
 ```cmd
 mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" S:\swift\stdlib\public\Platform\ucrt.modulemap
 mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" S:\swift\stdlib\public\Platform\winsdk.modulemap
@@ -112,7 +114,7 @@ mklink "%VCToolsInstallDir%\include\module.modulemap" S:\swift\stdlib\public\Pla
 mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Platform\visualc.apinotes
 ```
 
-Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
+> **WARNING:** Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing "More > Run As Administrator", and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
 ## Build the toolchain
 
@@ -127,7 +129,7 @@ cmake -B "S:\b\1" ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_MT=mt ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^  
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
   -D LLVM_ENABLE_PDB=YES ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
