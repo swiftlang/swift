@@ -499,6 +499,17 @@ AbstractGenericSignatureRequestRQM::evaluate(
       requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
   }
 
+  // Preprocess requirements to eliminate conformances on generic parameters
+  // which are made concrete.
+  if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
+    SmallVector<StructuralRequirement, 4> contractedRequirements;
+    if (performConcreteContraction(requirements, contractedRequirements,
+                                   ctx.getRewriteContext().getDebugOptions()
+                                      .contains(DebugFlags::ConcreteContraction))) {
+      std::swap(contractedRequirements, requirements);
+    }
+  }
+
   // Heap-allocate the requirement machine to save stack space.
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
       ctx.getRewriteContext()));
@@ -612,6 +623,17 @@ InferredGenericSignatureRequestRQM::evaluate(
   // an extension whose extended type is a generic typealias.
   for (const auto &req : addedRequirements)
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/true});
+
+  // Preprocess requirements to eliminate conformances on generic parameters
+  // which are made concrete.
+  if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
+    SmallVector<StructuralRequirement, 4> contractedRequirements;
+    if (performConcreteContraction(requirements, contractedRequirements,
+                                   ctx.getRewriteContext().getDebugOptions()
+                                      .contains(DebugFlags::ConcreteContraction))) {
+      std::swap(contractedRequirements, requirements);
+    }
+  }
 
   // Heap-allocate the requirement machine to save stack space.
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(

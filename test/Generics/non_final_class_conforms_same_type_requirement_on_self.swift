@@ -1,5 +1,6 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures -requirement-machine-inferred-signatures=verify %s 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures -requirement-machine-inferred-signatures=on %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures -requirement-machine-inferred-signatures=on -disable-requirement-machine-concrete-contraction %s 2>&1 | %FileCheck %s
 
 public protocol P {
   associatedtype A : Q where A.B == Self
@@ -21,20 +22,26 @@ public class D : Q {
   public typealias B = C
 }
 
-// Both <T : P & C> and <T : C & P> minimize to <T where T == C>:
+// This is fine, because FinalC is final.
+public final class FinalC : P {
+  public typealias A = FinalD
+}
+
+public class FinalD : Q {
+  public typealias B = FinalC
+}
+
+// With the GSB, both <T : P & C> and <T : C & P> minimized to <T where T == C>:
 // - T : P and T : C imply that T.A == C.A == D;
 // - T : P also implies that T.A.B == T, via A.B == Self in P;
 // - Since T.A == D, T.A.B == D.B, therefore Self == D.B.
 // - D.B is a typealias for C, so really Self == C.
+//
+// The Requirement Machine leaves it as <T : C>. Technically this is an ABI break,
+// but the entire construction is unsound unless C is final.
 
-// CHECK-LABEL: Generic signature: <T where T == C>
-public func takesBoth1<T : P & C>(_: T) {}
-// expected-warning@-1 {{redundant conformance constraint 'T' : 'P'}}
-// expected-note@-2 {{conformance constraint 'T' : 'P' implied here}}
-// expected-error@-3 {{same-type requirement makes generic parameter 'T' non-generic}}
+// CHECK-LABEL: Generic signature: <T where T : C>
+public func takesBoth1<T>(_: T) where T : P, T : C {}
 
-// CHECK-LABEL: Generic signature: <U where U == C>
-public func takesBoth2<U : C & P>(_: U) {}
-// expected-warning@-1 {{redundant conformance constraint 'U' : 'P'}}
-// expected-note@-2 {{conformance constraint 'U' : 'P' implied here}}
-// expected-error@-3 {{same-type requirement makes generic parameter 'U' non-generic}}
+// CHECK-LABEL: Generic signature: <U where U : C>
+public func takesBoth2<U>(_: U) where U : C, U : P {}

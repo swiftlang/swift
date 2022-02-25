@@ -159,7 +159,8 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
           concreteRule.markConflicting();
 
         auto &conformanceRule = System.getRule(conformanceRuleID);
-        if (conformanceRule.getRHS().size() == key.size())
+        if (!conformanceRule.isIdentityConformanceRule() &&
+            conformanceRule.getRHS().size() == key.size())
           conformanceRule.markConflicting();
       }
 

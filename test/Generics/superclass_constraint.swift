@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=verify
 
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=verify > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 class A {
@@ -66,16 +66,16 @@ class S : P2 {
   typealias T = C
 }
 
-// CHECK: superclassConformance1
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
+// CHECK-LABEL: .superclassConformance1(t:)@
+// CHECK-NEXT: Generic signature: <T where T : C>
 func superclassConformance1<T>(t: T)
   where T : C, // expected-note{{conformance constraint 'T' : 'P3' implied here}}
         T : P3 {} // expected-warning{{redundant conformance constraint 'T' : 'P3'}}
 
 
 
-// CHECK: superclassConformance2
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
+// CHECK-LABEL: .superclassConformance2(t:)@
+// CHECK-NEXT: Generic signature: <T where T : C>
 func superclassConformance2<T>(t: T)
   where T : C, // expected-note{{conformance constraint 'T' : 'P3' implied here}}
    T : P3 {} // expected-warning{{redundant conformance constraint 'T' : 'P3'}}
@@ -84,8 +84,8 @@ protocol P4 { }
 
 class C2 : C, P4 { }
 
-// CHECK: superclassConformance3
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C2>
+// CHECK-LABEL: .superclassConformance3(t:)@
+// CHECK-NEXT: Generic signature: <T where T : C2>
 func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
 // expected-warning@-1{{redundant superclass constraint 'T' : 'C'}}
 // expected-note@-2{{superclass constraint 'T' : 'C' implied here}}
@@ -109,8 +109,8 @@ protocol P7 {
 	// expected-error@-2{{'Self.Assoc' cannot be a subclass of both 'Other' and 'A'}}
 }
 
-// CHECK: superclassConformance4
-// CHECK: Generic signature: <T, U where T : P3, U : P3, T.[P3]T : C, T.[P3]T == U.[P3]T>
+// CHECK-LABEL: .superclassConformance4@
+// CHECK-NEXT: Generic signature: <T, U where T : P3, U : P3, T.[P3]T : C, T.[P3]T == U.[P3]T>
 func superclassConformance4<T: P3, U: P3>(_: T, _: U)
   where T.T: C, // expected-note{{superclass constraint 'U.T' : 'C' implied here}}
         U.T: C, // expected-warning{{redundant superclass constraint 'U.T' : 'C'}}
@@ -130,6 +130,8 @@ class Classical : Elementary {
   }
 }
 
+// CHECK-LABEL: .genericFunc@
+// CHECK-NEXT: Generic signature: <T, U where T : Elementary, U : Classical, T.[Elementary]Element == Int>
 func genericFunc<T : Elementary, U : Classical>(_: T, _: U) where T.Element == U.Element {}
 
 // Lookup within superclass constraints.
@@ -141,10 +143,16 @@ class C8 {
   struct A { }
 }
 
+// CHECK-LABEL: .superclassLookup1@
+// CHECK-NEXT: Generic signature: <T where T : C8, T : P8, T.[P8]B == C8.A>
 func superclassLookup1<T: C8 & P8>(_: T) where T.A == T.B { }
 
+// CHECK-LABEL: .superclassLookup2@
+// CHECK-NEXT: Generic signature: <T where T : C8, T : P8, T.[P8]B == C8.A>
 func superclassLookup2<T: P8>(_: T) where T.A == T.B, T: C8 { }
 
+// CHECK-LABEL: .superclassLookup3@
+// CHECK-NEXT: Generic signature: <T where T : C8, T : P8, T.[P8]B == C8.A>
 func superclassLookup3<T>(_: T) where T.A == T.B, T: C8, T: P8 { }
 
 // SR-5165
@@ -158,9 +166,8 @@ protocol P10 {
   associatedtype A: C9
 }
 
-// CHECK: superclass_constraint.(file).testP10
-// CHECK: Generic signature: <T where T : P10, T.[P10]A : C10>
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0.[P10]A : C10>
+// CHECK-LABEL: .testP10@
+// CHECK-NEXT: Generic signature: <T where T : P10, T.[P10]A : C10>
 func testP10<T>(_: T) where T: P10, T.A: C10 { }
 
 // Nested types of generic class-constrained type parameters.
@@ -183,7 +190,7 @@ protocol X {
 	associatedtype Y : A
 }
 
-// CHECK-DAG: .noRedundancyWarning@
+// CHECK-LABEL: .noRedundancyWarning@
 // CHECK: Generic signature: <C where C : X, C.[X]Y == B>
 func noRedundancyWarning<C : X>(_ wrapper: C) where C.Y == B {}
 
@@ -222,7 +229,7 @@ public class Teddy: Pony {}
 public struct Paddock<P: Pony> {}
 
 public struct Barn<T: Teddy> {
-  // CHECK-DAG: Barn.foo@
+  // CHECK-LABEL: Barn.foo@
   // CHECK: Generic signature: <T, S where T : Teddy>
   public func foo<S>(_: S, _: Barn<T>, _: Paddock<T>) {}
 }
