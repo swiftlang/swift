@@ -1,10 +1,10 @@
 # Building Swift on Windows
 
-Visual Studio 2017 or newer is needed to build Swift on Windows, while VS2019 is recommended and currently used for CI.  The free Community edition is sufficient to build Swift.
+Visual Studio 2017 or newer is needed to build Swift on Windows, while VS2019 is recommended and currently used for CI.  The free Community edition is sufficient to build Swift, and we're assuming host and target to be both x64.
 
 The commands below (with the exception of installing Visual Studio) must be entered in the "**x64 Native** Tools Command Prompt for VS2019" (or VS2017, VS2022 depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
 
-> **NOTE:** This guide is intended for toolchain developers who wants to develop or build Swift on their own machine.  For building and packaging a standard toolchain, please refer to [`build-windows-toolchain.bat`](../utils/build-windows-toolchain.bat).
+> **NOTE:** This guide is intended for toolchain developers who wants to develop or build Swift on their own machine.  For building a standard toolchain, please refer to [`build-windows-toolchain.bat`](../utils/build-windows-toolchain.bat).
 
 ## Install dependencies
 
@@ -85,7 +85,7 @@ Note that ICU is only required for building Foundation, and SQLite is only
 needed for building llbuild and onwards.  The ICU project provides binaries,
 alternatively, see the ICU project for details on building ICU from source.
 
-## One-time Setup (re-run on Visual Studio upgrades)
+## One-time setup (re-run on Visual Studio upgrades)
 
 Set up the `ucrt`, `visualc`, and `WinSDK` modules by:
 
@@ -106,41 +106,82 @@ mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Pla
 
 > **WARNING:** Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing "More > Run As Administrator", and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
-## Build the toolchain
+## Build a minimal Swift toolchain
+
+A minimal Swift toolchain comes with neither optional features nor SwiftPM stuffs, and is useful for playing with the compiler or language itself.
 
 ```cmd
-cmake -B "S:\b\1" ^
+cmake -B S:\b\1 ^
   -C S:\swift\cmake\caches\Windows-x86_64.cmake ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
   -D CMAKE_C_COMPILER=cl ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy /source-charset:utf-8 /execution-charset:utf-8" ^
   -D CMAKE_CXX_COMPILER=cl ^
-  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy /utf-8" ^
   -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
-  -D LLVM_ENABLE_PDB=YES ^
+  -D LLVM_APPEND_VC_REV=NO ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
   -G Ninja ^
   -S S:\llvm-project\llvm
 
-ninja -C S:\b\1
+cmake --build S:\b\1
+cmake --build S:\b\1 --target install
+```
+
+## Build a complete toolchain for development
+
+The following guide will get you through the building process of a complete Swift debug toolchain.
+
+### Build Swift
+
+```cmd
+cmake -B S:\b\1 ^
+  -C S:\swift\cmake\caches\Windows-x86_64.cmake ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+  -D CMAKE_C_COMPILER=cl ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy /source-charset:utf-8 /execution-charset:utf-8" ^
+  -D CMAKE_CXX_COMPILER=cl ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy /utf-8" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
+  -D LLVM_ENABLE_PDB=YES ^
+
+  -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
+  -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
+  -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
+
+  -D SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES ^
+  -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES ^
+  -D SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES ^
+
+  -D SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES ^
+  -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=S:\swift-experimental-string-processing ^
+
+  -G Ninja ^
+  -S S:\llvm-project\llvm
+
+cmake --build S:\b\1
 ```
 
 > **NOTE:** Linking with debug information (`-D LLVM_ENABLE_PDB=YES`) is very memory intensive.  When building with parallel jobs, it is possible to consume upwards of 32 GiB of RAM.  You can append `-D LLVM_PARALLEL_LINK_JOBS=N -D DLLVM_PARALLEL_LINK_JOBS=N` to reduce the number of parallel link operations to `N` which should help reduce the memory pressure.  You may need to set this to a low number (e.g. 1) if you see build failures due to memory exhaustion.
 
-## Running Swift tests on Windows
+Test Swift:
 
 ```cmd
 path S:\Library\icu-67\usr\bin;S:\b\1\bin;S:\b\1\tools\swift\libdispatch-windows-x86_64-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\1 check-swift
 ```
 
-## Build swift-corelibs-libdispatch
+### Build libdispatch
 
 ```cmd
 cmake -B S:\b\2 ^
@@ -157,13 +198,13 @@ cmake -B S:\b\2 ^
 ninja -C S:\b\2
 ```
 
-## Test swift-corelibs-libdispatch
+Test libdispatch:
 
 ```cmd
 ninja -C S:\b\2 check
 ```
 
-## Build swift-corelibs-foundation
+### Build Foundation
 
 ```cmd
 cmake -B S:\b\3 ^
@@ -188,13 +229,13 @@ cmake -B S:\b\3 ^
 ninja -C S:\b\3
 ```
 
-- Add Foundation to your path:
+Add Foundation to your path:
 
 ```cmd
 path S:\b\3\bin;%PATH%
 ```
 
-## Build swift-corelibs-xctest
+### Build XCTest
 
 ```cmd
 cmake -B S:\b\4 ^
@@ -211,20 +252,20 @@ cmake -B S:\b\4 ^
 ninja -C S:\b\4
 ```
 
-- Add XCTest to your path:
+Add XCTest to your path:
 
 ```cmd
 
 path S:\b\4;%PATH%
 ```
 
-## Test XCTest
+Test XCTest:
 
 ```cmd
 ninja -C S:\b\4 check-xctest
 ```
 
-## Rebuild Foundation
+### Rebuild Foundation
 
 ```cmd
 cmake -B S:\b\3 ^
@@ -250,13 +291,13 @@ cmake -B S:\b\3 ^
 ninja -C S:\b\3
 ```
 
-## Test Foundation
+Test Foundation:
 
 ```cmd
 ninja -C S:\b\3 test
 ```
 
-## Build swift-tools-core-support
+### Build TSC
 
 ```cmd
 cmake -B S:\b\5 ^
@@ -275,7 +316,7 @@ cmake -B S:\b\5 ^
 ninja -C S:\b\5
 ```
 
-## Build swift-llbuild
+### Build llbuild
 
 ```cmd
 cmake -B S:\b\6 ^
@@ -297,13 +338,13 @@ cmake -B S:\b\6 ^
 ninja -C S:\b\6
 ```
 
-- Add llbuild to your path:
+Add llbuild to your path:
 
 ```cmd
 path S:\b\6\bin;%PATH%
 ```
 
-## Build Yams
+### Build Yams
 
 ```cmd
 cmake -B S:\b\7 ^
@@ -321,7 +362,7 @@ cmake -B S:\b\7 ^
 ninja -C S:\b\7
 ```
 
-## Build swift-argument-parser
+### Build ArgumentParser
 
 ```cmd
 cmake -B S:\b\8 ^
@@ -339,7 +380,7 @@ cmake -B S:\b\8 ^
 ninja -C S:\b\8
 ```
 
-## Build swift-driver
+## Build SwiftDriver
 
 ```cmd
 cmake -B S:\b\9 ^
@@ -360,7 +401,7 @@ cmake -B S:\b\9 ^
 ninja -C S:\b\9
 ```
 
-## Build swift-package-manager
+### Build SwiftPM
 
 ```cmd
 cmake -B S:\b\10 ^
@@ -378,22 +419,25 @@ cmake -B S:\b\10 ^
   -D ArgumentParser_DIR=S:\b\8\cmake\modules ^
   -D SwiftDriver_DIR=S:\b\9\cmake\modules ^
   -G Ninja ^
-  -S S:\swift-package-manager
+  -S S:\swiftpm
 
 ninja -C S:\b\10
 ```
 
-Indicate to swift-package-manager where to find the Package Description before installation:
+Indicate to SwiftPM where to find `PackageDescription` before installation:
+
 ```cmd
 set SWIFTPM_PD_LIBS=S:\b\10\pm
 ```
 
-## Install the Swift toolchain on Windows
-
-- Run ninja install:
+### Install the toolchain
 
 ```cmd
-ninja -C S:\b\1 install
+cmake --build S:\b\1 --target install
 ```
 
-- Add the Swift on Windows binaries path (`C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin`) to the `PATH` environment variable.
+Add the target to path:
+
+```cmd
+path S:\b\toolchain\usr\bin:%PATH%
+```
