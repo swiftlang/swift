@@ -9,7 +9,11 @@ public protocol Q {
   associatedtype B
 }
 
+// This is rejected, because 'A.B == Self' means that 'Self' must
+// exactly equal C; since C is not final, this means the conformance
+// is not covariant.
 public class C : P {
+// expected-warning@-1 {{non-final class 'C' cannot safely conform to protocol 'P', which requires that 'Self' is exactly equal to 'Self.A.B'; this is an error in Swift 6}}
   public typealias A = D
 }
 
