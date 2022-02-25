@@ -5122,6 +5122,15 @@ private:
                              = FreeTypeVariableBinding::Disallow);
 
 public:
+  /// Pre-check the target, validating any types that occur in it
+  /// and folding sequence expressions.
+  ///
+  /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
+  /// to replace any discovered invalid member references with `ErrorExpr`.
+  static bool preCheckTarget(SolutionApplicationTarget &target,
+                             bool replaceInvalidRefsWithErrors,
+                             bool leaveClosureBodiesUnchecked);
+
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
   ///
