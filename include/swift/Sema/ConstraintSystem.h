@@ -1715,6 +1715,13 @@ public:
                             ContextualTypePurpose contextualPurpose,
                             TypeLoc convertType, bool isDiscarded);
 
+  SolutionApplicationTarget(Expr *expr, DeclContext *dc, ExprPattern *pattern,
+                            Type patternType)
+      : SolutionApplicationTarget(expr, dc, CTP_ExprPattern, patternType,
+                                  /*isDiscarded=*/false) {
+    setPattern(pattern);
+  }
+
   SolutionApplicationTarget(AnyFunctionRef fn)
       : SolutionApplicationTarget(fn, fn.getBody()) { }
 
@@ -1799,6 +1806,12 @@ public:
   /// Form a target for a synthesized property wrapper initializer.
   static SolutionApplicationTarget forPropertyWrapperInitializer(
       VarDecl *wrappedVar, DeclContext *dc, Expr *initializer);
+
+  static SolutionApplicationTarget forExprPattern(Expr *expr, DeclContext *dc,
+                                                  ExprPattern *pattern,
+                                                  Type patternTy) {
+    return {expr, dc, pattern, patternTy};
+  }
 
   Expr *getAsExpr() const {
     switch (kind) {
@@ -1900,6 +1913,12 @@ public:
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
     return expression.pattern;
+  }
+
+  ExprPattern *getExprPattern() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_ExprPattern);
+    return cast<ExprPattern>(expression.pattern);
   }
 
   /// For a pattern initialization target, retrieve the contextual pattern.
@@ -2022,7 +2041,8 @@ public:
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization ||
            expression.contextualPurpose == CTP_ForEachStmt ||
-           expression.contextualPurpose == CTP_ForEachSequence);
+           expression.contextualPurpose == CTP_ForEachSequence ||
+           expression.contextualPurpose == CTP_ExprPattern);
     expression.pattern = pattern;
   }
 
