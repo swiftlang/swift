@@ -8936,6 +8936,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     case CTP_Unused:
     case CTP_CaseStmt:
     case CTP_ReturnStmt:
+    case CTP_ExprPattern:
     case swift::CTP_ReturnSingleExpr:
     case swift::CTP_YieldByValue:
     case swift::CTP_YieldByReference:
