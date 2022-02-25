@@ -93,7 +93,7 @@ AsyncContextLayout irgen::getAsyncContextLayout(IRGenModule &IGM,
 }
 
 static Size getAsyncContextHeaderSize(IRGenModule &IGM) {
-  return 2 * IGM.getPointerSize() + Size(4);
+  return 2 * IGM.getPointerSize();
 }
 
 AsyncContextLayout irgen::getAsyncContextLayout(
@@ -119,19 +119,6 @@ AsyncContextLayout irgen::getAsyncContextLayout(
   {
     auto ty = SILType();
     auto &ti = IGM.getTaskContinuationFunctionPtrTypeInfo();
-    valTypes.push_back(ty);
-    typeInfos.push_back(&ti);
-  }
-
-  // AsyncContextFlags Flags;
-  // FIXME: this appears to be dead; we should adjust the layout of
-  // the special async contexts that assume its existence and then
-  // remove it.
-  {
-    auto ty = SILType::getPrimitiveObjectType(
-        BuiltinIntegerType::get(32, IGM.IRGen.SIL.getASTContext())
-            ->getCanonicalType());
-    const auto &ti = IGM.getTypeInfo(ty);
     valTypes.push_back(ty);
     typeInfos.push_back(&ti);
   }
@@ -181,11 +168,7 @@ FunctionPointerKind::getStaticAsyncContextSize(IRGenModule &IGM) const {
     // If you add a new special runtime function, it is highly recommended
     // that you make calls to it allocate a little more memory than this!
     // These frames being this small is very arguably a mistake.
-    //
-    // FIXME: if we remove Flags in AsyncContextLayout (and thus from
-    // headerSize), account for it here so that we continue to pass the
-    // right amount of memory.
-    return headerSize + 2 * IGM.getPointerSize();
+    return headerSize + 3 * IGM.getPointerSize();
   }
   llvm_unreachable("covered switch");
 }
