@@ -7,47 +7,46 @@ import ImplicitComputedProperties
 
 var ImplicitComputedPropertiesTestSuite = TestSuite("ImplicitComputedProperties")
 
-// TODO: Omar, please rename "VoidGetter"
-// TODO: Omar, please add setter tests for all of these.
 ImplicitComputedPropertiesTestSuite.test("LongNameAllLower") {
-    var VoidGetter = LongNameAllLower()
-
-    expectEqual(VoidGetter.foo, 42)
+    var a = LongNameAllLower()
+    expectEqual(a.foo, 42)
+    a.foo = 32
+    expectEqual(a.foo, 32)
 
 }
 
 ImplicitComputedPropertiesTestSuite.test("LongNameAllUpper") {
-    var VoidGetter = LongNameAllUpper()
-
-    expectEqual(VoidGetter.foo, 42)
-
+    var b = LongNameAllUpper()
+    expectEqual(b.foo, 42)
+    b.foo = 32
+    expectEqual(b.foo, 32)
 }
 
 ImplicitComputedPropertiesTestSuite.test("LongNameMix") {
-    var VoidGetter = LongNameMix()
-
-    expectEqual(VoidGetter.foo, 42)
-
+    var c = LongNameMix()
+    expectEqual(c.foo, 42)
+    c.foo = 32
+    expectEqual(c.foo, 32)
 }
 
 ImplicitComputedPropertiesTestSuite.test("GetterOnly") {
-    var VoidGetter = GetterOnly()
-    expectEqual(VoidGetter.foo, 42)
-
+    var d = GetterOnly()
+    expectEqual(d.foo, 42)
 }
 
 ImplicitComputedPropertiesTestSuite.test("UTF8Str") {
-    var VoidGetter  = UTF8Str()
-    expectEqual(VoidGetter.utf8Str, 42)
-
+    var e  = UTF8Str()
+    expectEqual(e.utf8Str, 42)
+    e.utf8Str = 32
+    expectEqual(e.utf8Str, 32)
 }
 ImplicitComputedPropertiesTestSuite.test("setters") {
-    var Object = IntGetterSetter()
-    Object.x = 1
-    expectEqual(Object.x, 1)
+    var f = IntGetterSetter()
+    f.x = 1
+    expectEqual(f.x, 1)
 }
 
-// TODO: Omar put the radar link here.
+// rdar://89453106 (We need to handle imported properties that return a reference)
 //ImplicitComputedPropertiesTestSuite.test("ref") {
 //    var Object = RefGetterSetter()
 //    var i: CInt = 2

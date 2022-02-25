@@ -27,16 +27,21 @@ struct NoNameVoidGetter {
 };
 
 struct LongNameAllLower {
-  int getfoo() const { return 42; }
+  mutable int value = 42;
+  int getfoo() const { return value; }
+  void setfoo(int v) const { value = v ;}
 };
 
 struct LongNameAllUpper {
-  int getFOO() const { return 42; }
-  int setFOO(int v) const {}
+    mutable int value = 42;
+  int getFOO() const { return value; }
+  void setFOO(int v) const {value = v ;}
 };
 
 struct LongNameMix {
-  int GetFoo() const { return 42; }
+     int value = 42;
+  int GetFoo() const { return value; }
+  void SetFoo(int v) {value = v ;}
 };
 
 struct GetterOnly {
@@ -57,17 +62,16 @@ struct IntGetterSetter {
   void setX(int v) { val = v; }
 };
 
-// TODO: Omar please file a radar for this.
+// this should be handled as snake case. See: rdar://89453010
 struct IntGetterSetterSnakeCaseUpper {
     int val;
     int Get_X() const { return val; }
     void Set_X(int v) { val = v; }
 };
 
-// TODO: Omar, please file a radar to deprecate methods when we transform them successfully (telling users to use 
-//  the computed properties instead).
+// We should  deprecate methods when we transform them successfully (telling users to use 
+//  the computed properties instead) rdar://89452854.
 
-// TODO: Omar, please write a markdown file describing how names are imported and what this transformation does.
 
 struct IntGetterSetterSnakeCase {
     int val;
@@ -157,8 +161,9 @@ struct DifferentTypes {
 };
 
 struct UTF8Str {
-  int getUTF8Str() const { return 42; }
-  void setUTF8Str(int) {}
+    int value = 42;
+  int getUTF8Str() const { return value; }
+  void setUTF8Str(int v ) { value = v; }
 };
 
 struct MethodWithSameName {

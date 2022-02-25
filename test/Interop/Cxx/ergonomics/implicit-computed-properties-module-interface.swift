@@ -40,21 +40,29 @@
 // CHECK:      struct LongNameAllLower {
 // CHECK-NOT:     var
 // CHECK-NEXT:    init()
-// CHECK-NEXT:    var foo: Int32 { get }
-// CHECK-NEXT:    func getfoo() -> Int32
+// CHECK-NEXT:    init(value: Int32)
+// CHECK-NEXT:    var foo: Int32 { mutating get set }
+// CHECK-NEXT:    mutating func getfoo() -> Int32
+// CHECK-NEXT:    mutating func setfoo(_ v: Int32)
+// CHECK-NEXT:    var value: Int32
 // CHECK-NEXT: }
 
 // CHECK:      struct LongNameAllUpper {
-// CHECK-NEXT:    init()
-// CHECK-NEXT:    var foo: Int32
-// CHECK-NEXT:    func getFOO() -> Int32
-// CHECK-NEXT:    func setFOO(_ v: Int32) -> Int32
+// CHECK-NEXT:     init()
+// CHECK-NEXT:     init(value: Int32)
+// CHECK-NEXT:     var foo: Int32 { mutating get set }
+// CHECK-NEXT:     mutating func getFOO() -> Int32
+// CHECK-NEXT:     mutating func setFOO(_ v: Int32)
+// CHECK-NEXT:     var value: Int32
 // CHECK-NEXT: }
 
 // CHECK:      struct LongNameMix {
 // CHECK-NEXT:    init()
-// CHECK-NEXT:    var foo: Int32 { get }
+// CHECK-NEXT:    init(value: Int32)
+// CHECK-NEXT:    var foo: Int32
 // CHECK-NEXT:    func GetFoo() -> Int32
+// CHECK-NEXT:    mutating func SetFoo(_ v: Int32)
+// CHECK-NEXT:    var value: Int32
 // CHECK-NEXT: }
 
 // CHECK:      struct GetterOnly {
@@ -217,9 +225,11 @@
 
 // CHECK:      struct UTF8Str {
 // CHECK-NEXT:    init()
+// CHECK-NEXT:    init(value: Int32)
 // CHECK-NEXT:    var utf8Str: Int32
 // CHECK-NEXT:    func getUTF8Str() -> Int32
-// CHECK-NEXT:    mutating func setUTF8Str(_: Int32)
+// CHECK-NEXT:    mutating func setUTF8Str(_ v: Int32)
+// CHECK-NEXT:    var value: Int32
 // CHECK-NEXT: }
 
 

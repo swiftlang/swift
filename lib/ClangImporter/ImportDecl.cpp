@@ -7911,6 +7911,9 @@ SwiftDeclConverter::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
     if (setter->isMutating()) {
       setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
       result->setIsSetterMutating(true);
+    } else {
+        setterDecl->setSelfAccessKind(SelfAccessKind::NonMutating);
+        result->setIsSetterMutating(false);
     }
   }
 

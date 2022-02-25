@@ -22,7 +22,7 @@ struct CXXMethodBridging {
         if (nameIsBlacklist())
             return Kind::unkown;
 
-        // TODO: right now we can't transform names that aren't title case or camel
+        // this should be handled as snake case. See: rdar://89453010
         // case. In the future we could
         //  import these too, though.
         auto nameKind = classifyNameKind();
@@ -35,8 +35,7 @@ struct CXXMethodBridging {
             if (method->getNumParams() != 1)
                 return Kind::unkown;
 
-            // TODO: We can't transform getters that return a reference.
-            // TODO: Omar, put the radar link here.
+            // rdar://89453106 (We need to handle imported properties that return a reference)
             if (method->getParamDecl(0)->getType()->isReferenceType())
                 return Kind::unkown;
 
@@ -52,15 +51,14 @@ struct CXXMethodBridging {
             if (method->getNumParams() != 0)
                 return Kind::unkown;
 
-            // TODO: We can't transform getters that return a reference.
-            // TODO: Omar, put the radar link here.
+            // rdar://89453106 (We need to handle imported properties that return a reference)
             if (method->getReturnType()->isReferenceType())
                 return Kind::unkown;
 
             return Kind::getter;
         }
 
-        // TODO: classify subscripts.
+        rdar://89453187 (Add subscripts clarification to CXXMethod Bridging to clean up importDecl)
         return Kind::unkown;
     }
 
@@ -86,7 +84,7 @@ struct CXXMethodBridging {
         return method->getName();
     }
 
-    // TODO: handle snake case as well.
+    // this should be handled as snake case. See: rdar://89453010
     std::string importNameAsCamelCaseName() {
         std::string output;
         auto kind = classify();
