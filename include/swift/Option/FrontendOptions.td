@@ -355,6 +355,10 @@ def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machin
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete type nesting depth before giving up">;
 
+def disable_requirement_machine_concrete_contraction : Flag<["-"], "disable-requirement-machine-concrete-contraction">,
+  HelpText<"Disable preprocessing pass to eliminate conformance requirements "
+           "on generic parameters which are made concrete">;
+
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -verify -emit-ir %s
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -requirement-machine-inferred-signatures=verify 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -verify -emit-ir -requirement-machine-inferred-signatures=verify %s
 
 public protocol P {
     associatedtype Element
