@@ -132,31 +132,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
   std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
 
-  void addSuperKeyword(CodeCompletionResultSink &Sink) {
-    auto *DC = CurDeclContext->getInnermostTypeContext();
-    if (!DC)
-      return;
-    auto *CD = DC->getSelfClassDecl();
-    if (!CD)
-      return;
-    Type ST = CD->getSuperclass();
-    if (ST.isNull() || ST->is<ErrorType>())
-      return;
-
-    CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                        SemanticContextKind::CurrentNominal,
-                                        {});
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
-      if (AFD->getOverriddenDecl() != nullptr) {
-        Builder.addFlair(CodeCompletionFlairBit::CommonKeywordAtCurrentPosition);
-      }
-    }
-
-    Builder.setKeywordKind(CodeCompletionKeywordKind::kw_super);
-    Builder.addKeyword("super");
-    Builder.addTypeAnnotation(ST, PrintOptions());
-  }
-
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
 
@@ -879,6 +854,32 @@ static void addExprKeywords(CodeCompletionResultSink &Sink, DeclContext *DC) {
   addKeyword(Sink, "await", CodeCompletionKeywordKind::None, "", flair);
 }
 
+static void addSuperKeyword(CodeCompletionResultSink &Sink, DeclContext *DC) {
+  if (!DC)
+    return;
+  auto *TC = DC->getInnermostTypeContext();
+  if (!TC)
+    return;
+  auto *CD = TC->getSelfClassDecl();
+  if (!CD)
+    return;
+  Type ST = CD->getSuperclass();
+  if (ST.isNull() || ST->is<ErrorType>())
+    return;
+
+  CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
+                                      SemanticContextKind::CurrentNominal, {});
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+    if (AFD->getOverriddenDecl() != nullptr) {
+      Builder.addFlair(CodeCompletionFlairBit::CommonKeywordAtCurrentPosition);
+    }
+  }
+
+  Builder.setKeywordKind(CodeCompletionKeywordKind::kw_super);
+  Builder.addKeyword("super");
+  Builder.addTypeAnnotation(ST, PrintOptions());
+}
+
 static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "some", CodeCompletionKeywordKind::None, "some");
 }
@@ -950,7 +951,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::YieldStmtExpr:
   case CompletionKind::PostfixExprBeginning:
   case CompletionKind::ForEachSequence:
-    addSuperKeyword(Sink);
+    addSuperKeyword(Sink, CurDeclContext);
     addLetVarKeywords(Sink);
     addExprKeywords(Sink, CurDeclContext);
     addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
@@ -1565,7 +1566,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setHaveLParen(false);
 
       // Add any keywords that can be used in an argument expr position.
-      addSuperKeyword(CompletionContext.getResultSink());
+      addSuperKeyword(CompletionContext.getResultSink(), CurDeclContext);
       addExprKeywords(CompletionContext.getResultSink(), CurDeclContext);
 
       DoPostfixExprBeginning();
@@ -1711,7 +1712,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
                               ContextInfo.isImplicitSingleExpressionReturn());
 
       // Add any keywords that can be used in an argument expr position.
-      addSuperKeyword(CompletionContext.getResultSink());
+      addSuperKeyword(CompletionContext.getResultSink(), CurDeclContext);
       addExprKeywords(CompletionContext.getResultSink(), CurDeclContext);
 
       DoPostfixExprBeginning();
@@ -1769,7 +1770,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
                           Context.LangOpts.EnableExperimentalConcurrency,
                           Context.LangOpts.EnableExperimentalDistributed);
           addStmtKeywords(Sink, CurDeclContext, MaybeFuncBody);
-          addSuperKeyword(Sink);
+          addSuperKeyword(Sink, CurDeclContext);
           addLetVarKeywords(Sink);
           addExprKeywords(Sink, CurDeclContext);
           addAnyTypeKeyword(Sink, Context.TheAnyType);
