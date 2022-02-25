@@ -672,13 +672,22 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                                 /*Implicit=*/true);
   Expr *matchCall = BinaryExpr::create(Context, EP->getSubExpr(), matchOp,
                                        matchVarRef, /*implicit*/ true);
+
+  // Result of `~=` should always be a boolean.
+  auto contextualTy = Context.getBoolDecl()->getDeclaredInterfaceType();
+  auto target = SolutionApplicationTarget::forExprPattern(matchCall, DC, EP,
+                                                          contextualTy);
+
   // Check the expression as a condition.
-  bool hadError = typeCheckCondition(matchCall, DC);
+  auto result = typeCheckExpression(target);
+  if (!result)
+    return true;
+
   // Save the type-checked expression in the pattern.
-  EP->setMatchExpr(matchCall);
+  EP->setMatchExpr(result->getAsExpr());
   // Set the type on the pattern.
   EP->setType(rhsType);
-  return hadError;
+  return false;
 }
 
 static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
