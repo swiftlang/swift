@@ -2498,7 +2498,7 @@ int swift::ide::api::deserializeSDKDump(StringRef dumpPath, StringRef OutputPath
 }
 
 void swift::ide::api::dumpModuleContent(ModuleDecl *MD, StringRef OutputFile,
-                                        bool ABI) {
+                                        bool ABI, bool Empty) {
   CheckerOptions opts;
   opts.ABI = ABI;
   opts.SwiftOnly = true;
@@ -2509,12 +2509,17 @@ void swift::ide::api::dumpModuleContent(ModuleDecl *MD, StringRef OutputFile,
   opts.Verbose = false;
   SDKContext ctx(opts);
   SwiftDeclCollector collector(ctx);
-  collector.lookupVisibleDecls({MD});
   ConstExtractor extractor(ctx, MD->getASTContext());
-  extractor.extract(MD);
   PayLoad payload;
-  payload.allContsValues = &extractor.getAllConstValues();
-  dumpSDKRoot(collector.getSDKRoot(), payload, OutputFile);
+  SWIFT_DEFER {
+    payload.allContsValues = &extractor.getAllConstValues();
+    dumpSDKRoot(collector.getSDKRoot(), payload, OutputFile);
+  };
+  if (Empty) {
+    return;
+  }
+  collector.lookupVisibleDecls({MD});
+  extractor.extract(MD);
 }
 
 int swift::ide::api::findDeclUsr(StringRef dumpPath, CheckerOptions Opts) {

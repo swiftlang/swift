@@ -169,6 +169,9 @@ def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
 def serialized_path_obfuscate : Separate<["-"], "serialized-path-obfuscate">,
     HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
 
+def empty_abi_descriptor : Flag<["-"], "empty-abi-descriptor">,
+  HelpText<"Avoid printing actual module content into ABI descriptor file">;
+
 def no_serialize_debugging_options :
   Flag<["-"], "no-serialize-debugging-options">,
   HelpText<"Never serialize options for debugging (default: only for apps)">;
@@ -860,6 +863,10 @@ def experimental_one_way_closure_params :
 def experimental_multi_statement_closures :
   Flag<["-"], "experimental-multi-statement-closures">,
   HelpText<"Enable experimental support for type inference in multi-statement closures">;
+
+def experimental_type_inference_from_defaults :
+  Flag<["-"], "enable-experimental-type-inference-from-defaults">,
+  HelpText<"Enable experimental support for generic parameter inference from default values">;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,

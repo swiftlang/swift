@@ -1068,6 +1068,13 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   return initExpr;
 }
 
+Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
+                                          ParamDecl *param) const {
+  if (auto expr = param->getTypeCheckedDefaultExpr())
+    return expr->getType();
+  return Type();
+}
+
 Initializer *
 DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
                                             ParamDecl *param) const {
@@ -2650,6 +2657,12 @@ public:
 
     TypeChecker::checkDeclAttributes(PD);
 
+    // Explicity compute the requirement signature to detect errors.
+    // Do this before visiting members, to avoid a request cycle if
+    // a member referenecs another declaration whose generic signature
+    // has a conformance requirement to this protocol.
+    auto reqSig = PD->getRequirementSignature().getRequirements();
+
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);
@@ -2662,9 +2675,6 @@ public:
     if (PD->isResilient())
       if (!SF || SF->Kind != SourceFileKind::Interface)
         TypeChecker::inferDefaultWitnesses(PD);
-
-    // Explicity compute the requirement signature to detect errors.
-    auto reqSig = PD->getRequirementSignature().getRequirements();
 
     if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
       auto requirementsSig =
