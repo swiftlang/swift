@@ -6,4 +6,11 @@ public func getIncrementorValue() -> CInt {
   return callConstructor(41)
 }
 
-// CHECK: define linkonce_odr{{( dso_local)?}} i32 @{{_Z9incrementi|"\?increment@@YAHH@Z"}}(i32 %t)
+let a = Hold42()
+let b = Hold23()
+
+let sum = a.m + b.m
+
+// CHECK-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z9incrementi|"\?increment@@YAHH@Z"}}(i32 %t)
+// CHECK-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z5get42v|"\?get42@@YAHXZ"}}
+// CHECK-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z15passThroughArgTIiET_S0_|"\?\?\$passThroughArgT@H@@YAHH@Z"}}
