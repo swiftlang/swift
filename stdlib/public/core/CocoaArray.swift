@@ -154,7 +154,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     guard buffer.count > 0 else { return (makeIterator(), 0) }
     let start = buffer.baseAddress!
     let c = Swift.min(self.count, buffer.count)
-    let end = _copyContents(subRange: 0 ..< c, initializing: start)
+    _ = _copyContents(subRange: 0 ..< c, initializing: start)
     return (IndexingIterator(_elements: self, _position: c), c)
   }
 }

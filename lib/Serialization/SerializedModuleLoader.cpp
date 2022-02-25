@@ -608,10 +608,10 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       InterestingFilenames, Ctx.SourceMgr.getFileSystem().get(),
       Ctx.LangOpts.Target.isOSDarwin());
   for (const auto &searchPath : searchPaths) {
-    currPath = searchPath->Path;
-    isSystemModule = searchPath->IsSystem;
+    currPath = searchPath->getPath();
+    isSystemModule = searchPath->isSystem();
 
-    switch (searchPath->Kind) {
+    switch (searchPath->getKind()) {
     case ModuleSearchPathKind::Import:
     case ModuleSearchPathKind::RuntimeLibrary: {
       isFramework = false;
@@ -621,7 +621,7 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       // This was not always true on non-Apple platforms, and in order to
       // ease the transition, check both layouts.
       bool checkTargetSpecificModule = true;
-      if (searchPath->Kind != ModuleSearchPathKind::RuntimeLibrary ||
+      if (searchPath->getKind() != ModuleSearchPathKind::RuntimeLibrary ||
           !Ctx.LangOpts.Target.isOSDarwin()) {
         auto modulePath = currPath;
         llvm::sys::path::append(modulePath, genericModuleFileName);

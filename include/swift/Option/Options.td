@@ -810,6 +810,10 @@ def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Perform cross-module optimization">;
 
+def disableCrossModuleOptimization : Flag<["-"], "disable-cmo">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Disable cross-module optimization">;
+
 def ExperimentalPerformanceAnnotations : Flag<["-"], "experimental-performance-annotations">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Enable experimental performance annotations">;

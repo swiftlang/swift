@@ -46,6 +46,13 @@ internal func inspect(process pattern: String,
     print("Failed to create inspector for process id \(processId)")
     return
   }
+#elseif os(Windows)
+  guard let process = WindowsRemoteProcess(processId: processId) else {
+    print("Failed to create inspector for process id \(processId)")
+    return
+  }
+#else
+#error("Unsupported platform")
 #endif
 
   try body(process)

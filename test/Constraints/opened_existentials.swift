@@ -164,7 +164,7 @@ func testReturningOpaqueTypes(p: any P) {
   let q = p.getQ()
   let _: Int = q  // expected-error{{cannot convert value of type 'Q' to specified type 'Int'}}
 
-  p.getCollectionOf() // expected-error{{member 'getCollectionOf' cannot be used on value of protocol type 'P'; use a generic constraint instead}}
+  p.getCollectionOf() // expected-error{{member 'getCollectionOf' cannot be used on value of protocol type 'P'; consider using a generic constraint instead}}
 
   let q2 = getPQ(p)
   let _: Int = q2  // expected-error{{cannot convert value of type 'Q' to specified type 'Int'}}

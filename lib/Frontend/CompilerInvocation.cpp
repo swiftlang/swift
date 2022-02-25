@@ -360,6 +360,9 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
       Opts.PrintSPIs = true;
     }
   }
+  for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {
+    Opts.ModulesToSkipInPublicInterface.push_back(val);
+  }
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -876,6 +879,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableSubstSILFunctionTypes =
       Args.hasArg(OPT_disable_subst_sil_function_types);
 
+  Opts.RequirementMachineProtocolSignatures = RequirementMachineMode::Verify;
+
   if (auto A = Args.getLastArg(OPT_requirement_machine_protocol_signatures_EQ)) {
     auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
         .Case("off", RequirementMachineMode::Disabled)
@@ -958,6 +963,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.RequirementMachineMaxConcreteNesting = limit;
     }
   }
+
+  if (Args.hasArg(OPT_disable_requirement_machine_concrete_contraction))
+    Opts.EnableRequirementMachineConcreteContraction = false;
 
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 
@@ -1050,6 +1058,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   Opts.EnableMultiStatementClosureInference |=
       Args.hasArg(OPT_experimental_multi_statement_closures);
+
+  Opts.EnableTypeInferenceFromDefaultArguments |=
+      Args.hasArg(OPT_experimental_type_inference_from_defaults);
 
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);

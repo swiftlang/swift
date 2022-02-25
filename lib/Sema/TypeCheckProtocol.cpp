@@ -4853,18 +4853,42 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 
   CheckedRequirementSignature = true;
 
+  auto &diags = proto->getASTContext().Diags;
+
   auto DC = Conformance->getDeclContext();
   auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, substitutingType, ProtocolConformanceRef(Conformance));
+
+  auto reqSig = proto->getRequirementSignature().getRequirements();
 
   auto result = TypeChecker::checkGenericArguments(
       DC->getParentModule(), Loc, Loc,
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(),
       { proto->getSelfInterfaceType() },
-      proto->getRequirementSignature().getRequirements(),
-      QuerySubstitutionMap{substitutions});
+      reqSig, QuerySubstitutionMap{substitutions});
+
+  // Non-final classes should not be able to conform to protocols with a
+  // same-type requirement on 'Self', since such a conformance would no
+  // longer be covariant. For now, this is a warning. Once this becomes
+  // an error, we can handle it as part of the above checkGenericArguments()
+  // call by passing in a superclass-bound archetype for the 'self' type
+  // instead of the concrete class type itself.
+  if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {
+    if (!classDecl->isSemanticallyFinal()) {
+      for (auto req : reqSig) {
+        if (req.getKind() == RequirementKind::SameType &&
+            req.getFirstType()->isEqual(proto->getSelfInterfaceType())) {
+          diags.diagnose(Loc, diag::non_final_class_cannot_conform_to_self_same_type,
+                         Adoptee, proto->getDeclaredInterfaceType(),
+                         req.getSecondType())
+              .warnUntilSwiftVersion(6);
+          break;
+        }
+      }
+    }
+  }
 
   switch (result) {
   case RequirementCheckResult::Success:
@@ -4879,9 +4903,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     // Diagnose the failure generically.
     // FIXME: Would be nice to give some more context here!
     if (!Conformance->isInvalid()) {
-      proto->getASTContext().Diags.diagnose(Loc, diag::type_does_not_conform,
-                                            Adoptee,
-                                            Proto->getDeclaredInterfaceType());
+      diags.diagnose(Loc, diag::type_does_not_conform,
+                     Adoptee,
+                     Proto->getDeclaredInterfaceType());
       Conformance->setInvalid();
     }
     return;

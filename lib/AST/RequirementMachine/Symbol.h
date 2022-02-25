@@ -121,17 +121,12 @@ public:
     Layout,
 
     /// When appearing at the end of a term, denotes that the term
-    /// is exactly equal to the concrete type.
-    ConcreteType,
+    /// is a subclass of the superclass constraint.
+    Superclass,
 
     /// When appearing at the end of a term, denotes that the term
-    /// is a subclass of the superclass constraint.
-    ///
-    /// Note that this orders after ConcreteType, to ensure compatibility
-    /// with the GenericSignatureBuilder on pathological generic signatures
-    /// where a type is subject to both a superclass and concrete type
-    /// requirement that imply each other.
-    Superclass,
+    /// is exactly equal to the concrete type.
+    ConcreteType,
   };
 
   static const unsigned NumKinds = 8;

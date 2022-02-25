@@ -10,6 +10,7 @@
 // RUN: %target-run %t/Assert_Unchecked | %FileCheck --check-prefixes=UNCHECKED %s
 
 // UNSUPPORTED: swift_stdlib_debug_preconditions_in_release
+// REQUIRES: executable_test
 
 // DEBUG: _isStdlibDebugChecksEnabled: true
 // RELEASE: _isStdlibDebugChecksEnabled: false

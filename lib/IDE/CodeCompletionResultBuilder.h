@@ -13,10 +13,11 @@
 #ifndef SWIFT_LIB_IDE_CODE_COMPLETION_RESULT_BUILDER_H
 #define SWIFT_LIB_IDE_CODE_COMPLETION_RESULT_BUILDER_H
 
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/IDE/CodeCompletionResultSink.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -25,15 +26,13 @@ namespace clang {
 class Module;
 }
 
-namespace {
-class CodeCompletionStringPrinter;
-}
-
 namespace swift {
 class Decl;
 class ModuleDecl;
 
 namespace ide {
+
+class CodeCompletionStringPrinter;
 
 class CodeCompletionResultBuilder {
   friend CodeCompletionStringPrinter;

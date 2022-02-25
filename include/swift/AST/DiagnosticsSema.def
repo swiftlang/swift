@@ -38,6 +38,8 @@ NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 NOTE(opaque_return_type_declared_here,none,
      "opaque return type declared here", ())
+NOTE(default_value_declared_here,none,
+     "default value declared here", ())
 
 //------------------------------------------------------------------------------
 // MARK: Constraint solver diagnostics
@@ -140,8 +142,8 @@ ERROR(could_not_use_instance_member_on_type,none,
       "%select{| instance of nested}3 type %0",
       (Type, DeclNameRef, Type, bool))
 ERROR(could_not_use_member_on_existential,none,
-      "member %1 cannot be used on value of protocol type %0; use a generic"
-      " constraint instead",
+      "member %1 cannot be used on value of protocol type %0; consider using a"
+      " generic constraint instead",
       (Type, DeclNameRef))
 FIXIT(replace_with_type,"%0",(Type))
 FIXIT(insert_type_qualification,"%0.",(Type))
@@ -1942,6 +1944,11 @@ ERROR(type_does_not_conform,none,
 WARNING(type_does_not_conform_swiftui_warning,none,
         "type %0 does not conform to protocol %1", (Type, Type))
 
+ERROR(non_final_class_cannot_conform_to_self_same_type,none,
+      "non-final class %0 cannot safely conform to protocol %1, "
+      "which requires that 'Self' is exactly equal to %2",
+      (Type, Type, Type))
+
 ERROR(cannot_use_nil_with_this_type,none,
       "'nil' cannot be used in context expecting type %0", (Type))
 
@@ -2784,9 +2791,11 @@ WARNING(anyobject_class_inheritance_deprecated,Deprecation,
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,
-  "inheritance from non-protocol, non-class type %0", (Type))
+  "inheritance from non-protocol, non-class type '%0'", (StringRef))
 ERROR(inheritance_from_non_protocol,none,
-  "inheritance from non-protocol type %0", (Type))
+  "inheritance from non-protocol type '%0'", (StringRef))
+ERROR(inheritance_from_anyobject,none,
+  "only protocols can inherit from 'AnyObject'", ())
 ERROR(inheritance_from_parameterized_protocol,none,
   "cannot inherit from protocol type with generic argument %0", (Type))
 ERROR(superclass_not_first,none,
@@ -6237,6 +6246,29 @@ ERROR(noimplicitcopy_attr_invalid_in_generic_context,
 ERROR(type_sequence_on_non_generic_param, none,
       "'@_typeSequence' must appear on a generic parameter",
       ())
+
+//------------------------------------------------------------------------------
+// MARK: Type inference from default expressions
+//------------------------------------------------------------------------------
+
+ERROR(cannot_default_generic_parameter_inferrable_from_another_parameter, none,
+      "cannot use default expression for inference of %0 because it "
+      "is inferrable from parameters %1",
+      (Type, StringRef))
+
+ERROR(cannot_default_generic_parameter_inferrable_through_same_type, none,
+      "cannot use default expression for inference of %0 because it "
+      "is inferrable through same-type requirement: '%1'",
+      (Type, StringRef))
+
+ERROR(cannot_default_generic_parameter_invalid_requirement, none,
+      "cannot use default expression for inference of %0 because "
+      "requirement '%1' refers to other generic parameters",
+      (Type, StringRef))
+
+ERROR(cannot_convert_default_value_type_to_argument_type, none,
+      "cannot convert default value of type %0 to expected argument type %1 for parameter #%2",
+      (Type, Type, unsigned))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

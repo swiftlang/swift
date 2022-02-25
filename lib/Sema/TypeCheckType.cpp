@@ -431,18 +431,17 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
     if (selfType->is<GenericTypeParamType>()) {
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-        auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl);
-        if (getStage() == TypeResolutionStage::Structural &&
-            aliasDecl && !aliasDecl->isGeneric()) {
-          return aliasDecl->getStructuralType();
-        }
-
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-          typeDecl = assocType->getAssociatedTypeAnchor();
+        if (isa<AssociatedTypeDecl>(typeDecl) ||
+            (isa<TypeAliasDecl>(typeDecl) &&
+             !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
+          if (getStage() == TypeResolutionStage::Structural) {
+            return DependentMemberType::get(selfType, typeDecl->getName());
+          } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+            typeDecl = assocType->getAssociatedTypeAnchor();
+          }
         }
       }
 
-      // FIXME: Remove this once the above FIXME is addressed.
       if (typeDecl->getDeclContext()->getSelfClassDecl()) {
         // We found a member of a class from a protocol or protocol
         // extension.
@@ -2612,6 +2611,25 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     }
   }
 
+  if (attrs.has(TAK_unchecked)) {
+    ty = resolveType(repr, options);
+    if (!ty || ty->hasError()) return ty;
+
+    if (!options.is(TypeResolverContext::Inherited) ||
+        getDeclContext()->getSelfProtocolDecl()) {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_unchecked),
+                      diag::unchecked_not_inheritance_clause);
+      ty = ErrorType::get(getASTContext());
+    } else if (!ty->isConstraintType()) {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_unchecked),
+                      diag::unchecked_not_existential, ty);
+      ty = ErrorType::get(getASTContext());
+    }
+
+    // Nothing to record in the type. Just clear the attribute.
+    attrs.clearAttribute(TAK_unchecked);
+  }
+
   auto instanceOptions = options;
   instanceOptions.setContext(None);
 
@@ -2621,7 +2639,14 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // context, and then set isNoEscape if @escaping is not present.
   if (!ty) ty = resolveType(repr, instanceOptions);
   if (!ty || ty->hasError()) return ty;
-  
+
+  // Type aliases inside protocols are not yet resolved in the structural
+  // stage of type resolution
+  if (ty->is<DependentMemberType>() &&
+      resolution.getStage() == TypeResolutionStage::Structural) {
+    return ty;
+  }
+
   // Handle @escaping
   if (ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
@@ -2776,20 +2801,6 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     if (fnRepr != nullptr) {
       attrs.clearAttribute(TAK_async);
     }
-  }
-
-  if (attrs.has(TAK_unchecked)) {
-    if (!options.is(TypeResolverContext::Inherited) ||
-        getDeclContext()->getSelfProtocolDecl()) {
-      diagnoseInvalid(repr, attrs.getLoc(TAK_unchecked),
-                      diag::unchecked_not_inheritance_clause);
-    } else if (!ty->isExistentialType()) {
-      diagnoseInvalid(repr, attrs.getLoc(TAK_unchecked),
-                      diag::unchecked_not_existential, ty);
-    }
-
-    // Nothing to record in the type. Just clear the attribute.
-    attrs.clearAttribute(TAK_unchecked);
   }
 
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)

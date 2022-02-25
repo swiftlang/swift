@@ -41,6 +41,7 @@ class AccessorDecl;
 enum class AccessorKind;
 class ContextualPattern;
 class DefaultArgumentExpr;
+class DefaultArgumentType;
 class ClosureExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
@@ -2663,6 +2664,26 @@ public:
   bool isCached() const { return true; }
   Optional<Expr *> getCachedResult() const;
   void cacheResult(Expr *expr) const;
+};
+
+/// Computes the type of the default expression for a given parameter.
+class DefaultArgumentTypeRequest
+    : public SimpleRequest<DefaultArgumentTypeRequest, Type(ParamDecl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, ParamDecl *param) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type type) const;
 };
 
 /// Computes the fully type-checked caller-side default argument within the

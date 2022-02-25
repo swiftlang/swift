@@ -90,6 +90,7 @@
 #define DEBUG_TYPE "ssa-destroy-hoisting"
 
 #include "swift/Basic/GraphNodeWorklist.h"
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -192,11 +193,11 @@ class DeinitBarriers {
 public:
   // Data flow state: blocks whose beginning is backward reachable from a
   // destroy without first reaching a barrier or storage use.
-  BasicBlockSetVector destroyReachesBeginBlocks;
+  SmallPtrSetVector<SILBasicBlock *, 4> destroyReachesBeginBlocks;
 
   // Data flow state: blocks whose end is backward reachable from a destroy
   // without first reaching a barrier or storage use.
-  BasicBlockSet destroyReachesEndBlocks;
+  SmallPtrSet<SILBasicBlock *, 4> destroyReachesEndBlocks;
 
   // Deinit barriers or storage uses within a block, reachable from a destroy.
   SmallVector<SILInstruction *, 4> barriers;
@@ -215,8 +216,7 @@ public:
   explicit DeinitBarriers(bool ignoreDeinitBarriers,
                           const KnownStorageUses &knownUses,
                           SILFunction *function)
-      : destroyReachesBeginBlocks(function), destroyReachesEndBlocks(function),
-        ignoreDeinitBarriers(ignoreDeinitBarriers), knownUses(knownUses) {
+      : ignoreDeinitBarriers(ignoreDeinitBarriers), knownUses(knownUses) {
     auto rootValue = knownUses.getStorage().getRoot();
     assert(rootValue && "HoistDestroys requires a single storage root");
     // null for function args
@@ -225,6 +225,12 @@ public:
 
   void compute() {
     FindBarrierAccessScopes(*this).solveBackward();
+    if (barrierAccessScopes.size() == 0)
+      return;
+    destroyReachesBeginBlocks.clear();
+    destroyReachesEndBlocks.clear();
+    barriers.clear();
+    deadUsers.clear();
     DestroyReachability(*this).solveBackward();
   }
 
@@ -289,7 +295,6 @@ private:
   // open access scopes in the block's predecessors.
   class FindBarrierAccessScopes {
     DeinitBarriers &result;
-    BasicBlockSetVector destroyReachesBeginBlocks;
     llvm::DenseMap<SILBasicBlock *, llvm::SmallPtrSet<BeginAccessInst *, 2>>
         liveInAccessScopes;
     llvm::SmallPtrSet<BeginAccessInst *, 2> runningLiveAccessScopes;
@@ -298,9 +303,7 @@ private:
 
   public:
     FindBarrierAccessScopes(DeinitBarriers &result)
-        : result(result),
-          destroyReachesBeginBlocks(result.knownUses.getFunction()),
-          reachability(result.knownUses.getFunction(), *this) {
+        : result(result), reachability(result.knownUses.getFunction(), *this) {
       // Seed backward reachability with destroy points.
       for (SILInstruction *destroy : result.knownUses.originalDestroys) {
         reachability.initLastUse(destroy);
@@ -314,17 +317,18 @@ private:
     }
 
     bool hasReachableBegin(SILBasicBlock *block) {
-      return destroyReachesBeginBlocks.contains(block);
+      return result.destroyReachesBeginBlocks.contains(block);
     }
 
     void markReachableBegin(SILBasicBlock *block) {
-      destroyReachesBeginBlocks.insert(block);
+      result.destroyReachesBeginBlocks.insert(block);
       if (!runningLiveAccessScopes.empty()) {
         liveInAccessScopes[block] = runningLiveAccessScopes;
       }
     }
 
     void markReachableEnd(SILBasicBlock *block) {
+      result.destroyReachesEndBlocks.insert(block);
       runningLiveAccessScopes.clear();
       for (auto *predecessor : block->getPredecessorBlocks()) {
         auto iterator = liveInAccessScopes.find(predecessor);
@@ -347,7 +351,9 @@ private:
       } else if (auto *bai = dyn_cast<BeginAccessInst>(inst)) {
         runningLiveAccessScopes.erase(bai);
       }
-      bool isBarrier = result.isBarrier(inst);
+      auto classification = result.classifyInstruction(inst);
+      result.visitedInstruction(inst, classification);
+      auto isBarrier = result.classificationIsBarrier(classification);
       if (isBarrier) {
         markLiveAccessScopesAsBarriers();
       }
@@ -361,7 +367,7 @@ private:
     bool checkReachablePhiBarrier(SILBasicBlock *block) {
       bool isBarrier =
           llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-            return result.isBarrier(block->getTerminator());
+            return result.isBarrier(predecessor->getTerminator());
           });
       if (isBarrier) {
         // If there's a barrier preventing us from hoisting out of this block,
@@ -484,8 +490,7 @@ bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
   assert(llvm::all_of(block->getArguments(),
                       [&](auto argument) { return PhiValue(argument); }));
   return llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-    return result.classificationIsBarrier(
-        result.classifyInstruction(predecessor->getTerminator()));
+    return result.isBarrier(predecessor->getTerminator());
   });
 }
 
@@ -754,6 +759,7 @@ void SSADestroyHoisting::run() {
   llvm::SmallVector<AllocStackInst *, 4> asis;
   llvm::SmallVector<BeginAccessInst *, 4> bais;
   llvm::SmallVector<StoreInst *, 4> sis;
+  llvm::SmallVector<CopyAddrInst *, 4> cais;
 
   // Collect the instructions that we'll be transforming.
   for (auto &block : *getFunction()) {
@@ -767,6 +773,10 @@ void SSADestroyHoisting::run() {
       } else if (auto *si = dyn_cast<StoreInst>(&inst)) {
         if (si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign) {
           sis.push_back(si);
+        }
+      } else if (auto *cai = dyn_cast<CopyAddrInst>(&inst)) {
+        if (cai->isInitializationOfDest() == IsNotInitialization) {
+          cais.push_back(cai);
         }
       }
     }
@@ -801,6 +811,32 @@ void SSADestroyHoisting::run() {
         si->getOperand(1));
     si->setOwnershipQualifier(StoreOwnershipQualifier::Init);
     splitDestroysAndStores.push_back({dai, si});
+    remainingDestroyAddrs.insert(dai);
+    ++splitDestroys;
+  }
+  // Similarly, also expand each
+  //
+  //     copy_addr to
+  //
+  // instruction into
+  //
+  //     destroy_addr
+  //     copy_addr to [initialization]
+  //
+  // sequences to create still more destroy_addrs to hoist.
+  //
+  // As above, record the newly created destroy_addrs and copy_addrs off of
+  // which they were split.  After hoisting, we'll merge them back together when
+  // possible.
+  llvm::SmallVector<std::pair<DestroyAddrInst *, CopyAddrInst *>, 8>
+      splitDestroysAndCopies;
+  for (auto *cai : cais) {
+    auto builder = SILBuilderWithScope(cai);
+    auto *dai = builder.createDestroyAddr(
+        RegularLocation::getAutoGeneratedLocation(cai->getLoc()),
+        cai->getOperand(1));
+    cai->setIsInitializationOfDest(IsInitialization);
+    splitDestroysAndCopies.push_back({dai, cai});
     remainingDestroyAddrs.insert(dai);
     ++splitDestroys;
   }
@@ -840,17 +876,29 @@ void SSADestroyHoisting::run() {
     if (!remainingDestroyAddrs.contains(dai))
       continue;
     auto *si = pair.second;
-    if (dai->getNextInstruction() == si) {
-      // No stores should have been rewritten during hoisting.  Their ownership
-      // qualifiers were set to [init] when splitting off the destroy_addrs.
-      assert(si->getOwnershipQualifier() == StoreOwnershipQualifier::Init);
-      // If a newly created destroy_addr has not been hoisted from its previous
-      // location, combine it back together with the store [init] which it was
-      // split off from.
-      deleter.forceDelete(dai);
-      si->setOwnershipQualifier(StoreOwnershipQualifier::Assign);
-      --splitDestroys;
-    }
+    if (dai->getNextInstruction() != si)
+      continue;
+    // No stores should have been rewritten during hoisting.  Their ownership
+    // qualifiers were set to [init] when splitting off the destroy_addrs.
+    assert(si->getOwnershipQualifier() == StoreOwnershipQualifier::Init);
+    // If a newly created destroy_addr has not been hoisted from its previous
+    // location, combine it back together with the store [init] which it was
+    // split off from.
+    deleter.forceDelete(dai);
+    si->setOwnershipQualifier(StoreOwnershipQualifier::Assign);
+    --splitDestroys;
+  }
+  for (auto pair : splitDestroysAndCopies) {
+    auto *dai = pair.first;
+    if (!remainingDestroyAddrs.contains(dai))
+      continue;
+    auto *cai = pair.second;
+    if (dai->getNextInstruction() != cai)
+      continue;
+    assert(cai->isInitializationOfDest() == IsInitialization);
+    deleter.forceDelete(dai);
+    cai->setIsInitializationOfDest(IsNotInitialization);
+    --splitDestroys;
   }
   // If there were any destroy_addrs split off of stores and not recombined
   // with them, then the function has changed.

@@ -2032,18 +2032,19 @@ public:
 
             if (!spareBitsMask.isZero()) {
 
-#if !defined(NDEBUG)
-              // DEBUG ASSERTION: compare the locally-computed spare bit mask to the
-              // one we got from the compiler.  If they're different, then
-              // either the compiler is emitting the wrong thing or the
-              // local runtime computation isn't quite right.
+#if 0  // TODO: This should be !defined(NDEBUG)
+              // DEBUG verification that compiler mask and locally-computed
+              // mask are the same (whenever both are available).
               BitMask locallyComputedSpareBitsMask(PayloadSize);
               auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
               auto locallyComputedSpareBitsMaskIsValid
                 = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask, mpePointerSpareBits);
-              // assert(locallyComputedSpareBitsMaskIsValid); // Until we expect local computation to always succeed
+              // If the local computation were always correct, we could:
+              // assert(locallyComputedSpareBitsMaskIsValid);
               if (locallyComputedSpareBitsMaskIsValid) {
-                // If we can compute a mask locally, it should match the compiler one
+                // Whenever the compiler and local computation both produce
+                // data, they should agree.
+                // TODO: Make this true, then change `#if 0` above
                 assert(locallyComputedSpareBitsMask == spareBitsMask);
               }
 #endif
@@ -2071,6 +2072,9 @@ public:
         BitMask spareBitsMask(PayloadSize);
         auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
         auto validSpareBitsMask = populateSpareBitsMask(Cases, spareBitsMask, mpePointerSpareBits);
+        // For DEBUGGING, disable fallback to local computation to
+        // make missing compiler data more obvious:
+        // validSpareBitsMask = false;
         if (!validSpareBitsMask) {
           // If we couldn't correctly determine the spare bits mask,
           // return a TI that will always fail when asked for XIs or value.

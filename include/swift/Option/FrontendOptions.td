@@ -169,6 +169,9 @@ def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
 def serialized_path_obfuscate : Separate<["-"], "serialized-path-obfuscate">,
     HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
 
+def empty_abi_descriptor : Flag<["-"], "empty-abi-descriptor">,
+  HelpText<"Avoid printing actual module content into ABI descriptor file">;
+
 def no_serialize_debugging_options :
   Flag<["-"], "no-serialize-debugging-options">,
   HelpText<"Never serialize options for debugging (default: only for apps)">;
@@ -351,6 +354,10 @@ def requirement_machine_max_rule_length : Joined<["-"], "requirement-machine-max
 def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machine-max-concrete-nesting=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete type nesting depth before giving up">;
+
+def disable_requirement_machine_concrete_contraction : Flag<["-"], "disable-requirement-machine-concrete-contraction">,
+  HelpText<"Disable preprocessing pass to eliminate conformance requirements "
+           "on generic parameters which are made concrete">;
 
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
@@ -861,6 +868,10 @@ def experimental_multi_statement_closures :
   Flag<["-"], "experimental-multi-statement-closures">,
   HelpText<"Enable experimental support for type inference in multi-statement closures">;
 
+def experimental_type_inference_from_defaults :
+  Flag<["-"], "enable-experimental-type-inference-from-defaults">,
+  HelpText<"Enable experimental support for generic parameter inference from default values">;
+
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
   HelpText<"Directory of prebuilt modules for loading module interfaces">;
@@ -1004,5 +1015,10 @@ def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
+
+def skip_import_in_public_interface:
+  Separate<["-"], "skip-import-in-public-interface">,
+  HelpText<"Skip the import statement corresponding to a module name "
+           "when printing the public interface.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

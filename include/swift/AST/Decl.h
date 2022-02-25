@@ -5504,6 +5504,7 @@ enum class ParamSpecifier : uint8_t {
 class ParamDecl : public VarDecl {
   friend class DefaultArgumentInitContextRequest;
   friend class DefaultArgumentExprRequest;
+  friend class DefaultArgumentTypeRequest;
 
   enum class ArgumentNameFlags : uint8_t {
     /// Whether or not this parameter is destructed.
@@ -5523,6 +5524,9 @@ class ParamDecl : public VarDecl {
 
   struct alignas(1 << StoredDefaultArgumentAlignInBits) StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
+
+    /// The type of the default argument expression.
+    Type ExprType;
 
     /// Stores the context for the default argument as well as a bit to
     /// indicate whether the default expression has been type-checked.
@@ -5641,6 +5645,10 @@ public:
     return nullptr;
   }
 
+  /// Retrieve the type of the default expression (if any) associated with
+  /// this parameter declaration.
+  Type getTypeOfDefaultExpr() const;
+
   VarDecl *getStoredProperty() const {
     if (auto stored = DefaultValueAndFlags.getPointer())
       return stored->DefaultArg.dyn_cast<VarDecl *>();
@@ -5654,6 +5662,10 @@ public:
   /// \param isTypeChecked Whether this argument should be used as the
   /// parameter's fully type-checked default argument.
   void setDefaultExpr(Expr *E, bool isTypeChecked);
+
+  /// Sets a type of default expression associated with this parameter.
+  /// This should only be called by deserialization.
+  void setDefaultExprType(Type type);
 
   void setStoredProperty(VarDecl *var);
 

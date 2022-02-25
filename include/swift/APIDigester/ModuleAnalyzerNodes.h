@@ -816,7 +816,7 @@ int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,
                    StringRef OutputFile, CheckerOptions Opts);
 
-void dumpModuleContent(ModuleDecl *MD, StringRef OutputFile, bool ABI);
+void dumpModuleContent(ModuleDecl *MD, StringRef OutputFile, bool ABI, bool Empty);
 
 /// Mostly for testing purposes, this function de-serializes the SDK dump in
 /// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,

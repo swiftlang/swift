@@ -1591,16 +1591,7 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig.getGenericParams()) {
-    auto *paramLocator = getConstraintLocator(
-        locator.withPathElement(LocatorPathElt::GenericParameter(gp)));
-
-    auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding |
-                                                    TVO_CanBindToHole);
-    auto result = replacements.insert(std::make_pair(
-        cast<GenericTypeParamType>(gp->getCanonicalType()), typeVar));
-
-    assert(result.second);
-    (void)result;
+    (void)openGenericParameter(outerDC, gp, replacements, locator);
   }
 
   auto *baseLocator = getConstraintLocator(
@@ -1609,44 +1600,69 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
   bindArchetypesFromContext(*this, outerDC, baseLocator, replacements);
 }
 
+TypeVariableType *ConstraintSystem::openGenericParameter(
+    DeclContext *outerDC, GenericTypeParamType *parameter,
+    OpenedTypeMap &replacements, ConstraintLocatorBuilder locator) {
+  auto *paramLocator = getConstraintLocator(
+      locator.withPathElement(LocatorPathElt::GenericParameter(parameter)));
+
+  auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding |
+                                                      TVO_CanBindToHole);
+  auto result = replacements.insert(std::make_pair(
+      cast<GenericTypeParamType>(parameter->getCanonicalType()), typeVar));
+
+  assert(result.second);
+  (void)result;
+
+  return typeVar;
+}
+
 void ConstraintSystem::openGenericRequirements(
     DeclContext *outerDC, GenericSignature signature,
     bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn) {
   auto requirements = signature.getRequirements();
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
-    const auto &req = requirements[pos];
-
-    Optional<Requirement> openedReq;
-    auto openedFirst = substFn(req.getFirstType());
-
-    auto kind = req.getKind();
-    switch (kind) {
-    case RequirementKind::Conformance: {
-      auto protoDecl = req.getProtocolDecl();
-      // Determine whether this is the protocol 'Self' constraint we should
-      // skip.
-      if (skipProtocolSelfConstraint && protoDecl == outerDC &&
-          protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
-        continue;
-      openedReq = Requirement(kind, openedFirst, req.getSecondType());
-      break;
-    }
-    case RequirementKind::Superclass:
-    case RequirementKind::SameType:
-      openedReq = Requirement(kind, openedFirst, substFn(req.getSecondType()));
-      break;
-    case RequirementKind::Layout:
-      openedReq = Requirement(kind, openedFirst, req.getLayoutConstraint());
-      break;
-    }
-
     auto openedGenericLoc =
-        locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
-    addConstraint(*openedReq,
-                  openedGenericLoc.withPathElement(
-                      LocatorPathElt::TypeParameterRequirement(pos, kind)));
+      locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
+    openGenericRequirement(outerDC, pos, requirements[pos],
+                           skipProtocolSelfConstraint, openedGenericLoc,
+                           substFn);
   }
+}
+
+void ConstraintSystem::openGenericRequirement(
+    DeclContext *outerDC, unsigned index, const Requirement &req,
+    bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
+    llvm::function_ref<Type(Type)> substFn) {
+  Optional<Requirement> openedReq;
+  auto openedFirst = substFn(req.getFirstType());
+
+  auto kind = req.getKind();
+  switch (kind) {
+  case RequirementKind::Conformance: {
+    auto protoDecl = req.getProtocolDecl();
+    // Determine whether this is the protocol 'Self' constraint we should
+    // skip.
+    if (skipProtocolSelfConstraint && protoDecl == outerDC &&
+        protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
+      return;
+
+    openedReq = Requirement(kind, openedFirst, req.getSecondType());
+    break;
+  }
+  case RequirementKind::Superclass:
+  case RequirementKind::SameType:
+    openedReq = Requirement(kind, openedFirst, substFn(req.getSecondType()));
+    break;
+  case RequirementKind::Layout:
+    openedReq = Requirement(kind, openedFirst, req.getLayoutConstraint());
+    break;
+  }
+
+  addConstraint(*openedReq,
+                locator.withPathElement(
+                    LocatorPathElt::TypeParameterRequirement(index, kind)));
 }
 
 /// Add the constraint on the type used for the 'Self' type for a member
@@ -3697,7 +3713,8 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
             solution.Fixes, [](const ConstraintFix *fix) -> bool {
               return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
                      fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
-                     fix->getKind() == FixKind::AllowTupleTypeMismatch;
+                     fix->getKind() == FixKind::AllowTupleTypeMismatch ||
+                     fix->getKind() == FixKind::GenericArgumentsMismatch;
             });
       });
 
@@ -3709,26 +3726,28 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
   llvm::SmallDenseMap<TypeVariableType *,
                       std::pair<GenericTypeParamType *, SourceLoc>, 4>
       genericParams;
-  // Consider only representative type variables shared across
-  // all of the solutions.
-  for (auto *typeVar : cs.getTypeVariables()) {
-    if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-      auto *locator = typeVar->getImpl().getLocator();
-      auto *repr = cs.getRepresentative(typeVar);
-      // If representative is another generic parameter let's
-      // use its generic parameter type instead of originator's,
-      // but it's possible that generic parameter is equated to
-      // some other type e.g.
-      //
-      // func foo<T>(_: T) -> T {}
-      //
-      // In this case when reference to function `foo` is "opened"
-      // type variable representing `T` would be equated to
-      // type variable representing a result type of the reference.
-      if (auto *reprGP = repr->getImpl().getGenericParameter())
-        GP = reprGP;
+  // Consider all representative type variables across all solutions.
+  for (auto &solution : solutions) {
+    for (auto &typeBinding : solution.typeBindings) {
+      auto *typeVar = typeBinding.first;
+      if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+        auto *locator = typeVar->getImpl().getLocator();
+        auto *repr = cs.getRepresentative(typeVar);
+        // If representative is another generic parameter let's
+        // use its generic parameter type instead of originator's,
+        // but it's possible that generic parameter is equated to
+        // some other type e.g.
+        //
+        // func foo<T>(_: T) -> T {}
+        //
+        // In this case when reference to function `foo` is "opened"
+        // type variable representing `T` would be equated to
+        // type variable representing a result type of the reference.
+        if (auto *reprGP = repr->getImpl().getGenericParameter())
+          GP = reprGP;
 
-      genericParams[repr] = {GP, getLoc(locator->getAnchor())};
+        genericParams[repr] = {GP, getLoc(locator->getAnchor())};
+      }
     }
   }
 
@@ -3743,6 +3762,13 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
     llvm::SmallSetVector<Type, 4> arguments;
     for (const auto &solution : solutions) {
       auto type = solution.typeBindings.lookup(typeVar);
+      // Type variables gathered from a solution's type binding context may not
+      // exist in another given solution because some solutions may have
+      // additional type variables not present in other solutions due to taking
+      // different paths in the solver.
+      if (!type)
+        continue;
+
       // Contextual opaque result type is uniquely identified by
       // declaration it's associated with, so we have to compare
       // declarations instead of using pointer equality on such types.

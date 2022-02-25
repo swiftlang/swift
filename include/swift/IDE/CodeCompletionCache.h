@@ -15,6 +15,8 @@
 
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/IDE/CodeCompletionString.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/Chrono.h"

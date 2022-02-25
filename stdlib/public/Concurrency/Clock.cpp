@@ -127,7 +127,7 @@ switch (clock_id) {
       *seconds = suspending.tv_sec;
       *nanoseconds = suspending.tv_nsec;
 #elif defined(__APPLE__) && HAS_TIME
-      clock_gettime(CLOCK_UPTIME_RAW, &suspending);
+      clock_getres(CLOCK_UPTIME_RAW, &suspending);
       *seconds = suspending.tv_sec;
       *nanoseconds = suspending.tv_nsec;
 #elif defined(_WIN32)

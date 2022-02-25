@@ -18,4 +18,44 @@ internal typealias ProcessIdentifier = DarwinRemoteProcess.ProcessIdentifier
 internal func process(matching: String) -> ProcessIdentifier? {
   return pidFromHint(matching)
 }
+#elseif os(Windows)
+import WinSDK
+
+internal typealias ProcessIdentifier = WindowsRemoteProcess.ProcessIdentifier
+
+internal func process(matching: String) -> ProcessIdentifier? {
+  if let dwProcess = DWORD(matching) {
+    return dwProcess
+  }
+
+  let hSnapshot = CreateToolhelp32Snapshot(DWORD(TH32CS_SNAPPROCESS), 0)
+  if hSnapshot == INVALID_HANDLE_VALUE {
+    return nil
+  }
+  defer { CloseHandle(hSnapshot) }
+
+  var entry: PROCESSENTRY32W = PROCESSENTRY32W()
+  entry.dwSize = DWORD(MemoryLayout<PROCESSENTRY32W>.size)
+
+  if !Process32FirstW(hSnapshot, &entry) {
+    return nil
+  }
+
+  var matches: [(ProcessIdentifier, String)] = []
+  repeat {
+    let executable: String = withUnsafePointer(to: entry.szExeFile) {
+      $0.withMemoryRebound(to: WCHAR.self,
+                           capacity: MemoryLayout.size(ofValue: $0) / MemoryLayout<WCHAR>.size) {
+        String(decodingCString: $0, as: UTF16.self)
+      }
+    }
+    if executable.hasPrefix(matching) {
+      matches.append((entry.th32ProcessID, executable))
+    }
+  } while Process32NextW(hSnapshot, &entry)
+
+  return matches.first?.0
+}
+#else
+#error("Unsupported platform")
 #endif

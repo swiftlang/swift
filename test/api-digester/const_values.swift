@@ -7,7 +7,7 @@
 
 // RUN: %FileCheck %s < %t/abi.json
 
-// CHECK: "kind": "String"
-// CHECK: "value": "abc"
-// CHECK: "kind": "String"
-// CHECK: "value": "def"
+// CHECK: "kind": "StringLiteral"
+// CHECK: "value": "\"abc\""
+// CHECK: "kind": "StringLiteral"
+// CHECK: "value": "\"def\""

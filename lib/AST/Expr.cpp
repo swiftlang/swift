@@ -198,40 +198,81 @@ Expr *Expr::getSemanticsProvidingExpr() {
   return this;
 }
 
-bool Expr::isSemanticallyConstExpr() const {
-  auto E = getSemanticsProvidingExpr();
-  if (!E) {
-    return false;
-  }
-  switch(E->getKind()) {
-  case ExprKind::IntegerLiteral:
-  case ExprKind::NilLiteral:
-  case ExprKind::BooleanLiteral:
-  case ExprKind::FloatLiteral:
-  case ExprKind::StringLiteral:
-  case ExprKind::KeyPath:
+bool Expr::printConstExprValue(llvm::raw_ostream *OS) const {
+  auto print = [&](StringRef text) {
+    if (OS) {
+      *OS << text;
+    }
+  };
+  auto *E = getSemanticsProvidingExpr();
+  assert(E);
+  switch(getKind()) {
+  case ExprKind::BooleanLiteral: {
+    auto isTrue = cast<BooleanLiteralExpr>(E)->getValue();
+    print(isTrue ? "true" : "false");
     return true;
+  }
+  case ExprKind::IntegerLiteral:
+  case ExprKind::FloatLiteral:  {
+    auto digits = cast<NumberLiteralExpr>(E)->getDigitsText();
+    assert(!digits.empty());
+    print(digits);
+    return true;
+  }
+  case ExprKind::NilLiteral: {
+    print("nil");
+    return true;
+  }
+  case ExprKind::StringLiteral: {
+    auto *LE = cast<StringLiteralExpr>(E);
+    print("\"");
+    print(LE->getValue());
+    print("\"");
+    return true;
+  }
+  case ExprKind::KeyPath: {
+    // FIXME: print keypath
+    print("\\.<NOT_IMPLEMENTED>");
+    return true;
+  }
   case ExprKind::Array:
   case ExprKind::Dictionary: {
+    print("[");
     auto *CE = cast<CollectionExpr>(E);
-    for (auto *EL: CE->getElements()) {
-      if (!EL->isSemanticallyConstExpr())
+    for (unsigned N = CE->getNumElements(), I = 0; I != N; I ++) {
+      auto Ele = CE->getElement(I);
+      auto needComma = I + 1 != N;
+      if (!Ele->printConstExprValue(OS)) {
         return false;
+      }
+      if (needComma)
+        print(", ");
     }
+    print("]");
     return true;
   }
   case ExprKind::Tuple: {
+    print("(");
     auto *TE = cast<TupleExpr>(E);
-    for (auto *EL: TE->getElements()) {
-      if (!EL->isSemanticallyConstExpr()) {
+    for (unsigned N = TE->getNumElements(), I = 0; I != N; I ++) {
+      auto Ele = TE->getElement(I);
+      auto needComma = I + 1 != N;
+      if (!Ele->printConstExprValue(OS)) {
         return false;
       }
+      if (needComma)
+        print(", ");
     }
+    print(")");
     return true;
   }
   default:
     return false;
   }
+}
+
+bool Expr::isSemanticallyConstExpr() const {
+  return printConstExprValue(nullptr);
 }
 
 Expr *Expr::getValueProvidingExpr() {

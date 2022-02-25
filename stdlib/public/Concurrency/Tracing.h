@@ -75,11 +75,22 @@ void job_enqueue_global_with_delay(unsigned long long delay, Job *job);
 
 void job_enqueue_main_executor(Job *job);
 
-// This returns a handle that must be passed to the corresponding call to
-// task_run_end.
-uint64_t job_run_begin(Job *job, ExecutorRef *executor);
+struct job_run_info {
+  /// The ID of the task that started running.
+  uint64_t taskId;
 
-void job_run_end(Job *job, ExecutorRef *executor, uint64_t beginHandle);
+  /// The signpost ID for this task execution, or OS_SIGNPOST_ID_INVALID
+  /// if the job was not a task.
+  uint64_t handle;
+};
+
+// This returns information that must be passed to the corresponding
+// call to task_run_end.  Any information we want to log must be
+// extracted from the job when we start to run it because execution
+// will invalidate the job.
+job_run_info job_run_begin(Job *job, ExecutorRef *executor);
+
+void job_run_end(ExecutorRef *executor, job_run_info info);
 
 } // namespace trace
 } // namespace concurrency

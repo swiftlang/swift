@@ -1031,6 +1031,8 @@ static Job *
 preprocessQueue(JobRef unprocessedStart, JobRef unprocessedEnd, Job *existingProcessedJobsToMergeInto)
 {
   assert(existingProcessedJobsToMergeInto != NULL);
+  assert(unprocessedStart.needsPreprocessing());
+  assert(unprocessedStart.getAsJob() != unprocessedEnd.getAsJob());
 
   // Build up a list of jobs we need to preprocess
   using ListMerger = swift::ListMerger<Job*, JobQueueTraits>;
@@ -1423,6 +1425,11 @@ Job * DefaultActorImpl::drainOne() {
       return firstJob;
     }
 
+    // We failed the weak cmpxchg spuriously, go through loop again.
+    if (oldState.getFirstJob().getAsJob() == jobToPreprocessFrom.getAsJob()) {
+      continue;
+    }
+
     // There were new items concurrently added to the queue. We need to
     // preprocess the newly added unprocessed items and merge them to the already
     // preprocessed list.
@@ -1533,7 +1540,7 @@ static void swift_job_runImpl(Job *job, ExecutorRef executor) {
   SWIFT_TASK_DEBUG_LOG("%s(%p)", __func__, job);
   runJobInEstablishedExecutorContext(job);
 
-  concurrency::trace::job_run_end(job, &executor, traceHandle);
+  concurrency::trace::job_run_end(&executor, traceHandle);
   trackingInfo.leave();
 
   // Give up the current executor if this is a switching context

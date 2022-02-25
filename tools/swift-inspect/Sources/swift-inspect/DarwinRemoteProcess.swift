@@ -151,8 +151,10 @@ extension DarwinRemoteProcess {
                                      UnsafeMutableRawPointer(mutating: $0),
                                      CUnsignedInt(MALLOC_PTR_IN_USE_RANGE_TYPE),
                                      { (task, context, type, ranges, count) in
+          let callback: (swift_addr_t, UInt64) -> Void =
+              context!.assumingMemoryBound(to: ((swift_addr_t, UInt64) -> Void).self).pointee
           ranges.forEach {
-            body(swift_addr_t($0.address), UInt64($0.size))
+            callback(swift_addr_t($0.address), UInt64($0.size))
           }
         })
       }

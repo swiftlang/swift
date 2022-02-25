@@ -1963,6 +1963,22 @@ class AllocStackInst final
   /// any point of the program.
   bool wasMoved = false;
 
+  /// Set to true if this AllocStack has var info that a pass purposely
+  /// invalidated.
+  ///
+  /// NOTE:
+  ///
+  /// 1. We don't print this state. It is just a way to invalidate the debug
+  /// info. When we parse back in whatever we printed, we will parse it without
+  /// debug var info since none will be printed.
+  ///
+  /// 2. Since we do not serialize debug info today, we do not need to serialize
+  /// this state.
+  ///
+  /// TODO: If we begin serializing debug info, we will need to begin
+  /// serializing this!
+  bool hasInvalidatedVarInfo = false;
+
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                  Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
@@ -2019,6 +2035,12 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
+    // If we used to have debug info attached but our debug info is now
+    // invalidated, just bail.
+    if (hasInvalidatedVarInfo) {
+      return None;
+    }
+
     Optional<SILType> AuxVarType;
     Optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
@@ -2038,6 +2060,14 @@ public:
     return VI.get(getDecl(), getTrailingObjects<char>(), AuxVarType, VarDeclLoc,
                   VarDeclScope, DIExprElements);
   }
+
+  bool isVarInfoInvalidated() const { return hasInvalidatedVarInfo; }
+
+  /// Invalidate the debug info in an alloc_stack. This is useful in cases where
+  /// we one is merging alloc_stack and wants to split the debug info on an
+  /// alloc_stack into a separate debug_value instruction from the merged
+  /// alloc_stack.
+  void invalidateVarInfo() { hasInvalidatedVarInfo = true; }
 
   bool isLet() const {
     if (auto varInfo = getVarInfo())

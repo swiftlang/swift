@@ -43,12 +43,23 @@ struct TrivialStruct {
   var e: E
 }
 
+enum Change {
+case insert(offset: Int, element: X)
+case remove(offset: Int, element: X)
+}
+
+struct Int {
+    @_hasStorage var _value : Builtin.Int64
+}
+
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
 
 sil @f_out : $@convention(thin) <T> () -> @out T
 sil @f_bool : $@convention(thin) () -> Builtin.Int1
 sil [ossa] @take_trivial_struct : $@convention(thin) (TrivialStruct) -> ()
+sil [ossa] @get_change_out : $@convention(thin) () -> @out Change
+sil [ossa] @coro : $@yield_once @convention(thin) (@inout X) -> @yields ()
 
 // CHECK-LABEL: sil [ossa] @test_simple
 // CHECK:      bb0(%0 : $*S):
@@ -270,6 +281,90 @@ entry(%addr : $*X):
   return %tuple : $()
 }
 
+// Hoist a destroy_addr over a phi.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_undef_phi : {{.*}} {
+// CHECK:         [[STACK1:%[^,]+]] = alloc_stack
+// CHECK-NEXT:    apply undef
+// CHECK-NEXT:    destroy_addr [[STACK1]]
+// CHECK-LABEL: } // end sil function 'hoist_over_undef_phi'
+sil [ossa] @hoist_over_undef_phi : $@convention(thin) () -> () {
+entry:
+  br latch
+
+latch:
+  cond_br undef, top, exit
+
+top:
+  %stack1 = alloc_stack $Change
+  apply undef(%stack1) : $@convention(thin) () -> @out Change 
+  %access = begin_access [static] [modify] %stack1 : $*Change
+  br top2(undef : $())
+
+top2(%66 : $()):
+  end_access %access : $*Change
+  destroy_addr %stack1 : $*Change
+  dealloc_stack %stack1 : $*Change
+  %stack2 = alloc_stack $Change
+  apply undef(%stack2) : $@convention(thin) () -> @out Change 
+  switch_enum_addr %stack2 : $*Change, case #Change.insert!enumelt: left, case #Change.remove!enumelt: right
+
+left:
+  br bottom
+
+right:
+  br bottom
+
+bottom:
+  destroy_addr %stack2 : $*Change
+  dealloc_stack %stack2 : $*Change
+  br backedge
+
+backedge:
+  br latch
+
+exit:
+  %321 = tuple ()
+  return %321 : $()
+}
+
+// Hoist a destroy_addr of an @in argument over a load from an alloc_stack.
+//
+// CHECK-LABEL: sil [ossa] @test_hoist_over_load_from_stack : {{.*}} {
+// CHECK:         apply
+// CHECK:         destroy_addr
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'test_hoist_over_load_from_stack'
+sil [ossa] @test_hoist_over_load_from_stack : $@convention(thin) (@in X) -> @owned X {
+entry(%in_addr : $*X):
+  %stack_addr = alloc_stack $X
+  copy_addr %in_addr to [initialization] %stack_addr : $*X
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+  %retval = load [take] %stack_addr : $*X
+  destroy_addr %in_addr : $*X
+  dealloc_stack %stack_addr : $*X
+  return %retval : $X
+}
+
+// If a begin_apply uses the address, the end_appy and abort_apply should be
+// regarded as uses too.  Don't hoist over them.
+//
+// CHECK-LABEL: sil [ossa] @nohoist_over_end_apply_use : {{.*}} {
+// CHECK:         end_apply
+// CHECK:         destroy_addr
+// CHECK:         tuple
+// CHECK-LABEL: } // end sil function 'nohoist_over_end_apply_use'
+sil [ossa] @nohoist_over_end_apply_use : $@convention(thin) (@inout X, @owned X) -> () {
+entry(%addr : $*X, %instance : @owned $X):
+  %coro = function_ref @coro : $@yield_once @convention(thin) (@inout X) -> @yields ()
+  (%empty, %continuation) = begin_apply %coro(%addr) : $@yield_once @convention(thin) (@inout X) -> @yields ()
+  end_apply %continuation
+  %retval = tuple ()
+  store %instance to [assign] %addr : $*X
+  return %retval : $()
+}
+
 // Fold destroy_addr and a load [copy] into a load [take] even when that
 // load [take] is guarded by an access scope.
 //
@@ -385,9 +480,10 @@ entry(%instance : @owned $S):
 }
 
 // Don't fold with an unrelated load [copy].
+//
 // CHECK-LABEL: sil [ossa] @nofold_unrelated_scoped_load_copy : {{.*}} {
-// CHECK:         load [copy] 
 // CHECK:         destroy_addr
+// CHECK:         load [copy] 
 // CHECK:         destroy_addr
 // CHECK-LABEL: // end sil function 'nofold_unrelated_scoped_load_copy'
 sil [ossa] @nofold_unrelated_scoped_load_copy : $@convention(thin) (@owned X) -> (@owned X) {

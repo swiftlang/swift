@@ -29,7 +29,6 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
     auto flag = llvm::StringSwitch<Optional<DebugFlags>>(flagStr)
       .Case("simplify", DebugFlags::Simplify)
       .Case("add", DebugFlags::Add)
-      .Case("merge", DebugFlags::Merge)
       .Case("completion", DebugFlags::Completion)
       .Case("property-map", DebugFlags::PropertyMap)
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
@@ -42,6 +41,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("minimization", DebugFlags::Minimization)
       .Case("redundant-rules", DebugFlags::RedundantRules)
       .Case("redundant-rules-detail", DebugFlags::RedundantRulesDetail)
+      .Case("concrete-contraction", DebugFlags::ConcreteContraction)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
@@ -134,7 +134,9 @@ RequirementMachine *RewriteContext::getRequirementMachine(
 
   // This might re-entrantly invalidate 'machine', which is a reference
   // into Protos.
-  newMachine->initWithGenericSignature(sig);
+  auto status = newMachine->initWithGenericSignature(sig);
+  newMachine->checkCompletionResult(status.first);
+
   return newMachine;
 }
 

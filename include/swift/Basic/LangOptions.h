@@ -530,6 +530,11 @@ namespace swift {
     RequirementMachineMode RequirementMachineInferredSignatures =
         RequirementMachineMode::Disabled;
 
+    /// Disable preprocessing pass to eliminate conformance requirements
+    /// on generic parameters which are made concrete. Usually you want this
+    /// enabled. It can be disabled for debugging and testing.
+    bool EnableRequirementMachineConcreteContraction = true;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
@@ -717,6 +722,10 @@ namespace swift {
     /// Enable experimental support for type inference through multi-statement
     /// closures.
     bool EnableMultiStatementClosureInference = false;
+
+    /// Enable experimental support for generic parameter inference in
+    /// parameter positions from associated default expressions.
+    bool EnableTypeInferenceFromDefaultArguments = false;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;

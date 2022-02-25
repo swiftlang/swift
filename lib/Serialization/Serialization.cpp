@@ -3770,11 +3770,18 @@ public:
     // any of the special ones.
     StringRef defaultArgumentText;
     SmallString<128> scratch;
+    // Type of the default expression.
+    Type defaultExprType;
+
     swift::DefaultArgumentKind argKind = param->getDefaultArgumentKind();
     if (argKind == swift::DefaultArgumentKind::Normal ||
-        argKind == swift::DefaultArgumentKind::StoredProperty)
+        argKind == swift::DefaultArgumentKind::StoredProperty) {
       defaultArgumentText =
         param->getDefaultValueStringRepresentation(scratch);
+
+      // Serialize the type of the default expression (if any).
+      defaultExprType = param->getTypeOfDefaultExpr();
+    }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3789,6 +3796,7 @@ public:
         param->isIsolated(),
         param->isCompileTimeConst(),
         getRawStableDefaultArgumentKind(argKind),
+        S.addTypeRef(defaultExprType),
         defaultArgumentText);
 
     if (interfaceType->hasError() && !S.allowCompilerErrors()) {
@@ -5802,10 +5810,11 @@ bool Serializer::allowCompilerErrors() const {
 
 static void emitABIDescriptor(ModuleOrSourceFile DC,
                               const SerializationOptions &options) {
+  using namespace swift::ide::api;
   if (!options.ABIDescriptorPath.empty()) {
     if (DC.is<ModuleDecl*>()) {
-      swift::ide::api::dumpModuleContent(DC.get<ModuleDecl*>(),
-                                         options.ABIDescriptorPath, true);
+      dumpModuleContent(DC.get<ModuleDecl*>(), options.ABIDescriptorPath, true,
+                        options.emptyABIDescriptor);
     }
   }
 }

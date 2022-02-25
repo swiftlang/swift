@@ -13,7 +13,7 @@
 #ifndef SWIFT_IDE_CODECOMPLETIONDIAGNOSTICS_H
 #define SWIFT_IDE_CODECOMPLETIONDIAGNOSTICS_H
 
-#include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionResult.h"
 
 namespace swift {
 
