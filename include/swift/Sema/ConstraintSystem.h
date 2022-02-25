@@ -966,6 +966,7 @@ public:
     stmtCondElement,
     expr,
     stmt,
+    pattern,
     patternBindingEntry,
     varDecl,
   };
@@ -979,6 +980,8 @@ private:
     const Expr *expr;
 
     const Stmt *stmt;
+
+    const Pattern *pattern;
 
     struct PatternBindingEntry {
       const PatternBindingDecl *patternBinding;
@@ -1007,6 +1010,11 @@ public:
   SolutionApplicationTargetsKey(const Stmt *stmt) {
     kind = Kind::stmt;
     storage.stmt = stmt;
+  }
+
+  SolutionApplicationTargetsKey(const Pattern *pattern) {
+    kind = Kind::pattern;
+    storage.pattern = pattern;
   }
 
   SolutionApplicationTargetsKey(
@@ -1039,6 +1047,9 @@ public:
 
     case Kind::stmt:
       return lhs.storage.stmt == rhs.storage.stmt;
+
+    case Kind::pattern:
+      return lhs.storage.pattern == rhs.storage.pattern;
 
     case Kind::patternBindingEntry:
       return (lhs.storage.patternBindingEntry.patternBinding
@@ -1080,6 +1091,11 @@ public:
       return hash_combine(
           DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
           DenseMapInfo<void *>::getHashValue(storage.stmt));
+
+    case Kind::pattern:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.pattern));
 
     case Kind::patternBindingEntry:
       return hash_combine(
