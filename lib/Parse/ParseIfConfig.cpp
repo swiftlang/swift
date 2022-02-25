@@ -378,7 +378,7 @@ public:
       return E;
     }
 
-    // ( 'os' | 'arch' | '_endian' | '_pointer_bit_width' | '_runtime' ) '(' identifier ')''
+    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.has_value()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);

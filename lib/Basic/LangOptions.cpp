@@ -84,12 +84,12 @@ static const SupportedConditionalValue SupportedConditionalCompilationEndianness
   "big"
 };
 
-static const StringRef SupportedConditionalCompilationPointerBitWidths[] = {
+static const SupportedConditionalValue SupportedConditionalCompilationPointerBitWidths[] = {
   "_32",
   "_64"
 };
 
-static const StringRef SupportedConditionalCompilationRuntimes[] = {
+static const SupportedConditionalValue SupportedConditionalCompilationRuntimes[] = {
   "_ObjC",
   "_Native",
 };
@@ -119,6 +119,8 @@ ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(con
     return SupportedConditionalCompilationArches;
   case PlatformConditionKind::Endianness:
     return SupportedConditionalCompilationEndianness;
+  case PlatformConditionKind::PointerBitWidth:
+    return SupportedConditionalCompilationPointerBitWidths;
   case PlatformConditionKind::Runtime:
     return SupportedConditionalCompilationRuntimes;
   case PlatformConditionKind::CanImport:
@@ -411,32 +413,23 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   }
 
-  // Set the "_native_word_size" platform condition.
+  // Set the "_pointerBitWidth" platform condition.
   switch (Target.getArch()) {
+  default: llvm_unreachable("undefined architecture pointer bit width");
   case llvm::Triple::ArchType::arm:
   case llvm::Triple::ArchType::thumb:
+  case llvm::Triple::ArchType::aarch64_32:
+  case llvm::Triple::ArchType::x86:
+  case llvm::Triple::ArchType::wasm32:
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
     break;
   case llvm::Triple::ArchType::aarch64:
-    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
-    break;
   case llvm::Triple::ArchType::ppc64:
-    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
-    break;
   case llvm::Triple::ArchType::ppc64le:
-    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
-    break;
-  case llvm::Triple::ArchType::x86:
-    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
-    break;
   case llvm::Triple::ArchType::x86_64:
-    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
-    break;
   case llvm::Triple::ArchType::systemz:
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
     break;
-  default:
-    llvm_unreachable("undefined architecture pointer bit width");
   }
 
   // Set the "runtime" platform condition.
