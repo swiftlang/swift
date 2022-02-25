@@ -1,8 +1,8 @@
 # Building Swift on Windows
 
-Visual Studio 2017 or newer is needed to build Swift on Windows. The free Community edition is sufficient to build Swift.
+Visual Studio 2017 or newer is needed to build Swift on Windows, while VS2019 is recommended and currently used for CI.  The free Community edition is sufficient to build Swift.
 
-The commands below (with the exception of installing Visual Studio) must be entered in the "**x64 Native** Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
+The commands below (with the exception of installing Visual Studio) must be entered in the "**x64 Native** Tools Command Prompt for VS2019" (or VS2017, VS2022 depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
 
 ## Install dependencies
 
@@ -18,8 +18,7 @@ vs_community ^
   --add Microsoft.VisualStudio.Component.VC.ATL ^
   --add Microsoft.VisualStudio.Component.VC.CMake.Project ^
   --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
-  --add Microsoft.VisualStudio.Component.Windows10SDK ^
-  --add Microsoft.VisualStudio.Component.Windows10SDK.17763
+  --add Microsoft.VisualStudio.Component.Windows10SDK.19041
 del /q vs_community.exe
 ```
 
@@ -29,12 +28,12 @@ The following [link](https://docs.microsoft.com/visualstudio/install/workload-co
 
 ### Python
 
-The command above already installs Python 3. Alternatively, in the Visual Studio installation program, under *Individual Components*, install *Python 3 64 bits (3.7.x)*.
+The command above already installs Python 3. Alternatively, in the Visual Studio installation program, under *Individual Components*, install *Python 3 64 bits (3.9.x)*.
 
 If you are building a debug version of Swift, you should also install the Python debug binaries.
 
 1. In the Windows settings, go to *Add and Remove Programs*
-2. Select the *Python 3.7.x (64-bit)* entry
+2. Select the *Python 3.9.x (64-bit)* entry
 3. Click *Modify*, then *Yes*, then *Modify* again and then *Next*
 4. Select *Download debug binaries (requires VS 2015 or later)*
 5. Click *Install*
