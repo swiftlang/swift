@@ -360,6 +360,9 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
       Opts.PrintSPIs = true;
     }
   }
+  for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {
+    Opts.ModulesToSkipInPublicInterface.push_back(val);
+  }
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
