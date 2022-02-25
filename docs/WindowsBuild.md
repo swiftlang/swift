@@ -4,6 +4,8 @@ Visual Studio 2017 or newer is needed to build Swift on Windows, while VS2019 is
 
 The commands below (with the exception of installing Visual Studio) must be entered in the "**x64 Native** Tools Command Prompt for VS2019" (or VS2017, VS2022 depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
 
+> **NOTE:** This guide is intended for toolchain developers who wants to develop or build Swift on their own machine.  For building and packaging a standard toolchain, please refer to [`build-windows-toolchain.bat`](../utils/build-windows-toolchain.bat).
+
 ## Install dependencies
 
 ### Visual Studio
@@ -44,32 +46,20 @@ From the settings application, go to `Update & Security`.  In the `For developer
 
 ## Clone the repositories
 
-1. Clone `swift/main` branch of `apple/llvm-project` into the build workspace
-2. Clone `apple/swift-cmark`, `apple/swift`, `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-tools-support-core`, `apple/swift-llbuild`, `apple/swift-argument-parser`, `apple/swift-driver`, `apple/swift-package-manager`, `JPSim/Yams`, `apple/indexstore-db` into the build workspace
+> **NOTE:** This guide assumes your sources live at the root of `S:`. If your sources live elsewhere, you can create a substitution for this:
+>    subst S: <path to sources>
 
-- Currently, other repositories in the Swift project have not been tested and may not be supported.
-
-This guide assumes your sources live at the root of `S:`. If your sources live elsewhere, you can create a substitution for this:
-
-```cmd
-subst S: <path to sources>
-```
+First, clone `apple/swift` (this repository) with Git:
 
 ```cmd
 S:
-git clone https://github.com/apple/llvm-project --branch swift/main llvm-project
-git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift swift
-git clone https://github.com/apple/swift-cmark cmark
-git clone https://github.com/apple/swift-corelibs-libdispatch swift-corelibs-libdispatch
-git clone https://github.com/apple/swift-corelibs-foundation swift-corelibs-foundation
-git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
-git clone https://github.com/apple/swift-tools-support-core swift-tools-support-core
-git clone -c core.symlinks=true https://github.com/apple/swift-llbuild swift-llbuild
-git clone https://github.com/JPSim/Yams Yams
-git clone https://github.com/apple/swift-driver swift-driver
-git clone https://github.com/apple/swift-argument-parser swift-argument-parser
-git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager swift-package-manager
-git clone https://github.com/apple/indexstore-db indexstore-db
+git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift
+```
+
+You'll be able to clone and check out the rest of Swift source repositories with `update-checkout` tool:
+
+```cmd
+swift\utils\update-checkout.cmd --clone
 ```
 
 ## Dependencies (ICU, SQLite3, curl, libxml2 and zlib)
