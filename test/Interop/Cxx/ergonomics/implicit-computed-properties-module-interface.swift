@@ -7,7 +7,7 @@
 // CHECK-NEXT:    mutating func setXMutating(_: Int32)
 // CHECK-NEXT: }
 
-// CHECK:      struct VoidGetterNoName {
+// CHECK:      struct VoidSetterNoName {
 // CHECK-NOT:     var
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    mutating func set()

@@ -6,7 +6,7 @@ struct VoidGetter {
   void setX(int);
 };
 
-struct VoidGetterNoName {
+struct VoidSetterNoName {
   void set();
 };
 
@@ -71,8 +71,6 @@ struct IntGetterSetterSnakeCaseUpper {
 
 // We should  deprecate methods when we transform them successfully (telling users to use 
 //  the computed properties instead) rdar://89452854.
-
-
 struct IntGetterSetterSnakeCase {
     int val;
     int get_x() const { return val; }
