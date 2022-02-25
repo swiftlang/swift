@@ -581,18 +581,21 @@ entry(%instance_c: @owned $C, %instance_d: @owned $D):
     return %instance_c : $C
 }
 
-// Don't hoist over store to an address which itself is (earlier) stored into a
-// field of the object being borrowed.
-// TODO: Eventually, we should be able to hoist over such a store.
-// CHECK-LABEL: sil [ossa] @hoist_over_load : $@convention(thin) () -> () {
-// CHECK:        [[D:%[^,]+]] = alloc_ref $PointerWrapper                  
-// CHECK:        [[LIFETIME:%[^,]+]] = begin_borrow [[D]] : $PointerWrapper          
-// CHECK:        [[ADDR:%[^,]+]] = alloc_stack $PointedTo                     
-// CHECK:        [[C:%[^,]+]] = alloc_ref $PointedTo                       
-// CHECK:        store [[C]] to [init] [[ADDR]] : $*PointedTo             
-// CHECK-NEXT:    end_borrow [[LIFETIME]] : $PointerWrapper                 
-// CHECK-LABEL: } // end sil function 'hoist_over_load'
-sil [ossa] @hoist_over_load : $@convention(thin) () -> () {
+// Hoist over store to unrelated stack address.  Do not hoist over store to
+// field of lifetime.
+//
+// CHECK-LABEL: sil [ossa] @hoist_over_store : $@convention(thin) () -> () {
+// CHECK:        [[D:%[^,]+]] = alloc_ref $PointerWrapper
+// CHECK:        [[LIFETIME:%[^,]+]] = begin_borrow [[D]] : $PointerWrapper
+// CHECK:        [[ADDR:%[^,]+]] = alloc_stack $PointedTo
+// CHECK:        [[PTR:%[^,]+]] = address_to_pointer [[ADDR]]
+// CHECK:        [[FIELD:%[^,]+]] = ref_element_addr [[LIFETIME]]
+// CHECK:        store [[PTR]] to [trivial] [[FIELD]]
+// CHECK:        end_borrow [[LIFETIME]] : $PointerWrapper
+// CHECK:        [[C:%[^,]+]] = alloc_ref $PointedTo
+// CHECK:        store [[C]] to [init] [[ADDR]] : $*PointedTo
+// CHECK-LABEL: } // end sil function 'hoist_over_store'
+sil [ossa] @hoist_over_store : $@convention(thin) () -> () {
 bb0:
   %d = alloc_ref $PointerWrapper
   %lifetime = begin_borrow %d : $PointerWrapper

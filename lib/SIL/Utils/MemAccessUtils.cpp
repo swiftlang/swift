@@ -405,13 +405,13 @@ static bool isBarrierApply(FullApplySite) {
 static bool mayAccessPointer(SILInstruction *instruction) {
   if (!instruction->mayReadOrWriteMemory())
     return false;
-  bool fail = false;
-  visitAccessedAddress(instruction, [&fail](Operand *operand) {
+  bool isUnidentified = false;
+  visitAccessedAddress(instruction, [&isUnidentified](Operand *operand) {
     auto accessStorage = AccessStorage::compute(operand->get());
-    if (accessStorage.getKind() != AccessRepresentation::Kind::Unidentified)
-      fail = true;
+    if (accessStorage.getKind() == AccessRepresentation::Kind::Unidentified)
+      isUnidentified = true;
   });
-  return fail;
+  return isUnidentified;
 }
 
 static bool mayLoadWeakOrUnowned(SILInstruction *instruction) {
