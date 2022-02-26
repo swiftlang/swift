@@ -145,9 +145,16 @@ namespace {
 ///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
+  // The ABI reserves three words of storage for these contexts, which
+  // we currently use as follows.  These fields are not accessed by
+  // generated code; they're purely internal to the runtime, and only
+  // when the calling task actually suspends.
+  //
+  // (If you think three words is an odd choice, one of them used to be
+  // the context flags.)
   SwiftError *errorResult;
-
   OpaqueValue *successResultPointer;
+  void *_reserved;
 
   void fillWithSuccess(AsyncTask::FutureFragment *future) {
     fillWithSuccess(future->getStoragePtr(), future->getResultType(),

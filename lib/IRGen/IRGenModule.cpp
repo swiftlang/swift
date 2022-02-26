@@ -662,9 +662,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
 
   SwiftContextTy->setBody({
-    SwiftContextPtrTy,    // Parent
-    TaskContinuationFunctionPtrTy, // ResumeParent,
-    SizeTy,               // Flags
+    SwiftContextPtrTy,             // Parent
+    TaskContinuationFunctionPtrTy, // ResumeParent
   });
 
   AsyncTaskAndContextTy = createStructType(
@@ -674,6 +673,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ContinuationAsyncContextTy = createStructType(
       *this, "swift.continuation_context",
       {SwiftContextTy,       // AsyncContext header
+       SizeTy,               // flags
        SizeTy,               // await synchronization
        ErrorPtrTy,           // error result pointer
        OpaquePtrTy,          // normal result address
