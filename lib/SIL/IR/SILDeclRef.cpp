@@ -121,14 +121,18 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return false;
 }
 
-SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       bool isForeign, bool isDistributed,
+SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
+                       bool isDistributed,
+                       SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
     : loc(vd), kind(kind), isForeign(isForeign), isDistributed(isDistributed),
-      defaultArgIndex(0), pointer(derivativeId) {}
+      backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
+      pointer(derivativeId) {}
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign, bool asDistributed)
-    : defaultArgIndex(0),
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
+                       bool asDistributed)
+    : backDeploymentKind(SILDeclRef::BackDeploymentKind::None),
+      defaultArgIndex(0),
       pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
@@ -202,7 +206,8 @@ ASTContext &SILDeclRef::getASTContext() const {
 }
 
 bool SILDeclRef::isThunk() const {
-  return isForeignToNativeThunk() || isNativeToForeignThunk() || isDistributedThunk();
+  return isForeignToNativeThunk() || isNativeToForeignThunk() ||
+         isDistributedThunk() || isBackDeploymentThunk();
 }
 
 bool SILDeclRef::isClangImported() const {
@@ -313,6 +318,11 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     if (isSerialized())
       return maybeAddExternal(SILLinkage::PublicNonABI);
   }
+
+  // Back deployment thunks and fallbacks are emitted into the client and
+  // therefore have PublicNonABI linkage.
+  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
+    return maybeAddExternal(SILLinkage::PublicNonABI);
 
   enum class Limit {
     /// No limit.
@@ -728,9 +738,8 @@ bool SILDeclRef::isAlwaysInline() const {
 }
 
 bool SILDeclRef::isAnyThunk() const {
-  return isForeignToNativeThunk() ||
-    isNativeToForeignThunk() ||
-    isDistributedThunk();
+  return isForeignToNativeThunk() || isNativeToForeignThunk() ||
+         isDistributedThunk() || isBackDeploymentThunk();
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
@@ -780,6 +789,18 @@ bool SILDeclRef::isNativeToForeignThunk() const {
 
 bool SILDeclRef::isDistributedThunk() const {
   if (!isDistributed)
+    return false;
+  return kind == Kind::Func;
+}
+
+bool SILDeclRef::isBackDeploymentFallback() const {
+  if (backDeploymentKind != BackDeploymentKind::Fallback)
+    return false;
+  return kind == Kind::Func;
+}
+
+bool SILDeclRef::isBackDeploymentThunk() const {
+  if (backDeploymentKind != BackDeploymentKind::Thunk)
     return false;
   return kind == Kind::Func;
 }
@@ -864,6 +885,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
       } else if (isDistributedThunk()) {
         SKind = ASTMangler::SymbolKind::DistributedThunk;
+      } else if (isBackDeploymentThunk()) {
+        SKind = ASTMangler::SymbolKind::BackDeploymentThunk;
+      } else if (isBackDeploymentFallback()) {
+        SKind = ASTMangler::SymbolKind::BackDeploymentFallback;
       }
       break;
     case SILDeclRef::ManglingKind::DynamicThunk:
@@ -995,6 +1020,8 @@ bool SILDeclRef::requiresNewVTableEntry() const {
     return false;
   if (isDistributedThunk())
     return false;
+  if (isBackDeploymentThunk())
+    return false;
   auto fnDecl = dyn_cast<AbstractFunctionDecl>(getDecl());
   if (!fnDecl)
     return false;
@@ -1022,6 +1049,9 @@ SILDeclRef SILDeclRef::getOverridden() const {
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
   if (auto overridden = getOverridden()) {
+    // Back deployed methods should not be overridden.
+    assert(backDeploymentKind == SILDeclRef::BackDeploymentKind::None);
+
     // If we overrode a foreign decl or dynamic method, if this is an
     // accessor for a property that overrides an ObjC decl, or if it is an
     // @NSManaged property, then it won't be in the vtable.
@@ -1031,7 +1061,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // Distributed thunks are not in the vtable.
     if (isDistributedThunk())
       return SILDeclRef();
-    
+
     // An @objc convenience initializer can be "overridden" in the sense that
     // its selector is reclaimed by a subclass's convenience init with the
     // same name. The AST models this as an override for the purposes of
@@ -1313,6 +1343,8 @@ bool SILDeclRef::canBeDynamicReplacement() const {
     return false;
   if (isDistributedThunk())
     return false;
+  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
+    return false;
   if (kind == SILDeclRef::Kind::Destroyer ||
       kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
@@ -1330,6 +1362,9 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
     return false;
 
   if (isDistributedThunk())
+    return false;
+
+  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
     return false;
 
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)

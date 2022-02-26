@@ -1627,6 +1627,8 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::AsyncAwaitResumePartialFunction:
       case Node::Kind::AsyncSuspendResumePartialFunction:
       case Node::Kind::AccessibleFunctionRecord:
+      case Node::Kind::BackDeploymentThunk:
+      case Node::Kind::BackDeploymentFallback:
         mangleInReverseOrder = true;
         break;
       default:
@@ -3404,6 +3406,18 @@ ManglingError Remangler::mangleGlobalVariableOnceDeclList(Node *node,
 ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
                                                         unsigned depth) {
   Buffer << "HF";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBackDeploymentThunk(Node *node,
+                                                   unsigned depth) {
+  Buffer << "Twb";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
+                                                      unsigned depth) {
+  Buffer << "TwB";
   return ManglingError::Success;
 }
 

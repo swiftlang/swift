@@ -112,6 +112,12 @@ void SILGenModule::emitDistributedThunk(SILDeclRef thunk) {
   emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
+void SILGenModule::emitBackDeploymentThunk(SILDeclRef thunk) {
+  // Thunks are always emitted by need, so don't need delayed emission.
+  assert(thunk.isBackDeploymentThunk() && "back deployment thunks only");
+  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
+}
+
 SILValue
 SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
                                       SILConstantInfo constantInfo,
