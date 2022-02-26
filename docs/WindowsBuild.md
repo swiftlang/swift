@@ -62,30 +62,18 @@ You'll be able to clone and check out the rest of Swift source repositories with
 swift\utils\update-checkout.cmd --clone
 ```
 
-## Dependencies (ICU, SQLite3, curl, libxml2 and zlib)
+## Set up `vcpkg`
 
-The instructions assume that the dependencies are in `S:\Library`. The directory
-structure should resemble:
+The instructions will use `vcpkg` for pulling in external dependencies, including ICU, libcurl, libxml2, SQLite 3 and zlib.
 
-```
-/Library
-  ┝ icu-67
-  │   ┕ usr/...
-  ├ libcurl-development
-  │   ┕ usr/...
-  ├ libxml2-development
-  │   ┕ usr/...
-  ├ sqlite-3.28.0
-  │   ┕ usr/...
-  ┕ zlib-1.2.11
-      ┕ usr/...
+Before you get started, clone and bootstrap `vcpkg`:
+
+```cmd
+git clone https://github.com/microsoft/vcpkg
+vcpkg\bootstrap-vcpkg.bat
 ```
 
-Note that ICU is only required for building Foundation, and SQLite is only
-needed for building llbuild and onwards.  The ICU project provides binaries,
-alternatively, see the ICU project for details on building ICU from source.
-
-## One-time setup (re-run on Visual Studio upgrades)
+## Set up Visual Studio integration (re-run on Visual Studio upgrades)
 
 Set up the `ucrt`, `visualc`, and `WinSDK` modules by:
 
@@ -134,7 +122,7 @@ cmake --build S:\b\1
 cmake --build S:\b\1 --target install
 ```
 
-## Build a complete toolchain with debugging info
+## Build a complete toolchain for development
 
 The following guide will get you through the building process of a complete Swift debug toolchain.
 
@@ -226,6 +214,7 @@ cmake --build S:\b\2
 cmake -B S:\b\3 ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
   -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
+
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
@@ -240,44 +229,41 @@ cmake -B S:\b\3 ^
   -G Ninja ^
   -S S:\swift-corelibs-libdispatch
 
-ninja -C S:\b\3
+cmake --build S:\b\3
 ```
 
 Test libdispatch:
 
 ```cmd
-ninja -C S:\b\3 check
+cmake --build S:\b\3 check
 ```
 
 ### Foundation
 
 ```cmd
-cmake -B S:\b\3 ^
+cmake -B S:\b\4 ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
+
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D ENABLE_SWIFT=YES ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
-  -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" ^
-  -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" ^
-  -D ICU_I18N_LIBRARY_RELEASE=S:\library\icu-67\usr\lib\icuin67.lib ^
-  -D ICU_ROOT=S:\Library\icu-67\usr ^
-  -D ICU_UC_LIBRARY_RELEASE=S:\Library\icu-67\usr\lib\icuuc67.lib ^
-  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
-  -D LIBXML2_LIBRARY=S:\Library\libxml2-development\usr\lib\libxml2s.lib ^
-  -D LIBXML2_INCLUDE_DIR=S:\Library\libxml2-development\usr\include\libxml2 ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+
+  -D CMAKE_TOOLCHAIN_FILE=S:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+
   -D ENABLE_TESTING=NO ^
-  -D dispatch_DIR=S:\b\2\cmake\modules ^
   -G Ninja ^
   -S S:\swift-corelibs-foundation
 
-ninja -C S:\b\3
-```
-
-Add Foundation to your path:
-
-```cmd
-path S:\b\3\bin;%PATH%
+cmake --build S:\b\4
 ```
 
 ### XCTest
@@ -496,6 +482,7 @@ path S:\b\toolchain\usr\bin:%PATH%
 ```cmd
 cmake --build S:\b\2 --target install
 cmake --build S:\b\3 --target install
+cmake --build S:\b\4 --target install
 ```
 
 For testing, set `SDKROOT`:
