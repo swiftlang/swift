@@ -2,6 +2,8 @@
 // sync main is nested deeper in protocols than async, use async if supported
 // async and sync are same level, use async if supported
 
+// REQUIRES: rdar89500797
+
 // async main is nested in the protocol chain from `MyMain`
 // Always choose Sync overload
 // RUN: %target-swift-frontend -target x86_64-apple-macosx10.9 -DASYNC_NESTED -DINHERIT_SYNC -typecheck -dump-ast -parse-as-library %s | %FileCheck %s --check-prefix=CHECK-IS-SYNC
