@@ -13,8 +13,6 @@
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-module-interface-path %t/TestFromModule.swiftinterface -module-name Test
 // RUN: %FileCheck %s --check-prefix FROMMODULE --check-prefix CHECK < %t/TestFromModule.swiftinterface
 
-// FIXME(backDeploy): Verify that function bodies are emitted
-
 public struct TopLevelStruct {
   // CHECK: @_backDeploy(macOS 11.0)
   // FROMSOURCE: public func backDeployedFunc1_SinglePlatform() -> Swift.Int { return 42 }

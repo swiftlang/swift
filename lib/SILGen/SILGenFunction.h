@@ -2034,6 +2034,14 @@ public:
                                            CanSILFunctionType toType,
                                            bool reorderSelf);
 
+  //===--------------------------------------------------------------------===//
+  // Back Deployment thunks
+  //===--------------------------------------------------------------------===//
+
+  /// Invokes an original function if it is available at runtime. Otherwise,
+  /// invokes a fallback copy of the function emitted into the client.
+  void emitBackDeploymentThunk(SILDeclRef thunk);
+
   //===---------------------------------------------------------------------===//
   // Distributed Actors
   //===---------------------------------------------------------------------===//
