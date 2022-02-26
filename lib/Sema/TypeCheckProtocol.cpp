@@ -4847,12 +4847,6 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
   Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
-
-  if (CheckedRequirementSignature)
-    return;
-
-  CheckedRequirementSignature = true;
-
   auto &diags = proto->getASTContext().Diags;
 
   auto DC = Conformance->getDeclContext();
@@ -4934,6 +4928,71 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 }
 
 #pragma mark Protocol conformance checking
+
+/// Determine whether mapping the interface type of the given protocol non-type
+/// requirement into the context of the given conformance produces a well-formed
+/// type.
+static bool
+hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
+                                   NormalProtocolConformance *conformance) {
+  assert(!isa<TypeDecl>(requirement));
+  assert(requirement->getDeclContext()->getSelfProtocolDecl() ==
+         conformance->getProtocol());
+
+  // FIXME: getInterfaceType() on properties returns contextual types that have
+  // been mapped out of context, but mapTypeOutOfContext() does not reconstitute
+  // type parameters that were substituted with concrete types. Instead,
+  // patterns should be refactored to use interface types, at least if they
+  // appear in type contexts.
+  auto interfaceTy = requirement->getInterfaceType();
+
+  // Skip the curried 'self' parameter.
+  if (requirement->hasCurriedSelf())
+    interfaceTy = interfaceTy->castTo<AnyFunctionType>()->getResult();
+
+  // For subscripts, build a regular function type to skip walking generic
+  // requirements.
+  if (auto *gft = interfaceTy->getAs<GenericFunctionType>()) {
+    interfaceTy = FunctionType::get(gft->getParams(), gft->getResult(),
+                                    gft->getExtInfo());
+  }
+
+  if (!interfaceTy->hasTypeParameter())
+    return false;
+
+  const auto subs = SubstitutionMap::getProtocolSubstitutions(
+      conformance->getProtocol(),
+      conformance->getDeclContext()->mapTypeIntoContext(conformance->getType()),
+      ProtocolConformanceRef(conformance));
+
+  class Walker final : public TypeWalker {
+    const SubstitutionMap &Subs;
+    const ProtocolDecl *Proto;
+
+  public:
+    explicit Walker(const SubstitutionMap &Subs, const ProtocolDecl *Proto)
+        : Subs(Subs), Proto(Proto) {}
+
+    Action walkToTypePre(Type ty) override {
+      if (!ty->hasTypeParameter())
+        return Action::SkipChildren;
+
+      auto *const dmt = ty->getAs<DependentMemberType>();
+      if (!dmt)
+        return Action::Continue;
+
+      // We only care about 'Self'-rooted type parameters.
+      if (!dmt->getRootGenericParam()->isEqual(Proto->getSelfInterfaceType()))
+        return Action::SkipChildren;
+
+      if (ty.subst(Subs)->hasError())
+        return Action::Stop;
+      return Action::SkipChildren;
+    }
+  };
+
+  return interfaceTy.walk(Walker(subs, conformance->getProtocol()));
+}
 
 void ConformanceChecker::resolveValueWitnesses() {
   for (auto member : Proto->getMembers()) {
@@ -5086,10 +5145,6 @@ void ConformanceChecker::resolveValueWitnesses() {
       continue;
     }
 
-    // If this is an accessor for a storage decl, ignore it.
-    if (isa<AccessorDecl>(requirement))
-      continue;
-
     // If this requirement is part of a pair of imported async requirements,
     // where one has already been witnessed, we can skip it.
     //
@@ -5103,6 +5158,13 @@ void ConformanceChecker::resolveValueWitnesses() {
                      !cand->isImplicit() &&
                      this->Conformance->hasWitness(cand);
             })) {
+      continue;
+    }
+
+    // Try substituting into the requirement's interface type. If we fail,
+    // either a generic requirement was not satisfied or we tripped on an
+    // invalid type witness, and there's no point in resolving a witness.
+    if (hasInvalidTypeInConformanceContext(requirement, Conformance)) {
       continue;
     }
 
@@ -5192,14 +5254,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // Diagnose missing type witnesses for now.
   diagnoseMissingWitnesses(Kind);
-
-  // If we complain about any associated types, there is no point in continuing.
-  // FIXME: Not really true. We could check witnesses that don't involve the
-  // failed associated types.
-  if (AlreadyComplained) {
-    Conformance->setInvalid();
-    return;
-  }
 
   // Diagnose missing value witnesses later.
   SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
