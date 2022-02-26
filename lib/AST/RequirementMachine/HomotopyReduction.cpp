@@ -195,17 +195,21 @@ void RewriteSystem::propagateExplicitBits() {
       loop.findRulesAppearingOnceInEmptyContext(*this);
 
     bool sawExplicitRule = false;
+    Optional<unsigned> requirementID = None;
 
     for (unsigned ruleID : rulesInEmptyContext) {
       const auto &rule = getRule(ruleID);
-      if (rule.isExplicit())
+      if (rule.isExplicit()) {
         sawExplicitRule = true;
+        requirementID = rule.getRequirementID();
+        break;
+      }
     }
     if (sawExplicitRule) {
       for (unsigned ruleID : rulesInEmptyContext) {
         auto &rule = getRule(ruleID);
         if (!rule.isPermanent() && !rule.isExplicit())
-          rule.markExplicit();
+          rule.markExplicit(requirementID);
       }
     }
   }

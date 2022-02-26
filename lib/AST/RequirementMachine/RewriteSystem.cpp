@@ -498,7 +498,7 @@ bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
                                     Optional<unsigned> requirementID) {
   bool added = addRule(std::move(lhs), std::move(rhs));
   if (added) {
-    Rules.back().markExplicit();
+    Rules.back().markExplicit(requirementID);
   } else if (requirementID.hasValue()) {
     auto req = WrittenRequirements[requirementID.getValue()];
     Errors.push_back(
@@ -723,7 +723,15 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "Rewrite system: {\n";
   for (const auto &rule : Rules) {
-    out << "- " << rule << "\n";
+    out << "- " << rule;
+    if (auto ID = rule.getRequirementID()) {
+      auto requirement = WrittenRequirements[*ID];
+      out << ", ";
+      requirement.req.dump(out);
+      out << " at ";
+      requirement.loc.print(out, Context.getASTContext().SourceMgr);
+    }
+    out << "\n";
   }
   out << "}\n";
   if (!Relations.empty()) {

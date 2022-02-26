@@ -46,6 +46,11 @@ class Rule final {
   Term LHS;
   Term RHS;
 
+  /// The written requirement ID, which can be used to index into the
+  /// \c WrittenRequirements array in the rewrite system to retrieve
+  /// the structural requirement.
+  Optional<unsigned> requirementID;
+
   /// A 'permanent' rule cannot be deleted by homotopy reduction. These
   /// do not correspond to generic requirements and are re-added when the
   /// rewrite system is built.
@@ -97,6 +102,10 @@ public:
 
   const Term &getLHS() const { return LHS; }
   const Term &getRHS() const { return RHS; }
+
+  Optional<unsigned> getRequirementID() const {
+    return requirementID;
+  }
 
   Optional<Symbol> isPropertyRule() const;
 
@@ -167,9 +176,10 @@ public:
     Permanent = true;
   }
 
-  void markExplicit() {
+  void markExplicit(Optional<unsigned> requirementID) {
     assert(!Explicit && !Permanent &&
            "Permanent and explicit are mutually exclusive");
+    this->requirementID = requirementID;
     Explicit = true;
   }
 
