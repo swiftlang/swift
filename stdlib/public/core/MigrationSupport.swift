@@ -700,3 +700,13 @@ public typealias _DefaultCustomPlaygroundQuickLookable = __DefaultCustomPlaygrou
 public protocol __DefaultCustomPlaygroundQuickLookable {
   var _defaultCustomPlaygroundQuickLook: _PlaygroundQuickLook { get }
 }
+
+extension String {
+  /// A type that represents the number of steps between two `String.Index`
+  /// values, where one value is reachable from the other.
+  ///
+  /// In Swift, *reachability* refers to the ability to produce one value from
+  /// the other through zero or more applications of `index(after:)`.
+  @available(*, deprecated, message: "All index distances are now of type Int")
+  public typealias IndexDistance = Int
+}
