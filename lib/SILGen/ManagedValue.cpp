@@ -58,20 +58,20 @@ ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
 
 // Emit an unmanaged copy of this value
 // WARNING: Callers of this API should manage the cleanup of this value!
-ManagedValue ManagedValue::unmanagedCopy(SILGenFunction &SGF,
+SILValue ManagedValue::unmanagedCopy(SILGenFunction &SGF,
                                          SILLocation loc) const {
   auto &lowering = SGF.getTypeLowering(getType());
   if (lowering.isTrivial())
-    return *this;
+    return getValue();
 
   if (getType().isObject()) {
     auto copy = SGF.B.emitCopyValueOperation(loc, getValue());
-    return ManagedValue::forUnmanaged(copy);
+    return copy;
   }
 
   SILValue buf = SGF.emitTemporaryAllocation(loc, getType());
   SGF.B.createCopyAddr(loc, getValue(), buf, IsNotTake, IsInitialization);
-  return ManagedValue::forUnmanaged(buf);
+  return buf;
 }
 
 /// Emit a copy of this value with independent ownership.
