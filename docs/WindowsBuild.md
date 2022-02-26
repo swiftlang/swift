@@ -64,7 +64,7 @@ swift\utils\update-checkout.cmd --clone
 
 ## Dependencies (ICU, SQLite3, curl, libxml2 and zlib)
 
-The instructions assume that the dependencies are in `S:/Library`. The directory
+The instructions assume that the dependencies are in `S:\Library`. The directory
 structure should resemble:
 
 ```
@@ -138,13 +138,14 @@ cmake --build S:\b\1 --target install
 
 The following guide will get you through the building process of a complete Swift debug toolchain.
 
-### Build Swift
+### Swift compiler
 
 ```cmd
 cmake -B S:\b\1 ^
   -C S:\swift\cmake\caches\Windows-x86_64.cmake ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
   -D CMAKE_C_COMPILER=cl ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy /source-charset:utf-8 /execution-charset:utf-8" ^
   -D CMAKE_CXX_COMPILER=cl ^
@@ -152,8 +153,8 @@ cmake -B S:\b\1 ^
   -D CMAKE_MT=mt ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
 
+  -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
@@ -175,37 +176,80 @@ cmake --build S:\b\1
 >
 > Linking with debug information is very memory-intensive and may drastically slow down the linking process.  A single link job is possible to consume upwards of 10 GiB of RAM.  You can append `-D LLVM_PARALLEL_LINK_JOBS=N` to reduce the number of parallel link operations to `N` which should help reduce the memory pressure.
 
+> **NOTE:** By default, we enables all the experimental features in Swift by `-D SWIFT_ENABLE_EXPERIMENTAL_{FEATURE}=YES`.  These features can be disabled separately.  Notice that `Concurrency` is an accepted language feature that should be enabled for Swift 5.5+.
+
 Test Swift:
 
 ```cmd
-path S:\Library\icu-67\usr\bin;S:\b\1\bin;S:\b\1\tools\swift\libdispatch-windows-x86_64-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
-ninja -C S:\b\1 check-swift
+path S:\b\1\bin;S:\b\1\tools\swift\libdispatch-windows-x86_64-prefix\bin;%PATH%
+cmake --build S:\b\1 --target check-swift
 ```
 
-### Build libdispatch
+### Swift Standard Library
 
 ```cmd
 cmake -B S:\b\2 ^
+  -C S:\swift\cmake\caches\Runtime-Windows-x86_64.cmake ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
+
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
-  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D LLVM_DIR=S:\b\1\lib\cmake\llvm ^
+  -D SWIFT_NATIVE_SWIFT_TOOLS_PATH=S:\b\1\bin ^
+  -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
+
+  -D SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES ^
+  -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES ^
+  -D SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES ^
+
+  -D SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES ^
+  -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=S:\swift-experimental-string-processing ^
+
+  -G Ninja ^
+  -S S:\swift
+
+cmake --build S:\b\2
+```
+
+> **NOTE:** Swift Standard Library is also built along with the compiler.  This step extracts it into a portable SDK where we will install other runtime libraries.
+
+### libdispatch
+
+```cmd
+cmake -B S:\b\3 ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
   -D ENABLE_SWIFT=YES ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+
   -G Ninja ^
   -S S:\swift-corelibs-libdispatch
 
-ninja -C S:\b\2
+ninja -C S:\b\3
 ```
 
 Test libdispatch:
 
 ```cmd
-ninja -C S:\b\2 check
+ninja -C S:\b\3 check
 ```
 
-### Build Foundation
+### Foundation
 
 ```cmd
 cmake -B S:\b\3 ^
@@ -236,7 +280,7 @@ Add Foundation to your path:
 path S:\b\3\bin;%PATH%
 ```
 
-### Build XCTest
+### XCTest
 
 ```cmd
 cmake -B S:\b\4 ^
@@ -298,7 +342,7 @@ Test Foundation:
 ninja -C S:\b\3 test
 ```
 
-### Build TSC
+### TSC
 
 ```cmd
 cmake -B S:\b\5 ^
@@ -317,7 +361,7 @@ cmake -B S:\b\5 ^
 ninja -C S:\b\5
 ```
 
-### Build llbuild
+### llbuild
 
 ```cmd
 cmake -B S:\b\6 ^
@@ -345,7 +389,7 @@ Add llbuild to your path:
 path S:\b\6\bin;%PATH%
 ```
 
-### Build Yams
+### Yams
 
 ```cmd
 cmake -B S:\b\7 ^
@@ -363,7 +407,7 @@ cmake -B S:\b\7 ^
 ninja -C S:\b\7
 ```
 
-### Build ArgumentParser
+### ArgumentParser
 
 ```cmd
 cmake -B S:\b\8 ^
@@ -381,7 +425,7 @@ cmake -B S:\b\8 ^
 ninja -C S:\b\8
 ```
 
-## Build SwiftDriver
+### SwiftDriver
 
 ```cmd
 cmake -B S:\b\9 ^
@@ -402,7 +446,7 @@ cmake -B S:\b\9 ^
 ninja -C S:\b\9
 ```
 
-### Build SwiftPM
+### SwiftPM
 
 ```cmd
 cmake -B S:\b\10 ^
@@ -431,14 +475,31 @@ Indicate to SwiftPM where to find `PackageDescription` before installation:
 set SWIFTPM_PD_LIBS=S:\b\10\pm
 ```
 
-### Install the toolchain
+## Gather the toolchain and SDK
+
+If you want a toolchain for real-world testing or distribution, you can use CMake to perform the install step.
+
+### Swift compiler and standard library
 
 ```cmd
 cmake --build S:\b\1 --target install
 ```
 
-Add the target to path:
+For testing, add the target to path:
 
 ```cmd
 path S:\b\toolchain\usr\bin:%PATH%
+```
+
+## Swift Windows SDK (with core libraries)
+
+```cmd
+cmake --build S:\b\2 --target install
+cmake --build S:\b\3 --target install
+```
+
+For testing, set `SDKROOT`:
+
+```cmd
+set SDKROOT=S:\b\sdk
 ```
