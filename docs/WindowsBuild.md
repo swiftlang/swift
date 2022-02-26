@@ -143,6 +143,7 @@ cmake -B S:\b\1 ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
+
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
@@ -169,7 +170,7 @@ cmake --build S:\b\1
 Test Swift:
 
 ```cmd
-path S:\b\1\bin;S:\b\1\tools\swift\libdispatch-windows-x86_64-prefix\bin;%PATH%
+path %PATH%;%ProgramFiles%\Git\usr\bin
 cmake --build S:\b\1 --target check-swift
 ```
 
@@ -226,6 +227,8 @@ cmake -B S:\b\3 ^
   -D ENABLE_SWIFT=YES ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
 
+  -D BUILD_TESTING=YES ^
+
   -G Ninja ^
   -S S:\swift-corelibs-libdispatch
 
@@ -235,7 +238,7 @@ cmake --build S:\b\3
 Test libdispatch:
 
 ```cmd
-cmake --build S:\b\3 check
+cmake --build S:\b\3 --target test
 ```
 
 ### Foundation
