@@ -105,7 +105,9 @@ public:
     ObjCAsSwiftThunk,
     DistributedThunk,
     DistributedAccessor,
-    AccessibleFunctionRecord
+    AccessibleFunctionRecord,
+    BackDeploymentThunk,
+    BackDeploymentFallback,
   };
 
   ASTMangler(bool DWARFMangling = false)

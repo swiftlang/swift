@@ -131,6 +131,12 @@ struct RuleBuilder {
   void collectRulesFromReferencedProtocols();
 };
 
+// Defined in ConcreteContraction.cpp.
+bool performConcreteContraction(
+    ArrayRef<StructuralRequirement> requirements,
+    SmallVectorImpl<StructuralRequirement> &result,
+    bool debug);
+
 } // end namespace rewriting
 
 } // end namespace swift

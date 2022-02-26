@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump -requirement-machine-protocol-signatures=verify 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 { 
@@ -323,22 +323,6 @@ struct X24<T: P20> : P24 {
   typealias C = T
 }
 
-// CHECK-LABEL: .P25a@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P25a]A == X24<Self.[P25a]B>, Self.[P25a]B : P20>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P25a]A == X24<τ_0_0.[P25a]B>, τ_0_0.[P25a]B : P20>
-protocol P25a {
-  associatedtype A: P24 // expected-warning{{redundant conformance constraint 'Self.A' : 'P24'}}
-  associatedtype B: P20 where A == X24<B> // expected-note{{conformance constraint 'Self.A' : 'P24' implied here}}
-}
-
-// CHECK-LABEL: .P25b@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P25b]A == X24<Self.[P25b]B>, Self.[P25b]B : P20>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P25b]A == X24<τ_0_0.[P25b]B>, τ_0_0.[P25b]B : P20>
-protocol P25b {
-  associatedtype A
-  associatedtype B: P20 where A == X24<B>
-}
-
 protocol P25c {
   associatedtype A: P24
   associatedtype B where A == X<B> // expected-error{{cannot find type 'X' in scope}}
@@ -347,32 +331,6 @@ protocol P25c {
 protocol P25d {
   associatedtype A
   associatedtype B where A == X24<B> // expected-error{{type 'Self.B' does not conform to protocol 'P20'}}
-}
-
-// Similar to the above, but with superclass constraints.
-protocol P26 {
-  associatedtype C: X3
-}
-
-struct X26<T: X3> : P26 {
-  typealias C = T
-}
-
-// CHECK-LABEL: .P27a@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P27a]A == X26<Self.[P27a]B>, Self.[P27a]B : X3>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P27a]A == X26<τ_0_0.[P27a]B>, τ_0_0.[P27a]B : X3>
-protocol P27a {
-  associatedtype A: P26 // expected-warning{{redundant conformance constraint 'Self.A' : 'P26'}}
-
-  associatedtype B: X3 where A == X26<B> // expected-note{{conformance constraint 'Self.A' : 'P26' implied here}}
-}
-
-// CHECK-LABEL: .P27b@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P27b]A == X26<Self.[P27b]B>, Self.[P27b]B : X3>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P27b]A == X26<τ_0_0.[P27b]B>, τ_0_0.[P27b]B : X3>
-protocol P27b {
-  associatedtype A
-  associatedtype B: X3 where A == X26<B>
 }
 
 // ----------------------------------------------------------------------------

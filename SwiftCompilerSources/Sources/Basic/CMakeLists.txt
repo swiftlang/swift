@@ -7,4 +7,5 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 add_swift_compiler_module(Basic
+  SourceLoc.swift
   Utils.swift)

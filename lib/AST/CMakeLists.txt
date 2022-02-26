@@ -14,6 +14,7 @@ add_swift_host_library(swiftAST STATIC
   AccessNotes.cpp
   AccessRequests.cpp
   ArgumentList.cpp
+  ASTBridging.cpp
   ASTContext.cpp
   ASTDemangler.cpp
   ASTDumper.cpp
@@ -75,6 +76,7 @@ add_swift_host_library(swiftAST STATIC
   ProtocolConformance.cpp
   RawComment.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp
   RequirementMachine/GenericSignatureQueries.cpp
   RequirementMachine/HomotopyReduction.cpp

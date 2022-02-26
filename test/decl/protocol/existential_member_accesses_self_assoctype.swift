@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -requirement-machine-protocol-signatures=off
+
+// TODO: Get this to pass with  -requirement-machine-protocol-signatures=on.
 
 //===----------------------------------------------------------------------===//
 // Use of protocols with Self or associated type requirements

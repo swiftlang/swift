@@ -59,6 +59,7 @@ sil @f_out : $@convention(thin) <T> () -> @out T
 sil @f_bool : $@convention(thin) () -> Builtin.Int1
 sil [ossa] @take_trivial_struct : $@convention(thin) (TrivialStruct) -> ()
 sil [ossa] @get_change_out : $@convention(thin) () -> @out Change
+sil [ossa] @coro : $@yield_once @convention(thin) (@inout X) -> @yields ()
 
 // CHECK-LABEL: sil [ossa] @test_simple
 // CHECK:      bb0(%0 : $*S):
@@ -327,6 +328,43 @@ exit:
   return %321 : $()
 }
 
+// Hoist a destroy_addr of an @in argument over a load from an alloc_stack.
+//
+// CHECK-LABEL: sil [ossa] @test_hoist_over_load_from_stack : {{.*}} {
+// CHECK:         apply
+// CHECK:         destroy_addr
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'test_hoist_over_load_from_stack'
+sil [ossa] @test_hoist_over_load_from_stack : $@convention(thin) (@in X) -> @owned X {
+entry(%in_addr : $*X):
+  %stack_addr = alloc_stack $X
+  copy_addr %in_addr to [initialization] %stack_addr : $*X
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+  %retval = load [take] %stack_addr : $*X
+  destroy_addr %in_addr : $*X
+  dealloc_stack %stack_addr : $*X
+  return %retval : $X
+}
+
+// If a begin_apply uses the address, the end_appy and abort_apply should be
+// regarded as uses too.  Don't hoist over them.
+//
+// CHECK-LABEL: sil [ossa] @nohoist_over_end_apply_use : {{.*}} {
+// CHECK:         end_apply
+// CHECK:         destroy_addr
+// CHECK:         tuple
+// CHECK-LABEL: } // end sil function 'nohoist_over_end_apply_use'
+sil [ossa] @nohoist_over_end_apply_use : $@convention(thin) (@inout X, @owned X) -> () {
+entry(%addr : $*X, %instance : @owned $X):
+  %coro = function_ref @coro : $@yield_once @convention(thin) (@inout X) -> @yields ()
+  (%empty, %continuation) = begin_apply %coro(%addr) : $@yield_once @convention(thin) (@inout X) -> @yields ()
+  end_apply %continuation
+  %retval = tuple ()
+  store %instance to [assign] %addr : $*X
+  return %retval : $()
+}
+
 // Fold destroy_addr and a load [copy] into a load [take] even when that
 // load [take] is guarded by an access scope.
 //
@@ -442,9 +480,10 @@ entry(%instance : @owned $S):
 }
 
 // Don't fold with an unrelated load [copy].
+//
 // CHECK-LABEL: sil [ossa] @nofold_unrelated_scoped_load_copy : {{.*}} {
-// CHECK:         load [copy] 
 // CHECK:         destroy_addr
+// CHECK:         load [copy] 
 // CHECK:         destroy_addr
 // CHECK-LABEL: // end sil function 'nofold_unrelated_scoped_load_copy'
 sil [ossa] @nofold_unrelated_scoped_load_copy : $@convention(thin) (@owned X) -> (@owned X) {

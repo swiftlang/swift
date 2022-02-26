@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=verify 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -requirement-machine-inferred-signatures=verify
 
 protocol C {
   associatedtype I
@@ -19,5 +20,7 @@ struct PEN<_S : PST> : SL {
 
 struct PE<N : SL> {
   let n: N
+  // CHECK-LABEL: .c@
+  // CHECK-NEXT: Generic signature: <N, S where N == PEN<S>, S : PST>
   static func c<S>(_: PE<N>) where N == PEN<S> {}
 }

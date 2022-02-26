@@ -131,7 +131,6 @@ template <typename Runtime>
 struct AsyncContext {
   typename Runtime::StoredSignedPointer Parent;
   typename Runtime::StoredSignedPointer ResumeParent;
-  uint32_t Flags;
 };
 
 template <typename Runtime>

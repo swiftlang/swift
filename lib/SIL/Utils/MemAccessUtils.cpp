@@ -405,13 +405,13 @@ static bool isBarrierApply(FullApplySite) {
 static bool mayAccessPointer(SILInstruction *instruction) {
   if (!instruction->mayReadOrWriteMemory())
     return false;
-  bool fail = false;
-  visitAccessedAddress(instruction, [&fail](Operand *operand) {
+  bool isUnidentified = false;
+  visitAccessedAddress(instruction, [&isUnidentified](Operand *operand) {
     auto accessStorage = AccessStorage::compute(operand->get());
-    if (accessStorage.getKind() != AccessRepresentation::Kind::Unidentified)
-      fail = true;
+    if (accessStorage.getKind() == AccessRepresentation::Kind::Unidentified)
+      isUnidentified = true;
   });
-  return fail;
+  return isUnidentified;
 }
 
 static bool mayLoadWeakOrUnowned(SILInstruction *instruction) {
@@ -1948,6 +1948,29 @@ bool UniqueStorageUseVisitor::findUses(UniqueStorageUseVisitor &visitor) {
   return visitAccessStorageUses(gather, visitor.storage, visitor.function);
 }
 
+static bool
+visitApplyOperand(Operand *use, UniqueStorageUseVisitor &visitor,
+                  bool (UniqueStorageUseVisitor::*visit)(Operand *)) {
+  auto *user = use->getUser();
+  if (auto *bai = dyn_cast<BeginApplyInst>(user)) {
+    if (!(visitor.*visit)(use))
+      return false;
+    SmallVector<Operand *, 2> endApplyUses;
+    SmallVector<Operand *, 2> abortApplyUses;
+    bai->getCoroutineEndPoints(endApplyUses, abortApplyUses);
+    for (auto *endApplyUse : endApplyUses) {
+      if (!(visitor.*visit)(endApplyUse))
+        return false;
+    }
+    for (auto *abortApplyUse : abortApplyUses) {
+      if (!(visitor.*visit)(abortApplyUse))
+        return false;
+    }
+    return true;
+  }
+  return (visitor.*visit)(use);
+}
+
 bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
   unsigned operIdx = use->getOperandNumber();
   auto *user = use->getUser();
@@ -1960,16 +1983,19 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Indirect_Out:
-      return visitor.visitStore(use);
+      return visitApplyOperand(use, visitor,
+                               &UniqueStorageUseVisitor::visitStore);
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_In_Constant:
-      return visitor.visitLoad(use);
+      return visitApplyOperand(use, visitor,
+                               &UniqueStorageUseVisitor::visitLoad);
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Guaranteed:
       // most likely an escape of a box
-      return visitor.visitUnknownUse(use);
+      return visitApplyOperand(use, visitor,
+                               &UniqueStorageUseVisitor::visitUnknownUse);
     }
   }
   switch (user->getKind()) {

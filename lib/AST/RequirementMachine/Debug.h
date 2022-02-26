@@ -61,7 +61,10 @@ enum class DebugFlags : unsigned {
   RedundantRules = (1<<12),
 
   /// Print more detail about redundant rules.
-  RedundantRulesDetail = (1<<13)
+  RedundantRulesDetail = (1<<13),
+
+  /// Print debug output from the concrete contraction pre-processing pass.
+  ConcreteContraction = (1<<14)
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

@@ -269,6 +269,7 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
           return false;
         }
         if (!visitor.visitUse(use)) {
+          assert(!isa<SILFunctionArgument>(borrowedValue.value));
           return false;
         }
         break;
@@ -276,8 +277,10 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::ForwardingBorrow:
       case OperandOwnership::ForwardingConsume:
         if (CanonicalizeBorrowScope::isRewritableOSSAForward(user)) {
-          if (!visitor.visitForwardingUse(use))
+          if (!visitor.visitForwardingUse(use)) {
+            assert(!isa<SILFunctionArgument>(borrowedValue.value));
             return false;
+          }
           break;
         }
         LLVM_FALLTHROUGH;
@@ -287,8 +290,10 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::BitwiseEscape:
       case OperandOwnership::DestroyingConsume:
-        if (!visitor.visitUse(use))
+        if (!visitor.visitUse(use)) {
+          assert(!isa<SILFunctionArgument>(borrowedValue.value));
           return false;
+        }
         break;
       } // end switch OperandOwnership
     }
