@@ -3267,15 +3267,30 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 
 void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
   auto *nominal = dyn_cast<NominalTypeDecl>(D);
+  auto &ctx = D->getASTContext();
   SmallVector<ValueDecl *, 4> potentialMatches;
   bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
-      nominal->getDeclaredType(), nominal, D->getASTContext().Id_buildBlock,
+      nominal->getDeclaredType(), nominal, ctx.Id_buildBlock,
       /*argLabels=*/{}, &potentialMatches);
+  bool isBuildPartialBlockFeatureEnabled =
+      ctx.LangOpts.EnableExperimentalPairwiseBuildBlock;
+  bool supportsBuildPartialBlock = isBuildPartialBlockFeatureEnabled &&
+      TypeChecker::typeSupportsBuilderOp(
+          nominal->getDeclaredType(), nominal,
+          ctx.Id_buildPartialBlock,
+          /*argLabels=*/{ctx.Id_first}, &potentialMatches) &&
+      TypeChecker::typeSupportsBuilderOp(
+          nominal->getDeclaredType(), nominal,
+          ctx.Id_buildPartialBlock,
+          /*argLabels=*/{ctx.Id_accumulated, ctx.Id_next}, &potentialMatches);
 
-  if (!supportsBuildBlock) {
+  if (!supportsBuildBlock && !supportsBuildPartialBlock) {
     {
       auto diag = diagnose(
-          nominal->getLoc(), diag::result_builder_static_buildblock);
+          nominal->getLoc(),
+          isBuildPartialBlockFeatureEnabled
+              ? diag::result_builder_static_buildblock_or_buildpartialblock
+              : diag::result_builder_static_buildblock);
 
       // If there were no close matches, propose adding a stub.
       SourceLoc buildInsertionLoc;
