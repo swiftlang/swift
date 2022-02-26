@@ -419,6 +419,12 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
     }
   }
 
+  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
+      RequirementMachineMode::Enabled) {
+    diagnoseRequirementErrors(ctx, machine->System.getErrors(),
+                              /*allowConcreteGenericParams=*/false);
+  }
+
   // Return the result for the specific protocol this request was kicked off on.
   return *result;
 }
@@ -668,6 +674,8 @@ InferredGenericSignatureRequestRQM::evaluate(
   if (ctx.LangOpts.RequirementMachineInferredSignatures ==
       RequirementMachineMode::Enabled) {
     hadError |= diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
+    hadError |= diagnoseRequirementErrors(ctx, machine->System.getErrors(),
+                                          allowConcreteGenericParams);
   }
 
   // FIXME: Handle allowConcreteGenericParams

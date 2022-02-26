@@ -276,19 +276,26 @@ RewriteSystem::~RewriteSystem() {
 
 void RewriteSystem::initialize(
     bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
+    ArrayRef<StructuralRequirement> writtenRequirements,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-    std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
+    std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>>
+        &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
   RecordLoops = recordLoops;
   Protos = protos;
+  WrittenRequirements = writtenRequirements;
 
   for (const auto &rule : permanentRules)
     addPermanentRule(rule.first, rule.second);
 
-  for (const auto &rule : requirementRules)
-    addExplicitRule(rule.first, rule.second);
+  for (const auto &rule : requirementRules) {
+    auto lhs = std::get<0>(rule);
+    auto rhs = std::get<1>(rule);
+    auto requirementID = std::get<2>(rule);
+    addExplicitRule(lhs, rhs, requirementID);
+  }
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.
@@ -487,10 +494,16 @@ bool RewriteSystem::addPermanentRule(MutableTerm lhs, MutableTerm rhs) {
 }
 
 /// Add a new rule, marking it explicit.
-bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs) {
+bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
+                                    Optional<unsigned> requirementID) {
   bool added = addRule(std::move(lhs), std::move(rhs));
-  if (added)
+  if (added) {
     Rules.back().markExplicit();
+  } else if (requirementID.hasValue()) {
+    auto req = WrittenRequirements[requirementID.getValue()];
+    Errors.push_back(
+        RequirementError::forRedundantRequirement(req.req, req.loc));
+  }
 
   return added;
 }

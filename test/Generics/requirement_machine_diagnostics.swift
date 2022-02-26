@@ -82,3 +82,32 @@ func cascadingConflictingRequirement<T>(_: T) where DoesNotExist : EqualComparab
 
 func cascadingInvalidConformance<T>(_: T) where T : DoesNotExist { }
 // expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}
+
+func trivialRedundant1<T>(_: T) where T: P, T: P {}
+// expected-warning@-1 {{redundant conformance constraint 'T' : 'P'}}
+
+func trivialRedundant2<T>(_: T) where T: AnyObject, T: AnyObject {}
+// expected-warning@-1 {{redundant constraint 'T' : 'AnyObject'}}
+
+func trivialRedundant3<T>(_: T) where T: C, T: C {}
+// expected-warning@-1 {{redundant superclass constraint 'T' : 'C'}}
+
+func trivialRedundant4<T>(_: T) where T == T {}
+// expected-warning@-1 {{redundant same-type constraint 'T' == 'T'}}
+
+protocol TrivialRedundantConformance: P, P {}
+// expected-warning@-1 {{redundant conformance constraint 'Self' : 'P'}}
+
+protocol TrivialRedundantLayout: AnyObject, AnyObject {}
+// expected-warning@-1 {{redundant constraint 'Self' : 'AnyObject'}}
+// expected-error@-2 {{duplicate inheritance from 'AnyObject'}}
+
+protocol TrivialRedundantSuperclass: C, C {}
+// expected-warning@-1 {{redundant superclass constraint 'Self' : 'C'}}
+// expected-error@-2 {{duplicate inheritance from 'C'}}
+
+protocol TrivialRedundantSameType where Self == Self {
+// expected-warning@-1 {{redundant same-type constraint 'Self' == 'Self'}}
+  associatedtype T where T == T
+  // expected-warning@-1 {{redundant same-type constraint 'Self.T' == 'Self.T'}}
+}
