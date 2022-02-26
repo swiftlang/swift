@@ -134,7 +134,7 @@ cmake --build S:\b\1
 cmake --build S:\b\1 --target install
 ```
 
-## Build a complete toolchain for development
+## Build a complete toolchain with debugging info
 
 The following guide will get you through the building process of a complete Swift debug toolchain.
 
@@ -143,7 +143,7 @@ The following guide will get you through the building process of a complete Swif
 ```cmd
 cmake -B S:\b\1 ^
   -C S:\swift\cmake\caches\Windows-x86_64.cmake ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
   -D CMAKE_C_COMPILER=cl ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy /source-charset:utf-8 /execution-charset:utf-8" ^
@@ -153,7 +153,6 @@ cmake -B S:\b\1 ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
-  -D LLVM_ENABLE_PDB=YES ^
 
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
@@ -172,7 +171,9 @@ cmake -B S:\b\1 ^
 cmake --build S:\b\1
 ```
 
-> **NOTE:** Linking with debug information (`-D LLVM_ENABLE_PDB=YES`) is very memory intensive.  When building with parallel jobs, it is possible to consume upwards of 32 GiB of RAM.  You can append `-D LLVM_PARALLEL_LINK_JOBS=N -D DLLVM_PARALLEL_LINK_JOBS=N` to reduce the number of parallel link operations to `N` which should help reduce the memory pressure.  You may need to set this to a low number (e.g. 1) if you see build failures due to memory exhaustion.
+> **NOTE:** If you want to profile the Swift compiler, you may need to link it with debug information.  You can enable this by specifying `-D LLVM_ENABLE_PDB=YES`.
+>
+> Linking with debug information is very memory-intensive and may drastically slow down the linking process.  A single link job is possible to consume upwards of 10 GiB of RAM.  You can append `-D LLVM_PARALLEL_LINK_JOBS=N` to reduce the number of parallel link operations to `N` which should help reduce the memory pressure.
 
 Test Swift:
 
