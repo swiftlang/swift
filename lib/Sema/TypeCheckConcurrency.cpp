@@ -2736,18 +2736,6 @@ namespace {
         if (var->hasStorage() && var->isInstanceMember())
           return true;
 
-      // In Swift 5, we were allowing all members to be referenced from a
-      // deinit, but that will not be valid in Swift 6+, so warn about it.
-      if (!refCxt->getASTContext().isSwiftVersionAtLeast(6)) {
-        if (isa<DestructorDecl>(fnDecl) && member->isInstanceMember()) {
-          auto &diags = refCxt->getASTContext().Diags;
-          diags.diagnose(memberLoc, diag::actor_isolated_from_deinit,
-                         member->getDescriptiveKind(),
-                         member->getName()).warnUntilSwiftVersion(6);
-          return true;
-        }
-      }
-
       return false;
     }
 
@@ -2847,11 +2835,26 @@ namespace {
         if (isolatedActor)
           return false;
 
+        auto refCxt = getDeclContext();
+
+        // In Swift 5, we were allowing all members to be referenced from a
+        // deinit, but that will not be valid in Swift 6+, so warn about it.
+        if (!refCxt->getASTContext().isSwiftVersionAtLeast(6)) {
+          if (auto fnDecl = isActorInitOrDeInitContext(refCxt)) {
+            if (isa<DestructorDecl>(fnDecl) && member->isInstanceMember()) {
+              auto &diags = refCxt->getASTContext().Diags;
+              diags.diagnose(memberLoc, diag::actor_isolated_from_deinit,
+                             member->getDescriptiveKind(),
+                             member->getName()).warnUntilSwiftVersion(6);
+              return false;
+            }
+          }
+        }
+
         // Some initializers and deinitializers have special permission to
         // access an isolated member on `self`. If that case applies, then we
         // can skip checking.
-        if (checkedByFlowIsolation(getDeclContext(), isolatedActor,
-                                          member, memberLoc))
+        if (checkedByFlowIsolation(refCxt, isolatedActor, member, memberLoc))
           return false;
 
         // An escaping partial application of something that is part of
