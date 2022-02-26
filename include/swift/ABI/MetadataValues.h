@@ -2201,57 +2201,6 @@ public:
                                  getKind, setKind)
 };
 
-/// Kinds of async context.
-enum class AsyncContextKind {
-  /// An ordinary asynchronous function.
-  Ordinary         = 0,
-
-  /// A context which can yield to its caller.
-  Yielding         = 1,
-
-  /// A continuation context.
-  Continuation     = 2,
-
-  // Other kinds are reserved for interesting special
-  // intermediate contexts.
-
-  // Kinds >= 192 are private to the implementation.
-  First_Reserved = 192
-};
-
-/// Flags for async contexts.
-class AsyncContextFlags : public FlagSet<uint32_t> {
-public:
-  enum {
-    Kind                = 0,
-    Kind_width          = 8,
-
-    CanThrow            = 8,
-
-    // Kind-specific flags should grow down from 31.
-
-    Continuation_IsExecutorSwitchForced = 31,
-  };
-
-  explicit AsyncContextFlags(uint32_t bits) : FlagSet(bits) {}
-  constexpr AsyncContextFlags() {}
-  AsyncContextFlags(AsyncContextKind kind) {
-    setKind(kind);
-  }
-
-  /// The kind of context this represents.
-  FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, AsyncContextKind,
-                                 getKind, setKind)
-
-  /// Whether this context is permitted to throw.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow, canThrow, setCanThrow)
-
-  /// See AsyncContinuationFlags::isExecutorSwitchForced.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Continuation_IsExecutorSwitchForced,
-                                continuation_isExecutorSwitchForced,
-                                continuation_setIsExecutorSwitchForced)
-};
-
 /// Flags passed to swift_continuation_init.
 class AsyncContinuationFlags : public FlagSet<size_t> {
 public:

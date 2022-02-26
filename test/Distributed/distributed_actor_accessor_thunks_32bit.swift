@@ -417,7 +417,7 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: {{.*}} = alloca %swift.context*
 // CHECK-NEXT: %swifterror = alloca %swift.error*
-// CHECK-NEXT: {{.*}} = call token @llvm.coro.id.async(i32 12, i32 16, i32 0, i8* bitcast (%swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETFTu" to i8*))
+// CHECK-NEXT: {{.*}} = call token @llvm.coro.id.async(i32 8, i32 16, i32 0, i8* bitcast (%swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETFTu" to i8*))
 // CHECK-NEXT: {{.*}} = call i8* @llvm.coro.begin(token {{%.*}}, i8* null)
 // CHECK-NEXT: store %swift.context* {{.*}}, %swift.context** {{.*}}
 // CHECK-NEXT: store %swift.error* null, %swift.error** %swifterror
