@@ -626,15 +626,15 @@ def no_emit_module_separately:
 
 def requirement_machine_protocol_signatures_EQ : Joined<["-"], "requirement-machine-protocol-signatures=">,
   Flags<[FrontendOption]>,
-  HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', or 'verify'">;
+  HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', 'verify' or 'check'">;
 
 def requirement_machine_abstract_signatures_EQ : Joined<["-"], "requirement-machine-abstract-signatures=">,
   Flags<[FrontendOption]>,
-  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', or 'verify'">;
+  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', 'verify' or 'check'">;
 
 def requirement_machine_inferred_signatures_EQ : Joined<["-"], "requirement-machine-inferred-signatures=">,
   Flags<[FrontendOption]>,
-  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', or 'verify'">;
+  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', 'verify' or 'check'">;
 
 def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
