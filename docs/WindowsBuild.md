@@ -126,6 +126,12 @@ cmake --build S:\b\1 --target install
 
 The following guide will get you through the building process of a complete Swift debug toolchain.
 
+Before you kick off the process, unset `SDKROOT` if you've already installed Swift:
+
+```cmd
+set SDKROOT=
+```
+
 ### Swift compiler
 
 ```cmd
@@ -241,7 +247,7 @@ Test libdispatch:
 cmake --build S:\b\3 --target test
 ```
 
-### Foundation
+### Foundation (without tests)
 
 ```cmd
 cmake -B S:\b\4 ^
@@ -250,19 +256,15 @@ cmake -B S:\b\4 ^
 
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
-  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
-  -D ENABLE_SWIFT=YES ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D dispatch_DIR=S:\b\3\cmake\modules ^
 
   -D CMAKE_TOOLCHAIN_FILE=S:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
 
-  -D ENABLE_TESTING=NO ^
   -G Ninja ^
   -S S:\swift-corelibs-foundation
 
@@ -272,63 +274,68 @@ cmake --build S:\b\4
 ### XCTest
 
 ```cmd
-cmake -B S:\b\4 ^
+cmake -B S:\b\5 ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
+
   -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
-  -D dispatch_DIR=S:\b\2\cmake\modules ^
-  -D Foundation_DIR=S:\b\3\cmake\modules ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
+
+  -D ENABLE_TESTING=YES ^
+  -D LLVM_DIR=S:\b\1\lib\cmake\llvm ^
   -D LIT_COMMAND=S:\llvm-project\llvm\utils\lit\lit.py ^
+  -D XCTEST_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
+  -D XCTEST_PATH_TO_LIBDISPATCH_BUILD=S:\b\3 ^
+  -D XCTEST_PATH_TO_FOUNDATION_BUILD=S:\b\4 ^
+
   -G Ninja ^
   -S S:\swift-corelibs-xctest
 
-ninja -C S:\b\4
-```
-
-Add XCTest to your path:
-
-```cmd
-
-path S:\b\4;%PATH%
+cmake --build S:\b\5
 ```
 
 Test XCTest:
 
 ```cmd
-ninja -C S:\b\4 check-xctest
+path %PATH%;%ProgramFiles%\Git\usr\bin
+cmake --build S:\b\5 --target check-xctest
 ```
 
-### Rebuild Foundation
+### Foundation (with tests)
 
 ```cmd
-cmake -B S:\b\3 ^
+cmake -B S:\b\4 ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
+
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
-  -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" ^
-  -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" ^
-  -D ICU_I18N_LIBRARY_RELEASE=S:\library\icu-67\usr\lib\icuin67.lib ^
-  -D ICU_ROOT=S:\Library\icu-67\usr ^
-  -D ICU_UC_LIBRARY_RELEASE=S:\Library\icu-67\usr\lib\icuuc67.lib ^
-  -D LIBXML2_LIBRARY=S:\Library\libxml2-development\usr\lib\libxml2s.lib ^
-  -D LIBXML2_INCLUDE_DIR=S:\Library\libxml2-development\usr\include\libxml2 ^
-  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+
+  -D CMAKE_TOOLCHAIN_FILE=S:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+
   -D ENABLE_TESTING=YES ^
-  -D dispatch_DIR=S:\b\2\cmake\modules ^
-  -D XCTest_DIR=S:\b\4\cmake\modules ^
+  -D XCTest_DIR=S:\b\5\cmake\modules ^
+
   -G Ninja ^
   -S S:\swift-corelibs-foundation
 
-ninja -C S:\b\3
+cmake --build S:\b\4
 ```
 
 Test Foundation:
 
 ```cmd
-ninja -C S:\b\3 test
+cmake --build S:\b\4 --target test
 ```
 
 ### TSC
