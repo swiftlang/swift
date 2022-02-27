@@ -886,6 +886,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         .Case("off", RequirementMachineMode::Disabled)
         .Case("on", RequirementMachineMode::Enabled)
         .Case("verify", RequirementMachineMode::Verify)
+        .Case("check", RequirementMachineMode::Check)
         .Default(None);
 
     if (value)
@@ -900,6 +901,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         .Case("off", RequirementMachineMode::Disabled)
         .Case("on", RequirementMachineMode::Enabled)
         .Case("verify", RequirementMachineMode::Verify)
+        .Case("check", RequirementMachineMode::Check)
         .Default(None);
 
     if (value)
@@ -914,6 +916,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         .Case("off", RequirementMachineMode::Disabled)
         .Case("on", RequirementMachineMode::Enabled)
         .Case("verify", RequirementMachineMode::Verify)
+        .Case("check", RequirementMachineMode::Check)
         .Default(None);
 
     if (value)
