@@ -2,9 +2,9 @@
 
 Visual Studio 2017 or newer is needed to build Swift on Windows, while VS2019 is recommended and currently used for CI.  The free Community edition is sufficient to build Swift, and we're assuming host and target to be both x64.
 
-The commands below (with the exception of installing Visual Studio) must be entered in the "**x64 Native** Tools Command Prompt for VS2019" (or VS2017, VS2022 depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
+The commands below (with the exception of installing Visual Studio) must be entered in the **x64 Native Tools Command Prompt for VS2019** (or VS2017, VS2022 depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
 
-> **NOTE:** This guide is intended for toolchain developers who wants to develop or build Swift on their own machine.  For building a standard toolchain, please refer to [`build-windows-toolchain.bat`](../utils/build-windows-toolchain.bat).
+> **NOTE:** This guide is intended for toolchain developers who wants to develop or build Swift on their own machine.  For building and packaging a standard toolchain, please refer to [`build-windows-toolchain.bat`](../utils/build-windows-toolchain.bat).
 
 ## Install dependencies
 
@@ -24,53 +24,63 @@ vs_community ^
 del /q vs_community.exe
 ```
 
+> **NOTE:** For anyone who wants to use Visual Studio 2022 instead:
+> - replace `https://aka.ms/vs/16/release/vs_community.exe` with `https://aka.ms/vs/17/release/vs_community.exe`
+> - replace `Component.CPython3.x64` with `Component.CPython39.x64`
+
 If you prefer you can install everything by hand, but make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation. The components listed above are required.
 
 The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.
 
 ### Python
 
-The command above already installs Python 3. Alternatively, in the Visual Studio installation program, under *Individual Components*, install *Python 3 64 bits (3.9.x)*.
+The command above already installs Python 3. Alternatively, in the Visual Studio installation program, under *Individual Components*, install *Python 3 64 bits (3.x.x)*.
 
 If you are building a debug version of Swift, you should also install the Python debug binaries.
 
 1. In the Windows settings, go to *Add and Remove Programs*
-2. Select the *Python 3.9.x (64-bit)* entry
+2. Select the *Python 3.x.x (64-bit)* entry
 3. Click *Modify*, then *Yes*, then *Modify* again and then *Next*
 4. Select *Download debug binaries (requires VS 2015 or later)*
 5. Click *Install*
 
 ## Enable Developer Mode
 
-From the settings application, go to `Update & Security`.  In the `For developers` tab, select `Developer Mode` for `Use Developer Features`.  This is required to enable the creation of symbolic links.
+From the settings application, go to *Update & Security*.  In the *For developers* tab, select *Developer Mode* for *Use Developer Features*.  This is required to enable the creation of symbolic links.
 
 ## Clone the repositories
 
 > **NOTE:** This guide assumes your sources live at the root of `S:`. If your sources live elsewhere, you can create a substitution for this:
->    subst S: <path to sources>
+>
+>     subst S: <path to sources>
 
 First, clone `apple/swift` (this repository) with Git:
 
 ```cmd
-S:
-git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift
+git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift S:\swift
 ```
 
 You'll be able to clone and check out the rest of Swift source repositories with `update-checkout` tool:
 
 ```cmd
-swift\utils\update-checkout.cmd --clone
+S:\swift\utils\update-checkout.cmd --clone
 ```
 
 ## Set up `vcpkg`
 
-The instructions will use `vcpkg` for pulling in external dependencies, including ICU, libcurl, libxml2, SQLite 3 and zlib.
+This guide uses `vcpkg` for pulling in external dependencies, including ICU, libcurl, libxml2, SQLite 3 and zlib.
 
-Before you get started, clone and bootstrap `vcpkg`:
+All you have to do is to clone and bootstrap `vcpkg`:
 
 ```cmd
-git clone https://github.com/microsoft/vcpkg
-vcpkg\bootstrap-vcpkg.bat
+git clone https://github.com/microsoft/vcpkg S:\vcpkg
+S:\vcpkg\bootstrap-vcpkg.bat
+```
+
+By default, the dependencies will be downloaded and built on demand.  Optionally, you can prebuild the dependencies in advance:
+
+```cmd
+S:\vcpkg\vcpkg install curl icu libxml2 sqlite3 zlib --triplet=x64-windows
 ```
 
 ## Set up Visual Studio integration (re-run on Visual Studio upgrades)
@@ -171,7 +181,7 @@ cmake --build S:\b\1
 >
 > Linking with debug information is very memory-intensive and may drastically slow down the linking process.  A single link job is possible to consume upwards of 10 GiB of RAM.  You can append `-D LLVM_PARALLEL_LINK_JOBS=N` to reduce the number of parallel link operations to `N` which should help reduce the memory pressure.
 
-> **NOTE:** By default, we enables all the experimental features in Swift by `-D SWIFT_ENABLE_EXPERIMENTAL_{FEATURE}=YES`.  These features can be disabled separately.  Notice that `Concurrency` is an accepted language feature that should be enabled for Swift 5.5+.
+> **NOTE:** By default, we enables all the experimental features in Swift by `-D SWIFT_ENABLE_EXPERIMENTAL_{FEATURE}=YES`.  Notice that `Concurrency` is an accepted language feature that should be enabled for Swift 5.5+.
 
 Test Swift:
 
