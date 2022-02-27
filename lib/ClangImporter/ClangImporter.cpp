@@ -477,6 +477,11 @@ static bool clangSupportsPragmaAttributeWithSwiftAttr() {
   return swiftAttrParsedInfo.IsSupportedByPragmaAttribute;
 }
 
+static inline bool isPCHFilenameExtension(StringRef path) {
+  return llvm::sys::path::extension(path)
+    .endswith(file_types::getExtension(file_types::TY_PCH));
+}
+
 void
 importer::getNormalInvocationArguments(
     std::vector<std::string> &invocationArgStrs,
@@ -487,8 +492,7 @@ importer::getNormalInvocationArguments(
   ClangImporterOptions &importerOpts = ctx.ClangImporterOpts;
   auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
 
-  if (llvm::sys::path::extension(importerOpts.BridgingHeader)
-          .endswith(file_types::getExtension(file_types::TY_PCH))) {
+  if (isPCHFilenameExtension(importerOpts.BridgingHeader)) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
         "-include-pch", importerOpts.BridgingHeader
     });
@@ -922,8 +926,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
 Optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {
-  if (llvm::sys::path::extension(ImporterOptions.BridgingHeader)
-        .endswith(file_types::getExtension(file_types::TY_PCH))) {
+  if (isPCHFilenameExtension(ImporterOptions.BridgingHeader)) {
     isExplicit = true;
     return ImporterOptions.BridgingHeader;
   }
@@ -1083,8 +1086,7 @@ ClangImporter::create(ASTContext &ctx,
 
 
 
-  if (llvm::sys::path::extension(importerOpts.BridgingHeader)
-        .endswith(file_types::getExtension(file_types::TY_PCH))) {
+  if (isPCHFilenameExtension(importerOpts.BridgingHeader)) {
     importer->Impl.setSinglePCHImport(importerOpts.BridgingHeader);
     importer->Impl.IsReadingBridgingPCH = true;
     if (tracker) {
@@ -1510,8 +1512,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          SourceLoc diagLoc,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
-  if (llvm::sys::path::extension(header)
-        .endswith(file_types::getExtension(file_types::TY_PCH))) {
+  if (isPCHFilenameExtension(header)) {
     Impl.ImportedHeaderOwners.push_back(adapter);
     // We already imported this with -include-pch above, so we should have
     // collected a bunch of PCH-encoded module imports that we just need to
