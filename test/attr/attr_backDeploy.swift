@@ -2,56 +2,55 @@
 
 // MARK: - Valid declarations
 
+// OK: top level functions
 @available(macOS 11.0, *)
 @_backDeploy(macOS 12.0)
 public func backDeployedTopLevelFunc() {}
 
-// OK: @usableFromInline decls may be back deployed
+// OK: internal decls may be back deployed when @usableFromInline
 @available(macOS 11.0, *)
 @_backDeploy(macOS 12.0)
 @usableFromInline
 internal func backDeployedUsableFromInlineTopLevelFunc() {}
 
-// FIXME(backDeploy): Availability macros should be supported
+// OK: function decls in a struct
+public struct TopLevelStruct {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public func backDeployedMethod() {}
+
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public var backDeployedComputedProperty: Int { 98 }
+}
 
 public class TopLevelClass {
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
   final public func backDeployedFinalMethod() {}
 
-  // FIXME(backDeploy): Computed properties should be supported
-  @available(macOS 11.0, *)
-  @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
-  public var backDeployedComputedProperty: Int { 98 }
-
-  // FIXME(backDeploy): Subscripts should be supported
-  @available(macOS 11.0, *)
-  @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
-  subscript(index: Int) -> Int {
-    get { return 1 }
-    set(newValue) {}
-  }
-}
-
-public struct TopLevelStruct {
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
-  public func backDeployedMethod() {}
+  public var backDeployedComputedProperty: Int { 98 }
 }
 
 // MARK: - Unsupported declaration types
 
 @available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
-public class CannotBackDeployClass {
-  @available(macOS 11.0, *)
-  @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
-  public var cannotBackDeploystoredProperty: Int = 83
-}
+public class CannotBackDeployClass {}
 
 @available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
-public struct CannotBackDeployStruct {}
+public struct CannotBackDeployStruct {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' must not be used on stored properties}}
+  public var cannotBackDeployStoredProperty: Int = 83
+
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' must not be used on stored properties}}
+  public lazy var cannotBackDeployLazyStoredProperty: Int = 15
+}
 
 @available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
@@ -62,7 +61,7 @@ public enum CannotBackDeployEnum {
 }
 
 @available(macOS 11.0, *)
-@_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
+@_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' must not be used on stored properties}}
 public var cannotBackDeployTopLevelVar = 79
 
 @available(macOS 11.0, *)

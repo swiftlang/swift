@@ -3526,6 +3526,15 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/true))
       continue;
 
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      // There must be a function body to back deploy so for vars we require
+      // that they be computed in order to allow back deployment.
+      if (VD->hasStorageOrWrapsStorage()) {
+        diagnoseAndRemoveAttr(Attr, diag::attr_not_on_stored_properties, Attr);
+        continue;
+      }
+    }
+
     auto AtLoc = Attr->AtLoc;
     auto Platform = Attr->Platform;
 
