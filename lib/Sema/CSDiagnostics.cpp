@@ -710,6 +710,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_YieldByReference:
   case CTP_CalleeResult:
   case CTP_EnumCaseRawValue:
+  case CTP_ExprPattern:
     break;
   }
   return None;
@@ -2538,6 +2539,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_YieldByReference:
   case CTP_WrappedProperty:
   case CTP_ComposedPropertyWrapper:
+  case CTP_ExprPattern:
     return None;
 
   case CTP_EnumCaseRawValue:
@@ -3302,6 +3304,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_CannotFail:
   case CTP_YieldByReference:
   case CTP_CalleeResult:
+  case CTP_ExprPattern:
     break;
   }
   return None;
