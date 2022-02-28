@@ -968,6 +968,7 @@ public:
     stmtCondElement,
     expr,
     stmt,
+    pattern,
     patternBindingEntry,
     varDecl,
   };
@@ -981,6 +982,8 @@ private:
     const Expr *expr;
 
     const Stmt *stmt;
+
+    const Pattern *pattern;
 
     struct PatternBindingEntry {
       const PatternBindingDecl *patternBinding;
@@ -1009,6 +1012,11 @@ public:
   SolutionApplicationTargetsKey(const Stmt *stmt) {
     kind = Kind::stmt;
     storage.stmt = stmt;
+  }
+
+  SolutionApplicationTargetsKey(const Pattern *pattern) {
+    kind = Kind::pattern;
+    storage.pattern = pattern;
   }
 
   SolutionApplicationTargetsKey(
@@ -1041,6 +1049,9 @@ public:
 
     case Kind::stmt:
       return lhs.storage.stmt == rhs.storage.stmt;
+
+    case Kind::pattern:
+      return lhs.storage.pattern == rhs.storage.pattern;
 
     case Kind::patternBindingEntry:
       return (lhs.storage.patternBindingEntry.patternBinding
@@ -1082,6 +1093,11 @@ public:
       return hash_combine(
           DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
           DenseMapInfo<void *>::getHashValue(storage.stmt));
+
+    case Kind::pattern:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.pattern));
 
     case Kind::patternBindingEntry:
       return hash_combine(
@@ -1701,6 +1717,13 @@ public:
                             ContextualTypePurpose contextualPurpose,
                             TypeLoc convertType, bool isDiscarded);
 
+  SolutionApplicationTarget(Expr *expr, DeclContext *dc, ExprPattern *pattern,
+                            Type patternType)
+      : SolutionApplicationTarget(expr, dc, CTP_ExprPattern, patternType,
+                                  /*isDiscarded=*/false) {
+    setPattern(pattern);
+  }
+
   SolutionApplicationTarget(AnyFunctionRef fn)
       : SolutionApplicationTarget(fn, fn.getBody()) { }
 
@@ -1785,6 +1808,12 @@ public:
   /// Form a target for a synthesized property wrapper initializer.
   static SolutionApplicationTarget forPropertyWrapperInitializer(
       VarDecl *wrappedVar, DeclContext *dc, Expr *initializer);
+
+  static SolutionApplicationTarget forExprPattern(Expr *expr, DeclContext *dc,
+                                                  ExprPattern *pattern,
+                                                  Type patternTy) {
+    return {expr, dc, pattern, patternTy};
+  }
 
   Expr *getAsExpr() const {
     switch (kind) {
@@ -1886,6 +1915,12 @@ public:
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
     return expression.pattern;
+  }
+
+  ExprPattern *getExprPattern() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_ExprPattern);
+    return cast<ExprPattern>(expression.pattern);
   }
 
   /// For a pattern initialization target, retrieve the contextual pattern.
@@ -2008,7 +2043,8 @@ public:
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization ||
            expression.contextualPurpose == CTP_ForEachStmt ||
-           expression.contextualPurpose == CTP_ForEachSequence);
+           expression.contextualPurpose == CTP_ForEachSequence ||
+           expression.contextualPurpose == CTP_ExprPattern);
     expression.pattern = pattern;
   }
 
@@ -5107,6 +5143,15 @@ private:
                              = FreeTypeVariableBinding::Disallow);
 
 public:
+  /// Pre-check the target, validating any types that occur in it
+  /// and folding sequence expressions.
+  ///
+  /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
+  /// to replace any discovered invalid member references with `ErrorExpr`.
+  static bool preCheckTarget(SolutionApplicationTarget &target,
+                             bool replaceInvalidRefsWithErrors,
+                             bool leaveClosureBodiesUnchecked);
+
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
   ///

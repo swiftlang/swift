@@ -2110,6 +2110,40 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
              : nullptr;
 }
 
+bool ConstraintSystem::preCheckTarget(SolutionApplicationTarget &target,
+                                      bool replaceInvalidRefsWithErrors,
+                                      bool leaveClosureBodiesUnchecked) {
+  auto *DC = target.getDeclContext();
+
+  bool hadErrors = false;
+
+  if (auto *expr = target.getAsExpr()) {
+    hadErrors |= preCheckExpression(expr, DC, replaceInvalidRefsWithErrors,
+                                    leaveClosureBodiesUnchecked);
+    // Even if the pre-check fails, expression still has to be re-set.
+    target.setExpr(expr);
+  }
+
+  if (target.isForEachStmt()) {
+    auto &info = target.getForEachStmtInfo();
+
+    if (info.whereExpr)
+      hadErrors |= preCheckExpression(info.whereExpr, DC,
+                                      /*replaceInvalidRefsWithErrors=*/true,
+                                      /*leaveClosureBodiesUnchecked=*/false);
+
+    // Update sequence and where expressions to pre-checked versions.
+    if (!hadErrors) {
+      info.stmt->setSequence(target.getAsExpr());
+
+      if (info.whereExpr)
+        info.stmt->setWhere(info.whereExpr);
+    }
+  }
+
+  return hadErrors;
+}
+
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,

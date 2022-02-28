@@ -8382,7 +8382,8 @@ AbstractGenericSignatureRequest::evaluate(
   case RequirementMachineMode::Enabled:
     return buildViaRQM();
 
-  case RequirementMachineMode::Verify: {
+  case RequirementMachineMode::Verify:
+  case RequirementMachineMode::Check: {
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
@@ -8401,7 +8402,9 @@ AbstractGenericSignatureRequest::evaluate(
       gsbResult.getPointer()->print(llvm::errs(), opts);
       llvm::errs() << "\n";
 
-      abort();
+      if (ctx.LangOpts.RequirementMachineAbstractSignatures
+          == RequirementMachineMode::Verify)
+        abort();
     }
 
     return rqmResult;
@@ -8559,7 +8562,8 @@ InferredGenericSignatureRequest::evaluate(
   case RequirementMachineMode::Enabled:
     return buildViaRQM();
 
-  case RequirementMachineMode::Verify: {
+  case RequirementMachineMode::Verify:
+  case RequirementMachineMode::Check: {
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
@@ -8578,7 +8582,9 @@ InferredGenericSignatureRequest::evaluate(
       gsbResult.getPointer()->print(llvm::errs(), opts);
       llvm::errs() << "\n";
 
-      abort();
+      if (ctx.LangOpts.RequirementMachineInferredSignatures
+          == RequirementMachineMode::Verify)
+        abort();
     }
 
     return rqmResult;
@@ -8672,7 +8678,8 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   case RequirementMachineMode::Enabled:
     return buildViaRQM();
 
-  case RequirementMachineMode::Verify: {
+  case RequirementMachineMode::Verify:
+  case RequirementMachineMode::Check: {
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
@@ -8697,7 +8704,9 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
       gsbSig.print(llvm::errs(), opts);
       llvm::errs() << "\n";
 
-      abort();
+      if (ctx.LangOpts.RequirementMachineProtocolSignatures
+          == RequirementMachineMode::Verify)
+        abort();
     }
 
     return rqmResult;

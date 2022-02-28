@@ -3,10 +3,6 @@
 
 struct HasAmbiguousMethods {
 
-  // No input
-  void ping() { ++mutableMethodsCalledCount; }
-  void ping() const {}
-
   // One input (const first)
   int increment(int a) const {
     return a + 1;
