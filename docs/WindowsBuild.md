@@ -2,17 +2,19 @@
 
 Visual Studio 2017 or newer is needed to build Swift on Windows, while VS2019 is recommended and currently used for CI.  The free Community edition is sufficient to build Swift, and we're assuming host and target to be both x64.
 
-The commands below (with the exception of installing Visual Studio) must be entered in the **x64 Native Tools Command Prompt for VS2019** (or VS2017, VS2022 depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
+The commands below (with the exception of installing Visual Studio) must be entered in the **x64 Native Tools Command Prompt for VS2019** (or VS2017, VS2022 depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to locate tools and resources for the correct target platform.
 
 > **NOTE:** This guide is intended for toolchain developers who wants to develop or build Swift on their own machine.  For building and packaging a standard toolchain, please refer to [`build-windows-toolchain.bat`](../utils/build-windows-toolchain.bat).
 
-## Install dependencies
+## Enable Developer Mode
 
-### Visual Studio
+From **Settings** app, go to *Update & Security*.  In the *For developers* tab, set *Install apps from any source, including loose files* to On.  This is required to enable the creation of symbolic links.
 
-An easy way to get most of the tools to build Swift is using the [Visual Studio installer](https://www.visualstudio.com/downloads/). This command installs all needed Visual Studio components as well as Python, Git, CMake and Ninja:
+## Install build tools and SDK
 
-```
+An easy way to get the tools to build Swift is using the [Visual Studio installer](https://www.visualstudio.com/downloads/). The following command installs all needed Visual Studio components as well as Python, Git, CMake and Ninja:
+
+```cmd
 curl.exe -sOL https://aka.ms/vs/16/release/vs_community.exe
 vs_community ^
   --add Component.CPython3.x64 ^
@@ -28,13 +30,9 @@ del /q vs_community.exe
 > - replace `https://aka.ms/vs/16/release/vs_community.exe` with `https://aka.ms/vs/17/release/vs_community.exe`
 > - replace `Component.CPython3.x64` with `Component.CPython39.x64`
 
-If you prefer you can install everything by hand, but make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation. The components listed above are required.
+> **NOTE:** The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.  For anyone using VS installer in GUI, please check it out.
 
-The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.
-
-### Python
-
-The command above already installs Python 3. Alternatively, in the Visual Studio installation program, under *Individual Components*, install *Python 3 64 bits (3.x.x)*.
+### Configure Python
 
 If you are building a debug version of Swift, you should also install the Python debug binaries.
 
@@ -44,29 +42,7 @@ If you are building a debug version of Swift, you should also install the Python
 4. Select *Download debug binaries (requires VS 2015 or later)*
 5. Click *Install*
 
-## Enable Developer Mode
-
-From the settings application, go to *Update & Security*.  In the *For developers* tab, select *Developer Mode* for *Use Developer Features*.  This is required to enable the creation of symbolic links.
-
-## Clone the repositories
-
-> **NOTE:** This guide assumes your sources live at the root of `S:`. If your sources live elsewhere, you can create a substitution for this:
->
->     subst S: <path to sources>
-
-First, clone `apple/swift` (this repository) with Git:
-
-```cmd
-git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift S:\swift
-```
-
-You'll be able to clone and check out the rest of Swift source repositories with `update-checkout` tool:
-
-```cmd
-S:\swift\utils\update-checkout.cmd --clone
-```
-
-## Set up `vcpkg`
+### Set up `vcpkg`
 
 This guide uses `vcpkg` for pulling in external dependencies, including ICU, libcurl, libxml2, SQLite 3 and zlib.
 
@@ -77,11 +53,31 @@ git clone https://github.com/microsoft/vcpkg S:\vcpkg
 S:\vcpkg\bootstrap-vcpkg.bat
 ```
 
-By default, the dependencies will be downloaded and built on demand.  Optionally, you can prebuild the dependencies in advance:
+> **NOTE:** By default, the dependencies will be downloaded and built on demand. Optionally, you can pre-build the dependencies to speed up configuration:
+>
+>     S:\vcpkg\vcpkg install curl icu libxml2 sqlite3 zlib --triplet=x64-windows
+
+## Clone the source repositories
+
+This guide assumes your sources live at the root of `S:`.  As long as drive letter `S:` is not assigned, you can create a substitution to map your source directory:
 
 ```cmd
-S:\vcpkg\vcpkg install curl icu libxml2 sqlite3 zlib --triplet=x64-windows
+subst S: <path to source root>
 ```
+
+First, clone `apple/swift` (this repository) with Git:
+
+```cmd
+git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift S:\swift
+```
+
+You'll be able to clone and check out the rest of Swift source repositories with `update-checkout` tool:
+
+```cmd
+S:\swift\utils\update-checkout.cmd --clone --skip-repository swift
+```
+
+> **NOTE:** You can use forked versions of Swift source repositories by manually placing them into `S:\<repo-name>` and appending their names to the `--skip-repository` option of `update-checkout`.  Don't forget to clone them with `-c core.autocrlf=input -c core.symlinks=true` and the correct repository name.
 
 ## Set up Visual Studio integration (re-run on Visual Studio upgrades)
 
@@ -113,9 +109,9 @@ cmake -B S:\b\1 ^
   -C S:\swift\cmake\caches\Windows-x86_64.cmake ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
-  -D CMAKE_C_COMPILER=cl ^
+  -D CMAKE_C_COMPILER=cl.exe ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy /source-charset:utf-8 /execution-charset:utf-8" ^
-  -D CMAKE_CXX_COMPILER=cl ^
+  -D CMAKE_CXX_COMPILER=cl.exe ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy /utf-8" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
@@ -132,7 +128,7 @@ cmake --build S:\b\1
 cmake --build S:\b\1 --target install
 ```
 
-## Build a complete toolchain for development
+## Build for development
 
 The following guide will get you through the building process of a complete Swift debug toolchain.
 
@@ -152,9 +148,9 @@ cmake -B S:\b\1 ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
-  -D CMAKE_C_COMPILER=cl ^
+  -D CMAKE_C_COMPILER=cl.exe ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy /source-charset:utf-8 /execution-charset:utf-8" ^
-  -D CMAKE_CXX_COMPILER=cl ^
+  -D CMAKE_CXX_COMPILER=cl.exe ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy /utf-8" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
@@ -192,7 +188,7 @@ path %PATH%;%ProgramFiles%\Git\usr\bin
 cmake --build S:\b\1 --target check-swift
 ```
 
-### Swift Standard Library
+### Swift runtime libraries
 
 ```cmd
 cmake -B S:\b\2 ^
@@ -225,7 +221,7 @@ cmake -B S:\b\2 ^
 cmake --build S:\b\2
 ```
 
-> **NOTE:** Swift Standard Library is also built along with the compiler.  This step extracts it into a portable SDK where we will install other runtime libraries.
+> **NOTE:** Swift runtime libraries are also built along with the compiler.  This step extracts them into a portable SDK where we will install core libraries alongside.
 
 ### libdispatch
 
