@@ -136,11 +136,13 @@ cmake --build S:\b\1 --target install
 
 The following guide will get you through the building process of a complete Swift debug toolchain.
 
-Before you kick off the process, unset `SDKROOT` if you've already installed Swift:
+Before you kick off the process, unset `%SDKROOT%` if you've already installed Swift:
 
 ```cmd
 set SDKROOT=
 ```
+
+If you want to use an existing Swift toolchain to build the core libraries and other parts of the toolchain, make sure you have it in `%Path%`, and strip `S:/b/1/bin/` from every `-D CMAKE_{language}_COMPILER=S:/b/1/bin/{compiler}` option.
 
 ### Swift compiler
 
