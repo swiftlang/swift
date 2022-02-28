@@ -516,7 +516,7 @@ cmake -B S:\b\7\IndexStoreDB ^
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
-  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy -Xclang -fno-split-cold-code" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
@@ -537,6 +537,7 @@ cmake --build S:\b\7\IndexStoreDB
 
 ```cmd
 cmake -B S:\b\8 ^
+  -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
@@ -563,6 +564,7 @@ cmake --build S:\b\8
 
 ```cmd
 cmake -B S:\b\9 ^
+  -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
@@ -587,33 +589,66 @@ cmake -B S:\b\9 ^
 cmake --build S:\b\9
 ```
 
-### SwiftPM
+### SwiftPM (without tests)
 
 ```cmd
 cmake -B S:\b\10 ^
   -D BUILD_SHARED_LIBS=YES ^
-  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
-  -D dispatch_DIR=S:\b\2\cmake\modules ^
-  -D Foundation_DIR=S:\b\3\cmake\modules ^
-  -D TSC_DIR=S:\b\5\cmake\modules ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
   -D LLBuild_DIR=S:\b\6\cmake\modules ^
-  -D Yams_DIR=S:\b\7\cmake\modules ^
-  -D ArgumentParser_DIR=S:\b\8\cmake\modules ^
+  -D SwiftSystem_DIR=S:\b\7\SwiftSystem\cmake\modules ^
+  -D ArgumentParser_DIR=S:\b\7\ArgumentParser\cmake\modules ^
+  -D SwiftCrypto_DIR=S:\b\7\SwiftCrypto\cmake\modules ^
+  -D SwiftCollections_DIR=S:\b\7\SwiftCollections\cmake\modules ^
+  -D TSC_DIR=S:\b\8\cmake\modules ^
   -D SwiftDriver_DIR=S:\b\9\cmake\modules ^
+
   -G Ninja ^
   -S S:\swiftpm
 
-ninja -C S:\b\10
+cmake --build S:\b\10
 ```
 
-Indicate to SwiftPM where to find `PackageDescription` before installation:
+### SourceKit-LSP (without tests)
 
 ```cmd
-set SWIFTPM_PD_LIBS=S:\b\10\pm
+cmake -B S:\b\11 ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
+  -D LLBuild_DIR=S:\b\6\cmake\modules ^
+  -D SwiftSystem_DIR=S:\b\7\SwiftSystem\cmake\modules ^
+  -D ArgumentParser_DIR=S:\b\7\ArgumentParser\cmake\modules ^
+  -D SwiftCollections_DIR=S:\b\7\SwiftCollections\cmake\modules ^
+  -D IndexStoreDB_DIR=S:\b\7\IndexStoreDB\cmake\modules ^
+  -D TSC_DIR=S:\b\8\cmake\modules ^
+  -D SwiftPM_DIR=S:\b\10\cmake\modules ^
+
+  -G Ninja ^
+  -S S:\sourcekit-lsp
+
+cmake --build S:\b\11
 ```
 
 ## Gather the toolchain and SDK
