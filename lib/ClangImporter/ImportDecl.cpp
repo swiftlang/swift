@@ -9190,26 +9190,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     Result = importDecl(UnderlyingDecl, version);
     SkippedOverTypedef = true;
   }
-  // TODO extend Swift classes to it's equivalents from it's ClanDecled
-  // attributes
-
-  if (isa<clang::FunctionDecl>(ClangDecl)) {
-    if (ClangDecl->getDeclName().isIdentifier() &&
-        ClangDecl->getName().startswith_insensitive("get") &&
-        ClangDecl->getName().lower() != "getter") {
-      const_cast<clang::NamedDecl *>(ClangDecl)->addAttr(
-          clang::SwiftAttrAttr::CreateImplicit(ClangDecl->getASTContext(),
-                                               "import_as_getter"));
-    }
-    if (ClangDecl->getDeclName().isIdentifier() &&
-        ClangDecl->getName().startswith_insensitive("set") &&
-        ClangDecl->getName().lower() != "setter") {
-      const_cast<clang::NamedDecl *>(ClangDecl)->addAttr(
-          clang::SwiftAttrAttr::CreateImplicit(ClangDecl->getASTContext(),
-                                               "import_as_setter"));
-    }
-  }
-
+  
   if (!Result) {
     SwiftDeclConverter converter(*this, version);
     Result = converter.Visit(ClangDecl);

@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
 //
 // REQUIRES: executable_test
+//
+// Crash when running on windows: rdar://88391102
+// XFAIL: OS=windows-msvc
 
 import StdlibUnittest
 import ImplicitComputedProperties

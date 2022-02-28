@@ -1,26 +1,3 @@
-//===--- GenValueWitness.cpp - IR generation for value witnesses ----------===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements IR generation for value witnesses in Swift.
-//
-//  Value witnesses are (predominantly) functions that implement the basic
-//  operations for copying and destroying values.
-//
-//  In the comments throughout this file, three type names are used:
-//    'B' is the type of a fixed-size buffer
-//    'T' is the type which implements a protocol
-//
-//===----------------------------------------------------------------------===//
-
 #ifndef SWIFT_CXXMETHODBRIDGING_H
 #define SWIFT_CXXMETHODBRIDGING_H
 
