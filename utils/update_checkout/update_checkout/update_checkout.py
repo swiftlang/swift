@@ -70,7 +70,7 @@ def check_parallel_results(results, op):
             print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
             fail_count += 1
             if r.stderr:
-                print(r.stderr.decode('utf-8'))
+                print(r.stderr)
     return fail_count
 
 
@@ -280,13 +280,14 @@ def obtain_additional_swift_sources(pool_args):
         print("Cloning '" + repo_name + "'")
 
         if skip_history:
-            shell.run(['git', 'clone', '--recursive', '--depth', '1',
-                       '--branch', repo_branch, remote, repo_name] +
+            shell.run(['git', 'clone', '-c', 'core.symlinks=true', '-c', 'core.autocrlf=input',
+                       '--recursive', '--depth', '1', '--branch', repo_branch, remote, repo_name] +
                       (['--no-tags'] if skip_tags else []),
                       env=env,
                       echo=True)
         else:
-            shell.run(['git', 'clone', '--recursive', remote, repo_name] +
+            shell.run(['git', 'clone', '-c', 'core.symlinks=true', '-c', 'core.autocrlf=input',
+                       '--recursive', remote, repo_name] +
                       (['--no-tags'] if skip_tags else []),
                       env=env,
                       echo=True)
