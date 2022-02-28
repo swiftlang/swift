@@ -350,23 +350,53 @@ Test Foundation:
 cmake --build S:\b\4 --target test
 ```
 
-### TSC
+### SwiftSystem (without tests)
 
 ```cmd
-cmake -B S:\b\5 ^
+cmake -B S:\b\6 ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
-  -D dispatch_DIR=S:\b\2\cmake\modules ^
-  -D Foundation_DIR=S:\b\3\cmake\modules ^
-  -D SQLite3_INCLUDE_DIR=S:\Library\sqlite-3.28.0\usr\include ^
-  -D SQLite3_LIBRARY=S:\Library\sqlite-3.28.0\usr\lib\SQLite3.lib ^
+
+  -G Ninja ^
+  -S S:\swift-system
+
+cmake --build S:\b\6
+```
+
+### TSC (without tests)
+
+```cmd
+cmake -B S:\b\7 ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
+  -D SwiftSystem_DIR=S:\b\6\cmake\modules ^
+
+  -D CMAKE_TOOLCHAIN_FILE=S:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+
   -G Ninja ^
   -S S:\swift-tools-support-core
 
-ninja -C S:\b\5
+cmake --build S:\b\7
 ```
 
 ### llbuild
