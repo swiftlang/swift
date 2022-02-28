@@ -260,6 +260,8 @@ cmake -B S:\b\2 ^
 
   -D LLVM_DIR=S:\b\1\lib\cmake\llvm ^
   -D SWIFT_NATIVE_SWIFT_TOOLS_PATH=S:\b\1\bin ^
+
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
 
   -D SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES ^
@@ -745,6 +747,7 @@ cmake --build S:\b\6 --target install
 cmake --build S:\b\7\Yams --target install
 cmake --build S:\b\7\ArgumentParser --target install
 cmake --build S:\b\7\SwiftSystem --target install
+cmake --build S:\b\7\SwiftCrypto --target install
 cmake --build S:\b\7\SwiftCollections --target install
 cmake --build S:\b\7\IndexStoreDB --target install
 cmake --build S:\b\8 --target install
@@ -758,4 +761,11 @@ To use Swift Driver in place of the old driver:
 ```cmd
 copy /Y S:\b\toolchain\usr\bin\swift-driver.exe S:\b\toolchain\usr\bin\swift.exe
 copy /Y S:\b\toolchain\usr\bin\swift-driver.exe S:\b\toolchain\usr\bin\swiftc.exe
+```
+
+Add the built toolchain to `%Path%` to use directly:
+
+```cmd
+path S:\b\toolchain\usr\bin;%Path%
+swift --version
 ```
