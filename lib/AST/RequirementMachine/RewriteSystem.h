@@ -506,13 +506,15 @@ private:
 
   void processConflicts();
 
+  using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
+                                                       unsigned ruleID)>;
+
   Optional<std::pair<unsigned, unsigned>>
-  findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn);
+  findRuleToDelete(EliminationPredicate isRedundantRuleFn);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
 
-  void performHomotopyReduction(
-      llvm::function_ref<bool(unsigned)> isRedundantRuleFn);
+  void performHomotopyReduction(EliminationPredicate isRedundantRuleFn);
 
   void computeMinimalConformances(
       llvm::DenseSet<unsigned> &redundantConformances);

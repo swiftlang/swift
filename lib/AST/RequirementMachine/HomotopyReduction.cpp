@@ -488,7 +488,7 @@ RewritePath::getRulesInEmptyContext(const MutableTerm &term,
 /// \p redundantConformances equal to the set of conformance rules that are
 ///    not minimal conformances.
 Optional<std::pair<unsigned, unsigned>> RewriteSystem::
-findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
+findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
   for (unsigned loopID : indices(Loops)) {
     auto &loop = Loops[loopID];
@@ -520,7 +520,10 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
   }
 
   for (const auto &pair : redundancyCandidates) {
+    unsigned loopID = pair.first;
     unsigned ruleID = pair.second;
+
+    const auto &loop = Loops[loopID];
     const auto &rule = getRule(ruleID);
 
     // We should not find a rule that has already been marked redundant
@@ -538,10 +541,10 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     // Homotopy reduction runs multiple passes with different filters to
     // prioritize the deletion of certain rules ahead of others. Apply
     // the filter now.
-    if (!isRedundantRuleFn(ruleID)) {
+    if (!isRedundantRuleFn(loopID, ruleID)) {
       if (Debug.contains(DebugFlags::HomotopyReductionDetail)) {
         llvm::dbgs() << "** Skipping rule " << rule << " from loop #"
-                     << pair.first << "\n";
+                     << loopID << "\n";
       }
 
       continue;
@@ -549,7 +552,7 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
 
     if (Debug.contains(DebugFlags::HomotopyReductionDetail)) {
       llvm::dbgs() << "** Candidate rule " << rule << " from loop #"
-                   << pair.first << "\n";
+                   << loopID << "\n";
     }
 
     if (!found) {
@@ -561,7 +564,6 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     // we've found so far.
     const auto &otherRule = getRule(found->second);
 
-    const auto &loop = Loops[pair.first];
     const auto &otherLoop = Loops[found->first];
 
     {
@@ -712,7 +714,7 @@ void RewriteSystem::deleteRule(unsigned ruleID,
 }
 
 void RewriteSystem::performHomotopyReduction(
-    llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
+    EliminationPredicate isRedundantRuleFn) {
   while (true) {
     auto optPair = findRuleToDelete(isRedundantRuleFn);
 
@@ -810,7 +812,7 @@ void RewriteSystem::minimizeRewriteSystem() {
     llvm::dbgs() << "---------------------------------------------\n";
   }
 
-  performHomotopyReduction([&](unsigned ruleID) -> bool {
+  performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
     if (rule.isLHSSimplified() &&
@@ -845,7 +847,7 @@ void RewriteSystem::minimizeRewriteSystem() {
     llvm::dbgs() << "--------------------------------------------\n";
   }
 
-  performHomotopyReduction([&](unsigned ruleID) -> bool {
+  performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
     if (rule.isAnyConformanceRule() &&
@@ -862,7 +864,7 @@ void RewriteSystem::minimizeRewriteSystem() {
     llvm::dbgs() << "---------------------------------------\n";
   }
 
-  performHomotopyReduction([&](unsigned ruleID) -> bool {
+  performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
     if (!rule.isAnyConformanceRule())
