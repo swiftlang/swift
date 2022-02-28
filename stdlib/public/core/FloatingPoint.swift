@@ -328,7 +328,9 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// `infinity` is greater than this value.
   static var greatestFiniteMagnitude: Self { get }
 
-  /// The mathematical constant pi.
+  /// The ratio of a circle's circumference to its diameter.
+  ///
+  /// Also equivalent to half a revolution in radians.
   ///
   /// This value should be rounded toward zero to keep user computations with
   /// angles from inadvertently ending up in the wrong quadrant. A type that
