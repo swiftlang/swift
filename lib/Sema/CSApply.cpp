@@ -9007,6 +9007,31 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     Type patternType = solution.simplifyType(solution.getType(info.pattern));
     patternType = patternType->reconstituteSugar(/*recursive=*/false);
 
+    // Check whether this enum element is resolved via ~= application.
+    if (auto *enumElement = dyn_cast<EnumElementPattern>(info.pattern)) {
+      if (auto target = cs.getSolutionApplicationTarget(enumElement)) {
+        auto *EP = target->getExprPattern();
+        auto enumType = solution.simplifyType(EP->getType());
+
+        auto *matchCall = target->getAsExpr();
+
+        auto *result = matchCall->walk(*this);
+        if (!result)
+          return None;
+
+        {
+          auto *matchVar = EP->getMatchVar();
+          matchVar->setInterfaceType(enumType->mapTypeOutOfContext());
+        }
+
+        EP->setMatchExpr(result);
+        EP->setType(enumType);
+
+        (*caseLabelItem)->setPattern(EP, /*resolved=*/true);
+        return target;
+      }
+    }
+
     // Coerce the pattern to its appropriate type.
     TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
     patternOptions |= TypeResolutionFlags::OverrideType;
