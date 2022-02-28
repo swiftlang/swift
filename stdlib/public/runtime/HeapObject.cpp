@@ -680,7 +680,9 @@ void swift::swift_unownedCheck(HeapObject *object) {
 
 SWIFT_CC(swift)
 void _swift_release_dealloc(SWIFT_CONTEXT HeapObject *object) {
-  __attribute__((musttail)) return asFullMetadata(object->metadata)->destroy(object);
+  // We are forcing `destroy` to be tail called to prevent creation of a
+  // new stack frame and reduce overhead of frame pointer authentication.
+  SWIFT_MUSTTAIL return asFullMetadata(object->metadata)->destroy(object);
 }
 
 #if SWIFT_OBJC_INTEROP

@@ -232,6 +232,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 // so changing this value is not sufficient.
 #define SWIFT_DEFAULT_LLVM_CC llvm::CallingConv::C
 
+// Annotation to force a call in tail position to be tail call optimized.
+// If the compiler does not support this, it will be a no-op.
+#if __has_attribute(musttail)
+#define SWIFT_MUSTTAIL __attribute__((musttail))
+#else
+#define SWIFT_MUSTTAIL
+#endif
+
 // SWIFT_FORMAT(fmt,first) marks a function as taking a format string argument
 // at argument `fmt`, with the first argument for the format string as `first`.
 #if __has_attribute(format)
