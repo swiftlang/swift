@@ -653,9 +653,9 @@ cmake --build S:\b\11
 
 ## Gather the toolchain and SDK
 
-If you want a toolchain for real-world testing or distribution, you can use CMake to perform the install step.
+If you want a toolchain for real-world testing, you can use CMake to perform the install step.
 
-### Swift compiler and standard library
+### Swift compiler and standard libraries
 
 ```cmd
 cmake --build S:\b\1 --target install
@@ -667,16 +667,41 @@ For testing, add the target to path:
 path S:\b\toolchain\usr\bin:%PATH%
 ```
 
-## Swift Windows SDK (with core libraries)
+### Swift Windows SDK (with core libraries)
 
 ```cmd
 cmake --build S:\b\2 --target install
 cmake --build S:\b\3 --target install
 cmake --build S:\b\4 --target install
+cmake --build S:\b\5 --target install
 ```
 
-For testing, set `SDKROOT`:
+For testing, set `%SDKROOT%` and the default runtime:
 
 ```cmd
 set SDKROOT=S:\b\sdk
+python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" > S:\b\sdk\SDKSettings.plist
+```
+
+### Swift toolchain with developer tools
+
+```cmd
+cmake --build S:\b\1 --target install
+cmake --build S:\b\6 --target install
+cmake --build S:\b\7\Yams --target install
+cmake --build S:\b\7\ArgumentParser --target install
+cmake --build S:\b\7\SwiftSystem --target install
+cmake --build S:\b\7\SwiftCollections --target install
+cmake --build S:\b\7\IndexStoreDB --target install
+cmake --build S:\b\8 --target install
+cmake --build S:\b\9 --target install
+cmake --build S:\b\10 --target install
+cmake --build S:\b\11 --target install
+```
+
+To use Swift Driver in place of the old driver:
+
+```cmd
+copy /Y S:\b\toolchain\usr\bin\swift-driver.exe S:\b\toolchain\usr\bin\swift.exe
+copy /Y S:\b\toolchain\usr\bin\swift-driver.exe S:\b\toolchain\usr\bin\swiftc.exe
 ```
