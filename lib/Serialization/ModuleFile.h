@@ -55,8 +55,10 @@ class ModuleFile
   friend class DeclDeserializer;
   friend class TypeDeserializer;
   friend class SILDeserializer;
+  friend class ProtocolConformanceDeserializer;
   using Status = serialization::Status;
   using TypeID = serialization::TypeID;
+  using ProtocolConformanceID = serialization::ProtocolConformanceID;
 
   /// The core data of a serialized module file. This is accessed as immutable
   /// and thread-safe.
@@ -239,8 +241,8 @@ private:
   /// Local DeclContexts referenced by this module.
   MutableArrayRef<Serialized<DeclContext*>> LocalDeclContexts;
 
-  /// Normal protocol conformances referenced by this module.
-  MutableArrayRef<Serialized<NormalProtocolConformance *>> NormalConformances;
+  /// Protocol conformances referenced by this module.
+  MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
 
   /// SILLayouts referenced by this module.
   MutableArrayRef<Serialized<SILLayout *>> SILLayouts;
@@ -256,6 +258,11 @@ private:
 
   /// Substitution maps referenced by this module.
   MutableArrayRef<Serialized<SubstitutionMap>> SubstitutionMaps;
+
+  uint64_t
+  createLazyConformanceLoaderToken(ArrayRef<uint64_t> ids);
+  ArrayRef<ProtocolConformanceID>
+  claimLazyConformanceLoaderToken(uint64_t token);
 
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
@@ -389,14 +396,16 @@ private:
   GenericParamList *maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
-  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
-                               llvm::BitstreamCursor &Cursor);
+  void deserializeGenericRequirements(ArrayRef<uint64_t> scratch,
+                                      unsigned &nextIndex,
+                                 SmallVectorImpl<Requirement> &requirements);
 
   /// Reads a set of requirements from \c DeclTypeCursor, returns the first
   /// error, if any.
   llvm::Error
-  readGenericRequirementsChecked(SmallVectorImpl<Requirement> &requirements,
-                                 llvm::BitstreamCursor &Cursor);
+  deserializeGenericRequirementsChecked(ArrayRef<uint64_t> scratch,
+                                        unsigned &nextIndex,
+                                   SmallVectorImpl<Requirement> &requirements);
 
   /// Read the requirement signature of a protocol, which consists of a list of
   /// generic requirements and a list of protocol typealias records.
@@ -847,24 +856,18 @@ public:
   llvm::Expected<SubstitutionMap>
   getSubstitutionMapChecked(serialization::SubstitutionMapID id);
 
-  /// Recursively reads a protocol conformance from the given cursor.
-  ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,
-                                         GenericEnvironment *genericEnv =
-                                           nullptr);
+  /// Returns the protocol conformance for the given ID.
+  ProtocolConformanceRef
+  getConformance(serialization::ProtocolConformanceID id,
+                 GenericEnvironment *genericEnv = nullptr);
 
-  /// Recursively reads a protocol conformance from the given cursor,
-  /// returns the conformance or the first error.
+  /// Returns the protocol conformance for the given ID.
   llvm::Expected<ProtocolConformanceRef>
-  readConformanceChecked(llvm::BitstreamCursor &Cursor,
-                         GenericEnvironment *genericEnv = nullptr);
+  getConformanceChecked(serialization::ProtocolConformanceID id,
+                        GenericEnvironment *genericEnv = nullptr);
 
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
-
-  /// Read the given normal conformance from the current module file,
-  /// returns the conformance or the first error.
-  llvm::Expected<NormalProtocolConformance *>
-  readNormalConformanceChecked(serialization::NormalConformanceID id);
 
   /// Reads a foreign error convention from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();

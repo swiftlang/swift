@@ -429,229 +429,249 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
   }
 }
 
-ProtocolConformanceRef ModuleFile::readConformance(
-                                             llvm::BitstreamCursor &Cursor,
-                                             GenericEnvironment *genericEnv) {
-  auto conformance = readConformanceChecked(Cursor, genericEnv);
-  if (!conformance)
-    fatal(conformance.takeError());
-  return conformance.get();
-}
+namespace swift {
+class ProtocolConformanceDeserializer {
+  ModuleFile &MF;
+  ASTContext &ctx;
 
-Expected<ProtocolConformanceRef>
-ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
-                                   GenericEnvironment *genericEnv) {
-  using namespace decls_block;
+  using TypeID = serialization::TypeID;
+  using ProtocolConformanceID = serialization::ProtocolConformanceID;
+public:
+  ProtocolConformanceDeserializer(ModuleFile &mf)
+    : MF(mf), ctx(mf.getContext()) {}
 
+  Expected<ProtocolConformance *>
+  read(ModuleFile::Serialized<ProtocolConformance *> &entry);
+
+  Expected<ProtocolConformance *>
+  readSelfProtocolConformance(ArrayRef<uint64_t> data);
+  Expected<ProtocolConformance *>
+  readSpecializedProtocolConformance(ArrayRef<uint64_t> data);
+  Expected<ProtocolConformance *>
+  readInheritedProtocolConformance(ArrayRef<uint64_t> data);
+  Expected<ProtocolConformance *>
+  readBuiltinProtocolConformance(ArrayRef<uint64_t> data);
+  Expected<ProtocolConformance *>
+  readNormalProtocolConformance(ArrayRef<uint64_t> data,
+                    ModuleFile::Serialized<ProtocolConformance *> &entry);
+  Expected<ProtocolConformance *>
+  readNormalProtocolConformanceXRef(ArrayRef<uint64_t> data);
+};
+} // end namespace swift
+
+Expected<ProtocolConformance*>
+ProtocolConformanceDeserializer::read(
+          ModuleFile::Serialized<ProtocolConformance *> &conformanceEntry) {
   SmallVector<uint64_t, 16> scratch;
 
-  llvm::BitstreamEntry next =
-      fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
-  assert(next.Kind == llvm::BitstreamEntry::Record);
+  if (auto s = ctx.Stats)
+    ++s->getFrontendCounters().NumConformancesDeserialized;
 
-  if (auto *Stats = getContext().Stats)
-    ++Stats->getFrontendCounters().NumConformancesDeserialized;
+  llvm::BitstreamEntry entry =
+      MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
 
-  unsigned kind = fatalIfUnexpected(Cursor.readRecord(next.ID, scratch));
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    // We don't know how to serialize types represented by sub-blocks.
+    MF.fatal();
+  }
+
+  StringRef blobData;
+  unsigned kind = MF.fatalIfUnexpected(
+      MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+  assert(blobData.empty());
+
   switch (kind) {
-  case INVALID_PROTOCOL_CONFORMANCE: {
-    return ProtocolConformanceRef::forInvalid();
-  }
-
-  case ABSTRACT_PROTOCOL_CONFORMANCE: {
-    DeclID protoID;
-    AbstractProtocolConformanceLayout::readRecord(scratch, protoID);
-
-    auto decl = getDeclChecked(protoID);
-    if (!decl)
-      return decl.takeError();
-
-    auto proto = cast<ProtocolDecl>(decl.get());
-    return ProtocolConformanceRef(proto);
-  }
-
-  case SELF_PROTOCOL_CONFORMANCE: {
-    DeclID protoID;
-    SelfProtocolConformanceLayout::readRecord(scratch, protoID);
-
-    auto decl = getDeclChecked(protoID);
-    if (!decl)
-      return decl.takeError();
-
-    auto proto = cast<ProtocolDecl>(decl.get());
-    auto conformance = getContext().getSelfConformance(proto);
-    return ProtocolConformanceRef(conformance);
-  }
-
-  case SPECIALIZED_PROTOCOL_CONFORMANCE: {
-    TypeID conformingTypeID;
-    SubstitutionMapID substitutionMapID;
-    SpecializedProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
-                                                     substitutionMapID);
-
-    ASTContext &ctx = getContext();
-    Type conformingType = getType(conformingTypeID);
-    if (genericEnv) {
-      conformingType = genericEnv->mapTypeIntoContext(conformingType);
-    }
-
-    PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
-                               "reading specialized conformance for",
-                               conformingType);
-
-    auto subMapOrError = getSubstitutionMapChecked(substitutionMapID);
-    if (!subMapOrError)
-      return subMapOrError.takeError();
-    auto subMap = subMapOrError.get();
-
-    ProtocolConformanceRef genericConformance =
-      readConformance(Cursor, genericEnv);
-    PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
-
-    assert(genericConformance.isConcrete() && "Abstract generic conformance?");
-    auto conformance =
-           ctx.getSpecializedConformance(conformingType,
-                                         genericConformance.getConcrete(),
-                                         subMap);
-    return ProtocolConformanceRef(conformance);
-  }
-
-  case INHERITED_PROTOCOL_CONFORMANCE: {
-    TypeID conformingTypeID;
-    InheritedProtocolConformanceLayout::readRecord(scratch, conformingTypeID);
-
-    ASTContext &ctx = getContext();
-    Type conformingType = getType(conformingTypeID);
-    if (genericEnv) {
-      conformingType = genericEnv->mapTypeIntoContext(conformingType);
-    }
-
-    PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
-                               "reading inherited conformance for",
-                               conformingType);
-
-    ProtocolConformanceRef inheritedConformance =
-      readConformance(Cursor, genericEnv);
-    PrettyStackTraceDecl traceTo("... to",
-                                 inheritedConformance.getRequirement());
-
-    assert(inheritedConformance.isConcrete() &&
-           "Abstract inherited conformance?");
-    auto conformance =
-      ctx.getInheritedConformance(conformingType,
-                                  inheritedConformance.getConcrete());
-    return ProtocolConformanceRef(conformance);
-  }
-
-  case BUILTIN_PROTOCOL_CONFORMANCE: {
-    TypeID conformingTypeID;
-    DeclID protoID;
-    GenericSignatureID genericSigID;
-    unsigned builtinConformanceKind;
-    BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
-                                                 protoID, genericSigID,
-                                                 builtinConformanceKind);
-
-    Type conformingType = getType(conformingTypeID);
-
-    auto decl = getDeclChecked(protoID);
-    if (!decl)
-      return decl.takeError();
-
-    auto proto = cast<ProtocolDecl>(decl.get());
-    auto genericSig = getGenericSignatureChecked(genericSigID);
-    if (!genericSig)
-      return genericSig.takeError();
-
-    // Read the conditional requirements.
-    SmallVector<Requirement, 4> conditionalRequirements;
-    auto error = readGenericRequirementsChecked(
-        conditionalRequirements, Cursor);
-    if (error)
-      return std::move(error);
-
-    auto conformance = getContext().getBuiltinConformance(
-        conformingType, proto, *genericSig, conditionalRequirements,
-        static_cast<BuiltinConformanceKind>(builtinConformanceKind));
-    return ProtocolConformanceRef(conformance);
-  }
-
-  case NORMAL_PROTOCOL_CONFORMANCE_ID: {
-    NormalConformanceID conformanceID;
-    NormalProtocolConformanceIdLayout::readRecord(scratch, conformanceID);
-
-    auto conformance = readNormalConformanceChecked(conformanceID);
-    if (!conformance)
-      return conformance.takeError();
-    return ProtocolConformanceRef(conformance.get());
-  }
-
-  case PROTOCOL_CONFORMANCE_XREF: {
-    DeclID protoID;
-    DeclID nominalID;
-    ModuleID moduleID;
-    ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
-                                              moduleID);
-
-    auto maybeNominal = getDeclChecked(nominalID);
-    if (!maybeNominal)
-      return maybeNominal.takeError();
-
-    auto nominal = cast<NominalTypeDecl>(maybeNominal.get());
-    PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
-    auto proto = cast<ProtocolDecl>(getDecl(protoID));
-    PrettyStackTraceDecl traceTo("... to", proto);
-    auto module = getModule(moduleID);
-
-    // FIXME: If the module hasn't been loaded, we probably don't want to fall
-    // back to the current module like this.
-    if (!module)
-      module = getAssociatedModule();
-
-    SmallVector<ProtocolConformance *, 2> conformances;
-    nominal->lookupConformance(proto, conformances);
-    PrettyStackTraceModuleFile traceMsg(
-        "If you're seeing a crash here, check that your SDK and dependencies "
-        "are at least as new as the versions used to build", *this);
-    // This would normally be an assertion but it's more useful to print the
-    // PrettyStackTrace here even in no-asserts builds.
-    if (conformances.empty())
-      abort();
-    return ProtocolConformanceRef(conformances.front());
-  }
+  case decls_block::SELF_PROTOCOL_CONFORMANCE:
+    return readSelfProtocolConformance(scratch);
+  case decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE:
+    return readSpecializedProtocolConformance(scratch);
+  case decls_block::INHERITED_PROTOCOL_CONFORMANCE:
+    return readInheritedProtocolConformance(scratch);
+  case decls_block::BUILTIN_PROTOCOL_CONFORMANCE:
+    return readBuiltinProtocolConformance(scratch);
+  case decls_block::NORMAL_PROTOCOL_CONFORMANCE:
+    return readNormalProtocolConformance(scratch, conformanceEntry);
+  case decls_block::PROTOCOL_CONFORMANCE_XREF:
+    return readNormalProtocolConformanceXRef(scratch);
 
   // Not a protocol conformance.
   default:
-    fatal();
+    MF.fatal();
   }
 }
 
-Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
-                             NormalConformanceID conformanceID) {
-  auto &conformanceEntry = NormalConformances[conformanceID-1];
-  if (conformanceEntry.isComplete()) {
-    return conformanceEntry.get();
-  }
-
+Expected<ProtocolConformance *>
+ProtocolConformanceDeserializer::readSelfProtocolConformance(
+                                              ArrayRef<uint64_t> scratch) {
   using namespace decls_block;
 
-  // Find the conformance record.
-  BCOffsetRAII restoreOffset(DeclTypeCursor);
-  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(conformanceEntry));
-  llvm::BitstreamEntry entry = fatalIfUnexpected(DeclTypeCursor.advance());
-  if (entry.Kind != llvm::BitstreamEntry::Record)
-    fatal();
+  DeclID protoID;
+  SelfProtocolConformanceLayout::readRecord(scratch, protoID);
+
+  auto decl = MF.getDeclChecked(protoID);
+  if (!decl)
+    return decl.takeError();
+
+  auto proto = cast<ProtocolDecl>(decl.get());
+  auto conformance = ctx.getSelfConformance(proto);
+  return conformance;
+}
+
+Expected<ProtocolConformance *>
+ProtocolConformanceDeserializer::readSpecializedProtocolConformance(
+                                              ArrayRef<uint64_t> scratch) {
+  using namespace decls_block;
+
+  ProtocolConformanceID conformanceID;
+  TypeID conformingTypeID;
+  SubstitutionMapID substitutionMapID;
+  SpecializedProtocolConformanceLayout::readRecord(scratch,
+                                                   conformanceID,
+                                                   conformingTypeID,
+                                                   substitutionMapID);
+
+  Type conformingType = MF.getType(conformingTypeID);
+
+  PrettyStackTraceType trace(MF.getAssociatedModule()->getASTContext(),
+                             "reading specialized conformance for",
+                             conformingType);
+
+  auto subMapOrError = MF.getSubstitutionMapChecked(substitutionMapID);
+  if (!subMapOrError)
+    return subMapOrError.takeError();
+  auto subMap = subMapOrError.get();
+
+  auto genericConformance = MF.getConformance(conformanceID);
+
+  PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
+  ++NumNormalProtocolConformancesLoaded;
+
+  assert(genericConformance.isConcrete() && "Abstract generic conformance?");
+  auto conformance =
+         ctx.getSpecializedConformance(conformingType,
+                                       genericConformance.getConcrete(),
+                                       subMap);
+  return conformance;
+}
+
+Expected<ProtocolConformance *>
+ProtocolConformanceDeserializer::readInheritedProtocolConformance(
+                                              ArrayRef<uint64_t> scratch) {
+  using namespace decls_block;
+
+  ProtocolConformanceID conformanceID;
+  TypeID conformingTypeID;
+  InheritedProtocolConformanceLayout::readRecord(scratch, conformanceID,
+                                                 conformingTypeID);
+
+  Type conformingType = MF.getType(conformingTypeID);
+
+  PrettyStackTraceType trace(ctx, "reading inherited conformance for",
+                             conformingType);
+
+  ProtocolConformanceRef inheritedConformance =
+    MF.getConformance(conformanceID);
+  PrettyStackTraceDecl traceTo("... to",
+                               inheritedConformance.getRequirement());
+
+  assert(inheritedConformance.isConcrete() &&
+         "Abstract inherited conformance?");
+  auto conformance =
+    ctx.getInheritedConformance(conformingType,
+                                inheritedConformance.getConcrete());
+  return conformance;
+}
+
+Expected<ProtocolConformance *>
+ProtocolConformanceDeserializer::readBuiltinProtocolConformance(
+                                              ArrayRef<uint64_t> scratch) {
+  using namespace decls_block;
+
+  TypeID conformingTypeID;
+  DeclID protoID;
+  GenericSignatureID genericSigID;
+  unsigned builtinConformanceKind;
+  ArrayRef<uint64_t> data;
+  BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
+                                               protoID, genericSigID,
+                                               builtinConformanceKind,
+                                               data);
+
+  Type conformingType = MF.getType(conformingTypeID);
+
+  auto decl = MF.getDeclChecked(protoID);
+  if (!decl)
+    return decl.takeError();
+
+  auto proto = cast<ProtocolDecl>(decl.get());
+  auto genericSig = MF.getGenericSignatureChecked(genericSigID);
+  if (!genericSig)
+    return genericSig.takeError();
+
+  // Read the conditional requirements.
+  SmallVector<Requirement, 4> conditionalRequirements;
+  unsigned nextDataIndex = 0;
+  auto error = MF.deserializeGenericRequirementsChecked(
+      data, nextDataIndex, conditionalRequirements);
+  if (error)
+    return std::move(error);
+  if (nextDataIndex != data.size())
+    MF.fatal();
+
+  auto conformance = ctx.getBuiltinConformance(
+      conformingType, proto, *genericSig, conditionalRequirements,
+      static_cast<BuiltinConformanceKind>(builtinConformanceKind));
+  return conformance;
+}
+
+Expected<ProtocolConformance *>
+ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
+                                              ArrayRef<uint64_t> scratch) {
+  using namespace decls_block;
+
+  DeclID protoID;
+  DeclID nominalID;
+  ModuleID moduleID;
+  ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
+                                            moduleID);
+
+  auto maybeNominal = MF.getDeclChecked(nominalID);
+  if (!maybeNominal)
+    return maybeNominal.takeError();
+
+  auto nominal = cast<NominalTypeDecl>(maybeNominal.get());
+  PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
+  auto proto = cast<ProtocolDecl>(MF.getDecl(protoID));
+  PrettyStackTraceDecl traceTo("... to", proto);
+  auto module = MF.getModule(moduleID);
+
+  // FIXME: If the module hasn't been loaded, we probably don't want to fall
+  // back to the current module like this.
+  if (!module)
+    module = MF.getAssociatedModule();
+
+  SmallVector<ProtocolConformance *, 2> conformances;
+  nominal->lookupConformance(proto, conformances);
+  PrettyStackTraceModuleFile traceMsg(
+      "If you're seeing a crash here, check that your SDK and dependencies "
+      "are at least as new as the versions used to build", MF);
+  // This would normally be an assertion but it's more useful to print the
+  // PrettyStackTrace here even in no-asserts builds.
+  if (conformances.empty())
+    abort();
+  return conformances.front();
+}
+
+Expected<ProtocolConformance *>
+ProtocolConformanceDeserializer::readNormalProtocolConformance(
+                                              ArrayRef<uint64_t> scratch,
+            ModuleFile::Serialized<ProtocolConformance *> &conformanceEntry) {
+  using namespace decls_block;
 
   DeclID protoID;
   DeclContextID contextID;
   unsigned valueCount, typeCount, conformanceCount, isUnchecked;
   ArrayRef<uint64_t> rawIDs;
-  SmallVector<uint64_t, 16> scratch;
-
-  unsigned kind =
-      fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
-  if (kind != NORMAL_PROTOCOL_CONFORMANCE)
-    fatal();
 
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
@@ -659,8 +679,7 @@ Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
                                               isUnchecked,
                                               rawIDs);
 
-  ASTContext &ctx = getContext();
-  auto doOrError = getDeclContextChecked(contextID);
+  auto doOrError = MF.getDeclContextChecked(contextID);
   if (!doOrError)
     return doOrError.takeError();
   DeclContext *dc = doOrError.get();
@@ -670,20 +689,21 @@ Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
   Type conformingType = dc->getDeclaredInterfaceType();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
-  auto protoOrError = getDeclChecked(protoID);
+  auto protoOrError = MF.getDeclChecked(protoID);
   if (!protoOrError)
     return protoOrError.takeError();
   auto proto = cast<ProtocolDecl>(protoOrError.get());
 
   PrettyStackTraceDecl traceTo("... to", proto);
-  ++NumNormalProtocolConformancesLoaded;
 
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(), dc,
                                         ProtocolConformanceState::Incomplete,
                                         isUnchecked);
   // Record this conformance.
-  if (conformanceEntry.isComplete())
+  if (conformanceEntry.isComplete()) {
+    assert(conformanceEntry.get() == conformance);
     return conformance;
+  }
 
   uint64_t offset = conformanceEntry;
   conformanceEntry = conformance;
@@ -695,8 +715,60 @@ Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
     return conformance;
 
   conformance->setState(ProtocolConformanceState::Complete);
-  conformance->setLazyLoader(this, offset);
+  conformance->setLazyLoader(&MF, offset);
   return conformance;
+}
+
+ProtocolConformanceRef
+ModuleFile::getConformance(ProtocolConformanceID id,
+                           GenericEnvironment *genericEnv) {
+  auto conformance = getConformanceChecked(id, genericEnv);
+  if (!conformance)
+    fatal(conformance.takeError());
+  return conformance.get();
+}
+
+Expected<ProtocolConformanceRef>
+ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID,
+                                  GenericEnvironment *genericEnv) {
+  using namespace decls_block;
+
+  if (conformanceID == 0) return ProtocolConformanceRef::forInvalid();
+
+  // If the low bit is sit, this is an abstract conformance.
+  if ((conformanceID & 1) == 0) {
+    auto protocolID = conformanceID >> 1;
+    auto maybeProtocol = getDeclChecked(protocolID);
+    if (!maybeProtocol)
+      return maybeProtocol.takeError();
+    auto proto = cast<ProtocolDecl>(maybeProtocol.get());
+    return ProtocolConformanceRef(proto);
+  }
+
+  // Otherwise, it's a concrete conformance.
+  auto conformanceIndex = (conformanceID >> 1) - 1;
+  assert(conformanceIndex < Conformances.size() && "invalid conformance ID");
+  auto &conformanceOrOffset = Conformances[conformanceIndex];
+  if (!conformanceOrOffset.isComplete()) {
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
+    fatalIfNotSuccess(DeclTypeCursor.JumpToBit(conformanceOrOffset));
+
+    auto result =
+      ProtocolConformanceDeserializer(*this).read(conformanceOrOffset);
+    if (!result)
+      return result.takeError();
+
+    conformanceOrOffset = result.get();
+  }
+  auto conformance = conformanceOrOffset.get();
+  if (!genericEnv || !conformance->getType()->hasTypeParameter())
+    return ProtocolConformanceRef(conformance);
+
+  // If we have a generic environment, map the conformance into context.
+  auto mappedConformance =
+    genericEnv->mapConformanceRefIntoContext(conformance->getType(),
+                                     ProtocolConformanceRef(conformance));
+  return mappedConformance.second;
 }
 
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
@@ -738,133 +810,97 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
                                   SourceLoc());
 }
 
-void ModuleFile::readGenericRequirements(
-                   SmallVectorImpl<Requirement> &requirements,
-                   llvm::BitstreamCursor &Cursor) {
-  auto error = readGenericRequirementsChecked(requirements, Cursor);
+/// Translate from the requirement kind to the Serialization enum
+/// values, which are guaranteed to be stable.
+static Optional<RequirementKind> getActualRequirementKind(uint64_t rawKind) {
+#define CASE(KIND)                   \
+  case GenericRequirementKind::KIND: \
+    return RequirementKind::KIND;
+
+  switch (rawKind) {
+  CASE(Conformance)
+  CASE(Superclass)
+  CASE(SameType)
+  CASE(Layout)
+  }
+#undef CASE
+
+  return None;
+}
+
+/// Translate from the requirement kind to the Serialization enum
+/// values, which are guaranteed to be stable.
+static Optional<LayoutConstraintKind>
+getActualLayoutConstraintKind(uint64_t rawKind) {
+#define CASE(KIND)                     \
+  case LayoutRequirementKind::KIND:    \
+    return LayoutConstraintKind::KIND;
+
+  switch (rawKind) {
+  CASE(NativeRefCountedObject)
+  CASE(RefCountedObject)
+  CASE(Trivial)
+  CASE(TrivialOfExactSize)
+  CASE(TrivialOfAtMostSize)
+  CASE(Class)
+  CASE(NativeClass)
+  CASE(UnknownLayout)
+  }
+#undef CASE
+
+  return None;
+}
+
+void ModuleFile::deserializeGenericRequirements(
+                   ArrayRef<uint64_t> scratch,
+                   unsigned &nextIndex,
+                   SmallVectorImpl<Requirement> &requirements) {
+  auto error = deserializeGenericRequirementsChecked(scratch, nextIndex,
+                                                     requirements);
   if (error)
     fatal(std::move(error));
 }
 
-llvm::Error ModuleFile::readGenericRequirementsChecked(
-                   SmallVectorImpl<Requirement> &requirements,
-                   llvm::BitstreamCursor &Cursor) {
+llvm::Error ModuleFile::deserializeGenericRequirementsChecked(
+                   ArrayRef<uint64_t> scratch,
+                   unsigned &nextIndex,
+                   SmallVectorImpl<Requirement> &requirements) {
   using namespace decls_block;
 
-  BCOffsetRAII lastRecordOffset(Cursor);
-  SmallVector<uint64_t, 8> scratch;
-  StringRef blobData;
+  auto numRequirements = scratch[nextIndex++];
+  requirements.reserve(numRequirements);
 
-  while (true) {
-    lastRecordOffset.reset();
-    bool shouldContinue = true;
+  for (unsigned i = 0; i != numRequirements; ++i) {
+    auto maybeReqKind = getActualRequirementKind(scratch[nextIndex++]);
+    if (!maybeReqKind) fatal();
+    auto reqKind = *maybeReqKind;
 
-    llvm::BitstreamEntry entry =
-        fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
+    // General case
+    if (reqKind != RequirementKind::Layout) {
+      auto firstType = getTypeChecked(scratch[nextIndex++]);
+      if (!firstType) return firstType.takeError();
 
-    scratch.clear();
-    unsigned recordID = fatalIfUnexpected(
-        Cursor.readRecord(entry.ID, scratch, &blobData));
-    switch (recordID) {
-    case GENERIC_REQUIREMENT: {
-      uint8_t rawKind;
-      uint64_t rawTypeIDs[2];
-      GenericRequirementLayout::readRecord(scratch, rawKind,
-                                           rawTypeIDs[0], rawTypeIDs[1]);
+      auto secondType = getTypeChecked(scratch[nextIndex++]);
+      if (!secondType) return secondType.takeError();
 
-      switch (rawKind) {
-      case GenericRequirementKind::Conformance: {
-        auto subject = getTypeChecked(rawTypeIDs[0]);
-        if (!subject)
-          return subject.takeError();
+      requirements.push_back(
+        Requirement(reqKind, firstType.get(), secondType.get()));
 
-        auto constraint = getTypeChecked(rawTypeIDs[1]);
-        if (!constraint)
-          return constraint.takeError();
+    // Layout constraints
+    } else {
+      auto maybeKind =
+        getActualLayoutConstraintKind(scratch[nextIndex++]);
+      if (!maybeKind) fatal();
+      auto kind = *maybeKind;
 
-        requirements.push_back(Requirement(RequirementKind::Conformance,
-                                           subject.get(), constraint.get()));
-        break;
-      }
-      case GenericRequirementKind::Superclass: {
-        auto subject = getTypeChecked(rawTypeIDs[0]);
-        if (!subject)
-          return subject.takeError();
+      auto type = getTypeChecked(scratch[nextIndex++]);
+      if (!type) return type.takeError();
 
-        auto constraint = getTypeChecked(rawTypeIDs[1]);
-        if (!constraint)
-          return constraint.takeError();
-
-        requirements.push_back(Requirement(RequirementKind::Superclass,
-                                           subject.get(), constraint.get()));
-        break;
-      }
-      case GenericRequirementKind::SameType: {
-        auto first = getTypeChecked(rawTypeIDs[0]);
-        if (!first)
-          return first.takeError();
-
-        auto second = getTypeChecked(rawTypeIDs[1]);
-        if (!second)
-          return second.takeError();
-
-        requirements.push_back(Requirement(RequirementKind::SameType,
-                                           first.get(), second.get()));
-        break;
-      }
-      default:
-        // Unknown requirement kind.
-        fatal();
-      }
-      break;
-      }
-    case LAYOUT_REQUIREMENT: {
-      uint8_t rawKind;
-      uint64_t rawTypeID;
-      uint32_t size;
-      uint32_t alignment;
-      LayoutRequirementLayout::readRecord(scratch, rawKind, rawTypeID,
-                                          size, alignment);
-
-      auto first = getTypeChecked(rawTypeID);
-      if (!first)
-        return first.takeError();
-
-      LayoutConstraint layout;
-      LayoutConstraintKind kind = LayoutConstraintKind::UnknownLayout;
-      switch (rawKind) {
-      default:
-        // Unknown layout requirement kind.
-        fatal();
-      case LayoutRequirementKind::NativeRefCountedObject:
-        kind = LayoutConstraintKind::NativeRefCountedObject;
-        break;
-      case LayoutRequirementKind::RefCountedObject:
-        kind = LayoutConstraintKind::RefCountedObject;
-        break;
-      case LayoutRequirementKind::Trivial:
-        kind = LayoutConstraintKind::Trivial;
-        break;
-      case LayoutRequirementKind::TrivialOfExactSize:
-        kind = LayoutConstraintKind::TrivialOfExactSize;
-        break;
-      case LayoutRequirementKind::TrivialOfAtMostSize:
-        kind = LayoutConstraintKind::TrivialOfAtMostSize;
-        break;
-      case LayoutRequirementKind::Class:
-        kind = LayoutConstraintKind::Class;
-        break;
-      case LayoutRequirementKind::NativeClass:
-        kind = LayoutConstraintKind::NativeClass;
-        break;
-      case LayoutRequirementKind::UnknownLayout:
-        kind = LayoutConstraintKind::UnknownLayout;
-        break;
-      }
+      uint32_t size = scratch[nextIndex++];
+      uint32_t alignment = scratch[nextIndex++];
 
       ASTContext &ctx = getContext();
+      LayoutConstraint layout;
       if (kind != LayoutConstraintKind::TrivialOfAtMostSize &&
           kind != LayoutConstraintKind::TrivialOfExactSize)
         layout = LayoutConstraint::getLayoutConstraint(kind, ctx);
@@ -872,18 +908,8 @@ llvm::Error ModuleFile::readGenericRequirementsChecked(
         layout =
             LayoutConstraint::getLayoutConstraint(kind, size, alignment, ctx);
 
-      requirements.push_back(
-          Requirement(RequirementKind::Layout, first.get(), layout));
-      break;
-      }
-    default:
-      // This record is not part of the GenericParamList.
-      shouldContinue = false;
-      break;
+      requirements.push_back(Requirement(reqKind, type.get(), layout));
     }
-
-    if (!shouldContinue)
-      break;
   }
 
   return llvm::Error::success();
@@ -893,46 +919,45 @@ void ModuleFile::readRequirementSignature(
                    SmallVectorImpl<Requirement> &requirements,
                    SmallVectorImpl<ProtocolTypeAlias> &typeAliases,
                    llvm::BitstreamCursor &Cursor) {
-  readGenericRequirements(requirements, Cursor);
-
   using namespace decls_block;
 
+  // Tentatively advance from this point to see if there's a
+  // REQUIREMENT_SIGNATURE record.
   BCOffsetRAII lastRecordOffset(Cursor);
+
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return;
+
   SmallVector<uint64_t, 8> scratch;
   StringRef blobData;
+  unsigned recordID = fatalIfUnexpected(
+      Cursor.readRecord(entry.ID, scratch, &blobData));
 
-  while (true) {
-    lastRecordOffset.reset();
-    bool shouldContinue = true;
+  // This record is not part of the protocol requirement signature.
+  if (recordID != REQUIREMENT_SIGNATURE)
+    return;
 
-    llvm::BitstreamEntry entry =
-        fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
+  // Accept the tentative advance.
+  lastRecordOffset.reset();
 
-    scratch.clear();
-    unsigned recordID = fatalIfUnexpected(
-        Cursor.readRecord(entry.ID, scratch, &blobData));
-    switch (recordID) {
-    case PROTOCOL_TYPEALIAS: {
-      uint64_t rawName;
-      uint64_t rawTypeID;
-      ProtocolTypeAliasLayout::readRecord(scratch, rawName, rawTypeID);
+  unsigned nextIndex = 0;
+  ArrayRef<uint64_t> rawData;
+  RequirementSignatureLayout::readRecord(scratch, rawData);
 
-      auto name = getIdentifier(rawName);
-      auto underlyingType = getType(rawTypeID);
+  deserializeGenericRequirements(rawData, nextIndex, requirements);
+  rawData = rawData.slice(nextIndex);
 
-      typeAliases.emplace_back(name, underlyingType);
-      break;
-    }
-    default:
-      // This record is not part of the protocol requirement signature.
-      shouldContinue = false;
-      break;
-    }
+  if (rawData.size() % 2 != 0)
+    fatal();
 
-    if (!shouldContinue)
-      break;
+  while (!rawData.empty()) {
+    auto name = getIdentifier(rawData[0]);
+    auto underlyingType = getType(rawData[1]);
+    typeAliases.emplace_back(name, underlyingType);
+
+    rawData = rawData.slice(2);
   }
 }
 
@@ -987,9 +1012,7 @@ static llvm::Error skipRequirementSignature(llvm::BitstreamCursor &Cursor) {
     if (!maybeRecordID)
       return maybeRecordID.takeError();
     switch (maybeRecordID.get()) {
-    case GENERIC_REQUIREMENT:
-    case LAYOUT_REQUIREMENT:
-    case PROTOCOL_TYPEALIAS:
+    case REQUIREMENT_SIGNATURE:
       break;
 
     default:
@@ -1071,12 +1094,27 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   if (entry.Kind != llvm::BitstreamEntry::Record)
     fatal();
 
+  // Helper function to read the generic requirements off the
+  // front of the given opaque record.
+  SmallVector<Requirement, 4> requirements;
+  auto readGenericRequirements =
+    [&](ArrayRef<uint64_t> &rawParamIDs) -> llvm::Error {
+    unsigned nextIndex = 0;
+    auto error = deserializeGenericRequirementsChecked(rawParamIDs, nextIndex,
+                                                       requirements);
+    rawParamIDs = rawParamIDs.slice(nextIndex);
+    return error;
+  };
+
   unsigned recordID = fatalIfUnexpected(
       DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   switch (recordID) {
   case GENERIC_SIGNATURE: {
     ArrayRef<uint64_t> rawParamIDs;
     GenericSignatureLayout::readRecord(scratch, rawParamIDs);
+
+    if (auto error = readGenericRequirements(rawParamIDs))
+      return std::move(error);
 
     for (unsigned i = 0, n = rawParamIDs.size(); i != n; ++i) {
       auto paramTy = getType(rawParamIDs[i])->castTo<GenericTypeParamType>();
@@ -1088,6 +1126,9 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   case SIL_GENERIC_SIGNATURE: {
     ArrayRef<uint64_t> rawParamIDs;
     SILGenericSignatureLayout::readRecord(scratch, rawParamIDs);
+
+    if (auto error = readGenericRequirements(rawParamIDs))
+      return std::move(error);
 
     if (rawParamIDs.size() % 2 != 0)
       fatal();
@@ -1112,12 +1153,6 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
     // Not a generic signature; no way to recover.
     fatal();
   }
-
-  // Read the generic requirements.
-  SmallVector<Requirement, 4> requirements;
-  auto error = readGenericRequirementsChecked(requirements, DeclTypeCursor);
-  if (error)
-    return std::move(error);
 
   // If we've already deserialized this generic signature, start over to return
   // it directly.
@@ -1173,10 +1208,12 @@ ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
     fatal();
 
   GenericSignatureID genericSigID;
-  uint64_t numConformances;
-  ArrayRef<uint64_t> replacementTypeIDs;
-  SubstitutionMapLayout::readRecord(scratch, genericSigID, numConformances,
-                                    replacementTypeIDs);
+  uint64_t numReplacementIDs;
+  ArrayRef<uint64_t> typeAndConformanceIDs;
+  SubstitutionMapLayout::readRecord(scratch, genericSigID, numReplacementIDs,
+                                    typeAndConformanceIDs);
+  auto replacementTypeIDs = typeAndConformanceIDs.slice(0, numReplacementIDs);
+  auto conformanceIDs = typeAndConformanceIDs.slice(numReplacementIDs);
 
   // Generic signature.
   auto genericSigOrError = getGenericSignatureChecked(genericSigID);
@@ -1196,10 +1233,9 @@ ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
 
   // Read the conformances.
   SmallVector<ProtocolConformanceRef, 4> conformances;
-  conformances.reserve(numConformances);
-  for (unsigned i : range(numConformances)) {
-    (void)i;
-    auto conformanceOrError = readConformanceChecked(DeclTypeCursor);
+  conformances.reserve(conformanceIDs.size());
+  for (unsigned conformanceID : conformanceIDs) {
+    auto conformanceOrError = getConformanceChecked(conformanceID);
     if (!conformanceOrError)
       return conformanceOrError.takeError();
     conformances.push_back(conformanceOrError.get());
@@ -2504,23 +2540,6 @@ T *ModuleFile::createDecl(Args &&... args) {
   return new (getContext()) T(std::forward<Args>(args)...);
 }
 
-static const uint64_t lazyConformanceContextDataPositionMask = 0xFFFFFFFFFFFF;
-
-/// Decode the context data for lazily-loaded conformances.
-static std::pair<uint64_t, uint64_t> decodeLazyConformanceContextData(
-                                       uint64_t contextData) {
-  return std::make_pair(contextData >> 48,
-                        contextData & lazyConformanceContextDataPositionMask);
-}
-
-/// Encode the context data for lazily-loaded conformances.
-static uint64_t encodeLazyConformanceContextData(uint64_t numProtocols,
-                                                 uint64_t bitPosition) {
-  assert(numProtocols < 0xFFFF);
-  assert(bitPosition < lazyConformanceContextDataPositionMask);
-  return (numProtocols << 48) | bitPosition;
-}
-
 template <typename DERIVED>
 static bool attributeChainContains(DeclAttribute *attr) {
   DeclAttributes tempAttrs;
@@ -2809,19 +2828,23 @@ public:
     GenericSignatureID genericSigID;
     uint8_t rawAccessLevel;
     unsigned numConformances, numInheritedTypes;
-    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
+    ArrayRef<uint64_t> rawIDs;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
                                           isImplicit, isObjC, genericSigID,
                                           rawAccessLevel,
                                           numConformances, numInheritedTypes,
-                                          rawInheritedAndDependencyIDs);
+                                          rawIDs);
 
     Identifier name = MF.getIdentifier(nameID);
     PrettySupplementalDeclNameTrace trace(name);
 
-    for (TypeID dependencyID :
-           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+    auto conformanceIDs = rawIDs.slice(0, numConformances);
+    rawIDs = rawIDs.slice(numConformances);
+    auto inheritedIDs = rawIDs.slice(0, numInheritedTypes);
+    auto dependencyIDs = rawIDs.slice(numInheritedTypes);
+
+    for (TypeID dependencyID : dependencyIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
@@ -2854,15 +2877,12 @@ public:
       theStruct->setImplicit();
     theStruct->setIsObjC(isObjC);
 
-    handleInherited(theStruct,
-                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
+    handleInherited(theStruct, inheritedIDs);
 
     theStruct->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
     theStruct->setConformanceLoader(
-      &MF,
-      encodeLazyConformanceContextData(numConformances,
-                                       MF.DeclTypeCursor.GetCurrentBitNo()));
+      &MF, MF.createLazyConformanceLoaderToken(conformanceIDs));
 
     return theStruct;
   }
@@ -3810,7 +3830,7 @@ public:
     TypeID superclassID;
     uint8_t rawAccessLevel;
     unsigned numConformances, numInheritedTypes;
-    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
+    ArrayRef<uint64_t> rawIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          isExplicitActorDecl,
@@ -3819,13 +3839,17 @@ public:
                                          genericSigID, superclassID,
                                          rawAccessLevel, numConformances,
                                          numInheritedTypes,
-                                         rawInheritedAndDependencyIDs);
+                                         rawIDs);
 
     Identifier name = MF.getIdentifier(nameID);
     PrettySupplementalDeclNameTrace trace(name);
 
-    for (TypeID dependencyID :
-           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+    auto conformanceIDs = rawIDs.slice(0, numConformances);
+    rawIDs = rawIDs.slice(numConformances);
+    auto inheritedIDs = rawIDs.slice(0, numInheritedTypes);
+    auto dependencyIDs = rawIDs.slice(numInheritedTypes);
+
+    for (TypeID dependencyID : dependencyIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
@@ -3863,15 +3887,13 @@ public:
     ctx.evaluator.cacheOutput(HasMissingDesignatedInitializersRequest{theClass},
                               std::move(hasMissingDesignatedInits));
 
-    handleInherited(theClass,
-                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
+    handleInherited(theClass, inheritedIDs);
 
     theClass->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
     theClass->setConformanceLoader(
-      &MF,
-      encodeLazyConformanceContextData(numConformances,
-                                       MF.DeclTypeCursor.GetCurrentBitNo()));
+      &MF, MF.createLazyConformanceLoaderToken(conformanceIDs));
+
     return theClass;
   }
 
@@ -3885,13 +3907,13 @@ public:
     TypeID rawTypeID;
     uint8_t rawAccessLevel;
     unsigned numConformances, numInherited;
-    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
+    ArrayRef<uint64_t> rawIDs;
 
     decls_block::EnumLayout::readRecord(scratch, nameID, contextID,
                                         isImplicit, isObjC, genericSigID,
                                         rawTypeID, rawAccessLevel,
                                         numConformances, numInherited,
-                                        rawInheritedAndDependencyIDs);
+                                        rawIDs);
 
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -3899,8 +3921,12 @@ public:
     Identifier name = MF.getIdentifier(nameID);
     PrettySupplementalDeclNameTrace trace(name);
 
-    for (TypeID dependencyID :
-           rawInheritedAndDependencyIDs.slice(numInherited)) {
+    auto conformanceIDs = rawIDs.slice(0, numConformances);
+    rawIDs = rawIDs.slice(numConformances);
+    auto inheritedIDs = rawIDs.slice(0, numInherited);
+    auto dependencyIDs = rawIDs.slice(numInherited);
+
+    for (TypeID dependencyID : dependencyIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
@@ -3941,15 +3967,12 @@ public:
 
     theEnum->setRawType(MF.getType(rawTypeID));
 
-    auto rawInheritedIDs = rawInheritedAndDependencyIDs.slice(0, numInherited);
-    handleInherited(theEnum, rawInheritedIDs);
+    handleInherited(theEnum, inheritedIDs);
 
     theEnum->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
     theEnum->setConformanceLoader(
-      &MF,
-      encodeLazyConformanceContextData(numConformances,
-                                       MF.DeclTypeCursor.GetCurrentBitNo()));
+      &MF, MF.createLazyConformanceLoaderToken(conformanceIDs));
     return theEnum;
   }
 
@@ -4166,17 +4189,23 @@ public:
     bool isImplicit;
     GenericSignatureID genericSigID;
     unsigned numConformances, numInherited;
-    ArrayRef<uint64_t> inheritedAndDependencyIDs;
+    ArrayRef<uint64_t> data;
 
     decls_block::ExtensionLayout::readRecord(scratch, extendedTypeID,
                                              extendedNominalID, contextID,
                                              isImplicit, genericSigID,
                                              numConformances, numInherited,
-                                             inheritedAndDependencyIDs);
+                                             data);
 
     auto DC = MF.getDeclContext(contextID);
 
-    for (TypeID dependencyID : inheritedAndDependencyIDs.slice(numInherited)) {
+    auto conformanceIDs = data.slice(0, numConformances);
+    data = data.slice(numConformances);
+    auto inheritedIDs = data.slice(0, numInherited);
+    data = data.slice(numInherited);
+    auto dependencyIDs = data;
+
+    for (TypeID dependencyID : dependencyIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<ExtensionError>(
@@ -4218,15 +4247,12 @@ public:
     if (isImplicit)
       extension->setImplicit();
 
-    auto rawInheritedIDs = inheritedAndDependencyIDs.slice(0, numInherited);
-    handleInherited(extension, rawInheritedIDs);
+    handleInherited(extension, inheritedIDs);
 
     extension->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
     extension->setConformanceLoader(
-      &MF,
-      encodeLazyConformanceContextData(numConformances,
-                                       MF.DeclTypeCursor.GetCurrentBitNo()));
+      &MF, MF.createLazyConformanceLoaderToken(conformanceIDs));
 
     if (nominal) {
       nominal->addExtension(extension);
@@ -6038,7 +6064,8 @@ public:
 
     ProtocolConformanceRef witnessMethodConformance;
     if (*representation == SILFunctionTypeRepresentation::WitnessMethod) {
-      witnessMethodConformance = MF.readConformance(MF.DeclTypeCursor);
+      auto conformanceID = variableData[nextVariableDataIndex++];
+      witnessMethodConformance = MF.getConformance(conformanceID);
     }
 
     GenericSignature invocationSig =
@@ -6505,21 +6532,66 @@ static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error) {
     return std::move(error);
 }
 
+namespace {
+class LazyConformanceLoaderInfo final
+    : llvm::TrailingObjects<LazyConformanceLoaderInfo,
+                            ProtocolConformanceID> {
+  friend TrailingObjects;
+
+  size_t NumConformances;
+  size_t numTrailingObjects(OverloadToken<ProtocolConformanceID>) {
+    return NumConformances;
+  }
+
+  LazyConformanceLoaderInfo(ArrayRef<uint64_t> ids)
+    : NumConformances(ids.size()) {
+    auto buffer = getTrailingObjects<ProtocolConformanceID>();
+    for (unsigned i = 0, e = ids.size(); i != e; ++i)
+      buffer[i] = ProtocolConformanceID(ids[i]);
+  }
+
+public:
+  static LazyConformanceLoaderInfo *create(ModuleFile &mf,
+                                           ArrayRef<uint64_t> ids) {
+    size_t size = totalSizeToAlloc<ProtocolConformanceID>(ids.size());
+    size_t align = alignof(LazyConformanceLoaderInfo);
+
+    // TODO: maybe don't permanently allocate this?
+    void *memory = mf.getContext().Allocate(size, align); 
+    return new (memory) LazyConformanceLoaderInfo(ids);
+  }
+
+  ArrayRef<ProtocolConformanceID> claim() {
+    // TODO: free the memory here (if it's not used in multiple places?)
+    return llvm::makeArrayRef(getTrailingObjects<ProtocolConformanceID>(),
+                              NumConformances);
+  }
+};
+} // end anonymous namespace
+
+uint64_t ModuleFile::createLazyConformanceLoaderToken(ArrayRef<uint64_t> ids) {
+  if (ids.empty()) return 0;
+
+  auto info = LazyConformanceLoaderInfo::create(*this, ids);
+  return reinterpret_cast<uintptr_t>(info);
+}
+
+ArrayRef<ProtocolConformanceID>
+ModuleFile::claimLazyConformanceLoaderToken(uint64_t token) {
+  if (token == 0) return {};
+
+  auto info = reinterpret_cast<LazyConformanceLoaderInfo*>(token);
+  return info->claim();
+}
+
 void
 ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
                           SmallVectorImpl<ProtocolConformance*> &conformances) {
   PrettyStackTraceDecl trace("loading conformances for", D);
 
-  uint64_t numConformances;
-  uint64_t bitPosition;
-  std::tie(numConformances, bitPosition)
-    = decodeLazyConformanceContextData(contextData);
-
-  BCOffsetRAII restoreOffset(DeclTypeCursor);
-  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(bitPosition));
-
-  while (numConformances--) {
-    auto conformance = readConformanceChecked(DeclTypeCursor);
+  auto conformanceIDs = claimLazyConformanceLoaderToken(contextData);
+  for (auto conformanceID : conformanceIDs) {
+    auto conformance = getConformanceChecked(conformanceID);
 
     if (!conformance) {
       auto unconsumedError =
@@ -6535,6 +6607,8 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
       continue;
     }
 
+    // FIXME: why is suppressing abstract conformances generally
+    // acceptable here?
     if (conformance.get().isConcrete())
       conformances.push_back(conformance.get().getConcrete());
   }
@@ -6607,9 +6681,20 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                               isUnchecked, rawIDs);
 
   // Read requirement signature conformances.
-  const ProtocolDecl *proto = conformance->getProtocol();
   SmallVector<ProtocolConformanceRef, 4> reqConformances;
+  for (auto conformanceID : rawIDs.slice(0, conformanceCount)) {
+    auto maybeConformance = getConformanceChecked(conformanceID);
+    if (maybeConformance) {
+      reqConformances.push_back(maybeConformance.get());
+    } else if (allowCompilerErrors()) {
+      consumeError(maybeConformance.takeError());
+      reqConformances.push_back(ProtocolConformanceRef::forInvalid());
+    } else {
+      fatal(maybeConformance.takeError());
+    }
+  }
 
+  const ProtocolDecl *proto = conformance->getProtocol();
   if (proto->isObjC() && getContext().LangOpts.EnableDeserializationRecovery) {
     // Don't crash if inherited protocols are added or removed.
     // This is limited to Objective-C protocols because we know their only
@@ -6618,12 +6703,13 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
     llvm::SmallDenseMap<ProtocolDecl *, ProtocolConformanceRef, 16>
         conformancesForProtocols;
-    while (conformanceCount--) {
-      ProtocolConformanceRef nextConformance = readConformance(DeclTypeCursor);
+    for (auto nextConformance : reqConformances) {
       ProtocolDecl *confProto = nextConformance.getRequirement();
       conformancesForProtocols[confProto] = nextConformance;
     }
 
+    // Reset and rebuild the conformances from what we have.
+    reqConformances.clear();
     for (const auto &req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
@@ -6641,7 +6727,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
         reqConformances.push_back(ProtocolConformanceRef(proto));
       }
     }
-
   } else {
     auto isConformanceReq = [](const Requirement &req) {
       return req.getKind() == RequirementKind::Conformance;
@@ -6654,21 +6739,10 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
           "serialized conformances do not match requirement signature",
           llvm::inconvertibleErrorCode()));
     }
-    while (conformanceCount--) {
-      auto conformance = readConformanceChecked(DeclTypeCursor);
-      if (conformance) {
-        reqConformances.push_back(conformance.get());
-      } else if (allowCompilerErrors()) {
-        consumeError(conformance.takeError());
-        reqConformances.push_back(ProtocolConformanceRef::forInvalid());
-      } else {
-        fatal(conformance.takeError());
-      }
-    }
   }
   conformance->setSignatureConformances(reqConformances);
 
-  ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
+  ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin() + conformanceCount;
 
   TypeWitnessMap typeWitnesses;
   while (typeCount--) {
