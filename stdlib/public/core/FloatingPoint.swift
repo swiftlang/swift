@@ -328,9 +328,14 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// `infinity` is greater than this value.
   static var greatestFiniteMagnitude: Self { get }
 
-  /// The ratio of a circle's circumference to its diameter.
+  /// The mathematical constant π, approximately equal to 3.14159.
   ///
-  /// Also equivalent to half a revolution in radians.
+  /// This constant is most often defined as the numerical value of the ratio
+  /// of a circle's circumference to its diameter, which is the same for all
+  /// circles.
+  ///
+  /// A common application of this constant in geometry is to measure a half
+  /// revolution in radians. Used like this, it is equivalent to 180 degrees.
   ///
   /// This value should be rounded toward zero to keep user computations with
   /// angles from inadvertently ending up in the wrong quadrant. A type that
