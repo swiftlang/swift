@@ -350,12 +350,101 @@ Test Foundation:
 cmake --build S:\b\4 --target test
 ```
 
-### SwiftSystem (without tests)
+### LLBuild
 
 ```cmd
 cmake -B S:\b\6 ^
-  -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
+  -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy -Xclang -fno-split-cold-code" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D LLBUILD_SUPPORT_BINDINGS=Swift ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
+
+  -D CMAKE_TOOLCHAIN_FILE=S:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+
+  -D LIT_EXECUTABLE=S:\llvm-project\llvm\utils\lit\lit.py ^
+  -D FILECHECK_EXECUTABLE=S:\b\1\bin\FileCheck.exe ^
+
+  -G Ninja ^
+  -S S:\llbuild
+
+cmake --build S:\b\6
+```
+
+Test LLBuild:
+
+```cmd
+cmake --build S:\b\6 --target test
+```
+
+### Toolchain dependencies
+
+We're building the following libraries with `Release` preset and without tests here because they're independent packages that are directly or indirectly depended by Swift Driver, SwiftPM or SourceKit-LSP.  For developing these libraries, use SwiftPM instead.
+
+#### Yams (used by Swift Driver)
+
+```cmd
+cmake -B S:\b\7\Yams ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy /DYAML_DECLARE_EXPORT /DWIN32" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
+
+  -D BUILD_TESTING=NO ^
+
+  -G Ninja ^
+  -S S:\yams
+
+cmake --build S:\b\7\Yams
+```
+
+#### Argument Parser (used by Swift Driver and SwiftPM)
+
+```cmd
+cmake -B S:\b\7\ArgumentParser ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
+
+  -D BUILD_EXAMPLES=NO ^
+  -D BUILD_TESTING=NO ^
+
+  -G Ninja ^
+  -S S:\swift-argument-parser
+
+cmake --build S:\b\7\ArgumentParser
+```
+
+#### Swift System (used by Swift Driver and SwiftPM)
+
+```cmd
+cmake -B S:\b\7\SwiftSystem ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
@@ -369,14 +458,89 @@ cmake -B S:\b\6 ^
   -G Ninja ^
   -S S:\swift-system
 
-cmake --build S:\b\6
+cmake --build S:\b\7\SwiftSystem
+```
+
+#### Swift Crypto (used by SwiftPM)
+
+```cmd
+cmake -B S:\b\7\SwiftCrypto ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
+
+  -G Ninja ^
+  -S S:\swift-crypto
+
+cmake --build S:\b\7\SwiftCrypto
+```
+
+#### Swift Collections (used by SwiftPM)
+
+```cmd
+cmake -B S:\b\7\SwiftCollections ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+
+  -D BUILD_TESTING=NO ^
+
+  -G Ninja ^
+  -S S:\swift-collections
+
+cmake --build S:\b\7\SwiftCollections
+```
+
+#### IndexStoreDB (used by SourceKit-LSP)
+
+```cmd
+cmake -B S:\b\7\IndexStoreDB ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
+
+  -D BUILD_TESTING=NO ^
+
+  -G Ninja ^
+  -S S:\indexstore-db
+
+cmake --build S:\b\7\IndexStoreDB
 ```
 
 ### TSC (without tests)
 
 ```cmd
-cmake -B S:\b\7 ^
-  -D BUILD_SHARED_LIBS=YES ^
+cmake -B S:\b\8 ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
@@ -389,99 +553,42 @@ cmake -B S:\b\7 ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D dispatch_DIR=S:\b\3\cmake\modules ^
   -D Foundation_DIR=S:\b\4\cmake\modules ^
-  -D SwiftSystem_DIR=S:\b\6\cmake\modules ^
+  -D SwiftSystem_DIR=S:\b\7\SwiftSystem\cmake\modules ^
 
   -D CMAKE_TOOLCHAIN_FILE=S:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
 
   -G Ninja ^
   -S S:\swift-tools-support-core
 
-cmake --build S:\b\7
+cmake --build S:\b\8
 ```
 
-### llbuild
-
-```cmd
-cmake -B S:\b\6 ^
-  -D BUILD_SHARED_LIBS=YES ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
-  -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
-  -D CMAKE_CXX_FLAGS="-Xclang -fno-split-cold-code" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
-  -D LLBUILD_SUPPORT_BINDINGS=Swift ^
-  -D dispatch_DIR=S:\b\2\cmake\modules ^
-  -D Foundation_DIR=S:\b\3\cmake\modules ^
-  -D SQLite3_INCLUDE_DIR=S:\Library\sqlite-3.28.0\usr\include ^
-  -D SQLite3_LIBRARY=S:\Library\sqlite-3.28.0\usr\lib\sqlite3.lib ^
-  -G Ninja ^
-  -S S:\swift-llbuild
-
-ninja -C S:\b\6
-```
-
-Add llbuild to your path:
-
-```cmd
-path S:\b\6\bin;%PATH%
-```
-
-### Yams
-
-```cmd
-cmake -B S:\b\7 ^
-  -D BUILD_SHARED_LIBS=YES ^
-  -D CMAKE_BUILD_TYPE=Release ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
-  -D dispatch_DIR=S:\b\2\cmake\modules ^
-  -D Foundation_DIR=S:\b\3\cmake\modules ^
-  -D XCTest_DIR=S:\b\4\cmake\modules ^
-  -G Ninja ^
-  -S S:\Yams
-
-ninja -C S:\b\7
-```
-
-### ArgumentParser
-
-```cmd
-cmake -B S:\b\8 ^
-  -D BUILD_SHARED_LIBS=YES ^
-  -D CMAKE_BUILD_TYPE=Release ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
-  -D dispatch_DIR=S:\b\2\cmake\modules ^
-  -D Foundation_DIR=S:\b\3\cmake\modules ^
-  -D XCTest_DIR=S:\b\4\cmake\modules ^
-  -G Ninja ^
-  -S S:\swift-argument-parser
-
-ninja -C S:\b\8
-```
-
-### SwiftDriver
+### Swift Driver (without tests)
 
 ```cmd
 cmake -B S:\b\9 ^
-  -D BUILD_SHARED_LIBS=YES ^
-  -D CMAKE_BUILD_TYPE=Release ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
-  -D dispatch_DIR=S:\b\2\cmake\modules ^
-  -D Foundation_DIR=S:\b\3\cmake\modules ^
-  -D TSC_DIR=S:\b\5\cmake\modules ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
   -D LLBuild_DIR=S:\b\6\cmake\modules ^
-  -D Yams_DIR=S:\b\7\cmake\modules ^
-  -D ArgumentParser_DIR=S:\b\8\cmake\modules ^
+  -D Yams_DIR=S:\b\7\Yams\cmake\modules ^
+  -D SwiftSystem_DIR=S:\b\7\SwiftSystem\cmake\modules ^
+  -D ArgumentParser_DIR=S:\b\7\ArgumentParser\cmake\modules ^
+  -D TSC_DIR=S:\b\8\cmake\modules ^
+
   -G Ninja ^
   -S S:\swift-driver
 
-ninja -C S:\b\9
+cmake --build S:\b\9
 ```
 
 ### SwiftPM
