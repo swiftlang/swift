@@ -2835,9 +2835,20 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   }
 
   auto funcTy = type->castTo<AnyFunctionType>();
+
+  GenericEnvironment *genericEnv = nullptr;
+  if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy)) {
+    genericEnv = genericFuncTy->getGenericSignature()
+        .getGenericEnvironment();
+  }
+
   SmallVector<AnyFunctionType::Param, 4> newParams;
   for (const auto &param : funcTy->getParams()) {
-    auto newParamType = mapSignatureParamType(ctx, param.getPlainType());
+    auto newParamType = param.getPlainType();
+    if (genericEnv != nullptr)
+      newParamType = genericEnv->mapTypeIntoContext(newParamType);
+
+    newParamType = mapSignatureParamType(ctx, newParamType);
 
     // Don't allow overloading by @_nonEphemeral or isolated.
     auto newFlags = param.getParameterFlags()
@@ -2855,8 +2866,12 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   }
 
   // Map the result type.
-  auto resultTy = mapSignatureFunctionType(
-    ctx, funcTy->getResult(), topLevelFunction, false, isInitializer,
+  auto resultTy = funcTy->getResult();
+  if (genericEnv != nullptr)
+    resultTy = genericEnv->mapTypeIntoContext(resultTy);
+
+  resultTy = mapSignatureFunctionType(
+    ctx, resultTy, topLevelFunction, false, isInitializer,
     curryLevels - 1);
 
   // Map various attributes differently depending on if we're looking at
@@ -2865,10 +2880,6 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       funcTy->getExtInfo(), topLevelFunction);
 
   // Rebuild the resulting function type.
-  if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy))
-    return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
-                                    newParams, resultTy, info);
-
   return FunctionType::get(newParams, resultTy, info);
 }
 
