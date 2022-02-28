@@ -2115,10 +2115,8 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
 
 DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     clang::QualType type, OptionalTypeKind clangOptionality,
-    DeclBaseName baseName, StringRef argumentLabel, bool isFirstParameter,
-    bool isLastParameter, NameImporter &nameImporter) {
-  auto baseNameStr = baseName.userFacingName();
-
+    StringRef baseNameStr, StringRef argumentLabel, bool isFirstParameter,
+    bool isLastParameter, NameImporterBase &nameImporter) {
   // Don't introduce a default argument for the first parameter of setters.
   if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
@@ -2647,8 +2645,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
       auto defaultArg = inferDefaultArgument(
           param->getType(), optionalityOfParam,
-          importedName.getDeclName().getBaseName(), name.str(), paramIndex == 0,
-          isLastParameter, getNameImporter());
+          importedName.getDeclName().getBaseName().userFacingName(), name.str(),
+          paramIndex == 0, isLastParameter, getNameImporter());
       if (defaultArg != DefaultArgumentKind::None)
         paramInfo->setDefaultArgumentKind(defaultArg);
     }

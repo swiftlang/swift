@@ -1899,7 +1899,7 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   auto failed = nameImporter.forEachDistinctImportName(
       named, currentVersion,
       [&](ImportedName importedName, ImportNameVersion version) {
-        table.addEntry(importedName.getDeclName(), named,
+        table.addEntry(importedName.getDeclNameOrNull(), named,
                        importedName.getEffectiveContext());
 
         // Also add the subscript entry, if needed.

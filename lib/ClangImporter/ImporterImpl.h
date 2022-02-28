@@ -829,10 +829,9 @@ public:
   /// so it should not be used when referencing Clang symbols.
   ///
   /// \param D The Clang declaration whose name should be imported.
-  importer::ImportedName importFullName(const clang::NamedDecl *D,
-                                        Version version,
-                                        clang::DeclarationName givenName =
-                                          clang::DeclarationName()) {
+  importer::ImportedName
+  importFullName(const clang::NamedDecl *D, Version version,
+                 clang::DeclarationName givenName = clang::DeclarationName()) {
     return getNameImporter().importName(D, version, givenName);
   }
 
@@ -1344,9 +1343,9 @@ public:
   /// given Clang \c type, \c baseName, and optionality.
   static DefaultArgumentKind
   inferDefaultArgument(clang::QualType type, OptionalTypeKind clangOptionality,
-                       DeclBaseName baseName, StringRef argumentLabel,
+                       StringRef baseName, StringRef argumentLabel,
                        bool isFirstParameter, bool isLastParameter,
-                       importer::NameImporter &nameImporter);
+                       importer::NameImporterBase &nameImporter);
 
   /// Import the parameter and return types of an Objective-C method.
   ///

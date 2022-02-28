@@ -21,6 +21,7 @@
 #include "SwiftLookupTable.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
+#include "swift/Parse/Parser.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -70,6 +71,7 @@ public:
     if (version.size() > 1 && version[0] == 4 && version[1] >= 2) {
       return ImportNameVersion::swift4_2();
     }
+
     unsigned major = version[0];
     return ImportNameVersion(major >= 5 ? major + 1 : major, false);
   }
@@ -172,13 +174,10 @@ public:
   }
 };
 
-/// Describes a name that was imported from Clang.
+/// Describing a name that was imported from Clang.
 class ImportedName {
+  friend class NameImporterBase;
   friend class NameImporter;
-
-  /// The imported name.
-  DeclName declName;
-
   /// The context into which this declaration will be imported.
   ///
   /// When the context into which the declaration will be imported
@@ -226,7 +225,7 @@ class ImportedName {
 
     unsigned hasAsyncInfo : 1;
 
-    unsigned hasAsyncAlternateInfo: 1;
+    unsigned hasAsyncAlternateInfo : 1;
 
     Info()
         : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
@@ -236,19 +235,64 @@ class ImportedName {
           hasAsyncAlternateInfo(false) {}
   } info;
 
+  /// This either stores the raw identifier info in a
+  /// ParsedDeclName, which uses StringRefs for all identifiers, or in a
+  /// DeclName, which uses a swift::Identifier.
+  struct Storage {
+    ParsedDeclName parsedDeclName;
+    DeclName declName;
+    bool isInitializer = false;
+    DeclName getDeclName(ASTContext &ast) {
+      if (!declName)
+        declName = formDeclName(ast, parsedDeclName.BaseName,
+                                parsedDeclName.ArgumentLabels,
+                                parsedDeclName.IsFunctionName, isInitializer,
+                                parsedDeclName.IsSubscript);
+      return declName;
+    }
+    std::string getName() const;
+    explicit operator bool() const {
+      return declName ? true : !parsedDeclName.BaseName.empty();
+    }
+    bool operator==(const Storage &other) const {
+      if ((bool)declName ^ (bool)other.declName)
+        return false;
+      if (declName)
+        return declName == other.declName;
+      return getName() == other.getName();
+    }
+  } storage;
+
 public:
   ImportedName() = default;
+  DeclName getDeclName(ASTContext &ast) { return storage.getDeclName(ast); }
+  DeclName getDeclNameOrNull() const { return storage.declName; }
+  DeclName getDeclName() const {
+    assert(storage.declName || !(*this));
+    return storage.declName;
+  }
+  ParsedDeclName &getParsedDeclName() {
+    assert(!storage.declName);
+    return storage.parsedDeclName;
+  }
 
-  /// Produce just the imported name, for clients that don't care
-  /// about the details.
-  DeclName getDeclName() const { return declName; }
-  operator DeclName() const { return getDeclName(); }
-  void setDeclName(DeclName name) { declName = name; }
+  void setDeclName(StringRef name) { storage.parsedDeclName.BaseName = name; }
+  void setDeclName(DeclName name) { storage.declName = name; }
+  void setDeclName(ParsedDeclName name) {
+    assert(!storage.declName);
+    storage.parsedDeclName = name;
+  }
+  void setIsInitializer(bool value) { storage.isInitializer = value; }
+
+  std::string getName() const { return storage.getName(); }
+
+  explicit operator bool() const { return (bool)storage; }
+  bool operator==(const ImportedName &other) const {
+    return storage == other.storage;
+  }
 
   /// The context into which this declaration will be imported.
-  EffectiveClangContext getEffectiveContext() const {
-    return effectiveContext;
-  }
+  EffectiveClangContext getEffectiveContext() const { return effectiveContext; }
   void setEffectiveContext(EffectiveClangContext ctx) {
     effectiveContext = ctx;
   }
@@ -315,9 +359,6 @@ public:
   /// Whether this is a global being imported as a member
   bool importAsMember() const { return info.importAsMember; }
 
-  /// Whether any name was imported.
-  explicit operator bool() const { return static_cast<bool>(declName); }
-
   /// Whether this declaration is a property accessor (getter or setter).
   bool isPropertyAccessor() const {
     switch (getAccessorKind()) {
@@ -364,75 +405,18 @@ enum class CustomAsyncName {
   SwiftAsyncName,
 };
 
-/// Class to determine the Swift name of foreign entities. Currently fairly
-/// stateless and borrows from the ClangImporter::Implementation, but in the
-/// future will be more self-contained and encapsulated.
-class NameImporter {
-  ASTContext &swiftCtx;
-  const PlatformAvailability &availability;
-
-  clang::Sema &clangSema;
-  EnumInfoCache enumInfos;
-  StringScratchSpace scratch;
-
-  // TODO: remove when we drop the options (i.e. import all names)
-  using CacheKeyType =
-      std::pair<const clang::NamedDecl *, ImportNameVersion>;
-
-  /// Cache for repeated calls
-  llvm::DenseMap<CacheKeyType, ImportedName> importNameCache;
-
-  /// The set of property names that show up in the defining module of
-  /// an Objective-C class.
-  llvm::DenseMap<std::pair<const clang::ObjCInterfaceDecl *, char>,
-                 std::unique_ptr<InheritedNameSet>> allProperties;
-
+class NameImporterBase {
 public:
-  NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               clang::Sema &cSema)
-      : swiftCtx(ctx), availability(avail), clangSema(cSema),
-        enumInfos(clangSema.getPreprocessor()) {}
+  NameImporterBase(DiagnosticEngine &diags, const PlatformAvailability &avail,
+               clang::Sema &cSema, bool enableObjCInterop)
+      : diags(diags), availability(avail), clangSema(cSema),
+        enumInfos(clangSema.getPreprocessor()),
+        enableObjCInterop(enableObjCInterop) {}
+  virtual ~NameImporterBase(){};
 
-  /// Determine the Swift name for a Clang decl
-  ImportedName importName(const clang::NamedDecl *decl,
-                          ImportNameVersion version,
-                          clang::DeclarationName preferredName =
-                            clang::DeclarationName());
-
-  /// Attempts to import the name of \p decl with each possible
-  /// ImportNameVersion. \p action will be called with each unique name.
-  ///
-  /// In this case, "unique" means either the full name is distinct or the
-  /// effective context is distinct. This method does not attempt to handle
-  /// "unresolved" contexts in any special way---if one name references a
-  /// particular Clang declaration and the other has an unresolved context that
-  /// will eventually reference that declaration, the contexts will still be
-  /// considered distinct.
-  ///
-  /// If \p action returns false, the current name will \e not be added to the
-  /// set of seen names.
-  ///
-  /// The active name for \p activeVerion is always first, followed by the
-  /// other names in the order of
-  /// ImportNameVersion::forEachOtherImportNameVersion.
-  ///
-  /// Returns \c true if it fails to import name for the active version.
-  bool forEachDistinctImportName(
-      const clang::NamedDecl *decl, ImportNameVersion activeVersion,
-      llvm::function_ref<bool(ImportedName, ImportNameVersion)> action);
-
-  /// Imports the name of the given Clang macro into Swift.
-  Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                             const clang::MacroInfo *macro);
-
-  ASTContext &getContext() { return swiftCtx; }
-  const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
-
-  Identifier getIdentifier(StringRef name) {
-    return swiftCtx.getIdentifier(name);
-  }
-
-  StringScratchSpace &getScratch() { return scratch; }
+  /// Retrieve the inherited name set for the given Objective-C class.
+  const InheritedNameSet *
+  getAllPropertyNames(clang::ObjCInterfaceDecl *classDecl, bool forInstance);
 
   EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
     return enumInfos.getEnumInfo(decl);
@@ -448,14 +432,30 @@ public:
   clang::Preprocessor &getClangPreprocessor() {
     return getClangSema().getPreprocessor();
   }
+  StringScratchSpace &getScratch() { return scratch; }
 
-  /// Retrieve the inherited name set for the given Objective-C class.
-  const InheritedNameSet *getAllPropertyNames(
-                            clang::ObjCInterfaceDecl *classDecl,
-                            bool forInstance);
+protected:
+  DiagnosticEngine &diags;
+  const PlatformAvailability &availability;
 
-private:
-  bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }
+  clang::Sema &clangSema;
+  StringScratchSpace scratch;
+
+  // TODO: remove when we drop the options (i.e. import all names)
+  using CacheKeyType =
+      std::pair<const clang::NamedDecl *, ImportNameVersion>;
+
+  /// The set of property names that show up in the defining module of
+  /// an Objective-C class.
+  llvm::DenseMap<std::pair<const clang::ObjCInterfaceDecl *, char>,
+                 std::unique_ptr<InheritedNameSet>> allProperties;
+
+  EnumInfoCache enumInfos;
+  bool enableObjCInterop;
+
+  EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
+                                                  const clang::DeclContext *,
+                                                  ImportNameVersion version);
 
   /// Look for a method that will import to have the same name as the
   /// given method after importing the Nth parameter as an elided error
@@ -489,20 +489,109 @@ private:
                       bool completionHandlerFlagIsZeroOnError,
                       Optional<ForeignErrorConvention::Info> errorInfo);
 
-  EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
-                                                  const clang::DeclContext *,
-                                                  ImportNameVersion version);
-
   ImportedName importNameImpl(const clang::NamedDecl *,
                               ImportNameVersion version,
                               clang::DeclarationName);
+  /// Necessary because ObjC methods need to recursively import overrides, and
+  /// we want to benefit from the caching in NameImporter if it is available.
+  virtual ImportedName importNameCached(
+      const clang::NamedDecl *decl, ImportNameVersion version,
+      clang::DeclarationName preferredName = clang::DeclarationName()) {
+    return importNameImpl(decl, version, preferredName);
+  }
+  /// FIXME: This is redundant with finalize() and can be removed.
+  virtual StringRef internString(StringRef s) = 0;
+  /// importNameImpl populates the StringRefs in parsedDeclName with pointers to
+  /// temporary strings. This method allocates memory for them.
+  virtual ImportedName &finalize(ImportedName &result) {
+    assert(!result.storage.declName);
+    result.storage.parsedDeclName.BaseName =
+        internString(result.storage.parsedDeclName.BaseName);
+    for (auto &arg : result.storage.parsedDeclName.ArgumentLabels)
+      arg = internString(arg);
+    return result;
+  };
+};
+
+/// Class to determine the Swift name of foreign entities. Currently fairly
+/// stateless and borrows from the ClangImporter::Implementation, but in the
+/// future will be more self-contained and encapsulated.
+class NameImporter : public NameImporterBase {
+  ASTContext &swiftCtx;
+  /// Cache for repeated calls
+  llvm::DenseMap<CacheKeyType, ImportedName> importNameCache;
+
+public:
+  NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
+               clang::Sema &cSema)
+      : NameImporterBase(ctx.Diags, avail, cSema,
+                         ctx.LangOpts.EnableObjCInterop),
+        swiftCtx(ctx) {}
+
+  ASTContext &getContext() { return swiftCtx; }
+  const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
+
+  Identifier getIdentifier(StringRef name) {
+    return swiftCtx.getIdentifier(name);
+  }
+
+  /// Determine the Swift name for a Clang decl
+  ImportedName
+  importName(const clang::NamedDecl *decl, ImportNameVersion version,
+             clang::DeclarationName preferredName = clang::DeclarationName());
+
+  /// Imports the name of the given Clang macro into Swift.
+  Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
+                             const clang::MacroInfo *macro);
+
+  /// Attempts to import the name of \p decl with each possible
+  /// ImportNameVersion. \p action will be called with each unique name.
+  ///
+  /// In this case, "unique" means either the full name is distinct or the
+  /// effective context is distinct. This method does not attempt to handle
+  /// "unresolved" contexts in any special way---if one name references a
+  /// particular Clang declaration and the other has an unresolved context
+  /// that will eventually reference that declaration, the contexts will still
+  /// be considered distinct.
+  ///
+  /// If \p action returns false, the current name will \e not be added to the
+  /// set of seen names.
+  ///
+  /// The active name for \p activeVerion is always first, followed by the
+  /// other names in the order of
+  /// ImportNameVersion::forEachOtherImportNameVersion.
+  ///
+  /// Returns \c true if it fails to import name for the active version.
+  bool forEachDistinctImportName(
+      const clang::NamedDecl *decl, ImportNameVersion activeVersion,
+      llvm::function_ref<bool(ImportedName, ImportNameVersion)> action);
+
+  StringRef internString(StringRef s) override {
+    return swiftCtx.getIdentifier(s).str();
+  }
+
+  /// This implementation of finalizer creates a DeclName from the
+  /// ParsedDeclName.
+  ImportedName &finalize(ImportedName &result) override {
+    // Force conversion to a DeclName.
+    result.getDeclName(swiftCtx);
+    return result;
+  };
+
+private:
+  ImportedName importNameCached(const clang::NamedDecl *decl,
+                                ImportNameVersion version,
+                                clang::DeclarationName preferredName =
+                                    clang::DeclarationName()) override {
+    return importName(decl, version, preferredName);
+  }
 };
 
 }
 }
 
 namespace llvm {
-// Provide DenseMapInfo for ImportNameVersion.
+/// Provides DenseMapInfo for ImportNameVersion.
 template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
   using ImportNameVersion = swift::importer::ImportNameVersion;
   using DMIU = DenseMapInfo<unsigned>;
@@ -520,6 +609,33 @@ template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
     return LHS == RHS;
   }
 };
-}
+
+/// Provides DenseMapInfo for ImportedNameVersion.
+template <>
+struct DenseMapInfo<swift::importer::ImportedName> {
+  using ImportedName = swift::importer::ImportedName;
+  static inline ImportedName getEmptyKey() {
+    ImportedName n;
+    n.setDeclName(DenseMapInfo<swift::DeclName>::getEmptyKey());
+    return n;
+  }
+  static inline ImportedName getTombstoneKey() {
+    ImportedName n;
+    n.setDeclName(DenseMapInfo<swift::DeclName>::getTombstoneKey());
+    return n;
+  }
+
+  static unsigned getHashValue(const ImportedName &Val) {
+    if (auto declName = Val.getDeclNameOrNull())
+      return DenseMapInfo<swift::DeclName>::getHashValue(declName);
+    auto name = Val.getName();
+    return DenseMapInfo<StringRef>::getHashValue(StringRef(name));
+  }
+
+  static bool isEqual(const ImportedName &LHS, const ImportedName &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
 
 #endif
