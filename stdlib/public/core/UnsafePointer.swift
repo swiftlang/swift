@@ -316,10 +316,10 @@ public struct UnsafePointer<Pointee>: _Pointer {
     _debugPrecondition(
       Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
       ( count == 1 ||
-        MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
-        ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
-        : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0 )
-    )
+        ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
+          ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
+          : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
+    )))
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try body(.init(_rawValue))
@@ -1003,10 +1003,10 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     _debugPrecondition(
       Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
       ( count == 1 ||
-        MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
-        ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
-        : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0 )
-    )
+        ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
+          ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
+          : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
+    )))
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try body(.init(_rawValue))
