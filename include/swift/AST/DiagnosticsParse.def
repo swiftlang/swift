@@ -424,7 +424,7 @@ ERROR(initializer_has_name,PointsToFirstBadToken,
 
 // Destructor
 ERROR(destructor_decl_outside_class,none,
-      "deinitializers may only be declared within a class", ())
+      "deinitializers may only be declared within a class or actor", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,
