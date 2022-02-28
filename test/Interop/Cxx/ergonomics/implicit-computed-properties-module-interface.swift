@@ -56,11 +56,20 @@
 // CHECK-NEXT:     var value: Int32
 // CHECK-NEXT: }
 
-// CHECK:      struct LongNameMix {
+// CHECK:      struct UpperCaseMix {
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    init(value: Int32)
-// CHECK-NEXT:    var foo: Int32
-// CHECK-NEXT:    func GetFoo() -> Int32
+// CHECK-NEXT:    var foo: Int32 { mutating get set }
+// CHECK-NEXT:    mutating func getFoo() -> Int32
+// CHECK-NEXT:    mutating func SetFoo(_ v: Int32)
+// CHECK-NEXT:    var value: Int32
+// CHECK-NEXT: }
+
+// CHECK:      struct UpperCaseGetterSetter {
+// CHECK-NEXT:    init()
+// CHECK-NEXT:    init(value: Int32)
+// CHECK-NEXT:    var foo: Int32 { mutating get set }
+// CHECK-NEXT:    mutating func GetFoo() -> Int32
 // CHECK-NEXT:    mutating func SetFoo(_ v: Int32)
 // CHECK-NEXT:    var value: Int32
 // CHECK-NEXT: }

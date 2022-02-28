@@ -12,7 +12,6 @@ ImplicitComputedPropertiesTestSuite.test("LongNameAllLower") {
     expectEqual(a.foo, 42)
     a.foo = 32
     expectEqual(a.foo, 32)
-
 }
 
 ImplicitComputedPropertiesTestSuite.test("LongNameAllUpper") {
@@ -22,8 +21,8 @@ ImplicitComputedPropertiesTestSuite.test("LongNameAllUpper") {
     expectEqual(b.foo, 32)
 }
 
-ImplicitComputedPropertiesTestSuite.test("LongNameMix") {
-    var c = LongNameMix()
+ImplicitComputedPropertiesTestSuite.test("UpperCaseMix") {
+    var c = UpperCaseMix()
     expectEqual(c.foo, 42)
     c.foo = 32
     expectEqual(c.foo, 32)
@@ -40,10 +39,19 @@ ImplicitComputedPropertiesTestSuite.test("UTF8Str") {
     e.utf8Str = 32
     expectEqual(e.utf8Str, 32)
 }
+
 ImplicitComputedPropertiesTestSuite.test("setters") {
     var f = IntGetterSetter()
+    expectEqual(f.x, 42)
     f.x = 1
     expectEqual(f.x, 1)
+}
+
+ImplicitComputedPropertiesTestSuite.test("UpperCaseGetterSetter") {
+    var g = UpperCaseGetterSetter()
+    expectEqual(g.foo, 42)
+    g.foo = 32
+    expectEqual(g.foo, 32)
 }
 
 // rdar://89453106 (We need to handle imported properties that return a reference)
@@ -63,6 +71,7 @@ ImplicitComputedPropertiesTestSuite.test("ptr") {
 
 ImplicitComputedPropertiesTestSuite.test("non trivial") {
     var Object = NonTrivialGetterSetter()
+    expectEqual(Object.x.value, 42)
     Object.x = NonTrivial(value: 20)
     expectEqual(Object.x.value, 20)
 }
