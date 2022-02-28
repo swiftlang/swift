@@ -66,7 +66,8 @@ protected:
 
   /// Record the name of a record within a block.
   void emitRecordID(unsigned ID, StringRef name,
-                    SmallVectorImpl<unsigned char> &nameBuffer);
+                    SmallVectorImpl<unsigned char> &nameBuffer,
+                    SmallVectorImpl<unsigned> *wideNameBuffer = nullptr);
 
   void writeToStream(raw_ostream &os);
 

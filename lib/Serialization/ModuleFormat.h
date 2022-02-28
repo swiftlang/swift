@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 673; // new schema for conformances
+const uint16_t SWIFTMODULE_VERSION_MINOR = 674; // decl block renumbering
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -959,7 +959,7 @@ namespace input_block {
 ///
 /// \sa DECLS_AND_TYPES_BLOCK_ID
 namespace decls_block {
-  enum RecordKind : uint8_t {
+  enum RecordKind : uint16_t {
 #define RECORD(Id) Id,
 #define RECORD_VAL(Id, Value) Id = Value,
 #include "DeclTypeRecordNodes.def"

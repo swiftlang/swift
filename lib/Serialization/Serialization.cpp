@@ -782,20 +782,34 @@ void SerializerBase::emitBlockID(unsigned ID, StringRef name,
 }
 
 void SerializerBase::emitRecordID(unsigned ID, StringRef name,
-                                  SmallVectorImpl<unsigned char> &nameBuffer) {
-  assert(ID < 256 && "can't fit record ID in next to name");
-  nameBuffer.resize(name.size()+1);
-  nameBuffer[0] = ID;
-  memcpy(nameBuffer.data()+1, name.data(), name.size());
-  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
+                                  SmallVectorImpl<unsigned char> &nameBuffer,
+                                  SmallVectorImpl<unsigned> *wideNameBuffer) {
+  // Use the byte-based buffer if the ID is in range.
+  if (ID < 256) {
+    nameBuffer.resize(name.size()+1);
+    nameBuffer[0] = ID;
+    memcpy(nameBuffer.data()+1, name.data(), name.size());
+    Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
+
+  // Otherwise, we have to use the wide name buffer.
+  } else {
+    assert(wideNameBuffer && "too many IDs to use narrow name buffer");
+    auto &buffer = *wideNameBuffer;
+    buffer.resize(name.size()+1);
+    buffer[0] = ID;
+    for (unsigned i = 0, e = name.size(); i != e; ++i)
+      buffer[i+1] = name[i];
+    Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, buffer);
+  }
 }
 
 void Serializer::writeBlockInfoBlock() {
   BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
 
   SmallVector<unsigned char, 64> nameBuffer;
+  SmallVector<unsigned, 32> wideNameBuffer;
 #define BLOCK(X) emitBlockID(X ## _ID, #X, nameBuffer)
-#define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer)
+#define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer, &wideNameBuffer)
 
   BLOCK(MODULE_BLOCK);
 
