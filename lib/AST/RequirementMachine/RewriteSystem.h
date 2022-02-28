@@ -296,10 +296,6 @@ public:
     return ProtocolMap;
   }
 
-  ArrayRef<RequirementError> getErrors() {
-    return Errors;
-  }
-
   DebugOptions getDebugOptions() const { return Debug; }
 
   void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
@@ -371,6 +367,18 @@ public:
   };
 
   void verifyRewriteRules(ValidityPolicy policy) const;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Diagnostics
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  ArrayRef<RequirementError> getErrors() {
+    return Errors;
+  }
+
+  std::vector<RequirementError> getRedundantRequirements();
 
 private:
   struct CriticalPair {

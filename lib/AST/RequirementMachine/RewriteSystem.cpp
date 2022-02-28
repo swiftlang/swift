@@ -720,6 +720,50 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 #undef ASSERT_RULE
 }
 
+std::vector<RequirementError>
+RewriteSystem::getRedundantRequirements() {
+  // The resulting set of redundant requirements.
+  std::vector<RequirementError> redundantRequirements;
+
+  // Collect all rule IDs for each unique requirement ID.
+  llvm::SmallDenseMap<unsigned, llvm::SmallDenseSet<unsigned, 2>>
+      rulesPerRequirement;
+
+  for (unsigned ruleID : indices(getRules())) {
+    auto &rule = getRules()[ruleID];
+
+    if (!rule.isExplicit())
+      continue;
+
+    auto requirementID = rule.getRequirementID();
+    if (!requirementID.hasValue())
+      continue;
+
+    rulesPerRequirement[*requirementID].insert(ruleID);
+  }
+
+  auto isRedundantRule = [&](unsigned ruleID) {
+    auto &rule = getRules()[ruleID];
+    return rule.isRedundant();
+  };
+
+  for (auto pair : rulesPerRequirement) {
+    unsigned requirementID = pair.first;
+    auto ruleIDs = pair.second;
+
+    // If all rules derived from this structural requirement are redundant,
+    // then the requirement is unnecessary in the source code.
+    if (llvm::all_of(ruleIDs, isRedundantRule)) {
+      auto requirement = WrittenRequirements[requirementID];
+      redundantRequirements.push_back(
+          RequirementError::forRedundantRequirement(requirement.req,
+                                                    requirement.loc));
+    }
+  }
+
+  return redundantRequirements;
+}
+
 void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "Rewrite system: {\n";
   for (const auto &rule : Rules) {

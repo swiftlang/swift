@@ -111,3 +111,49 @@ protocol TrivialRedundantSameType where Self == Self {
   associatedtype T where T == T
   // expected-warning@-1 {{redundant same-type constraint 'Self.T' == 'Self.T'}}
 }
+
+struct G<T> { }
+
+protocol Pair {
+  associatedtype A
+  associatedtype B
+}
+
+func test1<T: Pair>(_: T) where T.A == G<Int>, T.A == G<T.B>, T.B == Int { }
+// expected-warning@-1 {{redundant same-type constraint 'T.A' == 'G<T.B>'}}
+
+
+protocol P1 {
+  func p1()
+}
+
+protocol P2 : P1 { }
+
+protocol P3 {
+  associatedtype P3Assoc : P2
+}
+
+protocol P4 {
+  associatedtype P4Assoc : P1
+}
+
+func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
+// expected-warning@-1{{redundant conformance constraint 'U.P4Assoc' : 'P2'}}
+
+protocol P5 {
+  associatedtype Element
+}
+
+protocol P6 {
+  associatedtype AssocP6 : P5
+}
+
+protocol P7 : P6 {
+  associatedtype AssocP7: P6
+}
+
+extension P7 where AssocP6.Element : P6,
+        AssocP7.AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP7.AssocP6.Element' : 'P6'}}
+        AssocP6.Element == AssocP7.AssocP6.Element {
+  func nestedSameType1() { }
+}

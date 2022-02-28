@@ -421,7 +421,15 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
   if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
       RequirementMachineMode::Enabled) {
+    // Diagnose trivially invalid requirements from the rewrite
+    // system.
     diagnoseRequirementErrors(ctx, machine->System.getErrors(),
+                              /*allowConcreteGenericParams=*/false);
+
+    // Diagnose redundant requirements found during signature
+    // minimization.
+    auto redundancies = machine->System.getRedundantRequirements();
+    diagnoseRequirementErrors(ctx, redundancies,
                               /*allowConcreteGenericParams=*/false);
   }
 
@@ -673,8 +681,19 @@ InferredGenericSignatureRequestRQM::evaluate(
 
   if (ctx.LangOpts.RequirementMachineInferredSignatures ==
       RequirementMachineMode::Enabled) {
-    hadError |= diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
+    // Diagnose invalid requirements dropped during desugaring.
+    hadError |= diagnoseRequirementErrors(ctx, errors,
+                                          allowConcreteGenericParams);
+
+    // Diagnose trivially invalid requirements from the rewrite
+    // system.
     hadError |= diagnoseRequirementErrors(ctx, machine->System.getErrors(),
+                                          allowConcreteGenericParams);
+
+    // Diagnose redundant requirements found during signature
+    // minimization.
+    auto redundancies = machine->System.getRedundantRequirements();
+    hadError |= diagnoseRequirementErrors(ctx, redundancies,
                                           allowConcreteGenericParams);
   }
 
