@@ -140,7 +140,61 @@ set SDKROOT=
 
 If you want to use an existing Swift toolchain to build the core libraries and other parts of the toolchain, make sure you have it in `%Path%`, and strip `S:/b/1/bin/` from every `-D CMAKE_{language}_COMPILER=S:/b/1/bin/{compiler}` option.
 
-### Swift compiler
+Here is a graphical overview of all build steps from this guide.
+
+```
+       ┌──────────────────────────────────────┐      ┌────────────────┐
+       │                                      │      │                │
+       │       1. LLVM + Swift compiler       │      │                │
+       │                                      │      │ Existing Swift │
+       │    ┌────────────────────────────┐    │  or  │   toolchain    │
+       │    │ 2. Swift runtime libraries │    │      │                │
+       │    └────────────────────────────┘    │      │                │
+       └──────────────────────────────────────┘      └────────────────┘
+                           │                                  │
+                           └─────────┬────────────────────────┘
+                                     │
+                 ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+                               ┌──────────────────────┐ │
+                 │             │    3. libdispatch    │
+                               └──────────────────────┘ │
+                 │     Core    ┌──────────────────────┐
+               ┌─              │    4. Foundation     │ │─┐
+               │ │  libraries  └──────────────────────┘   │
+               │               ┌──────────────────────┐ │ │
+               │ │             │      5. XCTest       │   │
+               │               └──────────────────────┘ │ │
+               │ └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  │
+               │                                          │
+               │                      ┌──────────────────────────────────────┐
+               │                      │                                      │
+               │                      │      7. Toolchain dependencies       │
+┌────────────────────────────┐        │                                      │
+│         6. LLBuild         │        ├────┬───────────┬────────┬────────────┤
+└────────────────────────────┘        │Yams│SwiftSystem│  ···   │IndexStoreDB│
+               │                      └────┴───────────┴────────┴────────────┘
+               │                                          │
+               │                                          │
+               │                           ┌────────────────────────────┐
+               │                           │           8. TSC           │
+               │                           └────────────────────────────┘
+               │                                          │
+               └─────────────────────┬────────────────────┘
+                                     │
+                 ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+                               ┌──────────────────────┐ │
+                 │             │   9. Swift Driver    │
+                               └──────────────────────┘ │
+                 │  Developer  ┌──────────────────────┐
+                               │     10. SwiftPM      │ │
+                 │    tools    └──────────────────────┘
+                               ┌──────────────────────┐ │
+                 │             │  11. SourceKit-LSP   │
+                               └──────────────────────┘ │
+                 └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+```
+
+### 1. Swift compiler
 
 ```cmd
 cmake -B S:\b\1 ^
@@ -188,7 +242,7 @@ path %PATH%;%ProgramFiles%\Git\usr\bin
 cmake --build S:\b\1 --target check-swift
 ```
 
-### Swift runtime libraries
+### 2. Swift runtime libraries
 
 ```cmd
 cmake -B S:\b\2 ^
@@ -223,7 +277,7 @@ cmake --build S:\b\2
 
 > **NOTE:** Swift runtime libraries are also built along with the compiler.  This step extracts them into a portable SDK where we will install core libraries alongside.
 
-### libdispatch
+### 3. libdispatch
 
 ```cmd
 cmake -B S:\b\3 ^
@@ -255,7 +309,7 @@ Test libdispatch:
 cmake --build S:\b\3 --target test
 ```
 
-### Foundation (without tests)
+### 4. Foundation (without tests)
 
 ```cmd
 cmake -B S:\b\4 ^
@@ -279,7 +333,7 @@ cmake -B S:\b\4 ^
 cmake --build S:\b\4
 ```
 
-### XCTest
+### 5. XCTest
 
 ```cmd
 cmake -B S:\b\5 ^
@@ -313,7 +367,7 @@ path %PATH%;%ProgramFiles%\Git\usr\bin
 cmake --build S:\b\5 --target check-xctest
 ```
 
-### Foundation (with tests)
+### 4.1 Foundation (with tests)
 
 ```cmd
 cmake -B S:\b\4 ^
@@ -346,7 +400,7 @@ Test Foundation:
 cmake --build S:\b\4 --target test
 ```
 
-### LLBuild
+### 6. LLBuild
 
 ```cmd
 cmake -B S:\b\6 ^
@@ -381,7 +435,7 @@ Test LLBuild:
 cmake --build S:\b\6 --target test
 ```
 
-### Toolchain dependencies
+### 7. Toolchain dependencies
 
 We're building the following libraries with `Release` preset and without tests here because they're independent packages that are directly or indirectly depended by Swift Driver, SwiftPM or SourceKit-LSP.  For developing these libraries, use SwiftPM instead.
 
@@ -533,7 +587,7 @@ cmake -B S:\b\7\IndexStoreDB ^
 cmake --build S:\b\7\IndexStoreDB
 ```
 
-### TSC (without tests)
+### 8. TSC (without tests)
 
 ```cmd
 cmake -B S:\b\8 ^
@@ -560,7 +614,7 @@ cmake -B S:\b\8 ^
 cmake --build S:\b\8
 ```
 
-### Swift Driver (without tests)
+### 9. Swift Driver (without tests)
 
 ```cmd
 cmake -B S:\b\9 ^
@@ -589,7 +643,7 @@ cmake -B S:\b\9 ^
 cmake --build S:\b\9
 ```
 
-### SwiftPM (without tests)
+### 10. SwiftPM (without tests)
 
 ```cmd
 cmake -B S:\b\10 ^
@@ -620,7 +674,7 @@ cmake -B S:\b\10 ^
 cmake --build S:\b\10
 ```
 
-### SourceKit-LSP (without tests)
+### 11. SourceKit-LSP (without tests)
 
 ```cmd
 cmake -B S:\b\11 ^
