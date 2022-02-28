@@ -24,7 +24,6 @@ namespace ide {
 /// (\c CompletionKind::DotExpr ) from the solutions formed during expression
 /// type-checking.
 class DotExprTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
-public:
   struct Result {
     Type BaseTy;
     ValueDecl *BaseDecl;
@@ -34,7 +33,6 @@ public:
     bool IsImplicitSingleExpressionReturn;
   };
 
-private:
   DeclContext *DC;
   CodeCompletionExpr *CompletionExpr;
   SmallVector<Result, 4> Results;
@@ -46,10 +44,6 @@ public:
                                      CodeCompletionExpr *CompletionExpr)
       : DC(DC), CompletionExpr(CompletionExpr) {}
 
-  /// Get the results collected from any sawSolutions() callbacks recevied so
-  /// far.
-  ArrayRef<Result> getResults() const { return Results; }
-
   /// True if at least one solution was passed via the \c sawSolution
   /// callback.
   bool gotCallback() const { return GotCallback; }
@@ -59,12 +53,11 @@ public:
   void fallbackTypeCheck();
 
   void sawSolution(const constraints::Solution &solution) override;
-};
 
-void deliverDotExprResults(
-    ArrayRef<DotExprTypeCheckCompletionCallback::Result> Results,
-    Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc, bool IsInSelector,
-    CodeCompletionContext &CompletionCtx, CodeCompletionConsumer &Consumer);
+  void deliverResults(Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc,
+                      bool IsInSelector, CodeCompletionContext &CompletionCtx,
+                      CodeCompletionConsumer &Consumer);
+};
 
 } // end namespace ide
 } // end namespace swift

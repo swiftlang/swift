@@ -1350,9 +1350,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
     Expr *CheckedBase = CodeCompleteTokenExpr->getBase();
-    deliverDotExprResults(Lookup.getResults(), CheckedBase, CurDeclContext,
-                          DotLoc, isInsideObjCSelector(), CompletionContext,
-                          Consumer);
+    Lookup.deliverResults(CheckedBase, CurDeclContext, DotLoc,
+                          isInsideObjCSelector(), CompletionContext, Consumer);
     return true;
   }
   case CompletionKind::UnresolvedMember: {
@@ -1368,9 +1367,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
       Lookup.fallbackTypeCheck(CurDeclContext);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-    deliverUnresolvedMemberResults(Lookup.getExprResults(),
-                                   Lookup.getEnumPatternTypes(), CurDeclContext,
-                                   DotLoc, CompletionContext, Consumer);
+    Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
     return true;
   }
   case CompletionKind::KeyPathExprSwift: {
@@ -1384,8 +1381,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
         Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
 
-    deliverKeyPathResults(Lookup.getResults(), CurDeclContext, DotLoc,
-                          CompletionContext, Consumer);
+    Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
     return true;
   }
   default:
