@@ -3444,11 +3444,12 @@ namespace {
       // that differ this way so we can disambiguate later
       for (auto m : decl->decls()) {
         if (auto method = dyn_cast<clang::CXXMethodDecl>(m)) {
-          if(method->getDeclName().isIdentifier()) {
-            if(Impl.cxxMethods.find(method->getName()) == Impl.cxxMethods.end()) {
+          if (method->getDeclName().isIdentifier()) {
+            if (Impl.cxxMethods.find(method->getName()) ==
+                Impl.cxxMethods.end()) {
               Impl.cxxMethods[method->getName()] = {};
             }
-            if(method->isConst()) {
+            if (method->isConst()) {
               // Add to const set
               Impl.cxxMethods[method->getName()].first.insert(method);
             } else {
@@ -3478,8 +3479,8 @@ namespace {
 
         if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
           // Non-nullable pointers can't be zero-initialized.
-          if (auto nullability = field->getType()
-                ->getNullability(Impl.getClangASTContext())) {
+          if (auto nullability =
+                  field->getType()->getNullability(Impl.getClangASTContext())) {
             if (*nullability == clang::NullabilityKind::NonNull)
               hasZeroInitializableStorage = false;
           }
@@ -3522,6 +3523,18 @@ namespace {
         }
 
         if (auto MD = dyn_cast<FuncDecl>(member)) {
+
+          // When 2 CXXMethods diff by "constness" alone we differentiate them
+          // by changing the name of one. That changed method needs to be added
+          // to the lookup table since it cannot be found lazily.
+          if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(m)) {
+            if (cxxMethod->getDeclName().isIdentifier()) {
+              auto &mutableFuncPtrs = Impl.cxxMethods[cxxMethod->getName()].second;
+              if(mutableFuncPtrs.contains(cxxMethod)) {
+                result->addMemberToLookupTable(member);
+              }
+            }
+          }
           methods.push_back(MD);
           continue;
         }
@@ -3602,10 +3615,10 @@ namespace {
         //
         // If we can completely represent the struct in SIL, leave the body
         // implicit, otherwise synthesize one to call property setters.
-        auto valueCtor = createValueConstructor(
-            Impl, result, members,
-            /*want param names*/true,
-            /*want body*/hasUnreferenceableStorage);
+        auto valueCtor =
+            createValueConstructor(Impl, result, members,
+                                   /*want param names*/ true,
+                                   /*want body*/ hasUnreferenceableStorage);
         if (!hasUnreferenceableStorage)
           valueCtor->setIsMemberwiseInitializer();
 
@@ -3636,8 +3649,8 @@ namespace {
             continue;
 
           auto getterAndSetter = subscriptInfo.second;
-          auto subscript = makeSubscript(getterAndSetter.first,
-                                         getterAndSetter.second);
+          auto subscript =
+              makeSubscript(getterAndSetter.first, getterAndSetter.second);
           // Also add subscripts directly because they won't be found from the
           // clang decl.
           result->addMember(subscript);
