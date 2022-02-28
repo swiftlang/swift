@@ -337,25 +337,23 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 }
 
 Optional<SolutionApplicationTarget>
-TypeChecker::typeCheckExpression(
-    SolutionApplicationTarget &target,
-    TypeCheckExprOptions options) {
-  Expr *expr = target.getAsExpr();
+TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
+                                 TypeCheckExprOptions options) {
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
-  FrontendStatsTracer StatsTracer(Context.Stats,
-                                  "typecheck-expr", expr);
-  PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr",
+                                  target.getAsExpr());
+  PrettyStackTraceExpr stackTrace(Context, "type-checking", target.getAsExpr());
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckExpression(
-        expr, dc, /*replaceInvalidRefsWithErrors=*/true,
-        options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
-    target.setExpr(expr);
+  if (ConstraintSystem::preCheckTarget(
+          target, /*replaceInvalidRefsWithErrors=*/true,
+          options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
     return None;
   }
-  target.setExpr(expr);
+
+  auto *expr = target.getAsExpr();
 
   // Check whether given expression has a code completion token which requires
   // special handling.
@@ -810,25 +808,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   if (!sequenceProto)
     return failed();
 
-  // Precheck the sequence.
-  Expr *sequence = stmt->getSequence();
-  if (ConstraintSystem::preCheckExpression(
-          sequence, dc, /*replaceInvalidRefsWithErrors=*/true,
-          /*leaveClosureBodiesUnchecked=*/false))
-    return failed();
-  stmt->setSequence(sequence);
-
-  // Precheck the filtering condition.
-  if (Expr *whereExpr = stmt->getWhere()) {
-    if (ConstraintSystem::preCheckExpression(
-            whereExpr, dc,
-            /*replaceInvalidRefsWithErrors=*/true,
-            /*leaveClosureBodiesUnchecked=*/false))
-      return failed();
-
-    stmt->setWhere(whereExpr);
-  }
-
   auto target = SolutionApplicationTarget::forForEachStmt(
       stmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/false);
   if (!typeCheckExpression(target))
@@ -913,13 +892,22 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                                 /*Implicit=*/true);
   Expr *matchCall = BinaryExpr::create(Context, EP->getSubExpr(), matchOp,
                                        matchVarRef, /*implicit*/ true);
+
+  // Result of `~=` should always be a boolean.
+  auto contextualTy = Context.getBoolDecl()->getDeclaredInterfaceType();
+  auto target = SolutionApplicationTarget::forExprPattern(matchCall, DC, EP,
+                                                          contextualTy);
+
   // Check the expression as a condition.
-  bool hadError = typeCheckCondition(matchCall, DC);
+  auto result = typeCheckExpression(target);
+  if (!result)
+    return true;
+
   // Save the type-checked expression in the pattern.
-  EP->setMatchExpr(matchCall);
+  EP->setMatchExpr(result->getAsExpr());
   // Set the type on the pattern.
   EP->setType(rhsType);
-  return hadError;
+  return false;
 }
 
 static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,

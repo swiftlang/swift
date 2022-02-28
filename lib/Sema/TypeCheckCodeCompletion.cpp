@@ -579,12 +579,10 @@ bool TypeChecker::typeCheckForCodeCompletion(
   if (needsPrecheck) {
     // First, pre-check the expression, validating any types that occur in the
     // expression and folding sequence expressions.
-    auto failedPreCheck = ConstraintSystem::preCheckExpression(
-        expr, DC,
-        /*replaceInvalidRefsWithErrors=*/true,
-        /*leaveClosureBodiesUnchecked=*/true);
-
-    target.setExpr(expr);
+    auto failedPreCheck =
+        ConstraintSystem::preCheckTarget(target,
+                                         /*replaceInvalidRefsWithErrors=*/true,
+                                         /*leaveClosureBodiesUnchecked=*/true);
 
     if (failedPreCheck)
       return false;

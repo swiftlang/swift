@@ -12996,6 +12996,7 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_ForEachStmt:
   case CTP_WrappedProperty:
   case CTP_ComposedPropertyWrapper:
+  case CTP_ExprPattern:
     break;
   }
 
