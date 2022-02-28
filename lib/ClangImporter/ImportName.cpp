@@ -1843,15 +1843,17 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
     case clang::OverloadedOperatorKind::OO_PipePipe:
-      baseName = clang::getOperatorSpelling(op);
+      baseName = StringRef{std::string{"__operator"} + clang::getOperatorSpelling(op)};
       isFunction = true;
-      argumentNames.resize(
-          functionDecl->param_size() +
-              // C++ operators that are implemented as non-static member functions
-              // get imported into Swift as static member functions that use an
-              // additional parameter for the left-hand side operand instead of
-              // the receiver object.
-              (isa<clang::CXXMethodDecl>(D) ? 1 : 0));
+//      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
+
+//      argumentNames.resize(
+//          functionDecl->param_size() +
+//              // C++ operators that are implemented as non-static member functions
+//              // get imported into Swift as static member functions that use an
+//              // additional parameter for the left-hand side operand instead of
+//              // the receiver object.
+//              (isa<clang::CXXMethodDecl>(D) ? 1 : 0));
       break;
     case clang::OverloadedOperatorKind::OO_Call:
       baseName = "callAsFunction";

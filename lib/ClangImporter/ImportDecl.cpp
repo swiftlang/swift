@@ -4286,15 +4286,11 @@ namespace {
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
           // Subscripts and call operators are imported as normal methods.
-          bool staticOperator = mdecl->isOverloadedOperator() &&
+          // bool staticOperator = mdecl->isOverloadedOperator();
+          bool requiresStaticTopLevel =
                                 mdecl->getOverloadedOperator() != clang::OO_Call &&
                                 mdecl->getOverloadedOperator() != clang::OO_Subscript;
-          if (mdecl->isStatic() ||
-              // C++ operators that are implemented as non-static member
-              // functions get imported into Swift as static member functions
-              // that use an additional parameter for the left-hand side operand
-              // instead of the receiver object.
-              staticOperator) {
+          if (mdecl->isStatic()) {
             selfIdx = None;
           } else {
             // Swift imports the "self" param last, even for clang functions.
