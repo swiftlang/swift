@@ -68,9 +68,9 @@ SubstitutionMap SILGenModule::mapSubstitutionsForWitnessOverride(
 /// Return the abstraction pattern to use when calling a function value.
 static AbstractionPattern
 getIndirectApplyAbstractionPattern(SILGenFunction &SGF,
+                                   AbstractionPattern pattern,
                                    CanFunctionType fnType) {
   assert(fnType);
-  AbstractionPattern pattern(fnType);
   switch (fnType->getRepresentation()) {
   case FunctionTypeRepresentation::Swift:
   case FunctionTypeRepresentation::Thin:
@@ -875,9 +875,9 @@ public:
 
     ManagedValue fn = SGF.emitRValueAsSingleValue(e);
     auto substType = cast<FunctionType>(e->getType()->getCanonicalType());
-
+    auto origType = AbstractionPattern(substType);
     // When calling an C or block function, there's implicit bridging.
-    auto origType = getIndirectApplyAbstractionPattern(SGF, substType);
+    origType = getIndirectApplyAbstractionPattern(SGF, origType, substType);
 
     setCallee(Callee::forIndirect(fn, origType, substType, e));
   }
@@ -1182,10 +1182,6 @@ public:
   }
   
   void visitMemberRefExpr(MemberRefExpr *e) {
-    // If we're loading a closure-type property out of a generic aggregate,
-    // we might reabstract it under normal circumstances, but since we're
-    // going to apply it immediately here, there's no reason to. We can
-    // invoke the function value at whatever abstraction level we get.
     assert(isa<VarDecl>(e->getMember().getDecl()));
 
     // Any writebacks for this access are tightly scoped.
@@ -1197,9 +1193,12 @@ public:
 
     ManagedValue fn = SGF.emitLoadOfLValue(e, std::move(lv), SGFContext())
       .getAsSingleValue(SGF, e);
-    
-    setCallee(Callee::forIndirect(fn, lv.getOrigFormalType(),
-                               cast<FunctionType>(lv.getSubstFormalType()), e));
+    auto substType = cast<FunctionType>(lv.getSubstFormalType());
+    auto origType = lv.getOrigFormalType();
+    // When calling an C or block function, there's implicit bridging.
+    origType = getIndirectApplyAbstractionPattern(SGF, origType, substType);
+
+    setCallee(Callee::forIndirect(fn, origType, substType, e));
   }
   
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
