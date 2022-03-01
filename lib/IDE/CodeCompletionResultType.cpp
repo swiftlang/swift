@@ -184,6 +184,14 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
         // exist when using the code completion cache from a different module.
         continue;
       }
+      if (Conformance->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        // FIXME: Sendable conformances are lazily synthesized as they are
+        // needed by the compiler. Depending on whether we checked whether a
+        // type conforms to Sendable before constructing the USRBasedType, we
+        // get different results for its conformance. For now, always drop the
+        // Sendable conformance.
+        continue;
+      }
       Supertypes.push_back(USRBasedType::fromType(
           Conformance->getProtocol()->getDeclaredInterfaceType(), Arena));
     }
