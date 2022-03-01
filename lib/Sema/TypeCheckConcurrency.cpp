@@ -2686,6 +2686,52 @@ namespace {
           });
     }
 
+    static bool isStoredProperty(ValueDecl const *member) {
+      if (auto *var = dyn_cast<VarDecl>(member))
+        if (var->hasStorage() && var->isInstanceMember())
+          return true;
+      return false;
+    }
+
+    /// an ad-hoc check specific to member isolation checking.
+    static bool memberAccessWasAllowedInSwift5(DeclContext const *refCxt,
+                                               ValueDecl const *member,
+                                               SourceLoc memberLoc) {
+      // no need for this in Swift 6+
+      if (refCxt->getASTContext().isSwiftVersionAtLeast(6))
+        return false;
+
+      // In Swift 5, we were allowing all members to be referenced from a
+      // deinit, nested within a wide variety of contexts.
+      if (auto oldFn = isActorInitOrDeInitContext(refCxt)) {
+        if (isa<DestructorDecl>(oldFn) && member->isInstanceMember()) {
+          auto &diags = refCxt->getASTContext().Diags;
+
+          // if the context in which we consider the access matches between
+          // old and new, and its a stored property, then skip the warning
+          // because it will still be allowed in Swift 6.
+          if (!(refCxt == oldFn && isStoredProperty(member))) {
+            unsigned cxtKind = 0; // deinit
+
+            // try to get a better name for this context.
+            if (isa<AutoClosureExpr>(refCxt)) {
+              cxtKind = 1;
+            } else if (isa<AbstractClosureExpr>(refCxt)) {
+              cxtKind = 2;
+            }
+
+            diags.diagnose(memberLoc, diag::actor_isolated_from_decl,
+                           member->getDescriptiveKind(),
+                           member->getName(),
+                           cxtKind).warnUntilSwiftVersion(6);
+          }
+          return true;
+        }
+      }
+
+      return false;
+    }
+
     /// To support flow-isolation, some member accesses in inits / deinits
     /// must be permitted, despite the isolation of 'self' not being
     /// correct in Sema.
@@ -2697,7 +2743,7 @@ namespace {
     ///
     /// \returns true iff the member access is permitted in Sema because it will
     /// be verified later by flow-isolation.
-    bool checkedByFlowIsolation(DeclContext const *refCxt,
+    static bool checkedByFlowIsolation(DeclContext const *refCxt,
                                 ReferencedActor &baseActor,
                                 ValueDecl const *member,
                                 SourceLoc memberLoc) {
@@ -2716,7 +2762,7 @@ namespace {
       while (true) {
         fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(refCxt->getAsDecl());
         if (!fnDecl)
-          return false;
+          break;
 
         // go up one level if this context is a defer.
         if (auto *d = dyn_cast<FuncDecl>(fnDecl)) {
@@ -2728,25 +2774,15 @@ namespace {
         break;
       }
 
+      if (memberAccessWasAllowedInSwift5(refCxt, member, memberLoc))
+        return true; // then permit it now.
+
       if (!usesFlowSensitiveIsolation(fnDecl))
         return false;
 
       // Stored properties are definitely OK.
-      if (auto *var = dyn_cast<VarDecl>(member))
-        if (var->hasStorage() && var->isInstanceMember())
+      if (isStoredProperty(member))
           return true;
-
-      // In Swift 5, we were allowing all members to be referenced from a
-      // deinit, but that will not be valid in Swift 6+, so warn about it.
-      if (!refCxt->getASTContext().isSwiftVersionAtLeast(6)) {
-        if (isa<DestructorDecl>(fnDecl) && member->isInstanceMember()) {
-          auto &diags = refCxt->getASTContext().Diags;
-          diags.diagnose(memberLoc, diag::actor_isolated_from_deinit,
-                         member->getDescriptiveKind(),
-                         member->getName()).warnUntilSwiftVersion(6);
-          return true;
-        }
-      }
 
       return false;
     }
