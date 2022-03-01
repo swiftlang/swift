@@ -2025,7 +2025,9 @@ void IRGenModule::emitVTableStubs() {
       alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
     else
       ApplyIRLinkage(IRGen.Opts.InternalizeSymbols
-                        ? IRLinkage::Internal
+                        ? IRLinkage{llvm::GlobalValue::ExternalLinkage,
+                                    llvm::GlobalValue::HiddenVisibility,
+                                    llvm::GlobalValue::DefaultStorageClass}
                         : IRLinkage::ExternalExport).to(alias);
   }
 }
