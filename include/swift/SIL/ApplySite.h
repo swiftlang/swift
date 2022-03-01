@@ -585,9 +585,9 @@ public:
   }
 
   /// Get the SIL value that represents all of the given call's results. For a
-  /// single direct result, returns the result. For multiple results, returns a
-  /// fake tuple value. The tuple has no storage of its own. The real results
-  /// must be extracted from it.
+  /// single direct result, returns the actual result. For multiple results,
+  /// returns a pseudo-result tuple. The tuple has no storage of its own. The
+  /// real results must be extracted from it.
   ///
   /// For ApplyInst, returns the single-value instruction itself.
   ///
@@ -596,7 +596,7 @@ public:
   /// For BeginApplyInst, returns an invalid value. For coroutines, there is no
   /// single value representing all results. Yielded values are generally
   /// handled differently since they have the convention of incoming arguments.
-  SILValue getPseudoResult() const {
+  SILValue getResult() const {
     switch (getKind()) {
     case FullApplySiteKind::ApplyInst:
       return SILValue(cast<ApplyInst>(getInstruction()));

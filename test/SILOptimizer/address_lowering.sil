@@ -79,6 +79,63 @@ bb0(%0 : @owned $T):
   return %0 : $T
 }
 
+// This could happen as a result of either partial specialization from
+// a single type parameter into a generic tuple, or specialization
+// from a single type parameter into a tuple of concrete address-only
+// types.
+//
+// CHECK-LABEL: sil [ossa] @f011_identity_tuple : $@convention(thin) <T> (@in (T, T)) -> @out (T, T) {
+// CHECK: bb0(%0 : $*(T, T), %1 : $*(T, T)):
+// CHECK:   copy_addr [take] %1 to [initialization] %0 : $*(T, T)
+// CHECK-LABEL: } // end sil function 'f011_identity_tuple'
+sil [ossa] @f011_identity_tuple : $@convention(thin) <T> (@in (T, T)) -> @out (T, T) {
+bb0(%0 : @owned $(T, T)):
+  return %0 : $(T, T)
+}
+
+// CHECK-LABEL: sil [ossa] @f012_decompose_tuple_arg : $@convention(thin) <T> (@in (T, T)) -> @out (T, T) {
+// CHECK: bb0(%0 : $*(T, T), %1 : $*(T, T)):
+// CHECK:   [[ARG0:%.*]] = tuple_element_addr %1 : $*(T, T), 0
+// CHECK:   [[ARG1:%.*]] = tuple_element_addr %1 : $*(T, T), 1
+// CHECK:   [[RET0:%.*]] = tuple_element_addr %0 : $*(T, T), 0
+// CHECK:   apply %{{.*}}<T>([[RET0]], [[ARG0]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK:   [[RET1:%.*]] = tuple_element_addr %0 : $*(T, T), 1
+// CHECK:   copy_addr [take] [[ARG1]] to [initialization] [[RET1]] : $*T
+// CHECK-LABEL: } // end sil function 'f012_decompose_tuple_arg'
+sil [ossa] @f012_decompose_tuple_arg : $@convention(thin) <T> (@in (T, T)) -> @out (T, T) {
+bb0(%0 : @owned $(T, T)):
+  (%arg0, %arg1) = destructure_tuple %0 : $(T, T)
+  %f = function_ref @f010_addrlower_identity : $@convention(thin) <T> (@in T) -> @out T
+  %call = apply %f<T>(%arg0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %result = tuple (%call : $T, %arg1 : $T)
+  return %result : $(T, T)
+}
+
+// CHECK-LABEL: sil [ossa] @f013_pass_tuple_arg : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0(%0 : $*T, %1 : $*T):
+// CHECK:   [[IN:%.*]] = alloc_stack $(T, T)
+// CHECK:   [[OUT:%.*]] = alloc_stack $(T, T)
+// CHECK:   [[IN1:%.*]] = tuple_element_addr [[IN]] : $*(T, T), 1
+// CHECK:   copy_addr %1 to [initialization] [[IN1]] : $*T
+// CHECK:   [[IN0:%.*]] = tuple_element_addr %2 : $*(T, T), 0
+// CHECK:   copy_addr [take] %1 to [initialization] [[IN0]] : $*T
+// CHECK:   apply %{{.*}}<T>([[OUT]], [[IN]]) : $@convention(thin) <τ_0_0> (@in (τ_0_0, τ_0_0)) -> @out (τ_0_0, τ_0_0)
+// CHECK:   [[RET:%.*]] = tuple_element_addr [[OUT]] : $*(T, T), 0
+// CHECK:   [[DEAD:%.*]] = tuple_element_addr [[OUT]] : $*(T, T), 1
+// CHECK:   destroy_addr [[DEAD]] : $*T
+// CHECK:   copy_addr [take] [[RET]] to [initialization] %0 : $*T
+// CHECK-LABEL: } // end sil function 'f013_pass_tuple_arg'
+sil [ossa] @f013_pass_tuple_arg : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : @owned $T):
+  %copy0 = copy_value %0 : $T
+  %arg = tuple (%0 : $T, %copy0 : $T)
+  %f = function_ref @f011_identity_tuple : $@convention(thin) <T> (@in (T, T)) -> @out (T, T)
+  %call = apply %f<T>(%arg) : $@convention(thin) <T> (@in (T, T)) -> @out (T, T)
+  (%call0, %call1) = destructure_tuple %call : $(T, T)
+  destroy_value %call1 : $T
+  return %call0 : $T
+}
+
 // CHECK-LABEL: sil [ossa] @f020_multiResult : $@convention(thin) <T> (@in T) -> (@out T, @out T, @out T) {
 // CHECK: %0 "$return_value"
 // CHECK: %1 "$return_value"
