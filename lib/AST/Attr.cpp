@@ -685,17 +685,11 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector attributes;
   AttributeVector modifiers;
 
-  CustomAttr *FuncBuilderAttr = nullptr;
-  if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
-    FuncBuilderAttr = VD->getAttachedResultBuilder();
-  }
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Always print result builder attribute.
-    bool isResultBuilderAttr = DA == FuncBuilderAttr;
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&
-        !isResultBuilderAttr &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
     if (Options.excludeAttrKind(DA->getKind()))

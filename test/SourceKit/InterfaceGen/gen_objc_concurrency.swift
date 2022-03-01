@@ -11,6 +11,9 @@
 // SWIFT-GEN-INTERFACE-NEXT:    internal func foo(_ operation: String, completionHandler handler: @escaping (Int) -> Void)
 // SWIFT-GEN-INTERFACE:         internal func foo(_ operation: String) async -> Int
 
+// SWIFT-GEN-INTERFACE:         @MainActor internal func mainActorMethod()
+
+
 // RUN: %sourcekitd-test -req=interface-gen -using-swift-args -header %S/../Inputs/concurrency/header_concurrency.h -- %s -Xfrontend -enable-objc-interop -import-objc-header %S/../Inputs/concurrency/header_concurrency.h -sdk %clang-importer-sdk | %FileCheck %s --check-prefix=OBJC-GEN-INTERFACE
 
 // But don't print @available if it was implicitly added to an imported Clang decl (rdar://76685011).
@@ -18,3 +21,5 @@
 // OBJC-GEN-INTERFACE-NOT:     @available
 // OBJC-GEN-INTERFACE:         func method(withHandler operation: String!, completionHandler handler: (@Sendable (Int) -> Void)!)
 // OBJC-GEN-INTERFACE:         func method(withHandler operation: String!) async -> Int
+
+// OBJC-GEN-INTERFACE:         @MainActor open func mainActorMethod()
