@@ -55,6 +55,7 @@
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -426,8 +427,15 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
 
     // Delete loops that don't contain any rewrite rules in empty context,
     // since such loops do not give us useful information.
-    if (!foundAny)
+    if (!foundAny) {
+      if (Debug.contains(DebugFlags::HomotopyReduction)) {
+        llvm::dbgs() << "** Deleting useless loop #" << loopID << ": ";
+        loop.dump(llvm::dbgs(), *this);
+        llvm::dbgs() << "\n";
+      }
+
       loop.markDeleted();
+    }
   }
 
   Optional<std::pair<unsigned, unsigned>> found;
@@ -658,6 +666,34 @@ void RewriteSystem::performHomotopyReduction(
   }
 }
 
+void RewriteSystem::normalizeRedundantRules() {
+  for (auto &pair : RedundantRules) {
+    pair.second.computeNormalForm(*this);
+  }
+
+  if (Debug.contains(DebugFlags::RedundantRules)) {
+    llvm::dbgs() << "\nRedundant rules:\n";
+    for (const auto &pair : RedundantRules) {
+      const auto &rule = getRule(pair.first);
+      llvm::dbgs() << "- ("
+                   << rule.getLHS() << " => "
+                   << rule.getRHS() << ") ::== ";
+
+      MutableTerm lhs(rule.getLHS());
+      pair.second.dump(llvm::dbgs(), lhs, *this);
+
+      llvm::dbgs() << "\n";
+
+      if (Debug.contains(DebugFlags::RedundantRulesDetail)) {
+        llvm::dbgs() << "\n";
+        pair.second.dumpLong(llvm::dbgs(), lhs, *this);
+
+        llvm::dbgs() << "\n\n";
+      }
+    }
+  }
+}
+
 /// Use the loops to delete redundant rewrite rules via a series of Tietze
 /// transformations, updating and simplifying existing loops as each rule
 /// is deleted.
@@ -753,25 +789,7 @@ void RewriteSystem::minimizeRewriteSystem() {
   verifyRedundantConformances(redundantConformances);
   verifyMinimizedRules(redundantConformances);
 
-  if (Debug.contains(DebugFlags::RedundantRules)) {
-    llvm::dbgs() << "\nRedundant rules:\n";
-    for (const auto &pair : RedundantRules) {
-      const auto &rule = getRule(pair.first);
-      llvm::dbgs() << "- " << rule << " ::== ";
-
-      MutableTerm lhs(rule.getLHS());
-      pair.second.dump(llvm::dbgs(), lhs, *this);
-
-      llvm::dbgs() << "\n";
-
-      if (Debug.contains(DebugFlags::RedundantRulesDetail)) {
-        llvm::dbgs() << "\n";
-        pair.second.dumpLong(llvm::dbgs(), lhs, *this);
-
-        llvm::dbgs() << "\n\n";
-      }
-    }
-  }
+  normalizeRedundantRules();
 }
 
 /// In a conformance-valid rewrite system, any rule with unresolved symbols on

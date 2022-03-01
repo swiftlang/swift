@@ -355,6 +355,11 @@ struct RewriteStep {
             RewritePathEvaluator &evaluator,
             const RewriteSystem &system) const;
 
+  bool isInverseOf(const RewriteStep &other) const;
+
+  bool maybeSwapRewriteSteps(RewriteStep &other,
+                             const RewriteSystem &system);
+
 private:
   static unsigned getConcreteProjectionArg(unsigned differenceID,
                                            unsigned substitutionIndex) {
@@ -405,6 +410,15 @@ public:
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
   void invert();
+
+  bool computeFreelyReducedForm();
+
+  bool computeCyclicallyReducedForm(MutableTerm &basepoint,
+                                    const RewriteSystem &system);
+
+  bool computeLeftCanonicalForm(const RewriteSystem &system);
+
+  void computeNormalForm(const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out,
             MutableTerm term,
@@ -490,6 +504,8 @@ public:
       llvm::SmallDenseMap<const ProtocolDecl *,
                           ProtocolConformanceRules, 2> &result,
       const RewriteSystem &system) const;
+
+  void computeNormalForm(const RewriteSystem &system);
 
   void verify(const RewriteSystem &system) const;
 
