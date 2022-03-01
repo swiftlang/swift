@@ -82,7 +82,7 @@ static VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
 
 void UnresolvedMemberTypeCheckCompletionCallback::sawSolution(
     const constraints::Solution &S) {
-  GotCallback = true;
+  TypeCheckCompletionCallback::sawSolution(S);
 
   auto &CS = S.getConstraintSystem();
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
@@ -117,25 +117,6 @@ void UnresolvedMemberTypeCheckCompletionCallback::sawSolution(
       }
     }
   }
-}
-
-void UnresolvedMemberTypeCheckCompletionCallback::fallbackTypeCheck(
-    DeclContext *DC) {
-  assert(!gotCallback());
-
-  CompletionContextFinder finder(DC);
-  if (!finder.hasCompletionExpr())
-    return;
-
-  auto fallback = finder.getFallbackCompletionExpr();
-  if (!fallback)
-    return;
-
-  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
-  typeCheckForCodeCompletion(completionTarget, /*needsPrecheck*/ true,
-                             [&](const Solution &S) { sawSolution(S); });
 }
 
 void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(

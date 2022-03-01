@@ -1333,8 +1333,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
-    DotExprTypeCheckCompletionCallback Lookup(CurDeclContext,
-                                              CodeCompleteTokenExpr);
+    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
     llvm::SaveAndRestore<TypeCheckCompletionCallback*>
       CompletionCollector(Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
@@ -1345,7 +1344,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     // typechecking still resolve even these cases would be beneficial for
     // tooling in general though.
     if (!Lookup.gotCallback())
-      Lookup.fallbackTypeCheck();
+      Lookup.fallbackTypeCheck(CurDeclContext);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 

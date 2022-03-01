@@ -21,7 +21,7 @@ using namespace swift;
 using namespace swift::constraints;
 using namespace swift::ide;
 
-void DotExprTypeCheckCompletionCallback::fallbackTypeCheck() {
+void DotExprTypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   assert(!gotCallback());
 
   // Default to checking the completion expression in isolation.
@@ -46,7 +46,7 @@ void DotExprTypeCheckCompletionCallback::fallbackTypeCheck() {
 
 void DotExprTypeCheckCompletionCallback::sawSolution(
     const constraints::Solution &S) {
-  GotCallback = true;
+  TypeCheckCompletionCallback::sawSolution(S);
   auto &CS = S.getConstraintSystem();
   auto *ParsedExpr = CompletionExpr->getBase();
   auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
