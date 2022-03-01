@@ -15,10 +15,6 @@
 using namespace swift;
 using namespace swift::ide;
 
-StringRef CodeCompletionContext::copyString(StringRef Str) {
-  return Str.copy(*CurrentResults.Allocator);
-}
-
 std::vector<CodeCompletionResult *>
 CodeCompletionContext::sortCompletionResults(
     ArrayRef<CodeCompletionResult *> Results) {

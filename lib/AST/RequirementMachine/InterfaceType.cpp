@@ -261,6 +261,16 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
       // Return a sugared GenericTypeParamType if we're given an array of
       // sugared types to substitute.
       unsigned index = GenericParamKey(genericParam).findIndexIn(genericParams);
+
+      if (index == genericParams.size()) {
+        llvm::errs() << "Invalid generic parameter: " << genericParam << "\n";
+        llvm::errs() << "Valid generic parameters are";
+        for (auto *otherParam : genericParams)
+          llvm::errs() << " " << Type(otherParam);
+        llvm::errs() << "\n";
+        abort();
+      }
+
       result = genericParams[index];
       return;
     }
@@ -344,7 +354,14 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
       assert(prefix.size() > 0);
 
       auto *props = map.lookUpProperties(prefix.rbegin(), prefix.rend());
-      assert(props != nullptr);
+      if (props == nullptr) {
+        llvm::errs() << "Cannot build interface type for term "
+                     << MutableTerm(begin, end) << "\n";
+        llvm::errs() << "Prefix does not conform to any protocols: "
+                     << prefix << "\n\n";
+        map.dump(llvm::errs());
+        abort();
+      }
 
       // Assert that the associated type's protocol appears among the set
       // of protocols that the prefix conforms to.
@@ -356,6 +373,18 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
   #endif
 
       assocType = props->getAssociatedType(symbol.getName());
+      if (assocType == nullptr) {
+        llvm::errs() << "Cannot build interface type for term "
+                     << MutableTerm(begin, end) << "\n";
+        llvm::errs() << "Prefix term does not not have a nested type named "
+                     << symbol.getName() << ": "
+                     << prefix << "\n";
+        llvm::errs() << "Property map entry: ";
+        props->dump(llvm::errs());
+        llvm::errs() << "\n\n";
+        map.dump(llvm::errs());
+        abort();
+      }
     }
 
     result = DependentMemberType::get(result, assocType);

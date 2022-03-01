@@ -138,9 +138,8 @@ void UnresolvedMemberTypeCheckCompletionCallback::fallbackTypeCheck(
                              [&](const Solution &S) { sawSolution(S); });
 }
 
-void swift::ide::deliverUnresolvedMemberResults(
-    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::ExprResult> Results,
-    ArrayRef<Type> EnumPatternTypes, DeclContext *DC, SourceLoc DotLoc,
+void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
+    DeclContext *DC, SourceLoc DotLoc,
     ide::CodeCompletionContext &CompletionCtx,
     CodeCompletionConsumer &Consumer) {
   ASTContext &Ctx = DC->getASTContext();
@@ -149,14 +148,15 @@ void swift::ide::deliverUnresolvedMemberResults(
 
   assert(DotLoc.isValid());
   Lookup.setHaveDot(DotLoc);
-  Lookup.shouldCheckForDuplicates(Results.size() + EnumPatternTypes.size() > 1);
+  Lookup.shouldCheckForDuplicates(ExprResults.size() + EnumPatternTypes.size() >
+                                  1);
 
   // Get the canonical versions of the top-level types
   SmallPtrSet<CanType, 4> originalTypes;
-  for (auto &Result : Results)
+  for (auto &Result : ExprResults)
     originalTypes.insert(Result.ExpectedTy->getCanonicalType());
 
-  for (auto &Result : Results) {
+  for (auto &Result : ExprResults) {
     Lookup.setExpectedTypes({Result.ExpectedTy},
                             Result.IsImplicitSingleExpressionReturn,
                             /*expectsNonVoid*/ true);

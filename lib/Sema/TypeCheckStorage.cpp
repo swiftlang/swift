@@ -2414,6 +2414,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
           break;
         }
       }
+
       if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
         break;
       }

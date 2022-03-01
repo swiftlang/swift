@@ -712,39 +712,25 @@ extension Collection {
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
-      bounds.lowerBound <= index,
-      "Out of bounds: index < startIndex")
-    _precondition(
-      index < bounds.upperBound,
-      "Out of bounds: index >= endIndex")
+      bounds.lowerBound <= index && index < bounds.upperBound,
+      "Index out of bounds")
   }
 
   @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
-      bounds.lowerBound <= index,
-      "Out of bounds: index < startIndex")
-    _precondition(
-      index <= bounds.upperBound,
-      "Out of bounds: index > endIndex")
+      bounds.lowerBound <= index && index <= bounds.upperBound,
+      "Index out of bounds")
   }
 
   @inlinable
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
-      bounds.lowerBound <= range.lowerBound,
-      "Out of bounds: range begins before startIndex")
-    _precondition(
-      range.lowerBound <= bounds.upperBound,
-      "Out of bounds: range ends after endIndex")
-    _precondition(
-      bounds.lowerBound <= range.upperBound,
-      "Out of bounds: range ends before bounds.lowerBound")
-    _precondition(
+      bounds.lowerBound <= range.lowerBound &&
       range.upperBound <= bounds.upperBound,
-      "Out of bounds: range begins after bounds.upperBound")
+      "Range out of bounds")
   }
 
   /// Returns an index that is the specified distance from the given index.

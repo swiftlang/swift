@@ -90,7 +90,9 @@ public:
   }
 
   /// Allocate a string owned by the code completion context.
-  StringRef copyString(StringRef Str);
+  StringRef copyString(StringRef Str) {
+    return Str.copy(*CurrentResults.Allocator);
+  }
 
   /// Sort code completion results in an implementation-defined order
   /// in place.

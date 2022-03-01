@@ -91,8 +91,7 @@ void DotExprTypeCheckCompletionCallback::sawSolution(
   }
 }
 
-void swift::ide::deliverDotExprResults(
-    ArrayRef<DotExprTypeCheckCompletionCallback::Result> Results,
+void DotExprTypeCheckCompletionCallback::deliverResults(
     Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc, bool IsInSelector,
     CodeCompletionContext &CompletionCtx, CodeCompletionConsumer &Consumer) {
   ASTContext &Ctx = DC->getASTContext();

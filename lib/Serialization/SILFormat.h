@@ -155,18 +155,6 @@ namespace sil_block {
     SIL_INST_LINEAR_FUNCTION,
     SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
     SIL_INST_LINEAR_FUNCTION_EXTRACT,
-
-    // We also share these layouts from the decls block. Their enumerators must
-    // not overlap with ours.
-    ABSTRACT_PROTOCOL_CONFORMANCE = decls_block::ABSTRACT_PROTOCOL_CONFORMANCE,
-    NORMAL_PROTOCOL_CONFORMANCE = decls_block::NORMAL_PROTOCOL_CONFORMANCE,
-    SPECIALIZED_PROTOCOL_CONFORMANCE
-      = decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE,
-    INHERITED_PROTOCOL_CONFORMANCE
-      = decls_block::INHERITED_PROTOCOL_CONFORMANCE,
-    INVALID_PROTOCOL_CONFORMANCE = decls_block::INVALID_PROTOCOL_CONFORMANCE,
-    GENERIC_REQUIREMENT = decls_block::GENERIC_REQUIREMENT,
-    LAYOUT_REQUIREMENT = decls_block::LAYOUT_REQUIREMENT,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -203,8 +191,8 @@ namespace sil_block {
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
                          // have empty witness tables.
-    BCFixed<1>           // IsSerialized.
-    // Conformance follows
+    BCFixed<1>,          // IsSerialized.
+    ProtocolConformanceIDField   // conformance
     // Witness table entries will be serialized after.
   >;
 
@@ -216,15 +204,15 @@ namespace sil_block {
 
   using WitnessBaseEntryLayout = BCRecordLayout<
     SIL_WITNESS_BASE_ENTRY,
-    DeclIDField  // ID of protocol decl
-    // Trailed by the conformance itself.
+    DeclIDField,               // ID of protocol decl
+    ProtocolConformanceIDField // ID of conformance
   >;
 
   using WitnessAssocProtocolLayout = BCRecordLayout<
     SIL_WITNESS_ASSOC_PROTOCOL,
     TypeIDField, // ID of associated type
-    DeclIDField  // ID of ProtocolDecl
-    // Trailed by the conformance itself if appropriate.
+    DeclIDField, // ID of ProtocolDecl
+    ProtocolConformanceIDField
   >;
 
   using WitnessAssocEntryLayout = BCRecordLayout<
@@ -235,8 +223,8 @@ namespace sil_block {
 
   using WitnessConditionalConformanceLayout = BCRecordLayout<
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
-    TypeIDField // ID of associated type
-    // Trailed by the conformance itself if appropriate.
+    TypeIDField, // ID of associated type
+    ProtocolConformanceIDField // ID of conformance
   >;
 
   using DefaultWitnessTableLayout = BCRecordLayout<
@@ -361,8 +349,7 @@ namespace sil_block {
     SILTypeCategoryField, // operand type category
     ValueIDField,         // operand id
     TypeIDField,          // formal concrete type
-    BCVBR<5>              // # of protocol conformances
-    // Trailed by protocol conformance info (if any)
+    BCArray<ProtocolConformanceIDField> // protocol conformances
   >;
 
   // SIL instructions with one type and a list of values.
@@ -482,8 +469,8 @@ namespace sil_block {
     TypeIDField,           // Optional
     SILTypeCategoryField,  // opened
     ValueIDField,          // existential
+    ProtocolConformanceIDField,    // conformance
     BCArray<ValueIDField>  // SILDeclRef
-    // may be trailed by an inline protocol conformance
   >;
 
   using SILInstDifferentiableFunctionLayout = BCRecordLayout<
