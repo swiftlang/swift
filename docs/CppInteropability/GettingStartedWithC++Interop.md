@@ -1,6 +1,6 @@
 #  Getting started with C++ Interoperability
 
-This document is desgined to get you started with bidirectional API-level interoperability between Swift and C++.
+This document is designed to get you started with bidirectional API-level interoperability between Swift and C++.
 
 ## Table of Contents
 
@@ -35,7 +35,7 @@ Add the C++ module to the include path and enable C++ interop:
 - Navigate to your project directory 
 - In `Project` navigate to `Build Settings` -> `Swift Compiler`
 - Under `Custom Flags` -> `Other Swift Flags` add`-Xfrontend -enable-cxx-interop`
-- Under `Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `./ProjectName/Cxx`).
+- Under `Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `./ProjectName/Cxx`). Repeat this step in `Other Swift Flags` 
 
 ```
 //Add to Other Swift Flags and Import Paths respectively
@@ -46,15 +46,14 @@ Add the C++ module to the include path and enable C++ interop:
 - This should now allow your to import your C++ Module into any `.swift` file.
 
 ```
-//In ViewController.swift
-import UIKit
+//In ContentView.swift
+import SwiftUI
 import Cxx
 
-class ViewController: UIViewController {
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        let result = cxxFunction(7)
-        print(result)
+struct ContentView: View {
+    var body: some View {
+        Text("Cxx function result: \(cxxFunction(7))")
+            .padding()
     }
 }
 ```
@@ -86,8 +85,8 @@ int cxxFunction(int n);
 After creating your Swift package project, follow the steps [Creating a Module to contain your C++ source code](#creating-a-module-to-contain-your-c-source-code) in your `Source` directory
 
 - In your Package Manifest, you need to configure the Swift target's dependencies and compiler flags
-- In this example the name of the package is `Cxx_Interop`
-- Swift code will be in `Sources/Cxx_Interop` called `main.swift`
+- In this example the name of the package is `CxxInterop`
+- Swift code will be in `Sources/CxxInterop` called `main.swift`
 - C++ source code follows the example shown in [Creating a Module to contain your C++ source code](#creating-a-module-to-contain-your-c-source-code)
 - Under targets, add the name of your C++ module and the directory containing the Swift code as a target.
 - In the target defining your Swift target, add a`dependencies` to the C++ Module, the `path`, `source`, and `swiftSettings` with `unsafeFlags` with the source to the C++ Module, and enable `-enable-cxx-interop`
@@ -98,15 +97,15 @@ After creating your Swift package project, follow the steps [Creating a Module t
 import PackageDescription
 
 let package = Package(
-    name: "Cxx_Interop",
+    name: "CxxInterop",
     platforms: [.macOS(.v12)],
     products: [
         .library(
             name: "Cxx",
             targets: ["Cxx"]),
         .library(
-            name: "Cxx_Interop",
-            targets: ["Cxx_Interop"]),
+            name: "CxxInterop",
+            targets: ["CxxInterop"]),
     ],
     targets: [
         .target(
@@ -114,9 +113,9 @@ let package = Package(
             dependencies: []
         ),
         .executableTarget(
-            name: "Cxx_Interop",
+            name: "CxxInterop",
             dependencies: ["Cxx"],
-            path: "./Sources/Cxx_Interop",
+            path: "./Sources/CxxInterop",
             sources: [ "main.swift" ],
             swiftSettings: [.unsafeFlags([
                 "-I", "Sources/Cxx",
@@ -135,14 +134,14 @@ let package = Package(
 
 import Cxx
 
-public struct Cxx_Interop {
+public struct CxxInterop {
     
     public func callCxxFunction(n: Int32) -> Int32 {
         return cxxFunction(n: n)
     }
 }
 
-print(Cxx_Interop().callCxxFunction(n: 7))
+print(CxxInterop().callCxxFunction(n: 7))
 //outputs: 7
 
 ```
@@ -161,7 +160,7 @@ After creating your project follow the steps [Creating a Module to contain your 
 
 cmake_minimum_required(VERSION 3.18)
 
-project(Cxx_Interop LANGUAGES CXX Swift)
+project(CxxInterop LANGUAGES CXX Swift)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
@@ -176,10 +175,10 @@ target_compile_options(cxx-support PRIVATE
 target_include_directories(cxx-support PUBLIC
   ${CMAKE_SOURCE_DIR}/Sources/Cxx)
 
-add_executable(Cxx_Interop ./Sources/Cxx_Interop/main.swift)
-target_compile_options(Cxx_Interop PRIVATE
+add_executable(CxxInterop ./Sources/CxxInterop/main.swift)
+target_compile_options(CxxInterop PRIVATE
   "SHELL:-Xfrontend -enable-cxx-interop"
-target_link_libraries(Cxx_Interop PRIVATE cxx-support)
+target_link_libraries(CxxInterop PRIVATE cxx-support)
 
 ```
 
@@ -188,14 +187,14 @@ target_link_libraries(Cxx_Interop PRIVATE cxx-support)
 
 import Cxx
 
-public struct Cxx_Interop {
+public struct CxxInterop {
     public static func main() {
         let result = cxxFunction(7)
         print(result)
     }
 }
 
-Cxx_Interop.main()
+CxxInterop.main()
 
 ```
 
