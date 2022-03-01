@@ -93,7 +93,8 @@ public struct DiagnosticEngine {
         }
       }
     }
-    for arg in args {
+    // 'reversed()' because the closure should be wrapped in that order.
+    for arg in args.reversed() {
       closure = { [closure, arg] in
         arg._withBridgedDiagnosticArgument { bridgedArg in
           bridgedArgs.append(bridgedArg)
@@ -101,7 +102,8 @@ public struct DiagnosticEngine {
         }
       }
     }
-    for fixIt in fixIts {
+    // 'reversed()' because the closure should be wrapped in that order.
+    for fixIt in fixIts.reversed() {
       closure = { [closure, fixIt] in
         fixIt.withBridgedDiagnosticFixIt { bridgedFixIt in
           bridgedFixIts.append(bridgedFixIt)
