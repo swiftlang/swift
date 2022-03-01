@@ -5475,6 +5475,32 @@ void swift::diagnoseConformanceFailure(Type T,
     return;
   }
 
+  // Special case: a distributed actor conformance often can fail because of
+  // a missing ActorSystem (or DefaultDistributedActorSystem) typealias.
+  // In this case, the "normal" errors are an avalanche of errors related to
+  // missing things in the actor that don't help users diagnose the root problem.
+  // Instead, we want to suggest adding the typealias.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
+    auto nominal = T->getNominalOrBoundGenericNominal();
+    if (!nominal)
+      return;
+
+    // If it is missing the ActorSystem type, suggest adding it:
+    // FIXME(distributed): use getDistributedActorSystemType(nominal); once merged
+    auto &C = nominal->getASTContext();
+    auto DA = C.getDistributedActorDecl();
+    Type selfType = nominal->getSelfInterfaceType();
+    auto conformance = nominal->getParentModule()->lookupConformance(selfType, DA);
+    auto systemTy = conformance.getTypeWitnessByName(selfType, C.Id_ActorSystem);
+
+    if (!systemTy || systemTy->hasError()) {
+      diags.diagnose(ComplainLoc,
+                     diag::distributed_actor_conformance_missing_system_type,
+                     nominal->getName());
+      return;
+    }
+  }
+
   // Special case: for enums with a raw type, explain that the failing
   // conformance to RawRepresentable was inferred.
   if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
