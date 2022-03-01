@@ -36,49 +36,38 @@ public class TopLevelClass {
 
 // MARK: - Unsupported declaration types
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public class CannotBackDeployClass {}
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public struct CannotBackDeployStruct {
-  @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' must not be used on stored properties}}
   public var cannotBackDeployStoredProperty: Int = 83
 
-  @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' must not be used on stored properties}}
   public lazy var cannotBackDeployLazyStoredProperty: Int = 15
 }
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public enum CannotBackDeployEnum {
-  @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
   case cannotBackDeployEnumCase
 }
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' must not be used on stored properties}}
 public var cannotBackDeployTopLevelVar = 79
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 extension TopLevelStruct {}
 
 // MARK: - Incompatible declarations
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' may not be used on fileprivate declarations}}
 fileprivate func filePrivateFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' may not be used on private declarations}}
 private func privateFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' may not be used on internal declarations}}
 internal func internalFunc() {}
 
@@ -130,27 +119,21 @@ public func transparentFunc() {}
 
 // MARK: - Attribute parsing
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0, unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@_backDeploy'}}
 public func unknownOSFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(@) // expected-error {{expected platform in '@_backDeploy' attribute}}
 public func badPlatformFunc1() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(@ 12.0) // expected-error {{expected platform in '@_backDeploy' attribute}}
 public func badPlatformFunc2() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS) // expected-error {{expected version number in '@_backDeploy' attribute}}
 public func missingVersionFunc1() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0, iOS) // expected-error {{expected version number in '@_backDeploy' attribute}}
 public func missingVersionFunc2() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS, iOS) // expected-error 2{{expected version number in '@_backDeploy' attribute}}
 public func missingVersionFunc3() {}
 
@@ -174,14 +157,11 @@ public func trailingWildcardFunc() {}
 @_backDeploy(macOS 12.0, *, iOS 15.0) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
 public func embeddedWildcardFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy() // expected-error {{expected at least one platform version in '@_backDeploy' attribute}}
 public func zeroPlatformVersionsFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy // expected-error {{expected '(' in '_backDeploy' attribute}}
 public func expectedLeftParenFunc() {}
 
-@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0 // expected-note {{to match this opening '('}}
 public func expectedRightParenFunc() {} // expected-error {{expected ')' in '@_backDeploy' argument list}}
