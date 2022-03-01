@@ -1030,10 +1030,8 @@ public:
   }
 
   void processClassMethod(DeclRefExpr *e, AbstractFunctionDecl *afd) {
-    // FIXME(backDeploy): Investigate support for back deployed class method
-    // calls
     assert(!afd->isBackDeployed() &&
-           "back deployed method calls are unsupported");
+           "cannot back deploy dynamically dispatched methods");
 
     ArgumentSource selfArgSource(selfApply->getBase());
     setSelfParam(std::move(selfArgSource));

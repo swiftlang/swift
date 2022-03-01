@@ -80,7 +80,7 @@ public:
             attr,
             isError ? diag::attr_not_on_decl_with_invalid_access_level
                     : diag::attr_has_no_effect_on_decl_with_access_level,
-            attr, VD->getFormalAccess());
+            attr, access.accessLevelForDiagnostics());
         return true;
       }
     }
@@ -3508,17 +3508,28 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
   // ABI version of the declaration when it is available.
   if (auto *AEICA = D->getAttrs().getAttribute<AlwaysEmitIntoClientAttr>()) {
     diagnoseAndRemoveAttr(AEICA, diag::attr_incompatible_with_back_deploy,
-                          AEICA);
+                          AEICA, D->getDescriptiveKind());
   }
 
   if (auto *IA = D->getAttrs().getAttribute<InlinableAttr>()) {
-    diagnoseAndRemoveAttr(IA, diag::attr_incompatible_with_back_deploy, IA);
+    diagnoseAndRemoveAttr(IA, diag::attr_incompatible_with_back_deploy, IA,
+                          D->getDescriptiveKind());
   }
 
   if (auto *TA = D->getAttrs().getAttribute<TransparentAttr>()) {
-    diagnoseAndRemoveAttr(TA, diag::attr_incompatible_with_back_deploy, TA);
+    diagnoseAndRemoveAttr(TA, diag::attr_incompatible_with_back_deploy, TA,
+                          D->getDescriptiveKind());
   }
 
+  // @objc conflicts with back deployment since it implies dynamic dispatch.
+  if (auto *OA = D->getAttrs().getAttribute<ObjCAttr>()) {
+    diagnose(OA->getLocation(), diag::attr_incompatible_with_back_deploy, OA,
+             D->getDescriptiveKind());
+  }
+
+  // Only functions, methods, computed properties, and subscripts are
+  // back-deployable, so D should be ValueDecl.
+  auto *VD = cast<ValueDecl>(D);
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
   for (auto *Attr : Attrs) {
@@ -3526,10 +3537,17 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/true))
       continue;
 
-    if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Back deployment isn't compatible with dynamic dispatch.
+    if (VD->isPotentiallyOverridable() && !VD->isFinal()) {
+      diagnose(Attr->getLocation(), diag::attr_incompatible_with_non_final,
+               Attr, D->getDescriptiveKind());
+      continue;
+    }
+
+    if (auto *VarD = dyn_cast<VarDecl>(D)) {
       // There must be a function body to back deploy so for vars we require
       // that they be computed in order to allow back deployment.
-      if (VD->hasStorageOrWrapsStorage()) {
+      if (VarD->hasStorageOrWrapsStorage()) {
         diagnoseAndRemoveAttr(Attr, diag::attr_not_on_stored_properties, Attr);
         continue;
       }
@@ -3556,9 +3574,6 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
     // fallback could never be executed at runtime.
     auto IntroVer = D->getIntroducedOSVersion(Platform);
     if (Attr->Version <= IntroVer.getValue()) {
-      // Only functions, methods, computed properties, and subscripts are
-      // back-deployable.
-      auto *VD = cast<ValueDecl>(D);
       diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before, Attr,
                VD->getName(), prettyPlatformString(Platform), Attr->Version);
       continue;

@@ -24,6 +24,7 @@ public struct TopLevelStruct {
   public var backDeployedComputedProperty: Int { 98 }
 }
 
+// OK: final function decls in a non-final class
 public class TopLevelClass {
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
@@ -31,7 +32,66 @@ public class TopLevelClass {
 
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
+  final public var backDeployedFinalComputedProperty: Int { 98 }
+
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public static func backDeployedStaticMethod() {}
+
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public final class func backDeployedClassMethod() {}
+}
+
+// OK: function decls in a final class
+final public class FinalTopLevelClass {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public func backDeployedMethod() {}
+
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
   public var backDeployedComputedProperty: Int { 98 }
+}
+
+// OK: final function decls on an actor
+@available(macOS 11.0, *)
+public actor TopLevelActor {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  final public func finalActorMethod() {}
+
+  // OK: actor methods are effectively final
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public func actorMethod() {}
+}
+
+// OK: function decls in extension on public types
+extension TopLevelStruct {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public func backDeployedExtensionMethod() {}
+}
+
+extension TopLevelClass {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  final public func backDeployedExtensionMethod() {}
+}
+
+extension FinalTopLevelClass {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public func backDeployedExtensionMethod() {}
+}
+
+public protocol TopLevelProtocol {}
+
+extension TopLevelProtocol {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public func backDeployedExtensionMethod() {}
 }
 
 // MARK: - Unsupported declaration types
@@ -60,6 +120,13 @@ public var cannotBackDeployTopLevelVar = 79
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 extension TopLevelStruct {}
 
+@_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
+protocol CannotBackDeployProtocol {}
+
+@available(macOS 11.0, *)
+@_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
+public actor CannotBackDeployActor {}
+
 // MARK: - Incompatible declarations
 
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' may not be used on fileprivate declarations}}
@@ -71,11 +138,22 @@ private func privateFunc() {}
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' may not be used on internal declarations}}
 internal func internalFunc() {}
 
-// FIXME(backDeploy): back deployed methods must be final
+private struct PrivateTopLevelStruct {
+  @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' may not be used on private declarations}}
+  public func effectivelyPrivateFunc() {}
+}
+
 public class TopLevelClass2 {
+  @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' cannot be applied to a non-final instance method}}
+  public func nonFinalMethod() {}
+
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
-  public func backDeployedNonFinalMethod() {}
+  @objc // expected-error {{'@objc' cannot be applied to a back deployed instance method}}
+  final public func objcMethod() {}
+
+  @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' cannot be applied to a non-final class method}}
+  public class func nonFinalClassMethod() {}
 }
 
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' requires that 'missingAllAvailabilityFunc()' have explicit availability for macOS}}
@@ -104,17 +182,17 @@ public func duplicatePlatformsFunc2() {}
 
 @available(macOS 11.0, *)
 @_backDeploy(macOS 12.0)
-@_alwaysEmitIntoClient // expected-error {{'@_alwaysEmitIntoClient' cannot be applied to back deployed declarations}}
+@_alwaysEmitIntoClient // expected-error {{'@_alwaysEmitIntoClient' cannot be applied to a back deployed global function}}
 public func alwaysEmitIntoClientFunc() {}
 
 @available(macOS 11.0, *)
 @_backDeploy(macOS 12.0)
-@inlinable // expected-error {{'@inlinable' cannot be applied to back deployed declarations}}
+@inlinable // expected-error {{'@inlinable' cannot be applied to a back deployed global function}}
 public func inlinableFunc() {}
 
 @available(macOS 11.0, *)
 @_backDeploy(macOS 12.0)
-@_transparent // expected-error {{'@_transparent' cannot be applied to back deployed declarations}}
+@_transparent // expected-error {{'@_transparent' cannot be applied to a back deployed global function}}
 public func transparentFunc() {}
 
 // MARK: - Attribute parsing

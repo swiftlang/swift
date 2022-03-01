@@ -3161,6 +3161,10 @@ ERROR(final_not_allowed_here,none,
       "'final' may only be applied to classes, properties, methods, and "
       "subscripts", ())
 
+ERROR(attr_incompatible_with_non_final,none,
+      "'%0' cannot be applied to a non-final %1",
+      (DeclAttribute, DescriptiveDeclKind))
+
 ERROR(final_not_on_accessors,none,
       "'final' cannot be applied to accessors, it must be put on the "
       "%select{var|let|subscript}0", (unsigned))
@@ -6291,7 +6295,8 @@ ERROR(cannot_convert_default_value_type_to_argument_type, none,
 //------------------------------------------------------------------------------
 
 ERROR(attr_incompatible_with_back_deploy,none,
-      "'%0' cannot be applied to back deployed declarations", (DeclAttribute))
+      "'%0' cannot be applied to a back deployed %1",
+      (DeclAttribute, DescriptiveDeclKind))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
