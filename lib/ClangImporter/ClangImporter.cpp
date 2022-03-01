@@ -477,6 +477,11 @@ static bool clangSupportsPragmaAttributeWithSwiftAttr() {
   return swiftAttrParsedInfo.IsSupportedByPragmaAttribute;
 }
 
+static inline bool isPCHFilenameExtension(StringRef path) {
+  return llvm::sys::path::extension(path)
+    .endswith(file_types::getExtension(file_types::TY_PCH));
+}
+
 static Optional<StringRef>
 getWasiLibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
                          SmallVectorImpl<char> &buffer) {
@@ -511,19 +516,6 @@ getWasiLibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
   }
 
   return None;
-}
-
-static bool clangSupportsPragmaAttributeWithSwiftAttr() {
-  clang::AttributeCommonInfo swiftAttrInfo(clang::SourceRange(),
-     clang::AttributeCommonInfo::AT_SwiftAttr,
-     clang::AttributeCommonInfo::AS_GNU);
-  auto swiftAttrParsedInfo = clang::ParsedAttrInfo::get(swiftAttrInfo);
-  return swiftAttrParsedInfo.IsSupportedByPragmaAttribute;
-}
-
-static inline bool isPCHFilenameExtension(StringRef path) {
-  return llvm::sys::path::extension(path)
-    .endswith(file_types::getExtension(file_types::TY_PCH));
 }
 
 void
