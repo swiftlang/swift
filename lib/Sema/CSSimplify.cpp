@@ -3135,8 +3135,18 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
         return result;
     }
 
+    // Arguments of parameterized protocol types have to match on the nose.
+    if (auto ppt1 = type1->getAs<ParameterizedProtocolType>()) {
+      auto ppt2 = type2->castTo<ParameterizedProtocolType>();
+      return matchDeepTypeArguments(*this, subflags,
+                                    ppt1->getArgs(),
+                                    ppt2->getArgs(),
+                                    locator);
+    }
+
     return getTypeMatchSuccess();
   }
+
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
     auto nominal2 = type2->castTo<NominalType>();
@@ -3448,6 +3458,40 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         break;
       }
     }
+  }
+
+  auto constraintType1 = type1;
+  if (auto existential = constraintType1->getAs<ExistentialType>())
+    constraintType1 = existential->getConstraintType();
+
+  auto constraintType2 = type2;
+  if (auto existential = constraintType2->getAs<ExistentialType>())
+    constraintType2 = existential->getConstraintType();
+
+  auto ppt1 = constraintType1->getAs<ParameterizedProtocolType>();
+  auto ppt2 = constraintType2->getAs<ParameterizedProtocolType>();
+
+  // With two parameterized protocols, we've already made sure conformance
+  // constraints are satisified. Try to match the arguments!
+  if (ppt1 && ppt2) {
+    return matchDeepTypeArguments(*this, subflags,
+                                  ppt1->getArgs(), ppt2->getArgs(),
+                                  locator);
+  } else if (!type1->isExistentialType() && ppt2) {
+    // Discharge the requirements of parameterized protocols.
+    // FIXME: Extend the locator path to point to the argument
+    // inducing the requirement.
+    SmallVector<Requirement, 2> reqs;
+    ppt2->getRequirements(type1, reqs);
+    for (const auto &req : reqs) {
+      auto result = matchTypes(req.getFirstType(), req.getSecondType(),
+                               ConstraintKind::Bind,
+                               subflags, locator);
+      if (result.isFailure())
+        return result;
+    }
+  } else if (ppt1 && !type2->isExistentialType()) {
+    llvm_unreachable("Malformed constraint!");
   }
 
   return getTypeMatchSuccess();
