@@ -68,10 +68,16 @@ extension String: BidirectionalCollection {
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
+    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+
+    // Note: bounds checking in `index(before:)` is tricky as scalar aligning an
+    // index may need to access storage, but it may also move it closer towards
+    // the `startIndex`. Therefore, we must check against the `endIndex` before
+    // aligning, but we need to delay the `i > startIndex` check until after.
+    _precondition(i <= endIndex, "String index is out of bounds")
+    let i = _guts.scalarAlign(i)
     _precondition(i > startIndex, "String index is out of bounds")
 
-    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
-    let i = _guts.scalarAlign(i)
     let stride = _characterStride(endingAt: i)
     let priorOffset = i._encodedOffset &- stride
     return Index(
