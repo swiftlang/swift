@@ -563,6 +563,10 @@ void RewriteSystem::simplifyRightHandSides() {
 
     unsigned newRuleID = Rules.size();
 
+    if (Debug.contains(DebugFlags::Add)) {
+      llvm::dbgs() << "## RHS simplification adds a rule " << lhs << " => " << rhs << "\n\n";
+    }
+
     // Add a new rule with the simplified right hand side.
     Rules.emplace_back(lhs, Term::get(rhs, Context));
     auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), newRuleID);
