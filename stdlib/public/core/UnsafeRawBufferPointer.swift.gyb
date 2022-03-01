@@ -509,8 +509,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// memory referenced by this buffer are initialized to raw bytes. If the
   /// memory is bound to type `T`, then it contains values of type `T`.
   ///
-  /// - Parameter source: A buffer of raw bytes from which to copy.
-  ///   `source.count` must be less than or equal to this buffer's `count`.
+  /// - Parameter source: A buffer of raw bytes. `source.count` must
+  ///   be less than or equal to this buffer's `count`.
   @inlinable
   public func copyMemory(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
@@ -527,7 +527,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// must be properly aligned for accessing `T`, and `source.count` must be a
   /// multiple of `MemoryLayout<T>.stride`.
   ///
-  /// After calling `copyBytes(from:)`, the `source.count` bytes of memory
+  /// After calling `copyBytes(from:)`, the first `source.count` bytes of memory
   /// referenced by this buffer are initialized to raw bytes. If the memory is
   /// bound to type `T`, then it contains values of type `T`.
   ///
@@ -714,9 +714,10 @@ extension Unsafe${Mutable}RawBufferPointer {
       return UnsafeMutableBufferPointer<T>(start: nil, count: 0)
     }
     
-    let count = (_end._unsafelyUnwrappedUnchecked - base) / MemoryLayout<T>.stride
-    let typed = base.initializeMemory(
-      as: type, repeating: repeatedValue, count: count)
+    let count = (_end._unsafelyUnwrappedUnchecked-base) / MemoryLayout<T>.stride
+    let typed = base.initializeMemory(as: type,
+                                      repeating: repeatedValue,
+                                      count: count)
     return UnsafeMutableBufferPointer<T>(start: typed, count: count)
   }
 
@@ -737,7 +738,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// `S.Element`.
   ///
   /// - Parameters:
-  ///   - type: The type of the elements to bind the buffer's memory to.
+  ///   - type: The type of element to which this buffer's memory will be bound.
   ///   - source: A sequence of elements with which to initialize the buffer.
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
   ///   buffer, and a typed buffer of the written elements. The returned
@@ -780,6 +781,122 @@ extension Unsafe${Mutable}RawBufferPointer {
                   start: base.assumingMemoryBound(to: S.Element.self), 
                   count: idx / elementStride))
   }
+
+  /// Initializes the buffer's memory with the given elements, binding the
+  /// initialized memory to the elements' type.
+  ///
+  /// When calling the `initializeMemory(as:fromElements:)` method on a buffer
+  /// `b`, the memory referenced by `b` must be uninitialized, or initialized
+  /// to a trivial type. `b` must be properly aligned for accessing `C.Element`.
+  ///
+  /// This method initializes the buffer with the contents of `fromElements`
+  /// until `fromElements` is exhausted or the buffer runs out of available
+  /// space. After calling `initializeMemory(as:fromElements:)`, the memory
+  /// referenced by the returned `UnsafeMutableBufferPointer` instance is bound
+  /// and initialized to type `C.Element`. This method does not change
+  /// the binding state of the unused portion of `b`, if any.
+  ///
+  /// - Parameters:
+  ///   - type: The type of element to which this buffer's memory will be bound.
+  ///   - fromElements: A collection of elements to be used to
+  ///     initialize the buffer's storage.
+  /// - Returns: A typed buffer of the initialized elements. The returned
+  ///   buffer references memory starting at the same base address as this
+  ///   buffer, and its count indicates the number of elements copied from
+  ///   the collection `elements`.
+  @discardableResult
+  public func initializeMemory<C: Collection>(
+    as type: C.Element.Type,
+    fromElements source: C
+  ) -> UnsafeMutableBufferPointer<C.Element> {
+    var count = source.count
+    guard let base = _position, let end = _end, end > base, count > 0 else {
+      return UnsafeMutableBufferPointer(start: nil, count: 0)
+    }
+    count = Swift.min((end - base)/MemoryLayout<C.Element>.stride, count)
+
+    if let start = source.withContiguousStorageIfAvailable({
+      base.initializeMemory(
+        as: C.Element.self,
+        from: $0.baseAddress._unsafelyUnwrappedUnchecked,
+        count: count
+      )
+    }) {
+      return UnsafeMutableBufferPointer(start: start, count: count)
+    }
+
+    let start = base.bindMemory(to: C.Element.self, capacity: count)
+    for (pointer, element) in zip(start..<start.advanced(by: count), source) {
+      pointer.initialize(to: element)
+    }
+    return UnsafeMutableBufferPointer(start: start, count: count)
+  }
+
+  /// Moves every instance of an initialized source buffer into the
+  /// uninitialized memory referenced by this buffer, leaving the source memory
+  /// uninitialized and this buffer's memory initialized.
+  ///
+  /// When calling the `moveInitializeMemory(as:fromElements:)` method on
+  /// a buffer `b`, the memory referenced by `b` must be uninitialized,
+  /// or must be be initialized to a trivial type. The base address of `b` must
+  /// be properly aligned for accessing `C.Element`. After the method returns,
+  /// the memory referenced by the returned buffer is initialized and the
+  /// memory region underlying `source` is uninitialized.
+  ///
+  /// - Parameters:
+  ///   - type: The type of element to which this buffer's memory will be bound.
+  ///   - fromElements: A buffer containing the values to copy.
+  ///     The memory region underlying `source` must be initialized.
+  ///     The memory regions referenced by `source` and this buffer may overlap.
+  /// - Returns: A typed buffer of the initialized elements. The returned
+  ///   buffer references memory starting at the same base address as this
+  ///   buffer, and it contains every element copied from `source`.
+  @discardableResult
+  public func moveInitializeMemory<T>(
+    as type: T.Type,
+    fromElements source: UnsafeMutableBufferPointer<T>
+  ) -> UnsafeMutableBufferPointer<T> {
+    guard let sourceBase = source.baseAddress
+      else { return UnsafeMutableBufferPointer(start: nil, count: 0) }
+
+    let neededBytes = source.count*MemoryLayout<T>.stride
+    guard let base = _position, count >= neededBytes
+      else { _debugPreconditionFailure("destination has too few bytes") }
+
+    let initialized = base.moveInitializeMemory(as: T.self,
+                                                from: sourceBase,
+                                                count: source.count)
+    return UnsafeMutableBufferPointer(start: initialized, count: source.count)
+  }
+
+  /// Moves every instance of an initialized source buffer slice into the
+  /// uninitialized memory referenced by this buffer, leaving the source memory
+  /// uninitialized and this buffer's memory initialized.
+  ///
+  /// When calling the `moveInitializeMemory(as:fromElements:)` method on
+  /// a buffer `b`, the memory referenced by `b` must be uninitialized,
+  /// or must be be initialized to a trivial type. The base address of `b` must
+  /// be properly aligned for accessing `C.Element`. After the method returns,
+  /// the memory referenced by the returned buffer is initialized and the
+  /// memory region underlying `source` is uninitialized.
+  ///
+  /// - Parameters:
+  ///   - type: The type of element to which this buffer's memory will be bound.
+  ///   - fromElements: A buffer containing the values to copy.
+  ///     The memory region underlying `source` must be initialized.
+  ///     The memory regions referenced by `source` and this buffer may overlap.
+  /// - Returns: A typed buffer of the initialized elements. The returned
+  ///   buffer references memory starting at the same base address as this
+  ///   buffer, and it contains every element copied from `source`.
+  @discardableResult
+  public func moveInitializeMemory<T>(
+    as type: T.Type,
+    fromElements source: Slice<UnsafeMutableBufferPointer<T>>
+  ) -> UnsafeMutableBufferPointer<T> {
+    let rebased = UnsafeMutableBufferPointer(rebasing: source)
+    return moveInitializeMemory(as: T.self, fromElements: rebased)
+  }
+
   %  end # mutable
 
   /// Binds this buffer’s memory to the specified type and returns a typed buffer 
