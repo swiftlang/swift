@@ -78,5 +78,14 @@ BinaryScanningTool::collectConformances(const std::vector<std::string> &protocol
   }
 }
 
+AssociatedTypeCollectionResult
+BinaryScanningTool::collectAssociatedTypes(const std::string &mangledTypeName) {
+  return Context->Builder.collectAssociatedTypes(mangledTypeName);
+}
+
+AssociatedTypeCollectionResult
+BinaryScanningTool::collectAllAssociatedTypes() {
+  return Context->Builder.collectAssociatedTypes(llvm::Optional<std::string>());
+}
 } // end namespace static_mirror
 } // end namespace swift

@@ -25,6 +25,7 @@
 #include "swift/Remote/MetadataReader.h"
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 
 using namespace swift;
 using namespace reflection;
@@ -457,31 +458,71 @@ void TypeRefBuilder::dumpFieldSection(std::ostream &stream) {
   }
 }
 
-void TypeRefBuilder::dumpAssociatedTypeSection(std::ostream &stream) {
+AssociatedTypeCollectionResult TypeRefBuilder::collectAssociatedTypes(
+    llvm::Optional<std::string> forMangledTypeName) {
+  AssociatedTypeCollectionResult result;
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.AssociatedType) {
-      auto conformingTypeNode = demangleTypeRef(
-          readTypeRef(descriptor, descriptor->ConformingTypeName));
-      auto conformingTypeName = nodeToString(conformingTypeNode);
+      auto typeRef = readTypeRef(descriptor, descriptor->ConformingTypeName);
+      auto typeName = nodeToString(demangleTypeRef(typeRef));
+      auto optionalMangledTypeName = normalizeReflectionName(typeRef);
       auto protocolNode = demangleTypeRef(
           readTypeRef(descriptor, descriptor->ProtocolTypeName));
       auto protocolName = nodeToString(protocolNode);
       clearNodeFactory();
+      if (optionalMangledTypeName.hasValue()) {
+        auto mangledTypeName =
+            optionalMangledTypeName.getValue().insert(0, "$s");
+        if (forMangledTypeName.hasValue()) {
+          if (mangledTypeName != forMangledTypeName.getValue())
+            continue;
+        }
+        std::vector<AssociatedType> associatedTypes;
+        for (const auto &associatedTypeRef : *descriptor.getLocalBuffer()) {
+          auto associatedType = descriptor.getField(associatedTypeRef);
+          std::string typealiasTypeName =
+              getTypeRefString(
+                  readTypeRef(associatedType, associatedType->Name))
+                  .str();
 
-      stream << "- " << conformingTypeName << " : " << protocolName << "\n";
-
-      for (const auto &associatedTypeRef : *descriptor.getLocalBuffer()) {
-        auto associatedType = descriptor.getField(associatedTypeRef);
-
-        std::string name =
-            getTypeRefString(readTypeRef(associatedType, associatedType->Name))
-                .str();
-        stream << "typealias " << name << " = ";
-        dumpTypeRef(
-            readTypeRef(associatedType, associatedType->SubstitutedTypeName),
-            stream);
+          std::string mangledSubstitutedTypeName =
+              std::string(associatedType->SubstitutedTypeName);
+          auto substitutedTypeRef =
+              readTypeRef(associatedType, associatedType->SubstitutedTypeName);
+          auto optionalMangledSubstitutedTypeName =
+              normalizeReflectionName(substitutedTypeRef);
+          if (optionalMangledSubstitutedTypeName.hasValue()) {
+            mangledSubstitutedTypeName =
+                "$s" + optionalMangledSubstitutedTypeName.getValue();
+          }
+          auto substitutedDemangleTree = demangleTypeRef(substitutedTypeRef);
+          auto substitutedTypeName = nodeToString(substitutedDemangleTree);
+          std::stringstream OS;
+          dumpTypeRef(substitutedTypeRef, OS);
+          associatedTypes.emplace_back(
+              AssociatedType{typealiasTypeName, mangledSubstitutedTypeName,
+                             substitutedTypeName, OS.str()});
+        }
+        result.AssociatedTypeInfos.emplace_back(AssociatedTypeInfo{
+            mangledTypeName, typeName, protocolName, associatedTypes});
       }
     }
+  }
+  return result;
+}
+
+void TypeRefBuilder::dumpAssociatedTypeSection(std::ostream &stream) {
+  auto associatedTypeCollectionResult =
+      collectAssociatedTypes(llvm::Optional<std::string>());
+  for (const auto &info : associatedTypeCollectionResult.AssociatedTypeInfos) {
+    stream << "- " << info.FullyQualifiedName << " : "
+           << info.ProtocolFullyQualifiedName << "\n";
+    for (const auto &typeAlias : info.AssociatedTypes) {
+      stream << "typealias " << typeAlias.TypeAliasName << " = "
+             << typeAlias.SubstitutedTypeFullyQualifiedName << "\n";
+      stream << typeAlias.SubstitutedTypeDiagnosticPrintName;
+    }
+    stream << "\n";
   }
 }
 
