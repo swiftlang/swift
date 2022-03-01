@@ -174,14 +174,19 @@ cleanupAfterCall(FullApplySite apply,
 // that lowers values to storage.
 //===----------------------------------------------------------------------===//
 
-/// If \p pseudoResult has multiple results, return the destructure.
-static DestructureTupleInst *getCallMultiResult(SILValue pseudoResult) {
-  if (pseudoResult->getType().is<TupleType>()) {
-    if (auto *use = pseudoResult->getSingleUse())
-      return cast<DestructureTupleInst>(use->getUser());
+/// If \p pseudoResult represents multiple results and at least one result is
+/// used, then return the destructure.
+static DestructureTupleInst *getCallDestructure(FullApplySite apply) {
+  if (apply.getSubstCalleeConv().getNumDirectSILResults() == 1)
+    return nullptr;
 
-    assert(pseudoResult->use_empty() && "pseudo result can't be used");
-  }
+  SILValue pseudoResult = apply.getResult();
+  assert(pseudoResult->getType().is<TupleType>());
+  if (auto *use = pseudoResult->getSingleUse())
+    return cast<DestructureTupleInst>(use->getUser());
+
+  assert(pseudoResult->use_empty()
+         && "pseudo result can only be used by a single destructure_tuple");
   return nullptr;
 }
 
@@ -205,19 +210,18 @@ static bool
 visitCallResults(FullApplySite apply,
                  llvm::function_ref<bool(SILValue, SILResultInfo)> visitor) {
   auto fnConv = apply.getSubstCalleeConv();
-  SILValue pseudoResult = apply.getPseudoResult();
-  if (auto *destructure = getCallMultiResult(pseudoResult)) {
+  if (auto *destructure = getCallDestructure(apply)) {
     return visitCallMultiResults(destructure, fnConv, visitor);
   }
-  return visitor(pseudoResult, *fnConv.getDirectSILResults().begin());
+  return visitor(apply.getResult(), *fnConv.getDirectSILResults().begin());
 }
 
 /// Return true if the given value is either a "fake" tuple that represents all
 /// of a call's results or an empty tuple of no results. This may return true
 /// for either tuple_inst or a block argument.
 static bool isPseudoCallResult(SILValue value) {
-  if (isa<ApplyInst>(value))
-    return value->getType().is<TupleType>();
+  if (auto *apply = dyn_cast<ApplyInst>(value))
+    return ApplySite(apply).getSubstCalleeConv().getNumDirectSILResults() > 1;
 
   auto *bbArg = dyn_cast<SILPhiArgument>(value);
   if (!bbArg)
@@ -227,11 +231,18 @@ static bool isPseudoCallResult(SILValue value) {
   if (!term)
     return false;
 
-  return isa<TryApplyInst>(term) && bbArg->getType().is<TupleType>();
+  auto *tryApply = dyn_cast<TryApplyInst>(term);
+  if (!tryApply)
+    return false;
+
+  return ApplySite(tryApply).getSubstCalleeConv().getNumDirectSILResults() > 1;
 }
 
 /// Return true if this is a pseudo-return value.
 static bool isPseudoReturnValue(SILValue value) {
+  if (value->getFunction()->getConventions().getNumDirectSILResults() < 2)
+    return false;
+
   if (auto *tuple = dyn_cast<TupleInst>(value)) {
     Operand *singleUse = tuple->getSingleUse();
     return singleUse && isa<ReturnInst>(singleUse->getUser());
@@ -261,9 +272,12 @@ static SILValue getTupleStorageValue(Operand *operand) {
   if (!singleUse || !isa<ReturnInst>(singleUse->getUser()))
     return tuple;
 
+  SILFunction *function = tuple->getFunction();
+  if (function->getConventions().getNumDirectSILResults() < 2)
+    return tuple;
+
   unsigned resultIdx = tuple->getElementIndex(operand);
 
-  SILFunction *function = tuple->getFunction();
   auto loweredFnConv = getLoweredFnConv(function);
   assert(loweredFnConv.getResults().size() == tuple->getElements().size());
 
@@ -279,11 +293,11 @@ static SILValue getTupleStorageValue(Operand *operand) {
 
 /// Return the value representing storage for a single return value.
 ///
-///   bb0(%loweredIndirectResult : $*T, ...)
+///   bb0(%loweredIndirectResult : $*T, ...) // function entry
 ///     return %oper
 ///
 ///   For %oper, return %loweredIndirectResult
-static SILValue getSingleReturnValue(Operand *operand) {
+static SILValue getSingleReturnAddress(Operand *operand) {
   assert(!isPseudoReturnValue(operand->get()));
 
   auto *function = operand->getParentFunction();
@@ -612,7 +626,7 @@ void OpaqueValueVisitor::visitValue(SILValue value) {
 
 // Canonicalize returned values.
 //
-// Given:
+// Given $() -> @out (T, T):
 //   %t = def  : $(T, T)
 //   use %t    : $(T, T)
 //   return %t : $(T, T)
@@ -807,7 +821,7 @@ static SILValue getProjectedUseValue(Operand *operand) {
 
   // Return instructions can project into the return value.
   case SILInstructionKind::ReturnInst:
-    return getSingleReturnValue(operand);
+    return getSingleReturnAddress(operand);
   }
   return SILValue();
 }
@@ -1420,9 +1434,7 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
   }
   case SILInstructionKind::TupleInst: {
     auto *tupleInst = cast<TupleInst>(user);
-    // Function return values.
-    if (tupleInst->hasOneUse()
-        && isa<ReturnInst>(tupleInst->use_begin()->getUser())) {
+    if (isPseudoReturnValue(tupleInst)) {
       unsigned resultIdx = tupleInst->getElementIndex(operand);
       assert(resultIdx < pass.loweredFnConv.getNumIndirectSILResults());
       // Cannot call getIndirectSILResults here because that API uses the
@@ -1830,9 +1842,8 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   // Populate newCallArgs.
   makeIndirectArgs(newCallArgs);
 
-  // Record the original results before potentially removing the apply
-  // (try_apply is removed during rewriting).
-  auto *destructure = getCallMultiResult(apply.getPseudoResult());
+  // Record the original result destructure before deleting a try_apply.
+  auto *destructure = getCallDestructure(apply);
 
   switch (apply.getKind()) {
   case FullApplySiteKind::ApplyInst: {
@@ -2071,7 +2082,7 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
       tryApply->getNormalBB(), tryApply->getErrorBB(),
       tryApply->getApplyOptions(), tryApply->getSpecializationInfo());
 
-  auto *resultArg = cast<SILArgument>(apply.getPseudoResult());
+  auto *resultArg = cast<SILArgument>(apply.getResult());
 
   auto replaceTermResult = [&](SILValue newResultVal) {
     SILType resultTy = loweredCalleeConv.getSILResultType(typeCtx);
@@ -2091,8 +2102,6 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
 
   // Handle a single opaque result value.
   if (pass.valueStorageMap.contains(resultArg)) {
-    assert(!resultArg->getType().is<TupleType>());
-
     // Storage was materialized by materializeIndirectResultAddress.
     auto &origStorage = pass.valueStorageMap.getStorage(resultArg);
     assert(origStorage.isRewritten);
@@ -2142,7 +2151,7 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
 //   // no uses of %d1, %d2
 //
 void ApplyRewriter::replaceDirectResults(DestructureTupleInst *oldDestructure) {
-  SILValue newPseudoResult = apply.getPseudoResult();
+  SILValue newPseudoResult = apply.getResult();
 
   DestructureTupleInst *newDestructure = nullptr;
   if (loweredCalleeConv.getNumDirectSILResults() > 1) {
@@ -2950,7 +2959,7 @@ static void rewriteIndirectApply(FullApplySite apply,
   ApplyRewriter(apply, pass).convertApplyWithIndirectResults();
 
   if (!apply.getInstruction()->isDeleted()) {
-    assert(!getCallMultiResult(apply.getPseudoResult())
+    assert(!getCallDestructure(apply)
            && "replaceDirectResults deletes the destructure");
     pass.deleter.forceDelete(apply.getInstruction());
   }

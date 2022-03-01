@@ -38,13 +38,13 @@ namespace swift {
 /// After allocation, before materialization or rewriting, we may have:
 ///
 ///   %result_addr = alloc_stack       // storage for %result
-///   %result = apply () -> @out T
+///   %result = apply : $() -> @out T
 ///   %extract = struct_extact %result // def-projection of %result
 ///
 /// Or, a projection may project into a composing use (use-projection):
 ///
-///   %struct_addr = alloc_stack     // storage for %struct
-///   %result = apply () -> @out T   // use-projection of %struct at operand #0
+///   %struct_addr = alloc_stack      // storage for %struct
+///   %result = apply : $() -> @out T // use-projection of %struct at operand #0
 ///   %struct = struct %result
 ///
 /// A phi-projection is a use projection that projects its entire value
