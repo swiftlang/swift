@@ -133,7 +133,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
         CodeCompletionString::create(sink.allocator, chunk);
     auto *contextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-            sink.allocator, CodeCompletionResultKind::Pattern, completionString,
+            sink.swiftSink, CodeCompletionResultKind::Pattern, completionString,
             CodeCompletionOperatorKind::None, /*BriefDocComment=*/"",
             CodeCompletionResultType::unknown(),
             ContextFreeNotRecommendedReason::None,
@@ -142,7 +142,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
         *contextFreeResult, SemanticContextKind::Local,
         CodeCompletionFlairBit::ExpressionSpecific,
         /*NumBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
-        ContextualNotRecommendedReason::None,
+        /*USRTypeContext=*/nullptr, ContextualNotRecommendedReason::None,
         CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
 
     CompletionBuilder builder(sink, *swiftResult);

@@ -390,7 +390,7 @@ public:
   /// StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
   static ContextFreeCodeCompletionResult *createPatternOrBuiltInOperatorResult(
-      llvm::BumpPtrAllocator &Allocator, CodeCompletionResultKind Kind,
+      CodeCompletionResultSink &Sink, CodeCompletionResultKind Kind,
       CodeCompletionString *CompletionString,
       CodeCompletionOperatorKind KnownOperatorKind,
       NullTerminatedStringRef BriefDocComment,
@@ -405,7 +405,7 @@ public:
   /// \p BriefDocComment outlive this result, typically by storing them in
   /// the same \c CodeCompletionResultSink as the result itself.
   static ContextFreeCodeCompletionResult *
-  createKeywordResult(llvm::BumpPtrAllocator &Allocator,
+  createKeywordResult(CodeCompletionResultSink &Sink,
                       CodeCompletionKeywordKind Kind,
                       CodeCompletionString *CompletionString,
                       NullTerminatedStringRef BriefDocComment,
@@ -417,7 +417,7 @@ public:
   /// result, typically by storing them in the same \c CodeCompletionResultSink
   /// as the result itself.
   static ContextFreeCodeCompletionResult *
-  createLiteralResult(llvm::BumpPtrAllocator &Allocator,
+  createLiteralResult(CodeCompletionResultSink &Sink,
                       CodeCompletionLiteralKind LiteralKind,
                       CodeCompletionString *CompletionString,
                       CodeCompletionResultType ResultType);
@@ -428,7 +428,7 @@ public:
   /// \c StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
   static ContextFreeCodeCompletionResult *createDeclResult(
-      llvm::BumpPtrAllocator &Allocator, CodeCompletionString *CompletionString,
+      CodeCompletionResultSink &Sink, CodeCompletionString *CompletionString,
       const Decl *AssociatedDecl, NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
@@ -566,6 +566,8 @@ public:
   /// information.
   /// This computes the type relation between the completion item and its
   /// expected type context.
+  /// See \c CodeCompletionResultType::calculateTypeRelation for documentation
+  /// on \p USRTypeContext.
   /// The \c ContextFree result must outlive this result. Typically, this is
   /// done by allocating the two in the same sink or adopting the context free
   /// sink in the sink that allocates this result.
@@ -574,6 +576,7 @@ public:
                        CodeCompletionFlair Flair, uint8_t NumBytesToErase,
                        const ExpectedTypeContext *TypeContext,
                        const DeclContext *DC,
+                       const USRBasedTypeContext *USRTypeContext,
                        ContextualNotRecommendedReason NotRecommended,
                        CodeCompletionDiagnosticSeverity DiagnosticSeverity,
                        NullTerminatedStringRef DiagnosticMessage);
