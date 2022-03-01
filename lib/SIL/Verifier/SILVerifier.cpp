@@ -5832,7 +5832,9 @@ public:
 
     // Make sure that our SILFunction only has context generic params if our
     // SILFunctionType is non-polymorphic.
-    if (F->getGenericEnvironment()) {
+    if (F->getGenericEnvironment() &&
+        !F->getGenericEnvironment()->getGenericSignature()
+            ->areAllParamsConcrete()) {
       require(FTy->isPolymorphic(),
               "non-generic function definitions cannot have a "
               "generic environment");
