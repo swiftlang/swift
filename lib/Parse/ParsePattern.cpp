@@ -1170,7 +1170,10 @@ ParserResult<Pattern> Parser::parsePattern() {
     // In our recursive parse, remember that we're in a var/let pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
     T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
-    
+
+    // Reset async attribute in parser context.
+    llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
     ParserResult<Pattern> subPattern = parsePattern();
     if (subPattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
@@ -1379,6 +1382,9 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   // In our recursive parse, remember that we're in a var/let pattern.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
     T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+
+  // Reset async attribute in parser context.
+  llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
 
   ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic);
   if (subPattern.isNull())

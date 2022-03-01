@@ -6851,10 +6851,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
                      SourceLoc TryLoc,
                      bool HasLetOrVarKeyword) {
   assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
-  // Track whether we are parsing an 'async let' pattern.
-  const auto hasAsyncAttr = Attributes.hasAttribute<AsyncAttr>();
-  llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute,
-                                       hasAsyncAttr);
 
   if (StaticLoc.isValid()) {
     if (!Flags.contains(PD_HasContainerType)) {
@@ -6949,6 +6945,11 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // In our recursive parse, remember that we're in a var/let pattern.
       llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+
+      // Track whether we are parsing an 'async let' pattern.
+      const auto hasAsyncAttr = Attributes.hasAttribute<AsyncAttr>();
+      llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute,
+                                           hasAsyncAttr);
 
       auto patternRes = parseTypedPattern();
       if (patternRes.hasCodeCompletion())
@@ -7630,7 +7631,11 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
         T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
         parseMatchingPattern(/*isExprBasic*/false);
-        
+
+        // Reset async attribute in parser context.
+        llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute,
+                                             false);
+
         if (consumeIf(tok::colon)) {
           backtrack.cancelBacktrack();
           diagnose(CaseLoc, diag::case_outside_of_switch, "case");

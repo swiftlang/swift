@@ -759,7 +759,7 @@ public:
     if (auto *SAE = dyn_cast<SelfApplyExpr>(E)) {
       assert(!E->isImplicitlyAsync());
 
-      if (ClassifySelfApplyExpr && !SAE->getBase()->isImplicit()) {
+      if (ClassifySelfApplyExpr) {
         auto fnType = E->getType()->getAs<AnyFunctionType>();
         if (fnType && fnType->isThrowing()) {
           return Classification::forUnconditional(
