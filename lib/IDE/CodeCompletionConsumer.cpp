@@ -134,8 +134,8 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     assert(V.hasValue());
     auto newItems = copyCodeCompletionResults(
         context.getResultSink(), **V, R.OnlyTypes, R.OnlyPrecedenceGroups);
-    postProcessResults(newItems, context.CodeCompletionKind, DC,
-                       &context.getResultSink());
+    postProcessCompletionResults(newItems, context.CodeCompletionKind, DC,
+                                 &context.getResultSink());
   }
 
   handleResults(context);

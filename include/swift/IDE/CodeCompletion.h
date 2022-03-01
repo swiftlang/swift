@@ -61,9 +61,9 @@ ArrayRef<T> copyArray(llvm::BumpPtrAllocator &Allocator,
 
 bool isDynamicLookup(Type T);
 
-void postProcessResults(MutableArrayRef<CodeCompletionResult *> results,
-                        CompletionKind Kind, DeclContext *DC,
-                        CodeCompletionResultSink *Sink);
+void postProcessCompletionResults(
+    MutableArrayRef<CodeCompletionResult *> results, CompletionKind Kind,
+    DeclContext *DC, CodeCompletionResultSink *Sink);
 
 void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                               CompletionLookup &Lookup, DeclContext *DC,
