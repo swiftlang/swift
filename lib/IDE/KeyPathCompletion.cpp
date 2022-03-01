@@ -73,8 +73,7 @@ void KeyPathTypeCheckCompletionCallback::sawSolution(
   Results.push_back({BaseType, /*OnRoot=*/(ComponentIndex == 0)});
 }
 
-void swift::ide::deliverKeyPathResults(
-    ArrayRef<KeyPathTypeCheckCompletionCallback::Result> Results,
+void KeyPathTypeCheckCompletionCallback::deliverResults(
     DeclContext *DC, SourceLoc DotLoc,
     ide::CodeCompletionContext &CompletionCtx,
     CodeCompletionConsumer &Consumer) {
