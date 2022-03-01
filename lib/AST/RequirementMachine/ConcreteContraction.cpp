@@ -532,7 +532,7 @@ bool ConcreteContraction::performConcreteContraction(
     //
     // FIXME: Do we need to check for errors? Right now they're just ignored.
     SmallVector<Requirement, 4> reqs;
-    SmallVector<RequirementError> errors;
+    SmallVector<RequirementError, 1> errors;
     desugarRequirement(*substReq, reqs, errors);
     for (auto desugaredReq : reqs) {
       if (Debug) {
