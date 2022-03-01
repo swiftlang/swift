@@ -499,9 +499,11 @@ ${SelfName}TestSuite.test("withMemoryReboundSE0333") {
 }
 
 ${SelfName}TestSuite.test("withMemoryReboundSE0333.capacity1") {
-  let mutablePtr = UnsafeMutablePointer<(Int,Bool,UInt8)>.allocate(capacity: 1)
+  let mutablePtr = UnsafeMutablePointer<(Int,Bool,Int64)>.allocate(capacity: 1)
+  let i = Int.random(in: 0 ... .max)
+  mutablePtr.initialize(to: (i, i.isMultiple(of: 2), Int64(0xff & i)))
   defer { mutablePtr.deallocate() }
-  let ptr = ${SelfName}<(Int, Bool, UInt8)>(mutablePtr)
+  let ptr = ${SelfName}<(Int, Bool, Int64)>(mutablePtr)
   // test rebinding to a shorter type with the same alignment
   ptr.withMemoryRebound(to: (Int, Bool).self, capacity: 1) {
     // Make sure the closure argument is a ${SelfName}
@@ -509,6 +511,8 @@ ${SelfName}TestSuite.test("withMemoryReboundSE0333.capacity1") {
     // and that the element is (Int, Bool).
     let mutablePtrT = UnsafeMutablePointer(mutating: ptrT)
     expectType((Int, Bool).self, &mutablePtrT.pointee)
+    expectEqual($0.pointee.0, i)
+    expectEqual($0.pointee.1, i.isMultiple(of: 2))
   }
 }
 
