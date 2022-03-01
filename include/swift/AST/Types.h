@@ -6528,7 +6528,8 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 inline Type TypeBase::getNominalParent() {
   if (auto existential = getAs<ExistentialType>())
     return existential->getConstraintType()->getNominalParent();
-
+  if (auto ppt = getAs<ParameterizedProtocolType>())
+    return ppt->getBaseType()->getNominalParent();
   return castTo<AnyGenericType>()->getParent();
 }
 

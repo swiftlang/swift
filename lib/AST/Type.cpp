@@ -106,6 +106,8 @@ NominalTypeDecl *CanType::getAnyNominal() const {
 GenericTypeDecl *CanType::getAnyGeneric() const {
   if (auto existential = dyn_cast<ExistentialType>(*this))
     return existential->getConstraintType()->getAnyGeneric();
+  if (auto ppt = dyn_cast<ParameterizedProtocolType>(*this))
+    return ppt->getBaseType()->getDecl();
   if (auto Ty = dyn_cast<AnyGenericType>(*this))
     return Ty->getDecl();
   return nullptr;
