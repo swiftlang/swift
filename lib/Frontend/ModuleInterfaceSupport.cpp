@@ -197,12 +197,22 @@ static void printImports(raw_ostream &out,
   // imports and filter them later.
   llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> ioiImportSet;
   if (Opts.PrintSPIs && Opts.ExperimentalSPIImports) {
-    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
 
-    SmallVector<ImportedModule, 4> ioiImport;
-    M->getImportedModules(ioiImport,
+    SmallVector<ImportedModule, 4> ioiImports, allImports;
+    M->getImportedModules(ioiImports,
                           ModuleDecl::ImportFilterKind::ImplementationOnly);
-    ioiImportSet.insert(ioiImport.begin(), ioiImport.end());
+
+    // Only consider modules imported consistently as implementation-only.
+    M->getImportedModules(allImports,
+                          allImportFilter);
+    llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> allImportSet;
+    allImportSet.insert(allImports.begin(), allImports.end());
+
+    for (auto import: ioiImports)
+      if (allImportSet.count(import) == 0)
+        ioiImportSet.insert(import);
+
+    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   }
 
   SmallVector<ImportedModule, 8> allImports;
