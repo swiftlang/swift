@@ -766,13 +766,6 @@ SILLayoutID Serializer::addSILLayoutRef(const SILLayout *layout) {
   return SILLayoutsToSerialize.addRef(layout);
 }
 
-NormalConformanceID
-Serializer::addConformanceRef(const NormalProtocolConformance *conformance) {
-  assert(conformance->getDeclContext()->getParentModule() == M &&
-         "cannot reference conformance from another module");
-  return NormalConformancesToSerialize.addRef(conformance);
-}
-
 /// Record the name of a block.
 void SerializerBase::emitBlockID(unsigned ID, StringRef name,
                                  SmallVectorImpl<unsigned char> &nameBuffer) {
@@ -789,20 +782,34 @@ void SerializerBase::emitBlockID(unsigned ID, StringRef name,
 }
 
 void SerializerBase::emitRecordID(unsigned ID, StringRef name,
-                                  SmallVectorImpl<unsigned char> &nameBuffer) {
-  assert(ID < 256 && "can't fit record ID in next to name");
-  nameBuffer.resize(name.size()+1);
-  nameBuffer[0] = ID;
-  memcpy(nameBuffer.data()+1, name.data(), name.size());
-  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
+                                  SmallVectorImpl<unsigned char> &nameBuffer,
+                                  SmallVectorImpl<unsigned> *wideNameBuffer) {
+  // Use the byte-based buffer if the ID is in range.
+  if (ID < 256) {
+    nameBuffer.resize(name.size()+1);
+    nameBuffer[0] = ID;
+    memcpy(nameBuffer.data()+1, name.data(), name.size());
+    Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
+
+  // Otherwise, we have to use the wide name buffer.
+  } else {
+    assert(wideNameBuffer && "too many IDs to use narrow name buffer");
+    auto &buffer = *wideNameBuffer;
+    buffer.resize(name.size()+1);
+    buffer[0] = ID;
+    for (unsigned i = 0, e = name.size(); i != e; ++i)
+      buffer[i+1] = name[i];
+    Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, buffer);
+  }
 }
 
 void Serializer::writeBlockInfoBlock() {
   BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
 
   SmallVector<unsigned char, 64> nameBuffer;
+  SmallVector<unsigned, 32> wideNameBuffer;
 #define BLOCK(X) emitBlockID(X ## _ID, #X, nameBuffer)
-#define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer)
+#define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer, &wideNameBuffer)
 
   BLOCK(MODULE_BLOCK);
 
@@ -861,7 +868,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, SUBSTITUTION_MAP_OFFSETS);
   BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
-  BLOCK_RECORD(index_block, NORMAL_CONFORMANCE_OFFSETS);
+  BLOCK_RECORD(index_block, PROTOCOL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
   BLOCK_RECORD(index_block, NESTED_TYPE_DECLS);
@@ -904,33 +911,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
-
-  // These layouts can exist in both decl blocks and sil blocks.
-#define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(X, #X, nameBuffer)
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::INVALID_PROTOCOL_CONFORMANCE);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::ABSTRACT_PROTOCOL_CONFORMANCE);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::NORMAL_PROTOCOL_CONFORMANCE);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::SELF_PROTOCOL_CONFORMANCE);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::INHERITED_PROTOCOL_CONFORMANCE);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::BUILTIN_PROTOCOL_CONFORMANCE);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::NORMAL_PROTOCOL_CONFORMANCE_ID);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::PROTOCOL_CONFORMANCE_XREF);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::GENERIC_PARAM_LIST);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::GENERIC_REQUIREMENT);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::LAYOUT_REQUIREMENT);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -1347,22 +1327,19 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
   llvm_unreachable("Unhandled RequirementKind in switch.");
 }
 
-void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
-                                          const std::array<unsigned, 256> &abbrCodes) {
+void Serializer::serializeGenericRequirements(
+                                        ArrayRef<Requirement> requirements,
+                                        SmallVectorImpl<uint64_t> &scratch) {
   using namespace decls_block;
 
-  if (requirements.empty())
-    return;
+  scratch.push_back(requirements.size());
 
-  auto reqAbbrCode = abbrCodes[GenericRequirementLayout::Code];
-  auto layoutReqAbbrCode = abbrCodes[LayoutRequirementLayout::Code];
   for (const auto &req : requirements) {
-    if (req.getKind() != RequirementKind::Layout)
-      GenericRequirementLayout::emitRecord(
-          Out, ScratchRecord, reqAbbrCode,
-          getRawStableRequirementKind(req.getKind()),
-          addTypeRef(req.getFirstType()), addTypeRef(req.getSecondType()));
-    else {
+    scratch.push_back(getRawStableRequirementKind(req.getKind()));
+    if (req.getKind() != RequirementKind::Layout) {
+      scratch.push_back(addTypeRef(req.getFirstType()));
+      scratch.push_back(addTypeRef(req.getSecondType()));
+    } else {
       // Write layout requirement.
       auto layout = req.getLayoutConstraint();
       unsigned size = 0;
@@ -1398,18 +1375,18 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
         rawKind = LayoutRequirementKind::UnknownLayout;
         break;
       }
-      LayoutRequirementLayout::emitRecord(
-          Out, ScratchRecord, layoutReqAbbrCode, rawKind,
-          addTypeRef(req.getFirstType()), size, alignment);
+      scratch.push_back(rawKind);
+      scratch.push_back(addTypeRef(req.getFirstType()));
+      scratch.push_back(size);
+      scratch.push_back(alignment);
     }
   }
 }
 
-void Serializer::writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes,
-                                      const std::array<unsigned, 256> &abbrCodes) {
+void Serializer::writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes) {
   using namespace decls_block;
 
-  auto assocTypeAbbrCode = abbrCodes[AssociatedTypeLayout::Code];
+  auto assocTypeAbbrCode = DeclTypeAbbrCodes[AssociatedTypeLayout::Code];
 
   for (auto *assocType : assocTypes) {
     AssociatedTypeLayout::emitRecord(
@@ -1419,20 +1396,21 @@ void Serializer::writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes,
 }
 
 void Serializer::writeRequirementSignature(
-    const RequirementSignature &requirementSig,
-    const std::array<unsigned, 256> &abbrCodes) {
-  writeGenericRequirements(requirementSig.getRequirements(), abbrCodes);
-
+    const RequirementSignature &requirementSig) {
   using namespace decls_block;
 
-  auto protocolTypeAliasAbbrCode = abbrCodes[ProtocolTypeAliasLayout::Code];
+  SmallVector<uint64_t, 16> rawData;
+  serializeGenericRequirements(requirementSig.getRequirements(), rawData);
 
   for (const auto &typeAlias : requirementSig.getTypeAliases()) {
-    ProtocolTypeAliasLayout::emitRecord(
-        Out, ScratchRecord, protocolTypeAliasAbbrCode,
-        addDeclBaseNameRef(typeAlias.getName()),
-        addTypeRef(typeAlias.getUnderlyingType()));
+    rawData.push_back(addDeclBaseNameRef(typeAlias.getName()));
+    rawData.push_back(addTypeRef(typeAlias.getUnderlyingType()));
   }
+
+  RequirementSignatureLayout::emitRecord(
+      Out, ScratchRecord,
+      DeclTypeAbbrCodes[RequirementSignatureLayout::Code],
+      rawData);
 }
 
 void Serializer::writeASTBlockEntity(GenericSignature sig) {
@@ -1451,9 +1429,11 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
     return decl && decl->getDeclContext()->isModuleScopeContext();
   });
 
+  SmallVector<uint64_t, 4> rawParamIDs;
+  serializeGenericRequirements(sig.getRequirements(), rawParamIDs);
+
   if (!mustEncodeParamsManually) {
     // Record the generic parameters.
-    SmallVector<uint64_t, 4> rawParamIDs;
     for (auto *paramTy : sig.getGenericParams()) {
       rawParamIDs.push_back(addTypeRef(paramTy));
     }
@@ -1463,7 +1443,6 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
                                        rawParamIDs);
   } else {
     // Record the generic parameters.
-    SmallVector<uint64_t, 4> rawParamIDs;
     for (auto *paramTy : sig.getGenericParams()) {
       auto *decl = paramTy->getDecl();
 
@@ -1479,8 +1458,6 @@ void Serializer::writeASTBlockEntity(GenericSignature sig) {
     SILGenericSignatureLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
                                           rawParamIDs);
   }
-
-  writeGenericRequirements(sig.getRequirements(), DeclTypeAbbrCodes);
 }
 
 void Serializer::writeASTBlockEntity(const SubstitutionMap substitutions) {
@@ -1489,18 +1466,19 @@ void Serializer::writeASTBlockEntity(const SubstitutionMap substitutions) {
   assert(SubstitutionMapsToSerialize.hasRef(substitutions));
 
   // Collect the replacement types.
-  SmallVector<uint64_t, 4> rawReplacementTypes;
+  SmallVector<uint64_t, 4> rawValues;
   for (auto type : substitutions.getReplacementTypes())
-    rawReplacementTypes.push_back(addTypeRef(type));
+    rawValues.push_back(addTypeRef(type));
+  unsigned numReplacementTypes = rawValues.size();
+  for (auto conformance : substitutions.getConformances())
+    rawValues.push_back(addConformanceRef(conformance));
 
   auto substitutionsAbbrCode = DeclTypeAbbrCodes[SubstitutionMapLayout::Code];
   SubstitutionMapLayout::emitRecord(Out, ScratchRecord, substitutionsAbbrCode,
                                     addGenericSignatureRef(
                                       substitutions.getGenericSignature()),
-                                    substitutions.getConformances().size(),
-                                    rawReplacementTypes);
-
-  writeConformances(substitutions.getConformances(), DeclTypeAbbrCodes);
+                                    numReplacementTypes,
+                                    rawValues);
 }
 
 void Serializer::writeASTBlockEntity(const SILLayout *layout) {
@@ -1527,21 +1505,27 @@ void Serializer::writeASTBlockEntity(const SILLayout *layout) {
                         data);
 }
 
-void Serializer::writeASTBlockEntity(
-    const NormalProtocolConformance *conformance) {
+void Serializer::writeLocalNormalProtocolConformance(
+                                    NormalProtocolConformance *conformance) {
   using namespace decls_block;
 
   PrettyStackTraceConformance trace("serializing", conformance);
 
   // The conformance must be complete, or we can't serialize it.
   assert(conformance->isComplete() || allowCompilerErrors());
-  assert(NormalConformancesToSerialize.hasRef(conformance));
+  assert(ConformancesToSerialize.hasRef(conformance));
 
   auto protocol = conformance->getProtocol();
 
   SmallVector<DeclID, 32> data;
   unsigned numValueWitnesses = 0;
   unsigned numTypeWitnesses = 0;
+  unsigned numSignatureConformances =
+      conformance->getSignatureConformances().size();
+
+  for (auto sigConformance : conformance->getSignatureConformances()) {
+    data.push_back(addConformanceRef(sigConformance));
+  }
 
   conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
                                       Type type, TypeDecl *typeDecl) {
@@ -1580,9 +1564,6 @@ void Serializer::writeASTBlockEntity(
       data.push_back(addSubstitutionMapRef(subs));
   });
 
-  unsigned numSignatureConformances =
-      conformance->getSignatureConformances().size();
-
   unsigned abbrCode
     = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
   auto ownerID = addDeclContextRef(conformance->getDeclContext());
@@ -1594,53 +1575,58 @@ void Serializer::writeASTBlockEntity(
                                               numSignatureConformances,
                                               conformance->isUnchecked(),
                                               data);
+}
 
-  // Write requirement signature conformances.
-  for (auto reqConformance : conformance->getSignatureConformances())
-    writeConformance(reqConformance, DeclTypeAbbrCodes);
+serialization::ProtocolConformanceID
+Serializer::addConformanceRef(ProtocolConformance *conformance,
+                              GenericEnvironment *genericEnv) {
+  return addConformanceRef(ProtocolConformanceRef(conformance), genericEnv);
+}
+
+serialization::ProtocolConformanceID
+Serializer::addConformanceRef(ProtocolConformanceRef ref,
+                              GenericEnvironment *genericEnv) {
+  if (ref.isInvalid()) {
+    return 0;
+  }
+
+  // Abstract protocol conformances are very common, so we avoid making
+  // a separate record for them by just emitting a declaration reference
+  // to the protocol and then using the low bit of the ID to distinguish
+  // abstract from concrete conformances.
+
+  if (ref.isAbstract()) {
+    auto protocolID = addDeclRef(ref.getAbstract());
+    assert(protocolID != 0);
+    return protocolID << 1;
+  }
+
+  auto conformance = ref.getConcrete();
+
+  if (genericEnv && conformance->getType()->hasArchetype()) {
+    ref = ref.mapConformanceOutOfContext();
+    assert(!ref.isInvalid() && !ref.isAbstract());
+    conformance = ref.getConcrete();
+  }
+
+  auto rawID = ConformancesToSerialize.addRef(conformance);
+  return (rawID << 1) + 1;
 }
 
 void
-Serializer::writeConformance(ProtocolConformance *conformance,
-                             const std::array<unsigned, 256> &abbrCodes,
-                             GenericEnvironment *genericEnv) {
-  writeConformance(ProtocolConformanceRef(conformance), abbrCodes, genericEnv);
-}
-
-void
-Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
-                             const std::array<unsigned, 256> &abbrCodes,
-                             GenericEnvironment *genericEnv) {
+Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
   using namespace decls_block;
 
-  if (conformanceRef.isInvalid()) {
-    unsigned abbrCode = abbrCodes[InvalidProtocolConformanceLayout::Code];
-    InvalidProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode);
-    return;
-  }
-
-  if (conformanceRef.isAbstract()) {
-    unsigned abbrCode = abbrCodes[AbstractProtocolConformanceLayout::Code];
-    AbstractProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      addDeclRef(conformanceRef.getAbstract()));
-    return;
-  }
-
-  auto conformance = conformanceRef.getConcrete();
   switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(conformance);
     if (!isDeclXRef(normal->getDeclContext()->getAsDecl())
         && !isa<ClangModuleUnit>(normal->getDeclContext()
                                        ->getModuleScopeContext())) {
-      // A normal conformance in this module file.
-      unsigned abbrCode = abbrCodes[NormalProtocolConformanceIdLayout::Code];
-      NormalProtocolConformanceIdLayout::emitRecord(Out, ScratchRecord,
-                                                    abbrCode,
-                                                    addConformanceRef(normal));
+      writeLocalNormalProtocolConformance(normal);
     } else {
       // A conformance in a different module file.
-      unsigned abbrCode = abbrCodes[ProtocolConformanceXrefLayout::Code];
+      unsigned abbrCode = DeclTypeAbbrCodes[ProtocolConformanceXrefLayout::Code];
       ProtocolConformanceXrefLayout::emitRecord(
         Out, ScratchRecord,
         abbrCode,
@@ -1653,7 +1639,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
 
   case ProtocolConformanceKind::Self: {
     auto self = cast<SelfProtocolConformance>(conformance);
-    unsigned abbrCode = abbrCodes[SelfProtocolConformanceLayout::Code];
+    unsigned abbrCode = DeclTypeAbbrCodes[SelfProtocolConformanceLayout::Code];
     auto protocolID = addDeclRef(self->getProtocol());
     SelfProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                               protocolID);
@@ -1662,65 +1648,73 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
 
   case ProtocolConformanceKind::Specialized: {
     auto conf = cast<SpecializedProtocolConformance>(conformance);
-    unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
+    unsigned abbrCode = DeclTypeAbbrCodes[SpecializedProtocolConformanceLayout::Code];
     auto type = conf->getType();
-    if (genericEnv && type->hasArchetype())
-      type = type->mapTypeOutOfContext();
+    auto genericConformanceID =
+      addConformanceRef(conf->getGenericConformance());
     SpecializedProtocolConformanceLayout::emitRecord(
                            Out, ScratchRecord,
                            abbrCode,
+                           genericConformanceID,
                            addTypeRef(type),
                            addSubstitutionMapRef(conf->getSubstitutionMap()));
-
-    writeConformance(conf->getGenericConformance(), abbrCodes, genericEnv);
     break;
   }
 
   case ProtocolConformanceKind::Inherited: {
     auto conf = cast<InheritedProtocolConformance>(conformance);
     unsigned abbrCode
-      = abbrCodes[InheritedProtocolConformanceLayout::Code];
+      = DeclTypeAbbrCodes[InheritedProtocolConformanceLayout::Code];
+
+    auto inheritedConformanceID =
+      addConformanceRef(conf->getInheritedConformance());
 
     auto type = conf->getType();
-    if (genericEnv && type->hasArchetype())
-      type = type->mapTypeOutOfContext();
+    auto typeID = addTypeRef(type);
 
     InheritedProtocolConformanceLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, addTypeRef(type));
+      Out, ScratchRecord, abbrCode, inheritedConformanceID, typeID);
 
-    writeConformance(conf->getInheritedConformance(), abbrCodes, genericEnv);
     break;
   }
   case ProtocolConformanceKind::Builtin:
     auto builtin = cast<BuiltinProtocolConformance>(conformance);
-    unsigned abbrCode = abbrCodes[BuiltinProtocolConformanceLayout::Code];
+    unsigned abbrCode =
+      DeclTypeAbbrCodes[BuiltinProtocolConformanceLayout::Code];
     auto typeID = addTypeRef(builtin->getType());
     auto protocolID = addDeclRef(builtin->getProtocol());
     auto genericSigID = addGenericSignatureRef(builtin->getGenericSignature());
+
+    SmallVector<uint64_t> requirementData;
+    serializeGenericRequirements(builtin->getConditionalRequirements(),
+                                 requirementData);
+
     BuiltinProtocolConformanceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, typeID, protocolID, genericSigID,
-        static_cast<unsigned>(builtin->getBuiltinConformanceKind()));
-    writeGenericRequirements(builtin->getConditionalRequirements(), abbrCodes);
+        static_cast<unsigned>(builtin->getBuiltinConformanceKind()),
+        requirementData);
     break;
   }
 }
 
-void
-Serializer::writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
-                              const std::array<unsigned, 256> &abbrCodes) {
+SmallVector<ProtocolConformanceID, 4>
+Serializer::addConformanceRefs(ArrayRef<ProtocolConformanceRef> conformances) {
   using namespace decls_block;
 
+  SmallVector<ProtocolConformanceID, 4> results;
   for (auto conformance : conformances)
-    writeConformance(conformance, abbrCodes);
+    results.push_back(addConformanceRef(conformance));
+  return results;
 }
 
-void
-Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
-                              const std::array<unsigned, 256> &abbrCodes) {
+SmallVector<ProtocolConformanceID, 4>
+Serializer::addConformanceRefs(ArrayRef<ProtocolConformance*> conformances) {
   using namespace decls_block;
 
+  SmallVector<ProtocolConformanceID, 4> results;
   for (auto conformance : conformances)
-    writeConformance(conformance, abbrCodes);
+    results.push_back(addConformanceRef(conformance));
+  return results;
 }
 
 static bool shouldSerializeMember(Decl *D) {
@@ -3257,9 +3251,12 @@ public:
     auto conformances = extension->getLocalConformances(
                           ConformanceLookupKind::All);
 
-    SmallVector<TypeID, 8> inheritedAndDependencyTypes;
+    SmallVector<TypeID, 8> data;
+    for (auto conformance : conformances)
+      data.push_back(S.addConformanceRef(conformance));
+
     size_t numInherited = addInherited(
-        extension->getInherited(), inheritedAndDependencyTypes);
+        extension->getInherited(), data);
 
     llvm::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(
@@ -3269,7 +3266,7 @@ public:
                                          /*excluding*/nullptr);
     }
     for (auto dependencyTy : dependencies)
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(dependencyTy));
+      data.push_back(S.addTypeRef(dependencyTy));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ExtensionLayout::Code];
     auto extendedNominal = extension->getExtendedNominal();
@@ -3282,7 +3279,7 @@ public:
                                            extension->getGenericSignature()),
                                 conformances.size(),
                                 numInherited,
-                                inheritedAndDependencyTypes);
+                                data);
 
     bool isClassExtension = false;
     if (extendedNominal) {
@@ -3305,7 +3302,6 @@ public:
       writeGenericParams(genericParams);
 
     writeMembers(id, extension->getAllMembers(), isClassExtension);
-    S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
   void visitPatternBindingDecl(const PatternBindingDecl *binding) {
@@ -3481,9 +3477,11 @@ public:
     auto conformances = theStruct->getLocalConformances(
                           ConformanceLookupKind::All);
 
-    SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    unsigned numInherited = addInherited(
-        theStruct->getInherited(), inheritedAndDependencyTypes);
+    SmallVector<TypeID, 4> data;
+    for (auto conformance : conformances)
+      data.push_back(S.addConformanceRef(conformance));
+
+    unsigned numInherited = addInherited(theStruct->getInherited(), data);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (Requirement req : theStruct->getGenericRequirements()) {
@@ -3491,7 +3489,7 @@ public:
                                          /*excluding*/nullptr);
     }
     for (Type ty : dependencyTypes)
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(ty));
+      data.push_back(S.addTypeRef(ty));
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theStruct->getFormalAccess());
@@ -3507,12 +3505,11 @@ public:
                              rawAccessLevel,
                              conformances.size(),
                              numInherited,
-                             inheritedAndDependencyTypes);
+                             data);
 
 
     writeGenericParams(theStruct->getGenericParams());
     writeMembers(id, theStruct->getAllMembers(), false);
-    S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
   void visitEnumDecl(const EnumDecl *theEnum) {
@@ -3524,9 +3521,11 @@ public:
     auto conformances = theEnum->getLocalConformances(
                           ConformanceLookupKind::All);
 
-    SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    unsigned numInherited = addInherited(
-        theEnum->getInherited(), inheritedAndDependencyTypes);
+    SmallVector<TypeID, 4> data;
+    for (auto conformance : conformances)
+      data.push_back(S.addConformanceRef(conformance));
+
+    unsigned numInherited = addInherited(theEnum->getInherited(), data);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
@@ -3546,7 +3545,7 @@ public:
                                          /*excluding*/nullptr);
     }
     for (Type ty : dependencyTypes)
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(ty));
+      data.push_back(S.addTypeRef(ty));
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theEnum->getFormalAccess());
@@ -3563,11 +3562,10 @@ public:
                             rawAccessLevel,
                             conformances.size(),
                             numInherited,
-                            inheritedAndDependencyTypes);
+                            data);
 
     writeGenericParams(theEnum->getGenericParams());
     writeMembers(id, theEnum->getAllMembers(), false);
-    S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
   void visitClassDecl(const ClassDecl *theClass) {
@@ -3580,9 +3578,11 @@ public:
     auto conformances = theClass->getLocalConformances(
                           ConformanceLookupKind::NonInherited);
 
-    SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    unsigned numInherited = addInherited(
-        theClass->getInherited(), inheritedAndDependencyTypes);
+    SmallVector<TypeID, 4> data;
+    for (auto conformance : conformances)
+      data.push_back(S.addConformanceRef(conformance));
+
+    unsigned numInherited = addInherited(theClass->getInherited(), data);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     if (theClass->hasSuperclass()) {
@@ -3599,7 +3599,7 @@ public:
                                          /*excluding*/nullptr);
     }
     for (Type ty : dependencyTypes)
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(ty));
+      data.push_back(S.addTypeRef(ty));
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theClass->getFormalAccess());
@@ -3621,11 +3621,10 @@ public:
                             rawAccessLevel,
                             conformances.size(),
                             numInherited,
-                            inheritedAndDependencyTypes);
+                            data);
 
     writeGenericParams(theClass->getGenericParams());
     writeMembers(id, theClass->getAllMembers(), true);
-    S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
   void visitProtocolDecl(const ProtocolDecl *proto) {
@@ -3683,10 +3682,8 @@ public:
                                inheritedAndDependencyTypes);
 
     writeGenericParams(proto->getGenericParams());
-    S.writeRequirementSignature(
-      proto->getRequirementSignature(), S.DeclTypeAbbrCodes);
-    S.writeAssociatedTypes(
-      proto->getAssociatedTypeMembers(), S.DeclTypeAbbrCodes);
+    S.writeRequirementSignature(proto->getRequirementSignature());
+    S.writeAssociatedTypes(proto->getAssociatedTypeMembers());
     writeMembers(id, proto->getAllMembers(), true);
     writeDefaultWitnessTable(proto);
   }
@@ -4694,6 +4691,8 @@ public:
       unsigned conv = getRawStableResultConvention(abResult.getConvention());
       variableData.push_back(TypeID(conv));
     }
+    if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
+      variableData.push_back(S.addConformanceRef(conformance));
 
     auto invocationSigID =
       S.addGenericSignatureRef(fnTy->getInvocationGenericSignature());
@@ -4721,9 +4720,6 @@ public:
         fnTy->getNumYields(), fnTy->getNumResults(),
         invocationSigID, invocationSubstMapID, patternSubstMapID,
         clangTypeID, variableData);
-
-    if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
-      S.writeConformance(conformance, S.DeclTypeAbbrCodes);
   }
 
   void visitArraySliceType(const ArraySliceType *sliceTy) {
@@ -4993,7 +4989,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<OpaqueTypeLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
-  registerDeclTypeAbbr<ProtocolTypeAliasLayout>();
   registerDeclTypeAbbr<AssociatedTypeLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
   registerDeclTypeAbbr<PrefixOperatorLayout>();
@@ -5019,8 +5014,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<InlinableBodyTextLayout>();
   registerDeclTypeAbbr<GenericParamListLayout>();
   registerDeclTypeAbbr<GenericSignatureLayout>();
-  registerDeclTypeAbbr<GenericRequirementLayout>();
-  registerDeclTypeAbbr<LayoutRequirementLayout>();
+  registerDeclTypeAbbr<RequirementSignatureLayout>();
   registerDeclTypeAbbr<SILGenericSignatureLayout>();
   registerDeclTypeAbbr<SubstitutionMapLayout>();
 
@@ -5039,14 +5033,11 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
   registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
 
-  registerDeclTypeAbbr<AbstractProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
   registerDeclTypeAbbr<SelfProtocolConformanceLayout>();
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
-  registerDeclTypeAbbr<InvalidProtocolConformanceLayout>();
   registerDeclTypeAbbr<BuiltinProtocolConformanceLayout>();
-  registerDeclTypeAbbr<NormalProtocolConformanceIdLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 
   registerDeclTypeAbbr<SILLayoutLayout>();
@@ -5077,7 +5068,7 @@ void Serializer::writeAllDeclsAndTypes() {
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(SubstitutionMapsToSerialize);
     wroteSomething |=
-        writeASTBlockEntitiesIfNeeded(NormalConformancesToSerialize);
+        writeASTBlockEntitiesIfNeeded(ConformancesToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(SILLayoutsToSerialize);
   } while (wroteSomething);
 }
@@ -5678,7 +5669,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, LocalDeclContextsToSerialize);
     writeOffsets(Offsets, GenericSignaturesToSerialize);
     writeOffsets(Offsets, SubstitutionMapsToSerialize);
-    writeOffsets(Offsets, NormalConformancesToSerialize);
+    writeOffsets(Offsets, ConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
 
     Offsets.emit(ScratchRecord, index_block::IDENTIFIER_OFFSETS,
