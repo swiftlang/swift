@@ -1722,7 +1722,7 @@
       key.column: 1,
       key.severity: source.diagnostic.severity.error,
       key.id: "destructor_decl_outside_class",
-      key.description: "deinitializers may only be declared within a class",
+      key.description: "deinitializers may only be declared within a class or actor",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     }
   ]
