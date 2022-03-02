@@ -5272,7 +5272,6 @@ class ParameterizedProtocolType final : public TypeBase,
   friend TrailingObjects;
 
   ProtocolType *Base;
-  Type Arg;
 
 public:
   /// Retrieve an instance of a protocol composition type with the
