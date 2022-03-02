@@ -21,6 +21,10 @@
 #ifndef SWIFT_STDLIB_SHIMS_METADATASECTIONS_H
 #define SWIFT_STDLIB_SHIMS_METADATASECTIONS_H
 
+#if defined(__cplusplus) && !defined(__swift__)
+#include <atomic>
+#endif
+
 #include "SwiftStddef.h"
 #include "SwiftStdint.h"
 
@@ -36,7 +40,12 @@ typedef struct MetadataSectionRange {
 } MetadataSectionRange;
 
 
-/// Identifies the address space ranges for the Swift metadata required by the Swift runtime.
+/// Identifies the address space ranges for the Swift metadata required by the
+/// Swift runtime.
+///
+/// \warning If you change the size of this structure by adding fields, it is an
+///   ABI-breaking change on platforms that use it. Make sure to increment
+///   \c CurrentSectionMetadataVersion if you do.
 struct MetadataSections {
   __swift_uintptr_t version;
 
@@ -56,20 +65,23 @@ struct MetadataSections {
   /// loader (i.e. no equivalent of \c __dso_handle or \c __ImageBase), this
   /// field is ignored and should be set to \c nullptr.
   ///
+  /// \bug When imported into Swift, this field is not atomic.
+  ///
   /// \sa swift_addNewDSOImage()
+#if defined(__swift__) || defined(__STDC_NO_ATOMICS__)
   const void *baseAddress;
+#elif defined(__cplusplus)
+  std::atomic<const void *> baseAddress;
+#else
+  _Atomic(const void *) baseAddress;
+#endif
 
-  /// `next` and `prev` are used by the runtime to construct a
-  /// circularly doubly linked list to quickly iterate over the metadata
-  /// from each image loaded into the address space.  These are invasive
-  /// to enable the runtime registration, which occurs at image load time, to
-  /// be allocation-free as it is invoked from an image constructor function
-  /// context where the system may not yet be ready to perform allocations.
-  /// Additionally, avoiding the allocation enables a fast load operation, which
-  /// directly impacts application load time.
-  struct MetadataSections *next;
-  struct MetadataSections *prev;
-
+  /// Unused.
+  ///
+  /// These pointers (or the space they occupy) can be repurposed without
+  /// causing ABI breakage. Set them to \c nullptr.
+  void *unused0;
+  void *unused1;
 
   MetadataSectionRange swift5_protocols;
   MetadataSectionRange swift5_protocol_conformances;
