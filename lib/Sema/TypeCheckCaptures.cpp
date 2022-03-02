@@ -297,6 +297,13 @@ public:
         // }
         if (!isa<FuncDecl>(D)) {
           if (DC->isLocalContext()) {
+            fprintf(stderr, "[%s:%d] (%s) NTD NTD NTD NTD NTD NTD NTD NTD NTD NTD NTD NTD NTD \n", __FILE__, __LINE__, __FUNCTION__);
+            NTD->dump();
+            fprintf(stderr, "[%s:%d] (%s) DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD\n", __FILE__, __LINE__, __FUNCTION__);
+            D->dump();
+            fprintf(stderr, "[%s:%d] (%s) DC DC DC DC DC DC DC DC DC DC DC DC DC DC DC DC DC DC DC \n", __FILE__, __LINE__, __FUNCTION__);
+            DC->dumpContext();
+            DC->getAsDecl()->dump();
             Context.Diags.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
                                    NTD->getDescriptiveKind(),
                                    D->getBaseIdentifier());

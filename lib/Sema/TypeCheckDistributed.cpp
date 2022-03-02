@@ -529,14 +529,6 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
     return true;
   }
 
-  // === Finally, ensure the distributed thunk is emitted
-  auto thunk = func->getDistributedThunk();
-  fprintf(stderr, "[%s:%d] (%s) THUNK >>>>\n", __FILE__, __LINE__, __FUNCTION__);
-  thunk->dump();
-  fprintf(stderr, "[%s:%d] (%s) THUNK BODY >>>>\n", __FILE__, __LINE__, __FUNCTION__);
-  thunk->getBody(true);
-  thunk->dump();
-
   return false;
 }
 

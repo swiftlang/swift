@@ -10,7 +10,9 @@ import FakeDistributedActorSystems
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 distributed actor MyDistActor {
-  distributed func test() {}
+  distributed func test(param: String) throws -> String {
+    param
+  }
 }
 
 // TODO(distributed): very naive test, SIL for discussion and cleanup

@@ -1398,7 +1398,9 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
   if (AFD->isDistributed()) {
     auto thunk = AFD->getDistributedThunk();
+    fprintf(stderr, "[%s:%d] (%s) THUNK::::::::::::::::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
     thunk->dump();
+    fprintf(stderr, "[%s:%d] (%s) ::::::::::::THUNK::::::::::::::::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
 //    auto thunk = SILDeclRef(AFD).asDistributed();
 //    emitDistributedThunk(thunk);
   }
