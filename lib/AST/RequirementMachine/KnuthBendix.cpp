@@ -244,12 +244,14 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
   // adding new rules in the property map's concrete type unification procedure.
   Complete = 1;
 
-  bool again = false;
+  unsigned ruleCount;
 
   std::vector<CriticalPair> resolvedCriticalPairs;
   std::vector<RewriteLoop> resolvedLoops;
 
   do {
+    ruleCount = Rules.size();
+
     // For every rule, looking for other rules that overlap with this rule.
     for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
       const auto &lhs = getRule(i);
@@ -335,9 +337,10 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
       }
     }
 
+    assert(ruleCount == Rules.size());
+
     simplifyLeftHandSides();
 
-    again = false;
     for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.
       if (Rules.size() > maxRuleCount)
@@ -349,8 +352,6 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
       // Check if the new rule is too long.
       if (Rules.back().getDepth() > maxRuleLength)
         return std::make_pair(CompletionResult::MaxRuleLength, Rules.size() - 1);
-
-      again = true;
     }
 
     for (const auto &loop : resolvedLoops) {
@@ -362,7 +363,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
 
     simplifyRightHandSides();
     simplifyLeftHandSideSubstitutions(/*map=*/nullptr);
-  } while (again);
+  } while (Rules.size() > ruleCount);
 
   return std::make_pair(CompletionResult::Success, 0);
 }
