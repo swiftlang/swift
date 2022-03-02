@@ -159,6 +159,8 @@ class ConcreteContraction {
 
   llvm::SmallDenseMap<GenericParamKey, Type> ConcreteTypes;
   llvm::SmallDenseMap<GenericParamKey, Type> Superclasses;
+  llvm::SmallDenseMap<GenericParamKey,
+                      llvm::SmallVector<ProtocolDecl *, 1>> Conformances;
 
   Optional<Type> substTypeParameter(GenericTypeParamType *rootParam,
                                     DependentMemberType *memberType,
@@ -436,8 +438,8 @@ bool ConcreteContraction::performConcreteContraction(
         if (Debug) {
           llvm::dbgs() << "@ Concrete contraction cannot proceed: "
                        << "duplicate concrete type requirements\n";
-          return false;
         }
+        return false;
       }
 
       break;
@@ -454,15 +456,51 @@ bool ConcreteContraction::performConcreteContraction(
         if (Debug) {
           llvm::dbgs() << "@ Concrete contraction cannot proceed: "
                        << "duplicate superclass requirements\n";
-          return false;
         }
+        return false;
       }
 
       break;
     }
-    case RequirementKind::Conformance:
+    case RequirementKind::Conformance: {
+      auto *protoDecl = req.req.getProtocolDecl();
+      Conformances[GenericParamKey(genericParam)].push_back(protoDecl);
+
+      break;
+    }
     case RequirementKind::Layout:
       break;
+    }
+  }
+
+  // Block concrete contraction if a generic parameter conforms to a protocol P
+  // which has a superclass bound C which again conforms to P. This is a really
+  // silly edge case, but we go to great pains to produce the same minimized
+  // signature as the GenericSignatureBuilder in this case, <T : P>, and not the
+  // more logical <T : C>.
+  for (const auto &pair : Conformances) {
+    auto subjectType = pair.first;
+    auto found = Superclasses.find(subjectType);
+    if (found == Superclasses.end())
+      continue;
+
+    auto superclassTy = found->second;
+
+    for (const auto *proto : pair.second) {
+      if (auto otherSuperclassTy = proto->getSuperclass()) {
+        if (Debug) {
+          llvm::dbgs() << "@ Subject type of superclass requirement "
+                       << "τ_" << subjectType.Depth << "_" << subjectType.Index
+                       << " : " << superclassTy << " conforms to "
+                       << proto->getName() << " which has a superclass bound "
+                       << otherSuperclassTy << "\n";
+        }
+
+        if (superclassTy->isEqual(otherSuperclassTy)) {
+          Superclasses.erase(subjectType);
+          break;
+        }
+      }
     }
   }
 
