@@ -337,10 +337,10 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// A common application of this constant in geometry is to measure a half
   /// revolution in radians. Used like this, it is equivalent to 180 degrees.
   ///
-  /// This value should be rounded toward zero to keep user computations with
-  /// angles from inadvertently ending up in the wrong quadrant. A type that
-  /// conforms to the `FloatingPoint` protocol provides the value for `pi` at
-  /// its best possible precision.
+  /// This value is rounded toward zero to keep user computations with angles
+  /// from inadvertently ending up in the wrong quadrant. A type that conforms
+  /// to the `FloatingPoint` protocol provides the value for `pi` at its best
+  /// possible precision.
   ///
   ///     print(Double.pi)
   ///     // Prints "3.14159265358979"
