@@ -1003,12 +1003,10 @@ public:
   /// deployment target.
   bool isWeakImported(ModuleDecl *fromModule) const;
 
-  /// Returns true if the nature of this declaration allows overrides.
-  /// Note that this does not consider whether it is final or whether
-  /// the class it's on is final.
+  /// Returns true if the nature of this declaration allows overrides syntactically.
   ///
   /// If this returns true, the decl can be safely casted to ValueDecl.
-  bool isPotentiallyOverridable() const;
+  bool isSyntacticallyOverridable() const;
 
   /// Retrieve the global actor attribute that applies to this declaration,
   /// if any.
@@ -7935,13 +7933,16 @@ inline unsigned ValueDecl::getNumCurryLevels() const {
   return curryLevels;
 }
 
-inline bool Decl::isPotentiallyOverridable() const {
+inline bool Decl::isSyntacticallyOverridable() const {
   if (isa<VarDecl>(this) ||
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
+    if (static_cast<const ValueDecl*>(this)->isFinal()) {
+      return false;
+    }
     auto classDecl = getDeclContext()->getSelfClassDecl();
-    return classDecl && !classDecl->isActor();
+    return classDecl && !classDecl->isActor() && !classDecl->isFinal();
   } else {
     return false;
   }

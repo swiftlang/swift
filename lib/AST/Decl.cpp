@@ -3439,7 +3439,7 @@ static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
 
   // Non-final overridable class members are considered open to
   // @testable importers.
-  } else if (decl->isPotentiallyOverridable()) {
+  } else if (decl->isSyntacticallyOverridable()) {
     if (!cast<ValueDecl>(decl)->isSemanticallyFinal())
       return AccessLevel::Open;
   }
@@ -3793,7 +3793,7 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
     access = AccessLevel::FilePrivate;
 
   // Only certain declarations can be 'open'.
-  if (access == AccessLevel::Open && !isPotentiallyOverridable()) {
+  if (access == AccessLevel::Open && !isSyntacticallyOverridable()) {
     assert(!isa<ClassDecl>(this) &&
            "copying 'open' onto a class has complications");
     access = AccessLevel::Public;
