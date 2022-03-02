@@ -68,7 +68,7 @@ func testUnknown() {
 // OPTIONALCONTEXT-LABEL: }
 // OPTIONALCONTEXT-LABEL: key.name: "Int",
 // OPTIONALCONTEXT:       key.typename: "Int",
-// OPTIONALCONTEXT:       key.typerelation: source.codecompletion.typerelation.convertible,
+// OPTIONALCONTEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
 // OPTIONALCONTEXT-LABEL: }
 // OPTIONALCONTEXT-LABEL: key.name: "nil",
 // OPTIONALCONTEXT:       key.typename: "Int?",

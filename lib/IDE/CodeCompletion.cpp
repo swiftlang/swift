@@ -1162,7 +1162,7 @@ static void addConditionalCompilationFlags(ASTContext &Ctx,
 /// If \p Sink is nullptr, the pointee of each result may be modified in place.
 void swift::ide::postProcessCompletionResults(
     MutableArrayRef<CodeCompletionResult *> results, CompletionKind Kind,
-    const DeclContext *DC, CodeCompletionResultSink *Sink) {
+    DeclContext *DC, CodeCompletionResultSink *Sink) {
   for (CodeCompletionResult *&result : results) {
     bool modified = false;
     auto flair = result->getFlair();
@@ -1318,8 +1318,7 @@ void swift::ide::deliverCompletionResults(
                                CompletionContext.CodeCompletionKind, DC,
                                /*Sink=*/nullptr);
 
-  Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
-                                   Lookup.getExpectedTypeContext(), DC);
+  Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
 }
 
 bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {

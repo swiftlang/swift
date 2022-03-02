@@ -70,10 +70,6 @@ public:
 
     std::vector<const ContextFreeCodeCompletionResult *> Results;
 
-    /// The arena that contains the \c USRBasedTypes of the
-    /// \c ContextFreeCodeCompletionResult in this cache value.
-    USRBasedTypeArena USRTypeArena;
-
     Value() : Allocator(std::make_shared<llvm::BumpPtrAllocator>()) {}
   };
   using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;
