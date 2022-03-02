@@ -2117,7 +2117,8 @@ namespace {
       case ActorIsolation::GlobalActorUnsafe:
         return ActorIsolation::forGlobalActor(
             dc->mapTypeIntoContext(isolation.getGlobalActor()),
-            isolation == ActorIsolation::GlobalActorUnsafe);
+            isolation == ActorIsolation::GlobalActorUnsafe)
+              .withPreconcurrency(isolation.preconcurrency());
       }
     }
 
@@ -2341,14 +2342,16 @@ namespace {
               apply->getLoc(), diag::actor_isolated_call_decl,
               *unsatisfiedIsolation,
               calleeDecl->getDescriptiveKind(), calleeDecl->getName(),
-              getContextIsolation());
+              getContextIsolation())
+            .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
           calleeDecl->diagnose(
               diag::actor_isolated_sync_func, calleeDecl->getDescriptiveKind(),
               calleeDecl->getName());
         } else {
           ctx.Diags.diagnose(
               apply->getLoc(), diag::actor_isolated_call, *unsatisfiedIsolation,
-              getContextIsolation());
+              getContextIsolation())
+            .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
         }
 
         if (unsatisfiedIsolation->isGlobalActor()) {
@@ -2961,45 +2964,52 @@ namespace {
     /// isolation checked.
     ClosureActorIsolation determineClosureIsolation(
         AbstractClosureExpr *closure) {
-      // If the closure specifies a global actor, use it.
+      bool preconcurrency = false;
+
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
+
+        // If the closure specifies a global actor, use it.
         if (Type globalActorType = resolveGlobalActorType(explicitClosure))
-          return ClosureActorIsolation::forGlobalActor(globalActorType);
+          return ClosureActorIsolation::forGlobalActor(globalActorType,
+                                                       preconcurrency);
       }
 
       // If a closure has an isolated parameter, it is isolated to that
       // parameter.
       for (auto param : *closure->getParameters()) {
         if (param->isIsolated())
-          return ClosureActorIsolation::forActorInstance(param);
+          return ClosureActorIsolation::forActorInstance(param, preconcurrency);
       }
 
       // Sendable closures are actor-independent unless the closure has
       // specifically opted into inheriting actor isolation.
       if (isSendableClosure(closure, /*forActorIsolation=*/true))
-        return ClosureActorIsolation::forIndependent();
+        return ClosureActorIsolation::forIndependent(preconcurrency);
 
       // A non-Sendable closure gets its isolation from its context.
       auto parentIsolation = getActorIsolationOfContext(closure->getParent());
+      preconcurrency |= parentIsolation.preconcurrency();
 
       // We must have parent isolation determined to get here.
       switch (parentIsolation) {
       case ActorIsolation::Independent:
       case ActorIsolation::Unspecified:
-        return ClosureActorIsolation::forIndependent();
+        return ClosureActorIsolation::forIndependent(preconcurrency);
 
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe: {
         Type globalActorType = closure->mapTypeIntoContext(
             parentIsolation.getGlobalActor()->mapTypeOutOfContext());
-        return ClosureActorIsolation::forGlobalActor(globalActorType);
+        return ClosureActorIsolation::forGlobalActor(globalActorType,
+                                                     preconcurrency);
       }
 
       case ActorIsolation::ActorInstance: {
         if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
-          return ClosureActorIsolation::forActorInstance(param);
+          return ClosureActorIsolation::forActorInstance(param, preconcurrency);
 
-        return ClosureActorIsolation::forIndependent();
+        return ClosureActorIsolation::forIndependent(preconcurrency);
       }
     }
     }
@@ -3615,12 +3625,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
       // Stored properties cannot be non-isolated, so don't infer it.
       if (auto var = dyn_cast<VarDecl>(value)) {
         if (!var->isStatic() && var->hasStorage())
-          return ActorIsolation::forUnspecified();
+          return ActorIsolation::forUnspecified()
+                    .withPreconcurrency(inferred.preconcurrency());
       }
 
 
       if (onlyGlobal)
-        return ActorIsolation::forUnspecified();
+        return ActorIsolation::forUnspecified()
+                  .withPreconcurrency(inferred.preconcurrency());
 
       value->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
       break;
@@ -3635,7 +3647,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
               if (auto *nominal = varDC->getSelfNominalTypeDecl())
                 if (isa<StructDecl>(nominal) &&
                     !isWrappedValueOfPropWrapper(var))
-                  return ActorIsolation::forUnspecified();
+                  return ActorIsolation::forUnspecified()
+                              .withPreconcurrency(inferred.preconcurrency());
 
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
       auto attr = CustomAttr::create(
@@ -3649,7 +3662,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
       if (onlyGlobal)
-        return ActorIsolation::forUnspecified();
+        return ActorIsolation::forUnspecified()
+                    .withPreconcurrency(inferred.preconcurrency());
 
       // Nothing to do.
       break;

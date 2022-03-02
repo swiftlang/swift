@@ -9007,11 +9007,13 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
     switch (auto isolation = closure->getActorIsolation()) {
     case ClosureActorIsolation::Independent:
-      return ActorIsolation::forIndependent();
+      return ActorIsolation::forIndependent()
+                .withPreconcurrency(isolation.preconcurrency());
 
     case ClosureActorIsolation::GlobalActor: {
       return ActorIsolation::forGlobalActor(
-          isolation.getGlobalActor(), /*unsafe=*/false);
+          isolation.getGlobalActor(), /*unsafe=*/false)
+                .withPreconcurrency(isolation.preconcurrency());
     }
 
     case ClosureActorIsolation::ActorInstance: {
@@ -9020,7 +9022,8 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
           ->getClassOrBoundGenericClass();
       // FIXME: Doesn't work properly with generics
       assert(actorClass && "Bad closure actor isolation?");
-      return ActorIsolation::forActorInstance(actorClass);
+      return ActorIsolation::forActorInstance(actorClass)
+                .withPreconcurrency(isolation.preconcurrency());
     }
     }
   }

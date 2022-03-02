@@ -1551,7 +1551,8 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   case GlobalActor:
   case GlobalActorUnsafe:
     return forGlobalActor(
-        getGlobalActor().subst(subs), kind == GlobalActorUnsafe);
+        getGlobalActor().subst(subs), kind == GlobalActorUnsafe)
+              .withPreconcurrency(preconcurrency());
   }
   llvm_unreachable("unhandled actor isolation kind!");
 }
