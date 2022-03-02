@@ -3753,6 +3753,11 @@ namespace {
           // Also add subscripts directly because they won't be found from the
           // clang decl.
           result->addMember(subscript);
+
+          // Add the subscript as an alternative for the getter so that it gets
+          // carried into derived classes.
+          auto *subscriptImpl = getterAndSetter.first ? getterAndSetter.first : getterAndSetter.second;
+          Impl.addAlternateDecl(subscriptImpl, subscript);
         }
       }
 

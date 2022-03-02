@@ -4564,7 +4564,7 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   ASTContext &ctx = afd->getASTContext();
 
   AccessorDecl *getterDecl = cast<AccessorDecl>(afd);
-  VarDecl *baseClassVar = static_cast<VarDecl *>(context);
+  AbstractStorageDecl *baseClassVar = static_cast<AbstractStorageDecl *>(context);
   StructDecl *baseStruct =
       cast<StructDecl>(baseClassVar->getDeclContext()->getAsDecl());
   StructDecl *derivedStruct =
@@ -4591,10 +4591,29 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   AccessSemantics accessKind = baseClassVar->getClangDecl()
                                    ? AccessSemantics::DirectToStorage
                                    : AccessSemantics::DirectToImplementation;
-  auto baseMember =
-      new (ctx) MemberRefExpr(casted, SourceLoc(), baseClassVar, DeclNameLoc(),
-                              /*Implicit=*/true, accessKind);
-  baseMember->setType(baseClassVar->getType());
+  Expr *baseMember = nullptr;
+  if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
+    auto paramDecl = getterDecl->getParameters()->get(0);
+    auto paramRefExpr = new (ctx) DeclRefExpr(paramDecl,
+                                              DeclNameLoc(),
+                                              /*Implicit=*/ true);
+    paramRefExpr->setType(paramDecl->getType());
+
+    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {paramRefExpr});
+    baseMember = SubscriptExpr::create(ctx, casted, argList, subscript);
+    baseMember->setType(subscript->getElementInterfaceType());
+  } else {
+    // If the base class var has a clang decl, that means it's an access into a
+    // stored field. Otherwise, we're looking into another base class, so it's a
+    // another synthesized accessor.
+    AccessSemantics accessKind = baseClassVar->getClangDecl()
+                                     ? AccessSemantics::DirectToStorage
+                                     : AccessSemantics::DirectToImplementation;
+    baseMember =
+        new (ctx) MemberRefExpr(casted, SourceLoc(), baseClassVar, DeclNameLoc(),
+                                /*Implicit=*/true, accessKind);
+    baseMember->setType(cast<VarDecl>(baseClassVar)->getType());
+  }
 
   auto ret = new (ctx) ReturnStmt(SourceLoc(), baseMember);
   auto body = BraceStmt::create(ctx, SourceLoc(), {ret}, SourceLoc(),
@@ -4612,7 +4631,7 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
 static std::pair<BraceStmt *, bool>
 synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   auto setterDecl = cast<AccessorDecl>(afd);
-  VarDecl *baseClassVar = static_cast<VarDecl *>(context);
+  AbstractStorageDecl *baseClassVar = static_cast<AbstractStorageDecl *>(context);
   ASTContext &ctx = setterDecl->getASTContext();
 
   StructDecl *baseStruct =
@@ -4623,16 +4642,30 @@ synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   auto *pointeePropertyRefExpr =
       getInOutSelfInteropStaticCast(setterDecl, baseStruct, derivedStruct);
 
-  // If the base class var has a clang decl, that means it's an access into a
-  // stored field. Otherwise, we're looking into another base class, so it's a
-  // another synthesized accessor.
-  AccessSemantics accessKind = baseClassVar->getClangDecl()
-                                   ? AccessSemantics::DirectToStorage
-                                   : AccessSemantics::DirectToImplementation;
-  auto storedRef =
-      new (ctx) MemberRefExpr(pointeePropertyRefExpr, SourceLoc(), baseClassVar,
-                              DeclNameLoc(), /*Implicit=*/true, accessKind);
-  storedRef->setType(LValueType::get(baseClassVar->getType()));
+  Expr *storedRef = nullptr;
+  if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
+    auto paramDecl = setterDecl->getParameters()->get(1);
+    auto paramRefExpr = new (ctx) DeclRefExpr(paramDecl,
+                                              DeclNameLoc(),
+                                              /*Implicit=*/ true);
+    paramRefExpr->setType(paramDecl->getType());
+
+    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {paramRefExpr});
+    storedRef = SubscriptExpr::create(ctx, pointeePropertyRefExpr, argList, subscript);
+    storedRef->setType(subscript->getElementInterfaceType());
+  } else {
+    // If the base class var has a clang decl, that means it's an access into a
+    // stored field. Otherwise, we're looking into another base class, so it's a
+    // another synthesized accessor.
+    AccessSemantics accessKind = baseClassVar->getClangDecl()
+                                     ? AccessSemantics::DirectToStorage
+                                     : AccessSemantics::DirectToImplementation;
+
+    storedRef =
+        new (ctx) MemberRefExpr(pointeePropertyRefExpr, SourceLoc(), baseClassVar,
+                                DeclNameLoc(), /*Implicit=*/true, accessKind);
+    storedRef->setType(LValueType::get(cast<VarDecl>(baseClassVar)->getType()));
+  }
 
   auto newValueParamRefExpr =
       new (ctx) DeclRefExpr(setterDecl->getParameters()->get(0), DeclNameLoc(),
@@ -4649,11 +4682,22 @@ synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked=*/true};
 }
 
-static std::array<AccessorDecl *, 2>
-makeBaseClassFieldAccessors(DeclContext *declContext, VarDecl *computedVar,
-                            VarDecl *baseClassVar) {
+static SmallVector<AccessorDecl *, 2>
+makeBaseClassMemberAccessors(DeclContext *declContext,
+                             AbstractStorageDecl *computedVar,
+                             AbstractStorageDecl *baseClassVar) {
   auto &ctx = declContext->getASTContext();
   auto computedType = computedVar->getInterfaceType();
+
+  ParameterList *bodyParams = nullptr;
+  if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
+    computedType = computedType->getAs<FunctionType>()->getResult();
+
+    auto idxParam = subscript->getIndices()->get(0);
+    bodyParams = ParameterList::create(ctx, { idxParam });
+  } else {
+    bodyParams = ParameterList::createEmpty(ctx);
+  }
 
   auto getterDecl = AccessorDecl::create(
       ctx,
@@ -4664,18 +4708,31 @@ makeBaseClassFieldAccessors(DeclContext *declContext, VarDecl *computedVar,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, ParameterList::createEmpty(ctx), computedType,
+      /*GenericParams=*/nullptr, bodyParams, computedType,
       declContext);
   getterDecl->setIsTransparent(true);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setBodySynthesizer(synthesizeBaseClassFieldGetterBody,
                                  baseClassVar);
 
+  if (baseClassVar->getWriteImpl() == WriteImplKind::Immutable)
+    return {getterDecl};
+
   auto newValueParam =
       new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
                           ctx.getIdentifier("newValue"), declContext);
   newValueParam->setSpecifier(ParamSpecifier::Default);
   newValueParam->setInterfaceType(computedType);
+
+  ParameterList *setterBodyParams = nullptr;
+  if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
+    auto idxParam = subscript->getIndices()->get(0);
+    bodyParams = ParameterList::create(ctx, { idxParam });
+    setterBodyParams = ParameterList::create(ctx, { newValueParam, idxParam });
+  } else {
+    setterBodyParams = ParameterList::create(ctx, { newValueParam });
+  }
+
   auto setterDecl = AccessorDecl::create(
       ctx,
       /*FuncLoc=*/SourceLoc(),
@@ -4685,7 +4742,7 @@ makeBaseClassFieldAccessors(DeclContext *declContext, VarDecl *computedVar,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, ParameterList::create(ctx, {newValueParam}),
+      /*GenericParams=*/nullptr, setterBodyParams,
       TupleType::getEmpty(ctx), declContext);
   setterDecl->setIsTransparent(true);
   setterDecl->setAccess(AccessLevel::Public);
@@ -4718,6 +4775,20 @@ ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
     return out;
   }
 
+  if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    auto out = SubscriptDecl::create(
+        subscript->getASTContext(), subscript->getName(), subscript->getStaticLoc(),
+        subscript->getStaticSpelling(), subscript->getSubscriptLoc(),
+        subscript->getIndices(), subscript->getNameLoc(), subscript->getElementInterfaceType(),
+        newContext, subscript->getGenericParams());
+    out->copyFormalAccessFrom(subscript);
+    out->setAccessors(SourceLoc(),
+                      makeBaseClassMemberAccessors(newContext, out, subscript),
+                      SourceLoc());
+    out->setImplInfo(subscript->getImplInfo());
+    return out;
+  }
+
   if (auto var = dyn_cast<VarDecl>(decl)) {
     auto rawMemory = allocateMemoryForDecl<VarDecl>(var->getASTContext(),
                                                     sizeof(VarDecl), false);
@@ -4729,9 +4800,11 @@ ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
     out->setIsDynamic(var->isDynamic());
     out->copyFormalAccessFrom(var);
     out->setAccessors(SourceLoc(),
-                      makeBaseClassFieldAccessors(newContext, out, var),
+                      makeBaseClassMemberAccessors(newContext, out, var),
                       SourceLoc());
-    out->setImplInfo(StorageImplInfo::getComputed(StorageIsMutable));
+    auto isMutable = var->getWriteImpl() == WriteImplKind::Immutable
+                         ? StorageIsNotMutable : StorageIsMutable;
+    out->setImplInfo(StorageImplInfo::getComputed(isMutable));
     out->setIsSetterMutating(true);
     return out;
   }
