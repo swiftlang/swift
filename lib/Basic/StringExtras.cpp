@@ -675,8 +675,8 @@ static Words::iterator matchTypeNameFromBackWithSpecialCases(
 
       if (shortenedNameWord != newShortenedNameWord) {
         unsigned targetSize = newShortenedNameWord.size();
-        auto newIter = llvm::make_reverse_iterator(WordIterator(name,
-                                                                targetSize));
+        auto newIter = std::make_reverse_iterator(WordIterator(name,
+                                                               targetSize));
 #ifndef NDEBUG
         while (nameWordRevIter.base().getPosition() > targetSize)
           ++nameWordRevIter;
