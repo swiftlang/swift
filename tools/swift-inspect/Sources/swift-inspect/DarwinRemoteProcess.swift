@@ -74,7 +74,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   func getAddr(symbolName: String) -> swift_addr_t {
     // FIXME: use `__USER_LABEL_PREFIX__` instead of the hardcoded `_`.
     let fullName = "_\(symbolName)"
-    let symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftCore, fullName)
+    var symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftCore, fullName)
     if CSIsNull(symbol) {
       symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftConcurrency, fullName)
     }
