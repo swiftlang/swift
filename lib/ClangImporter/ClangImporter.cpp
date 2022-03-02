@@ -5527,6 +5527,9 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
   if (!newFn)
     return ConcreteDeclRef(decl);
 
+  if (Impl.specializedFunctionTemplates.count(newFn))
+    return ConcreteDeclRef(Impl.specializedFunctionTemplates[newFn]);
+
   auto newDecl = cast_or_null<ValueDecl>(
       decl->getASTContext().getClangModuleLoader()->importDeclDirectly(
           newFn));
@@ -5548,6 +5551,7 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
     }
   }
 
+  Impl.specializedFunctionTemplates[newFn] = newDecl;
   return ConcreteDeclRef(newDecl);
 }
 
