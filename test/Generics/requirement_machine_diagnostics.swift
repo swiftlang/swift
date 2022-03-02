@@ -152,8 +152,28 @@ protocol P7 : P6 {
   associatedtype AssocP7: P6
 }
 
-extension P7 where AssocP6.Element : P6,
-        AssocP7.AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP7.AssocP6.Element' : 'P6'}}
+extension P7 where AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP6.Element' : 'P6'}}
+        AssocP7.AssocP6.Element : P6,
         AssocP6.Element == AssocP7.AssocP6.Element {
   func nestedSameType1() { }
 }
+
+protocol P8 {
+  associatedtype A
+  associatedtype B
+}
+
+protocol P9 : P8 {
+  associatedtype A
+  associatedtype B
+}
+
+protocol P10 {
+  associatedtype A
+  associatedtype C
+}
+
+class X3 { }
+
+func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
+// expected-warning@-1{{redundant superclass constraint 'T.B' : 'X3'}}

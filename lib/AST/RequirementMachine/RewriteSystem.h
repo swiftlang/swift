@@ -177,7 +177,9 @@ public:
   }
 
   void markExplicit(Optional<unsigned> requirementID) {
-    assert(!Explicit && !Permanent &&
+    assert((!Explicit || requirementID.hasValue()) &&
+           "Rule is already explicit");
+    assert(!Permanent &&
            "Permanent and explicit are mutually exclusive");
     this->requirementID = requirementID;
     Explicit = true;
@@ -504,6 +506,8 @@ private:
   std::vector<std::pair<unsigned, unsigned>> ConflictingRules;
 
   void propagateExplicitBits();
+
+  void propagateRedundantRequirementIDs();
 
   void processConflicts();
 

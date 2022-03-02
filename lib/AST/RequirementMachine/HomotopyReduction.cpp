@@ -195,23 +195,99 @@ void RewriteSystem::propagateExplicitBits() {
       loop.findRulesAppearingOnceInEmptyContext(*this);
 
     bool sawExplicitRule = false;
-    Optional<unsigned> requirementID = None;
 
     for (unsigned ruleID : rulesInEmptyContext) {
       const auto &rule = getRule(ruleID);
-      if (rule.isExplicit()) {
+      if (rule.isExplicit())
         sawExplicitRule = true;
-        requirementID = rule.getRequirementID();
-        break;
-      }
     }
     if (sawExplicitRule) {
       for (unsigned ruleID : rulesInEmptyContext) {
         auto &rule = getRule(ruleID);
         if (!rule.isPermanent() && !rule.isExplicit())
-          rule.markExplicit(requirementID);
+          rule.markExplicit(None);
       }
     }
+  }
+}
+
+/// Propagate requirement IDs from redundant rules to their
+/// replacements that appear once in empty context.
+void RewriteSystem::propagateRedundantRequirementIDs() {
+  if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
+    llvm::dbgs() << "\nPropagating requirement IDs: {";
+  }
+
+  for (auto ruleAndReplacement : RedundantRules) {
+    auto ruleID = ruleAndReplacement.first;
+    auto rewritePath = ruleAndReplacement.second;
+    auto &rule = Rules[ruleID];
+
+    auto requirementID = rule.getRequirementID();
+    if (!requirementID.hasValue())
+      continue;
+
+    // FIXME: This code is almost identical to `RewriteLoop::recompute`.
+
+    // Rules appearing in empty context (possibly more than once).
+    llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
+    // The number of times each rule appears (with or without context).
+    llvm::SmallDenseMap<unsigned, unsigned, 2> ruleFrequency;
+
+    RewritePathEvaluator evaluator(MutableTerm(rule.getLHS()));
+    for (auto step : rewritePath) {
+      switch (step.Kind) {
+      case RewriteStep::Rule: {
+        if (!step.isInContext() && !evaluator.isInContext())
+          rulesInEmptyContext.insert(step.getRuleID());
+
+        ++ruleFrequency[step.getRuleID()];
+        break;
+      }
+
+      case RewriteStep::LeftConcreteProjection:
+      case RewriteStep::Decompose:
+      case RewriteStep::PrefixSubstitutions:
+      case RewriteStep::Shift:
+      case RewriteStep::Relation:
+      case RewriteStep::DecomposeConcrete:
+      case RewriteStep::RightConcreteProjection:
+        break;
+      }
+
+      evaluator.apply(step, *this);
+    }
+
+    // Collect all rules that we saw exactly once in empty context.
+    SmallVector<unsigned, 1> rulesOnceInEmptyContext;
+    for (auto rule : rulesInEmptyContext) {
+      auto found = ruleFrequency.find(rule);
+      assert(found != ruleFrequency.end());
+
+      if (found->second == 1)
+        rulesOnceInEmptyContext.push_back(rule);
+    }
+
+    for (auto ruleID : rulesOnceInEmptyContext) {
+      auto &replacement = Rules[ruleID];
+      if (!replacement.isPermanent() &&
+          !replacement.getRequirementID().hasValue()) {
+        if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
+          llvm::dbgs() << "\n- propagating ID = "
+            << requirementID
+            << "\n  from ";
+          rule.dump(llvm::dbgs());
+          llvm::dbgs() << "\n  to ";
+          replacement.dump(llvm::dbgs());
+        }
+
+        replacement.markExplicit(requirementID);
+      }
+    }
+  }
+
+  if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
+    llvm::dbgs() << "\n}\n";
   }
 }
 
@@ -658,7 +734,7 @@ void RewriteSystem::performHomotopyReduction(
 
     // If no redundant rules remain which can be eliminated by this pass, stop.
     if (!optPair)
-      return;
+      break;
 
     unsigned loopID = optPair->first;
     unsigned ruleID = optPair->second;
@@ -683,6 +759,8 @@ void RewriteSystem::performHomotopyReduction(
 
     deleteRule(ruleID, replacementPath);
   }
+
+  propagateRedundantRequirementIDs();
 }
 
 void RewriteSystem::normalizeRedundantRules() {
