@@ -297,3 +297,23 @@ extension String.Index: Hashable {
     hasher.combine(orderingValue)
   }
 }
+
+// FIXME: This is for debugging only; remove before merging.
+extension String.Index: CustomStringConvertible {
+  @_alwaysEmitIntoClient
+  public var description: String {
+    var d = "Index("
+      d += "offset: \(_encodedOffset)"
+    if transcodedOffset != 0 {
+      d += "+\(transcodedOffset)"
+    }
+    if let stride = characterStride {
+      d += ", stride: \(stride)"
+    }
+    if _isScalarAligned {
+      d += ", scalarAligned"
+    }
+    d += ")"
+    return d
+  }
+}

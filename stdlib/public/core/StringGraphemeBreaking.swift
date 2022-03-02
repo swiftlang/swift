@@ -106,9 +106,32 @@ extension _StringGuts {
     }
 
     let nextIdx = withFastUTF8 { utf8 in
-      nextBoundary(startingAt: i) {
-        let (scalar, len) = _decodeScalar(utf8, startingAt: $0)
-        return (scalar, $0 &+ len)
+      nextBoundary(startingAt: i, startIndex: 0) { j in
+        guard j < utf8.count else { return nil }
+        let (scalar, len) = _decodeScalar(utf8, startingAt: j)
+        return (scalar, j &+ len)
+      }
+    }
+
+    return nextIdx &- i
+  }
+
+  @_effects(releasenone)
+  internal func _opaqueCharacterStride(
+    startingAt i: Int,
+    in bounds: Range<Int>
+  ) -> Int {
+    _internalInvariant(bounds.contains(i))
+    if _slowPath(isForeign) {
+      return _foreignOpaqueCharacterStride(startingAt: i, in: bounds)
+    }
+
+    let nextIdx = withFastUTF8 { utf8 in
+      nextBoundary(startingAt: i, startIndex: bounds.lowerBound) { j in
+        _internalInvariant(j >= bounds.lowerBound)
+        guard j < bounds.upperBound else { return nil }
+        let (scalar, len) = _decodeScalar(utf8, startingAt: j)
+        return (scalar, j &+ len)
       }
     }
 
@@ -123,9 +146,32 @@ extension _StringGuts {
     }
 
     let previousIdx = withFastUTF8 { utf8 in
-      previousBoundary(endingAt: i) {
-        let (scalar, len) = _decodeScalar(utf8, endingAt: $0)
-        return (scalar, $0 &- len)
+      previousBoundary(endingAt: i, startIndex: 0) { j in
+        guard j > 0 else { return nil }
+        let (scalar, len) = _decodeScalar(utf8, endingAt: j)
+        return (scalar, j &- len)
+      }
+    }
+
+    return i &- previousIdx
+  }
+
+  @_effects(releasenone)
+  internal func _opaqueCharacterStride(
+    endingAt i: Int,
+    in bounds: Range<Int>
+  ) -> Int {
+    _internalInvariant(i > bounds.lowerBound && i <= bounds.upperBound)
+    if _slowPath(isForeign) {
+      return _foreignOpaqueCharacterStride(endingAt: i, in: bounds)
+    }
+
+    let previousIdx = withFastUTF8 { utf8 in
+      previousBoundary(endingAt: i, startIndex: bounds.lowerBound) { j in
+        _internalInvariant(j <= bounds.upperBound)
+        guard j > bounds.lowerBound else { return nil }
+        let (scalar, len) = _decodeScalar(utf8, endingAt: j)
+        return (scalar, j &- len)
       }
     }
 
@@ -138,9 +184,39 @@ extension _StringGuts {
 #if _runtime(_ObjC)
     _internalInvariant(isForeign)
 
-    let nextIdx = nextBoundary(startingAt: i) {
+    let nextIdx = nextBoundary(startingAt: i, startIndex: 0) { j in
+      guard j < count else { return nil }
       let scalars = String.UnicodeScalarView(self)
-      let idx = String.Index(_encodedOffset: $0)
+      let idx = String.Index(_encodedOffset: j)
+
+      let scalar = scalars[idx]
+      let nextIdx = scalars.index(after: idx)
+
+      return (scalar, nextIdx._encodedOffset)
+    }
+
+    return nextIdx &- i
+#else
+  fatalError("No foreign strings on Linux in this version of Swift")
+#endif
+  }
+
+  @inline(never)
+  @_effects(releasenone)
+  private func _foreignOpaqueCharacterStride(
+    startingAt i: Int,
+    in bounds: Range<Int>
+  ) -> Int {
+#if _runtime(_ObjC)
+    _internalInvariant(isForeign)
+    _internalInvariant(bounds.contains(i))
+
+    let nextIdx = nextBoundary(
+      startingAt: i, startIndex: bounds.lowerBound
+    ) { j in
+      guard j < bounds.upperBound else { return nil }
+      let scalars = String.UnicodeScalarView(self)
+      let idx = String.Index(_encodedOffset: j)
 
       let scalar = scalars[idx]
       let nextIdx = scalars.index(after: idx)
@@ -160,13 +236,43 @@ extension _StringGuts {
 #if _runtime(_ObjC)
     _internalInvariant(isForeign)
 
-    let previousIdx = previousBoundary(endingAt: i) {
+    let previousIdx = previousBoundary(endingAt: i, startIndex: 0) { j in
+      guard j > 0 else { return nil }
       let scalars = String.UnicodeScalarView(self)
-      let idx = String.Index(_encodedOffset: $0)
+      let idx = String.Index(_encodedOffset: j)
 
       let previousIdx = scalars.index(before: idx)
       let scalar = scalars[previousIdx]
 
+      return (scalar, previousIdx._encodedOffset)
+    }
+
+    return i &- previousIdx
+#else
+  fatalError("No foreign strings on Linux in this version of Swift")
+#endif
+  }
+
+  @inline(never)
+  @_effects(releasenone)
+  private func _foreignOpaqueCharacterStride(
+    endingAt i: Int,
+    in bounds: Range<Int>
+  ) -> Int {
+#if _runtime(_ObjC)
+    _internalInvariant(isForeign)
+    _internalInvariant(i > bounds.lowerBound && i <= bounds.upperBound)
+
+    let previousIdx = previousBoundary(
+      endingAt: i, startIndex: bounds.lowerBound
+    ) { j in
+      guard j > bounds.lowerBound else { return nil }
+      let scalars = String.UnicodeScalarView(self)
+      let idx = String.Index(_encodedOffset: j)
+
+      let previousIdx = scalars.index(before: idx)
+
+      let scalar = scalars[previousIdx]
       return (scalar, previousIdx._encodedOffset)
     }
 
@@ -239,63 +345,54 @@ internal struct _GraphemeBreakingState {
 }
 
 extension _StringGuts {
-  // Returns the stride of the next grapheme cluster at the previous boundary
-  // offset.
+  // Returns the stride of the grapheme cluster starting at offset `index`.
   internal func nextBoundary(
     startingAt index: Int,
-    nextScalar: (Int) -> (Unicode.Scalar, end: Int)
+    startIndex: Int,
+    nextScalar: (Int) -> (Unicode.Scalar, end: Int)?
   ) -> Int {
-    _internalInvariant(index != endIndex._encodedOffset)
+    _internalInvariant(index < endIndex._encodedOffset)
     var state = _GraphemeBreakingState()
-    var index = index
+    var (scalar, index) = nextScalar(index)!
 
     while true {
-      let (scalar1, nextIdx) = nextScalar(index)
-      index = nextIdx
-
-      guard index != endIndex._encodedOffset else {
+      guard let (scalar2, nextIndex) = nextScalar(index) else { break }
+      if shouldBreak(
+        scalar, between: scalar2, &state, index, startIndex: startIndex
+      ) {
         break
       }
-
-      let (scalar2, _) = nextScalar(index)
-
-      if shouldBreak(scalar1, between: scalar2, &state, index) {
-        break
-      }
+      index = nextIndex
+      scalar = scalar2
     }
 
     return index
   }
 
-  // Returns the stride of the previous grapheme cluster at the current boundary
-  // offset.
+  // Returns the stride of the grapheme cluster ending at offset `index`.
   internal func previousBoundary(
     endingAt index: Int,
-    previousScalar: (Int) -> (Unicode.Scalar, start: Int)
+    startIndex: Int,
+    previousScalar: (Int) -> (Unicode.Scalar, start: Int)?
   ) -> Int {
-    _internalInvariant(index != startIndex._encodedOffset)
+    _internalInvariant(index > startIndex)
     var state = _GraphemeBreakingState()
-    var index = index
+    var (scalar2, index) = previousScalar(index)!
 
     while true {
-      let (scalar2, previousIdx) = previousScalar(index)
-      index = previousIdx
-
-      guard index != startIndex._encodedOffset else {
-        break
-      }
-
-      let (scalar1, _) = previousScalar(index)
-
+      guard let (scalar1, previousIndex) = previousScalar(index) else { break }
       if shouldBreak(
         scalar1,
         between: scalar2,
         &state,
         index,
+        startIndex: startIndex,
         isBackwards: true
       ) {
         break
       }
+      index = previousIndex
+      scalar2 = scalar1
     }
 
     return index
@@ -313,6 +410,7 @@ extension _StringGuts {
     between scalar2: Unicode.Scalar,
     _ state: inout _GraphemeBreakingState,
     _ index: Int,
+    startIndex: Int = 0,
     isBackwards: Bool = false
   ) -> Bool {
     // GB3
@@ -421,7 +519,7 @@ extension _StringGuts {
     // GB11
     case (.zwj, .extendedPictographic):
       if isBackwards {
-        return !checkIfInEmojiSequence(index)
+        return !checkIfInEmojiSequence(index, startIndex: startIndex)
       }
 
       return !state.isInEmojiSequence
@@ -429,7 +527,7 @@ extension _StringGuts {
     // GB12 & GB13
     case (.regionalIndicator, .regionalIndicator):
       if isBackwards {
-        return countRIs(index)
+        return countRIs(index, startIndex: startIndex)
       }
 
       defer {
@@ -457,10 +555,10 @@ extension _StringGuts {
             return true
           }
 
-          return !checkIfInIndicSequence(index)
+          return !checkIfInIndicSequence(index, startIndex: startIndex)
 
         case (.zwj, true):
-          return !checkIfInIndicSequence(index)
+          return !checkIfInIndicSequence(index, startIndex: startIndex)
 
         default:
           return true
@@ -514,17 +612,14 @@ extension _StringGuts {
   //                | = We found our starting .extendedPictographic letting us
   //                    know that we are in an emoji sequence so our initial
   //                    break question is answered as NO.
-  internal func checkIfInEmojiSequence(_ index: Int) -> Bool {
+  internal func checkIfInEmojiSequence(_ index: Int, startIndex: Int) -> Bool {
+    guard index > startIndex else { return false }
+
     var emojiIdx = String.Index(_encodedOffset: index)
-
-    guard emojiIdx != startIndex else {
-      return false
-    }
-
     let scalars = String.UnicodeScalarView(self)
     scalars.formIndex(before: &emojiIdx)
 
-    while emojiIdx != startIndex {
+    while emojiIdx._encodedOffset > startIndex {
       scalars.formIndex(before: &emojiIdx)
       let scalar = scalars[emojiIdx]
 
@@ -571,13 +666,10 @@ extension _StringGuts {
   //         ^
   //         | = Is a linking consonant and we've seen a virama, so this is a
   //             legitimate indic sequence, so do NOT break the initial question.
-  internal func checkIfInIndicSequence(_ index: Int) -> Bool {
+  internal func checkIfInIndicSequence(_ index: Int, startIndex: Int) -> Bool {
+    guard index > startIndex else { return false }
+
     var indicIdx = String.Index(_encodedOffset: index)
-
-    guard indicIdx != startIndex else {
-      return false
-    }
-
     let scalars = String.UnicodeScalarView(self)
     scalars.formIndex(before: &indicIdx)
 
@@ -590,7 +682,7 @@ extension _StringGuts {
       hasSeenVirama = true
     }
 
-    while indicIdx != startIndex {
+    while indicIdx._encodedOffset > startIndex {
       scalars.formIndex(before: &indicIdx)
       let scalar = scalars[indicIdx]
 
@@ -657,21 +749,16 @@ extension _StringGuts {
   //         ^
   //         | = Not a .regionalIndicator. riCount = 1 which is odd, so break
   //             the last two .regionalIndicators.
-  internal func countRIs(
-    _ index: Int
-  ) -> Bool {
+  internal func countRIs(_ index: Int, startIndex: Int) -> Bool {
+    guard index > startIndex else { return false }
+
     var riIdx = String.Index(_encodedOffset: index)
-
-    guard riIdx != startIndex else {
-      return false
-    }
-
     var riCount = 0
 
     let scalars = String.UnicodeScalarView(self)
     scalars.formIndex(before: &riIdx)
 
-    while riIdx != startIndex {
+    while riIdx._encodedOffset > startIndex {
       scalars.formIndex(before: &riIdx)
       let scalar = scalars[riIdx]
 

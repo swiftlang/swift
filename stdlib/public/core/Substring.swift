@@ -160,44 +160,145 @@ extension Substring: StringProtocol {
   @inlinable @inline(__always)
   public var endIndex: Index { return _slice.endIndex }
 
-  @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
-    _precondition(i < endIndex, "Cannot increment beyond endIndex")
-    _precondition(i >= startIndex, "Cannot increment an invalid index")
-    return _slice.index(after: i)
+    // Note: in Swift 5.6 and below, this method used to be inlinable,
+    // forwarding to `_slice.base.index(after:)`. Unfortunately, that approach
+    // isn't compatible with SE-0180, as it allows Unicode scalars outside the
+    // substring to affect grapheme breaking results within the substring. This
+    // leads to Collection conformance issues when the `Substring`'s bounds do
+    // not fall on grapheme boundaries in `base`.
+
+    // FIXME: Unlike `index(before:)`, this function may return incorrect
+    // results if `i` isn't on a grapheme cluster boundary. (The grapheme
+    // breaking algorithm assumes we start on a break when we go forward.)
+
+    let i = _slice.base._guts.scalarAlign(i)
+
+    _precondition(i < endIndex && i >= startIndex,
+      "Substring index is out of bounds")
+
+    let stride = _characterStride(startingAt: i)
+    let nextOffset = i._encodedOffset &+ stride
+
+    let nextIndex = Index(_encodedOffset: nextOffset)._scalarAligned
+    guard _knownToStartOnGraphemeBreak else {
+      // Don't cache character strides in indices of exotic substrings whose
+      // startIndex isn't aligned on a grapheme cluster boundary. (Their
+      // grapheme breaks may not match with those in `base`.)
+      return nextIndex
+    }
+    guard nextIndex < endIndex || _knownToEndOnGraphemeBreak else {
+      // Don't cache the stride if we end on a partial grapheme cluster.
+      return nextIndex
+    }
+    let nextStride = _characterStride(startingAt: nextIndex)
+    return Index(
+      encodedOffset: nextOffset, characterStride: nextStride)._scalarAligned
   }
 
-  @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
-    _precondition(i <= endIndex, "Cannot decrement an invalid index")
-    _precondition(i > startIndex, "Cannot decrement beyond startIndex")
-    return _slice.index(before: i)
+    // Note: in Swift 5.6 and below, this method used to be inlinable,
+    // forwarding to `_slice.base.index(before:)`. Unfortunately, that approach
+    // isn't compatible with SE-0180, as it allows Unicode scalars outside the
+    // substring to affect grapheme breaking results within the substring. This
+    // leads to Collection conformance issues when the `Substring`'s bounds do
+    // not fall on grapheme boundaries in `base`.
+
+    _precondition(i <= endIndex && i > startIndex,
+      "Substring index is out of bounds")
+
+    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+    let i = _slice.base._guts.scalarAlign(i)
+    let stride = _characterStride(endingAt: i)
+    let priorOffset = i._encodedOffset &- stride
+    _internalInvariant(priorOffset >= startIndex._encodedOffset)
+
+    guard _knownToStartOnGraphemeBreak else {
+      // Don't cache character strides in indices of exotic substrings whose
+      // startIndex isn't aligned on a grapheme cluster boundary. (Their
+      // grapheme breaks may not match with those in `base`.)
+      return Index(_encodedOffset: priorOffset)._scalarAligned
+    }
+
+    return Index(
+      encodedOffset: priorOffset, characterStride: stride)._scalarAligned
   }
 
-  @inlinable @inline(__always)
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
-    let result = _slice.index(i, offsetBy: n)
-    _precondition(
-      (_slice._startIndex ... _slice.endIndex).contains(result),
-      "Operation results in an invalid index")
-    return result
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
+    // Note: in Swift 5.6 and below, this method used to be inlinable,
+    // forwarding to `_slice.base.index(_:offsetBy:)`. Unfortunately, that
+    // approach isn't compatible with SE-0180, as it allows Unicode scalars
+    // outside the substring to affect grapheme breaking results within the
+    // substring. This leads to Collection conformance issues when the
+    // `Substring`'s bounds do not fall on grapheme boundaries in `base`.
+    return _index(i, offsetBy: distance)
   }
 
-  @inlinable @inline(__always)
   public func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
-    let result = _slice.index(i, offsetBy: n, limitedBy: limit)
-    _precondition(result.map {
-        (_slice._startIndex ... _slice.endIndex).contains($0)
-      } ?? true,
-      "Operation results in an invalid index")
-    return result
+    // Note: in Swift 5.6 and below, this method used to be inlinable,
+    // forwarding to `_slice.base.index(_:offsetBy:limitedBy:)`. Unfortunately,
+    // that approach isn't compatible with SE-0180, as it allows Unicode scalars
+    // outside the substring to affect grapheme breaking results within the
+    // substring. This leads to Collection conformance issues when the
+    // `Substring`'s bounds do not fall on grapheme boundaries in `base`.
+
+    // Per SE-0180, `i` and `limit` are allowed to fall in between grapheme
+    // breaks, in which case this function must still terminate without trapping
+    // and return a result that makes sense.
+
+    // Note: `limit` is intentionally not scalar aligned to ensure our behavior
+    // exactly matches the documentation.
+
+    let start = _slice.base._guts.scalarAlign(i)
+    var i = start
+    if distance >= 0 {
+      for _ in stride(from: 0, to: distance, by: 1) {
+        guard limit < start || i < limit else { return nil }
+        formIndex(after: &i)
+      }
+      guard limit < start || i <= limit else { return nil }
+    } else {
+      for _ in stride(from: 0, to: distance, by: -1) {
+        guard limit > start || i > limit else { return nil }
+        formIndex(before: &i)
+      }
+      guard limit > start || i >= limit else { return nil }
+    }
+    return i
   }
 
-  @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> Int {
-    return _slice.distance(from: start, to: end)
+    // Note: in Swift 5.6 and below, this method used to be inlinable,
+    // forwarding to `_slice.base.distance(from:to:)`. Unfortunately, that
+    // approach isn't compatible with SE-0180, as it allows Unicode scalars
+    // outside the substring to affect grapheme breaking results within the
+    // substring. This leads to Collection conformance issues when the
+    // `Substring`'s bounds do not fall on grapheme boundaries in `base`.
+
+    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+
+    // Per SE-0180, `start` and `end` are allowed to fall in between grapheme
+    // breaks, in which case this function must still terminate without trapping
+    // and return a result that makes sense.
+    var i = _slice.base._guts.scalarAlign(start)
+    let end = _slice.base._guts.scalarAlign(end)
+    var count = 0
+
+    if i < end {
+      while i < end { // Note `<` instead of `==`
+        count += 1
+        formIndex(after: &i)
+      }
+    }
+    else if i > end {
+      while i > end { // Note `<` instead of `==`
+        count -= 1
+        formIndex(before: &i)
+      }
+    }
+    return count
   }
 
   public subscript(i: Index) -> Character {
@@ -208,13 +309,20 @@ extension Substring: StringProtocol {
     _ bounds: Range<Index>,
     with newElements: C
   ) where C: Collection, C.Iterator.Element == Iterator.Element {
-    _slice.replaceSubrange(bounds, with: newElements)
+    _replaceSubrange(bounds, with: newElements)
   }
 
   public mutating func replaceSubrange(
     _ bounds: Range<Index>, with newElements: Substring
   ) {
-    replaceSubrange(bounds, with: newElements._slice)
+    _replaceSubrange(bounds, with: newElements)
+  }
+
+  @inline(__always)
+  internal mutating func _replaceSubrange<C: Collection>(
+    _ bounds: Range<Index>, with newElements: C
+  ) where C.Element == Element {
+    _slice.replaceSubrange(bounds, with: newElements)
   }
 
   /// Creates a string from the given Unicode code units in the specified
@@ -304,6 +412,50 @@ extension Substring: StringProtocol {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
     return try String(self).withCString(encodedAs: targetEncoding, body)
+  }
+}
+
+extension Substring {
+  internal var _knownToStartOnGraphemeBreak: Bool {
+    startIndex._encodedOffset == 0 || startIndex.characterStride != nil
+  }
+
+  internal var _knownToEndOnGraphemeBreak: Bool {
+    endIndex == _slice.base.endIndex || endIndex.characterStride != nil
+  }
+
+  internal var _encodedOffsetRange: Range<Int> {
+    Range(_uncheckedBounds: (
+        _slice._startIndex._encodedOffset, _slice._endIndex._encodedOffset))
+  }
+
+  internal func _characterStride(startingAt i: Index) -> Int {
+    _internalInvariant(i._isScalarAligned)
+
+    // Fast path if the index already has its stride cached. Substrings that
+    // don't start on a grapheme cluster boundary may have different grapheme
+    // break positions than their base string, so we must ignore the cache in
+    // that case.
+    if let d = i.characterStride, _knownToStartOnGraphemeBreak {
+      // Make sure a cached stride cannot lead us beyond the substring's end
+      // index. This can happen if `self` ends between grapheme cluster
+      // boundaries.
+      return Swift.min(d, endIndex._encodedOffset &- i._encodedOffset)
+    }
+
+    if i == endIndex { return 0 }
+
+    return _slice.base._guts._opaqueCharacterStride(
+      startingAt: i._encodedOffset, in: _encodedOffsetRange)
+  }
+
+  internal func _characterStride(endingAt i: Index) -> Int {
+    _internalInvariant(i._isScalarAligned)
+
+    if i == startIndex { return 0 }
+
+    return _slice.base._guts._opaqueCharacterStride(
+      endingAt: i._encodedOffset, in: _encodedOffsetRange)
   }
 }
 
@@ -601,9 +753,11 @@ extension Substring {
     /// Creates an instance that slices `base` at `_bounds`.
     @inlinable
     internal init(_ base: String.UnicodeScalarView, _bounds: Range<Index>) {
+      let start = base._guts.scalarAlign(_bounds.lowerBound)
+      let end = base._guts.scalarAlign(_bounds.upperBound)
       _slice = Slice(
         base: String(base._guts).unicodeScalars,
-        bounds: _bounds)
+        bounds: Range(_uncheckedBounds: (start, end)))
     }
   }
 }
@@ -676,6 +830,7 @@ extension Substring.UnicodeScalarView: BidirectionalCollection {
 
   @inlinable
   public subscript(r: Range<Index>) -> Substring.UnicodeScalarView {
+    _failEarlyRangeCheck(r, bounds: startIndex..<endIndex)
     return Substring.UnicodeScalarView(_slice.base, _bounds: r)
   }
 }

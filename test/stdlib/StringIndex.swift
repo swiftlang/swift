@@ -3,6 +3,9 @@
 // UNSUPPORTED: freestanding
 
 import StdlibUnittest
+#if _runtime(_ObjC)
+import Foundation
+#endif
 
 var StringIndexTests = TestSuite("StringIndexTests")
 
@@ -22,6 +25,34 @@ let simpleStrings: [String] = [
     SimpleString.emoji.rawValue,
     "",
 ]
+
+StringIndexTests.test("Wat") {
+  let s = "\u{1F1FA}\u{1F1F8}\u{1F1E8}\u{1F1E6}" // Regional indicators <U,S> + <C,A>
+
+  s.unicodeScalars.indices.forEach {
+    print("\($0) -> U+\(String(s.unicodeScalars[$0].value, radix: 16, uppercase: true)) \(s.unicodeScalars[$0].properties.name ?? "\(s.unicodeScalars[$0].debugDescription)")")
+  }
+
+  let i = s.unicodeScalars.index(s.unicodeScalars.startIndex, offsetBy: 1) // S
+  let j = s.unicodeScalars.index(s.unicodeScalars.startIndex, offsetBy: 3) // A
+  // Per SE-0180, `s[i..<j]` should be the Seychelles flag (country code SC)
+
+  print(i, j)
+
+  expectEqual(s.index(after: i), j) // Passes
+  expectEqual(s.index(before: j), i) // Fails, result is at scalar offset 2 (C)
+
+  let slice = s[i ..< j]
+  expectEqual(slice.index(after: slice.startIndex), slice.endIndex) // Passes
+  expectEqual(slice.index(before: slice.endIndex), slice.startIndex) // Fails
+
+  let ref = "a\u{1F1F8}\u{1F1E8}b"
+  let ri = ref.unicodeScalars.index(ref.unicodeScalars.startIndex, offsetBy: 1)
+  let rj = ref.unicodeScalars.index(ref.unicodeScalars.startIndex, offsetBy: 3)
+
+  expectEqual(ref.index(after: ri), rj)
+  expectEqual(ref.index(before: rj), ri)
+}
 
 StringIndexTests.test("basic sanity checks") {
   for s in simpleStrings {
@@ -49,7 +80,7 @@ StringIndexTests.test("view counts") {
     file: String = #file, line: UInt = #line
   ) where View.Element: Equatable, View.Index == String.Index {
 
-    var stackTrace = stackTrace.pushIf(showFrame, file: file, line: line)
+    let stackTrace = stackTrace.pushIf(showFrame, file: file, line: line)
 
     let count = view.count
     func expect(_ i: Int,
@@ -199,7 +230,6 @@ StringIndexTests.test("Scalar Align UTF-8 indices") {
 }
 
 #if _runtime(_ObjC)
-import Foundation
 StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
   guard #available(SwiftStdlib 5.1, *) else {
     return
@@ -300,8 +330,6 @@ StringIndexTests.test("Misaligned") {
   let string = "aодиde\u{301}日🧟‍♀️"
   doIt(string)
 }
-
-#endif // _runtime(_ObjC)
 
 StringIndexTests.test("Exhaustive Index Interchange") {
   // Exhaustively test aspects of string index interchange
@@ -464,5 +492,253 @@ StringIndexTests.test("Exhaustive Index Interchange") {
   testInterchange(("ab\r\ncдe\u{301}日🧟‍♀️x🧟x🏳️‍🌈🇺🇸🇨🇦" as NSString) as String)
 #endif // _runtime(_ObjC)
 }
+#endif
+
+extension Collection {
+  // Assuming both `self` and `other` are sorted, call `body` for each element
+  // `a` in `other` together with the slice in `self` that starts with the first
+  // element in `self` that is greater than or equal to `a`, up to the first
+  // element that is greater than or equal to the next value in `other`.
+  //
+  // `other` must start with an item that is less than or equal to the first
+  // item in `self`.
+  func forEachIndexGroup<G: Collection>(
+    by other: G,
+    body: (G.Index, Self.SubSequence) throws -> Void
+  ) rethrows
+where G.Index == Self.Index
+  {
+    if other.isEmpty {
+      assert(self.isEmpty)
+      return
+    }
+    var i = other.startIndex
+    var j = self.startIndex
+    while i != other.endIndex {
+      let current = i
+      other.formIndex(after: &i)
+      let start = j
+      while j < i, j < self.endIndex {
+        self.formIndex(after: &j)
+      }
+      let end = j
+      try body(current, self[start ..< end])
+    }
+  }
+}
+
+extension String {
+  /// Returns a dictionary mapping each valid index to the index that lies on
+  /// the nearest scalar boundary, rounding down.
+  func scalarMap() -> [String.Index: String.Index] {
+    var map: [String.Index: String.Index] = [:]
+    self.utf8.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice in
+      for i in slice.indices { map[i] = scalar }
+    }
+    self.utf16.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice in
+      for i in slice.indices { map[i] = scalar }
+    }
+    self.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice in
+      for i in slice.indices { map[i] = scalar }
+    }
+    map[endIndex] = endIndex
+    return map
+  }
+
+  /// Returns a dictionary mapping each valid index to the index that lies on
+  /// the nearest character boundary, rounding down.
+  func characterMap() -> [String.Index: String.Index] {
+    var map: [String.Index: String.Index] = [:]
+    self.utf8.forEachIndexGroup(by: self) { scalar, slice in
+      for i in slice.indices { map[i] = scalar }
+    }
+    self.utf16.forEachIndexGroup(by: self) { scalar, slice in
+      for i in slice.indices { map[i] = scalar }
+    }
+    self.unicodeScalars.forEachIndexGroup(by: self) { scalar, slice in
+      for i in slice.indices { map[i] = scalar }
+    }
+    map[endIndex] = endIndex
+    return map
+  }
+}
+
+StringIndexTests.test("Extra Exhaustive Index Interchange") {
+  func check(
+    _ string: String,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    showFrame: Bool = true,
+    file: String = #file,
+    line: UInt = #line
+  ) {
+    let scalarMap = string.scalarMap()
+    let characterMap = string.characterMap()
+
+    // This is a list of every valid index in every string view, including end
+    // indices. We keep equal indices because they may have different grapheme
+    // size caches or flags etc.
+    var allIndices = Array(string.indices) + [string.endIndex]
+    allIndices += Array(string.unicodeScalars.indices) + [string.unicodeScalars.endIndex]
+    allIndices += Array(string.utf8.indices) + [string.utf8.endIndex]
+    allIndices += Array(string.utf16.indices) + [string.utf16.endIndex]
+
+    func referenceCharacterDistance(
+      from i: String.Index, to j: String.Index
+    ) -> Int {
+      let ci = characterMap[i]!
+      let cj = characterMap[j]!
+      let si = scalarMap[i]!
+      let sj = scalarMap[j]!
+      var d = string.distance(from: ci, to: cj)
+      if si < sj {
+        if ci == cj { d = 1 }
+        else if cj < sj { d += 1 }
+      } else if si > sj {
+        if ci == cj { d = -1 }
+        else if ci < si { d -= 1 }
+      }
+      return d
+    }
+
+    for i in allIndices {
+      for j in allIndices {
+        let si = scalarMap[i]!
+        let sj = scalarMap[j]!
+
+        let characterDistance = referenceCharacterDistance(from: i, to: j)
+        let scalarDistance = string.unicodeScalars.distance(from: si, to: sj)
+
+        // Check distance calculations.
+        if #available(SwiftStdlib 5.7, *) {
+          expectEqual(
+            string.distance(from: i, to: j),
+            characterDistance,
+            """
+            string: \(string.debugDescription)
+            i:      \(i)
+            j:      \(j)
+            """)
+          if i <= j {
+            expectEqual(string[i ..< j].count, characterDistance,
+              """
+              string: \(string.debugDescription)
+              i:      \(i)
+              j:      \(j)
+              """)
+          }
+        }
+
+        expectEqual(
+          string.unicodeScalars.distance(from: i, to: j),
+          scalarDistance,
+          """
+          string: \(string.debugDescription)
+          i:      \(i)
+          j:      \(j)
+          """)
+        if i <= j {
+          expectEqual(string.unicodeScalars[i ..< j].count, scalarDistance,
+            """
+            string: \(string.debugDescription)
+            i:      \(i)
+            j:      \(j)
+            """)
+        }
+
+        // Check reachability of substring bounds.
+        if i <= j {
+          if #available(SwiftStdlib 5.7, *) {
+            let substring = string[i ..< j]
+            expectEqual(
+              substring.index(substring.startIndex, offsetBy: characterDistance),
+              substring.endIndex,
+              """
+              string:   \(string.debugDescription)
+              i:        \(i)
+              j:        \(j)
+              distance: \(characterDistance)
+              """)
+            expectEqual(
+              substring.index(substring.endIndex, offsetBy: -characterDistance),
+              substring.startIndex,
+              """
+              string:   \(string.debugDescription)
+              i:        \(i)
+              j:        \(j)
+              distance: \(-characterDistance)
+              """)
+          }
+          let subscalars = string.unicodeScalars[i ..< j]
+          expectEqual(
+            subscalars.index(subscalars.startIndex, offsetBy: scalarDistance),
+            subscalars.endIndex,
+            """
+            string:   \(string.debugDescription)
+            i:        \(i)
+            j:        \(j)
+            distance: \(scalarDistance)
+            """)
+          expectEqual(
+            subscalars.index(subscalars.endIndex, offsetBy: -scalarDistance),
+            subscalars.startIndex,
+            """
+            string:   \(string.debugDescription)
+            i:        \(i)
+            j:        \(j)
+            distance: \(-scalarDistance)
+            """)
+        }
+      }
+    }
+
+    // Check `String.index(_:offsetBy:limitedBy:)`.
+    if #available(SwiftStdlib 5.7, *) {
+      for i in allIndices {
+        for j in string.indices + [string.endIndex] { // End on a char boundary
+          let distance = referenceCharacterDistance(from: i, to: j)
+          for limit in allIndices {
+            let expectHit = (
+              distance > 0 && i <= limit && j > limit ? true
+              : distance < 0 && i >= limit && j < limit ? true
+              : false)
+            expectEqual(
+              string.index(i, offsetBy: distance, limitedBy: limit),
+              expectHit ? nil : j,
+              """
+              string: \(string.debugDescription)
+              i:      \(i)
+              j:      \(j)   (distance: \(distance))
+              limit:  \(limit)
+              """)
+          }
+        }
+      }
+    }
+  }
+
+  let strings: [StaticString] = [
+    "abc\r\ndefg",
+    "ab\r\ncдe\u{301}日🧟‍♀️x🧟x🏳️‍🌈🇺🇸🇨🇦",
+  ]
+
+  for s in strings {
+    let str = "\(s)"
+    print("-------------------------------------------------------------------")
+    str.unicodeScalars.indices.forEach { i in
+      let scalar = str.unicodeScalars[i]
+      let value = String(scalar.value, radix: 16, uppercase: true)
+      let name = scalar.properties.name ?? "\(scalar.debugDescription)"
+      print("\(i) -> U+\(value) \(name)")
+    }
+
+    check(str)
+
+    #if _runtime(_ObjC)
+    let nsstr = NSString(utf8String: s.utf8Start)!
+    check(nsstr as String)
+    #endif
+  }
+}
+
 
 runAllTests()

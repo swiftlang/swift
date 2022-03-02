@@ -51,6 +51,10 @@ extension String: BidirectionalCollection {
   public func index(after i: Index) -> Index {
     _precondition(i < endIndex, "String index is out of bounds")
 
+    // FIXME: Unlike `index(before:)`, this function may return incorrect
+    // results if `i` isn't on a grapheme cluster boundary. (The grapheme
+    // breaking algorithm assumes we start on a break when we go forward.)
+
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let i = _guts.scalarAlign(i)
     let stride = _characterStride(startingAt: i)
@@ -149,12 +153,37 @@ extension String: BidirectionalCollection {
   ///   case, the method returns `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `distance`.
-  @inlinable @inline(__always)
   public func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
+    // Note: In Swift 5.6 and below, this function used to be inlinable,
+    // forwarding to `BidirectionalCollection._index(_:offsetBy:limitedBy:)`.
+
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _index(i, offsetBy: distance, limitedBy: limit)
+
+    // Per SE-0180, `i` and `limit` are allowed to fall in between grapheme
+    // breaks, in which case this function must still terminate without trapping
+    // and return a result that makes sense.
+
+    // Note: `limit` is intentionally not scalar aligned to ensure our behavior
+    // exactly matches the documentation above.
+
+    let start = _guts.scalarAlign(i)
+    var i = start
+    if distance >= 0 {
+      for _ in stride(from: 0, to: distance, by: 1) {
+        guard limit < start || i < limit else { return nil }
+        formIndex(after: &i)
+      }
+      guard limit < start || i <= limit else { return nil }
+    } else {
+      for _ in stride(from: 0, to: distance, by: -1) {
+        guard limit > start || i > limit else { return nil }
+        formIndex(before: &i)
+      }
+      guard limit > start || i >= limit else { return nil }
+    }
+    return i
   }
 
   /// Returns the distance between two indices.
@@ -166,10 +195,39 @@ extension String: BidirectionalCollection {
   /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(*n*), where *n* is the resulting distance.
-  @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> Int {
+    // Note: In Swift 5.6 and below, this function used to be inlinable,
+    // forwarding to `BidirectionalCollection._distance(from:to:)`.
+
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _distance(from: _guts.scalarAlign(start), to: _guts.scalarAlign(end))
+    let start = _guts.scalarAlign(start)
+    let end = _guts.scalarAlign(end)
+
+    // Per SE-0180, `start` and `end` are allowed to fall in between grapheme
+    // breaks, in which case this function must still terminate without trapping
+    // and return a result that makes sense.
+
+    // FIXME: Due to the `index(after:)` problem above, this function doesn't
+    // always return consistent results when the given indices fall between
+    // grapheme breaks -- swapping `start` and `end` may change the magnitude of
+    // the result.
+
+    var i = start
+    var count = 0
+
+    if i < end {
+      while i < end { // Note `<` instead of `==`
+        count += 1
+        formIndex(after: &i)
+      }
+    }
+    else if i > end {
+      while i > end { // Note `<` instead of `==`
+        count -= 1
+        formIndex(before: &i)
+      }
+    }
+    return count
   }
 
   /// Accesses the character at the given position.
