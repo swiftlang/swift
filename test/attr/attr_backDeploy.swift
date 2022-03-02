@@ -55,7 +55,7 @@ final public class FinalTopLevelClass {
 }
 
 // OK: final function decls on an actor
-@available(macOS 11.0, *)
+@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 public actor TopLevelActor {
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
@@ -123,7 +123,7 @@ extension TopLevelStruct {}
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 protocol CannotBackDeployProtocol {}
 
-@available(macOS 11.0, *)
+@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public actor CannotBackDeployActor {}
 
@@ -146,11 +146,6 @@ private struct PrivateTopLevelStruct {
 public class TopLevelClass2 {
   @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' cannot be applied to a non-final instance method}}
   public func nonFinalMethod() {}
-
-  @available(macOS 11.0, *)
-  @_backDeploy(macOS 12.0)
-  @objc // expected-error {{'@objc' cannot be applied to a back deployed instance method}}
-  final public func objcMethod() {}
 
   @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' cannot be applied to a non-final class method}}
   public class func nonFinalClassMethod() {}
