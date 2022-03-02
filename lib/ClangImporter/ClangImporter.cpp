@@ -1068,9 +1068,10 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
 }
 
 std::unique_ptr<ClangImporter>
-ClangImporter::create(ASTContext &ctx,
-                      std::string swiftPCHHash, DependencyTracker *tracker,
-                      DWARFImporterDelegate *dwarfImporterDelegate) {
+ClangImporter::create(ASTContext &ctx, std::string swiftPCHHash,
+                      DependencyTracker *tracker,
+                      DWARFImporterDelegate *dwarfImporterDelegate,
+                      std::unique_ptr<clang::DiagnosticConsumer> diagClient) {
   std::unique_ptr<ClangImporter> importer{
       new ClangImporter(ctx, tracker, dwarfImporterDelegate)};
   auto &importerOpts = ctx.ClangImporterOpts;
@@ -1156,7 +1157,7 @@ ClangImporter::create(ASTContext &ctx,
     // options---as opposed to the temporary one we made above.
     auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
         importer->Impl, instance.getDiagnosticOpts(),
-        importerOpts.DumpClangDiagnostics);
+        importerOpts.DumpClangDiagnostics, std::move(diagClient));
     instance.createDiagnostics(actualDiagClient.release());
   }
 

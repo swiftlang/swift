@@ -159,12 +159,16 @@ public:
   /// \param dwarfImporterDelegate A helper object that can synthesize
   /// Clang Decls from debug info. Used by LLDB.
   ///
+  /// \param diagClient An optional clang diagnostic consumer for surfacing
+  /// diagnostics to ClangImporter users. Used by LLDB.
+  ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx,
-         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
-         DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
+  create(ASTContext &ctx, std::string swiftPCHHash = "",
+         DependencyTracker *tracker = nullptr,
+         DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
+         std::unique_ptr<clang::DiagnosticConsumer> diagClient = {});
 
   static std::vector<std::string>
   getClangArguments(ASTContext &ctx);

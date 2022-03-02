@@ -59,10 +59,13 @@ private:
   SourceLoc DiagLoc;
   const bool DumpToStderr;
 
+  std::unique_ptr<clang::DiagnosticConsumer> ExternalDiagClient;
+
 public:
-  ClangDiagnosticConsumer(ClangImporter::Implementation &impl,
-                          clang::DiagnosticOptions &clangDiagOptions,
-                          bool dumpToStderr);
+  ClangDiagnosticConsumer(
+      ClangImporter::Implementation &impl,
+      clang::DiagnosticOptions &clangDiagOptions, bool dumpToStderr,
+      std::unique_ptr<clang::DiagnosticConsumer> externalDiagClient = {});
 
   LoadModuleRAII handleImport(const clang::IdentifierInfo *name,
                               SourceLoc diagLoc) {

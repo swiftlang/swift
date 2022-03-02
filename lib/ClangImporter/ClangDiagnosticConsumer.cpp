@@ -106,14 +106,18 @@ namespace {
 
 ClangDiagnosticConsumer::ClangDiagnosticConsumer(
     ClangImporter::Implementation &impl,
-    clang::DiagnosticOptions &clangDiagOptions,
-    bool dumpToStderr)
-  : TextDiagnosticPrinter(llvm::errs(), &clangDiagOptions),
-    ImporterImpl(impl), DumpToStderr(dumpToStderr) {}
+    clang::DiagnosticOptions &clangDiagOptions, bool dumpToStderr,
+    std::unique_ptr<clang::DiagnosticConsumer> externalDiagClient)
+    : TextDiagnosticPrinter(llvm::errs(), &clangDiagOptions),
+      ImporterImpl(impl), DumpToStderr(dumpToStderr),
+      ExternalDiagClient(std::move(externalDiagClient)) {}
 
 void ClangDiagnosticConsumer::HandleDiagnostic(
     clang::DiagnosticsEngine::Level clangDiagLevel,
     const clang::Diagnostic &clangDiag) {
+  if (ExternalDiagClient)
+    ExternalDiagClient->HandleDiagnostic(clangDiagLevel, clangDiag);
+
   // Handle the module-not-found diagnostic specially if it's a top-level module
   // we're looking for.
   if (clangDiag.getID() == clang::diag::err_module_not_found &&
