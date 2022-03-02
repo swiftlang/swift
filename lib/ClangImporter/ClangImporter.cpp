@@ -1101,7 +1101,8 @@ ClangImporter::create(ASTContext &ctx,
 
   // Wrap Swift's FS to allow Clang to override the working directory
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
-    new llvm::vfs::OverlayFileSystem(ctx.SourceMgr.getFileSystem());
+      llvm::vfs::RedirectingFileSystem::create({}, true,
+                                               *ctx.SourceMgr.getFileSystem());
 
   // Create a new Clang compiler invocation.
   {
