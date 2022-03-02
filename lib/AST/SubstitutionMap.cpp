@@ -511,15 +511,9 @@ SubstitutionMap::getOverrideSubstitutions(
                                       Optional<SubstitutionMap> derivedSubs) {
   // For overrides within a protocol hierarchy, substitute the Self type.
   if (auto baseProto = baseDecl->getDeclContext()->getSelfProtocolDecl()) {
-    if (auto derivedProtoSelf =
-          derivedDecl->getDeclContext()->getSelfInterfaceType()) {
-      return SubstitutionMap::getProtocolSubstitutions(
-                                             baseProto,
-                                             derivedProtoSelf,
-                                             ProtocolConformanceRef(baseProto));
-    }
-
-    return SubstitutionMap();
+    auto baseSig = baseDecl->getInnermostDeclContext()
+        ->getGenericSignatureOfContext();
+    return baseSig->getIdentitySubstitutionMap();
   }
 
   auto *baseClass = baseDecl->getDeclContext()->getSelfClassDecl();
