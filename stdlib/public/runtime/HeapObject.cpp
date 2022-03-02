@@ -682,7 +682,13 @@ SWIFT_CC(swift)
 void _swift_release_dealloc(SWIFT_CONTEXT HeapObject *object) {
   // We are forcing `destroy` to be tail called to prevent creation of a
   // new stack frame and reduce overhead of frame pointer authentication.
+#if defined(__arm64__) && !defined(__LP64__)
+  // FIXME: rdar://89699064 - There is a bug in LLVM preventing this call
+  //        from being tail call optimized on arm64_32.
+  return asFullMetadata(object->metadata)->destroy(object);
+#else
   SWIFT_MUSTTAIL return asFullMetadata(object->metadata)->destroy(object);
+#endif
 }
 
 #if SWIFT_OBJC_INTEROP
