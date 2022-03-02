@@ -141,9 +141,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     let module = CSSymbolGetSymbolOwner(symbol)
     return (CSSymbolOwnerGetName(module), CSSymbolGetName(symbol))
   }
-}
 
-extension DarwinRemoteProcess {
   internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
     withoutActuallyEscaping(body) {
       withUnsafePointer(to: $0) {
@@ -160,7 +158,9 @@ extension DarwinRemoteProcess {
       }
     }
   }
+}
 
+extension DarwinRemoteProcess {
   internal var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
     var threadList: UnsafeMutablePointer<thread_t>?
     var threadCount: mach_msg_type_number_t = 0

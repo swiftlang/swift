@@ -53,10 +53,10 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
                                                SILBasicBlock *availableBB,
                                                SILBasicBlock *unavailableBB) {
   PlatformKind platform = targetPlatform(SGF.SGM.getASTContext().LangOpts);
-  auto introduced = AFD->getIntroducedOSVersion(platform);
+  auto version = AFD->getBackDeployBeforeOSVersion(platform);
   VersionRange OSVersion = VersionRange::empty();
-  if (introduced.hasValue()) {
-    OSVersion = VersionRange::allGTE(*introduced);
+  if (version.hasValue()) {
+    OSVersion = VersionRange::allGTE(*version);
   }
 
   SILValue booleanTestValue;

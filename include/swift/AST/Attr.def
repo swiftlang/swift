@@ -718,7 +718,7 @@ DECL_ATTR(exclusivity, Exclusivity,
   128)
 
 DECL_ATTR(_backDeploy, BackDeploy,
-  OnAbstractFunction |
+  OnAbstractFunction | OnAccessor | OnSubscript | OnVar |
   AllowMultipleAttributes | LongAttribute | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
   129)
