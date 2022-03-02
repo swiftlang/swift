@@ -623,6 +623,11 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   auto &C = getASTContext();
   auto module = getParentModule();
 
+  auto func = dyn_cast<FuncDecl>(this);
+  if (!func) {
+    return false;
+  }
+
   // === Check base name
   if (getBaseIdentifier() != C.Id_recordReturnType) {
     return false;
@@ -651,14 +656,11 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
     return false;
   }
 
-  // TODO(distributed): not sure how, but this fails Distributed/distributed_actor_accessor_section_macho.swift
-  //                    in the sense that it does not find the mutating on the declaration inside FakeDistributedActorSystems.swift
-  //                    even though it definitely is there on a source level hm...
-//  // --- must be mutating, if it is defined in a struct
-//  if (isa<StructDecl>(getDeclContext()) &&
-//      !getAttrs().hasAttribute<MutatingAttr>()) {
-//    return false;
-//  }
+  // --- must be mutating, if it is defined in a struct
+  if (isa<StructDecl>(getDeclContext()) &&
+      !func->isMutating()) {
+    return false;
+  }
 
   // === Check generics
   if (!isGeneric()) {
@@ -713,11 +715,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   // conforms_to: Argument Encodable
   // ...
 
-  auto func = dyn_cast<FuncDecl>(this);
-  if (!func) {
-    return false;
-  }
-
   auto resultType = func->mapTypeIntoContext(argumentParam->getInterfaceType())
                         ->getMetatypeInstanceType()
                         ->getDesugaredType();
@@ -750,6 +747,11 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     auto &C = getASTContext();
     auto module = getParentModule();
 
+    auto func = dyn_cast<FuncDecl>(this);
+    if (!func) {
+      return false;
+    }
+
     // === Check base name
     if (getBaseIdentifier() != C.Id_recordErrorType) {
       return false;
@@ -780,7 +782,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
 
     // --- must be mutating, if it is defined in a struct
     if (isa<StructDecl>(getDeclContext()) &&
-        !getAttrs().hasAttribute<MutatingAttr>()) {
+        !func->isMutating()) {
       return false;
     }
 
@@ -839,11 +841,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     }
 
     // === Check result type: Void
-    auto func = dyn_cast<FuncDecl>(this);
-    if (!func) {
-      return false;
-    }
-
     if (!func->getResultInterfaceType()->isVoid()) {
       return false;
     }
@@ -855,6 +852,11 @@ bool
 AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() const {
     auto &C = getASTContext();
     auto module = getParentModule();
+
+    auto func = dyn_cast<FuncDecl>(this);
+    if (!func) {
+      return false;
+    }
 
     // === Check base name
     if (getBaseIdentifier() != C.Id_decodeNextArgument) {
@@ -886,7 +888,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
 
     // --- must be mutating, if it is defined in a struct
     if (isa<StructDecl>(getDeclContext()) &&
-        !getAttrs().hasAttribute<MutatingAttr>()) {
+        !func->isMutating()) {
       return false;
     }
 
@@ -918,11 +920,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
     }
 
     // === Check generic parameters in detail
-    auto func = dyn_cast<FuncDecl>(this);
-    if (!func) {
-      return false;
-    }
-
     // --- Check: Argument: SerializationRequirement
     GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
     auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())

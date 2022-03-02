@@ -52,6 +52,7 @@ void ParameterList::setDeclContextOfParamDecls(DeclContext *DC) {
 /// the ParamDecls, so they can be reparented into a new DeclContext.
 ParameterList *ParameterList::clone(const ASTContext &C,
                                     OptionSet<CloneFlags> options) const {
+  // TODO(distributed): copy types thanks to flag in options
   // If this list is empty, don't actually bother with a copy.
   if (size() == 0)
     return const_cast<ParameterList*>(this);

@@ -1908,6 +1908,11 @@ public:
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Try;
   }
+
+  static TryExpr *createImplicit(ASTContext &ctx, SourceLoc tryLoc, Expr *sub,
+                                 Type type = Type()) {
+    return new (ctx) TryExpr(tryLoc, sub, type, /*implicit=*/true);
+  }
 };
 
 /// ForceTryExpr - A 'try!' surrounding an expression, marking that
@@ -2066,7 +2071,11 @@ public:
             bool implicit = false)
     : IdentityExpr(ExprKind::Await, sub, type, implicit), AwaitLoc(awaitLoc) {
   }
-  
+
+  static AwaitExpr *createImplicit(ASTContext &ctx, SourceLoc awaitLoc, Expr *sub, Type type = Type()) {
+    return new (ctx) AwaitExpr(awaitLoc, sub, type, /*implicit=*/true);
+  }
+
   SourceLoc getLoc() const { return AwaitLoc; }
   
   SourceLoc getAwaitLoc() const { return AwaitLoc; }
