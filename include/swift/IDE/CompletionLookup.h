@@ -226,10 +226,6 @@ public:
 
   void setIdealExpectedType(Type Ty) { expectedTypeContext.setIdealType(Ty); }
 
-  const ExpectedTypeContext *getExpectedTypeContext() const {
-    return &expectedTypeContext;
-  }
-
   CodeCompletionContext::TypeContextKind typeContextKind() const {
     if (expectedTypeContext.empty() &&
         !expectedTypeContext.getPreferNonVoid()) {

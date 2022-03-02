@@ -16,10 +16,10 @@
 using namespace swift;
 using namespace swift::ide;
 
-static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
-    CodeCompletionResultSink &targetSink, CodeCompletionCache::Value &source,
-    bool onlyTypes, bool onlyPrecedenceGroups,
-    const ExpectedTypeContext *TypeContext, const DeclContext *DC) {
+static MutableArrayRef<CodeCompletionResult *>
+copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
+                          CodeCompletionCache::Value &source, bool onlyTypes,
+                          bool onlyPrecedenceGroups) {
 
   // We will be adding foreign results (from another sink) into TargetSink.
   // TargetSink should have an owning pointer to the allocator that keeps the
@@ -74,9 +74,6 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
       return true;
     };
   }
-
-  USRBasedTypeContext USRTypeContext(TypeContext, source.USRTypeArena);
-
   for (auto contextFreeResult : source.Results) {
     if (!shouldIncludeResult(contextFreeResult)) {
       continue;
@@ -84,7 +81,7 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
     auto contextualResult = new (*targetSink.Allocator) CodeCompletionResult(
         *contextFreeResult, SemanticContextKind::OtherModule,
         CodeCompletionFlair(),
-        /*numBytesToErase=*/0, TypeContext, DC, &USRTypeContext,
+        /*numBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
         ContextualNotRecommendedReason::None,
         CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     targetSink.Results.push_back(contextualResult);
@@ -96,8 +93,7 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
 
 void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     CodeCompletionContext &context,
-    ArrayRef<RequestedCachedModule> requestedModules,
-    const ExpectedTypeContext *TypeContext, const DeclContext *DC) {
+    ArrayRef<RequestedCachedModule> requestedModules, DeclContext *DC) {
 
   // Use the current SourceFile as the DeclContext so that we can use it to
   // perform qualified lookup, and to get the correct visibility for
@@ -121,7 +117,6 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       Sink.enableCallPatternHeuristics = context.getCallPatternHeuristics();
       Sink.includeObjectLiterals = context.includeObjectLiterals();
       Sink.addCallWithNoDefaultArgs = context.addCallWithNoDefaultArgs();
-      Sink.setProduceContextFreeResults((*V)->USRTypeArena);
       lookupCodeCompletionResultsFromModule(Sink, R.TheModule, R.Key.AccessPath,
                                             R.Key.ResultsHaveLeadingDot, SF);
       (*V)->Allocator = Sink.Allocator;
@@ -132,19 +127,13 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       // properities) and simply store pointers to the context free results that
       // back the contextual results.
       for (auto Result : Sink.Results) {
-        assert(
-            Result->getContextFreeResult().getResultType().isBackedByUSRs() &&
-            "Results stored in the cache should have their result types backed "
-            "by a USR because the cache might outlive the ASTContext the "
-            "results were created from.");
-        CachedResults.push_back(&Result->getContextFreeResult());
+        CachedResults.push_back(Result->getContextFreeResultPtr());
       }
       context.Cache.set(R.Key, *V);
     }
     assert(V.hasValue());
-    auto newItems =
-        copyCodeCompletionResults(context.getResultSink(), **V, R.OnlyTypes,
-                                  R.OnlyPrecedenceGroups, TypeContext, DC);
+    auto newItems = copyCodeCompletionResults(
+        context.getResultSink(), **V, R.OnlyTypes, R.OnlyPrecedenceGroups);
     postProcessCompletionResults(newItems, context.CodeCompletionKind, DC,
                                  &context.getResultSink());
   }

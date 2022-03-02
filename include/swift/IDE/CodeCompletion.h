@@ -63,7 +63,7 @@ bool isDynamicLookup(Type T);
 
 void postProcessCompletionResults(
     MutableArrayRef<CodeCompletionResult *> results, CompletionKind Kind,
-    const DeclContext *DC, CodeCompletionResultSink *Sink);
+    DeclContext *DC, CodeCompletionResultSink *Sink);
 
 void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                               CompletionLookup &Lookup, DeclContext *DC,
