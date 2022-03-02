@@ -674,12 +674,12 @@ bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) cons
 
 /// Returns `true` if the symbol should be included as a node in the graph.
 bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
-  // If this decl isn't in this module, don't record it,
+  // If this decl isn't in this module or module that this module imported with `@_exported`, don't record it,
   // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName()) {
+  if (D->getModuleContext()->getName() != M.getName() && !Walker.isFromExportedImportedModule(D)) {
     return false;
   }
-
+  
   if (!isa<ValueDecl>(D)) {
     return false;
   }
