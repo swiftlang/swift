@@ -106,6 +106,8 @@ public:
 
   bool isProtocolRefinementRule() const;
 
+  bool isCircularConformanceRule() const;
+
   /// See above for an explanation of these predicates.
   bool isPermanent() const {
     return Permanent;

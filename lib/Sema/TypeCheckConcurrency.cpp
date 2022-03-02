@@ -2117,7 +2117,8 @@ namespace {
       case ActorIsolation::GlobalActorUnsafe:
         return ActorIsolation::forGlobalActor(
             dc->mapTypeIntoContext(isolation.getGlobalActor()),
-            isolation == ActorIsolation::GlobalActorUnsafe);
+            isolation == ActorIsolation::GlobalActorUnsafe)
+              .withPreconcurrency(isolation.preconcurrency());
       }
     }
 
@@ -2341,14 +2342,16 @@ namespace {
               apply->getLoc(), diag::actor_isolated_call_decl,
               *unsatisfiedIsolation,
               calleeDecl->getDescriptiveKind(), calleeDecl->getName(),
-              getContextIsolation());
+              getContextIsolation())
+            .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
           calleeDecl->diagnose(
               diag::actor_isolated_sync_func, calleeDecl->getDescriptiveKind(),
               calleeDecl->getName());
         } else {
           ctx.Diags.diagnose(
               apply->getLoc(), diag::actor_isolated_call, *unsatisfiedIsolation,
-              getContextIsolation());
+              getContextIsolation())
+            .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
         }
 
         if (unsatisfiedIsolation->isGlobalActor()) {
@@ -2686,6 +2689,52 @@ namespace {
           });
     }
 
+    static bool isStoredProperty(ValueDecl const *member) {
+      if (auto *var = dyn_cast<VarDecl>(member))
+        if (var->hasStorage() && var->isInstanceMember())
+          return true;
+      return false;
+    }
+
+    /// an ad-hoc check specific to member isolation checking.
+    static bool memberAccessWasAllowedInSwift5(DeclContext const *refCxt,
+                                               ValueDecl const *member,
+                                               SourceLoc memberLoc) {
+      // no need for this in Swift 6+
+      if (refCxt->getASTContext().isSwiftVersionAtLeast(6))
+        return false;
+
+      // In Swift 5, we were allowing all members to be referenced from a
+      // deinit, nested within a wide variety of contexts.
+      if (auto oldFn = isActorInitOrDeInitContext(refCxt)) {
+        if (isa<DestructorDecl>(oldFn) && member->isInstanceMember()) {
+          auto &diags = refCxt->getASTContext().Diags;
+
+          // if the context in which we consider the access matches between
+          // old and new, and its a stored property, then skip the warning
+          // because it will still be allowed in Swift 6.
+          if (!(refCxt == oldFn && isStoredProperty(member))) {
+            unsigned cxtKind = 0; // deinit
+
+            // try to get a better name for this context.
+            if (isa<AutoClosureExpr>(refCxt)) {
+              cxtKind = 1;
+            } else if (isa<AbstractClosureExpr>(refCxt)) {
+              cxtKind = 2;
+            }
+
+            diags.diagnose(memberLoc, diag::actor_isolated_from_decl,
+                           member->getDescriptiveKind(),
+                           member->getName(),
+                           cxtKind).warnUntilSwiftVersion(6);
+          }
+          return true;
+        }
+      }
+
+      return false;
+    }
+
     /// To support flow-isolation, some member accesses in inits / deinits
     /// must be permitted, despite the isolation of 'self' not being
     /// correct in Sema.
@@ -2697,7 +2746,7 @@ namespace {
     ///
     /// \returns true iff the member access is permitted in Sema because it will
     /// be verified later by flow-isolation.
-    bool checkedByFlowIsolation(DeclContext const *refCxt,
+    static bool checkedByFlowIsolation(DeclContext const *refCxt,
                                 ReferencedActor &baseActor,
                                 ValueDecl const *member,
                                 SourceLoc memberLoc) {
@@ -2716,7 +2765,7 @@ namespace {
       while (true) {
         fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(refCxt->getAsDecl());
         if (!fnDecl)
-          return false;
+          break;
 
         // go up one level if this context is a defer.
         if (auto *d = dyn_cast<FuncDecl>(fnDecl)) {
@@ -2728,25 +2777,15 @@ namespace {
         break;
       }
 
+      if (memberAccessWasAllowedInSwift5(refCxt, member, memberLoc))
+        return true; // then permit it now.
+
       if (!usesFlowSensitiveIsolation(fnDecl))
         return false;
 
       // Stored properties are definitely OK.
-      if (auto *var = dyn_cast<VarDecl>(member))
-        if (var->hasStorage() && var->isInstanceMember())
+      if (isStoredProperty(member))
           return true;
-
-      // In Swift 5, we were allowing all members to be referenced from a
-      // deinit, but that will not be valid in Swift 6+, so warn about it.
-      if (!refCxt->getASTContext().isSwiftVersionAtLeast(6)) {
-        if (isa<DestructorDecl>(fnDecl) && member->isInstanceMember()) {
-          auto &diags = refCxt->getASTContext().Diags;
-          diags.diagnose(memberLoc, diag::actor_isolated_from_deinit,
-                         member->getDescriptiveKind(),
-                         member->getName()).warnUntilSwiftVersion(6);
-          return true;
-        }
-      }
 
       return false;
     }
@@ -2961,45 +3000,52 @@ namespace {
     /// isolation checked.
     ClosureActorIsolation determineClosureIsolation(
         AbstractClosureExpr *closure) {
-      // If the closure specifies a global actor, use it.
+      bool preconcurrency = false;
+
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
+
+        // If the closure specifies a global actor, use it.
         if (Type globalActorType = resolveGlobalActorType(explicitClosure))
-          return ClosureActorIsolation::forGlobalActor(globalActorType);
+          return ClosureActorIsolation::forGlobalActor(globalActorType,
+                                                       preconcurrency);
       }
 
       // If a closure has an isolated parameter, it is isolated to that
       // parameter.
       for (auto param : *closure->getParameters()) {
         if (param->isIsolated())
-          return ClosureActorIsolation::forActorInstance(param);
+          return ClosureActorIsolation::forActorInstance(param, preconcurrency);
       }
 
       // Sendable closures are actor-independent unless the closure has
       // specifically opted into inheriting actor isolation.
       if (isSendableClosure(closure, /*forActorIsolation=*/true))
-        return ClosureActorIsolation::forIndependent();
+        return ClosureActorIsolation::forIndependent(preconcurrency);
 
       // A non-Sendable closure gets its isolation from its context.
       auto parentIsolation = getActorIsolationOfContext(closure->getParent());
+      preconcurrency |= parentIsolation.preconcurrency();
 
       // We must have parent isolation determined to get here.
       switch (parentIsolation) {
       case ActorIsolation::Independent:
       case ActorIsolation::Unspecified:
-        return ClosureActorIsolation::forIndependent();
+        return ClosureActorIsolation::forIndependent(preconcurrency);
 
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe: {
         Type globalActorType = closure->mapTypeIntoContext(
             parentIsolation.getGlobalActor()->mapTypeOutOfContext());
-        return ClosureActorIsolation::forGlobalActor(globalActorType);
+        return ClosureActorIsolation::forGlobalActor(globalActorType,
+                                                     preconcurrency);
       }
 
       case ActorIsolation::ActorInstance: {
         if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
-          return ClosureActorIsolation::forActorInstance(param);
+          return ClosureActorIsolation::forActorInstance(param, preconcurrency);
 
-        return ClosureActorIsolation::forIndependent();
+        return ClosureActorIsolation::forIndependent(preconcurrency);
       }
     }
     }
@@ -3615,12 +3661,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
       // Stored properties cannot be non-isolated, so don't infer it.
       if (auto var = dyn_cast<VarDecl>(value)) {
         if (!var->isStatic() && var->hasStorage())
-          return ActorIsolation::forUnspecified();
+          return ActorIsolation::forUnspecified()
+                    .withPreconcurrency(inferred.preconcurrency());
       }
 
 
       if (onlyGlobal)
-        return ActorIsolation::forUnspecified();
+        return ActorIsolation::forUnspecified()
+                  .withPreconcurrency(inferred.preconcurrency());
 
       value->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
       break;
@@ -3635,7 +3683,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
               if (auto *nominal = varDC->getSelfNominalTypeDecl())
                 if (isa<StructDecl>(nominal) &&
                     !isWrappedValueOfPropWrapper(var))
-                  return ActorIsolation::forUnspecified();
+                  return ActorIsolation::forUnspecified()
+                              .withPreconcurrency(inferred.preconcurrency());
 
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
       auto attr = CustomAttr::create(
@@ -3649,7 +3698,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
       if (onlyGlobal)
-        return ActorIsolation::forUnspecified();
+        return ActorIsolation::forUnspecified()
+                    .withPreconcurrency(inferred.preconcurrency());
 
       // Nothing to do.
       break;

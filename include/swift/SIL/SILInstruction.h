@@ -277,12 +277,12 @@ SILInstructionResultArray::end() const {
 
 inline SILInstructionResultArray::reverse_iterator
 SILInstructionResultArray::rbegin() const {
-  return llvm::make_reverse_iterator(end());
+  return std::make_reverse_iterator(end());
 }
 
 inline SILInstructionResultArray::reverse_iterator
 SILInstructionResultArray::rend() const {
-  return llvm::make_reverse_iterator(begin());
+  return std::make_reverse_iterator(begin());
 }
 
 inline SILInstructionResultArray::range

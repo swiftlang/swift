@@ -7357,6 +7357,20 @@ SubscriptDecl *SubscriptDecl::create(ASTContext &Context, DeclName Name,
   return SD;
 }
 
+SubscriptDecl *SubscriptDecl::create(ASTContext &Context, DeclName Name,
+                                     SourceLoc StaticLoc,
+                                     StaticSpellingKind StaticSpelling,
+                                     SourceLoc SubscriptLoc,
+                                     ParameterList *Indices, SourceLoc ArrowLoc,
+                                     Type ElementTy, DeclContext *Parent,
+                                     GenericParamList *GenericParams) {
+  auto *const SD = new (Context)
+      SubscriptDecl(Name, StaticLoc, StaticSpelling, SubscriptLoc, Indices,
+                    ArrowLoc, nullptr, Parent, GenericParams);
+  SD->setElementInterfaceType(ElementTy);
+  return SD;
+}
+
 SubscriptDecl *SubscriptDecl::createImported(ASTContext &Context, DeclName Name,
                                              SourceLoc SubscriptLoc,
                                              ParameterList *Indices,
@@ -9007,11 +9021,13 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
     switch (auto isolation = closure->getActorIsolation()) {
     case ClosureActorIsolation::Independent:
-      return ActorIsolation::forIndependent();
+      return ActorIsolation::forIndependent()
+                .withPreconcurrency(isolation.preconcurrency());
 
     case ClosureActorIsolation::GlobalActor: {
       return ActorIsolation::forGlobalActor(
-          isolation.getGlobalActor(), /*unsafe=*/false);
+          isolation.getGlobalActor(), /*unsafe=*/false)
+                .withPreconcurrency(isolation.preconcurrency());
     }
 
     case ClosureActorIsolation::ActorInstance: {
@@ -9020,7 +9036,8 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
           ->getClassOrBoundGenericClass();
       // FIXME: Doesn't work properly with generics
       assert(actorClass && "Bad closure actor isolation?");
-      return ActorIsolation::forActorInstance(actorClass);
+      return ActorIsolation::forActorInstance(actorClass)
+                .withPreconcurrency(isolation.preconcurrency());
     }
     }
   }

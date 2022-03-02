@@ -8,6 +8,10 @@ undefinedFunc()
 // CHECK: [[@LINE+1]]:4: error: expected error not produced
 // expected-error{{This error message never gets output}}
 
+anotherUndefinedFunc()
+// CHECK: [[@LINE+1]]:13: error: expected warning, not error
+// expected-warning@-2 {{cannot find 'anotherUndefinedFunc' in scope}}
+
 // CHECK: [[@LINE+1]]:20: error: expected {{{{}} in {{expected}}-{{warning}}
 // expected-warning
 

@@ -41,3 +41,13 @@ class Generic<T>: NSObject {
 class SubGeneric1<U, V>: Generic<Int> {
 }
 
+
+// Ensure that the verifier doesn't reject @objc functions where all of the
+// generic parameters have been same-typed to concrete types.
+public struct GenericStruct<T> { }
+
+public extension GenericStruct where T == String {
+  public class Y {
+    @objc public func f() -> String { "hello" }
+  }
+}
