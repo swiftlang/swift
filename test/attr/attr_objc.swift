@@ -2655,3 +2655,12 @@ class SR12801 {
   subscript<T>(foo : [T]) -> Int { return 0 }
   // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
 }
+
+// @_backDeploy
+
+public class BackDeployClass {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  @objc // expected-error {{'@objc' cannot be applied to a back deployed instance method}}
+  final public func objcMethod() {}
+}
