@@ -132,9 +132,6 @@ USRBasedType::fromUSR(StringRef USR, ArrayRef<const USRBasedType *> Supertypes,
                       USRBasedTypeArena &Arena) {
   auto ExistingTypeIt = Arena.CanonicalTypes.find(USR);
   if (ExistingTypeIt != Arena.CanonicalTypes.end()) {
-    assert(ArrayRef<const USRBasedType *>(ExistingTypeIt->second->Supertypes) ==
-               Supertypes &&
-           "Same USR but different supertypes?");
     return ExistingTypeIt->second;
   }
   // USR and Supertypes need to be allocated in the arena to be passed into the
@@ -170,11 +167,21 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
     return USRBasedType::null(Arena);
   }
 
+  SmallString<32> USR;
+  llvm::raw_svector_ostream OS(USR);
+  printTypeUSR(Ty, OS);
+
+  // Check the USRBasedType cache in the arena as quickly as possible to avoid
+  // converting the entire supertype hierarchy from AST-based types to
+  // USRBasedTypes.
+  auto ExistingTypeIt = Arena.CanonicalTypes.find(USR);
+  if (ExistingTypeIt != Arena.CanonicalTypes.end()) {
+    return ExistingTypeIt->second;
+  }
+
   SmallVector<const USRBasedType *, 2> Supertypes;
   if (auto Nominal = Ty->getAnyNominal()) {
-    // Sorted conformances so we get a deterministic supertype order and can
-    // assert that USRBasedTypes with the same USR have the same supertypes.
-    auto Conformances = Nominal->getAllConformances(/*sorted=*/true);
+    auto Conformances = Nominal->getAllConformances();
     Supertypes.reserve(Conformances.size());
     for (auto Conformance : Conformances) {
       if (Conformance->getDeclContext()->getParentModule() !=
@@ -201,10 +208,6 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
     Supertypes.push_back(USRBasedType::fromType(Superclass, Arena));
     Superclass = Superclass->getSuperclass();
   }
-
-  SmallString<32> USR;
-  llvm::raw_svector_ostream OS(USR);
-  printTypeUSR(Ty, OS);
 
   assert(llvm::all_of(Supertypes, [&USR](const USRBasedType *Ty) {
     return Ty->getUSR() != USR;
