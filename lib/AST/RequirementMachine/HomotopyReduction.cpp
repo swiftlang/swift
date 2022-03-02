@@ -775,12 +775,17 @@ void RewriteSystem::minimizeRewriteSystem() {
 }
 
 /// In a conformance-valid rewrite system, any rule with unresolved symbols on
-/// the left or right hand side should have been simplified by another rule.
+/// the left or right hand side should be redundant. The presence of unresolved
+/// non-redundant rules means one of the original requirements written by the
+/// user was invalid.
 bool RewriteSystem::hadError() const {
   assert(Complete);
   assert(Minimized);
 
   for (const auto &rule : Rules) {
+    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
+      continue;
+
     if (rule.isPermanent())
       continue;
 

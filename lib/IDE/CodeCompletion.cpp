@@ -1160,7 +1160,7 @@ static void addConditionalCompilationFlags(ASTContext &Ctx,
 /// If \p Sink is passed, the pointer of the each result may be replaced with a
 /// pointer to the new item allocated in \p Sink.
 /// If \p Sink is nullptr, the pointee of each result may be modified in place.
-void swift::ide::postProcessResults(
+void swift::ide::postProcessCompletionResults(
     MutableArrayRef<CodeCompletionResult *> results, CompletionKind Kind,
     DeclContext *DC, CodeCompletionResultSink *Sink) {
   for (CodeCompletionResult *&result : results) {
@@ -1314,9 +1314,9 @@ void swift::ide::deliverCompletionResults(
   Lookup.RequestedCachedResults.clear();
   CompletionContext.typeContextKind = Lookup.typeContextKind();
 
-  postProcessResults(CompletionContext.getResultSink().Results,
-                     CompletionContext.CodeCompletionKind, DC,
-                     /*Sink=*/nullptr);
+  postProcessCompletionResults(CompletionContext.getResultSink().Results,
+                               CompletionContext.CodeCompletionKind, DC,
+                               /*Sink=*/nullptr);
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
 }
@@ -1350,9 +1350,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
     Expr *CheckedBase = CodeCompleteTokenExpr->getBase();
-    deliverDotExprResults(Lookup.getResults(), CheckedBase, CurDeclContext,
-                          DotLoc, isInsideObjCSelector(), CompletionContext,
-                          Consumer);
+    Lookup.deliverResults(CheckedBase, CurDeclContext, DotLoc,
+                          isInsideObjCSelector(), CompletionContext, Consumer);
     return true;
   }
   case CompletionKind::UnresolvedMember: {
@@ -1368,9 +1367,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
       Lookup.fallbackTypeCheck(CurDeclContext);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-    deliverUnresolvedMemberResults(Lookup.getExprResults(),
-                                   Lookup.getEnumPatternTypes(), CurDeclContext,
-                                   DotLoc, CompletionContext, Consumer);
+    Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
     return true;
   }
   case CompletionKind::KeyPathExprSwift: {
@@ -1384,8 +1381,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
         Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
 
-    deliverKeyPathResults(Lookup.getResults(), CurDeclContext, DotLoc,
-                          CompletionContext, Consumer);
+    Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
     return true;
   }
   default:

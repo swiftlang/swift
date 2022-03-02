@@ -25,13 +25,11 @@ namespace ide {
 /// formed during expression type-checking.
 class UnresolvedMemberTypeCheckCompletionCallback
     : public TypeCheckCompletionCallback {
-public:
   struct ExprResult {
     Type ExpectedTy;
     bool IsImplicitSingleExpressionReturn;
   };
 
-private:
   CodeCompletionExpr *CompletionExpr;
   SmallVector<ExprResult, 4> ExprResults;
   SmallVector<Type, 1> EnumPatternTypes;
@@ -42,12 +40,6 @@ public:
       CodeCompletionExpr *CompletionExpr)
       : CompletionExpr(CompletionExpr) {}
 
-  ArrayRef<ExprResult> getExprResults() const { return ExprResults; }
-
-  /// If we are completing in a pattern matching position, the types of all
-  /// enums for whose cases are valid as an \c EnumElementPattern.
-  ArrayRef<Type> getEnumPatternTypes() const { return EnumPatternTypes; }
-
   /// True if at least one solution was passed via the \c sawSolution
   /// callback.
   bool gotCallback() const { return GotCallback; }
@@ -57,13 +49,11 @@ public:
   void fallbackTypeCheck(DeclContext *DC);
 
   void sawSolution(const constraints::Solution &solution) override;
-};
 
-void deliverUnresolvedMemberResults(
-    ArrayRef<UnresolvedMemberTypeCheckCompletionCallback::ExprResult> Results,
-    ArrayRef<Type> EnumPatternTypes, DeclContext *DC, SourceLoc DotLoc,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer);
+  void deliverResults(DeclContext *DC, SourceLoc DotLoc,
+                      ide::CodeCompletionContext &CompletionCtx,
+                      CodeCompletionConsumer &Consumer);
+};
 
 } // end namespace ide
 } // end namespace swift

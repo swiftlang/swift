@@ -470,7 +470,9 @@ void MinimalConformances::collectConformanceRules() {
 /// That is, we can choose to eliminate <X>.[P], but not <Y>.[P], or vice
 /// versa; but it is never valid to eliminate both.
 void MinimalConformances::computeCandidateConformancePaths() {
-  for (const auto &loop : System.getLoops()) {
+  for (unsigned loopID : indices(System.getLoops())) {
+    const auto &loop = System.getLoops()[loopID];
+
     if (loop.isDeleted())
       continue;
 
@@ -483,7 +485,7 @@ void MinimalConformances::computeCandidateConformancePaths() {
       continue;
 
     if (Debug.contains(DebugFlags::MinimalConformances)) {
-      llvm::dbgs() << "Candidate homotopy generator: ";
+      llvm::dbgs() << "Candidate homotopy generator: (#" << loopID << ") ";
       loop.dump(llvm::dbgs(), System);
       llvm::dbgs() << "\n";
     }

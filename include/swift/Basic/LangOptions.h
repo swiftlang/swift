@@ -88,7 +88,10 @@ namespace swift {
     Enabled = 1,
 
     /// Use both and assert if the results do not match.
-    Verify = 2
+    Verify = 2,
+
+    /// Use both, print a message only but do not assert on mismatch.
+    Check = 3,
   };
 
   /// A collection of options that affect the language dialect and

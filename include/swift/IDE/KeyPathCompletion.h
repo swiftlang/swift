@@ -21,7 +21,6 @@ namespace swift {
 namespace ide {
 
 class KeyPathTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
-public:
   struct Result {
     /// The type on which completion should occur, i.e. a result type of the
     /// previous component.
@@ -30,23 +29,18 @@ public:
     bool OnRoot;
   };
 
-private:
   KeyPathExpr *KeyPath;
   SmallVector<Result, 4> Results;
 
 public:
   KeyPathTypeCheckCompletionCallback(KeyPathExpr *KeyPath) : KeyPath(KeyPath) {}
 
-  ArrayRef<Result> getResults() const { return Results; }
-
   void sawSolution(const constraints::Solution &solution) override;
-};
 
-void deliverKeyPathResults(
-    ArrayRef<KeyPathTypeCheckCompletionCallback::Result> Results,
-    DeclContext *DC, SourceLoc DotLoc,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer);
+  void deliverResults(DeclContext *DC, SourceLoc DotLoc,
+                      ide::CodeCompletionContext &CompletionCtx,
+                      CodeCompletionConsumer &Consumer);
+};
 
 } // end namespace ide
 } // end namespace swift

@@ -6,6 +6,8 @@
 // sync main is nested deeper in protocols than async, use async
 // async and sync are same level, use async
 
+// REQUIRES: rdar89500797
+
 // REQUIRES: concurrency
 // UNSUPPORTED: VENDOR=apple
 

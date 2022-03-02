@@ -560,6 +560,8 @@ public:
   /// Keep track of subscript declarations based on getter/setter
   /// pairs.
   llvm::DenseMap<std::pair<FuncDecl *, FuncDecl *>, SubscriptDecl *> Subscripts;
+  llvm::DenseMap<llvm::StringRef, std::pair<FuncDecl *, FuncDecl *>>
+      GetterSetterMap;
 
   /// Keep track of getter/setter pairs for functions imported from C++
   /// subscript operators based on the type in which they are declared and
