@@ -108,6 +108,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   public func index(after i: Index) -> Index {
     // TODO(String performance): isASCII fast-path
 
+    // TODO(lorentey): Review index validation
     _precondition(i < endIndex, "String index is out of bounds")
     let i = _guts.scalarAlign(i)
 
@@ -121,6 +122,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
 
   @_alwaysEmitIntoClient // Swift 5.1 bug fix
   public func distance(from start: Index, to end: Index) -> Int {
+    // TODO(lorentey): Review index validation
     return _distance(from: _guts.scalarAlign(start), to: _guts.scalarAlign(end))
   }
 
@@ -129,6 +131,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   /// - Precondition: The previous location exists.
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
+    // TODO(lorentey): Review index validation
     // TODO(String performance): isASCII fast-path
 
     // Note: bounds checking in `index(before:)` is tricky as scalar aligning an
@@ -168,6 +171,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   ///   must be less than the view's end index.
   @inlinable @inline(__always)
   public subscript(position: Index) -> Unicode.Scalar {
+    // TODO(lorentey): Review index validation
     String(_guts)._boundsCheck(position)
     let i = _guts.scalarAlign(position)
     return _guts.errorCorrectedScalar(startingAt: i._encodedOffset).0
@@ -314,6 +318,7 @@ extension String.UnicodeScalarView: RangeReplaceableCollection {
     _ bounds: Range<Index>,
     with newElements: C
   ) where C: Collection, C.Element == Unicode.Scalar {
+    // TODO(lorentey): Review index validation
     // TODO(String performance): Skip extra String and Array allocation
 
     let utf8Replacement = newElements.flatMap { String($0).utf8 }
@@ -358,6 +363,7 @@ extension String.UnicodeScalarIndex {
     _ sourcePosition: String.Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
+    // TODO(lorentey): Review index validation
     guard unicodeScalars._guts.isOnUnicodeScalarBoundary(sourcePosition) else {
       return nil
     }
@@ -385,6 +391,7 @@ extension String.UnicodeScalarIndex {
   ///   an attempt to convert the position of a UTF-8 continuation byte
   ///   returns `nil`.
   public func samePosition(in characters: String) -> String.Index? {
+    // TODO(lorentey): Review index validation
     return String.Index(self, within: characters)
   }
 }
@@ -414,6 +421,7 @@ extension String.UnicodeScalarView {
 
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> String.UnicodeScalarView.SubSequence {
+    // TODO(lorentey): Review index validation
     _failEarlyRangeCheck(r, bounds: startIndex..<endIndex)
     return String.UnicodeScalarView.SubSequence(self, _bounds: r)
   }

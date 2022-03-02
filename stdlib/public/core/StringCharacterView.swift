@@ -49,9 +49,8 @@ extension String: BidirectionalCollection {
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
-    let i = _guts.ensureMatchingEncoding(i)
-    _precondition(i < endIndex, "String index is out of bounds")
-    let r = _uncheckedIndex(after: _guts.scalarAlign(i))
+    let i = _guts.validateScalarIndex(i)
+    let r = _uncheckedIndex(after: i)
     return _guts.internalMarkEncoding(r)
   }
 
@@ -85,14 +84,10 @@ extension String: BidirectionalCollection {
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
-    let i = _guts.ensureMatchingEncoding(i)
-
-    // Note: bounds checking in `index(before:)` is tricky as scalar aligning an
-    // index may need to access storage, but it may also move it closer towards
-    // the `startIndex`. Therefore, we must check against the `endIndex` before
-    // aligning, but we need to delay the `i > startIndex` check until after.
-    _precondition(i <= endIndex, "String index is out of bounds")
-    let i = _guts.scalarAlign(i)
+    let i = _guts.validateInclusiveScalarIndex(i)
+    // Note: Scalar aligning an index may move it closer towards the
+    // `startIndex`, so the `i > startIndex` check needs to come after the
+    // `validateScalarIndex` call.
     _precondition(i > startIndex, "String index is out of bounds")
 
     let r = _uncheckedIndex(before: _guts.scalarAlign(i))
@@ -147,10 +142,7 @@ extension String: BidirectionalCollection {
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
-    var i = _guts.ensureMatchingEncoding(i)
-    _precondition(i >= startIndex && i <= endIndex,
-      "String index is out of bounds")
-    i = _guts.scalarAlign(i)
+    var i = _guts.validateInclusiveScalarIndex(i)
 
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
@@ -222,10 +214,7 @@ extension String: BidirectionalCollection {
     // exactly matches the documentation above.
     let limit = _guts.ensureMatchingEncoding(limit)
 
-    var i = _guts.ensureMatchingEncoding(i)
-    _precondition(i >= startIndex && i <= endIndex,
-      "String index is out of bounds")
-    i = _guts.scalarAlign(i)
+    var i = _guts.validateInclusiveScalarIndex(i)
 
     let start = i
     if distance >= 0 {
@@ -264,22 +253,14 @@ extension String: BidirectionalCollection {
     // grapheme breaks -- swapping `start` and `end` may change the magnitude of
     // the result.
 
-    var start = _guts.ensureMatchingEncoding(start)
-    var end = _guts.ensureMatchingEncoding(end)
-
-    _precondition(
-      start >= startIndex && start <= endIndex &&
-      end >= startIndex && end <= endIndex,
-      "String index is out of bounds")
-
-    start = _guts.scalarAlign(start)
-    end = _guts.scalarAlign(end)
+    let start = _guts.validateInclusiveScalarIndex(start)
+    let end = _guts.validateInclusiveScalarIndex(end)
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
-    // Per SE-0180, `start` and `end` are allowed to fall in between grapheme
-    // breaks, in which case this function must still terminate without trapping
-    // and return a result that makes sense.
+    // Per SE-0180, `start` and `end` are allowed to fall in between Character
+    // boundaries, in which case this function must still terminate without
+    // trapping and return a result that makes sense.
 
     var i = start
     var count = 0
@@ -313,7 +294,7 @@ extension String: BidirectionalCollection {
   ///
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
-  @inlinable @inline(__always) // FIXME(lorentey): Consider removing these. If
+  @inlinable @inline(__always) // TODO(lorentey): Consider removing these. If
                                // `index(after:)` isn't inlinable, does it
                                // really matter if this one is? (Potential
                                // _guts-related optimizations notwithstanding.)
@@ -321,11 +302,8 @@ extension String: BidirectionalCollection {
                                // new additions to be _aEIC, even though they
                                // ought to be internal.
   public subscript(i: Index) -> Character {
-    var i = _guts.ensureMatchingEncoding(i)
-    _boundsCheck(i)
-    i = _guts.scalarAlign(i)
+    let i = _guts.validateScalarIndex(i)
     let distance = _characterStride(startingAt: i)
-
     return _guts.errorCorrectedCharacter(
       startingAt: i._encodedOffset, endingAt: i._encodedOffset &+ distance)
   }

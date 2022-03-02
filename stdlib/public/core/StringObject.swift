@@ -839,6 +839,14 @@ extension _StringObject.CountAndFlags {
   internal var isTailAllocated: Bool {
     return 0 != _storage & _StringObject.CountAndFlags.isTailAllocatedMask
   }
+
+  /// Returns whether this string is known to use UTF-16 code units.
+  ///
+  /// This always returns a value corresponding to the string's actual encoding
+  /// on stdlib versions >=5.7.
+  ///
+  /// Standard Library versions <=5.6 did not set the corresponding flag, so
+  /// this property always returns false.
   @_alwaysEmitIntoClient
   @inline(__always) // Swift 5.7
   internal var isKnownUTF16: Bool {

@@ -309,6 +309,17 @@ func _isSwiftStdlib_5_7() -> Bool {
 
 // Encoding
 extension _StringGuts {
+  /// Returns whether this string is known to use UTF-16 code units.
+  ///
+  /// This always returns a value corresponding to the string's actual encoding
+  /// on stdlib versions >=5.7.
+  ///
+  /// Standard Library versions <=5.6 did not set the corresponding flag, so
+  /// this property always returns false.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var isKnownUTF16: Bool { _object.isKnownUTF16 }
+
   @_alwaysEmitIntoClient // Swift 5.7
   internal func markEncoding(_ i: String.Index) -> String.Index {
     // In this inlinable function, we cannot assume that all foreign strings are
@@ -316,7 +327,7 @@ extension _StringGuts {
     // introduced other foreign forms.
     if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) { // SwiftStdlib 5.7
       // With a >=5.7 stdlib, we can rely on `isKnownUTF16` to contain the truth.
-      return _object.isKnownUTF16 ? i._knownUTF16 : i._knownUTF8
+      return isKnownUTF16 ? i._knownUTF16 : i._knownUTF8
     }
     // We know that in stdlibs 5.0..<5.7, all foreign strings were UTF-16,
     // so we can use `isForeign` to determine the encoding.
@@ -354,14 +365,14 @@ extension _StringGuts {
   /// not set the flags that this method relies on. However, false positives
   /// cannot happen: if this method detects a mismatch, then it is guaranteed to
   /// be a real one.
-  @_alwaysEmitIntoClient // FIXME(lorentey): Should this remain internal?
+  @_alwaysEmitIntoClient // TODO(lorentey): Should this remain internal?
   @inline(__always)
   internal func ensureMatchingEncoding(_ i: String.Index) -> String.Index {
     if _fastPath(!isForeign && i._canBeUTF8) { return i }
     return _slowEnsureMatchingEncoding(i)
   }
 
-  @_alwaysEmitIntoClient // FIXME(lorentey): Should this remain internal?
+  @_alwaysEmitIntoClient // TODO(lorentey): Should this remain internal?
   internal func _slowEnsureMatchingEncoding(_ i: String.Index) -> String.Index {
     _internalInvariant(isForeign || !i._canBeUTF8)
     if isForeign {
@@ -383,7 +394,7 @@ extension _StringGuts {
       // This trap can never trigger on OSes that have stdlibs <= 5.6, because
       // those versions never set the `isKnownUTF16` flag in `_StringObject`.
       //
-      _precondition(!_object.isKnownUTF16 || i._canBeUTF16,
+      _precondition(!isKnownUTF16 || i._canBeUTF16,
         "Invalid string index")
       return i
     }
@@ -404,6 +415,135 @@ extension _StringGuts {
     // client executable was built on some particular future Swift release.
     let utf16 = String(self).utf16
     return utf16.index(utf16.startIndex, offsetBy: i._encodedOffset)
+  }
+}
+
+// Index validation
+extension _StringGuts {
+  /// Validate `i` and adjust its position toward the start, returning the
+  /// resulting index or trapping as appropriate. If this function returns, then
+  /// the returned value
+  ///
+  /// - has an encoding that matches this string,
+  /// - is within the bounds of this string, and
+  /// - is aligned on a scalar boundary.
+  @_alwaysEmitIntoClient
+  internal func validateScalarIndex(_ i: String.Index) -> String.Index {
+    let i = ensureMatchingEncoding(i)
+    _precondition(i._encodedOffset < count, "String index is out of bounds")
+    return scalarAlign(i)
+  }
+
+  /// Validate `i` and adjust its position toward the start, returning the
+  /// resulting index or trapping as appropriate. If this function returns, then
+  /// the returned value
+  ///
+  /// - has an encoding that matches this string,
+  /// - is within `start ..< end`, and
+  /// - is aligned on a scalar boundary.
+  @_alwaysEmitIntoClient
+  internal func validateScalarIndex(
+    _ i: String.Index,
+    from start: String.Index,
+    to end: String.Index
+  ) -> String.Index {
+    _internalInvariant(start <= end && end <= endIndex)
+
+    let i = ensureMatchingEncoding(i)
+    _precondition(i >= start && i < end, "Substring index is out of bounds")
+    return scalarAlign(i)
+  }
+
+  /// Validate `i` and adjust its position toward the start, returning the
+  /// resulting index or trapping as appropriate. If this function returns, then
+  /// the returned value
+  ///
+  /// - has an encoding that matches this string,
+  /// - is within the bounds of this string (including the `endIndex`), and
+  /// - is aligned on a scalar boundary.
+  @_alwaysEmitIntoClient
+  internal func validateInclusiveScalarIndex(
+    _ i: String.Index
+  ) -> String.Index {
+    let i = ensureMatchingEncoding(i)
+    _precondition(i._encodedOffset <= count, "String index is out of bounds")
+    return scalarAlign(i)
+  }
+
+  /// Validate `i` and adjust its position toward the start, returning the
+  /// resulting index or trapping as appropriate. If this function returns, then
+  /// the returned value
+  ///
+  /// - has an encoding that matches this string,
+  /// - is within the bounds of this string (including the `endIndex`), and
+  /// - is aligned on a scalar boundary.
+  @_alwaysEmitIntoClient
+  internal func validateInclusiveScalarIndex(
+    _ i: String.Index,
+    from start: String.Index,
+    to end: String.Index
+  ) -> String.Index {
+    _internalInvariant(start <= end && end <= endIndex)
+
+    let i = ensureMatchingEncoding(i)
+    _precondition(i >= start && i <= end, "Substring index is out of bounds")
+    return scalarAlign(i)
+  }
+
+  /// Validate `range` and adjust the position of its bounds, returning the
+  /// resulting range or trapping as appropriate. If this function returns, then
+  /// the bounds of the returned value
+  ///
+  /// - have an encoding that matches this string,
+  /// - are within the bounds of this string, and
+  /// - are aligned on a scalar boundary.
+  @_alwaysEmitIntoClient
+  internal func validateScalarRange(
+    _ range: Range<String.Index>
+  ) -> Range<String.Index> {
+    var upper = ensureMatchingEncoding(range.upperBound)
+    var lower = ensureMatchingEncoding(range.lowerBound)
+
+    // Note: if only `lower` was miscoded, then the range invariant `lower <=
+    // upper` may no longer hold after the above conversions, so we need to
+    // re-check it here.
+    _precondition(upper._encodedOffset <= count && lower <= upper,
+      "String index range is out of bounds")
+
+    upper = scalarAlign(upper)
+    lower = scalarAlign(lower)
+
+    return Range(_uncheckedBounds: (lower, upper))
+  }
+
+  /// Validate `range` and adjust the position of its bounds, returning the
+  /// resulting range or trapping as appropriate. If this function returns, then
+  /// the bounds of the returned value
+  ///
+  /// - have an encoding that matches this string,
+  /// - are within `start ..< end`, and
+  /// - are aligned on a scalar boundary.
+  @_alwaysEmitIntoClient
+  internal func validateScalarRange(
+    _ range: Range<String.Index>,
+    from start: String.Index,
+    to end: String.Index
+  ) -> Range<String.Index> {
+    _internalInvariant(start <= end && end <= endIndex)
+
+    var upper = ensureMatchingEncoding(range.upperBound)
+    var lower = ensureMatchingEncoding(range.lowerBound)
+
+    // Note: if only `lower` was miscoded, then the range invariant `lower <=
+    // upper` may no longer hold after the above conversions, so we need to
+    // re-check it here.
+    _precondition(upper <= end && lower >= start && lower <= upper,
+      "Substring index range is out of bounds")
+
+    upper = scalarAlign(upper)
+    lower = scalarAlign(lower)
+
+    return Range(_uncheckedBounds: (lower, upper))
   }
 }
 
