@@ -328,7 +328,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// `infinity` is greater than this value.
   static var greatestFiniteMagnitude: Self { get }
 
-  /// The mathematical constant π, approximately equal to 3.14159.
+  /// The [mathematical constant π][wiki], approximately equal to 3.14159.
   ///
   /// This constant is most often defined as the numerical value of the ratio
   /// of a circle's circumference to its diameter, which is the same for all
@@ -344,8 +344,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   ///     print(Double.pi)
   ///     // Prints "3.14159265358979"
-  ///
-  /// See [this Wikipedia article][wiki] for more information.
   ///
   /// [wiki]: https://en.wikipedia.org/wiki/Pi
   static var pi: Self { get }
