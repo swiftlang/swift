@@ -2366,8 +2366,7 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   auto *dispatchFnTy =
       llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
   llvm::SmallString<40> name;
-  llvm::raw_svector_ostream(name)
-      << "__swift_suspend_dispatch_" << argTypes.size();
+  llvm::raw_svector_ostream(name) << CurFn->getName() << ".0";
   llvm::Function *dispatch =
       llvm::Function::Create(dispatchFnTy, llvm::Function::InternalLinkage,
                              llvm::StringRef(name), &IGM.Module);
