@@ -62,7 +62,7 @@ class CodeCompletionResultBuilder {
 
   /// The context in which this completion item is used. Used to compute the
   /// type relation to \c ResultType.
-  const ExpectedTypeContext *TypeContext;
+  const ExpectedTypeContext *TypeContext = nullptr;
   const DeclContext *DC = nullptr;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
@@ -137,17 +137,11 @@ public:
 
   /// Set the result type of this code completion item and the context that the
   /// item may be used in.
-  /// If \p AlsoConsiderMetatype is \c true the code completion item will be
-  /// considered as producing the declared interface type (which is passed as
-  /// \p ResultTypes ) as well as the corresponding metatype.
-  /// This allows us to suggest 'Int' as 'Identical' for both of the following
-  /// functions
-  ///
-  ///   func receiveInstance(_: Int) {}
-  ///   func receiveMetatype(_: Int.Type) {}
-  void setResultType(Type ResultType, bool AlsoConsiderMetatype = false) {
-    this->ResultType =
-        CodeCompletionResultType(ResultType, AlsoConsiderMetatype);
+  /// This is not a single unique type because for code completion we consider
+  /// e.g. \c Int as producing both an \c Int metatype and an \c Int instance
+  /// type.
+  void setResultTypes(ArrayRef<Type> ResultTypes) {
+    this->ResultType = CodeCompletionResultType(ResultTypes);
   }
 
   /// Set context in which this code completion item occurs. Used to compute the
