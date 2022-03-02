@@ -4188,7 +4188,7 @@ int main(int argc, char *argv[]) {
             *contextFreeResult, SemanticContextKind::OtherModule,
             CodeCompletionFlair(),
             /*numBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
-            /*USRTypeContext=*/nullptr, ContextualNotRecommendedReason::None,
+            ContextualNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
         contextualResults.push_back(contextualResult);
       }

@@ -23,7 +23,7 @@ using namespace swift::ide;
 
 ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-    CodeCompletionResultSink &Sink, CodeCompletionResultKind Kind,
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionResultKind Kind,
     CodeCompletionString *CompletionString,
     CodeCompletionOperatorKind KnownOperatorKind,
     NullTerminatedStringRef BriefDocComment,
@@ -31,56 +31,47 @@ ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
     ContextFreeNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
     NullTerminatedStringRef DiagnosticMessage) {
-  if (Sink.shouldProduceContextFreeResults()) {
-    ResultType = ResultType.usrBasedType(Sink.getUSRTypeArena());
-  }
-  return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
+  return new (Allocator) ContextFreeCodeCompletionResult(
       Kind, /*AssociatedKind=*/0, KnownOperatorKind,
       /*IsSystem=*/false, CompletionString, /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, NotRecommended, DiagnosticSeverity,
       DiagnosticMessage,
-      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()));
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
 }
 
 ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createKeywordResult(
-    CodeCompletionResultSink &Sink, CodeCompletionKeywordKind Kind,
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionKeywordKind Kind,
     CodeCompletionString *CompletionString,
     NullTerminatedStringRef BriefDocComment,
     CodeCompletionResultType ResultType) {
-  if (Sink.shouldProduceContextFreeResults()) {
-    ResultType = ResultType.usrBasedType(Sink.getUSRTypeArena());
-  }
-  return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
+  return new (Allocator) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
       CodeCompletionOperatorKind::None, /*IsSystem=*/false, CompletionString,
       /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
-      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()));
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
 }
 
 ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createLiteralResult(
-    CodeCompletionResultSink &Sink, CodeCompletionLiteralKind LiteralKind,
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionLiteralKind LiteralKind,
     CodeCompletionString *CompletionString,
     CodeCompletionResultType ResultType) {
-  if (Sink.shouldProduceContextFreeResults()) {
-    ResultType = ResultType.usrBasedType(Sink.getUSRTypeArena());
-  }
-  return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
+  return new (Allocator) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Literal, static_cast<uint8_t>(LiteralKind),
       CodeCompletionOperatorKind::None,
       /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
       /*BriefDocComment=*/"",
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
-      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()));
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
 }
 
 ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createDeclResult(
-    CodeCompletionResultSink &Sink, CodeCompletionString *CompletionString,
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionString *CompletionString,
     const Decl *AssociatedDecl, NullTerminatedStringRef ModuleName,
     NullTerminatedStringRef BriefDocComment,
     ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
@@ -89,16 +80,13 @@ ContextFreeCodeCompletionResult::createDeclResult(
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
     NullTerminatedStringRef DiagnosticMessage) {
   assert(AssociatedDecl && "should have a decl");
-  if (Sink.shouldProduceContextFreeResults()) {
-    ResultType = ResultType.usrBasedType(Sink.getUSRTypeArena());
-  }
-  return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
+  return new (Allocator) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Declaration,
       static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
       CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
       CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, ResultType,
       NotRecommended, DiagnosticSeverity, DiagnosticMessage,
-      getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()));
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
 }
 
 CodeCompletionOperatorKind
@@ -266,16 +254,15 @@ CodeCompletionResult::CodeCompletionResult(
     const ContextFreeCodeCompletionResult &ContextFree,
     SemanticContextKind SemanticContext, CodeCompletionFlair Flair,
     uint8_t NumBytesToErase, const ExpectedTypeContext *TypeContext,
-    const DeclContext *DC, const USRBasedTypeContext *USRTypeContext,
-    ContextualNotRecommendedReason NotRecommended,
+    const DeclContext *DC, ContextualNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
     NullTerminatedStringRef DiagnosticMessage)
     : ContextFree(ContextFree), SemanticContext(SemanticContext),
       Flair(Flair.toRaw()), NotRecommended(NotRecommended),
       DiagnosticSeverity(DiagnosticSeverity),
       DiagnosticMessage(DiagnosticMessage), NumBytesToErase(NumBytesToErase),
-      TypeDistance(ContextFree.getResultType().calculateTypeRelation(
-          TypeContext, DC, USRTypeContext)) {}
+      TypeDistance(
+          ContextFree.getResultType().calculateTypeRelation(TypeContext, DC)) {}
 
 CodeCompletionResult *
 CodeCompletionResult::withFlair(CodeCompletionFlair NewFlair,
