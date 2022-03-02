@@ -16,8 +16,9 @@
 /// is semantically associated with an array access, a value of this type
 /// is returned and later passed to the accessing function.
 /// For example, a typical call to `_getElement` looks like
-///   let token = _checkSubscript(index, ...)
-///   return _getElement(index, ... , matchingSubscriptCheck: token)
+///
+///     let token = _checkSubscript(index, ...)
+///     return _getElement(index, ... , matchingSubscriptCheck: token)
 @frozen
 public struct _DependenceToken {
   @inlinable
