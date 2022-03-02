@@ -178,7 +178,7 @@ extension Substring: StringProtocol {
     _precondition(i < endIndex && i >= startIndex,
       "Substring index is out of bounds")
     let r = _uncheckedIndex(after: _slice.base._guts.scalarAlign(i))
-    return _slice.base._guts.markEncoding(r)
+    return _slice.base._guts.internalMarkEncoding(r)
   }
 
   /// A version of `index(after:)` that assumes that the given index:
@@ -226,7 +226,7 @@ extension Substring: StringProtocol {
     _precondition(i <= endIndex && i > startIndex,
       "Substring index is out of bounds")
     let r = _uncheckedIndex(before: _slice.base._guts.scalarAlign(i))
-    return _slice.base._guts.markEncoding(r)
+    return _slice.base._guts.internalMarkEncoding(r)
   }
 
   /// A version of `index(before:)` that assumes that the given index:
@@ -282,7 +282,7 @@ extension Substring: StringProtocol {
         i = _uncheckedIndex(before: i)
       }
     }
-    return _slice.base._guts.markEncoding(i)
+    return _slice.base._guts.internalMarkEncoding(i)
   }
 
   public func index(
@@ -324,7 +324,7 @@ extension Substring: StringProtocol {
       }
       guard limit > start || i >= limit else { return nil }
     }
-    return _slice.base._guts.markEncoding(i)
+    return _slice.base._guts.internalMarkEncoding(i)
   }
 
   public func distance(from start: Index, to end: Index) -> Int {

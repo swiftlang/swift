@@ -295,10 +295,15 @@ extension _StringGuts {
   internal var endIndex: String.Index {
     markEncoding(Index(_encodedOffset: self.count)._scalarAligned)
   }
+}
 
-  @inlinable @inline(__always)
-  internal func index(atOffset offset: Int) -> String.Index {
-    markEncoding(Index(_encodedOffset: self.count)._scalarAligned)
+@_alwaysEmitIntoClient
+@inline(__always)
+func _isSwiftStdlib_5_7() -> Bool {
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) { // SwiftStdlib 5.7
+    return true
+  } else {
+    return false
   }
 }
 
@@ -306,29 +311,39 @@ extension _StringGuts {
 extension _StringGuts {
   @_alwaysEmitIntoClient // Swift 5.7
   internal func markEncoding(_ i: String.Index) -> String.Index {
-    if _slowPath(isForeign) {
-      // FIXME: Instead of having an opaque path here, we should define the same
-      // encoding flags in StringObject and pick them up from there. The flags
-      // can be initialized at the time the foreign string is created.
-      guard
-        #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)  // SwiftStdlib 5.7
-      else {
-        // We know all foreign strings were UTF-16 in releases < 5.7
-        return i._knownUTF16
-      }
-      return _foreignMarkEncoding(i)
+    // In this inlinable function, we cannot assume that all foreign strings are
+    // UTF-16 encoded, as this code may run on a future stdlib that may have
+    // introduced other foreign forms.
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) { // SwiftStdlib 5.7
+      // With a >=5.7 stdlib, we can rely on `isKnownUTF16` to contain the truth.
+      return _object.isKnownUTF16 ? i._knownUTF16 : i._knownUTF8
     }
-    return i._knownUTF8
+    // We know that in stdlibs 5.0..<5.7, all foreign strings were UTF-16,
+    // so we can use `isForeign` to determine the encoding.
+    return isForeign ? i._knownUTF16 : i._knownUTF8
   }
 
-  @_effects(readnone)
-  @available(SwiftStdlib 5.7, *)
-  @usableFromInline
-  internal func _foreignMarkEncoding(_ i: String.Index) -> String.Index {
-    // Currently foreign indices always have UTF-16 offsets.
-    i._knownUTF16
+  @inline(__always)
+  internal func internalMarkEncoding(_ i: String.Index) -> String.Index {
+    // This code is behind a resiliance boundary, so it always runs on a >=5.7
+    // stdlib. Note though that it doesn't match the 5.7+ case in the inlinable
+    // version above!
+    //
+    // We know that in this version of the stdlib, foreign strings happen to
+    // always be UTF-16 encoded (like they were between 5.0 and 5.6), and
+    // looking at `isForeign` instead of `isKnownUTF16` may allow the stdlib's
+    // internal code to be better optimized -- so let's do that.
+    isForeign ? i._knownUTF16 : i._knownUTF8
   }
 
+  /// Returns true if the encoding of the given index isn't known to be in
+  /// conflict with this string's encoding.
+  ///
+  /// If the index or the string was created by code that was built on stdlibs
+  /// below 5.7, then this check may incorrectly return true on a mismatching
+  /// index, but it is guaranteed to never incorrectly return false. If all
+  /// loaded binaries were built in 5.7+, then this method is guaranteed to
+  /// always return the correct value.
   internal func hasMatchingEncoding(_ i: String.Index) -> Bool {
     (isForeign && i._canBeUTF16) || (!isForeign && i._canBeUTF8)
   }
@@ -339,14 +354,14 @@ extension _StringGuts {
   /// not set the flags that this method relies on. However, false positives
   /// cannot happen: if this method detects a mismatch, then it is guaranteed to
   /// be a real one.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient // FIXME(lorentey): Should this remain internal?
   @inline(__always)
   internal func ensureMatchingEncoding(_ i: String.Index) -> String.Index {
     if _fastPath(!isForeign && i._canBeUTF8) { return i }
     return _slowEnsureMatchingEncoding(i)
   }
 
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient // FIXME(lorentey): Should this remain internal?
   internal func _slowEnsureMatchingEncoding(_ i: String.Index) -> String.Index {
     _internalInvariant(isForeign || !i._canBeUTF8)
     if isForeign {

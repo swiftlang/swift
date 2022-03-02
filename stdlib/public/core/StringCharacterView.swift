@@ -52,7 +52,7 @@ extension String: BidirectionalCollection {
     let i = _guts.ensureMatchingEncoding(i)
     _precondition(i < endIndex, "String index is out of bounds")
     let r = _uncheckedIndex(after: _guts.scalarAlign(i))
-    return _guts.markEncoding(r)
+    return _guts.internalMarkEncoding(r)
   }
 
   /// A version of `index(after:)` that assumes that the given index:
@@ -96,7 +96,7 @@ extension String: BidirectionalCollection {
     _precondition(i > startIndex, "String index is out of bounds")
 
     let r = _uncheckedIndex(before: _guts.scalarAlign(i))
-    return _guts.markEncoding(r)
+    return _guts.internalMarkEncoding(r)
   }
 
   /// A version of `index(before:)` that assumes that the given index:
@@ -163,7 +163,7 @@ extension String: BidirectionalCollection {
         i = _uncheckedIndex(before: i)
       }
     }
-    return _guts.markEncoding(i)
+    return _guts.internalMarkEncoding(i)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -243,7 +243,7 @@ extension String: BidirectionalCollection {
       }
       guard limit > start || i >= limit else { return nil }
     }
-    return _guts.markEncoding(i)
+    return _guts.internalMarkEncoding(i)
   }
 
   /// Returns the distance between two indices.
