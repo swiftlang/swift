@@ -3558,7 +3558,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   } else if (callee.getRepresentation() ==
              SILFunctionTypeRepresentation::CXXMethod) {
     // Skip the "self" param.
-    paramEnd--;
+    firstParam += 1;
+    params = params.drop_back();
   }
 
   if (fnType->getNumResults() > 0 &&
