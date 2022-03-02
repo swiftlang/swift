@@ -911,7 +911,7 @@ static void transformAndForwardResults(
         CodeCompletionString::create(innerSink.allocator, chunks);
     ContextFreeCodeCompletionResult *contextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-            innerSink.allocator, CodeCompletionResultKind::BuiltinOperator,
+            innerSink.swiftSink, CodeCompletionResultKind::BuiltinOperator,
             completionString, CodeCompletionOperatorKind::None,
             /*BriefDocComment=*/"", CodeCompletionResultType::notApplicable(),
             ContextFreeNotRecommendedReason::None,
@@ -921,7 +921,7 @@ static void transformAndForwardResults(
         *contextFreeResult, SemanticContextKind::CurrentNominal,
         CodeCompletionFlairBit::ExpressionSpecific,
         exactMatch ? exactMatch->getNumBytesToErase() : 0,
-        /*TypeContext=*/nullptr, /*DC=*/nullptr,
+        /*TypeContext=*/nullptr, /*DC=*/nullptr, /*USRTypeContext=*/nullptr,
         ContextualNotRecommendedReason::None,
         CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
 
