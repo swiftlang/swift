@@ -165,6 +165,15 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   // We can still succeed with a subtype match later in
   // OverrideMatcher::match().
   if (auto declCtx = decl->getAsGenericContext()) {
+    // The below logic now works correctly for protocol requirements which are
+    // themselves generic, but that would be an ABI break, since we would now
+    // drop the protocol requirements from witness tables. Simulate the old
+    // behavior by not considering generic declarations in protocols as
+    // overrides at all.
+    if (decl->getDeclContext()->getSelfProtocolDecl() &&
+        declCtx->isGeneric())
+      return false;
+
     auto *parentCtx = parentDecl->getAsGenericContext();
 
     if (declCtx->isGeneric() != parentCtx->isGeneric())
