@@ -106,9 +106,10 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   /// - Precondition: The next location exists.
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
-    let i = _guts.scalarAlign(i)
-    _internalInvariant(i < endIndex)
     // TODO(String performance): isASCII fast-path
+
+    _precondition(i < endIndex, "String index is out of bounds")
+    let i = _guts.scalarAlign(i)
 
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.fastUTF8ScalarLength(startingAt: i._encodedOffset)
@@ -128,9 +129,15 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   /// - Precondition: The previous location exists.
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
-    let i = _guts.scalarAlign(i)
-    _precondition(i._encodedOffset > 0)
     // TODO(String performance): isASCII fast-path
+
+    // Note: bounds checking in `index(before:)` is tricky as scalar aligning an
+    // index may need to access storage, but it may also move it closer towards
+    // the `startIndex`. Therefore, we must check against the `endIndex` before
+    // aligning, but we need to delay the `i > startIndex` check until after.
+    _precondition(i <= endIndex, "String index is out of bounds")
+    let i = _guts.scalarAlign(i)
+    _precondition(i > startIndex, "String index is out of bounds")
 
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.withFastUTF8 { utf8 -> Int in

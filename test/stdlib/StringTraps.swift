@@ -56,6 +56,35 @@ StringTraps.test("subscript(_:)/endIndex")
   _ = s[i]
 }
 
+StringTraps.test("String.index(before:) trap on i > endIndex")
+.skip(
+  .custom({ _isFastAssertConfiguration() },
+  reason: "trap is not guaranteed to happen in -Ounchecked"))
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+
+  let long = String(repeating: "X", count: 1024)
+  let short = "This is a short string"
+  expectCrashLater()
+  let i = short.index(before: long.endIndex)
+  print(i)
+}
+
+StringTraps.test("String.index(before:) trap on i == startIndex after scalar alignment")
+.skip(
+  .custom({ _isFastAssertConfiguration() },
+  reason: "trap is not guaranteed to happen in -Ounchecked"))
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+
+  let s = "🥯 Bagel with schmear"
+  let i = s.utf8.index(after: s.utf8.startIndex)
+  expectCrashLater()
+  // `i` is equivalent to `s.startIndex` as far as `String` is concerned
+  let j = s.index(before: i)
+  print(j)
+}
+
 StringTraps.test("UTF8ViewSubscript/endIndexSuccessor")
   .skip(.custom(
     { _isFastAssertConfiguration() },
@@ -167,6 +196,68 @@ StringTraps.test("UTF8ViewIndex/offsetCrash")
   expectCrashLater()
   let i = u8.index(u8.startIndex, offsetBy: 99)
   _ = s8.utf8[i]
+}
+
+StringTraps.test("UnicodeScalarView index(before:) trap on startIndex")
+.skip(
+  .custom({ _isFastAssertConfiguration() },
+  reason: "trap is not guaranteed to happen in -Ounchecked"))
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+
+  let s = "abc"
+  var i = s.unicodeScalars.endIndex
+  i = s.unicodeScalars.index(before: i)
+  i = s.unicodeScalars.index(before: i)
+  i = s.unicodeScalars.index(before: i)
+  expectCrashLater()
+  i = s.unicodeScalars.index(before: i)
+}
+
+StringTraps.test("UnicodeScalarView index(before:) trap on startIndex after scalar alignment")
+.skip(
+  .custom({ _isFastAssertConfiguration() },
+  reason: "trap is not guaranteed to happen in -Ounchecked"))
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+
+  let s = "🥦 Floret of broccoli"
+  var i = s.utf8.index(after: s.utf8.startIndex)
+  expectCrashLater()
+  // `i` is equivalent to `s.startIndex` as far as `String.UnicodeScalarView` is
+  // concerned
+  i = s.unicodeScalars.index(before: i)
+}
+
+StringTraps.test("UnicodeScalarView index(after:) trap on endIndex")
+.skip(
+  .custom({ _isFastAssertConfiguration() },
+  reason: "trap is not guaranteed to happen in -Ounchecked"))
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+
+  let s = "abc"
+  var i = s.unicodeScalars.startIndex
+  i = s.unicodeScalars.index(after: i)
+  i = s.unicodeScalars.index(after: i)
+  i = s.unicodeScalars.index(after: i)
+  expectCrashLater()
+  i = s.unicodeScalars.index(after: i)
+}
+
+StringTraps.test("UnicodeScalarView index(after:) trap on i > endIndex")
+.skip(
+  .custom({ _isFastAssertConfiguration() },
+  reason: "trap is not guaranteed to happen in -Ounchecked"))
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+
+  let long = "abcd"
+  var i = long.unicodeScalars.endIndex
+
+  let s = "abc"
+  expectCrashLater()
+  i = s.unicodeScalars.index(after: i)
 }
 
 runAllTests()
