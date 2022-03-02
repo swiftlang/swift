@@ -976,8 +976,7 @@ extension ContiguousArray: RangeReplaceableCollection {
       self.replaceSubrange(indices, with: EmptyCollection())
     }
     else {
-      _buffer = _Buffer(_uninitializedCount: capacity, minimumCapacity: 0)
-      _buffer.count = 0
+      _buffer = _Buffer(_uninitializedCount: 0, minimumCapacity: capacity)
     }
   }
 

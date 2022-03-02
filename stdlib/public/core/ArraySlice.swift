@@ -1072,10 +1072,9 @@ extension ArraySlice: RangeReplaceableCollection {
     }
     else {
       let buffer = _ContiguousArrayBuffer<Element>(
-        _uninitializedCount: capacity,
-        minimumCapacity: 0
+        _uninitializedCount: 0,
+        minimumCapacity: capacity
       )
-      buffer.count = 0
       _buffer = _Buffer(_buffer: buffer, shiftedToStartIndex: startIndex)
     }
   }
