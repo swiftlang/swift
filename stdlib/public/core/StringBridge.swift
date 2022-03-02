@@ -614,10 +614,13 @@ extension String {
       // TODO: We'd rather emit a valid ObjC object statically than create a
       // shared string class instance.
       let gutsCountAndFlags = _guts._object._countAndFlags
+      let countAndFlags = _StringObject.CountAndFlags(
+        sharedCount: _guts.count,
+        isASCII: gutsCountAndFlags.isASCII,
+        isUTF16: false)
       return __SharedStringStorage(
         immortal: _guts._object.fastUTF8.baseAddress!,
-        countAndFlags: _StringObject.CountAndFlags(
-          sharedCount: _guts.count, isASCII: gutsCountAndFlags.isASCII))
+        countAndFlags: countAndFlags)
     }
 
     _internalInvariant(_guts._object.hasObjCBridgeableObject,

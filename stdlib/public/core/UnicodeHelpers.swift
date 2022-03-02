@@ -233,6 +233,12 @@ extension _StringGuts {
     return self.withFastUTF8 { _decodeScalar($0, startingAt: i).0 }
   }
 
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal func isOnUnicodeScalarBoundary(_ offset: Int) -> Bool {
+    isOnUnicodeScalarBoundary(String.Index(_encodedOffset: offset))
+  }
+
   @usableFromInline
   @_effects(releasenone)
   internal func isOnUnicodeScalarBoundary(_ i: String.Index) -> Bool {
@@ -244,7 +250,7 @@ extension _StringGuts {
 
     if _fastPath(isFastUTF8) {
       return self.withFastUTF8 {
-        return !UTF8.isContinuation($0[i._encodedOffset])
+        return !UTF8.isContinuation($0[_unchecked: i._encodedOffset])
       }
     }
 

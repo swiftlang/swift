@@ -49,21 +49,34 @@ extension String: BidirectionalCollection {
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
+    let i = _guts.ensureMatchingEncoding(i)
     _precondition(i < endIndex, "String index is out of bounds")
+    let r = _uncheckedIndex(after: _guts.scalarAlign(i))
+    return _guts.markEncoding(r)
+  }
 
+  /// A version of `index(after:)` that assumes that the given index:
+  ///
+  /// - has the right encoding,
+  /// - is within bounds, and
+  /// - is scalar aligned.
+  ///
+  /// It does not mark the encoding of the returned index.
+  internal func _uncheckedIndex(after i: Index) -> Index {
     // FIXME: Unlike `index(before:)`, this function may return incorrect
     // results if `i` isn't on a grapheme cluster boundary. (The grapheme
     // breaking algorithm assumes we start on a break when we go forward.)
+    _internalInvariant(_guts.hasMatchingEncoding(i))
+    _internalInvariant(i < endIndex)
+    _internalInvariant(i._isScalarAligned)
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
-    let i = _guts.scalarAlign(i)
     let stride = _characterStride(startingAt: i)
     let nextOffset = i._encodedOffset &+ stride
-    let nextStride = _characterStride(
-      startingAt: Index(_encodedOffset: nextOffset)._scalarAligned)
-
-    return Index(
-      encodedOffset: nextOffset, characterStride: nextStride)._scalarAligned
+    let nextIndex = Index(_encodedOffset: nextOffset)._scalarAligned
+    let nextStride = _characterStride(startingAt: nextIndex)
+    let r = Index(encodedOffset: nextOffset, characterStride: nextStride)
+    return r._scalarAligned
   }
 
   /// Returns the position immediately before the given index.
@@ -72,7 +85,7 @@ extension String: BidirectionalCollection {
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
-    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+    let i = _guts.ensureMatchingEncoding(i)
 
     // Note: bounds checking in `index(before:)` is tricky as scalar aligning an
     // index may need to access storage, but it may also move it closer towards
@@ -82,11 +95,30 @@ extension String: BidirectionalCollection {
     let i = _guts.scalarAlign(i)
     _precondition(i > startIndex, "String index is out of bounds")
 
+    let r = _uncheckedIndex(before: _guts.scalarAlign(i))
+    return _guts.markEncoding(r)
+  }
+
+  /// A version of `index(before:)` that assumes that the given index:
+  ///
+  /// - has the right encoding,
+  /// - is within bounds, and
+  /// - is scalar aligned.
+  ///
+  /// It does not mark the encoding of the returned index.
+  internal func _uncheckedIndex(before i: Index) -> Index {
+    _internalInvariant(_guts.hasMatchingEncoding(i))
+    _internalInvariant(i > startIndex && i <= endIndex)
+    _internalInvariant(i._isScalarAligned)
+
+    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(endingAt: i)
     let priorOffset = i._encodedOffset &- stride
-    return Index(
-      encodedOffset: priorOffset, characterStride: stride)._scalarAligned
+
+    let r = Index(encodedOffset: priorOffset, characterStride: stride)
+    return r._scalarAligned
   }
+
   /// Returns an index that is the specified distance from the given index.
   ///
   /// The following example obtains an index advanced four positions from a
@@ -109,10 +141,29 @@ extension String: BidirectionalCollection {
   ///   is the same value as the result of `abs(distance)` calls to
   ///   `index(before:)`.
   /// - Complexity: O(*n*), where *n* is the absolute value of `distance`.
-  @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
+    // Note: in Swift 5.6 and below, this method used to be inlinable,
+    // forwarding to `_index(_:offsetBy:)`.
+
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _index(i, offsetBy: distance)
+
+    var i = _guts.ensureMatchingEncoding(i)
+    _precondition(i >= startIndex && i <= endIndex,
+      "String index is out of bounds")
+    i = _guts.scalarAlign(i)
+
+    if distance >= 0 {
+      for _ in stride(from: 0, to: distance, by: 1) {
+        _precondition(i < endIndex, "String index is out of bounds")
+        i = _uncheckedIndex(after: i)
+      }
+    } else {
+      for _ in stride(from: 0, to: distance, by: -1) {
+        _precondition(i > startIndex, "String index is out of bounds")
+        i = _uncheckedIndex(before: i)
+      }
+    }
+    return _guts.markEncoding(i)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -158,6 +209,8 @@ extension String: BidirectionalCollection {
   ) -> Index? {
     // Note: In Swift 5.6 and below, this function used to be inlinable,
     // forwarding to `BidirectionalCollection._index(_:offsetBy:limitedBy:)`.
+    // Unfortunately, that approach isn't compatible with SE-0180, as it doesn't
+    // support cases where `i` or `limit` aren't character aligned.
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
@@ -167,23 +220,30 @@ extension String: BidirectionalCollection {
 
     // Note: `limit` is intentionally not scalar aligned to ensure our behavior
     // exactly matches the documentation above.
+    let limit = _guts.ensureMatchingEncoding(limit)
 
-    let start = _guts.scalarAlign(i)
-    var i = start
+    var i = _guts.ensureMatchingEncoding(i)
+    _precondition(i >= startIndex && i <= endIndex,
+      "String index is out of bounds")
+    i = _guts.scalarAlign(i)
+
+    let start = i
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
         guard limit < start || i < limit else { return nil }
-        formIndex(after: &i)
+        _precondition(i < endIndex, "String index is out of bounds")
+        i = _uncheckedIndex(after: i)
       }
       guard limit < start || i <= limit else { return nil }
     } else {
       for _ in stride(from: 0, to: distance, by: -1) {
         guard limit > start || i > limit else { return nil }
-        formIndex(before: &i)
+        _precondition(i > startIndex, "String index is out of bounds")
+        i = _uncheckedIndex(before: i)
       }
       guard limit > start || i >= limit else { return nil }
     }
-    return i
+    return _guts.markEncoding(i)
   }
 
   /// Returns the distance between two indices.
@@ -199,32 +259,40 @@ extension String: BidirectionalCollection {
     // Note: In Swift 5.6 and below, this function used to be inlinable,
     // forwarding to `BidirectionalCollection._distance(from:to:)`.
 
-    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    let start = _guts.scalarAlign(start)
-    let end = _guts.scalarAlign(end)
-
-    // Per SE-0180, `start` and `end` are allowed to fall in between grapheme
-    // breaks, in which case this function must still terminate without trapping
-    // and return a result that makes sense.
-
     // FIXME: Due to the `index(after:)` problem above, this function doesn't
     // always return consistent results when the given indices fall between
     // grapheme breaks -- swapping `start` and `end` may change the magnitude of
     // the result.
 
+    var start = _guts.ensureMatchingEncoding(start)
+    var end = _guts.ensureMatchingEncoding(end)
+
+    _precondition(
+      start >= startIndex && start <= endIndex &&
+      end >= startIndex && end <= endIndex,
+      "String index is out of bounds")
+
+    start = _guts.scalarAlign(start)
+    end = _guts.scalarAlign(end)
+
+    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+
+    // Per SE-0180, `start` and `end` are allowed to fall in between grapheme
+    // breaks, in which case this function must still terminate without trapping
+    // and return a result that makes sense.
+
     var i = start
     var count = 0
-
     if i < end {
       while i < end { // Note `<` instead of `==`
         count += 1
-        formIndex(after: &i)
+        i = _uncheckedIndex(after: i)
       }
     }
     else if i > end {
       while i > end { // Note `<` instead of `==`
         count -= 1
-        formIndex(before: &i)
+        i = _uncheckedIndex(before: i)
       }
     }
     return count
@@ -245,11 +313,17 @@ extension String: BidirectionalCollection {
   ///
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
-  @inlinable @inline(__always)
+  @inlinable @inline(__always) // FIXME(lorentey): Consider removing these. If
+                               // `index(after:)` isn't inlinable, does it
+                               // really matter if this one is? (Potential
+                               // _guts-related optimizations notwithstanding.)
+                               // `subscript` being inlinable forces a bunch of
+                               // new additions to be _aEIC, even though they
+                               // ought to be internal.
   public subscript(i: Index) -> Character {
+    var i = _guts.ensureMatchingEncoding(i)
     _boundsCheck(i)
-
-    let i = _guts.scalarAlign(i)
+    i = _guts.scalarAlign(i)
     let distance = _characterStride(startingAt: i)
 
     return _guts.errorCorrectedCharacter(

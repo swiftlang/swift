@@ -97,11 +97,17 @@ public struct Substring: Sendable {
   @usableFromInline
   internal var _slice: Slice<String>
 
-  @inlinable
+  @usableFromInline
   internal init(_ slice: Slice<String>) {
-    let _guts = slice.base._guts
-    let start = _guts.scalarAlign(slice.startIndex)
-    let end = _guts.scalarAlign(slice.endIndex)
+    let _guts = slice._base._guts
+    _internalInvariant(
+      _guts.hasMatchingEncoding(slice.startIndex) &&
+      _guts.hasMatchingEncoding(slice.endIndex))
+    _internalInvariant(
+      slice.startIndex >= _guts.startIndex && slice.endIndex <= _guts.endIndex)
+
+    let start = slice.base._guts.scalarAlign(slice.startIndex)
+    let end = slice.base._guts.scalarAlign(slice.endIndex)
 
     self._slice = Slice(
       base: slice.base,
@@ -168,32 +174,44 @@ extension Substring: StringProtocol {
     // leads to Collection conformance issues when the `Substring`'s bounds do
     // not fall on grapheme boundaries in `base`.
 
+    let i = _slice.base._guts.ensureMatchingEncoding(i)
+    _precondition(i < endIndex && i >= startIndex,
+      "Substring index is out of bounds")
+    let r = _uncheckedIndex(after: _slice.base._guts.scalarAlign(i))
+    return _slice.base._guts.markEncoding(r)
+  }
+
+  /// A version of `index(after:)` that assumes that the given index:
+  ///
+  /// - has the right encoding,
+  /// - is within bounds, and
+  /// - is scalar aligned.
+  ///
+  /// It does not mark the encoding of the returned index.
+  internal func _uncheckedIndex(after i: Index) -> Index {
     // FIXME: Unlike `index(before:)`, this function may return incorrect
     // results if `i` isn't on a grapheme cluster boundary. (The grapheme
     // breaking algorithm assumes we start on a break when we go forward.)
-
-    let i = _slice.base._guts.scalarAlign(i)
-
-    _precondition(i < endIndex && i >= startIndex,
-      "Substring index is out of bounds")
+    _internalInvariant(_slice.base._guts.hasMatchingEncoding(i))
+    _internalInvariant(i < endIndex)
+    _internalInvariant(i._isScalarAligned)
 
     let stride = _characterStride(startingAt: i)
     let nextOffset = i._encodedOffset &+ stride
-
     let nextIndex = Index(_encodedOffset: nextOffset)._scalarAligned
-    guard _knownToStartOnGraphemeBreak else {
+    guard
       // Don't cache character strides in indices of exotic substrings whose
       // startIndex isn't aligned on a grapheme cluster boundary. (Their
       // grapheme breaks may not match with those in `base`.)
-      return nextIndex
-    }
-    guard nextIndex < endIndex || _knownToEndOnGraphemeBreak else {
+      _knownToStartOnGraphemeBreak,
       // Don't cache the stride if we end on a partial grapheme cluster.
+      nextIndex < endIndex || _knownToEndOnGraphemeBreak
+    else {
       return nextIndex
     }
     let nextStride = _characterStride(startingAt: nextIndex)
-    return Index(
-      encodedOffset: nextOffset, characterStride: nextStride)._scalarAligned
+    let r = Index(encodedOffset: nextOffset, characterStride: nextStride)
+    return r._scalarAligned
   }
 
   public func index(before i: Index) -> Index {
@@ -204,8 +222,24 @@ extension Substring: StringProtocol {
     // leads to Collection conformance issues when the `Substring`'s bounds do
     // not fall on grapheme boundaries in `base`.
 
+    let i = _slice.base._guts.ensureMatchingEncoding(i)
     _precondition(i <= endIndex && i > startIndex,
       "Substring index is out of bounds")
+    let r = _uncheckedIndex(before: _slice.base._guts.scalarAlign(i))
+    return _slice.base._guts.markEncoding(r)
+  }
+
+  /// A version of `index(before:)` that assumes that the given index:
+  ///
+  /// - has the right encoding,
+  /// - is within bounds, and
+  /// - is scalar aligned.
+  ///
+  /// It does not mark the encoding of the returned index.
+  internal func _uncheckedIndex(before i: Index) -> Index {
+    _internalInvariant(_slice.base._guts.hasMatchingEncoding(i))
+    _internalInvariant(i < endIndex)
+    _internalInvariant(i._isScalarAligned)
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let i = _slice.base._guts.scalarAlign(i)
@@ -231,7 +265,24 @@ extension Substring: StringProtocol {
     // outside the substring to affect grapheme breaking results within the
     // substring. This leads to Collection conformance issues when the
     // `Substring`'s bounds do not fall on grapheme boundaries in `base`.
-    return _index(i, offsetBy: distance)
+
+    var i = _slice.base._guts.ensureMatchingEncoding(i)
+    _precondition(i >= startIndex && i <= endIndex,
+      "String index is out of bounds")
+    i = _slice.base._guts.scalarAlign(i)
+    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+    if distance >= 0 {
+      for _ in stride(from: 0, to: distance, by: 1) {
+        _precondition(i < endIndex, "String index is out of bounds")
+        i = _uncheckedIndex(after: i)
+      }
+    } else {
+      for _ in stride(from: 0, to: distance, by: -1) {
+        _precondition(i > startIndex, "String index is out of bounds")
+        i = _uncheckedIndex(before: i)
+      }
+    }
+    return _slice.base._guts.markEncoding(i)
   }
 
   public func index(
@@ -250,23 +301,30 @@ extension Substring: StringProtocol {
 
     // Note: `limit` is intentionally not scalar aligned to ensure our behavior
     // exactly matches the documentation.
+    let limit = _slice.base._guts.ensureMatchingEncoding(limit)
 
-    let start = _slice.base._guts.scalarAlign(i)
-    var i = start
+    var i = _slice.base._guts.ensureMatchingEncoding(i)
+    _precondition(i >= startIndex && i <= endIndex,
+      "String index is out of bounds")
+    i = _slice.base._guts.scalarAlign(i)
+
+    let start = i
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
         guard limit < start || i < limit else { return nil }
-        formIndex(after: &i)
+        _precondition(i < endIndex, "String index is out of bounds")
+        i = _uncheckedIndex(after: i)
       }
       guard limit < start || i <= limit else { return nil }
     } else {
       for _ in stride(from: 0, to: distance, by: -1) {
         guard limit > start || i > limit else { return nil }
-        formIndex(before: &i)
+        _precondition(i > startIndex, "String index is out of bounds")
+        i = _uncheckedIndex(before: i)
       }
       guard limit > start || i >= limit else { return nil }
     }
-    return i
+    return _slice.base._guts.markEncoding(i)
   }
 
   public func distance(from start: Index, to end: Index) -> Int {
@@ -277,32 +335,53 @@ extension Substring: StringProtocol {
     // substring. This leads to Collection conformance issues when the
     // `Substring`'s bounds do not fall on grapheme boundaries in `base`.
 
+    // FIXME: Due to the `index(after:)` problem above, this function doesn't
+    // always return consistent results when the given indices fall between
+    // grapheme breaks -- swapping `start` and `end` may change the magnitude of
+    // the result.
+
+    var start = _slice.base._guts.ensureMatchingEncoding(start)
+    var end = _slice.base._guts.ensureMatchingEncoding(end)
+
+    _precondition(
+      start >= startIndex && start <= endIndex &&
+      end >= startIndex && end <= endIndex,
+      "String index is out of bounds")
+
+    start = _slice.base._guts.scalarAlign(start)
+    end = _slice.base._guts.scalarAlign(end)
+
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
     // Per SE-0180, `start` and `end` are allowed to fall in between grapheme
     // breaks, in which case this function must still terminate without trapping
     // and return a result that makes sense.
-    var i = _slice.base._guts.scalarAlign(start)
-    let end = _slice.base._guts.scalarAlign(end)
-    var count = 0
 
+    var i = start
+    var count = 0
     if i < end {
       while i < end { // Note `<` instead of `==`
         count += 1
-        formIndex(after: &i)
+        i = _uncheckedIndex(after: i)
       }
     }
     else if i > end {
       while i > end { // Note `<` instead of `==`
         count -= 1
-        formIndex(before: &i)
+        i = _uncheckedIndex(before: i)
       }
     }
     return count
   }
 
   public subscript(i: Index) -> Character {
-    get { return _slice[i] }
+    var i = _slice.base._guts.ensureMatchingEncoding(i)
+    _precondition(i >= startIndex && i < endIndex,
+      "Substring index is out of bounds")
+    i = _slice.base._guts.scalarAlign(i)
+    let distance = _characterStride(startingAt: i)
+    return _slice.base._guts.errorCorrectedCharacter(
+      startingAt: i._encodedOffset, endingAt: i._encodedOffset &+ distance)
   }
 
   public mutating func replaceSubrange<C>(
@@ -958,6 +1037,9 @@ extension Substring: ExpressibleByStringLiteral {
 extension String {
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
+    let r = Range(_uncheckedBounds: (
+        _guts.ensureMatchingEncoding(r.lowerBound),
+        _guts.ensureMatchingEncoding(r.upperBound)))
     _boundsCheck(r)
     return Substring(Slice(base: self, bounds: r))
   }
@@ -966,6 +1048,11 @@ extension String {
 extension Substring {
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
-    return Substring(_slice[r])
+    let r = Range(_uncheckedBounds: (
+        _slice.base._guts.ensureMatchingEncoding(r.lowerBound),
+        _slice.base._guts.ensureMatchingEncoding(r.upperBound)))
+    _precondition(r.lowerBound >= startIndex && r.upperBound <= endIndex,
+      "Substring index range is out of bounds")
+    return Substring(Slice(base: _slice.base, bounds: r))
   }
 }

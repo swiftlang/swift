@@ -29,6 +29,9 @@ internal struct _StringGutsSlice {
 
   @inline(__always)
   internal init(_ guts: _StringGuts, _ offsetRange: Range<Int>) {
+    _internalInvariant(
+      guts.isOnUnicodeScalarBoundary(offsetRange.lowerBound)
+      && guts.isOnUnicodeScalarBoundary(offsetRange.upperBound))
     self._guts = guts
     self._offsetRange = offsetRange
   }
@@ -74,8 +77,11 @@ internal struct _StringGutsSlice {
   @inlinable
   internal var range: Range<String.Index> {
     @inline(__always) get {
-      return String.Index(_encodedOffset: _offsetRange.lowerBound)
-         ..< String.Index(_encodedOffset: _offsetRange.upperBound)
+      let lower = String.Index(_encodedOffset: _offsetRange.lowerBound)
+        ._scalarAligned
+      let higher = String.Index(_encodedOffset: _offsetRange.upperBound)
+        ._scalarAligned
+      return Range(_uncheckedBounds: (lower, higher))
     }
   }
 

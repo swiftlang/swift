@@ -288,11 +288,107 @@ extension _StringGuts {
 
   @inlinable @inline(__always)
   internal var startIndex: String.Index {
-   return Index(_encodedOffset: 0)._scalarAligned
+    Index(_encodedOffset: 0)._scalarAligned._encodingIndependent
   }
+
   @inlinable @inline(__always)
   internal var endIndex: String.Index {
-    return Index(_encodedOffset: self.count)._scalarAligned
+    markEncoding(Index(_encodedOffset: self.count)._scalarAligned)
+  }
+
+  @inlinable @inline(__always)
+  internal func index(atOffset offset: Int) -> String.Index {
+    markEncoding(Index(_encodedOffset: self.count)._scalarAligned)
+  }
+}
+
+// Encoding
+extension _StringGuts {
+  @_alwaysEmitIntoClient // Swift 5.7
+  internal func markEncoding(_ i: String.Index) -> String.Index {
+    if _slowPath(isForeign) {
+      // FIXME: Instead of having an opaque path here, we should define the same
+      // encoding flags in StringObject and pick them up from there. The flags
+      // can be initialized at the time the foreign string is created.
+      guard
+        #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)  // SwiftStdlib 5.7
+      else {
+        // We know all foreign strings were UTF-16 in releases < 5.7
+        return i._knownUTF16
+      }
+      return _foreignMarkEncoding(i)
+    }
+    return i._knownUTF8
+  }
+
+  @_effects(readnone)
+  @available(SwiftStdlib 5.7, *)
+  @usableFromInline
+  internal func _foreignMarkEncoding(_ i: String.Index) -> String.Index {
+    // Currently foreign indices always have UTF-16 offsets.
+    i._knownUTF16
+  }
+
+  internal func hasMatchingEncoding(_ i: String.Index) -> Bool {
+    (isForeign && i._canBeUTF16) || (!isForeign && i._canBeUTF8)
+  }
+
+  /// Return an index whose encoding can be assumed to match that of `self`.
+  ///
+  /// Detecting an encoding mismatch isn't always possible -- older binaries did
+  /// not set the flags that this method relies on. However, false positives
+  /// cannot happen: if this method detects a mismatch, then it is guaranteed to
+  /// be a real one.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal func ensureMatchingEncoding(_ i: String.Index) -> String.Index {
+    if _fastPath(!isForeign && i._canBeUTF8) { return i }
+    return _slowEnsureMatchingEncoding(i)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _slowEnsureMatchingEncoding(_ i: String.Index) -> String.Index {
+    _internalInvariant(isForeign || !i._canBeUTF8)
+    if isForeign {
+      // Opportunistically detect attempts to use an UTF-8 index on a UTF-16
+      // string. Strings don't usually get converted to UTF-16 storage, so it
+      // seems okay to trap in this case -- the index most likely comes from an
+      // unrelated string. (Trapping here may still turn out to affect binary
+      // compatibility with broken code in existing binaries running with new
+      // stdlibs. If so, we can replace this with the same transcoding hack as
+      // in the UTF-16->8 case below.)
+      //
+      // Note that this trap is not guaranteed to trigger when the process
+      // includes client binaries compiled with a previous Swift release.
+      // (`i._canBeUTF16` can sometimes return true in that case even if the
+      // index actually came from an UTF-8 string.) However, the trap will still
+      // often trigger in this case, as long as the index was initialized by
+      // code that was compiled with 5.7+.
+      //
+      // This trap can never trigger on OSes that have stdlibs <= 5.6, because
+      // those versions never set the `isKnownUTF16` flag in `_StringObject`.
+      //
+      _precondition(!_object.isKnownUTF16 || i._canBeUTF16,
+        "Invalid string index")
+      return i
+    }
+    // If we get here, then we know for sure that this is an attempt to use an
+    // UTF-16 index on a UTF-8 string.
+    //
+    // This can happen if `self` was originally verbatim-bridged, and someone
+    // mistakenly attempts to keep using an old index after a mutation. This is
+    // technically an error, but trapping here would trigger a lot of broken
+    // code that previously happened to work "fine" on e.g. ASCII strings.
+    // Instead, attempt to convert the offset to UTF-8 code units by transcoding
+    // the string. This can be slow, but it often results in a usable index,
+    // even if non-ASCII characters are present. (UTF-16 breadcrumbs help reduce
+    // the severity of the slowdown.)
+
+    // FIXME: Consider emitting a runtime warning here.
+    // FIXME: Consider performing a linked-on-or-after check & trapping if the
+    // client executable was built on some particular future Swift release.
+    let utf16 = String(self).utf16
+    return utf16.index(utf16.startIndex, offsetBy: i._encodedOffset)
   }
 }
 

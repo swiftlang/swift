@@ -580,40 +580,79 @@ extension _StringObject {
 
  All non-small forms share the same structure for the other half of the bits
  (i.e. non-object bits) as a word containing code unit count and various
- performance flags. The top 16 bits are for performance flags, which are not
- semantically relevant but communicate that some operations can be done more
- efficiently on this particular string, and the lower 48 are the code unit
- count (aka endIndex).
+ performance flags. The top 16 bits are nonessential flags; these aren't
+ critical for correct operation, but they may provide additional guarantees that
+ allow more efficient operation or more reliable detection of runtime errors.
+ The lower 48 bits contain the code unit count (aka endIndex).
 
-┌─────────┬───────┬──────────────────┬─────────────────┬────────┬───────┐
-│   b63   │  b62  │       b61        │       b60       │ b59:48 │ b47:0 │
-├─────────┼───────┼──────────────────┼─────────────────┼────────┼───────┤
-│ isASCII │ isNFC │ isNativelyStored │ isTailAllocated │  TBD   │ count │
-└─────────┴───────┴──────────────────┴─────────────────┴────────┴───────┘
+┌──────┬──────┬──────┬──────┬──────┬──────────┬───────────────────────────────┐
+│ b63  │ b62  │ b61  │ b60  │ b59  │  b58:48  │             b47:0             │
+├──────┼──────┼──────┼──────┼──────┼──────────┼───────────────────────────────┤
+│ ASCII│ NFC  │native│ tail │ UTF16│ reserved │             count             │
+└──────┴──────┴──────┴──────┴──────┴──────────┴───────────────────────────────┘
 
- isASCII: set when all code units are known to be ASCII, enabling:
+ b63: isASCII. set when all code units are known to be ASCII, enabling:
    - Trivial Unicode scalars, they're just the code units
    - Trivial UTF-16 transcoding (just bit-extend)
    - Also, isASCII always implies isNFC
- isNFC: set when the contents are in normal form C
+
+ b62: isNFC. set when the contents are in normal form C
    - Enables trivial lexicographical comparisons: just memcmp
    - `isASCII` always implies `isNFC`, but not vice versa
- isNativelyStored: set for native stored strings
+
+ b61: isNativelyStored. set for native stored strings
    - `largeAddressBits` holds an instance of `_StringStorage`.
    - I.e. the start of the code units is at the stored address + `nativeBias`
- isTailAllocated: contiguous UTF-8 code units starts at address + `nativeBias`
+   - NOTE: isNativelyStored is *specifically* allocated to b61 to align with the
+     bit-position of isSmall on the BridgeObject. This allows us to check for
+     native storage without an extra branch guarding against smallness. See
+     `_StringObject.hasNativeStorage` for this usage.
+
+ b60: isTailAllocated. contiguous UTF-8 code units starts at address + `nativeBias`
    - `isNativelyStored` always implies `isTailAllocated`, but not vice versa
       (e.g. literals)
    - `isTailAllocated` always implies `isFastUTF8`
- TBD: Reserved for future usage
-   - Setting a TBD bit to 1 must be semantically equivalent to 0
-   - I.e. it can only be used to "cache" fast-path information in the future
- count: stores the number of code units, corresponds to `endIndex`.
 
- NOTE: isNativelyStored is *specifically* allocated to b61 to align with the
- bit-position of isSmall on the BridgeObject. This allows us to check for
- native storage without an extra branch guarding against smallness. See
- `_StringObject.hasNativeStorage` for this usage.
+ b59: isKnownUTF16. This bit is set if index positions in the string are known
+     to be measured in UTF-16 code units, rather than the default UTF-8.
+   - This is only ever set on UTF-16 foreign strings created in noninlinable
+     code in stdlib versions >= 5.7. On stdlibs <= 5.6, this bit is always set
+     to zero.
+   - Note that while as of 5.7 all foreign strings are UTF-16, this isn't
+     guaranteed to remain this way -- future versions of the stdlib may
+     introduce new foreign forms that use a different encoding. (Likely UTF-8.)
+   - Foreign strings are only created in non-inlinable code, so on stdlib
+     versions >=5.7, this bit always correctly reflects the correct encoding
+     for the string's offset values.
+   - This bit along with the two related bits in String.Index allow us to
+     opportunistically catch cases where an UTF-16 index is used on an UTF-8
+     string (or vice versa), and to provide better error reporting & recovery.
+     As more code gets rebuilt with Swift 5.7+, the stdlib will gradually become
+     able to reliably catch all such issues.
+   - It is okay for isASCII strings to not set this flag, even if they are
+     UTF-16 encoded -- the offsets in that case can work in either encoding.
+     (This is not currently exercised, as foreign bridged strings never set
+     the isASCII flag.)
+
+ b48-58: Reserved for future usage.
+   - Because Swift is ABI stable (on some platforms at least), these bits can
+     only be assigned semantics that don't affect interoperability with code
+     built with previous releases of the Standard Library, from 5.0 onward.
+   - Older binaries will not look at newly assigned bits, and they will not
+     set them, either (unless by side effect of calling into newly built code).
+     Such code must continue working.
+   - Code in new versions of the stdlib must continue to work corectly even if
+     some of these newly assigned bits are never set -- as may be the case when
+     the initialization of a string was emitted entirely into an older client
+     binary.
+   - This typically means that these bits can only be used as optional
+     performance shortcuts, e.g. to signal the availability of a potential fast
+     path. (However, it is also possible to store information here that allows
+     more reliable detection & handling of runtime errors, like the
+     `isKnownUTF16` bit above.)
+
+ b0-47: count. Stores the number of code units. Corresponds to the position of
+     the `endIndex`.
 
 */
 extension _StringObject.CountAndFlags {
@@ -637,6 +676,12 @@ extension _StringObject.CountAndFlags {
   @inlinable @inline(__always)
   internal static var isTailAllocatedMask: UInt64 {
     return 0x1000_0000_0000_0000
+  }
+
+  @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
+  internal static var isKnownUTF16Mask: UInt64 {
+    return 0x0800_0000_0000_0000
   }
 
   // General purpose bottom initializer
@@ -677,10 +722,53 @@ extension _StringObject.CountAndFlags {
     _internalInvariant(isTailAllocated == self.isTailAllocated)
   }
 
+  @inline(__always)
+  internal init(
+    count: Int,
+    isASCII: Bool,
+    isNFC: Bool,
+    isNativelyStored: Bool,
+    isTailAllocated: Bool,
+    isKnownUTF16: Bool
+  ) {
+    var rawBits = UInt64(truncatingIfNeeded: count)
+    _internalInvariant(rawBits <= _StringObject.CountAndFlags.countMask)
+
+    if isASCII {
+      _internalInvariant(isNFC)
+      rawBits |= _StringObject.CountAndFlags.isASCIIMask
+    }
+
+    if isNFC {
+      rawBits |= _StringObject.CountAndFlags.isNFCMask
+    }
+
+    if isNativelyStored {
+      _internalInvariant(isTailAllocated)
+      rawBits |= _StringObject.CountAndFlags.isNativelyStoredMask
+    }
+
+    if isTailAllocated {
+      rawBits |= _StringObject.CountAndFlags.isTailAllocatedMask
+    }
+
+    if isKnownUTF16 {
+      rawBits |= _StringObject.CountAndFlags.isKnownUTF16Mask
+    }
+
+    self.init(raw: rawBits)
+    _internalInvariant(count == self.count)
+    _internalInvariant(isASCII == self.isASCII)
+    _internalInvariant(isNFC == self.isNFC)
+    _internalInvariant(isNativelyStored == self.isNativelyStored)
+    _internalInvariant(isTailAllocated == self.isTailAllocated)
+    _internalInvariant(isKnownUTF16 == self.isKnownUTF16)
+  }
+
   @inlinable @inline(__always)
   internal init(count: Int, flags: UInt16) {
-    // Currently, we only use top 4 flags
-    _internalInvariant(flags & 0xF000 == flags)
+    // Currently, we only use top 5 flags
+    _internalInvariant(flags & 0xF800 == flags)
 
     let rawBits = UInt64(truncatingIfNeeded: flags) &<< 48
                 | UInt64(truncatingIfNeeded: count)
@@ -710,13 +798,14 @@ extension _StringObject.CountAndFlags {
       isTailAllocated: true)
   }
   @inline(__always)
-  internal init(sharedCount: Int, isASCII: Bool) {
+  internal init(sharedCount: Int, isASCII: Bool, isUTF16: Bool) {
     self.init(
       count: sharedCount,
       isASCII: isASCII,
       isNFC: isASCII,
       isNativelyStored: false,
-      isTailAllocated: false)
+      isTailAllocated: false,
+      isKnownUTF16: isUTF16)
   }
 
   //
@@ -750,6 +839,11 @@ extension _StringObject.CountAndFlags {
   internal var isTailAllocated: Bool {
     return 0 != _storage & _StringObject.CountAndFlags.isTailAllocatedMask
   }
+  @_alwaysEmitIntoClient
+  @inline(__always) // Swift 5.7
+  internal var isKnownUTF16: Bool {
+    return 0 != _storage & _StringObject.CountAndFlags.isKnownUTF16Mask
+  }
 
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}
@@ -761,6 +855,10 @@ extension _StringObject.CountAndFlags {
     }
     if isNativelyStored {
       _internalInvariant(isTailAllocated)
+    }
+    if isKnownUTF16 {
+      _internalInvariant(!isNativelyStored)
+      _internalInvariant(!isTailAllocated)
     }
   }
   #endif // INTERNAL_CHECKS_ENABLED
@@ -895,6 +993,13 @@ extension _StringObject {
     return _countAndFlags.isNFC
   }
 
+  @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
+  internal var isKnownUTF16: Bool {
+    if isSmall { return false }
+    return _countAndFlags.isKnownUTF16
+  }
+
   // Get access to fast UTF-8 contents for large strings which provide it.
   @inlinable @inline(__always)
   internal var fastUTF8: UnsafeBufferPointer<UInt8> {
@@ -994,7 +1099,8 @@ extension _StringObject {
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
   ) {
-    let countAndFlags = CountAndFlags(sharedCount: length, isASCII: isASCII)
+    let countAndFlags = CountAndFlags(
+      sharedCount: length, isASCII: isASCII, isUTF16: !providesFastUTF8)
     let discriminator = Nibbles.largeCocoa(providesFastUTF8: providesFastUTF8)
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     self.init(
