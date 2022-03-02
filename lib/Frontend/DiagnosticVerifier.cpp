@@ -72,6 +72,9 @@ struct ExpectedDiagnosticInfo {
   // This specifies the full range of the "expected-foo {{}}" specifier.
   const char *ExpectedStart, *ExpectedEnd = nullptr;
 
+  // This specifies the full range of the classification string.
+  const char *ClassificationStart, *ClassificationEnd = nullptr;
+
   DiagnosticKind Classification;
 
   // This is true if a '*' constraint is present to say that the diagnostic
@@ -108,8 +111,11 @@ struct ExpectedDiagnosticInfo {
   Optional<ExpectedEducationalNotes> EducationalNotes;
 
   ExpectedDiagnosticInfo(const char *ExpectedStart,
+                         const char *ClassificationStart,
+                         const char *ClassificationEnd,
                          DiagnosticKind Classification)
-      : ExpectedStart(ExpectedStart), Classification(Classification) {}
+      : ExpectedStart(ExpectedStart), ClassificationStart(ClassificationStart),
+        ClassificationEnd(ClassificationEnd), Classification(Classification) {}
 };
 
 static std::string getDiagKindString(DiagnosticKind Kind) {
@@ -139,11 +145,15 @@ renderEducationalNotes(llvm::SmallVectorImpl<std::string> &EducationalNotes) {
   return OS.str();
 }
 
-/// If we find the specified diagnostic in the list, return it.
-/// Otherwise return CapturedDiagnostics.end().
-static std::vector<CapturedDiagnosticInfo>::iterator
+/// If we find the specified diagnostic in the list, return it with \c true .
+/// If we find a near-match that varies only in classification, return it with
+/// \c false.
+/// Otherwise return \c CapturedDiagnostics.end() with \c false.
+static std::tuple<std::vector<CapturedDiagnosticInfo>::iterator, bool>
 findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
                const ExpectedDiagnosticInfo &Expected, StringRef BufferName) {
+  auto fallbackI = CapturedDiagnostics.end();
+
   for (auto I = CapturedDiagnostics.begin(), E = CapturedDiagnostics.end();
        I != E; ++I) {
     // Verify the file and line of the diagnostic.
@@ -155,15 +165,22 @@ findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
       continue;
 
     // Verify the classification and string.
-    if (I->Classification != Expected.Classification ||
-        I->Message.find(Expected.MessageStr) == StringRef::npos)
+    if (I->Message.find(Expected.MessageStr) == StringRef::npos)
       continue;
 
+    // Verify the classification and, if incorrect, remember as a second choice.
+    if (I->Classification != Expected.Classification) {
+      if (fallbackI == E && !Expected.MessageStr.empty())
+        fallbackI = I;
+      continue;
+    }
+
     // Okay, we found a match, hurray!
-    return I;
+    return { I, true };
   }
 
-  return CapturedDiagnostics.end();
+  // No perfect match; we'll return the fallback or `end()` instead.
+  return { fallbackI, false };
 }
 
 /// If there are any -verify errors (e.g. differences between expectations
@@ -481,20 +498,22 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     // the next match.
     StringRef MatchStart = InputFile.substr(Match);
     const char *DiagnosticLoc = MatchStart.data();
+    MatchStart = MatchStart.substr(strlen("expected-"));
+    const char *ClassificationStartLoc = MatchStart.data();
 
     DiagnosticKind ExpectedClassification;
-    if (MatchStart.startswith("expected-note")) {
+    if (MatchStart.startswith("note")) {
       ExpectedClassification = DiagnosticKind::Note;
-      MatchStart = MatchStart.substr(strlen("expected-note"));
-    } else if (MatchStart.startswith("expected-warning")) {
+      MatchStart = MatchStart.substr(strlen("note"));
+    } else if (MatchStart.startswith("warning")) {
       ExpectedClassification = DiagnosticKind::Warning;
-      MatchStart = MatchStart.substr(strlen("expected-warning"));
-    } else if (MatchStart.startswith("expected-error")) {
+      MatchStart = MatchStart.substr(strlen("warning"));
+    } else if (MatchStart.startswith("error")) {
       ExpectedClassification = DiagnosticKind::Error;
-      MatchStart = MatchStart.substr(strlen("expected-error"));
-    } else if (MatchStart.startswith("expected-remark")) {
+      MatchStart = MatchStart.substr(strlen("error"));
+    } else if (MatchStart.startswith("remark")) {
       ExpectedClassification = DiagnosticKind::Remark;
-      MatchStart = MatchStart.substr(strlen("expected-remark"));
+      MatchStart = MatchStart.substr(strlen("remark"));
     } else
       continue;
 
@@ -508,7 +527,9 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       continue;
     }
 
-    ExpectedDiagnosticInfo Expected(DiagnosticLoc, ExpectedClassification);
+    ExpectedDiagnosticInfo Expected(DiagnosticLoc, ClassificationStartLoc,
+                                    /*ClassificationEndLoc=*/MatchStart.data(),
+                                    ExpectedClassification);
     int LineOffset = 0;
 
     if (TextStartIdx > 0 && MatchStart[0] == '@') {
@@ -750,8 +771,9 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     auto &expected = ExpectedDiagnostics[i];
 
     // Check to see if we had this expected diagnostic.
-    auto FoundDiagnosticIter =
+    auto FoundDiagnosticInfo =
         findDiagnostic(CapturedDiagnostics, expected, BufferName);
+    auto FoundDiagnosticIter = std::get<0>(FoundDiagnosticInfo);
     if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
       // Diagnostic didn't exist.  If this is a 'mayAppear' diagnostic, then
       // we're ok.  Otherwise, leave it in the list.
@@ -759,8 +781,29 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
       continue;
     }
-    
+
+    auto emitFixItsError = [&](const char *location, const Twine &message,
+                               const char *replStartLoc, const char *replEndLoc,
+                               const std::string &replStr) {
+      llvm::SMFixIt fix(llvm::SMRange(SMLoc::getFromPointer(replStartLoc),
+                                      SMLoc::getFromPointer(replEndLoc)),
+                        replStr);
+      addError(location, message, fix);
+    };
+
     auto &FoundDiagnostic = *FoundDiagnosticIter;
+
+    if (!std::get<1>(FoundDiagnosticInfo)) {
+      // Found a diagnostic with the right location and text but the wrong
+      // classification. We'll emit an error about the mismatch and
+      // thereafter pretend that the diagnostic fully matched.
+      auto expectedKind = getDiagKindString(expected.Classification);
+      auto actualKind = getDiagKindString(FoundDiagnostic.Classification);
+      emitFixItsError(expected.ClassificationStart,
+          llvm::Twine("expected ") + expectedKind + ", not " + actualKind,
+          expected.ClassificationStart, expected.ClassificationEnd,
+          actualKind);
+    }
 
     const char *missedFixitLoc = nullptr;
     // Verify that any expected fix-its are present in the diagnostic.
@@ -789,15 +832,6 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
                                  (actualFixits.size() >= 2 ? "s" : "") +
                                  " seen: " + actualFixitsStr).str(),
                                 actualFixitsStr};
-    };
-
-    auto emitFixItsError = [&](const char *location, const Twine &message,
-                               const char *replStartLoc, const char *replEndLoc,
-                               const std::string &replStr) {
-      llvm::SMFixIt fix(llvm::SMRange(SMLoc::getFromPointer(replStartLoc),
-                                      SMLoc::getFromPointer(replEndLoc)),
-                        replStr);
-      addError(location, message, fix);
     };
 
     // If we have any expected fixits that didn't get matched, then they are

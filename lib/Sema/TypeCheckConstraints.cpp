@@ -1430,26 +1430,29 @@ void ConstraintSystem::print(raw_ostream &out) const {
           out << choice.getBaseType()->getString(PO) << ".";
         out << choice.getDecl()->getBaseName() << ": "
             << resolved.boundType->getString(PO) << " == "
-            << resolved.openedType->getString(PO) << "\n";
+            << resolved.openedType->getString(PO);
         break;
 
       case OverloadChoiceKind::KeyPathApplication:
         out << "key path application root "
-            << choice.getBaseType()->getString(PO) << "\n";
+            << choice.getBaseType()->getString(PO);
         break;
 
       case OverloadChoiceKind::DynamicMemberLookup:
       case OverloadChoiceKind::KeyPathDynamicMemberLookup:
-        out << "dynamic member lookup:"
-            << choice.getBaseType()->getString(PO) << "  name="
-            << choice.getName() << "\n";
+        out << "dynamic member lookup: "
+            << choice.getBaseType()->getString(PO) << " name="
+            << choice.getName();
         break;
 
       case OverloadChoiceKind::TupleIndex:
         out << "tuple " << choice.getBaseType()->getString(PO) << " index "
-            << choice.getTupleIndex() << "\n";
+            << choice.getTupleIndex();
         break;
       }
+      out << " for ";
+      elt.first->dump(&getASTContext().SourceMgr, out);
+      out << "\n";
     }
     out << "\n";
   }

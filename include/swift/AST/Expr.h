@@ -255,7 +255,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -266,7 +266,11 @@ protected:
 
     /// True if this @Sendable async closure parameter should implicitly
     /// inherit the actor context from where it was formed.
-    InheritActorContext : 1
+    InheritActorContext : 1,
+
+    /// True if this closure's actor isolation behavior was determined by an
+    /// \c \@preconcurrency declaration.
+    IsolatedByPreconcurrency : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -3537,40 +3541,46 @@ public:
   };
 
 private:
-    /// The actor to which this closure is isolated.
+    /// The actor to which this closure is isolated, plus a bit indicating
+    /// whether the isolation was imposed by a preconcurrency declaration.
     ///
-    /// There are three possible states:
+    /// There are three possible states for the pointer:
     ///   - NULL: The closure is independent of any actor.
     ///   - VarDecl*: The 'self' variable for the actor instance to which
     ///     this closure is isolated. It will always have a type that conforms
     ///     to the \c Actor protocol.
     ///   - Type: The type of the global actor on which
-  llvm::PointerUnion<VarDecl *, Type> storage;
+  llvm::PointerIntPair<llvm::PointerUnion<VarDecl *, Type>, 1, bool> storage;
 
-  ClosureActorIsolation(VarDecl *selfDecl) : storage(selfDecl) { }
-  ClosureActorIsolation(Type globalActorType) : storage(globalActorType) { }
+  ClosureActorIsolation(VarDecl *selfDecl, bool preconcurrency)
+      : storage(selfDecl, preconcurrency) { }
+  ClosureActorIsolation(Type globalActorType, bool preconcurrency)
+      : storage(globalActorType, preconcurrency) { }
 
 public:
-  ClosureActorIsolation() : storage() { }
+  ClosureActorIsolation(bool preconcurrency = false)
+      : storage(nullptr, preconcurrency) { }
 
-  static ClosureActorIsolation forIndependent() {
-    return ClosureActorIsolation();
+  static ClosureActorIsolation forIndependent(bool preconcurrency) {
+    return ClosureActorIsolation(preconcurrency);
   }
 
-  static ClosureActorIsolation forActorInstance(VarDecl *selfDecl) {
-    return ClosureActorIsolation(selfDecl);
+  static ClosureActorIsolation forActorInstance(VarDecl *selfDecl,
+                                                bool preconcurrency) {
+    return ClosureActorIsolation(selfDecl, preconcurrency);
   }
 
-  static ClosureActorIsolation forGlobalActor(Type globalActorType) {
-    return ClosureActorIsolation(globalActorType);
+  static ClosureActorIsolation forGlobalActor(Type globalActorType,
+                                              bool preconcurrency) {
+    return ClosureActorIsolation(globalActorType, preconcurrency);
   }
 
   /// Determine the kind of isolation.
   Kind getKind() const {
-    if (storage.isNull())
+    if (storage.getPointer().isNull())
       return Kind::Independent;
 
-    if (storage.is<VarDecl *>())
+    if (storage.getPointer().is<VarDecl *>())
       return Kind::ActorInstance;
 
     return Kind::GlobalActor;
@@ -3587,11 +3597,15 @@ public:
   }
 
   VarDecl *getActorInstance() const {
-    return storage.dyn_cast<VarDecl *>();
+    return storage.getPointer().dyn_cast<VarDecl *>();
   }
 
   Type getGlobalActor() const {
-    return storage.dyn_cast<Type>();
+    return storage.getPointer().dyn_cast<Type>();
+  }
+
+  bool preconcurrency() const {
+    return storage.getInt();
   }
 };
 
@@ -3862,6 +3876,16 @@ public:
 
   void setInheritsActorContext(bool value = true) {
     Bits.ClosureExpr.InheritActorContext = value;
+  }
+
+  /// Whether the closure's concurrency behavior was determined by an
+  /// \c \@preconcurrency declaration.
+  bool isIsolatedByPreconcurrency() const {
+    return Bits.ClosureExpr.IsolatedByPreconcurrency;
+  }
+
+  void setIsolatedByPreconcurrency(bool value = true) {
+    Bits.ClosureExpr.IsolatedByPreconcurrency = value;
   }
 
   /// Determine whether this closure expression has an
