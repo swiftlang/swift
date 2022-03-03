@@ -685,17 +685,11 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector attributes;
   AttributeVector modifiers;
 
-  CustomAttr *FuncBuilderAttr = nullptr;
-  if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
-    FuncBuilderAttr = VD->getAttachedResultBuilder();
-  }
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Always print result builder attribute.
-    bool isResultBuilderAttr = DA == FuncBuilderAttr;
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&
-        !isResultBuilderAttr &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
     if (Options.excludeAttrKind(DA->getKind()))
@@ -851,6 +845,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
   case DAK_Custom: {
+
+    auto attr = cast<CustomAttr>(this);
+    if (auto type = attr->getType()) {
+      // Print custom attributes only if the attribute decl is accessible.
+      // FIXME: rdar://85477478 They should be rejected.
+      if (auto attrDecl = type->getNominalOrBoundGenericNominal()) {
+        if (attrDecl->getFormalAccess() < Options.AccessFilter) {
+          return false;
+        }
+      }
+    }
+
     if (!Options.IsForSwiftInterface)
       break;
     // For Swift interface, we should print result builder attributes
