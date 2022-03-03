@@ -386,6 +386,10 @@ public:
 
   bool isTypeSequence() const;
 
+  /// Determine whether this type variable represents a code completion
+  /// expression.
+  bool isCodeCompletionToken() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
