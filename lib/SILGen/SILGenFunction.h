@@ -683,6 +683,13 @@ public:
   /// Generates code to destroy linearly recursive data structures, without
   /// building up the call stack.
   ///
+  /// Example:
+  ///
+  /// class Node<A> {
+  ///   let value: A
+  ///   let next: Node<A>?
+  /// }
+  ///
   /// \param selfValue The 'self' value.
   /// \param cd The class declaration whose members are being destroyed.
   /// \param recursiveLink The property that forms the recursive structure.

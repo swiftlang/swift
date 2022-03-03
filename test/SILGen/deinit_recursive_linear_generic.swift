@@ -18,9 +18,11 @@ class Node<A, B> {
 // CHECK:   br [[LOOPBB:bb.*]] //
 
 // CHECK: [[LOOPBB]]:
-// CHECK:   switch_enum_addr [[ITER]] : $*Optional<Node<A, B>>, case #Optional.some!enumelt: [[IS_SOME_BB:bb.*]], case #Optional.none!enumelt: [[IS_NONE_BB:bb[0-9]+]]
+// CHECK:   [[ITER_COPY:%.*]] = load [copy] [[ITER]] : $*Optional<Node<A, B>>
+// CHECK:   switch_enum [[ITER_COPY]] : $Optional<Node<A, B>>, case #Optional.some!enumelt: [[IS_SOME_BB:bb.*]], case #Optional.none!enumelt: [[IS_NONE_BB:bb[0-9]+]]
 
-// CHECK: [[IS_SOME_BB]]:
+// CHECK: [[IS_SOME_BB]]([[NODE:%.*]] : @owned $Node<A, B>):
+// CHECK:   destroy_value [[NODE]] : $Node<A, B>
 // CHECK:   [[IS_UNIQUE:%.*]] = is_unique [[ITER]] : $*Optional<Node<A, B>>
 // CHECK:   cond_br [[IS_UNIQUE]], [[IS_UNIQUE_BB:bb.*]], [[NOT_UNIQUE_BB:bb[0-9]*]]
 
