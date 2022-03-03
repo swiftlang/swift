@@ -8644,6 +8644,69 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
   return nullptr;
 }
 
+/// Convert the given enum element pattern into an expression pattern
+/// and synthesize ~= operator application to find the type of the
+/// element.
+static bool inferEnumMemberThroughTildeEqualsOperator(
+    ConstraintSystem &cs, EnumElementPattern *pattern, Type enumTy,
+    Type elementTy, ConstraintLocator *locator) {
+  if (!pattern->hasUnresolvedOriginalExpr())
+    return true;
+
+  auto &DC = cs.DC;
+  auto &ctx = cs.getASTContext();
+
+  // Slots for expression and variable are going to be filled via
+  // synthesizing ~= operator application.
+  auto *EP = new (ctx) ExprPattern(pattern->getUnresolvedOriginalExpr(),
+                                   /*matchExpr=*/nullptr, /*matchVar=*/nullptr);
+
+  auto tildeEqualsApplication =
+      TypeChecker::synthesizeTildeEqualsOperatorApplication(EP, DC, enumTy);
+
+  if (!tildeEqualsApplication)
+    return true;
+
+  VarDecl *matchVar;
+  Expr *matchCall;
+
+  std::tie(matchVar, matchCall) = *tildeEqualsApplication;
+
+  // result of ~= operator is always a `Bool`.
+  auto target = SolutionApplicationTarget::forExprPattern(
+      matchCall, DC, EP, ctx.getBoolDecl()->getDeclaredInterfaceType());
+
+  DiagnosticTransaction diagnostics(ctx.Diags);
+  {
+    if (cs.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true,
+                          /*leaveClosureBodyUnchecked=*/false)) {
+      // Skip diagnostics if they are disabled, otherwise it would result in
+      // duplicate diagnostics, since this operation is going to be repeated
+      // in diagnostic mode.
+      if (!cs.shouldAttemptFixes())
+        diagnostics.abort();
+
+      return true;
+    }
+  }
+
+  cs.generateConstraints(target, FreeTypeVariableBinding::Disallow);
+
+  // Sub-expression associated with expression pattern is the enum element
+  // access which needs to be connected to the provided element type.
+  cs.addConstraint(ConstraintKind::Conversion, cs.getType(EP->getSubExpr()),
+                   elementTy, cs.getConstraintLocator(EP));
+
+  // Store the $match variable and binary expression for solution application.
+  EP->setMatchVar(matchVar);
+  EP->setMatchExpr(matchCall);
+  EP->setType(enumTy);
+
+  cs.setSolutionApplicationTarget(pattern, target);
+
+  return false;
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     ConstraintKind kind, Type baseTy, DeclNameRef member, Type memberTy,
     DeclContext *useDC, FunctionRefKind functionRefKind,
@@ -8847,6 +8910,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   if (auto *fix = SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
           *this, kind, baseObjTy, member, functionRefKind, result, locator)) {
     (void)recordFix(fix);
+  }
+
+  // If there were no results from a direct enum lookup, let's attempt
+  // to resolve this member via ~= operator application.
+  if (candidates.empty()) {
+    if (auto patternLoc =
+            locator->getLastElementAs<LocatorPathElt::PatternMatch>()) {
+      if (auto *enumElement =
+              dyn_cast<EnumElementPattern>(patternLoc->getPattern())) {
+        auto enumType = baseObjTy->getMetatypeInstanceType();
+
+        // If the synthesis of ~= resulted in errors (i.e. broken stdlib)
+        // that would be diagnosed inline, so let's just fall through and
+        // let this situation be diagnosed as a missing member.
+        auto hadErrors = inferEnumMemberThroughTildeEqualsOperator(
+            *this, enumElement, enumType, memberTy, locator);
+
+        // Let's consider current member constraint solved because it's
+        // replaced by a new set of constraints that would resolve member
+        // type.
+        if (!hadErrors)
+          return SolutionKind::Solved;
+      }
+    }
   }
 
   if (!candidates.empty()) {
