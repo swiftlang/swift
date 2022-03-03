@@ -581,7 +581,8 @@ void swift::addImageProtocolConformanceBlockCallbackUnsafe(
             ConformanceSection{conformances, conformancesSize});
       return;
 #if DYLD_FIND_PROTOCOL_ON_DISK_CONFORMANCE_DEFINED
-    } else if (_dyld_has_preoptimized_swift_protocol_conformances(
+    } else if (&_dyld_has_preoptimized_swift_protocol_conformances &&
+               _dyld_has_preoptimized_swift_protocol_conformances(
                    reinterpret_cast<const mach_header *>(baseAddress))) {
       // dyld may optimize images outside the shared cache. Skip those too.
       DYLD_CONFORMANCES_LOG(
