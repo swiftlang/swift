@@ -859,7 +859,7 @@ namespace {
       }
 
       if (D->isDistributed()) {
-        OS << " distributed";
+        PrintWithColorRAII(OS, ExprModifierColor) << " distributed";
       }
 
       if (auto fac = D->getForeignAsyncConvention()) {
