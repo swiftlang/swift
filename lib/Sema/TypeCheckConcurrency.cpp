@@ -3076,7 +3076,6 @@ namespace {
         if (nominal && nominal->isDistributedActor()) {
           auto funcDecl = dyn_cast<AbstractFunctionDecl>(member);
           if (funcDecl && !funcDecl->isStatic()) {
-            fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
             member->diagnose(diag::distributed_actor_isolated_method);
             return true;
           }

@@ -9,6 +9,15 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
-distributed actor Worker<WorkItem: Codable> {
-  distributed func test(item: WorkItem) {}
+typealias Message = Sendable & Codable
+
+distributed actor GreeterX<A: Message> {
+  distributed func generic<V: Message>(_ value: V) -> String {
+    return "\(value)"
+  }
+
+  distributed func generic2<B: Message>(
+    strict: Double, _ value: A, _ bs: [B]) -> String {
+    return "\(value) \(bs)"
+  }
 }

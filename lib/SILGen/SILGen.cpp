@@ -846,9 +846,13 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     PrettyStackTraceSILFunction X("silgen emitDistributedThunk", f);
     f->setBare(IsBare);
     f->setThunk(IsThunk);
+    f->setIsDistributed();
 
-    // FIXME(distributed): can we delete this that we now emit the thunk elsewhere in AST?
-    SILGenFunction(*this, *f, dc).emitDistributedThunk(constant); // TODO: remove
+    assert(constant.isDistributedThunk());
+    fprintf(stderr, "[%s:%d] (%s) IS THUNK ===== %d\n", __FILE__, __LINE__, __FUNCTION__,
+            constant.isDistributedThunk());
+    SILGenFunction(*this, *f, constant.getFuncDecl())
+        .emitFunction(constant.getFuncDecl());
 
     postEmitFunction(constant, f);
     return;
@@ -1398,12 +1402,16 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 
   if (AFD->isDistributed()) {
-    auto thunk = AFD->getDistributedThunk();
+    auto thunkDecl = AFD->getDistributedThunk();
+
     fprintf(stderr, "[%s:%d] (%s) THUNK::::::::::::::::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
-    thunk->dump();
+    thunkDecl->dump();
     fprintf(stderr, "[%s:%d] (%s) ::::::::::::THUNK::::::::::::::::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
-//    auto thunk = SILDeclRef(AFD).asDistributed();
-//    emitDistributedThunk(thunk);
+
+    auto thunk = SILDeclRef(thunkDecl).asDistributed();
+    emitFunctionDefinition(
+        SILDeclRef(thunkDecl).asDistributed(),
+        getFunction(thunk, ForDefinition));
   }
 
   if (AFD->isBackDeployed()) {

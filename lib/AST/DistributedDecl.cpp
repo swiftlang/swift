@@ -95,8 +95,7 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
   llvm_unreachable("Unable to fetch ActorSystem type!");
 }
 
-Type swift::getDistributedActorSystemType(ClassDecl *actor) {
-//  assert(!isa<ProtocolDecl>(nominal) && "FIXME: we should deal with it here too or collapse the two impls");
+Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   assert(actor->isDistributedActor());
   auto &C = actor->getASTContext();
   auto *DC = actor->getDeclContext();

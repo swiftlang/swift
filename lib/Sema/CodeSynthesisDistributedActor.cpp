@@ -37,7 +37,8 @@ using namespace swift;
 /******************************************************************************/
 
 static DeclName createDistributedFuncName(ASTContext &C, FuncDecl* func) {
-  std::string localFuncNameString = "$dist_";
+//  std::string localFuncNameString = "$dist_";
+  std::string localFuncNameString = "";
   localFuncNameString.append(std::string(func->getBaseName().getIdentifier().str()));
   auto thunkBaseName = DeclBaseName(C.getIdentifier(StringRef(localFuncNameString)));
   return DeclName(C, thunkBaseName, func->getParameters());
@@ -129,9 +130,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   auto selfDecl = thunk->getImplicitSelfDecl();
   selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(/*implicit=*/true));
   auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
-//  fprintf(stderr, "[%s:%d] (%s) FORCE KNOWN TO BE LOCAL: \n", __FILE__, __LINE__, __FUNCTION__);
-//  selfDecl->dump();
-//  selfRefExpr->dump();
 
   // === return type
   Type returnTy = func->getResultInterfaceType();
@@ -145,11 +143,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   assert(systemDecl);
   auto systemConfRef = module->lookupConformance(systemTy, DAS);
   assert(systemConfRef && "ActorSystem must conform to DistributedActorSystem");
-
-  auto systemProperty = nominal->getDistributedActorSystemProperty();
-  auto systemRefExpr = new (C)
-      MemberRefExpr(selfRefExpr, sloc, ConcreteDeclRef(systemProperty),
-                    dloc, implicit);
 
   // === ActorSystem.InvocationEncoder
   ProtocolDecl *DTIE = C.getDistributedTargetInvocationEncoderDecl();
@@ -193,6 +186,28 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   // === remote branch  --------------------------------------------------------
   SmallVector<ASTNode, 8> remoteBranchStmts;
+  // --- self.actorSystem
+  auto systemProperty = nominal->getDistributedActorSystemProperty();
+  auto systemRefExpr =
+      UnresolvedDotExpr::createImplicit(
+          C, new (C) DeclRefExpr(selfDecl, dloc, implicit), //  TODO: make createImplicit
+          C.Id_actorSystem);
+
+  VarDecl *systemVar =
+      new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
+                      C.getIdentifier("system"), thunk);
+  systemVar->setInterfaceType(systemProperty->getInterfaceType());
+  systemVar->setImplicit();
+  systemVar->setSynthesized();
+
+  Pattern *systemPattern = NamedPattern::createImplicit(C, systemVar);
+
+  auto systemPB = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, systemPattern, systemRefExpr,
+      thunk);
+
+  remoteBranchStmts.push_back(systemPB);
+  remoteBranchStmts.push_back(systemVar);
 
   // --- invocationEncoder = system.makeInvocationEncoder()
   VarDecl *invocationVar =
@@ -208,7 +223,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     FuncDecl *makeInvocationEncoderDecl =
         C.getMakeInvocationEncoderOnDistributedActorSystem(func);
     auto makeInvocationExpr = UnresolvedDotExpr::createImplicit(
-        C, systemRefExpr, makeInvocationEncoderDecl->getName());
+        C, new (C) DeclRefExpr(ConcreteDeclRef(systemVar), dloc, implicit),
+        makeInvocationEncoderDecl->getName());
     auto *makeInvocationArgs = ArgumentList::createImplicit(C, {});
     auto makeInvocationCallExpr =
         CallExpr::createImplicit(C, makeInvocationExpr, makeInvocationArgs);
@@ -223,7 +239,41 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   }
 
   // --- Recording invocation details
-  // -- recordArgument
+  // -- recordGenericSubstitution(s)
+  if (func->isGeneric() || nominal->isGeneric()) {
+    auto recordGenericSubstitutionDecl =
+        C.getRecordGenericSubstitutionOnDistributedInvocationEncoder(invocationEncoderDecl);
+    assert(recordGenericSubstitutionDecl);
+    auto recordGenericSubstitutionDeclRef =
+        UnresolvedDeclRefExpr::createImplicit(
+            C, recordGenericSubstitutionDecl->getName());
+
+    auto sig = func->getGenericSignature();
+    for (auto genParamType : sig.getGenericParams()) {
+
+      auto subTypeExpr = new (C) DotSelfExpr(
+          TypeExpr::createImplicit(thunk->mapTypeIntoContext(genParamType), C),
+          sloc, sloc, thunk->mapTypeIntoContext(genParamType));
+
+      auto recordGenericSubArgsList =
+          ArgumentList::forImplicitCallTo(
+              recordGenericSubstitutionDeclRef->getName(),
+              {subTypeExpr},
+              C);
+
+      Expr *recordGenericSub =
+          CallExpr::createImplicit(C,
+              UnresolvedDotExpr::createImplicit(C,
+                  new (C) DeclRefExpr(ConcreteDeclRef(invocationVar), dloc, implicit, AccessSemantics::Ordinary),
+                  recordGenericSubstitutionDecl->getName()),
+                  recordGenericSubArgsList);
+      recordGenericSub = TryExpr::createImplicit(C, sloc, recordGenericSub);
+
+      remoteBranchStmts.push_back(recordGenericSub);
+    }
+  }
+
+  // -- recordArgument(s)
   {
     auto recordArgumentDecl =
         C.getRecordArgumentOnDistributedInvocationEncoder(invocationEncoderDecl);
@@ -232,7 +282,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         UnresolvedDeclRefExpr::createImplicit(C, recordArgumentDecl->getName());
 
     for (auto param : *thunk->getParameters()) {
-      param->getDeclContext()->getAsDecl()->dump();
       auto recordArgArgsList = ArgumentList::forImplicitCallTo(
           recordArgumentDeclRef->getName(),
           {
@@ -244,7 +293,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       auto tryRecordArgExpr = TryExpr::createImplicit(C, sloc,
         CallExpr::createImplicit(C,
           UnresolvedDotExpr::createImplicit(C,
-          // UnresolvedDeclRefExpr::createImplicit(C, invocationVar->getName()),
           new (C) DeclRefExpr(ConcreteDeclRef(invocationVar), dloc, implicit, AccessSemantics::Ordinary),
           recordArgumentDecl->getName()),
           recordArgArgsList));
@@ -253,20 +301,14 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     }
   }
 
-  // Error.self
-  auto errorDecl = C.getErrorDecl();
-  auto *errorTypeExpr = new (C) DotSelfExpr(
-      UnresolvedDeclRefExpr::createImplicit(C, errorDecl->getName()), sloc,
-      sloc, errorDecl->getDeclaredInterfaceType());
-
-  // Never.self
-  auto neverDecl = C.getNeverDecl();
-  auto *neverTypeExpr = new (C) DotSelfExpr(
-      UnresolvedDeclRefExpr::createImplicit(C, neverDecl->getName()), sloc,
-      sloc, neverDecl->getDeclaredInterfaceType());
-
   // -- recordErrorType
   if (func->hasThrows()) {
+    // Error.self
+    auto errorDecl = C.getErrorDecl();
+    auto *errorTypeExpr = new (C) DotSelfExpr(
+        UnresolvedDeclRefExpr::createImplicit(C, errorDecl->getName()), sloc,
+        sloc, errorDecl->getDeclaredInterfaceType());
+
     auto recordErrorDecl = C.getRecordErrorTypeOnDistributedInvocationEncoder(
         invocationEncoderDecl);
     assert(recordErrorDecl);
@@ -287,14 +329,14 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     remoteBranchStmts.push_back(tryRecordErrorTyExpr);
   }
 
-  // Result.self
-  auto resultType = func->getResultInterfaceType();
-  auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
-  auto *resultTypeExpr =
-      new (C) DotSelfExpr(metaTypeRef, sloc, sloc, resultType);
-
   // -- recordReturnType
   if (!isVoidReturn) {
+    // Result.self
+    auto resultType = func->getResultInterfaceType();
+    auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
+    auto *resultTypeExpr =
+        new (C) DotSelfExpr(metaTypeRef, sloc, sloc, resultType);
+
     auto recordReturnTypeDecl =
         C.getRecordReturnTypeOnDistributedInvocationEncoder(
             invocationEncoderDecl);
@@ -362,10 +404,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         RCT->getDistributedRemoteCallTargetInitFunction();
     auto remoteCallTargetInitDeclRef = UnresolvedDeclRefExpr::createImplicit(
         C, remoteCallTargetInitDecl->getEffectiveFullName());
-//    remoteCallTargetInitDeclRef->setType(RCT->getInterfaceType());
 
-//    auto initTargetExpr = TypeExpr::createImplicit(
-//        RCT->getInterfaceType(), C);
     auto initTargetExpr = UnresolvedDeclRefExpr::createImplicit(
         C, RCT->getName());
     auto initTargetArgs = ArgumentList::forImplicitCallTo(
@@ -388,26 +427,49 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         C.getRemoteCallOnDistributedActorSystem(systemDecl, isVoidReturn);
     auto systemRemoteCallRef =
         UnresolvedDotExpr::createImplicit(
-            C, new (C) DeclRefExpr(systemProperty, dloc, implicit),
+            C, new (C) DeclRefExpr(ConcreteDeclRef(systemVar), dloc, implicit),
             remoteCallDecl->getName());
 
     SmallVector<Expr *, 5> args;
-    // on actor: Act
+    // -- on actor: Act
     args.push_back(new (C) DeclRefExpr(selfDecl, dloc, implicit,
                                        swift::AccessSemantics::Ordinary,
                                        selfDecl->getInterfaceType()));
-    // target: RemoteCallTarget
+    // -- target: RemoteCallTarget
     args.push_back(new (C) DeclRefExpr(ConcreteDeclRef(targetVar), dloc, implicit,
                                        AccessSemantics::Ordinary,
                                        RCT->getDeclaredInterfaceType()));
-    // invocation: inout InvocationEncoder
+    // -- invocation: inout InvocationEncoder
     args.push_back(new (C) InOutExpr(sloc,
         new (C) DeclRefExpr(ConcreteDeclRef(invocationVar), dloc,
         implicit, AccessSemantics::Ordinary, invocationEncoderTy), invocationEncoderTy, implicit));
-    // throwing: Err.Type
-    args.push_back(func->hasThrows() ? errorTypeExpr : neverTypeExpr);
-    // returning: Res.Type
+
+    // -- throwing: Err.Type
+    if (func->hasThrows()) {
+      // Error.self
+      auto errorDecl = C.getErrorDecl();
+      auto *errorTypeExpr = new (C) DotSelfExpr(
+          UnresolvedDeclRefExpr::createImplicit(C, errorDecl->getName()), sloc,
+          sloc, errorDecl->getDeclaredInterfaceType());
+
+      args.push_back(errorTypeExpr);
+    } else {
+      // Never.self
+      auto neverDecl = C.getNeverDecl();
+      auto *neverTypeExpr = new (C) DotSelfExpr(
+          UnresolvedDeclRefExpr::createImplicit(C, neverDecl->getName()), sloc,
+          sloc, neverDecl->getDeclaredInterfaceType());
+      args.push_back(neverTypeExpr);
+    }
+
+    // -- returning: Res.Type
     if (!isVoidReturn) {
+      // Result.self
+      auto resultType = func->getResultInterfaceType();
+      auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
+      auto *resultTypeExpr =
+          new (C) DotSelfExpr(metaTypeRef, sloc, sloc, resultType);
+
       args.push_back(resultTypeExpr);
     }
 
@@ -449,10 +511,22 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 
   DeclName thunkName = createDistributedFuncName(C, func);
 
+  // --- Prepare generic parameters
   GenericParamList *genericParamList = nullptr;
   if (auto genericParams = func->getGenericParams()) {
+    for (auto genParam : *genericParams) {
+      fprintf(stderr, "[%s:%d] (%s) GENERIC PARAM:\n", __FILE__, __LINE__, __FUNCTION__);
+      genParam->dump();
+    }
     genericParamList = genericParams->clone(DC);
   }
+
+  GenericSignature thunkGenSig =
+      buildGenericSignature(C, func->getGenericSignature(),
+                            /*addedParameters=*/{},
+                            /*addedRequirements=*/{});
+
+  // --- Prepare parameters
   auto funcParams = func->getParameters();
   SmallVector<ParamDecl*, 2> paramDecls;
   for (auto i : indices(*func->getParameters())) {
@@ -480,9 +554,22 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
                            DC);
   thunk->setSynthesized(true);
   thunk->getAttrs().add(new (C) NonisolatedAttr(/*implicit=*/true));
-  thunk->setGenericSignature(func->getGenericSignature());
+  fprintf(stderr, "[%s:%d] (%s) FUNC GEN SIG:\n", __FILE__, __LINE__, __FUNCTION__);
+  func->getGenericSignature().dump();
+  thunk->setGenericSignature(thunkGenSig);
+  fprintf(stderr, "[%s:%d] (%s) THUNK GEN SIG:\n", __FILE__, __LINE__, __FUNCTION__);
+  thunk->getGenericSignature().dump();
+  for (auto req : thunk->getGenericRequirements()) {
+    req.dump();
+  }
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
   thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
+
+  fprintf(stderr, "[%s:%d] (%s) THE DECL::::::\n", __FILE__, __LINE__, __FUNCTION__);
+  thunk->dump();
+  fprintf(stderr, "[%s:%d] (%s) ORIGINAL ::::::\n", __FILE__, __LINE__, __FUNCTION__);
+  func->dump();
+
 
   return thunk;
 }
@@ -505,41 +592,11 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
     if (!C.getLoadedModule(C.Id_Distributed))
       return nullptr;
 
-    NominalTypeDecl *nominal = dyn_cast<NominalTypeDecl>(DC);
-    if (!nominal) nominal = func->getSelfNominalTypeDecl();
+    auto nominal = DC->getSelfNominalTypeDecl(); // NOTE: Always from DC
     assert(nominal);
 
-    fprintf(stderr, "[%s:%d] (%s) CONTEXT\n", __FILE__, __LINE__, __FUNCTION__);
-    nominal->getModuleScopeContext()->dumpContext();
-
     // --- Prepare the "distributed thunk" which does the "maybe remote" dance:
-    // TypeChecker::typeCheckDecl(func);
     auto distributedThunk = createDistributedThunkFunction(func);
-
-    // Add the thunk to:
-    // - a new extension made just for the thunk, if the type is a protocol
-    // - directly to the nominal otherwise
-    if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-      auto extension = ExtensionDecl::create(
-          C, SourceLoc(),
-          nullptr, /*inheritedEntity*/{},
-          nominal->getDeclContext(),
-          TrailingWhereClause::create(C, SourceLoc(), SourceLoc(), {}));
-      nominal->addExtension(extension);
-      extension->setExtendedNominal(nominal);
-
-      extension->addMember(distributedThunk);
-
-      fprintf(stderr, "[%s:%d] (%s) CONTEXT\n", __FILE__, __LINE__, __FUNCTION__);
-      nominal->getModuleScopeContext()->dumpContext();
-
-      if (auto file = dyn_cast<FileUnit>(nominal->getModuleScopeContext()))
-        file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
-
-    } else {
-      nominal->addMember(distributedThunk,
-                         /*hint (insert directly after)=*/func);
-    }
 
     return distributedThunk;
   }
@@ -568,11 +625,11 @@ VarDecl *GetDistributedActorIDPropertyRequest::evaluate(
 
 
 VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
-    Evaluator &evaluator, NominalTypeDecl *actor) const {
-  auto &C = actor->getASTContext();
-  auto module = actor->getParentModule();
+    Evaluator &evaluator, NominalTypeDecl *nominal) const {
+  auto &C = nominal->getASTContext();
+  auto module = nominal->getParentModule();
 
-  auto DAS = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
+  auto DAS = C.getDistributedActorSystemDecl();
   auto f = DAS->lookupDirect(C.Id_makeInvocationEncoder);
 
   // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
@@ -580,27 +637,16 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   if (!C.getLoadedModule(C.Id_Distributed))
     return nullptr;
 
-  auto classDecl = dyn_cast<ClassDecl>(actor);
-  if (!classDecl)
+  if (!nominal->isDistributedActor())
     return nullptr;
 
-  if (!actor->isDistributedActor())
-    return nullptr;
-
-  auto expectedSystemType = getDistributedActorSystemType(classDecl);
-  auto DistSystemProtocol =
-      C.getProtocol(KnownProtocolKind::DistributedActorSystem);
-
-  if (auto proto = dyn_cast<ProtocolDecl>(actor)) {
-    if (auto systemAssocTyDecl = proto->getAssociatedType(C.Id_ActorSystem)) {
-      assert(false && "handling assoc type in protocol not handled");
-    }
-
+  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
     auto DistributedActorProto = C.getDistributedActorDecl();
     for (auto system : DistributedActorProto->lookupDirect(C.Id_actorSystem)) {
       if (auto var = dyn_cast<VarDecl>(system)) {
-        auto conformance = module->conformsToProtocol(var->getInterfaceType(),
-                                                      DistSystemProtocol);
+        auto conformance = module->conformsToProtocol(
+            proto->mapTypeIntoContext(var->getInterfaceType()),
+            DAS);
 
         if (conformance.isInvalid())
           continue;
@@ -612,10 +658,10 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     return nullptr;
   }
 
-  for (auto system : actor->lookupDirect(C.Id_actorSystem)) {
+  for (auto system : nominal->lookupDirect(C.Id_actorSystem)) {
     if (auto var = dyn_cast<VarDecl>(system)) {
-      auto conformance = module->conformsToProtocol(var->getInterfaceType(),
-                                                    DistSystemProtocol);
+      auto conformance = module->conformsToProtocol(
+          var->getInterfaceType(), DAS);
       if (conformance.isInvalid())
         continue;
 

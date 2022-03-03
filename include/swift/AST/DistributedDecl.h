@@ -37,7 +37,7 @@ class NominalTypeDecl;
 Type getConcreteReplacementForProtocolActorSystemType(ValueDecl *member);
 
 /// Determine the `ActorSystem` type for the given actor.
-Type getDistributedActorSystemType(ClassDecl *actor);
+Type getDistributedActorSystemType(NominalTypeDecl *actor);
 
 /// Determine the `ID` type for the given actor.
 Type getDistributedActorIDType(NominalTypeDecl *actor);
