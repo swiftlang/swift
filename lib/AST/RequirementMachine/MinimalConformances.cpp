@@ -418,16 +418,25 @@ void MinimalConformances::collectConformanceRules() {
 
   // Sort the list of conformance rules in reverse order; we're going to try
   // to minimize away less canonical rules first.
-  std::sort(ConformanceRules.begin(), ConformanceRules.end(),
-            [&](unsigned lhs, unsigned rhs) -> bool {
-              const auto &lhsRule = System.getRule(lhs);
-              const auto &rhsRule = System.getRule(rhs);
+  std::stable_sort(ConformanceRules.begin(), ConformanceRules.end(),
+                   [&](unsigned lhs, unsigned rhs) -> bool {
+                     const auto &lhsRule = System.getRule(lhs);
+                     const auto &rhsRule = System.getRule(rhs);
 
-              if (lhsRule.isExplicit() != rhsRule.isExplicit())
-                return !lhsRule.isExplicit();
+                     if (lhsRule.isExplicit() != rhsRule.isExplicit())
+                       return !lhsRule.isExplicit();
 
-              return *lhsRule.getLHS().compare(rhsRule.getLHS(), Context) > 0;
-            });
+                     auto result = lhsRule.getLHS().compare(rhsRule.getLHS(), Context);
+
+                     // Concrete conformance rules are unordered if they name the
+                     // same protocol but have different types. This can come up
+                     // if we have a class inheritance relationship 'Derived : Base',
+                     // and Base conforms to a protocol:
+                     //
+                     //     T.[Base : P] => T
+                     //     T.[Derived : P] => T
+                     return (result ? *result > 0 : 0);
+                   });
 
   Context.ConformanceRulesHistogram.add(ConformanceRules.size());
 }
