@@ -1572,8 +1572,6 @@ namespace  {
     UNINTERESTING_ATTR(TypeSequence)
     UNINTERESTING_ATTR(CompileTimeConst)
 
-    UNINTERESTING_ATTR(PrimaryAssociatedType)
-
     UNINTERESTING_ATTR(BackDeploy)
 
     UNINTERESTING_ATTR(UnsafeInheritExecutor)

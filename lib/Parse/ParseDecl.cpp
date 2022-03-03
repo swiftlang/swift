@@ -8040,8 +8040,7 @@ ParserStatus Parser::parsePrimaryAssociatedTypes(
     AssocType->getAttrs() = Attrs;
     if (!Inherited.empty())
       AssocType->setInherited(Context.AllocateCopy(Inherited));
-    AssocType->getAttrs().add(new (Context) PrimaryAssociatedTypeAttr(
-        /*Implicit=*/true));
+    AssocType->setPrimary();
 
     AssocTypes.push_back(AssocType);
 
