@@ -33,6 +33,24 @@ using namespace swift;
 
 
 /******************************************************************************/
+/****************************** UTILS *****************************************/
+/******************************************************************************/
+
+static DeclName createLocalFuncName(ASTContext &C, FuncDecl* func) {
+  std::string localFuncNameString = "$local_";
+  localFuncNameString.append(std::string(func->getBaseName().getIdentifier().str()));
+  auto thunkBaseName = DeclBaseName(C.getIdentifier(StringRef(localFuncNameString)));
+  return DeclName(C, thunkBaseName, func->getParameters());
+}
+
+static DeclName createDistributedFuncName(ASTContext &C, FuncDecl* func) {
+  std::string localFuncNameString = "$dist_";
+  localFuncNameString.append(std::string(func->getBaseName().getIdentifier().str()));
+  auto thunkBaseName = DeclBaseName(C.getIdentifier(StringRef(localFuncNameString)));
+  return DeclName(C, thunkBaseName, func->getParameters());
+}
+
+/******************************************************************************/
 /************************ PROPERTY SYNTHESIS **********************************/
 /******************************************************************************/
 
@@ -113,8 +131,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   const DeclNameLoc dloc = DeclNameLoc();
 
   auto func = static_cast<FuncDecl *>(context);
-  if (!(func && func->isDistributed())) func->dump();
-  assert(func && func->isDistributed() && "base for distributed thunk must be 'distributed'");
   auto funcDC = func->getDeclContext();
   assert(funcDC && "Function must be part of distributed actor");
   NominalTypeDecl *nominal = funcDC->getSelfNominalTypeDecl();
@@ -437,24 +453,12 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
   auto module = func->getParentModule();
-  TypeChecker::typeCheckDecl(func);
-
-  NominalTypeDecl *nominal;
-  if (auto actor = dyn_cast<NominalTypeDecl>(DC)) {
-    nominal = actor;
-  } else {
-    nominal = func->getSelfNominalTypeDecl();
-  }
-  assert(nominal);
 
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(func);
-  if (!systemTy)
-    assert(false);
+  assert(systemTy &&
+         "Thunk synthesis must have concrete actor system type available");
 
-  std::string thunkNameString = "$dist_";
-  thunkNameString.append(std::string(func->getBaseName().getIdentifier().str()));
-  auto thunkBaseName = DeclBaseName(C.getIdentifier(StringRef(thunkNameString)));
-  DeclName thunkName = DeclName(C, thunkBaseName, func->getParameters());
+  DeclName thunkName = createDistributedFuncName(C, func);
 
   GenericParamList *genericParamList = nullptr;
   if (auto genericParams = func->getGenericParams()) {
@@ -494,6 +498,66 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   return thunk;
 }
 
+static FuncDecl *createDistributedLocalFuncFunction(FuncDecl *func) {
+  auto &C = func->getASTContext();
+  auto DC = func->getDeclContext();
+  auto module = func->getParentModule();
+  TypeChecker::typeCheckDecl(func);
+
+  DeclName thunkName = createLocalFuncName(C, func);
+
+  GenericParamList *genericParamList = nullptr;
+  if (auto genericParams = func->getGenericParams()) {
+    genericParamList = genericParams->clone(DC);
+  }
+  auto funcParams = func->getParameters();
+  SmallVector<ParamDecl*, 2> paramDecls;
+  for (auto i : indices(*func->getParameters())) {
+//    auto thunkParam = params->get(i);
+    auto funcParam = funcParams->get(i);
+//    thunkParam->setInterfaceType(funcParam->getInterfaceType());
+//    thunkParam->setImplicit();
+    auto paramDecl = new (C) ParamDecl(SourceLoc(),
+                               SourceLoc(), funcParam->getArgumentName(),
+                               SourceLoc(), funcParam->getParameterName(),
+                               DC);
+    paramDecl->setImplicit(true);
+    paramDecl->setSpecifier(funcParam->getSpecifier());
+    paramDecl->setInterfaceType(funcParam->getInterfaceType());
+    paramDecls.push_back(paramDecl);
+  }
+  ParameterList *params = ParameterList::create(C, paramDecls); // = funcParams->clone(C);
+
+    auto thunk = FuncDecl::createImplicit(C, swift::StaticSpellingKind::None,
+                           thunkName, SourceLoc(),
+                           /*async=*/func->hasAsync(),
+                           /*throws=*/func->hasThrows(),
+                           genericParamList,
+                           params,
+                           func->getResultInterfaceType(),
+                           DC);
+  thunk->setSynthesized(true);
+  for (auto attr : func->getAttrs()) {
+    if (isa<DistributedActorAttr>(attr)) {
+      continue;
+    }
+  }
+  thunk->getAttrs().add(new (C) KnownToBeLocalAttr());
+  thunk->setGenericSignature(func->getGenericSignature());
+  thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
+
+  // The body of the "local" function is the same as the user defined func
+  fprintf(stderr, "[%s:%d] (%s) GET TYPECHECKED BODY\n", __FILE__, __LINE__, __FUNCTION__);
+  // The body is not type-checked yet, so we say it is Parsed.
+  thunk->setBody(func->getBody(), swift::AbstractFunctionDecl::BodyKind::Parsed);
+
+  fprintf(stderr, "[%s:%d] (%s) LOCAL FUNC LOCAL FUNC LOCAL FUNC LOCAL FUNC LOCAL FUNC \n", __FILE__, __LINE__, __FUNCTION__);
+  thunk->dump();
+  fprintf(stderr, "[%s:%d] (%s) LOCAL FUNC LOCAL FUNC LOCAL FUNC LOCAL FUNC LOCAL FUNC \n", __FILE__, __LINE__, __FUNCTION__);
+
+  return thunk;
+}
+
 /******************************************************************************/
 /************************ SYNTHESIS ENTRY POINT *******************************/
 /******************************************************************************/
@@ -505,10 +569,6 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
 
   auto &C = afd->getASTContext();
   auto DC = afd->getDeclContext();
-  if (isa<ProtocolDecl>(DC)) {
-    // don't synthesize thunks for protocols
-    return nullptr;
-  }
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
@@ -516,7 +576,55 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
     if (!C.getLoadedModule(C.Id_Distributed))
       return nullptr;
 
-    return createDistributedThunkFunction(func);
+    NominalTypeDecl *nominal = dyn_cast<NominalTypeDecl>(DC);
+    if (!nominal) nominal = func->getSelfNominalTypeDecl();
+    assert(nominal);
+    if (isa<ProtocolDecl>(nominal)) {
+      // don't synthesize thunks for protocols.
+      // there's no place to put the thunk there anyway
+      return nullptr;
+    }
+
+    for (auto a : func->getAttrs()) {
+      fprintf(stderr, "[%s:%d] (%s) ATTR: %s\n", __FILE__, __LINE__, __FUNCTION__, a->getAttrName().str().c_str());
+    }
+
+    // THE RENAME TRICKERY
+//    {
+//      auto localFuncName = createLocalFuncName(C, func);
+//      func->setName(localFuncName);
+//
+//      // remove the distributed marker, this is a plain actor "local" function now
+//      auto distributedFuncAttr = func->getAttrs().getAttribute<DistributedActorAttr>();
+//      func->getAttrs().removeAttribute(distributedFuncAttr);
+//
+//      fprintf(stderr, "[%s:%d] (%s) LOCAL FUNC: \n", __FILE__, __LINE__, __FUNCTION__);
+//      func->dump();
+//      // auto localFunc = createDistributedLocalFuncFunction(func);
+//    }
+
+    // --- Prepare the "local func"
+    // Force type-checking the body of the user-defined func since we'll copy it
+    // over to the "local func"
+    TypeChecker::typeCheckDecl(func);
+    auto localFunc = createDistributedLocalFuncFunction(func);
+
+    // --- Prepare the "distributed thunk" which does the "maybe remote" dance:
+    //     if remote { <remoteCall> } else { localFunc(...) }
+    auto distributedThunk = createDistributedThunkFunction(localFunc);
+
+    TypeChecker::typeCheckDecl(localFunc); // forces getting the body of the user-defined function
+    localFunc->dump();
+
+    // add the new functions
+    nominal->addMember(distributedThunk, /*hint (insert directly after)=*/func);
+    nominal->addMember(localFunc, /*hint (insert directly after)=*/distributedThunk);
+
+    fprintf(stderr, "[%s:%d] (%s) THE ACTOR ACTOR ACTOR ACTOR ACTOR ACTOR \n", __FILE__, __LINE__, __FUNCTION__);
+    nominal->dump();
+    fprintf(stderr, "[%s:%d] (%s) THE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
+
+    return distributedThunk;
   }
 
   llvm_unreachable("Unable to synthesize distributed thunk");

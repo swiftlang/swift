@@ -454,7 +454,7 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   assert(func->isDistributed());
 
   auto &C = func->getASTContext();
-  auto declContext = func->getDeclContext();
+  auto DC = func->getDeclContext();
   auto module = func->getParentModule();
 
   /// If no distributed module is available, then no reason to even try checks.
@@ -464,10 +464,10 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   // === All parameters and the result type must conform
   // SerializationRequirement
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationRequirements;
-  if (auto extension = dyn_cast<ExtensionDecl>(declContext)) {
+  if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
     serializationRequirements = extractDistributedSerializationRequirements(
         C, extension->getGenericRequirements());
-  } else if (auto actor = dyn_cast<ClassDecl>(declContext)) {
+  } else if (auto actor = dyn_cast<ClassDecl>(DC)) {
     auto systemProp = actor->getDistributedActorSystemProperty();
     serializationRequirements = getDistributedSerializationRequirementProtocols(
         systemProp->getInterfaceType()->getAnyNominal(),

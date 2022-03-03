@@ -1120,8 +1120,11 @@ public:
 
     // Otherwise, we have a statically-dispatched call.
     auto constant = SILDeclRef(e->getDecl());
-    if (callSite && callSite->shouldApplyDistributedThunk()) {
-      constant = constant.asDistributed(true);
+//    if (callSite && callSite->shouldApplyDistributedThunk()) {
+//      constant = constant.asDistributed(true);
+//    } else
+    if (callSite && callSite->shouldApplyDistributedLocalThunk()) {
+      constant = constant.asDistributedKnownToBeLocal(true);
     } else if (afd->isBackDeployed()) {
       // If we're calling a back deployed function then we need to call a
       // thunk instead that will handle the fallback when the original

@@ -858,6 +858,9 @@ namespace {
         D->getCaptureInfo().print(OS);
       }
 
+      if (D->getAttrs().hasAttribute<NonisolatedAttr>()) {
+        PrintWithColorRAII(OS, ExprModifierColor) << " nonisolated";
+      }
       if (D->isDistributed()) {
         PrintWithColorRAII(OS, ExprModifierColor) << " distributed";
       }

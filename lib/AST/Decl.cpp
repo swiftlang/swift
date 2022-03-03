@@ -6369,6 +6369,10 @@ bool VarDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
+bool VarDecl::isKnownToBeLocal() const {
+  return getAttrs().hasAttribute<KnownToBeLocalAttr>();
+}
+
 bool VarDecl::isOrdinaryStoredProperty() const {
   // we assume if it hasAttachedPropertyWrapper, it has no storage.
   //
