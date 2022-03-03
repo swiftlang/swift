@@ -748,6 +748,9 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " lazy";
       printStorageImpl(VD);
       printAccessors(VD);
+      if (VD->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+        OS << " known-to-be-local";
+      }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -896,6 +899,9 @@ namespace {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ParameterColor) << "parameter ";
+      if (P->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+        OS << "known-to-be-local ";
+      }
       printDeclName(P);
       if (!P->getArgumentName().empty())
         PrintWithColorRAII(OS, IdentifierColor)
@@ -1318,6 +1324,10 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
   } else {
     auto moduleName = cast<ModuleDecl>(this)->getRealName();
     os << moduleName;
+  }
+
+  if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+    os << " known-to-be-local";
   }
 
   // Print location.

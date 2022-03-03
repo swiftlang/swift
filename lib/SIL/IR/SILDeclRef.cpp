@@ -122,11 +122,11 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
-                       bool isDistributed, bool isDistributedKnownToBeLocal,
+                       bool isDistributed, bool isKnownToBeLocal,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
     : loc(vd), kind(kind), isForeign(isForeign), 
-      isDistributed(isDistributed), isKnownToBeLocal(isDistributedKnownToBeLocal),
+      isDistributed(isDistributed), isKnownToBeLocal(isKnownToBeLocal),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
       pointer(derivativeId) {}
 
@@ -172,7 +172,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
 
   isForeign = asForeign;
   isDistributed = asDistributed;
-  isDistributedKnownToBeLocal = asDistributedKnownToBeLocal;
+  isKnownToBeLocal = asDistributedKnownToBeLocal;
 }
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,

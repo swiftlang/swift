@@ -187,7 +187,7 @@ struct SILDeclRef {
   /// True if this references a distributed function.
   unsigned isDistributed : 1;
   /// True if this references a distributed function, but it is known to be local
-  unsigned isDistributedKnownToBeLocal : 1;
+  unsigned isKnownToBeLocal : 1;
   /// The BackDeploymentKind of this SILDeclRef.
   BackDeploymentKind backDeploymentKind : 2;
   /// The default argument index for a default argument getter.
@@ -225,7 +225,7 @@ struct SILDeclRef {
   /// Produces a null SILDeclRef.
   SILDeclRef()
       : loc(), kind(Kind::Func), isForeign(0), 
-        isDistributed(0), isDistributedKnownToBeLocal(0),
+        isDistributed(0), isKnownToBeLocal(0),
         backDeploymentKind(BackDeploymentKind::None), defaultArgIndex(0) {}
 
   /// Produces a SILDeclRef of the given kind for the given decl.
@@ -431,6 +431,7 @@ struct SILDeclRef {
                       /*foreign=*/false,
                       /*distributed=*/false,
                       /*distributedKnownToBeLocal=*/isLocal,
+                      backDeploymentKind,
                       defaultArgIndex,
                       pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
   }
@@ -440,6 +441,7 @@ struct SILDeclRef {
     return SILDeclRef(loc.getOpaqueValue(), kind,
                       isForeign,
                       isDistributed,
+                      isKnownToBeLocal,
                       backDeploymentKind,
                       defaultArgIndex,
                       pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
@@ -618,10 +620,10 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
     unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
     unsigned h5 = PointerInfo::getHashValue(Val.pointer.getOpaqueValue());
     unsigned h6 = UnsignedInfo::getHashValue(Val.isDistributed);
-    unsigned h7 = UnsignedInfo::getHashValue(Val.isKnownToBeLocal);
-    unsigned h8 = UnsignedInfo::getHashValue(unsigned(Val.backDeploymentKind));
+    unsigned h7 = UnsignedInfo::getHashValue(unsigned(Val.backDeploymentKind));
+    unsigned h8 = UnsignedInfo::getHashValue(Val.isKnownToBeLocal);
     return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11) ^ (h6 << 8) ^
-           (ht << 10) ^ (h8 << 13); // FIXME: is this right?
+           (h7 << 10) ^ (h8 << 13); // FIXME: is this right?
   }
   static bool isEqual(swift::SILDeclRef const &LHS,
                       swift::SILDeclRef const &RHS) {

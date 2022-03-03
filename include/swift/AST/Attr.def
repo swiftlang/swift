@@ -57,6 +57,7 @@ TYPE_ATTR(async)
 TYPE_ATTR(Sendable)
 TYPE_ATTR(unchecked)
 TYPE_ATTR(_typeSequence)
+TYPE_ATTR(_local)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -720,8 +721,8 @@ DECL_ATTR(_backDeploy, BackDeploy,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
   129)
 
-CONTEXTUAL_SIMPLE_DECL_ATTR(local, KnownToBeLocal,
-  DeclModifier | OnFunc | OnVar |
+CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
+  DeclModifier | OnFunc | OnParam | OnVar |
   DistributedOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
