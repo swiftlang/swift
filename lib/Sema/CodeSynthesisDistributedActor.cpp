@@ -91,17 +91,13 @@ static VarDecl *addImplicitDistributedActorIDProperty(
 /******************************************************************************/
 
 static void forwardParameters(AbstractFunctionDecl *afd,
-                              SmallVectorImpl<Argument> &forwardingParams) {
+                              SmallVectorImpl<Expr*> &forwardingParams) {
   auto &C = afd->getASTContext();
-  auto params = afd->getParameters();
-
-  for (auto param : *params) {
-    Expr *paramRefExpr =
-        new (C) DeclRefExpr(param, DeclNameLoc(), /*implicit=*/true);
-    paramRefExpr->setType(param->getType());
-
-    auto arg = Argument(SourceLoc(), param->getArgumentName(), paramRefExpr);
-    forwardingParams.push_back(arg);
+  for (auto param : *afd->getParameters()) {
+    forwardingParams.push_back(new (C) DeclRefExpr(
+        ConcreteDeclRef(param), DeclNameLoc(), /*implicit=*/true,
+        swift::AccessSemantics::Ordinary,
+        param->getInterfaceType()));
   }
 }
 
@@ -117,6 +113,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   const DeclNameLoc dloc = DeclNameLoc();
 
   auto func = static_cast<FuncDecl *>(context);
+  if (!(func && func->isDistributed())) func->dump();
   assert(func && func->isDistributed() && "base for distributed thunk must be 'distributed'");
   auto funcDC = func->getDeclContext();
   assert(funcDC && "Function must be part of distributed actor");
@@ -170,12 +167,11 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   // === local branch ----------------------------------------------------------
   // -- forward arguments
-  SmallVector<Argument, 8> forwardingParams;
-  forwardParameters(func, forwardingParams);
-  auto forwardingArgList = ArgumentList::createImplicit(C, forwardingParams);
+  SmallVector<Expr*, 4> forwardingParams;
+  forwardParameters(thunk, forwardingParams);
+  auto funcRef = UnresolvedDeclRefExpr::createImplicit(C, func->getName());
+  auto forwardingArgList = ArgumentList::forImplicitCallTo(funcRef->getName(), forwardingParams, C);
 
-  auto localCallSubs = SubstitutionMap();
-  // auto funcDeclRef = UnresolvedDeclRefExpr::createImplicit(C, func->getBaseName());
   auto funcDeclRef =
       UnresolvedDotExpr::createImplicit(C, selfRefExpr, func->getBaseName());
   Expr *localFuncCall = CallExpr::createImplicit(C, funcDeclRef, forwardingArgList);
@@ -465,10 +461,22 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     genericParamList = genericParams->clone(DC);
   }
   auto funcParams = func->getParameters();
-  ParameterList *params = funcParams->clone(C);
+  SmallVector<ParamDecl*, 2> paramDecls;
   for (auto i : indices(*func->getParameters())) {
-    params->get(i)->setInterfaceType(funcParams->get(i)->getInterfaceType());
+//    auto thunkParam = params->get(i);
+    auto funcParam = funcParams->get(i);
+//    thunkParam->setInterfaceType(funcParam->getInterfaceType());
+//    thunkParam->setImplicit();
+    auto paramDecl = new (C) ParamDecl(SourceLoc(),
+                               SourceLoc(), funcParam->getArgumentName(),
+                               SourceLoc(), funcParam->getParameterName(),
+                               DC);
+    paramDecl->setImplicit(true);
+    paramDecl->setSpecifier(funcParam->getSpecifier());
+    paramDecl->setInterfaceType(funcParam->getInterfaceType());
+    paramDecls.push_back(paramDecl);
   }
+  ParameterList *params = ParameterList::create(C, paramDecls); // = funcParams->clone(C);
 
     auto thunk = FuncDecl::createImplicit(C, swift::StaticSpellingKind::None,
                            thunkName, SourceLoc(),
