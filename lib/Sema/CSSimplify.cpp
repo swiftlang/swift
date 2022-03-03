@@ -10120,7 +10120,8 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
       instanceTy = metaTy->getExistentialInstanceType();
     }
     assert(instanceTy->isExistentialType());
-    Type openedTy = OpenedArchetypeType::get(instanceTy->getCanonicalType());
+    Type openedTy =
+        OpenedArchetypeType::get(instanceTy->getCanonicalType(), DC);
     if (isMetatype)
       openedTy = MetatypeType::get(openedTy, getASTContext());
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
@@ -11119,7 +11120,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     if (result2->hasTypeVariable() && !openedExistentials.empty()) {
       for (const auto &opened : openedExistentials) {
         result2 = typeEraseOpenedExistentialReference(
-            result2, opened.second->getExistentialType(), opened.first);
+            result2, opened.second->getExistentialType(), opened.first, DC);
       }
     }
 

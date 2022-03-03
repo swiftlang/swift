@@ -1726,7 +1726,8 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   auto box = IGF.Builder.CreateExtractValue(result, 0);
   auto addr = IGF.Builder.CreateExtractValue(result, 1);
 
-  auto archetype = OpenedArchetypeType::get(destType.getASTType());
+  auto archetype =
+      OpenedArchetypeType::get(destType.getASTType(), IGF.IGM.getSwiftModule());
   auto &srcTI = IGF.getTypeInfoForUnlowered(AbstractionPattern(archetype),
                                             formalSrcType);
   addr = IGF.Builder.CreateBitCast(addr,

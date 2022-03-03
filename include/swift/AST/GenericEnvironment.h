@@ -157,7 +157,14 @@ public:
   GenericEnvironment *getIncomplete(GenericSignature signature);
 
   /// Create a new generic environment for an opened existential.
-  static GenericEnvironment *forOpenedExistential(Type existential, UUID uuid);
+  ///
+  /// \param existential The subject existential type
+  /// \param useDC The decl context where this existential type is being opened
+  /// \param uuid The unique identifier for this opened existential
+  static GenericEnvironment *
+  forOpenedExistential(Type existential, const DeclContext *useDC, UUID uuid);
+  static GenericEnvironment *
+  forOpenedExistential(Type existential, GenericSignature signature, UUID uuid);
 
   /// Create a new generic environment for an opaque type with the given set of
   /// outer substitutions.

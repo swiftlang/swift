@@ -1298,8 +1298,6 @@ public:
   CanGenericSignature getSingleGenericParameterSignature() const;
 
   /// Retrieve a generic signature with a single type parameter conforming
-  /// to the given protocol or composition type, like <T: type>.
-  CanGenericSignature getOpenedArchetypeSignature(Type type);
   /// to the given protocol or composition type, like <T: P>.
   ///
   /// The opened archetype may have a different set of conformances from the
@@ -1309,6 +1307,8 @@ public:
   /// particular, the opened archetype signature does not have requirements for
   /// conformances inherited from superclass constraints while existential
   /// values do.
+  CanGenericSignature getOpenedArchetypeSignature(Type type,
+                                                  const DeclContext *useDC);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);

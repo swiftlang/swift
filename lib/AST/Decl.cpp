@@ -2926,7 +2926,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                     /*topLevelFunction=*/true, isMethod,
                                     /*isInitializer=*/isa<ConstructorDecl>(afd),
                                     getNumCurryLevels())
-        ->getCanonicalType();
+        ->getMinimalCanonicalType(afd);
   }
 
   if (isa<AbstractStorageDecl>(this)) {
@@ -2942,7 +2942,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                    /*topLevelFunction=*/true,
                                    /*isMethod=*/false,
                                    /*isInitializer=*/false, getNumCurryLevels())
-              ->getCanonicalType();
+              ->getMinimalCanonicalType(getDeclContext());
     }
 
     // We want to curry the default signature type with the 'self' type of the
@@ -2950,14 +2950,14 @@ CanType ValueDecl::getOverloadSignatureType() const {
     // is unique across different contexts, such as between a protocol extension
     // and struct decl.
     return defaultSignatureType->addCurriedSelfType(getDeclContext())
-        ->getCanonicalType();
+        ->getMinimalCanonicalType(getDeclContext());
   }
 
   if (isa<EnumElementDecl>(this)) {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
         /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
-    return mappedType->getCanonicalType();
+    return mappedType->getMinimalCanonicalType(getDeclContext());
   }
 
   // Note: If you add more cases to this function, you should update the
@@ -4085,7 +4085,8 @@ GenericParameterReferenceInfo swift::findGenericParameterReferences(
 }
 
 GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
-    Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const {
+    Type baseTy, const DeclContext *useDC,
+    bool treatNonResultCovariantSelfAsInvariant) const {
   assert(baseTy->isExistentialType());
 
   // Types never refer to 'Self'.
@@ -4098,7 +4099,8 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
   if (type->hasError())
     return GenericParameterReferenceInfo();
 
-  const auto sig = getASTContext().getOpenedArchetypeSignature(baseTy);
+  const auto sig =
+      getASTContext().getOpenedArchetypeSignature(baseTy, useDC);
   auto genericParam = sig.getGenericParams().front();
   return findGenericParameterReferences(
       this, sig, genericParam, treatNonResultCovariantSelfAsInvariant, None);

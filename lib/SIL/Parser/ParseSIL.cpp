@@ -5423,8 +5423,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         return true;
 
       // Lower the type at the abstraction level of the existential.
-      auto archetype = OpenedArchetypeType::get(Val->getType().getASTType())
-                           ->getCanonicalType();
+      auto archetype =
+          OpenedArchetypeType::get(Val->getType().getASTType(),
+                                   B.getModule().getSwiftModule())
+              ->getCanonicalType();
 
       auto &F = B.getFunction();
       SILType LoweredTy =

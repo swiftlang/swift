@@ -446,8 +446,11 @@ void ExistentialTransform::populateThunkBody() {
       OpenedArchetypeType *Opened;
       auto OrigOperand = ThunkBody->getArgument(ArgDesc.Index);
       auto SwiftType = ArgDesc.Arg->getType().getASTType();
+      auto *DC = F->getDeclContext() ? F->getDeclContext() : M.getSwiftModule();
       auto OpenedType =
-          SwiftType->openAnyExistentialType(Opened)->getCanonicalType();
+          SwiftType
+              ->openAnyExistentialType(Opened, DC)
+              ->getCanonicalType();
       auto OpenedSILType = NewF->getLoweredType(OpenedType);
       SILValue archetypeValue;
       auto ExistentialRepr =

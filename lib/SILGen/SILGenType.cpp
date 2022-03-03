@@ -843,7 +843,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   // Open the protocol type.
   auto openedType = OpenedArchetypeType::get(
-      protocol->getExistentialType()->getCanonicalType());
+      protocol->getExistentialType()->getCanonicalType(), SGM.SwiftModule);
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,

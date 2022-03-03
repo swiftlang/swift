@@ -2166,7 +2166,8 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD) {
 
   if (!ExprType->getMetatypeInstanceType()->isAnyObject())
     if (ExprType->isAnyExistentialType())
-      ExprType = OpenedArchetypeType::getAny(ExprType->getCanonicalType());
+      ExprType = OpenedArchetypeType::getAny(ExprType->getCanonicalType(),
+                                             CurrDeclContext);
 
   if (!IsSelfRefExpr && !IsSuperRefExpr && ExprType->getAnyNominal() &&
       ExprType->getAnyNominal()->isActor()) {
