@@ -4014,12 +4014,17 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
     return Reqs.front().getSecondType()->getCanonicalType();
   }
 
+  Type superclass;
   llvm::SmallVector<Type, 2> MinimalMembers;
   bool MinimalHasExplicitAnyObject = false;
   for (const auto &Req : Reqs) {
     switch (Req.getKind()) {
-    case RequirementKind::Conformance:
     case RequirementKind::Superclass:
+      assert((!superclass || superclass->isEqual(Req.getSecondType()))
+             && "Multiple distinct superclass constraints!");
+      superclass = Req.getSecondType();
+      break;
+    case RequirementKind::Conformance:
       MinimalMembers.push_back(Req.getSecondType());
       break;
     case RequirementKind::Layout:
@@ -4029,6 +4034,11 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
       llvm_unreachable("");
     }
   }
+
+  // Ensure any superclass bounds appears first regardless of its order among
+  // the signature's requirements.
+  if (superclass)
+    MinimalMembers.insert(MinimalMembers.begin(), superclass->getCanonicalType());
 
   // The resulting composition is necessarily canonical.
   return CanType(build(Ctx, MinimalMembers, MinimalHasExplicitAnyObject));
