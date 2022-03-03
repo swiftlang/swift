@@ -318,7 +318,7 @@ public:
 
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
 
-  void visitKnownToBeLocal(KnownToBeLocalAttr *attr);
+  void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 };
 
 } // end anonymous namespace
@@ -5696,11 +5696,14 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   }
 }
 
-void AttributeChecker::visitKnownToBeLocal(KnownToBeLocalAttr *attr) {
+void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
   fprintf(stderr, "[%s:%d] (%s) KNOWN TO BE LOCAL\n", __FILE__, __LINE__, __FUNCTION__);
   D->dump();
-  fprintf(stderr, "\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "\n", __FILE__, __LINE__, __FUNCTION__);
+  if (D->isImplicit()) {
+    return;
+  }
+  fprintf(stderr, "[%s:%d] (%s) KNOWN TO BE LOCAL -- BANNED!\n", __FILE__, __LINE__, __FUNCTION__);
+  diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
 }
 
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {

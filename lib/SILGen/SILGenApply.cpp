@@ -1120,11 +1120,8 @@ public:
 
     // Otherwise, we have a statically-dispatched call.
     auto constant = SILDeclRef(e->getDecl());
-//    if (callSite && callSite->shouldApplyDistributedThunk()) {
-//      constant = constant.asDistributed(true);
-//    } else
-    if (callSite && callSite->shouldApplyDistributedLocalThunk()) {
-      constant = constant.asDistributedKnownToBeLocal(true);
+    if (callSite && callSite->shouldApplyDistributedThunk()) {
+      constant = constant.asDistributed(true);
     } else if (afd->isBackDeployed()) {
       // If we're calling a back deployed function then we need to call a
       // thunk instead that will handle the fallback when the original
@@ -5159,7 +5156,7 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
                      .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
 
   if (call->isDistributed()) {
-    callRef = callRef.asDistributed(true);
+    callRef = callRef.asDistributed(true); // TODO(distributed): how does this cause the remote thunk to be called!?
   } else if (call->isBackDeployed()) {
     callRef =
         callRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);

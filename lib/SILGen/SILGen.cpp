@@ -847,6 +847,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     f->setBare(IsBare);
     f->setThunk(IsThunk);
 
+    // FIXME(distributed): can we delete this that we now emit the thunk elsewhere in AST?
     SILGenFunction(*this, *f, dc).emitDistributedThunk(constant); // TODO: remove
 
     postEmitFunction(constant, f);

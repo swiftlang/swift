@@ -4595,6 +4595,9 @@ NOTE(note_distributed_actor_isolated_method,none,
 ERROR(distributed_actor_isolated_method,none,
       "only 'distributed' instance methods can be called on a potentially remote distributed actor",
       ())
+ERROR(distributed_local_cannot_be_used,none,
+      "'local' cannot be used in user-defined code currently",
+      ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
       (StringRef, Type, DescriptiveDeclKind, StringRef))

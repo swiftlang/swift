@@ -136,9 +136,12 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   NominalTypeDecl *nominal = funcDC->getSelfNominalTypeDecl();
   assert(nominal && nominal->isDistributedActor() && "Function must be part of distributed actor");
 
-  // === self
   auto selfDecl = thunk->getImplicitSelfDecl();
+  selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(/*implicit=*/true));
   auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
+  fprintf(stderr, "[%s:%d] (%s) FORCE KNOWN TO BE LOCAL: \n", __FILE__, __LINE__, __FUNCTION__);
+  selfDecl->dump();
+  selfRefExpr->dump();
 
   // === return type
   Type returnTy = func->getResultInterfaceType();
@@ -498,6 +501,7 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   return thunk;
 }
 
+// FIXME(distributed): remove this, not used
 static FuncDecl *createDistributedLocalFuncFunction(FuncDecl *func) {
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
@@ -542,7 +546,6 @@ static FuncDecl *createDistributedLocalFuncFunction(FuncDecl *func) {
       continue;
     }
   }
-  thunk->getAttrs().add(new (C) KnownToBeLocalAttr());
   thunk->setGenericSignature(func->getGenericSignature());
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
 
@@ -585,40 +588,23 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
       return nullptr;
     }
 
-    for (auto a : func->getAttrs()) {
-      fprintf(stderr, "[%s:%d] (%s) ATTR: %s\n", __FILE__, __LINE__, __FUNCTION__, a->getAttrName().str().c_str());
-    }
-
-    // THE RENAME TRICKERY
-//    {
-//      auto localFuncName = createLocalFuncName(C, func);
-//      func->setName(localFuncName);
-//
-//      // remove the distributed marker, this is a plain actor "local" function now
-//      auto distributedFuncAttr = func->getAttrs().getAttribute<DistributedActorAttr>();
-//      func->getAttrs().removeAttribute(distributedFuncAttr);
-//
-//      fprintf(stderr, "[%s:%d] (%s) LOCAL FUNC: \n", __FILE__, __LINE__, __FUNCTION__);
-//      func->dump();
-//      // auto localFunc = createDistributedLocalFuncFunction(func);
-//    }
-
     // --- Prepare the "local func"
     // Force type-checking the body of the user-defined func since we'll copy it
     // over to the "local func"
     TypeChecker::typeCheckDecl(func);
-    auto localFunc = createDistributedLocalFuncFunction(func);
+//    auto localFunc = createDistributedLocalFuncFunction(func);
 
     // --- Prepare the "distributed thunk" which does the "maybe remote" dance:
     //     if remote { <remoteCall> } else { localFunc(...) }
-    auto distributedThunk = createDistributedThunkFunction(localFunc);
+//    auto distributedThunk = createDistributedThunkFunction(localFunc);
+    auto distributedThunk = createDistributedThunkFunction(func);
 
-    TypeChecker::typeCheckDecl(localFunc); // forces getting the body of the user-defined function
-    localFunc->dump();
+//    TypeChecker::typeCheckDecl(localFunc); // forces getting the body of the user-defined function
+//    localFunc->dump();
 
     // add the new functions
     nominal->addMember(distributedThunk, /*hint (insert directly after)=*/func);
-    nominal->addMember(localFunc, /*hint (insert directly after)=*/distributedThunk);
+//    nominal->addMember(localFunc, /*hint (insert directly after)=*/distributedThunk);
 
     fprintf(stderr, "[%s:%d] (%s) THE ACTOR ACTOR ACTOR ACTOR ACTOR ACTOR \n", __FILE__, __LINE__, __FUNCTION__);
     nominal->dump();
