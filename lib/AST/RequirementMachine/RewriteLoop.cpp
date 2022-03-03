@@ -203,7 +203,6 @@ void RewritePath::dumpLong(llvm::raw_ostream &out,
 }
 
 void RewriteLoop::verify(const RewriteSystem &system) const {
-#ifndef NDEBUG
   RewritePathEvaluator evaluator(Basepoint);
 
   for (const auto &step : Path) {
@@ -222,7 +221,6 @@ void RewriteLoop::verify(const RewriteSystem &system) const {
     evaluator.dump(llvm::errs());
     abort();
   }
-#endif
 }
 
 void RewriteLoop::dump(llvm::raw_ostream &out,

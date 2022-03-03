@@ -524,6 +524,9 @@ AbstractGenericSignatureRequestRQM::evaluate(
   auto result = GenericSignature::get(genericParams, minimalRequirements);
   bool hadError = machine->hadError();
 
+  if (!hadError)
+    result.verify();
+
   return GenericSignatureWithError(result, hadError);
 }
 
@@ -668,6 +671,10 @@ InferredGenericSignatureRequestRQM::evaluate(
   }
 
   // FIXME: Handle allowConcreteGenericParams
+
+  // Check invariants.
+  if (!hadError)
+    result.verify();
 
   return GenericSignatureWithError(result, hadError);
 }
