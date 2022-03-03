@@ -25,7 +25,7 @@
 /// SWIFTSTATICMIRROR_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSTATICMIRROR_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSTATICMIRROR_VERSION_MAJOR 0
-#define SWIFTSTATICMIRROR_VERSION_MINOR 1
+#define SWIFTSTATICMIRROR_VERSION_MINOR 2 // Added associated-type gather
 
 SWIFTSTATICMIRROR_BEGIN_DECLS
 
@@ -42,10 +42,32 @@ typedef void *swift_static_mirror_t;
 typedef struct swift_static_mirror_conformance_info_s
     *swift_static_mirror_conformance_info_t;
 
+/// Opaque container to details of an associated type specification.
+typedef struct swift_static_mirror_type_alias_s
+    *swift_static_mirror_type_alias_t;
+
+/// Opaque container to an associated type (typealias) info of a given type.
+typedef struct swift_static_mirror_associated_type_info_s
+    *swift_static_mirror_associated_type_info_t;
+
+typedef struct {
+  swift_static_mirror_type_alias_t *type_aliases;
+  size_t count;
+} swift_static_mirror_type_alias_set_t;
+
+
+typedef struct {
+  swift_static_mirror_associated_type_info_t *associated_type_infos;
+  size_t count;
+} swift_static_mirror_associated_type_info_set_t;
+
 typedef struct {
   swift_static_mirror_conformance_info_t *conformances;
   size_t count;
 } swift_static_mirror_conformances_set_t;
+
+
+// swift_static_mirror_conformance_info query methods
 
 SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_string_ref_t
     swift_static_mirror_conformance_info_get_type_name(
@@ -62,6 +84,25 @@ SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_string_ref_t
 SWIFTSTATICMIRROR_PUBLIC void
     swift_static_mirror_conformance_info_dispose(
         swift_static_mirror_conformance_info_t);
+
+// swift_static_mirror_associated_type query methods
+SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_string_ref_t
+    swift_static_mirror_type_alias_get_type_alias_name(
+        swift_static_mirror_type_alias_t);
+SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_string_ref_t
+    swift_static_mirror_type_alias_get_substituted_type_name(
+        swift_static_mirror_type_alias_t);
+SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_string_ref_t
+    swift_static_mirror_type_alias_get_substituted_type_mangled_name(
+        swift_static_mirror_type_alias_t);
+
+// swift_static_mirror_associated_type_info query methods
+SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_string_ref_t
+    swift_static_mirror_associated_type_info_get_mangled_type_name(
+        swift_static_mirror_associated_type_info_t);
+SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_type_alias_set_t*
+    swift_static_mirror_associated_type_info_get_type_alias_set(
+        swift_static_mirror_associated_type_info_t);
 
 /// Create an \c swift_static_mirror_t instance.
 /// The returned \c swift_static_mirror_t is owned by the caller and must be
@@ -80,6 +121,19 @@ swift_static_mirror_conformances_set_create(
 
 SWIFTSTATICMIRROR_PUBLIC void swift_static_mirror_conformances_set_dispose(
     swift_static_mirror_conformances_set_t *);
+
+/// Identify and collect all associated types of a given input type (by mangled name)
+SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_associated_type_info_set_t *
+swift_static_mirror_associated_type_info_set_create(
+    swift_static_mirror_t, const char *);
+
+/// Identify and collect associated types of all discovered types.
+SWIFTSTATICMIRROR_PUBLIC swift_static_mirror_associated_type_info_set_t *
+swift_static_mirror_all_associated_type_info_set_create(
+    swift_static_mirror_t);
+
+SWIFTSTATICMIRROR_PUBLIC void swift_static_mirror_associated_type_info_set_dispose(
+    swift_static_mirror_associated_type_info_set_t *);
 
 SWIFTSTATICMIRROR_END_DECLS
 
