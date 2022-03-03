@@ -5166,13 +5166,6 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   return canonicalSig;
 }
 
-// Return the signature for an opened existential. The opened archetype may have
-// a different set of conformances from the corresponding existential. The
-// opened archetype conformances are dictated by the ABI for generic arguments,
-// while the existential value conformances are dictated by their layout (see
-// Type::getExistentialLayout()). In particular, the opened archetype signature
-// does not have requirements for conformances inherited from superclass
-// constraints while existential values do.
 CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
   assert(type->isExistentialType());
   if (auto existential = type->getAs<ExistentialType>())
