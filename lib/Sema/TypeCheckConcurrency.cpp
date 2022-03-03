@@ -1568,7 +1568,9 @@ namespace {
     /// and we reach up to mark the CallExpr.
     void markNearestCallAsImplicitly(
         Optional<ImplicitActorHopTarget> setAsync,
-        bool setThrows = false, bool setDistributedThunk = false) {
+        bool setThrows = false,
+        bool setDistributedThunk = false,
+        bool setDistributedLocal = false) {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
 
       const auto End = applyStack.rend();
@@ -1577,6 +1579,7 @@ namespace {
           if (setAsync) call->setImplicitlyAsync(*setAsync);
           if (setThrows) call->setImplicitlyThrows(true);
           if (setDistributedThunk) call->setShouldApplyDistributedThunk(true);
+          if (setDistributedLocal) call->setShouldApplyDistributedLocalThunk(true);
           return;
         }
       llvm_unreachable("expected a CallExpr in applyStack!");
@@ -2869,7 +2872,8 @@ namespace {
           if (auto access = checkDistributedAccess(memberLoc, member, context)){
             // This is a distributed access, so mark it as throwing or
             // using a distributed thunk as appropriate.
-            markNearestCallAsImplicitly(None, access->first, access->second);
+            // markNearestCallAsImplicitly(None, access->first, access->second);
+            markNearestCallAsImplicitly(None, access->first, access->second, !access->second);
           } else {
             return true;
           }

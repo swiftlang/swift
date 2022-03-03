@@ -1673,6 +1673,7 @@ public:
   void diagnoseUncoveredThrowSite(ASTContext &ctx, ASTNode E,
                                   const PotentialEffectReason &reason) {
     auto &Diags = ctx.Diags;
+    E.dump();
     auto message = diag::throwing_call_without_try;
     auto reasonKind = reason.getKind();
 

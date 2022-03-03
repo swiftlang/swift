@@ -454,7 +454,7 @@ public protocol DistributedTargetInvocationResultHandler {
   associatedtype SerializationRequirement
 
   // FIXME(distributed): these must be ad-hoc protocol requirements, because Res: SerializationRequirement !!!
-  func onReturn<Res: SerializationRequirement>(value: Res) async throws
+  func onReturn<Res>(value: Res) async throws
   func onReturnVoid() async throws
 
   func onThrow<Err: Error>(error: Err) async throws

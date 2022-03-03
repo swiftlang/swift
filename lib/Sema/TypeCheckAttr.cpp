@@ -317,6 +317,8 @@ public:
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
 
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
+
+  void visitKnownToBeLocal(KnownToBeLocalAttr *attr);
 };
 
 } // end anonymous namespace
@@ -5692,6 +5694,13 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       return;
     }
   }
+}
+
+void AttributeChecker::visitKnownToBeLocal(KnownToBeLocalAttr *attr) {
+  fprintf(stderr, "[%s:%d] (%s) KNOWN TO BE LOCAL\n", __FILE__, __LINE__, __FUNCTION__);
+  D->dump();
+  fprintf(stderr, "\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {

@@ -720,6 +720,13 @@ DECL_ATTR(_backDeploy, BackDeploy,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
   129)
 
+CONTEXTUAL_SIMPLE_DECL_ATTR(local, KnownToBeLocal,
+  DeclModifier | OnFunc | OnVar |
+  DistributedOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  130)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 
