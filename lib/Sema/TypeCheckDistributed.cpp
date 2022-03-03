@@ -585,7 +585,7 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
   return false;
 }
 
-void swift::checkDistributedActorProperties(const ClassDecl *decl) {
+void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
   auto &C = decl->getASTContext();
 
   for (auto member : decl->getMembers()) {
@@ -645,24 +645,26 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
 
 // ==== ------------------------------------------------------------------------
 
-void TypeChecker::checkDistributedActor(SourceFile *SF, ClassDecl *decl) {
-  if (!decl)
+void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal) {
+  if (!nominal)
     return;
 
   // ==== Ensure the _Distributed module is available,
   // without it there's no reason to check the decl in more detail anyway.
-  if (!swift::ensureDistributedModuleLoaded(decl))
+  if (!swift::ensureDistributedModuleLoaded(nominal))
     return;
 
   // ==== Constructors
   // --- Get the default initializer
   // If applicable, this will create the default 'init(transport:)' initializer
-  (void)decl->getDefaultInitializer();
+  (void)nominal->getDefaultInitializer();
 
-  for (auto member : decl->getMembers()) {
+  for (auto member : nominal->getMembers()) {
     // --- Check all constructors
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      checkDistributedActorConstructor(decl, ctor);
+    if (auto classDecl  = dyn_cast<ClassDecl>(nominal)) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+        checkDistributedActorConstructor(classDecl, ctor);
+      }
     }
 
     // --- Ensure all thunks
@@ -676,12 +678,12 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, ClassDecl *decl) {
   }
 
   // ==== Properties
-  checkDistributedActorProperties(decl);
+  checkDistributedActorProperties(nominal);
   // --- Synthesize the 'id' property here rather than via derived conformance
   //     because the 'DerivedConformanceDistributedActor' won't trigger for 'id'
   //     because it has a default impl via 'Identifiable' (ObjectIdentifier)
   //     which we do not want.
-  (void)decl->getDistributedActorIDProperty();
+  (void)nominal->getDistributedActorIDProperty();
 }
 
 llvm::SmallPtrSet<ProtocolDecl *, 2>

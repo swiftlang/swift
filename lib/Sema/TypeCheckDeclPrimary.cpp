@@ -3051,7 +3051,7 @@ public:
     checkExplicitAvailability(ED);
 
     if (nominal->isDistributedActor())
-      TypeChecker::checkDistributedActor(SF, dyn_cast<ClassDecl>(nominal));
+      TypeChecker::checkDistributedActor(SF, nominal);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
