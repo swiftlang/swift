@@ -501,7 +501,7 @@ void CompletionLookup::addTypeAnnotation(CodeCompletionResultBuilder &Builder,
   if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
     PO.setBaseType(typeContext->getDeclaredTypeInContext());
   Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO);
-  Builder.setResultType(T);
+  Builder.setResultTypes(T);
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
@@ -524,7 +524,7 @@ void CompletionLookup::addTypeAnnotationForImplicitlyUnwrappedOptional(
   if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
     PO.setBaseType(typeContext->getDeclaredTypeInContext());
   Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, suffix);
-  Builder.setResultType(T);
+  Builder.setResultTypes(T);
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
@@ -1017,7 +1017,7 @@ void CompletionLookup::addPoundSelector(bool needPound) {
   Builder.addRightParen();
   Builder.addTypeAnnotation("Selector");
   // This function is called only if the context type is 'Selector'.
-  Builder.setResultType(Ctx.getSelectorType());
+  Builder.setResultTypes(Ctx.getSelectorType());
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
@@ -1037,7 +1037,7 @@ void CompletionLookup::addPoundKeyPath(bool needPound) {
                                   /*IsVarArg=*/false);
   Builder.addRightParen();
   Builder.addTypeAnnotation("String");
-  Builder.setResultType(Ctx.getStringType());
+  Builder.setResultTypes(Ctx.getStringType());
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
@@ -1367,7 +1367,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       Builder.addTypeAnnotation(TypeStr);
     }
 
-    Builder.setResultType(ResultType);
+    Builder.setResultTypes(ResultType);
     Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 
     if (isUnresolvedMemberIdealType(ResultType))
@@ -1577,8 +1577,8 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   //   func receiveMetatype(_: Int.Type) {}
   //
   // We want to suggest 'Int' as 'Identical' for both arguments.
-  Builder.setResultType(NTD->getDeclaredInterfaceType(),
-                        /*AlsoConsiderMetatype=*/true);
+  Builder.setResultTypes(
+      {NTD->getInterfaceType(), NTD->getDeclaredInterfaceType()});
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
@@ -1742,8 +1742,10 @@ bool CompletionLookup::addCompoundFunctionNameIfDesiable(
 
   bool useFunctionReference = PreferFunctionReferencesToCalls;
   if (!useFunctionReference && funcTy) {
+    // We know that the CodeCompletionResultType is AST-based so we can pass
+    // nullptr for USRTypeContext.
     auto maxRel = CodeCompletionResultType(funcTy).calculateTypeRelation(
-        &expectedTypeContext, CurrDeclContext);
+        &expectedTypeContext, CurrDeclContext, /*USRTypeContext=*/nullptr);
     useFunctionReference =
         maxRel >= CodeCompletionResultTypeRelation::Convertible;
   }
@@ -2427,7 +2429,7 @@ void CompletionLookup::addTypeRelationFromProtocol(
   }
   if (literalType) {
     addTypeAnnotation(builder, literalType);
-    builder.setResultType(literalType);
+    builder.setResultTypes(literalType);
     builder.setTypeContext(expectedTypeContext, CurrDeclContext);
   }
 }
@@ -2581,7 +2583,7 @@ void CompletionLookup::addValueLiteralCompletions() {
     for (auto T : expectedTypeContext.getPossibleTypes()) {
       if (T && T->is<TupleType>() && !T->isVoid()) {
         addTypeAnnotation(builder, T);
-        builder.setResultType(T);
+        builder.setResultTypes(T);
         builder.setTypeContext(expectedTypeContext, CurrDeclContext);
         break;
       }
