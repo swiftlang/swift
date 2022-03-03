@@ -623,7 +623,7 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
     unsigned h7 = UnsignedInfo::getHashValue(unsigned(Val.backDeploymentKind));
     unsigned h8 = UnsignedInfo::getHashValue(Val.isKnownToBeLocal);
     return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11) ^ (h6 << 8) ^
-           (h7 << 10) ^ (h8 << 13); // FIXME: is this right?
+           (h7 << 10) ^ (h8 << 13);
   }
   static bool isEqual(swift::SILDeclRef const &LHS,
                       swift::SILDeclRef const &RHS) {
