@@ -2314,7 +2314,7 @@ public:
 
       if (VD->hasAccess()) {
         if (VD->getFormalAccess() == AccessLevel::Open) {
-          if (!isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
+          if (!isa<ClassDecl>(VD) && !VD->isSyntacticallyOverridable()) {
             Out << "decl cannot be 'open'\n";
             VD->dump(Out);
             abort();

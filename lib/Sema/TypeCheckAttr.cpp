@@ -940,7 +940,7 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
   if (attr->getAccess() == AccessLevel::Open) {
     auto classDecl = dyn_cast<ClassDecl>(D);
     if (!(classDecl && !classDecl->isActor()) &&
-        !D->isPotentiallyOverridable() &&
+        !D->isSyntacticallyOverridable() &&
         !attr->isInvalid()) {
       diagnose(attr->getLocation(), diag::access_control_open_bad_decl)
         .fixItReplace(attr->getRange(), "public");
@@ -3496,7 +3496,7 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
       continue;
 
     // Back deployment isn't compatible with dynamic dispatch.
-    if (VD->isPotentiallyOverridable() && !VD->isFinal()) {
+    if (VD->isSyntacticallyOverridable()) {
       diagnose(Attr->getLocation(), diag::attr_incompatible_with_non_final,
                Attr, D->getDescriptiveKind());
       continue;
