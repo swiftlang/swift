@@ -33,24 +33,17 @@ class DotExprTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     bool IsImplicitSingleExpressionReturn;
   };
 
-  DeclContext *DC;
   CodeCompletionExpr *CompletionExpr;
   SmallVector<Result, 4> Results;
   llvm::DenseMap<std::pair<Type, Decl *>, size_t> BaseToSolutionIdx;
-  bool GotCallback = false;
 
 public:
-  DotExprTypeCheckCompletionCallback(DeclContext *DC,
-                                     CodeCompletionExpr *CompletionExpr)
-      : DC(DC), CompletionExpr(CompletionExpr) {}
-
-  /// True if at least one solution was passed via the \c sawSolution
-  /// callback.
-  bool gotCallback() const { return GotCallback; }
+  DotExprTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr)
+      : CompletionExpr(CompletionExpr) {}
 
   /// Typecheck the code completion expression in isolation, calling
   /// \c sawSolution for each solution formed.
-  void fallbackTypeCheck();
+  void fallbackTypeCheck(DeclContext *DC) override;
 
   void sawSolution(const constraints::Solution &solution) override;
 

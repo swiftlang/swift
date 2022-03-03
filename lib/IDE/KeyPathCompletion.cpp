@@ -21,6 +21,8 @@ using namespace swift::ide;
 
 void KeyPathTypeCheckCompletionCallback::sawSolution(
     const constraints::Solution &S) {
+  TypeCheckCompletionCallback::sawSolution(S);
+
   // Determine the code completion.
   size_t ComponentIndex = 0;
   for (auto &Component : KeyPath->getComponents()) {

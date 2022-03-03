@@ -848,3 +848,22 @@ bool swift::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
   }
   return false;
 }
+
+void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
+  assert(!GotCallback);
+
+  CompletionContextFinder finder(DC);
+  if (!finder.hasCompletionExpr())
+    return;
+
+  auto fallback = finder.getFallbackCompletionExpr();
+  if (!fallback)
+    return;
+
+  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
+                                             CTP_Unused, Type(),
+                                             /*isDiscared=*/true);
+  TypeChecker::typeCheckForCodeCompletion(
+      completionTarget, /*needsPrecheck*/ true,
+      [&](const Solution &S) { sawSolution(S); });
+}
