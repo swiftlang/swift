@@ -189,7 +189,7 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::Struct:
     return CodeCompletionDeclKind::Struct;
   case DeclKind::Class:
-    if (cast<ClassDecl>(D)->isActor()) {
+    if (cast<ClassDecl>(D)->isAnyActor()) {
       return CodeCompletionDeclKind::Actor;
     } else {
       return CodeCompletionDeclKind::Class;

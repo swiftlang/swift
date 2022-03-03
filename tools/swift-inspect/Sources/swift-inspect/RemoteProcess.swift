@@ -42,6 +42,7 @@ internal protocol RemoteProcess: AnyObject {
   static var GetSymbolAddress: GetSymbolAddressFunction { get }
 
   func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?)
+  func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void)
 }
 
 extension RemoteProcess {

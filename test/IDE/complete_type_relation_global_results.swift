@@ -52,9 +52,9 @@ public func makeProtoWithAssocType() -> some ProtoWithAssocType { return StructW
 import Lib
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token COMPLETE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token COMPLETE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s
 // Perform the same completion again, this time using the code completion cache that implicitly gets added to swift-ide-test
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token COMPLETE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token COMPLETE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s
 
 func test() -> MyProto {
 	return #^COMPLETE^#
@@ -71,9 +71,9 @@ func test() -> MyProto {
 
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token COMPLETE_OPAQUE_COMPOSITION -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=COMPLETE_OPAQUE_COMPOSITION
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token COMPLETE_OPAQUE_COMPOSITION -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=COMPLETE_OPAQUE_COMPOSITION
 // Perform the same completion again, this time using the code completion cache that implicitly gets added to swift-ide-test
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token COMPLETE_OPAQUE_COMPOSITION -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=COMPLETE_OPAQUE_COMPOSITION
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token COMPLETE_OPAQUE_COMPOSITION -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=COMPLETE_OPAQUE_COMPOSITION
 
 func testOpaqueComposition() -> some MyProto & MyOtherProto {
 	return #^COMPLETE_OPAQUE_COMPOSITION^#
@@ -89,9 +89,9 @@ func testOpaqueComposition() -> some MyProto & MyOtherProto {
 // COMPLETE_OPAQUE_COMPOSITION: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token ALSO_CONSIDER_METATYPE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=ALSO_CONSIDER_METATYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token ALSO_CONSIDER_METATYPE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=ALSO_CONSIDER_METATYPE
 // Perform the same completion again, this time using the code completion cache
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token ALSO_CONSIDER_METATYPE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=ALSO_CONSIDER_METATYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token ALSO_CONSIDER_METATYPE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=ALSO_CONSIDER_METATYPE
 
 func testAlsoConsiderMetatype() -> MyClass.Type {
   return #^ALSO_CONSIDER_METATYPE^#
@@ -103,9 +103,9 @@ func testAlsoConsiderMetatype() -> MyClass.Type {
 // ALSO_CONSIDER_METATYPE: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token OPAQUE_WITH_CLASS -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=OPAQUE_WITH_CLASS
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token OPAQUE_WITH_CLASS -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=OPAQUE_WITH_CLASS
 // Perform the same completion again, this time using the code completion cache
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token OPAQUE_WITH_CLASS -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=OPAQUE_WITH_CLASS
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token OPAQUE_WITH_CLASS -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=OPAQUE_WITH_CLASS
 func testOpaqueWithClass<T: MyClass & MyProto>() -> T {
   return #^OPAQUE_WITH_CLASS^#
 }
@@ -121,9 +121,9 @@ func testOpaqueWithClass<T: MyClass & MyProto>() -> T {
 // OPAQUE_WITH_CLASS: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token GENERIC_RETURN -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=GENERIC_RETURN
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token GENERIC_RETURN -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=GENERIC_RETURN
 // Perform the same completion again, this time using the code completion cache
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token GENERIC_RETURN -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=GENERIC_RETURN
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token GENERIC_RETURN -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=GENERIC_RETURN
 func testGenericReturn<T: MyProto>() -> T {
   return #^GENERIC_RETURN^#
 }
@@ -140,9 +140,9 @@ func testGenericReturn<T: MyProto>() -> T {
 // GENERIC_RETURN: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token OPAQUE_CLASS_AND_PROTOCOL -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=OPAQUE_CLASS_AND_PROTOCOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token OPAQUE_CLASS_AND_PROTOCOL -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=OPAQUE_CLASS_AND_PROTOCOL
 // Perform the same completion again, this time using the code completion cache
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token OPAQUE_CLASS_AND_PROTOCOL -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=OPAQUE_CLASS_AND_PROTOCOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token OPAQUE_CLASS_AND_PROTOCOL -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=OPAQUE_CLASS_AND_PROTOCOL
 func testGenericReturn() -> some MyClass & MyProto {
   return #^OPAQUE_CLASS_AND_PROTOCOL^#
 }
@@ -157,9 +157,9 @@ func testGenericReturn() -> some MyClass & MyProto {
 // OPAQUE_CLASS_AND_PROTOCOL: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token TRANSITIVE_CONFORMANCE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=TRANSITIVE_CONFORMANCE
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token TRANSITIVE_CONFORMANCE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=TRANSITIVE_CONFORMANCE
 // Perform the same completion again, this time using the code completion cache
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token TRANSITIVE_CONFORMANCE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=TRANSITIVE_CONFORMANCE
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token TRANSITIVE_CONFORMANCE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=TRANSITIVE_CONFORMANCE
 func testGenericReturn() -> MyBaseProto {
   return #^TRANSITIVE_CONFORMANCE^#
 }
@@ -181,9 +181,9 @@ func testGenericReturn() -> MyBaseProto {
 
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE
 // Perform the same completion again, this time using the code completion cache
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE
 func protoWithAssocType() -> ProtoWithAssocType {
   return #^PROTO_WITH_ASSOC_TYPE^#
 }
@@ -195,17 +195,17 @@ func protoWithAssocType() -> ProtoWithAssocType {
 // PROTO_WITH_ASSOC_TYPE: End completions
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_OPAQUE_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_OPAQUE_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE
 // Perform the same completion again, this time using the code completion cache
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_OPAQUE_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_OPAQUE_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE
 func protoWithAssocTypeInOpaqueContext() -> some ProtoWithAssocType {
   return #^PROTO_WITH_ASSOC_TYPE_OPAQUE_CONTEXT^#
 }
 
 // RUN: %empty-directory(%t/completion-cache)
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath
 // Perform the same completion again, this time using the code completion cache
-// RUN: %swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %t/test.swift -code-completion-token PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT -completion-cache-path %t/completion-cache -I %t/ImportPath | %FileCheck %s --check-prefix=PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT
 func protoWithAssocTypeInGenericContext<T: ProtoWithAssocType>() -> T {
   return #^PROTO_WITH_ASSOC_TYPE_GENERIC_RETURN_CONTEXT^#
 }

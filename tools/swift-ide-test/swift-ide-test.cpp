@@ -2960,11 +2960,10 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
-  // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
-  if (!Stdlib) {
-    llvm::errs() << "Failed loading stdlib\n";
-    return 1;
+  // Load implict imports so that Clang importer can use it.
+  for (auto unloadedImport :
+       CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Context.getModule(unloadedImport.module.getModulePath());
   }
 
   // If needed, load _Concurrency library so that the Clang importer can use it.
@@ -3028,11 +3027,10 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
-  // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
-  if (!Stdlib) {
-    llvm::errs() << "Failed loading stdlib\n";
-    return 1;
+  // Load implict imports so that Clang importer can use it.
+  for (auto unloadedImport :
+       CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Context.getModule(unloadedImport.module.getModulePath());
   }
 
   auto &FEOpts = Invocation.getFrontendOptions();

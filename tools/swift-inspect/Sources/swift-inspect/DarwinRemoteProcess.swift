@@ -13,7 +13,7 @@
 #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
 
 import SwiftRemoteMirror
-@_implementationOnly import SymbolicationShims
+import SymbolicationShims
 
 internal final class DarwinRemoteProcess: RemoteProcess {
   public typealias ProcessIdentifier = pid_t
@@ -23,8 +23,10 @@ internal final class DarwinRemoteProcess: RemoteProcess {
 
   public var process: ProcessHandle { task }
   public private(set) var context: SwiftReflectionContextRef!
+  private var symbolicator: CSSymbolicatorRef
 
   private var swiftCore: CSTypeRef
+  private let swiftConcurrency: CSTypeRef
 
   static var QueryDataLayout: QueryDataLayoutFunction {
     return { (context, type, _, output) in
@@ -38,7 +40,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
 
       case DLQ_GetPtrAuthMask:
         let mask = GetPtrauthMask()
-        output.storeBytes(of: mask, toByteOffset: 0, as: UInt.size)
+        output.storeBytes(of: mask, toByteOffset: 0, as: UInt.self)
         return 1
 
       case DLQ_GetObjCReservedLowBits:
@@ -65,10 +67,25 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     }
   }
 
+  func read(address: swift_addr_t, size: Int) -> UnsafeRawPointer? {
+    return task_peek(task, address, mach_vm_size_t(size))
+  }
+
+  func getAddr(symbolName: String) -> swift_addr_t {
+    // FIXME: use `__USER_LABEL_PREFIX__` instead of the hardcoded `_`.
+    let fullName = "_\(symbolName)"
+    var symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftCore, fullName)
+    if CSIsNull(symbol) {
+      symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftConcurrency, fullName)
+    }
+    let range = CSSymbolGetRange(symbol)
+    return swift_addr_t(range.location)
+  }
+
   static var ReadBytes: ReadBytesFunction {
     return { (context, address, size, _) in
       let process: DarwinRemoteProcess = DarwinRemoteProcess.fromOpaque(context!)
-      return task_peek(process.task, address, size)
+      return process.read(address: address, size: Int(size))
     }
   }
 
@@ -90,11 +107,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
         let buffer = UnsafeBufferPointer(start: $0, count: Int(length))
         return String(decoding: buffer, as: UTF8.self)
       }
-
-      let symbol =
-          CSSymbolOwnerGetSymbolWithMangledName(process.swiftCore, "_\(name)")
-      // FIXME: use `__USER_LABEL_PREFIX__` instead of the hardcoded `_`.
-      return swift_addr_t(CSSymbolGetRange(symbol).location)
+      return process.getAddr(symbolName: name)
     }
   }
 
@@ -107,6 +120,14 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     }
     self.task = task
 
+    self.symbolicator = CSSymbolicatorCreateWithTask(self.task)
+    self.swiftCore =
+        CSSymbolicatorGetSymbolOwnerWithNameAtTime(self.symbolicator,
+                                                   "libswiftCore.dylib", kCSNow)
+    self.swiftConcurrency = CSSymbolicatorGetSymbolOwnerWithNameAtTime(
+      symbolicator, "libswift_Concurrency.dylib", kCSNow)
+    _ = task_start_peeking(self.task)
+
     guard let context =
         swift_reflection_createReflectionContextWithDataLayout(self.toOpaqueRef(),
                                                                Self.QueryDataLayout,
@@ -116,12 +137,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
                                                                Self.GetSymbolAddress) else {
       return nil
     }
-
-    self.symbolicator = CSSymbolicatorCreateWithTask(self.task)
-    self.swiftCore =
-        CSSymbolicatorGetSymbolOwnerWithNameAtTime(self.symbolicator,
-                                                   "libswiftCore.dylib", kCSNow)
-    _ = task_start_peeking(self.task)
+    self.context = context
 
     _ = CSSymbolicatorForeachSymbolOwnerAtTime(self.symbolicator, kCSNow, { owner in
       let address = CSSymbolOwnerGetBaseAddress(owner)
@@ -136,14 +152,12 @@ internal final class DarwinRemoteProcess: RemoteProcess {
 
   func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?) {
     let symbol =
-        CSSymbolicatorGetSymbolWithAddressAtTime(sself.symbolicator, address, kCSNow)
+        CSSymbolicatorGetSymbolWithAddressAtTime(self.symbolicator, address, kCSNow)
 
     let module = CSSymbolGetSymbolOwner(symbol)
     return (CSSymbolOwnerGetName(module), CSSymbolGetName(symbol))
   }
-}
 
-extension DarwinRemoteProcess {
   internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
     withoutActuallyEscaping(body) {
       withUnsafePointer(to: $0) {
@@ -153,14 +167,17 @@ extension DarwinRemoteProcess {
                                      { (task, context, type, ranges, count) in
           let callback: (swift_addr_t, UInt64) -> Void =
               context!.assumingMemoryBound(to: ((swift_addr_t, UInt64) -> Void).self).pointee
-          ranges.forEach {
-            callback(swift_addr_t($0.address), UInt64($0.size))
+          for i in 0..<Int(count) {
+            let range = ranges[i]
+            callback(swift_addr_t(range.address), UInt64(range.size))
           }
         })
       }
     }
   }
+}
 
+extension DarwinRemoteProcess {
   internal var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
     var threadList: UnsafeMutablePointer<thread_t>?
     var threadCount: mach_msg_type_number_t = 0
@@ -196,24 +213,24 @@ extension DarwinRemoteProcess {
           let result =
               thread_info(threadList![i], thread_flavor_t(THREAD_IDENTIFIER_INFO),
                           $0, &infoCount)
-          guard result == ERROR_SUCCESS else {
+          guard result == KERN_SUCCESS else {
             print("unable to get info for thread \(i): \(String(cString: mach_error_string(result))) (0x\(String(result, radix: 16)))")
             return
           }
-
-          let tlsStart = info.thread_handle
-          if tlsStart == 0 { return }
-
-          let SWIFT_CONCURRENCY_TASK_KEY = 103
-          let currentTaskPointer = tlsStart + UInt64(SWIFT_CONCURRENCY_TASK_KEY * MemoryLayout<UnsafeRawPointer>.size)
-          if let pointer = ReadBytes(currentTaskPointer, size: MemoryLayout<UnsafeRawPointer>.size) {
-            let currentTask = pointer.load(as: UInt.self)
-            results.append((threadID: info.thread_id, currentTask: swift_addr_t(currentTask)))
-          }
         }
       }
+
+      let tlsStart = info.thread_handle
+      if tlsStart == 0 { continue }
+
+      let SWIFT_CONCURRENCY_TASK_KEY = 103
+      let currentTaskPointer = tlsStart + UInt64(SWIFT_CONCURRENCY_TASK_KEY * MemoryLayout<UnsafeRawPointer>.size)
+      if let pointer = read(address: currentTaskPointer, size: MemoryLayout<UnsafeRawPointer>.size) {
+        let currentTask = pointer.load(as: UInt.self)
+        results.append((threadID: info.thread_id, currentTask: swift_addr_t(currentTask)))
+      }
     }
-    return result
+    return results
   }
 }
 

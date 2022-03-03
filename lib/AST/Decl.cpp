@@ -377,6 +377,18 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
   return None;
 }
 
+Optional<llvm::VersionTuple>
+Decl::getBackDeployBeforeOSVersion(PlatformKind Kind) const {
+  for (auto *attr : getAttrs()) {
+    if (auto *backDeployAttr = dyn_cast<BackDeployAttr>(attr)) {
+      if (backDeployAttr->Platform == Kind && backDeployAttr->Version) {
+        return backDeployAttr->Version;
+      }
+    }
+  }
+  return None;
+}
+
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      StaticSpellingKind SSK) {
   switch (SSK) {
@@ -2914,7 +2926,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                     /*topLevelFunction=*/true, isMethod,
                                     /*isInitializer=*/isa<ConstructorDecl>(afd),
                                     getNumCurryLevels())
-        ->getMinimalCanonicalType();
+        ->getCanonicalType();
   }
 
   if (isa<AbstractStorageDecl>(this)) {
@@ -2930,7 +2942,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                    /*topLevelFunction=*/true,
                                    /*isMethod=*/false,
                                    /*isInitializer=*/false, getNumCurryLevels())
-              ->getMinimalCanonicalType();
+              ->getCanonicalType();
     }
 
     // We want to curry the default signature type with the 'self' type of the
@@ -2938,14 +2950,14 @@ CanType ValueDecl::getOverloadSignatureType() const {
     // is unique across different contexts, such as between a protocol extension
     // and struct decl.
     return defaultSignatureType->addCurriedSelfType(getDeclContext())
-        ->getMinimalCanonicalType();
+        ->getCanonicalType();
   }
 
   if (isa<EnumElementDecl>(this)) {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
         /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
-    return mappedType->getMinimalCanonicalType();
+    return mappedType->getCanonicalType();
   }
 
   // Note: If you add more cases to this function, you should update the
@@ -3427,7 +3439,7 @@ static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
 
   // Non-final overridable class members are considered open to
   // @testable importers.
-  } else if (decl->isPotentiallyOverridable()) {
+  } else if (decl->isSyntacticallyOverridable()) {
     if (!cast<ValueDecl>(decl)->isSemanticallyFinal())
       return AccessLevel::Open;
   }
@@ -3781,7 +3793,7 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
     access = AccessLevel::FilePrivate;
 
   // Only certain declarations can be 'open'.
-  if (access == AccessLevel::Open && !isPotentiallyOverridable()) {
+  if (access == AccessLevel::Open && !isSyntacticallyOverridable()) {
     assert(!isa<ClassDecl>(this) &&
            "copying 'open' onto a class has complications");
     access = AccessLevel::Public;

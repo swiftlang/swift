@@ -36,11 +36,24 @@ namespace swift {
   }
 
   class TypeCheckCompletionCallback {
+    bool GotCallback = false;
+
   public:
+    virtual ~TypeCheckCompletionCallback() {}
+
     /// Called for each solution produced while  type-checking an expression
     /// that the code completion expression participates in.
-    virtual void sawSolution(const constraints::Solution &solution) = 0;
-    virtual ~TypeCheckCompletionCallback() {}
+    virtual void sawSolution(const constraints::Solution &solution) {
+      GotCallback = true;
+    };
+
+    /// True if at least one solution was passed via the \c sawSolution
+    /// callback.
+    bool gotCallback() const { return GotCallback; }
+
+    /// Typecheck the code completion expression in its outermost expression
+    /// context, calling \c sawSolution for each solution formed.
+    virtual void fallbackTypeCheck(DeclContext *DC);
   };
 }
 

@@ -342,3 +342,5 @@ enum E1 {
 
   func foo() -> @_nonEphemeral UnsafeMutableRawPointer? { return nil } // expected-error {{attribute can only be applied to declarations, not types}}
 }
+
+@_custom func testCustomAttribute() {} // expected-error {{unknown attribute '_custom'}}

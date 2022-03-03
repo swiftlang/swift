@@ -2,7 +2,7 @@
 // RUN:   -define-availability "_myProject 1.0:macOS 10.10"
 // REQUIRES: OS=macosx
 
-@_originallyDefinedIn(module: "original", OSX 10.13) // expected-error {{need @available attribute for @_originallyDefinedIn}}
+@_originallyDefinedIn(module: "original", OSX 10.13) // expected-error {{'@_originallyDefinedIn' requires that 'foo()' have explicit availability for macOS}}
 public func foo() {}
 
 @available(macOS 10.13, *)

@@ -172,6 +172,8 @@ public:
   /// Emit a mapping of profile counters for use in coverage.
   bool EmitProfileCoverageMapping = false;
 
+  bool emitTBD = false;
+
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   llvm::StringRef ExternalPassPipelineFilename;
 

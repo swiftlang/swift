@@ -22,6 +22,9 @@ The following inspection operations are available currently.
 
 ##### All Platforms
 
+dump-arrays &lt;name-or-pid&gt;
+: Print information about array objects in the target
+
 dump-cache-nodes &lt;name-or-pid&gt;
 : Print the metadata cache nodes.
 
@@ -35,9 +38,6 @@ dump-raw-metadata &lt;name-or-pid&gt; [--backtrace] [--backtrace-long]
 : Print metadata allocations.
 
 ##### Darwin Only
-
-dump-arrays &lt;name-or-pid&gt;
-: Print information about array objects in the target
 
 dump-concurrency &lt;name-or-pid&gt;
 : Print information about tasks, actors, and threads under Concurrency.

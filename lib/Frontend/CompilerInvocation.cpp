@@ -1670,6 +1670,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
   Opts.ParseStdlib = FEOpts.ParseStdlib;
 
+  Opts.emitTBD = FEOpts.InputsAndOutputs.hasTBDPath();
+
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_EQ)) {
     llvm::Expected<llvm::remarks::Format> formatOrErr =
         llvm::remarks::parseFormat(A->getValue());

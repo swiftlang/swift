@@ -79,11 +79,13 @@ internal final class WindowsRemoteProcess: RemoteProcess {
 
       var information: WIN32_MEMORY_REGION_INFORMATION =
           WIN32_MEMORY_REGION_INFORMATION()
-      _ = QueryVirtualMemoryInformation(process.process,
+      if !QueryVirtualMemoryInformation(process.process,
                                         LPVOID(bitPattern: UInt(address)),
                                         MemoryRegionInfo, &information,
                                         SIZE_T(MemoryLayout.size(ofValue: information)),
-                                        nil)
+                                        nil) {
+        return 0
+      }
 
       // FIXME(compnerd) mapping in the memory region from the remote process
       // would be ideal to avoid a round-trip for each byte.  This seems to work
@@ -123,7 +125,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
   }
 
   init?(processId: ProcessIdentifier) {
-    // Setup process handle.
+    // Get process handle.
     self.process =
         OpenProcess(DWORD(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ), false,
                     processId)
@@ -222,6 +224,46 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     }, &context)
 
     return (context.1, symbol)
+  }
+
+  internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
+    let dwProcessId: DWORD = GetProcessId(self.process)
+    if dwProcessId == 0 {
+      // FIXME(compnerd) log error
+      return
+    }
+
+    let hSnapshot: HANDLE =
+        CreateToolhelp32Snapshot(DWORD(TH32CS_SNAPHEAPLIST), dwProcessId)
+    if hSnapshot == INVALID_HANDLE_VALUE {
+      // FIXME(compnerd) log error
+      return
+    }
+    defer { CloseHandle(hSnapshot) }
+
+    var heap: HEAPLIST32 = HEAPLIST32()
+    heap.dwSize = SIZE_T(MemoryLayout<HEAPLIST32>.size)
+    if !Heap32ListFirst(hSnapshot, &heap) {
+      // FIXME(compnerd) log error
+      return
+    }
+
+    repeat {
+      var entry: HEAPENTRY32 = HEAPENTRY32()
+      entry.dwSize = SIZE_T(MemoryLayout<HEAPENTRY32>.size)
+
+      if !Heap32First(&entry, dwProcessId, heap.th32HeapID) {
+        // FIXME(compnerd) log error
+        continue
+      }
+
+      repeat {
+        if entry.dwFlags & DWORD(LF32_FREE) == DWORD(LF32_FREE) { continue }
+        body(swift_addr_t(entry.dwAddress), UInt64(entry.dwBlockSize))
+      } while Heap32Next(&entry)
+
+      heap.dwSize = SIZE_T(MemoryLayout<HEAPLIST32>.size)
+    } while Heap32ListNext(hSnapshot, &heap)
   }
 }
 

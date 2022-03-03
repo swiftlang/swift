@@ -494,7 +494,7 @@ SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   84)
 DECL_ATTR(_custom, Custom,
-  OnAnyDecl | UserInaccessible |
+  OnAnyDecl | RejectByParser |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   85)
 SIMPLE_DECL_ATTR(propertyWrapper, PropertyWrapper,
@@ -718,7 +718,7 @@ DECL_ATTR(exclusivity, Exclusivity,
   128)
 
 DECL_ATTR(_backDeploy, BackDeploy,
-  OnAbstractFunction |
+  OnAbstractFunction | OnAccessor | OnSubscript | OnVar |
   AllowMultipleAttributes | LongAttribute | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
   129)

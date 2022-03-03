@@ -101,14 +101,14 @@ using AssociativityCacheType =
 struct OverrideSignatureKey {
   GenericSignature baseMethodSig;
   GenericSignature derivedMethodSig;
-  Decl *subclassDecl;
+  NominalTypeDecl *derivedNominal;
 
   OverrideSignatureKey(GenericSignature baseMethodSignature,
                        GenericSignature derivedMethodSignature,
-                       Decl *subclassDecl)
+                       NominalTypeDecl *derivedNominal)
     : baseMethodSig(baseMethodSignature),
       derivedMethodSig(derivedMethodSignature),
-      subclassDecl(subclassDecl) {}
+      derivedNominal(derivedNominal) {}
 };
 
 namespace llvm {
@@ -120,27 +120,27 @@ template <> struct DenseMapInfo<OverrideSignatureKey> {
                       const OverrideSignatureKey rhs) {
     return lhs.baseMethodSig.getPointer() == rhs.baseMethodSig.getPointer() &&
            lhs.derivedMethodSig.getPointer() == rhs.derivedMethodSig.getPointer() &&
-           lhs.subclassDecl == rhs.subclassDecl;
+           lhs.derivedNominal == rhs.derivedNominal;
   }
 
   static inline OverrideSignatureKey getEmptyKey() {
     return OverrideSignatureKey(DenseMapInfo<GenericSignature>::getEmptyKey(),
                                 DenseMapInfo<GenericSignature>::getEmptyKey(),
-                                DenseMapInfo<Decl *>::getEmptyKey());
+                                DenseMapInfo<NominalTypeDecl *>::getEmptyKey());
   }
 
   static inline OverrideSignatureKey getTombstoneKey() {
     return OverrideSignatureKey(
         DenseMapInfo<GenericSignature>::getTombstoneKey(),
         DenseMapInfo<GenericSignature>::getTombstoneKey(),
-        DenseMapInfo<Decl *>::getTombstoneKey());
+        DenseMapInfo<NominalTypeDecl *>::getTombstoneKey());
   }
 
   static unsigned getHashValue(const OverrideSignatureKey &Val) {
     return hash_combine(
         DenseMapInfo<GenericSignature>::getHashValue(Val.baseMethodSig),
         DenseMapInfo<GenericSignature>::getHashValue(Val.derivedMethodSig),
-        DenseMapInfo<Decl *>::getHashValue(Val.subclassDecl));
+        DenseMapInfo<NominalTypeDecl *>::getHashValue(Val.derivedNominal));
   }
 };
 } // namespace llvm
@@ -5177,6 +5177,7 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
     type = existential->getConstraintType();
 
   const CanType constraint = type->getCanonicalType();
+  assert(!constraint->hasTypeParameter() && "This only works with archetypes");
 
   // The opened archetype signature for a protocol type is identical
   // to the protocol's own canonical generic signature.
@@ -5214,11 +5215,11 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   assert(isa<AbstractFunctionDecl>(base) || isa<SubscriptDecl>(base));
   assert(isa<AbstractFunctionDecl>(derived) || isa<SubscriptDecl>(derived));
 
-  const auto baseClass = base->getDeclContext()->getSelfClassDecl();
-  const auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
+  const auto baseNominal = base->getDeclContext()->getSelfNominalTypeDecl();
+  const auto derivedNominal = derived->getDeclContext()->getSelfNominalTypeDecl();
 
-  assert(baseClass != nullptr);
-  assert(derivedClass != nullptr);
+  assert(baseNominal != nullptr);
+  assert(derivedNominal != nullptr);
 
   const auto baseGenericSig =
       base->getAsGenericContext()->getGenericSignature();
@@ -5228,10 +5229,6 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   if (base == derived)
     return derivedGenericSig;
 
-  const auto derivedSuperclass = derivedClass->getSuperclass();
-  if (derivedSuperclass.isNull())
-    return nullptr;
-
   if (derivedGenericSig.isNull())
     return nullptr;
 
@@ -5240,21 +5237,14 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
 
   auto key = OverrideSignatureKey(baseGenericSig,
                                   derivedGenericSig,
-                                  derivedClass);
+                                  derivedNominal);
 
   if (getImpl().overrideSigCache.find(key) !=
       getImpl().overrideSigCache.end()) {
     return getImpl().overrideSigCache.lookup(key);
   }
 
-  const auto derivedClassSig = derivedClass->getGenericSignature();
-
-  unsigned derivedDepth = 0;
-  unsigned baseDepth = 0;
-  if (derivedClassSig)
-    derivedDepth = derivedClassSig.getGenericParams().back()->getDepth() + 1;
-  if (const auto baseClassSig = baseClass->getGenericSignature())
-    baseDepth = baseClassSig.getGenericParams().back()->getDepth() + 1;
+  const auto derivedNominalSig = derivedNominal->getGenericSignature();
 
   SmallVector<GenericTypeParamType *, 2> addedGenericParams;
   if (const auto *gpList = derived->getAsGenericContext()->getGenericParams()) {
@@ -5264,38 +5254,59 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     }
   }
 
-  const auto subMap = derivedSuperclass->getContextSubstitutionMap(
-      derivedClass->getModuleContext(), baseClass);
-
-  auto substFn = [&](SubstitutableType *type) -> Type {
-    auto *gp = cast<GenericTypeParamType>(type);
-
-    if (gp->getDepth() < baseDepth) {
-      return Type(gp).subst(subMap);
-    }
-
-    return CanGenericTypeParamType::get(
-        gp->isTypeSequence(), gp->getDepth() - baseDepth + derivedDepth,
-        gp->getIndex(), *this);
-  };
-
-  auto lookupConformanceFn =
-      [&](CanType depTy, Type substTy,
-          ProtocolDecl *proto) -> ProtocolConformanceRef {
-    if (auto conf = subMap.lookupConformance(depTy, proto))
-      return conf;
-
-    return ProtocolConformanceRef(proto);
-  };
-
   SmallVector<Requirement, 2> addedRequirements;
-  for (auto reqt : baseGenericSig.getRequirements()) {
-    if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
-      addedRequirements.push_back(*substReqt);
+
+  if (isa<ProtocolDecl>(baseNominal)) {
+    assert(isa<ProtocolDecl>(derivedNominal));
+
+    for (auto reqt : baseGenericSig.getRequirements()) {
+      addedRequirements.push_back(reqt);
+    }
+  } else {
+    const auto derivedSuperclass = cast<ClassDecl>(derivedNominal)
+        ->getSuperclass();
+    if (derivedSuperclass.isNull())
+      return nullptr;
+
+    unsigned derivedDepth = 0;
+    unsigned baseDepth = 0;
+    if (derivedNominalSig)
+      derivedDepth = derivedNominalSig.getGenericParams().back()->getDepth() + 1;
+    if (const auto baseNominalSig = baseNominal->getGenericSignature())
+      baseDepth = baseNominalSig.getGenericParams().back()->getDepth() + 1;
+
+    const auto subMap = derivedSuperclass->getContextSubstitutionMap(
+        derivedNominal->getModuleContext(), baseNominal);
+
+    auto substFn = [&](SubstitutableType *type) -> Type {
+      auto *gp = cast<GenericTypeParamType>(type);
+
+      if (gp->getDepth() < baseDepth) {
+        return Type(gp).subst(subMap);
+      }
+
+      return CanGenericTypeParamType::get(
+          gp->isTypeSequence(), gp->getDepth() - baseDepth + derivedDepth,
+          gp->getIndex(), *this);
+    };
+
+    auto lookupConformanceFn =
+        [&](CanType depTy, Type substTy,
+            ProtocolDecl *proto) -> ProtocolConformanceRef {
+      if (auto conf = subMap.lookupConformance(depTy, proto))
+        return conf;
+
+      return ProtocolConformanceRef(proto);
+    };
+
+    for (auto reqt : baseGenericSig.getRequirements()) {
+      if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
+        addedRequirements.push_back(*substReqt);
+      }
     }
   }
 
-  auto genericSig = buildGenericSignature(*this, derivedClassSig,
+  auto genericSig = buildGenericSignature(*this, derivedNominalSig,
                                           std::move(addedGenericParams),
                                           std::move(addedRequirements));
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));

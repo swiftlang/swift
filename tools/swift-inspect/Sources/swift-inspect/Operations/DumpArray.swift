@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
 import ArgumentParser
 import SwiftRemoteMirror
 
@@ -28,6 +27,7 @@ internal struct DumpArrays: ParsableCommand {
         let metadata: UInt =
             swift_reflection_metadataForObject(process.context, UInt(allocation))
         if metadata == 0 { return }
+
         guard process.context.isContiguousArray(swift_reflection_ptr_t(metadata)) else {
           return
         }
@@ -44,5 +44,3 @@ internal struct DumpArrays: ParsableCommand {
     }
   }
 }
-
-#endif

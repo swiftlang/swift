@@ -338,12 +338,40 @@ bool CrossModuleOptimization::canSerializeType(SILType type) {
   return success;
 }
 
+/// Returns true if the function in \p funcCtxt could be linked statically to
+/// this module.
+static bool couldBeLinkedStatically(DeclContext *funcCtxt, SILModule &module) {
+  if (!funcCtxt)
+    return true;
+  ModuleDecl *funcModule = funcCtxt->getParentModule();
+  // If the function is in the same module, it's not in another module which
+  // could be linked statically.
+  if (module.getSwiftModule() == funcModule)
+    return false;
+    
+  // The stdlib module is always linked dynamically.
+  if (funcModule == module.getASTContext().getStdlibModule())
+    return false;
+    
+  // Conservatively assume the function is in a statically linked module.
+  return true;
+}
+
 /// Returns true if the function \p func can be used from a serialized function.
 bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
-  if (DeclContext *funcCtxt = function->getDeclContext()) {
-    if (!M.getSwiftModule()->canBeUsedForCrossModuleOptimization(funcCtxt))
-      return false;
-  }
+  DeclContext *funcCtxt = function->getDeclContext();
+  if (funcCtxt && !M.getSwiftModule()->canBeUsedForCrossModuleOptimization(funcCtxt))
+    return false;
+
+  /// If we are emitting a TBD file, the TBD file only contains public symbols
+  /// of this module. But not public symbols of imported modules which are
+  /// statically linked to the current binary.
+  /// This prevents referencing public symbols from other modules which could
+  /// (potentially) linked statically. Unfortunately there is no way to find out
+  /// if another module is linked statically or dynamically, so we have to be
+  /// conservative here.
+  if (conservative && M.getOptions().emitTBD && couldBeLinkedStatically(funcCtxt, M))
+    return false;
 
   switch (function->getLinkage()) {
   case SILLinkage::PublicNonABI:

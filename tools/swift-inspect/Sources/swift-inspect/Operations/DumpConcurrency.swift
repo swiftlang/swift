@@ -12,6 +12,7 @@
 
 #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
 
+import ArgumentParser
 import SwiftRemoteMirror
 
 struct DumpConcurrency: ParsableCommand {
@@ -60,7 +61,7 @@ fileprivate class ConcurrencyDumper {
 
   lazy var heapInfo: HeapInfo = gatherHeapInfo()
 
-  lazy var threadCurrentTasks = process.threadCurrentTasks().filter{ $0.currentTask != 0 }
+  lazy var threadCurrentTasks = process.currentTasks.filter{ $0.currentTask != 0 }
 
   lazy var tasks: [swift_reflection_ptr_t: TaskInfo] = gatherTasks()
 
@@ -76,8 +77,8 @@ fileprivate class ConcurrencyDumper {
     self.process = process
 
     func getMetadata(symbolName: String) -> swift_reflection_ptr_t? {
-      let addr = process.GetSymbolAddress(symbolName)
-      if let ptr = process.ReadBytes(addr, MemoryLayout<UInt>.size) {
+      let addr = process.getAddr(symbolName: symbolName)
+      if let ptr = process.read(address: addr, size: MemoryLayout<UInt>.size) {
         return swift_reflection_ptr_t(ptr.load(as: UInt.self))
       }
       return nil
@@ -148,7 +149,7 @@ fileprivate class ConcurrencyDumper {
       return cached
     }
 
-    let name = context.name(metadata: metadata)
+    let name = context.name(type: metadata)
     metadataNameCache[metadata] = name
     return name
   }
