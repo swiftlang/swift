@@ -338,7 +338,9 @@ namespace {
 
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
         for (auto base : cxxRecord->bases()) {
-          auto baseRecord = cast<clang::RecordType>(base.getType())->getDecl();
+          auto baseType = base.getType().getCanonicalType();
+
+          auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
           auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
 
           if (baseCxxRecord->isEmpty())
@@ -346,8 +348,8 @@ namespace {
 
           auto offset = layout.getBaseClassOffset(baseCxxRecord);
           auto size =
-              ClangDecl->getASTContext().getTypeSizeInChars(base.getType());
-          fn(base.getType(), offset, size);
+              ClangDecl->getASTContext().getTypeSizeInChars(baseType);
+          fn(baseType, offset, size);
         }
       }
     }
