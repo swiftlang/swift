@@ -231,6 +231,33 @@ Optional<Type> ConcreteContraction::substTypeParameter(
   if (!substBaseType)
     return None;
 
+  // A resolved DependentMemberType stores an associated type declaration.
+  //
+  // Handle this by looking up the corresponding type witness in the base
+  // type's conformance to the associated type's protocol.
+  if (auto *assocType = memberType->getAssocType()) {
+    auto *proto = assocType->getProtocol();
+    auto *module = proto->getParentModule();
+
+    auto conformance = ((*substBaseType)->isTypeParameter()
+                        ? ProtocolConformanceRef(proto)
+                        : module->lookupConformance(*substBaseType, proto));
+
+    // The base type doesn't conform, in which case the requirement remains
+    // unsubstituted.
+    if (!conformance) {
+      if (Debug) {
+        llvm::dbgs() << "@@@ " << substBaseType << " does not conform to "
+                     << proto->getName() << "\n";
+      }
+      return None;
+    }
+
+    return assocType->getDeclaredInterfaceType()
+                    ->castTo<DependentMemberType>()
+                    ->substBaseType(module, *substBaseType);
+  }
+
   auto *decl = (*substBaseType)->getAnyNominal();
   if (decl == nullptr) {
     if (Debug) {
@@ -241,24 +268,6 @@ Optional<Type> ConcreteContraction::substTypeParameter(
   }
 
   auto *module = decl->getParentModule();
-
-  // A resolved DependentMemberType stores an associated type declaration.
-  //
-  // Handle this by looking up the corresponding type witness in the base
-  // type's conformance to the associated type's protocol.
-  if (auto *assocType = memberType->getAssocType()) {
-    auto conformance = module->lookupConformance(
-        *substBaseType, assocType->getProtocol());
-
-    // The base type doesn't conform, in which case the requirement remains
-    // unsubstituted.
-    if (!conformance)
-      return None;
-
-    return assocType->getDeclaredInterfaceType()
-                    ->castTo<DependentMemberType>()
-                    ->substBaseType(module, *substBaseType);
-  }
 
   // An unresolved DependentMemberType stores an identifier. Handle this
   // by performing a name lookup into the base type.
