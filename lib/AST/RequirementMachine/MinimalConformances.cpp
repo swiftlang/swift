@@ -742,7 +742,6 @@ void MinimalConformances::dumpMinimalConformanceEquation(
 }
 
 void MinimalConformances::verifyMinimalConformanceEquations() const {
-#ifndef NDEBUG
   for (const auto &pair : ConformancePaths) {
     const auto &rule = System.getRule(pair.first);
     auto *proto = rule.getLHS().back().getProtocol();
@@ -804,7 +803,6 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
       }
     }
   }
-#endif
 }
 
 bool MinimalConformances::isDerivedViaCircularConformanceRule(
@@ -884,7 +882,6 @@ void MinimalConformances::computeMinimalConformances() {
 
 /// Check invariants.
 void MinimalConformances::verifyMinimalConformances() const {
-#ifndef NDEBUG
   for (const auto &pair : ConformancePaths) {
     unsigned ruleID = pair.first;
     const auto &rule = System.getRule(ruleID);
@@ -913,7 +910,6 @@ void MinimalConformances::verifyMinimalConformances() const {
       abort();
     }
   }
-#endif
 }
 
 void MinimalConformances::dumpMinimalConformances(
