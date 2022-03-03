@@ -460,8 +460,14 @@ namespace {
 
       unsigned baseOffset = 0;
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
-        baseOffset =
-            std::distance(cxxRecord->bases().begin(), cxxRecord->bases().end());
+        baseOffset = llvm::count_if(cxxRecord->bases(), [](auto base) {
+          auto baseType = base.getType().getCanonicalType();
+
+          auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
+          auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
+
+          return !baseCxxRecord->isEmpty();
+        });
       }
 
       // Otherwise, project from the base.
