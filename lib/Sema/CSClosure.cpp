@@ -1004,6 +1004,9 @@ class ClosureConstraintApplication
   RewriteTargetFn rewriteTarget;
   bool isSingleExpression;
 
+  /// All `func`s declared in the body of the closure.
+  SmallVector<FuncDecl *, 4> LocalFuncs;
+
 public:
   /// Whether an error was encountered while generating constraints.
   bool hadError = false;
@@ -1046,6 +1049,14 @@ private:
       // Allow `typeCheckDecl` to be called after solution is applied
       // to a pattern binding. That would materialize required
       // information e.g. accessors and do access/availability checks.
+    }
+
+    // Local functions cannot be type-checked in-order because they can
+    // capture variables declared after them. Let's save them to be
+    // processed after the solution has been applied to the body.
+    if (auto *func = dyn_cast<FuncDecl>(decl)) {
+      LocalFuncs.push_back(func);
+      return;
     }
 
     TypeChecker::typeCheckDecl(decl);
@@ -1456,6 +1467,19 @@ private:
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 
+public:
+  /// Apply solution to the closure and return updated body.
+  ASTNode apply() {
+    auto body = visit(closure->getBody());
+
+    // Since local functions can capture variables that are declared
+    // after them, let's type-check them after all of the pattern
+    // bindings have been resolved by applying solution to the body.
+    for (auto *func : LocalFuncs)
+      TypeChecker::typeCheckDecl(func);
+
+    return body;
+  }
 };
 
 }
@@ -1552,7 +1576,7 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   auto closureType = cs.getType(closure)->castTo<FunctionType>();
   ClosureConstraintApplication application(
       solution, closure, closureType->getResult(), rewriteTarget);
-  auto body = application.visit(closure->getBody());
+  auto body = application.apply();
 
   if (!body || application.hadError)
     return true;
