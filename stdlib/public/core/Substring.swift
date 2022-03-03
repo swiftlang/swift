@@ -412,12 +412,102 @@ extension Substring: StringProtocol {
   internal mutating func _replaceSubrange<C: Collection>(
     _ subrange: Range<Index>, with newElements: C
   ) where C.Element == Element {
+    defer { _invariantCheck() }
     let subrange = _validateScalarRange(subrange)
-    // TODO(lorentey): We can't delegate to Slice here; it doesn't handle
-    // subscalar indices or the case where `newElements` changes character
-    // breaks in the surrounding context. The substring's
-    // `startIndex`/`endIndex` may get broken.
-    _slice.replaceSubrange(subrange, with: newElements)
+
+    // Replacing the range is easy -- we can just reuse `String`'s
+    // implementation. However, we must also update `startIndex` and `endIndex`
+    // to keep them valid & pointing to the same positions, which is somewhat
+    // tricky.
+    //
+    // In Swift <=5.6, this used to forward to `Slice.replaceSubrange`, which
+    // does it by counting elements, i.e., `Character`s. Unfortunately, that is
+    // prone to return incorrect results in unusual cases, e.g.
+    //
+    //    - when the substring or the given subrange doesn't start/end on a
+    //      character boundary, or
+    //    - when the beginning/end of the replacement string ends up getting
+    //      merged with the Character preceding/following the replaced range.
+    //
+    // The best way to avoid problems in these cases is to lower index
+    // calculations to Unicode scalars (or below) -- in this implementation, we
+    // are measuring things in UTF-8 code units, for efficiency.
+
+    if _slowPath(_slice._base._guts.isKnownUTF16) {
+      // UTF-16 (i.e., foreign) string. The mutation will convert this to the
+      // native UTF-8 encoding, so we need to do some extra work to preserve our
+      // bounds.
+      let utf8StartOffset = _slice._base.utf8.distance(
+        from: _slice._base.startIndex,
+        to: _slice._startIndex)
+      let oldUTF8Count = self.utf8.count
+
+      let oldSubrangeCount = self.utf8.distance(
+        from: subrange.lowerBound, to: subrange.upperBound)
+
+      let newUTF8Subrange = _slice._base._guts.replaceSubrange(
+        subrange, with: newElements)
+      _internalInvariant(!_slice._base._guts.isKnownUTF16)
+
+      let newUTF8Count = oldUTF8Count + newUTF8Subrange.count - oldSubrangeCount
+
+      // Get the character stride in the entire string, not just the substring.
+      // (Characters in a substring may end beyond the bounds of it.)
+      let newStride = _slice.base._guts._opaqueCharacterStride(
+        startingAt: utf8StartOffset,
+        in: utf8StartOffset ..< _slice._base._guts.count)
+
+      _slice._startIndex = String.Index(
+        encodedOffset: utf8StartOffset,
+        transcodedOffset: 0,
+        characterStride: newStride)._scalarAligned._knownUTF8
+      _slice._endIndex = String.Index(
+        encodedOffset: utf8StartOffset + newUTF8Count,
+        transcodedOffset: 0)._scalarAligned._knownUTF8
+      return
+    }
+
+    // UTF-8 string.
+
+    let oldRange = Range(_uncheckedBounds: (
+        subrange.lowerBound._encodedOffset, subrange.upperBound._encodedOffset))
+
+    let newRange = _slice._base._guts.replaceSubrange(
+      subrange, with: newElements)
+
+    let newOffsetBounds = Range(_uncheckedBounds: (
+        startIndex._encodedOffset,
+        endIndex._encodedOffset &+ newRange.count &- oldRange.count))
+
+    // Update `startIndex` if necessary. The replacement may have invalidated
+    // its cached character stride, but not its stored offset.
+    //
+    // We are exploiting the fact that mutating the string _after_ the scalar
+    // following the end of the character at `startIndex` cannot possibly change
+    // the length of that character. (This is true because `index(after:)` never
+    // needs to look ahead by more than one Unicode scalar.)
+    if
+      let stride = startIndex.characterStride,
+      oldRange.lowerBound <= startIndex._encodedOffset &+ stride
+    {
+      // Get the character stride in the entire string, not just the substring.
+      // (Characters in a substring may end beyond the bounds of it.)
+      let newStride = _slice.base._guts._opaqueCharacterStride(
+        startingAt: newOffsetBounds.lowerBound,
+        in: newOffsetBounds.lowerBound ..< _slice._base._guts.count)
+      _slice._startIndex = String.Index(
+        encodedOffset: startIndex._encodedOffset,
+        transcodedOffset: 0,
+        characterStride: newStride)._scalarAligned._knownUTF8
+    }
+
+    // Update endIndex.
+    if newOffsetBounds.upperBound != endIndex._encodedOffset {
+      _slice._endIndex = Index(
+        encodedOffset: newOffsetBounds.upperBound,
+        transcodedOffset: 0
+      )._scalarAligned._knownUTF8
+    }
   }
 
   /// Creates a string from the given Unicode code units in the specified

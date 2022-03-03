@@ -299,21 +299,22 @@ extension _StringGuts {
     self = result._guts
   }
 
+  // - Returns: The encoded offset range of the replaced contents in the result.
+  @discardableResult
   internal mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
-  ) where C: Collection, C.Iterator.Element == Character {
+  ) -> Range<Int>
+  where C: Collection, C.Iterator.Element == Character {
     if isUniqueNative {
       if let replStr = newElements as? String, replStr._guts.isFastUTF8 {
-        replStr._guts.withFastUTF8 {
+        return replStr._guts.withFastUTF8 {
           uniqueNativeReplaceSubrange(
             bounds, with: $0, isASCII: replStr._guts.isASCII)
         }
-        return
       }
-      uniqueNativeReplaceSubrange(
+      return uniqueNativeReplaceSubrange(
         bounds, with: newElements.lazy.flatMap { $0.utf8 })
-      return
     }
 
     var result = String()
@@ -324,16 +325,20 @@ extension _StringGuts {
     }
     let selfStr = String(self)
     result.append(contentsOf: selfStr[..<bounds.lowerBound])
+    let i = result._guts.count
     result.append(contentsOf: newElements)
+    let j = result._guts.count
     result.append(contentsOf: selfStr[bounds.upperBound...])
     self = result._guts
+    return Range(_uncheckedBounds: (i, j))
   }
 
+  // - Returns: The encoded offset range of the replaced contents in the result.
   internal mutating func uniqueNativeReplaceSubrange(
     _ bounds: Range<Index>,
     with codeUnits: UnsafeBufferPointer<UInt8>,
     isASCII: Bool
-  ) {
+  ) -> Range<Int> {
     let neededCapacity =
       bounds.lowerBound._encodedOffset
       + codeUnits.count + (self.count - bounds.upperBound._encodedOffset)
@@ -342,17 +347,19 @@ extension _StringGuts {
     _internalInvariant(bounds.lowerBound.transcodedOffset == 0)
     _internalInvariant(bounds.upperBound.transcodedOffset == 0)
 
-    _object.nativeStorage.replace(
-      from: bounds.lowerBound._encodedOffset,
-      to: bounds.upperBound._encodedOffset,
-      with: codeUnits)
+    let start = bounds.lowerBound._encodedOffset
+    let end = bounds.upperBound._encodedOffset
+    _object.nativeStorage.replace(from: start, to: end, with: codeUnits)
     self = _StringGuts(_object.nativeStorage)
+    return Range(_uncheckedBounds: (start, start + codeUnits.count))
   }
 
+  // - Returns: The encoded offset range of the replaced contents in the result.
   internal mutating func uniqueNativeReplaceSubrange<C: Collection>(
     _ bounds: Range<Index>,
     with codeUnits: C
-  ) where C.Element == UInt8 {
+  ) -> Range<Int>
+  where C.Element == UInt8 {
     let replCount = codeUnits.count
 
     let neededCapacity =
@@ -363,12 +370,12 @@ extension _StringGuts {
     _internalInvariant(bounds.lowerBound.transcodedOffset == 0)
     _internalInvariant(bounds.upperBound.transcodedOffset == 0)
 
+    let start = bounds.lowerBound._encodedOffset
+    let end = bounds.upperBound._encodedOffset
     _object.nativeStorage.replace(
-      from: bounds.lowerBound._encodedOffset,
-      to: bounds.upperBound._encodedOffset,
-      with: codeUnits,
-      replacementCount: replCount)
+      from: start, to: end, with: codeUnits, replacementCount: replCount)
     self = _StringGuts(_object.nativeStorage)
+    return Range(_uncheckedBounds: (start, start + replCount))
   }
 }
 
