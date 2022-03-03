@@ -719,8 +719,9 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 
   if (AFD->isDistributed()) {
-    addSymbol(SILDeclRef(AFD).asDistributed());
-    addAsyncFunctionPointerSymbol(SILDeclRef(AFD).asDistributed());
+    auto thunk = SILDeclRef(AFD->getDistributedThunk()).asDistributed();
+    addSymbol(thunk);
+    addAsyncFunctionPointerSymbol(thunk);
   }
 
   // Add derivative function symbols.

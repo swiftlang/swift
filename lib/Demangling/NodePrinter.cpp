@@ -2024,7 +2024,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::DistributedThunk:
     if (!Options.ShortenThunk) {
-      Printer << "distributed thunk for ";
+      Printer << "distributed thunk ";
     }
     return nullptr;
   case Node::Kind::DistributedAccessor:
