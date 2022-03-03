@@ -208,3 +208,28 @@ func test_custom_tilde_equals_operator_matching() {
     }
   }
 }
+
+// Local functions can capture variables before they are declared.
+func test_local_function_capturing_vars() {
+  struct A {
+    var cond: Bool
+  }
+
+  func test<T>(fn: () -> T) -> T {
+    fn()
+  }
+
+  func outer(a: A) {
+    test {
+      func local() {
+        if !message.isEmpty { // Ok
+          print(message)
+        }
+
+        message = "World" // Ok
+      }
+
+      var message = a.cond ? "hello" : ""
+    }
+  }
+}
