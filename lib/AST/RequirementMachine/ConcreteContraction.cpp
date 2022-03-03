@@ -157,8 +157,10 @@ namespace {
 class ConcreteContraction {
   bool Debug;
 
-  llvm::SmallDenseMap<GenericParamKey, Type> ConcreteTypes;
-  llvm::SmallDenseMap<GenericParamKey, Type> Superclasses;
+  llvm::SmallDenseMap<GenericParamKey,
+                      llvm::SmallDenseSet<Type, 1>> ConcreteTypes;
+  llvm::SmallDenseMap<GenericParamKey,
+                      llvm::SmallDenseSet<Type, 1>> Superclasses;
   llvm::SmallDenseMap<GenericParamKey,
                       llvm::SmallVector<ProtocolDecl *, 1>> Conformances;
 
@@ -296,20 +298,22 @@ Type ConcreteContraction::substTypeParameter(
   Type concreteType;
   {
     auto found = ConcreteTypes.find(key);
-    if (found != ConcreteTypes.end())
-      concreteType = found->second;
+    if (found != ConcreteTypes.end() && found->second.size() == 1)
+      concreteType = *found->second.begin();
   }
 
   Type superclass;
   {
     auto found = Superclasses.find(key);
-    if (found != Superclasses.end())
-      superclass = found->second;
+    if (found != Superclasses.end() && found->second.size() == 1)
+      superclass = *found->second.begin();
   }
 
   if (!concreteType && !superclass)
     return type;
 
+  // If we have both, prefer the concrete type requirement since it is more
+  // specific.
   if (!concreteType) {
     assert(superclass);
 
@@ -434,17 +438,7 @@ bool ConcreteContraction::performConcreteContraction(
       if (constraintType->isTypeParameter())
         break;
 
-      auto entry = std::make_pair(GenericParamKey(genericParam),
-                                  constraintType);
-      bool inserted = ConcreteTypes.insert(entry).second;
-      if (!inserted) {
-        if (Debug) {
-          llvm::dbgs() << "@ Concrete contraction cannot proceed: "
-                       << "duplicate concrete type requirements\n";
-        }
-        return false;
-      }
-
+      ConcreteTypes[GenericParamKey(genericParam)].insert(constraintType);
       break;
     }
     case RequirementKind::Superclass: {
@@ -452,17 +446,7 @@ bool ConcreteContraction::performConcreteContraction(
       assert(!constraintType->isTypeParameter() &&
              "You forgot to call desugarRequirement()");
 
-      auto entry = std::make_pair(GenericParamKey(genericParam),
-                                  constraintType);
-      bool inserted = Superclasses.insert(entry).second;
-      if (!inserted) {
-        if (Debug) {
-          llvm::dbgs() << "@ Concrete contraction cannot proceed: "
-                       << "duplicate superclass requirements\n";
-        }
-        return false;
-      }
-
+      Superclasses[GenericParamKey(genericParam)].insert(constraintType);
       break;
     }
     case RequirementKind::Conformance: {
@@ -484,10 +468,10 @@ bool ConcreteContraction::performConcreteContraction(
   for (const auto &pair : Conformances) {
     auto subjectType = pair.first;
     auto found = Superclasses.find(subjectType);
-    if (found == Superclasses.end())
+    if (found == Superclasses.end() || found->second.size() != 1)
       continue;
 
-    auto superclassTy = found->second;
+    auto superclassTy = *found->second.begin();
 
     for (const auto *proto : pair.second) {
       if (auto otherSuperclassTy = proto->getSuperclass()) {
@@ -511,35 +495,27 @@ bool ConcreteContraction::performConcreteContraction(
   if (ConcreteTypes.empty() && Superclasses.empty())
     return false;
 
-  // If a generic parameter is subject to both a concrete type and superclass
-  // requirement, bail out because we're not smart enough to figure out what's
-  // going on.
-  for (auto pair : ConcreteTypes) {
-    auto subjectType = pair.first;
-
-    if (Superclasses.find(subjectType) != Superclasses.end()) {
-      if (Debug) {
-        llvm::dbgs() << "@ Concrete contraction cannot proceed; "
-                     << "τ_" << subjectType.Depth << "_" << subjectType.Index
-                     << " has both a concrete type and superclass requirement";
-      }
-      return false;
-    }
-  }
-
   if (Debug) {
     llvm::dbgs() << "@ Concrete types: @\n";
     for (auto pair : ConcreteTypes) {
       llvm::dbgs() << "- τ_" << pair.first.Depth
-                   << "_" << pair.first.Index << " == "
-                   << pair.second << "\n";
+                   << "_" << pair.first.Index;
+      if (pair.second.size() == 1) {
+        llvm::dbgs() << " == " << *pair.second.begin() << "\n";
+      } else {
+        llvm::dbgs() << " has duplicate concrete type requirements\n";
+      }
     }
 
     llvm::dbgs() << "@ Superclasses: @\n";
     for (auto pair : Superclasses) {
       llvm::dbgs() << "- τ_" << pair.first.Depth
-                   << "_" << pair.first.Index << " : "
-                   << pair.second << "\n";
+                   << "_" << pair.first.Index;
+      if (pair.second.size() == 1) {
+        llvm::dbgs() << " : " << *pair.second.begin() << "\n";
+      } else {
+        llvm::dbgs() << " has duplicate superclass requirements\n";
+      }
     }
   }
 
