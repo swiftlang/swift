@@ -442,9 +442,8 @@ func getSomeEnumOverloaded(_: Int) -> E2 { return .b(0, nil) }
 
 func testOverloadedSwitch() {
   tuplify(true) { c in
-    // FIXME: Bad source location.
-    switch getSomeEnumOverloaded(17) { // expected-error{{type 'E2' has no member 'a'; did you mean 'b'?}}
-    case .a:
+    switch getSomeEnumOverloaded(17) {
+    case .a: // expected-error{{type 'E2' has no member 'a'; did you mean 'b'?}}
       "a"
     default:
       "default"
@@ -775,12 +774,13 @@ func test_rdar65667992() {
     @Builder var body: S {
       switch entry { // expected-error {{type 'E' has no member 'unset'}}
       case .set(_, _): S()
-      case .unset(_): S()
+      case .unset(_): S() // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
       default: S()
       }
     }
   }
 }
+
 
 func test_weak_with_nonoptional_type() {
   class X {
