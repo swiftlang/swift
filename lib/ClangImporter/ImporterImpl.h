@@ -574,7 +574,16 @@ public:
 
   /// Keep track of cxx function names, params etc in order to
   /// allow for de-duping functions that differ strictly on "constness".
-  llvm::DenseMap<llvm::StringRef, std::pair<llvm::DenseSet<clang::FunctionDecl *>, llvm::DenseSet<clang::FunctionDecl *>>> cxxMethods;
+  llvm::DenseMap<llvm::StringRef,
+                 std::pair<
+                     llvm::DenseSet<clang::FunctionDecl *>,
+                     llvm::DenseSet<clang::FunctionDecl *>>>
+      cxxMethods;
+
+  // Cache for already-specialized function templates and any thunks they may
+  // have.
+  llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
+      specializedFunctionTemplates;
 
   /// Keeps track of the Clang functions that have been turned into
   /// properties.

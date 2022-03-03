@@ -23,6 +23,15 @@ DependentTypesTestSuite.test("Different dependent inferred by arg.") {
   expectEqual(m.getValue(), 42)
 }
 
+DependentTypesTestSuite.test("Instanciate the same function twice") {
+  // Intentionally test the same thing twice.
+  let m = dependantReturnTypeInffered(42) as! M<Int>
+  expectEqual(m.getValue(), 42)
+
+  let m2 = dependantReturnTypeInffered(42) as! M<Int>
+  expectEqual(m2.getValue(), 42)
+}
+
 DependentTypesTestSuite.test("Multiple arguments (inferred type).") {
   let m = multipleArgs(M<Int>(value: 40), 2, 10) as! M<Int>
   expectEqual(m.getValue(), 42)
