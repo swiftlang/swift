@@ -43,6 +43,29 @@
 
 #include <inttypes.h>
 
+// The Swift runtime can be built in two ways: with or without
+// SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION enabled. In order to decode the
+// lock used in a runtime with priority escalation enabled, we need inline
+// functions from dispatch/swift_concurrency_private.h. If we don't have that
+// header at build time, we can still build but we'll be unable to decode the
+// lock and thus information about a running task is degraded. There are four
+// combinations:
+//
+//      Runtime        | swift_concurrency_private.h | task running info
+// --------------------+-----------------------------+------------------
+// without escalation  |         present             |       full
+// without escalation  |       not present           |       full
+//   with escalation   |         present             |       full
+//   with escalation   |       not present           |     DEGRADED
+//
+// Currently, degraded info means that IsRunning is not available (indicated
+// with `HasIsRunning = false`) and async backtraces are not provided.
+
+#if __has_include(<dispatch/swift_concurrency_private.h>)
+#include <dispatch/swift_concurrency_private.h>
+#define HAS_DISPATCH_LOCK_IS_LOCKED 1
+#endif
+
 namespace {
 
 template <unsigned PointerSize> struct MachOTraits;
@@ -145,8 +168,23 @@ public:
   };
 
   struct AsyncTaskInfo {
-    uint32_t JobFlags;
-    uint64_t TaskStatusFlags;
+    // Job flags.
+    unsigned Kind;
+    unsigned EnqueuePriority;
+    bool IsChildTask;
+    bool IsFuture;
+    bool IsGroupChildTask;
+    bool IsAsyncLetTask;
+
+    // Task flags.
+    unsigned MaxPriority;
+    bool IsCancelled;
+    bool IsStatusRecordLocked;
+    bool IsEscalated;
+    bool HasIsRunning; // If false, the IsRunning flag is not valid.
+    bool IsRunning;
+    bool IsEnqueued;
+
     uint64_t Id;
     StoredPointer RunJob;
     StoredPointer AllocatorSlabPtr;
@@ -1435,18 +1473,91 @@ public:
   asyncTaskInfo(StoredPointer AsyncTaskPtr) {
     loadTargetPointers();
 
-    if (supportsPriorityEscalation) {
-      return {std::string("Failure reading async task with escalation support"), {}};
-    }
+    if (supportsPriorityEscalation)
+      return asyncTaskInfo<
+          AsyncTask<Runtime, ActiveTaskStatusWithEscalation<Runtime>>>(
+          AsyncTaskPtr);
+    else
+      return asyncTaskInfo<
+          AsyncTask<Runtime, ActiveTaskStatusWithoutEscalation<Runtime>>>(
+          AsyncTaskPtr);
+  }
 
-    using AsyncTask = AsyncTask<Runtime, ActiveTaskStatusWithoutEscalation<Runtime>>;
-    auto AsyncTaskObj = readObj<AsyncTask>(AsyncTaskPtr);
+  std::pair<llvm::Optional<std::string>, ActorInfo>
+  actorInfo(StoredPointer ActorPtr) {
+    if (supportsPriorityEscalation)
+      return actorInfo<
+          DefaultActorImpl<Runtime, ActiveActorStatusWithEscalation<Runtime>>>(
+          ActorPtr);
+    else
+      return actorInfo<DefaultActorImpl<
+          Runtime, ActiveActorStatusWithoutEscalation<Runtime>>>(ActorPtr);
+  }
+
+  StoredPointer nextJob(StoredPointer JobPtr) {
+    using Job = Job<Runtime>;
+
+    auto JobBytes = getReader().readBytes(RemoteAddress(JobPtr), sizeof(Job));
+    auto *JobObj = reinterpret_cast<const Job *>(JobBytes.get());
+    if (!JobObj)
+      return 0;
+
+    // This is a JobRef which stores flags in the low bits.
+    return JobObj->SchedulerPrivate[0] & ~StoredPointer(0x3);
+  }
+
+private:
+  void setIsRunning(
+      AsyncTaskInfo &Info,
+      const AsyncTask<Runtime, ActiveTaskStatusWithEscalation<Runtime>> *Task) {
+#if HAS_DISPATCH_LOCK_IS_LOCKED
+    Info.HasIsRunning = true;
+    Info.IsRunning =
+        dispatch_lock_is_locked(Task->PrivateStorage.Status.ExecutionLock[0]);
+#else
+    // The target runtime was built with priority escalation but we don't have
+    // the swift_concurrency_private.h header needed to decode the running
+    // status in the task. Set HasIsRunning to false to indicate that we can't
+    // tell whether or not the task is running.
+    Info.HasIsRunning = false;
+#endif
+  }
+
+  void setIsRunning(
+      AsyncTaskInfo &Info,
+      const AsyncTask<Runtime, ActiveTaskStatusWithoutEscalation<Runtime>>
+          *Task) {
+    Info.HasIsRunning = true;
+    Info.IsRunning =
+        Task->PrivateStorage.Status.Flags[0] & ActiveTaskStatusFlags::IsRunning;
+  }
+
+  template <typename AsyncTaskType>
+  std::pair<llvm::Optional<std::string>, AsyncTaskInfo>
+  asyncTaskInfo(StoredPointer AsyncTaskPtr) {
+    auto AsyncTaskObj = readObj<AsyncTaskType>(AsyncTaskPtr);
     if (!AsyncTaskObj)
       return {std::string("failure reading async task"), {}};
 
     AsyncTaskInfo Info{};
-    Info.JobFlags = AsyncTaskObj->Flags;
-    Info.TaskStatusFlags = AsyncTaskObj->PrivateStorage.Status.Flags[0];
+
+    swift::JobFlags JobFlags(AsyncTaskObj->Flags);
+    Info.Kind = static_cast<unsigned>(JobFlags.getKind());
+    Info.EnqueuePriority = static_cast<unsigned>(JobFlags.getPriority());
+    Info.IsChildTask = JobFlags.task_isChildTask();
+    Info.IsFuture = JobFlags.task_isFuture();
+    Info.IsGroupChildTask = JobFlags.task_isGroupChildTask();
+    Info.IsAsyncLetTask = JobFlags.task_isAsyncLetTask();
+
+    uint32_t TaskStatusFlags = AsyncTaskObj->PrivateStorage.Status.Flags[0];
+    Info.IsCancelled = TaskStatusFlags & ActiveTaskStatusFlags::IsCancelled;
+    Info.IsStatusRecordLocked =
+        TaskStatusFlags & ActiveTaskStatusFlags::IsStatusRecordLocked;
+    Info.IsEscalated = TaskStatusFlags & ActiveTaskStatusFlags::IsEscalated;
+    Info.IsEnqueued = TaskStatusFlags & ActiveTaskStatusFlags::IsEnqueued;
+
+    setIsRunning(Info, AsyncTaskObj.get());
+
     Info.Id =
         AsyncTaskObj->Id | ((uint64_t)AsyncTaskObj->PrivateStorage.Id << 32);
     Info.AllocatorSlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
@@ -1479,8 +1590,7 @@ public:
       while (ChildTask) {
         Info.ChildTasks.push_back(ChildTask);
 
-        StoredPointer ChildFragmentAddr =
-            ChildTask + sizeof(AsyncTask);
+        StoredPointer ChildFragmentAddr = ChildTask + sizeof(*AsyncTaskObj);
         auto ChildFragmentObj =
             readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
         if (ChildFragmentObj)
@@ -1492,13 +1602,8 @@ public:
       RecordPtr = RecordObj->Parent;
     }
 
-    // Walk the async backtrace if the task isn't running or cancelled.
-    // TODO: Use isEnqueued from https://github.com/apple/swift/pull/41088/ once
-    // that's available.
-    int IsCancelledFlag = 0x100;
-    int IsRunningFlag = 0x800;
-    if (!(AsyncTaskObj->PrivateStorage.Status.Flags[0] & IsCancelledFlag) &&
-        !(AsyncTaskObj->PrivateStorage.Status.Flags[0] & IsRunningFlag)) {
+    // Walk the async backtrace.
+    if (Info.HasIsRunning && !Info.IsRunning) {
       auto ResumeContext = AsyncTaskObj->ResumeContextAndReserved[0];
       while (ResumeContext) {
         auto ResumeContextObj = readObj<AsyncContext<Runtime>>(ResumeContext);
@@ -1513,15 +1618,10 @@ public:
     return {llvm::None, Info};
   }
 
+  template <typename ActorType>
   std::pair<llvm::Optional<std::string>, ActorInfo>
   actorInfo(StoredPointer ActorPtr) {
-    if (supportsPriorityEscalation) {
-      return {std::string("Failure reading actor with escalation support"), {}};
-    }
-
-    using DefaultActorImpl = DefaultActorImpl<Runtime, ActiveActorStatusWithoutEscalation<Runtime>>;
-
-    auto ActorObj = readObj<DefaultActorImpl>(ActorPtr);
+    auto ActorObj = readObj<ActorType>(ActorPtr);
     if (!ActorObj)
       return {std::string("failure reading actor"), {}};
 
@@ -1538,22 +1638,10 @@ public:
     return {llvm::None, Info};
   }
 
-  StoredPointer nextJob(StoredPointer JobPtr) {
-    using Job = Job<Runtime>;
-
-    auto JobBytes = getReader().readBytes(RemoteAddress(JobPtr), sizeof(Job));
-    auto *JobObj = reinterpret_cast<const Job *>(JobBytes.get());
-    if (!JobObj)
-      return 0;
-
-    // This is a JobRef which stores flags in the low bits.
-    return JobObj->SchedulerPrivate[0] & ~StoredPointer(0x3);
-  }
-
-private:
   // Get the most human meaningful "run job" function pointer from the task,
   // like AsyncTask::getResumeFunctionForLogging does.
-  StoredPointer getRunJob(const AsyncTask<Runtime, ActiveTaskStatusWithoutEscalation<Runtime>> *AsyncTaskObj) {
+  template <typename AsyncTaskType>
+  StoredPointer getRunJob(const AsyncTaskType *AsyncTaskObj) {
     auto Fptr = stripSignedPointer(AsyncTaskObj->RunJob);
 
     loadTargetPointers();
@@ -1612,9 +1700,11 @@ private:
         getFunc("_swift_concurrency_debug_task_wait_throwing_resume_adapter");
     target_task_future_wait_resume_adapter =
         getFunc("_swift_concurrency_debug_task_future_wait_resume_adapter");
-    auto supportsPriorityEscalationAddr = getReader().getSymbolAddress("_swift_concurrency_debug_supportsPriorityEscalation");
+    auto supportsPriorityEscalationAddr = getReader().getSymbolAddress(
+        "_swift_concurrency_debug_supportsPriorityEscalation");
     if (supportsPriorityEscalationAddr) {
-      getReader().readInteger(supportsPriorityEscalationAddr, &supportsPriorityEscalation);
+      getReader().readInteger(supportsPriorityEscalationAddr,
+                              &supportsPriorityEscalation);
     }
 
     setupTargetPointers = true;
