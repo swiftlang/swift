@@ -400,6 +400,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// bound type of the memory.
   ///
   /// - Parameters:
+  ///   - value: The value to store as raw bytes.
   ///   - offset: The offset in bytes into the buffer pointer's memory to begin
   ///     reading data for the new instance. The buffer pointer plus `offset`
   ///     must be properly aligned for accessing an instance of type `T`. The
