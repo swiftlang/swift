@@ -465,9 +465,10 @@ function(_compile_swift_files
     endif()
   endif()
 
-  # The standard library and overlays are built with -requirement-machine-protocol-signatures=verify.
+  # The standard library and overlays are built with the Requirement Machine enabled.
   if(SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-requirement-machine-protocol-signatures=verify")
+    list(APPEND swift_flags "-Xfrontend" "-requirement-machine-abstract-signatures=verify")
   endif()
 
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.

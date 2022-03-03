@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -requirement-machine-protocol-signatures=off
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -requirement-machine-protocol-signatures=off -requirement-machine-abstract-signatures=on
 
 // TODO: Get this to pass with  -requirement-machine-protocol-signatures=on.
 

@@ -5177,6 +5177,7 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
     type = existential->getConstraintType();
 
   const CanType constraint = type->getCanonicalType();
+  assert(!constraint->hasTypeParameter() && "This only works with archetypes");
 
   // The opened archetype signature for a protocol type is identical
   // to the protocol's own canonical generic signature.
