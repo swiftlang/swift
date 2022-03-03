@@ -231,7 +231,10 @@ Optional<Type> ConcreteContraction::substTypeParameter(
 
   auto *decl = (*substBaseType)->getAnyNominal();
   if (decl == nullptr) {
-    llvm::dbgs() << "@@@ Not a nominal type: " << *substBaseType << "\n";
+    if (Debug) {
+      llvm::dbgs() << "@@@ Not a nominal type: " << *substBaseType << "\n";
+    }
+
     return None;
   }
 
