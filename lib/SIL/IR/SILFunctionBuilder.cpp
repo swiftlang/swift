@@ -101,17 +101,19 @@ void SILFunctionBuilder::addFunctionAttributes(
   }
 
   llvm::SmallVector<const EffectsAttr *, 8> customEffects;
-  for (auto *attr : Attrs.getAttributes<EffectsAttr>()) {
-    auto *effectsAttr = cast<EffectsAttr>(attr);
-    if (effectsAttr->getKind() == EffectsKind::Custom) {
-      customEffects.push_back(effectsAttr);
-    } else {
-      if (F->getEffectsKind() != EffectsKind::Unspecified &&
-          F->getEffectsKind() != effectsAttr->getKind()) {
-        mod.getASTContext().Diags.diagnose(effectsAttr->getLocation(),
-            diag::warning_in_effects_attribute, "mismatching function effects");
+  if (constant) {
+    for (auto *attr : Attrs.getAttributes<EffectsAttr>()) {
+      auto *effectsAttr = cast<EffectsAttr>(attr);
+      if (effectsAttr->getKind() == EffectsKind::Custom) {
+        customEffects.push_back(effectsAttr);
       } else {
-        F->setEffectsKind(effectsAttr->getKind());
+        if (F->getEffectsKind() != EffectsKind::Unspecified &&
+            F->getEffectsKind() != effectsAttr->getKind()) {
+          mod.getASTContext().Diags.diagnose(effectsAttr->getLocation(),
+              diag::warning_in_effects_attribute, "mismatching function effects");
+        } else {
+          F->setEffectsKind(effectsAttr->getKind());
+        }
       }
     }
   }
