@@ -1660,14 +1660,16 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     ASTContext &Context,
     InFlightDiagnostic &Err) {
   const TypeRefinementContext *TRC = nullptr;
-  AvailabilityContext RunningOSOverApprox =
-    TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
-                                                       ReferenceDC, &TRC);
-  VersionRange RunningRange = RunningOSOverApprox.getOSVersion();
+  (void)TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
+                                                           ReferenceDC, &TRC);
+  if (!TRC)
+    return false;
+  VersionRange RunningRange = TRC->getExplicitAvailabilityInfo().getOSVersion();
   if (RunningRange.hasLowerEndpoint() &&
       RequiredRange.hasLowerEndpoint() &&
-      AvailabilityContext(RequiredRange).isContainedIn(RunningOSOverApprox) &&
-      TRC && TRC->getReason() != TypeRefinementContext::Reason::Root) {
+      TRC->getReason() != TypeRefinementContext::Reason::Root &&
+      AvailabilityContext(RequiredRange).isContainedIn(
+                                 AvailabilityContext(RunningRange))) {
 
     // Only fix situations that are "nearby" versions, meaning
     // disagreement on a minor-or-less version for non-macOS,

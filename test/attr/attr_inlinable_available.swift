@@ -264,7 +264,6 @@ public func deployedUseAfterDeploymentTarget(
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
-  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} FIXME: should have {{18-25=10.14.5}} || {{31-35=12.3}} || {{42-46=12.3}} || {{56-59=5.3}}; instead, expected-note {{add 'if #available'}}
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} {{18-25=10.14.5}} || {{31-35=12.3}} || {{42-46=12.3}} || {{56-59=5.3}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
@@ -296,7 +295,7 @@ public func deployedUseAfterDeploymentTarget(
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
-  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} FIXME: should have {{18-25=10.14.5}} || {{31-35=12.3}} || {{42-46=12.3}} || {{56-59=5.3}}
+  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} {{18-25=10.14.5}} || {{31-35=12.3}} || {{42-46=12.3}} || {{56-59=5.3}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
