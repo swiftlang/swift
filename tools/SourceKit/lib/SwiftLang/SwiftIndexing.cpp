@@ -131,7 +131,7 @@ private:
     info.IsImplicit = symbol.roles & (unsigned)SymbolRole::Implicit;
     info.IsTestCandidate = symbol.symInfo.Properties & SymbolProperty::UnitTest;
     std::vector<UIdent> uidAttrs;
-    if (!isRef) {
+    if (!isRef && symbol.decl) {
       uidAttrs = getDeclAttributeUIDs(symbol.decl);
       info.Attrs = uidAttrs;
       if (auto *VD = dyn_cast<ValueDecl>(symbol.decl)) {
@@ -194,7 +194,7 @@ private:
     info.IsDynamic = relation.roles & (unsigned)SymbolRole::Dynamic;
     info.IsTestCandidate = relation.symInfo.Properties & SymbolProperty::UnitTest;
     std::vector<UIdent> uidAttrs;
-    if (!isRef) {
+    if (!isRef && relation.decl) {
       uidAttrs = getDeclAttributeUIDs(relation.decl);
       info.Attrs = uidAttrs;
     }
