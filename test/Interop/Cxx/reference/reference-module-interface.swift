@@ -13,4 +13,5 @@
 // CHECK: func getFuncRef() -> @convention(c) () -> Int32
 // CHECK: func getFuncRvalueRef() -> @convention(c) () -> Int32
 
+// CHECK-NOT: refToDependent
 // CHECK-NOT: dontImportAtomicRef
