@@ -296,7 +296,7 @@ public func deployedUseAfterDeploymentTarget(
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
-  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} {{18-25=10.14.5}} || {{31-35=12.3}} || {{42-46=12.3}} || {{56-59=5.3}}
+  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} FIXME: should have {{18-25=10.14.5}} || {{31-35=12.3}} || {{42-46=12.3}} || {{56-59=5.3}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
@@ -438,7 +438,7 @@ public func defaultArgsUseNoAvailable( // expected-note 3 {{add @available attri
   _: Any = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in}}
 ) {}
 
-public struct PublicStruct { // expected-note 6 {{add @available attribute}}
+public struct PublicStruct { // expected-note 7 {{add @available attribute}}
   // Public declarations act like @inlinable.
   public var aPublic: NoAvailable
   public var bPublic: BeforeInliningTarget
@@ -451,18 +451,59 @@ public struct PublicStruct { // expected-note 6 {{add @available attribute}}
   var aInternal: NoAvailable
   var bInternal: BeforeInliningTarget
   var cInternal: AtInliningTarget
-  var dInternal: BetweenTargets // FIXME: expected-error {{'BetweenTargets' is only available in}}
-  var eInternal: AtDeploymentTarget // FIXME: expected-error {{'AtDeploymentTarget' is only available in}}
+  var dInternal: BetweenTargets
+  var eInternal: AtDeploymentTarget
+  var fInternal: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  @available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
+  public internal(set) var internalSetter: Void {
+    @inlinable get {
+      // Public inlinable getter acts like @inlinable
+      _ = NoAvailable()
+      _ = BeforeInliningTarget()
+      _ = AtInliningTarget()
+      _ = BetweenTargets()
+      _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+      _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+
+    }
+    set {
+      // Private setter acts like non-inlinable
+      _ = NoAvailable()
+      _ = BeforeInliningTarget()
+      _ = AtInliningTarget()
+      _ = BetweenTargets()
+      _ = AtDeploymentTarget()
+      _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+    }
+  }
+}
+
+@frozen public struct FrozenPublicStruct { // expected-note 6 {{add @available attribute}}
+  // Public declarations act like @inlinable.
+  public var aPublic: NoAvailable
+  public var bPublic: BeforeInliningTarget
+  public var cPublic: AtInliningTarget
+  public var dPublic: BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
+  public var ePublic: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
+  public var fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+
+  // Internal declarations act like @inlinable in a frozen struct.
+  var aInternal: NoAvailable
+  var bInternal: BeforeInliningTarget
+  var cInternal: AtInliningTarget
+  var dInternal: BetweenTargets // expected-error {{'BetweenTargets' is only available in}}
+  var eInternal: AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in}}
   var fInternal: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
 }
 
-internal struct InternalStruct { // expected-note 3 {{add @available attribute}}
+internal struct InternalStruct { // expected-note {{add @available attribute}}
   // Internal declarations act like non-inlinable.
   var aInternal: NoAvailable
   var bInternal: BeforeInliningTarget
   var cInternal: AtInliningTarget
-  var dInternal: BetweenTargets // FIXME: expected-error {{'BetweenTargets' is only available in}}
-  var eInternal: AtDeploymentTarget // FIXME: expected-error {{'AtDeploymentTarget' is only available in}}
+  var dInternal: BetweenTargets
+  var eInternal: AtDeploymentTarget
   var fInternal: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
 }
 

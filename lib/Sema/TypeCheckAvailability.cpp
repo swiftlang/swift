@@ -455,7 +455,7 @@ private:
     if (declarationIntroducesNewContext(D)) {
       return buildDeclarationRefinementContext(D);
     }
-    
+
     return nullptr;
   }
 
@@ -468,7 +468,7 @@ private:
     // probably to gin up a source range for the declaration when synthesizing
     // it.
     assert(D->getSourceRange().isValid());
-    
+
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
@@ -477,43 +477,67 @@ private:
     AvailabilityContext DeclInfo = ExplicitDeclInfo;
     DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
 
-    TypeRefinementContext *NewTRC =
-        TypeRefinementContext::createForDecl(Context, D, getCurrentTRC(),
-                                             DeclInfo,
-                                             ExplicitDeclInfo,
-                                             refinementSourceRangeForDecl(D));
-    
+    // If the entire declaration is surrounded by a resilience boundary, it is
+    // also constrained by the deployment target.
+    if (signatureIsResilienceBoundary(D))
+      DeclInfo.intersectWith(AvailabilityContext::forDeploymentTarget(Context));
+
+    SourceRange Range = refinementSourceRangeForDecl(D);
+    TypeRefinementContext *NewTRC;
+    if (hasActiveAvailableAttribute(D, Context))
+      NewTRC = TypeRefinementContext::createForDecl(Context, D, getCurrentTRC(),
+                                                    DeclInfo, ExplicitDeclInfo,
+                                                    Range);
+    else
+      NewTRC =
+          TypeRefinementContext::createForResilienceBoundary(Context, D,
+                                                             getCurrentTRC(),
+                                                             DeclInfo, Range);
 
     // Possibly use this as an effective parent context later.
     recordEffectiveParentContext(D, NewTRC);
 
     return NewTRC;
   }
-  
+
   /// Returns true if the declaration should introduce a new refinement context.
   bool declarationIntroducesNewContext(Decl *D) {
     if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
       return false;
     }
-    
-    // No need to introduce a context if the declaration does not have an
-    // availability attribute.
-    if (!hasActiveAvailableAttribute(D, Context)) {
+
+    // Ignore implicit declarations. This mainly skips over the functions in
+    // `DeferStmt`s.
+    if (D->isImplicit()) {
       return false;
     }
-    
+
+    // No need to introduce a context if the declaration does not have an
+    // availability attribute and the signature is not a resilience boundary.
+    if (!hasActiveAvailableAttribute(D, Context) &&
+        !signatureIsResilienceBoundary(D)) {
+      return false;
+    }
+
     // Only introduce for an AbstractStorageDecl if it is not local.
     // We introduce for the non-local case because these may
     // have getters and setters (and these may be synthesized, so they might
     // not even exist yet).
     if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (storageDecl->getDeclContext()->isLocalContext()) {
-        // No need to
         return false;
       }
     }
-    
+
     return true;
+  }
+
+  /// A declaration's signature is a resilience boundary if the entire
+  /// declaration--not just the body--is not ABI-public and it's in a context
+  /// where ABI-public declarations would be available below the minimum
+  /// deployment target.
+  bool signatureIsResilienceBoundary(Decl *D) {
+    return !isCurrentTRCContainedByDeploymentTarget() && !::isExported(D);
   }
 
   /// Returns the source range which should be refined by declaration. This
