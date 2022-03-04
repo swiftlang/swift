@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -g -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %IRGenFileCheck %s
 // RUN: %target-swift-frontend  -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all
 
 // REQUIRES: concurrency
@@ -72,10 +72,11 @@ bb0:
 // CHECK:      {{musttail call swifttailcc|tail call swiftcc}} void @swift_continuation_await(%swift.continuation_context* %0)
 // CHECK-NEXT: ret void
 
-// CHECK: define {{.*}} void @async_continuation.0(i8* %0, %swift.context* %1)
+// CHECK: define {{.*}} void @async_continuation.0(i8* %0, %swift.context* %1){{.*}}!dbg ![[DBG:[0-9]+]]
 // CHECK-NOT: define
 // CHECK:  tail call swift{{(tail)?}}cc void %{{.*}}(%swift.context* swiftasync %1)
 // CHECK-NEXT:  ret void
+// CHECK: ![[DBG]] = distinct !DISubprogram(linkageName: "async_continuation"
 
 sil @async_continuation : $@async () -> () {
 entry:
