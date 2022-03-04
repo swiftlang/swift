@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: not --crash %target-build-swift -emit-module -module-name sr15849 -emit-module-path %t/sr15849.swiftmodule -swift-version 5 -c %S/sr15849-mutating-functions-with-control-flow.swift
-// XFAIL: *
 
 // SR-15849: Mutating functions with control flow can cause assertion failure
 // for conflicting debug variable type.
