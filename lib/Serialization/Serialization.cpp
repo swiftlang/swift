@@ -1685,7 +1685,7 @@ Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
     auto protocolID = addDeclRef(builtin->getProtocol());
     auto genericSigID = addGenericSignatureRef(builtin->getGenericSignature());
 
-    SmallVector<uint64_t> requirementData;
+    SmallVector<uint64_t, 16> requirementData;
     serializeGenericRequirements(builtin->getConditionalRequirements(),
                                  requirementData);
 
