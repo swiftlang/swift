@@ -283,7 +283,7 @@ private:
 static void addSelectorModifierKeywords(CodeCompletionResultSink &sink) {
   auto addKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind) {
     CodeCompletionResultBuilder Builder(sink, CodeCompletionResultKind::Keyword,
-                                        SemanticContextKind::None, {});
+                                        SemanticContextKind::None);
     Builder.setKeywordKind(Kind);
     Builder.addTextChunk(Name);
     Builder.addCallParameterColon();
@@ -646,7 +646,7 @@ static void addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
                        StringRef TypeAnnotation = "",
                        CodeCompletionFlair Flair = {}) {
   CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                      SemanticContextKind::None, {});
+                                      SemanticContextKind::None);
   Builder.setKeywordKind(Kind);
   Builder.addKeyword(Name);
   Builder.addFlair(Flair);
@@ -868,7 +868,7 @@ static void addSuperKeyword(CodeCompletionResultSink &Sink, DeclContext *DC) {
     return;
 
   CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                      SemanticContextKind::CurrentNominal, {});
+                                      SemanticContextKind::CurrentNominal);
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
     if (AFD->getOverriddenDecl() != nullptr) {
       Builder.addFlair(CodeCompletionFlairBit::CommonKeywordAtCurrentPosition);
@@ -886,7 +886,7 @@ static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
 
 static void addAnyTypeKeyword(CodeCompletionResultSink &Sink, Type T) {
   CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                      SemanticContextKind::None, {});
+                                      SemanticContextKind::None);
   Builder.setKeywordKind(CodeCompletionKeywordKind::None);
   Builder.addKeyword("Any");
   Builder.addTypeAnnotation(T, PrintOptions());
@@ -1040,7 +1040,7 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
               nullptr) {
         CodeCompletionResultBuilder Builder(Sink,
                                             CodeCompletionResultKind::Keyword,
-                                            SemanticContextKind::None, {});
+                                            SemanticContextKind::None);
         Builder.addBaseName(name);
         Builder.setKeywordKind(K);
         if (consumer)
@@ -1100,7 +1100,7 @@ static void addPlatformConditions(CodeCompletionResultSink &Sink) {
             Sink, CodeCompletionResultKind::Pattern,
             // FIXME: SemanticContextKind::CurrentModule is not correct.
             // Use 'None' (and fix prioritization) or introduce a new context.
-            SemanticContextKind::CurrentModule, {});
+            SemanticContextKind::CurrentModule);
         Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
         Builder.addBaseName(Name);
         Builder.addLeftParen();
@@ -1150,7 +1150,7 @@ static void addConditionalCompilationFlags(ASTContext &Ctx,
         Sink, CodeCompletionResultKind::Keyword,
         // FIXME: SemanticContextKind::CurrentModule is not correct.
         // Use 'None' (and fix prioritization) or introduce a new context.
-        SemanticContextKind::CurrentModule, {});
+        SemanticContextKind::CurrentModule);
     Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
     Builder.addTextChunk(Flag);
   }
