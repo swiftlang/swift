@@ -16,6 +16,12 @@ void setConstStaticIntRvalueRef(const int &&);
 auto getFuncRef() -> int (&)();
 auto getFuncRvalueRef() -> int (&&)();
 
+template<class T>
+struct ClassTemplate {};
+
+template<class T>
+const ClassTemplate<T> &refToDependent() { return ClassTemplate<T>(); }
+
 // We cannot import "_Atomic" types. Make sure we fail gracefully instead of
 // crashing when we have an "_Atomic" type or a reference to one.
 void dontImportAtomicRef(_Atomic(int)&) { }

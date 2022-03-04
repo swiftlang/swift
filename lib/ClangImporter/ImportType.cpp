@@ -546,6 +546,12 @@ namespace {
         return importFunctionPointerLikeType(*type, pointeeType);
       }
 
+      // Currently, we can't generate thunks for references to dependent types
+      // because there's no way to cast without a copy (without writing the SIL
+      // manually).
+      if (pointeeQualType->isDependentType())
+        return Type();
+
       if (Impl.isOverAligned(pointeeQualType)) {
         return importOverAlignedFunctionPointerLikeType(*type, Impl);
       }
