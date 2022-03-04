@@ -49,7 +49,6 @@ class CodeCompletionResultBuilder {
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
-  ExpectedTypeContext declTypeContext;
   bool Cancelled = false;
   ContextFreeNotRecommendedReason ContextFreeNotRecReason =
       ContextFreeNotRecommendedReason::None;
@@ -90,10 +89,8 @@ class CodeCompletionResultBuilder {
 public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
                               CodeCompletionResultKind Kind,
-                              SemanticContextKind SemanticContext,
-                              const ExpectedTypeContext &declTypeContext)
-      : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext),
-        declTypeContext(declTypeContext) {}
+                              SemanticContextKind SemanticContext)
+      : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext) {}
 
   ~CodeCompletionResultBuilder() {
     finishResult();
