@@ -8,4 +8,4 @@
 // CHECK: func multipleDependentArgs<T, U>(_ a: Any, _ b: Any, T: T.Type, U: U.Type) -> Any
 // CHECK: func refToDependent<T>(_ a: inout T) -> Any
 // CHECK: func dependentRef<T>(_ a: inout Any, T: T.Type) -> Any
-// CHECK: func dependentRefAndRefInferred<T>(_ a: inout Any, _ b: inout T) -> Any
+// CHECK: func dependentRefAndRefInferred<T>(_ a: Any, _ b: inout T) -> Any

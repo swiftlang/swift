@@ -211,7 +211,7 @@
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    init(value: Int32)
 // CHECK-NEXT:    mutating func getXMutating() -> UnsafePointer<Int32>
-// CHECK-NEXT:    mutating func setXMutating(_ v: inout Int32)
+// CHECK-NEXT:    mutating func setXMutating(_ v: Int32)
 // CHECK-NEXT:    var value: Int32
 // CHECK-NEXT: }
 
