@@ -23,7 +23,9 @@ protocol P1 {
   func covariantSelf5() -> Array<Self>
   func covariantSelf6() -> [String : Self]
   func covariantSelf7(_: (Self) -> Void)
+  func covariantSelf8(_: (Self...) -> Void)
   func covariantSelfComplex(_: (Self.Type) -> Void,
+                            _: (Self.Type...) -> Void,
                             _: (Array<Self>) -> Void,
                             _: (Array<Array<Self>?>) -> Void,
                             _: (() -> Self?) -> Void
@@ -35,7 +37,9 @@ protocol P1 {
   func covariantAssoc5() -> Array<Q>
   func covariantAssoc6() -> [String : Q]
   func covariantAssoc7(_: (Q) -> Void)
+  func covariantAssoc8(_: (Q...) -> Void)
   func covariantAssocComplex(_: (Q.Type) -> Void,
+                             _: (Q.Type...) -> Void,
                              _: (Array<Q>) -> Void,
                              _: (Array<Array<Q>?>) -> Void,
                              _: (() -> Q?) -> Void
@@ -95,7 +99,9 @@ protocol P1 {
   var covariantSelfProp5: Array<Self> { get }
   var covariantSelfProp6: [String : Self] { get }
   var covariantSelfProp7: ((Self) -> Void) -> Void { get }
+  var covariantSelfProp8: ((Self...) -> Void) -> Void { get }
   var covariantSelfPropComplex: ((Self.Type) -> Void,
+                                 (Self.Type...) -> Void,
                                  (Array<Self>) -> Void,
                                  (Array<Array<Self>?>) -> Void,
                                  (() -> Self?) -> Void
@@ -107,7 +113,9 @@ protocol P1 {
   var covariantAssocProp5: Array<Q> { get }
   var covariantAssocProp6: [String : Q] { get }
   var covariantAssocProp7: ((Q) -> Void) -> Void { get }
+  var covariantAssocProp8: ((Q...) -> Void) -> Void { get }
   var covariantAssocPropComplex: ((Q.Type) -> Void,
+                                  (Q.Type...) -> Void,
                                   (Array<Q>) -> Void,
                                   (Array<Array<Q>?>) -> Void,
                                   (() -> Q?) -> Void
@@ -167,8 +175,10 @@ protocol P1 {
   subscript(covariantSelfSubscript5 _: Void) -> Array<Self> { get }
   subscript(covariantSelfSubscript6 _: Void) -> [String : Self] { get }
   subscript(covariantSelfSubscript7 _: (Self) -> Void) -> Self { get }
+  subscript(covariantSelfSubscript8 _: (Self...) -> Void) -> Self { get }
   subscript(covariantSelfSubscriptComplex
             _: (Self.Type) -> Void,
+            _: (Self.Type...) -> Void,
             _: (Array<Self>) -> Void,
             _: (Array<Array<Self>?>) -> Void,
             _: (() -> Self?) -> Void
@@ -180,8 +190,10 @@ protocol P1 {
   subscript(covariantAssocSubscript5 _: Void) -> Array<Q> { get }
   subscript(covariantAssocSubscript6 _: Void) -> [String : Q] { get }
   subscript(covariantAssocSubscript7 _: (Q) -> Void) -> Q { get }
+  subscript(covariantAssocSubscript8 _: (Q...) -> Void) -> Self { get }
   subscript(covariantAssocSubscriptComplex
             _: (Q.Type) -> Void,
+            _: (Q.Type...) -> Void,
             _: (Array<Q>) -> Void,
             _: (Array<Array<Q>?>) -> Void,
             _: (() -> Q?) -> Void
@@ -242,8 +254,10 @@ do {
     let _: Array<any P1> = arg.covariantSelf5()
     let _: [String : any P1] = arg.covariantSelf6()
     arg.covariantSelf7 { (_: any P1) in }
+    arg.covariantSelf8 { (_: any P1...) in }
     let _: [String : () -> (any P1, any P1)] = arg.covariantSelfComplex(
       { (_: any P1.Type) in },
+      { (_: any P1.Type...) in },
       { (_: Array<any P1>) in },
       { (_: Array<Array<any P1>?>) in },
       { (_: () -> (any P1)?) in }
@@ -256,8 +270,10 @@ do {
     let _: Array<Any> = arg.covariantAssoc5()
     let _: [String : Any] = arg.covariantAssoc6()
     arg.covariantAssoc7 { (_: Any) in }
+    arg.covariantAssoc8 { (_: Any...) in }
     let _: [String : () -> (Any, Any)] = arg.covariantAssocComplex(
       { (_: Any.Type) in },
+      { (_: Any.Type...) in },
       { (_: Array<Any>) in },
       { (_: Array<Array<Any>?>) in },
       { (_: () -> Any?) in }
@@ -270,8 +286,10 @@ do {
     let _: Array<any P1> = arg.covariantSelfProp5
     let _: [String : any P1] = arg.covariantSelfProp6
     let _: ((any P1) -> Void) -> Void = arg.covariantSelfProp7
+    let _: ((any P1...) -> Void) -> Void = arg.covariantSelfProp8
     let _: (
       (any P1.Type) -> Void,
+      (any P1.Type...) -> Void,
       (Array<any P1>) -> Void,
       (Array<Array<any P1>?>) -> Void,
       (() -> (any P1)?) -> Void
@@ -284,8 +302,10 @@ do {
     let _: Array<Any> = arg.covariantAssocProp5
     let _: [String : Any] = arg.covariantAssocProp6
     let _: ((Any) -> Void) -> Void = arg.covariantAssocProp7
+    let _: ((Any...) -> Void) -> Void = arg.covariantAssocProp8
     let _: (
       (Any.Type) -> Void,
+      (Any.Type...) -> Void,
       (Array<Any>) -> Void,
       (Array<Array<Any>?>) -> Void,
       (() -> Any?) -> Void
@@ -298,8 +318,10 @@ do {
     let _: Array<any P1> = arg[covariantSelfSubscript5: ()]
     let _: [String : any P1] = arg[covariantSelfSubscript6: ()]
     let _: any P1 = arg[covariantSelfSubscript7: { (_: any P1) in }]
+    let _: any P1 = arg[covariantSelfSubscript8: { (_: any P1...) in }]
     let _: [String : () -> (any P1, any P1)] = arg[
       covariantSelfSubscriptComplex: { (_: any P1.Type) in },
+      { (_: any P1.Type...) in },
       { (_: Array<any P1>) in },
       { (_: Array<Array<any P1>?>) in },
       { (_: () -> (any P1)?) in }
@@ -312,8 +334,10 @@ do {
     let _: Array<Any> = arg[covariantAssocSubscript5: ()]
     let _: [String : Any] = arg[covariantAssocSubscript6: ()]
     let _: Any = arg[covariantAssocSubscript7: { (_: Any) in }]
+    let _: Any = arg[covariantAssocSubscript8: { (_: Any...) in }]
     let _: [String : () -> (Any, Any)] = arg[
       covariantAssocSubscriptComplex: { (_: Any.Type) in },
+      { (_: Any.Type...) in },
       { (_: Array<Any>) in },
       { (_: Array<Array<Any>?>) in },
       { (_: () -> Any?) in }
