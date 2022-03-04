@@ -62,6 +62,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "arm64_32",
   "i386",
   "x86_64",
+  "powerpc",
   "powerpc64",
   "powerpc64le",
   "s390x",
@@ -311,6 +312,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     } else {
       addPlatformConditionValue(PlatformConditionKind::Arch, "arm64");
     }
+    break;
+  case llvm::Triple::ArchType::ppc:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "powerpc");
     break;
   case llvm::Triple::ArchType::ppc64:
     addPlatformConditionValue(PlatformConditionKind::Arch, "powerpc64");

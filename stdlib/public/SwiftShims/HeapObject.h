@@ -202,6 +202,9 @@ static_assert(alignof(HeapObject) == alignof(void*),
       (defined(__arm64__) && (__POINTER_WIDTH__ == 32))
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK
+#elif defined(__ppc__)
+#define _swift_abi_SwiftSpareBitsMask                                          \
+  (__swift_uintptr_t) SWIFT_ABI_POWERPC_SWIFT_SPARE_BITS_MASK
 #else
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK

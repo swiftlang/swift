@@ -461,6 +461,7 @@ function verify_host_is_supported() {
       | linux-armv6             \
       | linux-armv7             \
       | linux-aarch64           \
+      | linux-powerpc           \
       | linux-powerpc64         \
       | linux-powerpc64le       \
       | linux-s390x             \
