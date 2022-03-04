@@ -999,13 +999,13 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
   lookupResult.setAllowHidden(true);
   lookupResult.suppressDiagnostics();
 
-  if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
+  if (clangSema.LookupName(lookupResult, clangSema.TUScope)) {
     if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
       return true;
   }
 
   lookupResult.clear(clang::Sema::LookupTagName);
-  if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
+  if (clangSema.LookupName(lookupResult, clangSema.TUScope)) {
     if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
       return true;
   }
