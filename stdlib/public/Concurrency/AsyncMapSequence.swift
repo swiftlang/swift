@@ -43,9 +43,10 @@ extension AsyncSequence {
   ///   same or of a different type.
   /// - Returns: An asynchronous sequence that contains, in order, the elements
   ///   produced by the `transform` closure.
+  @preconcurrency 
   @inlinable
   public __consuming func map<Transformed>(
-    _ transform: @preconcurrency @Sendable @escaping (Element) async -> Transformed
+    _ transform: @Sendable @escaping (Element) async -> Transformed
   ) -> AsyncMapSequence<Self, Transformed> {
     return AsyncMapSequence(self, transform: transform)
   }
@@ -58,13 +59,15 @@ public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let base: Base
 
+  @preconcurrency 
   @usableFromInline
-  let transform: @preconcurrency @Sendable (Base.Element) async -> Transformed
+  let transform: @Sendable (Base.Element) async -> Transformed
 
+  @preconcurrency 
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @preconcurrency @Sendable @escaping (Base.Element) async -> Transformed
+    transform: @Sendable @escaping (Base.Element) async -> Transformed
   ) {
     self.base = base
     self.transform = transform
@@ -86,13 +89,15 @@ extension AsyncMapSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
+    @preconcurrency 
     @usableFromInline
-    let transform: @preconcurrency @Sendable (Base.Element) async -> Transformed
+    let transform: @Sendable (Base.Element) async -> Transformed
 
+    @preconcurrency 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @preconcurrency @Sendable @escaping (Base.Element) async -> Transformed
+      transform: @Sendable @escaping (Base.Element) async -> Transformed
     ) {
       self.baseIterator = baseIterator
       self.transform = transform

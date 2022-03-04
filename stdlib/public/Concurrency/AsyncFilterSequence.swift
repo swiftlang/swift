@@ -33,9 +33,10 @@ extension AsyncSequence {
   ///   that indicates whether to include the element in the filtered sequence.
   /// - Returns: An asynchronous sequence that contains, in order, the elements
   ///   of the base sequence that satisfy the given predicate.
+  @preconcurrency 
   @inlinable
   public __consuming func filter(
-    _ isIncluded: @preconcurrency @Sendable @escaping (Element) async -> Bool
+    _ isIncluded: @Sendable @escaping (Element) async -> Bool
   ) -> AsyncFilterSequence<Self> {
     return AsyncFilterSequence(self, isIncluded: isIncluded)
   }
@@ -48,13 +49,15 @@ public struct AsyncFilterSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
 
+  @preconcurrency 
   @usableFromInline
-  let isIncluded: @preconcurrency Sendable (Element) async -> Bool
+  let isIncluded: @Sendable (Element) async -> Bool
 
+  @preconcurrency 
   @usableFromInline
   init(
     _ base: Base, 
-    isIncluded: @preconcurrency @Sendable @escaping (Base.Element) async -> Bool
+    isIncluded: @Sendable @escaping (Base.Element) async -> Bool
   ) {
     self.base = base
     self.isIncluded = isIncluded
@@ -76,13 +79,15 @@ extension AsyncFilterSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
+    @preconcurrency 
     @usableFromInline
-    let isIncluded: @preconcurrency @Sendable (Base.Element) async -> Bool
+    let isIncluded: @Sendable (Base.Element) async -> Bool
 
+    @preconcurrency 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      isIncluded: @preconcurrency @Sendable @escaping (Base.Element) async -> Bool
+      isIncluded: @Sendable @escaping (Base.Element) async -> Bool
     ) {
       self.baseIterator = baseIterator
       self.isIncluded = isIncluded

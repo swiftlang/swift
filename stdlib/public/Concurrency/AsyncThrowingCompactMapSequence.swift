@@ -57,9 +57,10 @@ extension AsyncSequence {
   ///   non-`nil` elements produced by the `transform` closure. The sequence
   ///   ends either when the base sequence ends or when `transform` throws an
   ///   error.
+  @preconcurrency
   @inlinable
   public __consuming func compactMap<ElementOfResult>(
-    _ transform: @preconcurrency @Sendable @escaping (Element) async throws -> ElementOfResult?
+    _ transform: @Sendable @escaping (Element) async throws -> ElementOfResult?
   ) -> AsyncThrowingCompactMapSequence<Self, ElementOfResult> {
     return AsyncThrowingCompactMapSequence(self, transform: transform)
   }
@@ -72,13 +73,15 @@ public struct AsyncThrowingCompactMapSequence<Base: AsyncSequence, ElementOfResu
   @usableFromInline
   let base: Base
 
+  @preconcurrency
   @usableFromInline
-  let transform: @preconcurrency @Sendable (Base.Element) async throws -> ElementOfResult?
+  let transform: @Sendable (Base.Element) async throws -> ElementOfResult?
 
+  @preconcurrency
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @preconcurrency @Sendable @escaping (Base.Element) async throws -> ElementOfResult?
+    transform: @Sendable @escaping (Base.Element) async throws -> ElementOfResult?
   ) {
     self.base = base
     self.transform = transform
@@ -102,16 +105,18 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
+    @preconcurrency
     @usableFromInline
-    let transform: @preconcurrency @Sendable (Base.Element) async throws -> ElementOfResult?
+    let transform: @Sendable (Base.Element) async throws -> ElementOfResult?
 
     @usableFromInline
     var finished = false
 
+    @preconcurrency
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @preconcurrency @Sendable @escaping (Base.Element) async throws -> ElementOfResult?
+      transform: @Sendable @escaping (Base.Element) async throws -> ElementOfResult?
     ) {
       self.baseIterator = baseIterator
       self.transform = transform

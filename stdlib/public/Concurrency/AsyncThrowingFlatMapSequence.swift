@@ -53,9 +53,10 @@ extension AsyncSequence {
   ///   elements in all the asychronous sequences produced by `transform`. The
   ///   sequence ends either when the the last sequence created from the last
   ///   element from base sequence ends, or when `transform` throws an error.
+  @preconcurrency
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
-    _ transform: @preconcurrency @Sendable @escaping (Element) async throws -> SegmentOfResult
+    _ transform: @Sendable @escaping (Element) async throws -> SegmentOfResult
   ) -> AsyncThrowingFlatMapSequence<Self, SegmentOfResult> {
     return AsyncThrowingFlatMapSequence(self, transform: transform)
   }
@@ -68,13 +69,15 @@ public struct AsyncThrowingFlatMapSequence<Base: AsyncSequence, SegmentOfResult:
   @usableFromInline
   let base: Base
 
+  @preconcurrency
   @usableFromInline
-  let transform: @preconcurrency @Sendable (Base.Element) async throws -> SegmentOfResult
+  let transform: @Sendable (Base.Element) async throws -> SegmentOfResult
 
+  @preconcurrency
   @usableFromInline
   init(
     _ base: Base,
-    transform: @preconcurrency @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
+    transform: @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
   ) {
     self.base = base
     self.transform = transform
@@ -96,8 +99,9 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
+    @preconcurrency
     @usableFromInline
-    let transform: @preconcurrency @Sendable (Base.Element) async throws -> SegmentOfResult
+    let transform: @Sendable (Base.Element) async throws -> SegmentOfResult
 
     @usableFromInline
     var currentIterator: SegmentOfResult.AsyncIterator?
@@ -105,10 +109,11 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     @usableFromInline
     var finished = false
 
+    @preconcurrency
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      transform: @preconcurrency @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
+      transform: @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
     ) {
       self.baseIterator = baseIterator
       self.transform = transform

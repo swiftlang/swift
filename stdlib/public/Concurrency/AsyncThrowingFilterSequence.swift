@@ -45,9 +45,10 @@ extension AsyncSequence {
   ///   of the base sequence that satisfy the given predicate. If the predicate
   ///   throws an error, the sequence contains only values produced prior to
   ///   the error.
+  @preconcurrency
   @inlinable
   public __consuming func filter(
-    _ isIncluded: @preconcurrency @Sendable @escaping (Element) async throws -> Bool
+    _ isIncluded: @Sendable @escaping (Element) async throws -> Bool
   ) -> AsyncThrowingFilterSequence<Self> {
     return AsyncThrowingFilterSequence(self, isIncluded: isIncluded)
   }
@@ -60,13 +61,15 @@ public struct AsyncThrowingFilterSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
   
+  @preconcurrency
   @usableFromInline
-  let isIncluded: @preconcurrency @Sendable (Element) async throws -> Bool
+  let isIncluded: @Sendable (Element) async throws -> Bool
 
+  @preconcurrency
   @usableFromInline
   init(
     _ base: Base, 
-    isIncluded: @preconcurrency @Sendable @escaping (Base.Element) async throws -> Bool
+    isIncluded: @Sendable @escaping (Base.Element) async throws -> Bool
   ) {
     self.base = base
     self.isIncluded = isIncluded
@@ -88,16 +91,18 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
+    @preconcurrency
     @usableFromInline
-    let isIncluded: @preconcurrency @Sendable (Base.Element) async throws -> Bool
+    let isIncluded: @Sendable (Base.Element) async throws -> Bool
 
     @usableFromInline
     var finished = false
 
+    @preconcurrency
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      isIncluded: @preconcurrency @Sendable @escaping (Base.Element) async throws -> Bool
+      isIncluded: @Sendable @escaping (Base.Element) async throws -> Bool
     ) {
       self.baseIterator = baseIterator
       self.isIncluded = isIncluded
