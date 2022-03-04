@@ -4539,6 +4539,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
     : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
       TrailingWhere(trailingWhere) {
+  Bits.AssociatedTypeDecl.IsPrimary = 0;
 }
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,

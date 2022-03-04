@@ -3465,6 +3465,7 @@ public:
       contextID.getOpaqueValue(),
       S.addTypeRef(assocType->getDefaultDefinitionType()),
       assocType->isImplicit(),
+      assocType->isPrimary(),
       overriddenAssocTypeIDs);
   }
 

@@ -1797,8 +1797,14 @@ ERROR(redundant_class_requirement,none,
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
 ERROR(where_inside_brackets,none,
-        "'where' clause next to generic parameters is obsolete, "
-        "must be written following the declaration's type", ())
+      "'where' clause next to generic parameters is obsolete, "
+      "must be written following the declaration's type", ())
+
+
+ERROR(expected_rangle_primary_associated_type_list,PointsToFirstBadToken,
+      "expected '>' to complete primary associated type list", ())
+ERROR(expected_primary_associated_type_name,PointsToFirstBadToken,
+      "expected an identifier to name primary associated type", ())
 
 //------------------------------------------------------------------------------
 // MARK: Conditional compilation parsing diagnostics

@@ -255,6 +255,8 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'UnavailabilityCondition': 251,
     'AvailabilityEntry' : 252,
     'RegexLiteralExpr': 253,
+    'PrimaryAssociatedTypeList' : 254,
+    'PrimaryAssociatedType' : 255,
 }
 
 

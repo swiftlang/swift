@@ -892,6 +892,7 @@ private:
                     bool openBracket = true, bool closeBracket = true);
   void printGenericDeclGenericParams(GenericContext *decl);
   void printDeclGenericRequirements(GenericContext *decl);
+  void printPrimaryAssociatedTypes(ProtocolDecl *decl);
   void printBodyIfNecessary(const AbstractFunctionDecl *decl);
 
   void printEnumElement(EnumElementDecl *elt);
@@ -1380,7 +1381,8 @@ struct RequirementPrintLocation {
 /// function does: asking "where should this requirement be printed?" and then
 /// callers check if the location is the ATD.
 static RequirementPrintLocation
-bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
+bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req,
+                             PrintOptions opts, bool inheritanceClause) {
   auto protoSelf = proto->getProtocolSelfType();
   // Returns the most relevant decl within proto connected to outerType (or null
   // if one doesn't exist), and whether the type is an "direct use",
@@ -1397,6 +1399,7 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
         return true;
       } else if (auto DMT = t->getAs<DependentMemberType>()) {
         auto assocType = DMT->getAssocType();
+
         if (assocType && assocType->getProtocol() == proto) {
           relevantDecl = assocType;
           foundType = t;
@@ -1411,6 +1414,17 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
     // If we didn't find anything, relevantDecl and foundType will be null, as
     // desired.
     auto directUse = foundType && outerType->isEqual(foundType);
+
+    // Prefer to attach requirements to associated type declarations,
+    // unless the associated type is a primary associated type and
+    // we're printing primary associated types using the new syntax.
+    if (!directUse &&
+        relevantDecl &&
+        opts.PrintPrimaryAssociatedTypes &&
+        isa<AssociatedTypeDecl>(relevantDecl) &&
+        cast<AssociatedTypeDecl>(relevantDecl)->isPrimary())
+      relevantDecl = proto;
+
     return std::make_pair(relevantDecl, directUse);
   };
 
@@ -1481,7 +1495,8 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
           return false;
         }
 
-        auto location = bestRequirementPrintLocation(proto, req);
+        auto location = bestRequirementPrintLocation(proto, req, Options,
+                                                     /*inheritanceClause=*/true);
         return location.AttachedTo == attachingTo && !location.InWhereClause;
       });
 }
@@ -1496,7 +1511,8 @@ void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                             proto->getRequirementSignature().getRequirements()),
       flags,
       [&](const Requirement &req) {
-        auto location = bestRequirementPrintLocation(proto, req);
+        auto location = bestRequirementPrintLocation(proto, req, Options,
+                                                     /*inheritanceClause=*/false);
         return location.AttachedTo == attachingTo && location.InWhereClause;
       });
 }
@@ -2969,6 +2985,22 @@ static void suppressingFeatureUnsafeInheritExecutor(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
+static bool usesFeaturePrimaryAssociatedTypes(Decl *decl) {
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+    if (protoDecl->getPrimaryAssociatedTypes().size() > 0)
+      return true;
+  }
+
+  return false;
+}
+
+static void suppressingFeaturePrimaryAssociatedTypes(PrintOptions &options,
+                                         llvm::function_ref<void()> action) {
+  bool originalPrintPrimaryAssociatedTypes = options.PrintPrimaryAssociatedTypes;
+  options.PrintPrimaryAssociatedTypes = false;
+  action();
+  options.PrintPrimaryAssociatedTypes = originalPrintPrimaryAssociatedTypes;
+}
 
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
@@ -3485,6 +3517,38 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   }
 }
 
+void PrintAST::printPrimaryAssociatedTypes(ProtocolDecl *decl) {
+  auto primaryAssocTypes = decl->getPrimaryAssociatedTypes();
+  if (primaryAssocTypes.empty())
+    return;
+
+  Printer.printStructurePre(PrintStructureKind::DeclGenericParameterClause);
+
+  Printer << "<";
+  llvm::interleave(
+      primaryAssocTypes,
+      [&](AssociatedTypeDecl *assocType) {
+        Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
+                                      assocType);
+        Printer.printName(assocType->getName(),
+                          PrintNameContext::GenericParameter);
+
+        printInheritedFromRequirementSignature(decl, assocType);
+
+        if (assocType->hasDefaultDefinitionType()) {
+          Printer << " = ";
+          assocType->getDefaultDefinitionType().print(Printer, Options);
+        }
+
+        Printer.printStructurePost(PrintStructureKind::GenericParameter,
+                                   assocType);
+      },
+      [&] { Printer << ", "; });
+  Printer << ">";
+
+  Printer.printStructurePost(PrintStructureKind::DeclGenericParameterClause);
+}
+
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
@@ -3501,6 +3565,10 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
       [&]{
         Printer.printName(decl->getName());
       });
+
+    if (Options.PrintPrimaryAssociatedTypes) {
+      printPrimaryAssociatedTypes(decl);
+    }
 
     printInheritedFromRequirementSignature(decl, decl);
 
@@ -4995,6 +5063,14 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
 
   if (isa<IfConfigDecl>(this)) {
     return PO.PrintIfConfig;
+  }
+
+  if (auto *ATD = dyn_cast<AssociatedTypeDecl>(this)) {
+    // If PO.PrintPrimaryAssociatedTypes is on, primary associated
+    // types are printed as part of the protocol declaration itself,
+    // so skip them here.
+    if (ATD->isPrimary() && PO.PrintPrimaryAssociatedTypes)
+      return false;
   }
 
   // Print everything else.

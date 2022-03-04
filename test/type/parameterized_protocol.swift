@@ -3,16 +3,30 @@
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -enable-parameterized-protocol-types -requirement-machine-inferred-signatures=verify -disable-availability-checking 2>&1 | %FileCheck %s
 
 
-protocol Sequence {
-  @_primaryAssociatedType associatedtype Element
+/// Test some invalid syntax first
+
+protocol Invalid1<> {}
+// expected-error@-1 {{expected an identifier to name primary associated type}}
+
+protocol Invalid2<A B> {}
+// expected-error@-1 {{expected '>' to complete primary associated type list}}
+// expected-note@-2 {{to match this opening '<'}}
+
+protocol Invalid3<Element, +> {}
+// expected-error@-1 {{expected an identifier to name primary associated type}}
+// expected-error@-2 {{expected '>' to complete primary associated type list}}
+// expected-note@-3 {{to match this opening '<'}}
+
+
+/// Test semantics
+
+protocol Sequence<Element> {
   // expected-note@-1 {{protocol requires nested type 'Element'; do you want to add it?}}
 }
 
 struct ConcreteSequence<Element> : Sequence {}
 
-protocol EquatableSequence {
-  @_primaryAssociatedType associatedtype Element : Equatable
-}
+protocol EquatableSequence<Element : Equatable> {}
 
 struct ConcreteEquatableSequence<Element : Equatable> : EquatableSequence {}
 
@@ -86,10 +100,7 @@ protocol SequenceWrapperProtocol2 {
 
 
 /// Multiple primary associated types
-protocol Collection {
-  @_primaryAssociatedType associatedtype Element
-  @_primaryAssociatedType associatedtype Index
-}
+protocol Collection<Element, Index> {}
 
 // CHECK-LABEL: .testCollection1@
 // CHECK-NEXT: Generic signature: <T where T : Collection, T.[Collection]Element == String>
