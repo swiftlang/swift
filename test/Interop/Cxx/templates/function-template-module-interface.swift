@@ -15,7 +15,7 @@
 // CHECK: }
 
 // CHECK: func lvalueReference<T>(_ ref: inout T)
-// CHECK: func constLvalueReference<T>(_: inout T)
+// CHECK: func constLvalueReference<T>(_: T)
 // CHECK: func forwardingReference<T>(_: inout T)
 // CHECK: func PointerTemplateParameter<T>(_: UnsafeMutablePointer<T>)
 

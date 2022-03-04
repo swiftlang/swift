@@ -51,7 +51,10 @@ template<class T, class U>
 M<T> multipleDependentArgs(M<T> a, M<U> b) { return {a.value}; }
 
 template<class T>
-M<T> refToDependent(const T &a) { return {a}; }
+M<T> refToDependent(T &a) { return {a}; }
+
+template<class T>
+M<T> constRefToDependent(const T &a) { return {a}; }
 
 // TODO: We can't import this template rdar://89028943
 template<class T>

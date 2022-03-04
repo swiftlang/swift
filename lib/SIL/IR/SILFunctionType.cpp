@@ -1323,6 +1323,14 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 
     return true;
   }
+
+  // Pass C++ const reference types indirectly. Right now there's no way to
+  // express immutable borrowed params, so we have to have this hack.
+  // Eventually, we should just express these correctly: rdar://89647503
+  if (clangTy->isReferenceType() &&
+      clangTy->getPointeeType().isConstQualified())
+    return true;
+
   return false;
 }
 
