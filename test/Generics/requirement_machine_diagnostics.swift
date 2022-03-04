@@ -152,7 +152,8 @@ protocol P7 : P6 {
   associatedtype AssocP7: P6
 }
 
-extension P7 where AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP6.Element' : 'P6'}}
+// FIXME: diagnose redundant requirement 'AssocP6.Element : P6'
+extension P7 where AssocP6.Element : P6,
         AssocP7.AssocP6.Element : P6,
         AssocP6.Element == AssocP7.AssocP6.Element {
   func nestedSameType1() { }

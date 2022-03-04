@@ -11,14 +11,14 @@ protocol P2 {
 
 // CHECK: ExtensionDecl line={{.*}} base=P1
 // CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2>
-extension P1 where Self : P2, T == Int {
+extension P1 where Self : P2, T == Int { // expected-warning {{redundant same-type constraint 'Self.T' == 'Int'}}
   func takeT11(_: T) {}
   func takeT12(_: Self.T) {}
 }
 
 // CHECK: ExtensionDecl line={{.*}} base=P1
 // CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2>
-extension P1 where Self : P2, Self.T == Int {
+extension P1 where Self : P2, Self.T == Int { // expected-warning {{redundant same-type constraint 'Self.T' == 'Int'}}
   func takeT21(_: T) {}
   func takeT22(_: Self.T) {}
 }

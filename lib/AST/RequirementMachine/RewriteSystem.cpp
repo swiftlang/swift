@@ -725,12 +725,24 @@ RewriteSystem::getRedundantRequirements() {
   // The resulting set of redundant requirements.
   std::vector<RequirementError> redundantRequirements;
 
+  // Map redundant rule IDs to their rewrite path for easy access
+  // in the `isRedundantRule` lambda.
+  llvm::SmallDenseMap<unsigned, RewritePath> redundantRules;
+  for (auto &pair : RedundantRules)
+    redundantRules[pair.first] = pair.second;
+
   // Collect all rule IDs for each unique requirement ID.
   llvm::SmallDenseMap<unsigned, llvm::SmallDenseSet<unsigned, 2>>
       rulesPerRequirement;
 
+  // Collect non-explicit requirements that are not redundant.
+  llvm::SmallDenseSet<unsigned, 2> impliedRequirements;
+
   for (unsigned ruleID : indices(getRules())) {
     auto &rule = getRules()[ruleID];
+
+    if (!rule.isExplicit() && !rule.isPermanent() && !rule.isRedundant())
+      impliedRequirements.insert(ruleID);
 
     if (!rule.isExplicit())
       continue;
@@ -744,6 +756,30 @@ RewriteSystem::getRedundantRequirements() {
 
   auto isRedundantRule = [&](unsigned ruleID) {
     auto &rule = getRules()[ruleID];
+
+    // If this rule is replaced using a non-explicit,
+    // non-redundant rule, it's not redundant.
+    auto rewritePath = redundantRules[ruleID];
+    for (auto step : rewritePath) {
+      switch (step.Kind) {
+      case RewriteStep::Rule: {
+        if (impliedRequirements.count(step.getRuleID()))
+          return false;
+
+        break;
+      }
+
+      case RewriteStep::LeftConcreteProjection:
+      case RewriteStep::Decompose:
+      case RewriteStep::PrefixSubstitutions:
+      case RewriteStep::Shift:
+      case RewriteStep::Relation:
+      case RewriteStep::DecomposeConcrete:
+      case RewriteStep::RightConcreteProjection:
+        break;
+      }
+    }
+
     return rule.isRedundant();
   };
 

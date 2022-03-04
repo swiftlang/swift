@@ -3,6 +3,7 @@
 class Base<T> { }
 class Derived: Base<Int> { }
 
+// expected-warning@+1 {{redundant superclass constraint 'T' : 'Base<Int>'}}
 func foo<T>(_ x: T) -> Derived where T: Base<Int>, T: Derived {
   return x
 }
