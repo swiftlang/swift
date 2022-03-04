@@ -3593,6 +3593,36 @@ static bool checkClassGlobalActorIsolation(
   return true;
 }
 
+/// Generally speaking, the isolation of the decl that overrides
+/// must match the overridden decl. But there are a number of exceptions,
+/// e.g., the decl that overrides can be nonisolated.
+/// \param newIso the isolation of the overriding declaration.
+static bool validOverrideIsolation(ActorIsolation newIso,
+                                   ValueDecl *overriddenDecl,
+                                   ActorIsolation overriddenIso) {
+  // If the isolation matches, we're done.
+  if (newIso == overriddenIso)
+    return true;
+
+  // If the overriding declaration is non-isolated, it's okay.
+  if (newIso.isIndependent() || newIso.isUnspecified())
+    return true;
+
+  // If both are actor-instance isolated, we're done. This wasn't caught by
+  // the equality case above because the nominal type describing the actor
+  // will differ when we're overriding.
+  if (newIso.getKind() == overriddenIso.getKind() &&
+      newIso.getKind() == ActorIsolation::ActorInstance)
+    return true;
+
+  // If the overridden declaration is from Objective-C with no actor annotation,
+  // allow it.
+  if (overriddenDecl->hasClangNode() && !overriddenIso)
+    return true;
+
+  return false;
+}
+
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
   // If this declaration has actor-isolated "self", it's isolated to that
@@ -3650,9 +3680,36 @@ ActorIsolation ActorIsolationRequest::evaluate(
         if (!ctor->hasAsync())
           defaultIsolation = ActorIsolation::forIndependent();
 
+  // Look for and remember the overridden declaration's isolation.
+  Optional<ActorIsolation> overriddenIso;
+  ValueDecl *overriddenValue = nullptr;
+  if ( (overriddenValue = value->getOverriddenDecl()) ) {
+    auto iso = getActorIsolation(overriddenValue);
+    SubstitutionMap subs;
+
+    if (Type selfType = value->getDeclContext()->getSelfInterfaceType()) {
+      subs = selfType->getMemberSubstitutionMap(
+          value->getModuleContext(), overriddenValue);
+    }
+    iso = iso.subst(subs);
+
+    // use the overridden decl's iso as the default isolation for this decl.
+    defaultIsolation = iso;
+    overriddenIso = iso;
+  }
+
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](
       ActorIsolation inferred, bool onlyGlobal = false) {
+    // check if the inferred isolation is valid in the context of
+    // its overridden isolation.
+    if (overriddenValue) {
+      // if the inferred isolation is not valid, then carry-over the overridden
+      // declaration's isolation as this decl's inferred isolation.
+      if (!validOverrideIsolation(inferred, overriddenValue, *overriddenIso))
+        inferred = *overriddenIso;
+    }
+
     // Add an implicit attribute to capture the actor isolation that was
     // inferred, so that (e.g.) it will be printed and serialized.
     ASTContext &ctx = value->getASTContext();
@@ -3737,20 +3794,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
         return inferredIsolation(enclosingIsolation);
       }
     }
-  }
-
-  // If the declaration overrides another declaration, it must have the same
-  // actor isolation.
-  if (auto overriddenValue = value->getOverriddenDecl()) {
-    auto isolation = getActorIsolation(overriddenValue);
-    SubstitutionMap subs;
-
-    if (Type selfType = value->getDeclContext()->getSelfInterfaceType()) {
-      subs = selfType->getMemberSubstitutionMap(
-          value->getModuleContext(), overriddenValue);
-    }
-
-    return inferredIsolation(isolation.subst(subs));
   }
 
   // If this is an accessor, use the actor isolation of its storage
@@ -3947,30 +3990,7 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
     overriddenIsolation = overriddenIsolation.subst(subs);
   }
 
-  // If the isolation matches, we're done.
-  if (isolation == overriddenIsolation)
-    return;
-  
-  // FIXME: do we need this?
-  if (overriddenIsolation == ActorIsolation::Unspecified &&
-      isolation == ActorIsolation::Independent) {
-    return;
-  }
-
-  // If the overriding declaration is non-isolated, it's okay.
-  if (isolation.isIndependent() || isolation.isUnspecified())
-    return;
-
-  // If both are actor-instance isolated, we're done. This wasn't caught by
-  // the equality case above because the nominal type describing the actor
-  // will differ when we're overriding.
-  if (isolation.getKind() == overriddenIsolation.getKind() &&
-      isolation.getKind() == ActorIsolation::ActorInstance)
-    return;
-
-  // If the overridden declaration is from Objective-C with no actor annotation,
-  // allow it.
-  if (overridden->hasClangNode() && !overriddenIsolation)
+  if (validOverrideIsolation(isolation, overridden, overriddenIsolation))
     return;
 
   // Isolation mismatch. Diagnose it.
