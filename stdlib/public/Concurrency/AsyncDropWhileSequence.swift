@@ -59,12 +59,12 @@ public struct AsyncDropWhileSequence<Base: AsyncSequence> {
   let base: Base
 
   @usableFromInline
-  let predicate: @Sendable (Base.Element) async -> Bool
+  let predicate: (Base.Element) async -> Bool
 
   @usableFromInline
   init(
     _ base: Base, 
-    predicate: @Sendable @escaping (Base.Element) async -> Bool
+    predicate: @escaping (Base.Element) async -> Bool
   ) {
     self.base = base
     self.predicate = predicate
@@ -88,12 +88,12 @@ extension AsyncDropWhileSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    var predicate: (@Sendable (Base.Element) async -> Bool)?
+    var predicate: ((Base.Element) async -> Bool)?
 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      predicate: @Sendable @escaping (Base.Element) async -> Bool
+      predicate: @escaping (Base.Element) async -> Bool
     ) {
       self.baseIterator = baseIterator
       self.predicate = predicate
