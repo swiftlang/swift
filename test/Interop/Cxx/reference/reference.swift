@@ -87,4 +87,18 @@ ReferenceTestSuite.test("pod-struct-const-lvalue-reference") {
   expectEqual(getStaticInt(), 78)
 }
 
+ReferenceTestSuite.test("reference to template") {
+  var val: CInt = 53
+  let ref = refToTemplate(&val)
+  expectEqual(53, ref.pointee)
+  ref.pointee = 42
+  expectEqual(42, val)
+}
+
+ReferenceTestSuite.test("const reference to template") {
+  var val: CInt = 53
+  let ref = constRefToTemplate(val)
+  expectEqual(53, ref.pointee)
+}
+
 runAllTests()
