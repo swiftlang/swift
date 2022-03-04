@@ -132,7 +132,7 @@ private:
   /// unexpected ones.
   Result verifyFile(unsigned BufferID);
 
-  bool checkForFixIt(const ExpectedFixIt &Expected,
+  bool checkForFixIt(const std::vector<ExpectedFixIt> &ExpectedAlts,
                      const CapturedDiagnosticInfo &D, unsigned BufferID) const;
 
   // Render the verifier syntax for a given set of fix-its.
