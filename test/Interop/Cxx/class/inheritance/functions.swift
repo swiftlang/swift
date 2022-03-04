@@ -69,4 +69,10 @@ FunctionsTestSuite.test("base member from derived from non trivial") {
   expectEqual(String(cString: dnt.inNonTrivialWithArgs(0, 1)!), "NonTrivial::inNonTrivialWithArgs")
 }
 
+FunctionsTestSuite.test("non-empty derived from empty class") {
+  let derived = DerivedFromEmptyBaseClass()
+  expectEqual(String(cString: derived.inBase()!), "EmptyBaseClass::inBase")
+  expectEqual(derived.b, 42)
+}
+
 runAllTests()
