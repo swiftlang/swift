@@ -410,7 +410,7 @@ constructTextForCallParam(ArrayRef<CodeCompletionString::Chunk> ParamGroup,
   OS << "<#T##" << Display;
   if (Display == Type && Display == ExpansionType) {
     // Short version, display and type are the same.
-  } else {
+  } else if (!Type.empty()) {
     OS << "##" << Type;
     if (ExpansionType != Type)
       OS << "##" << ExpansionType;
