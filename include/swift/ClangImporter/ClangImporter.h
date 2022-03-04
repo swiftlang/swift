@@ -61,10 +61,12 @@ class CompilerInvocation;
 class ClangImporterOptions;
 class ClangModuleUnit;
 class ClangNode;
+class ConcreteDeclRef;
 class Decl;
 class DeclContext;
 class EffectiveClangContext;
 class EnumDecl;
+class FuncDecl;
 class ImportDecl;
 class IRGenOptions;
 class ModuleDecl;
@@ -72,6 +74,7 @@ class NominalTypeDecl;
 class StructDecl;
 class SwiftLookupTable;
 class TypeDecl;
+class ValueDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
 
@@ -260,6 +263,9 @@ public:
   StructDecl *
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) override;
+
+  ConcreteDeclRef getCXXFunctionTemplateSpecialization(
+          SubstitutionMap subst, ValueDecl *decl) override;
 
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.

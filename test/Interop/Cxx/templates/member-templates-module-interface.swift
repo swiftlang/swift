@@ -8,7 +8,7 @@
 // CHECK:   mutating func passThroughConst<T>(_ val: T) -> T
 // CHECK:   func passThroughOnConst<T>(_ val: T) -> T
 // CHECK:   func passThroughConstOnConst<T>(_ val: T) -> T
-// CHECK:   mutating func doNothingConstRef<T>(_ val: inout T)
+// CHECK:   mutating func doNothingConstRef<T>(_ val: T)
 // CHECK:   mutating func make42Ref<T>(_ val: inout T)
 // CHECK: }
 

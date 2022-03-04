@@ -30,4 +30,15 @@ struct swift_static_mirror_conformance_info_s {
   swift_static_mirror_string_ref_t protocol_name;
 };
 
+struct swift_static_mirror_type_alias_s {
+  swift_static_mirror_string_ref_t type_alias_name;
+  swift_static_mirror_string_ref_t substituted_type_name;
+  swift_static_mirror_string_ref_t substituted_type_mangled_name;
+};
+
+struct swift_static_mirror_associated_type_info_s {
+  swift_static_mirror_string_ref_t mangled_type_name;
+  swift_static_mirror_type_alias_set_t *type_alias_set;
+};
+
 #endif // SWIFT_C_BINARY_SCAN_IMPL_H

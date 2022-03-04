@@ -31,10 +31,12 @@ class Type;
 
 namespace swift {
 
+class ConcreteDeclRef;
 class Decl;
 class DeclContext;
 class EffectiveClangContext;
 class SwiftLookupTable;
+class ValueDecl;
 class VisibleDeclConsumer;
 
 /// Represents the different namespaces for types in C.
@@ -200,6 +202,10 @@ public:
   virtual StructDecl *
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) = 0;
+
+  virtual ConcreteDeclRef
+  getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
+                                       ValueDecl *decl) = 0;
 
   /// Try to parse the string as a Clang function type.
   ///

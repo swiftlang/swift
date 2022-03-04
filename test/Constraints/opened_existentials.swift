@@ -72,9 +72,7 @@ func testMagic(pt: any P.Type) {
 }
 
 // --- With primary associated types and opaque parameter types
-protocol CollectionOf: Collection {
-  @_primaryAssociatedType associatedtype Element
-}
+protocol CollectionOf<Element>: Collection { }
 
 extension Array: CollectionOf { }
 extension Set: CollectionOf { }

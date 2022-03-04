@@ -1967,7 +1967,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
           cast<clang::TemplateTypeParmType>(paramTy->getPointeeType());
       swiftParamTy =
           findGenericTypeInGenericDecls(templateParamType, genericParams);
-      isInOut = true;
+      if (!paramTy->getPointeeType().isConstQualified())
+        isInOut = true;
     } else if (auto *templateParamType =
                    dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
       swiftParamTy =
@@ -1975,7 +1976,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     } else {
       if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
         paramTy = refType->getPointeeType();
-        isInOut = true;
+        if (!paramTy.isConstQualified())
+          isInOut = true;
       }
       auto importedType = importType(paramTy, importKind, allowNSUIntegerAsInt,
                                      Bridgeability::Full, OptionalityOfParam);

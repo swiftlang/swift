@@ -1170,7 +1170,14 @@ namespace {
         // declaration's name as the ABI name.
       } else if (auto clangDecl =
                             Mangle::ASTMangler::getClangDeclForMangling(Type)) {
-        abiName = clangDecl->getName();
+        // Class template specializations need to use their mangled name so
+        // that each specialization gets its own metadata. A class template
+        // specialization's Swift name will always be the mangled name, so just
+        // use that.
+        if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
+          abiName = Type->getName().str();
+        else
+          abiName = clangDecl->getName();
 
         // Typedefs and compatibility aliases that have been promoted to
         // their own nominal types need to be marked specially.

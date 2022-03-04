@@ -12,3 +12,8 @@ module CopyConstructors {
   header "copy-constructors.h"
   requires cplusplus
 }
+
+module ClassTemplateMetadata {
+  header "class-template-metadata.h"
+  requires cplusplus
+}

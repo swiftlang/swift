@@ -864,18 +864,15 @@ RewriteSystem::getMinimizedGenericSignatureRules() const {
 
 /// Verify that each loop begins and ends at its basepoint.
 void RewriteSystem::verifyRewriteLoops() const {
-#ifndef NDEBUG
   for (const auto &loop : Loops) {
     loop.verify(*this);
   }
-#endif
 }
 
 /// Assert if homotopy reduction failed to eliminate a redundant conformance,
 /// since this suggests a misunderstanding on my part.
 void RewriteSystem::verifyRedundantConformances(
     const llvm::DenseSet<unsigned> &redundantConformances) const {
-#ifndef NDEBUG
   for (unsigned ruleID : redundantConformances) {
     const auto &rule = getRule(ruleID);
     assert(!rule.isPermanent() &&
@@ -893,14 +890,12 @@ void RewriteSystem::verifyRedundantConformances(
       abort();
     }
   }
-#endif
 }
 
 // Assert if homotopy reduction failed to eliminate a rewrite rule it was
 // supposed to delete.
 void RewriteSystem::verifyMinimizedRules(
     const llvm::DenseSet<unsigned> &redundantConformances) const {
-#ifndef NDEBUG
   unsigned redundantRuleCount = 0;
 
   for (unsigned ruleID : indices(Rules)) {
@@ -982,5 +977,4 @@ void RewriteSystem::verifyMinimizedRules(
       abort();
     }
   }
-#endif
 }

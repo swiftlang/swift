@@ -72,7 +72,7 @@ bb0:
 // CHECK:      {{musttail call swifttailcc|tail call swiftcc}} void @swift_continuation_await(%swift.continuation_context* %0)
 // CHECK-NEXT: ret void
 
-// CHECK: define {{.*}} void @__swift_suspend_dispatch_1(i8* %0, %swift.context* %1)
+// CHECK: define {{.*}} void @async_continuation.0(i8* %0, %swift.context* %1)
 // CHECK-NOT: define
 // CHECK:  tail call swift{{(tail)?}}cc void %{{.*}}(%swift.context* swiftasync %1)
 // CHECK-NEXT:  ret void

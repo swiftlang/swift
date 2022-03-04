@@ -18,7 +18,6 @@
 #include "swift/StaticMirror/BinaryScanningTool.h"
 #include "swift/StaticMirror/BinaryScanImpl.h"
 #include "swift/DependencyScan/StringUtils.h"
-//#include "swift/Option/Options.h"
 
 // FIXME: Code duplication with StringUtils.cpp
 namespace swift {
@@ -135,4 +134,120 @@ void swift_static_mirror_conformances_set_dispose(
   }
   delete[] set->conformances;
   delete set;
+}
+
+static swift_static_mirror_associated_type_info_set_t *
+convertAssociatedTypeQueryResult(
+    const swift::reflection::AssociatedTypeCollectionResult &scanResult) {
+  swift_static_mirror_associated_type_info_set_t *result =
+      new swift_static_mirror_associated_type_info_set_t;
+  result->count = scanResult.AssociatedTypeInfos.size();
+  result->associated_type_infos = new swift_static_mirror_associated_type_info_t
+      [scanResult.AssociatedTypeInfos.size()];
+
+  int associatedTypeInfoIndex = 0;
+  for (const auto &assocTypeInfo : scanResult.AssociatedTypeInfos) {
+    swift_static_mirror_associated_type_info_s *info =
+        new swift_static_mirror_associated_type_info_s;
+    info->mangled_type_name = swift::c_string_utils::create_clone(
+        assocTypeInfo.MangledTypeName.c_str());
+    info->type_alias_set = new swift_static_mirror_type_alias_set_t;
+    info->type_alias_set->count = assocTypeInfo.AssociatedTypes.size();
+    info->type_alias_set->type_aliases =
+        new swift_static_mirror_type_alias_t[assocTypeInfo.AssociatedTypes
+                                                      .size()];
+    int typealiasIndex = 0;
+    for (const auto &typeAliasInfo : assocTypeInfo.AssociatedTypes) {
+      swift_static_mirror_type_alias_s *typealiasDetails =
+          new swift_static_mirror_type_alias_s;
+      typealiasDetails->type_alias_name = swift::c_string_utils::create_clone(
+          typeAliasInfo.TypeAliasName.c_str());
+      typealiasDetails->substituted_type_name =
+          swift::c_string_utils::create_clone(
+              typeAliasInfo.SubstitutedTypeFullyQualifiedName.c_str());
+      typealiasDetails->substituted_type_mangled_name =
+          swift::c_string_utils::create_clone(
+              typeAliasInfo.SubstitutedTypeMangledName.c_str());
+      info->type_alias_set->type_aliases[typealiasIndex] =
+          typealiasDetails;
+      typealiasIndex += 1;
+    }
+    result->associated_type_infos[associatedTypeInfoIndex] = info;
+    associatedTypeInfoIndex += 1;
+  }
+  return result;
+}
+
+swift_static_mirror_associated_type_info_set_t *
+swift_static_mirror_associated_type_info_set_create(
+    swift_static_mirror_t static_mirror, const char *forTypeName) {
+  BinaryScanningTool *scanTool = unwrap(static_mirror);
+  auto scanResult = scanTool->collectAssociatedTypes(forTypeName);
+  return convertAssociatedTypeQueryResult(scanResult);
+}
+
+/// Identify and collect associated types of all discovered types.
+swift_static_mirror_associated_type_info_set_t *
+swift_static_mirror_all_associated_type_info_set_create(
+    swift_static_mirror_t static_mirror) {
+  BinaryScanningTool *scanTool = unwrap(static_mirror);
+  auto scanResult = scanTool->collectAllAssociatedTypes();
+  return convertAssociatedTypeQueryResult(scanResult);
+}
+
+// swift_static_mirror_associated_type query methods
+swift_static_mirror_string_ref_t
+swift_static_mirror_type_alias_get_type_alias_name(
+    swift_static_mirror_type_alias_t type_alias) {
+  return type_alias->type_alias_name;
+}
+swift_static_mirror_string_ref_t
+swift_static_mirror_type_alias_get_substituted_type_name(
+    swift_static_mirror_type_alias_t type_alias) {
+  return type_alias->substituted_type_name;
+}
+swift_static_mirror_string_ref_t
+swift_static_mirror_type_alias_get_substituted_type_mangled_name(
+    swift_static_mirror_type_alias_t type_alias) {
+  return type_alias->substituted_type_mangled_name;
+}
+
+// swift_static_mirror_associated_type_info query methods
+swift_static_mirror_string_ref_t
+swift_static_mirror_associated_type_info_get_mangled_type_name(
+    swift_static_mirror_associated_type_info_t associated_type_info) {
+  return associated_type_info->mangled_type_name;
+}
+swift_static_mirror_type_alias_set_t*
+swift_static_mirror_associated_type_info_get_type_alias_set(
+    swift_static_mirror_associated_type_info_t associated_type_info) {
+  return associated_type_info->type_alias_set;
+}
+
+void swift_static_mirror_type_alias_dispose(swift_static_mirror_type_alias_t type_alias) {
+  swift_static_mirror_string_dispose(type_alias->substituted_type_mangled_name);
+  swift_static_mirror_string_dispose(type_alias->substituted_type_name);
+  swift_static_mirror_string_dispose(type_alias->type_alias_name);
+  delete type_alias;
+}
+
+void swift_static_mirror_type_alias_set_dispose(swift_static_mirror_type_alias_set_t *type_alias_set) {
+  for (size_t i = 0; i < type_alias_set->count; ++i) {
+    swift_static_mirror_type_alias_dispose(type_alias_set->type_aliases[i]);
+  }
+  delete[] type_alias_set->type_aliases;
+  delete type_alias_set;
+}
+
+void swift_static_mirror_associated_type_info_dispose(swift_static_mirror_associated_type_info_t associated_type_info) {
+  swift_static_mirror_string_dispose(associated_type_info->mangled_type_name);
+  swift_static_mirror_type_alias_set_dispose(associated_type_info->type_alias_set);
+}
+
+void swift_static_mirror_associated_type_info_set_dispose(swift_static_mirror_associated_type_info_set_t *associated_type_info_set) {
+  for (size_t i = 0; i < associated_type_info_set->count; ++i) {
+    swift_static_mirror_associated_type_info_dispose(associated_type_info_set->associated_type_infos[i]);
+  }
+  delete[] associated_type_info_set->associated_type_infos;
+  delete associated_type_info_set;
 }

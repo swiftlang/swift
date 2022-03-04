@@ -631,14 +631,12 @@ void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
 }
 
 void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
-#ifndef NDEBUG
-
 #define ASSERT_RULE(expr) \
   if (!(expr)) { \
     llvm::errs() << "&&& Malformed rewrite rule: " << rule << "\n"; \
     llvm::errs() << "&&& " << #expr << "\n\n"; \
     dump(llvm::errs()); \
-    assert(expr); \
+    abort(); \
   }
 
   for (const auto &rule : Rules) {
@@ -705,7 +703,6 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
   }
 
 #undef ASSERT_RULE
-#endif
 }
 
 void RewriteSystem::dump(llvm::raw_ostream &out) const {

@@ -297,6 +297,26 @@ struct ConformanceCollectionResult {
   std::vector<std::string> Errors;
 };
 
+struct AssociatedType {
+  std::string TypeAliasName;
+  std::string SubstitutedTypeMangledName;
+  std::string SubstitutedTypeFullyQualifiedName;
+  std::string SubstitutedTypeDiagnosticPrintName;
+};
+
+/// Info about a given type's associated type, as read out from an Image
+struct AssociatedTypeInfo {
+  std::string MangledTypeName;
+  std::string FullyQualifiedName;
+  std::string ProtocolFullyQualifiedName;
+  std::vector<AssociatedType> AssociatedTypes;
+};
+
+struct AssociatedTypeCollectionResult {
+  std::vector<AssociatedTypeInfo> AssociatedTypeInfos;
+  std::vector<std::string> Errors;
+};
+
 /// An implementation of MetadataReader's BuilderType concept for
 /// building TypeRefs, and parsing field metadata from any images
 /// it has been made aware of.
@@ -880,6 +900,7 @@ public:
   void dumpTypeRef(RemoteRef<char> MangledName, std::ostream &stream,
                    bool printTypeName = false);
   void dumpFieldSection(std::ostream &stream);
+  AssociatedTypeCollectionResult collectAssociatedTypes(llvm::Optional<std::string> forMangledTypeName);
   void dumpAssociatedTypeSection(std::ostream &stream);
   void dumpBuiltinTypeSection(std::ostream &stream);
   void dumpCaptureSection(std::ostream &stream);
