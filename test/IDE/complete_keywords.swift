@@ -308,7 +308,10 @@ for _ in 1...10 {
   #^TOP_LEVEL_2?check=KW_DECL_STMT;check=KW_NO_RETURN^#
 }
 
-if true {} #^TOP_LEVEL_AFTER_IF_1?check=KW_DECL_STMT;check=KW_NO_RETURN^#
+if true {} #^TOP_LEVEL_AFTER_IF_1?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN^#
+if true {} 
+#^TOP_LEVEL_AFTER_IF_2?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN^#
+
 
 if true {} else #^TOP_LEVEL_AFTER_IF_ELSE_1?check=AFTER_IF_ELSE^# {}
 

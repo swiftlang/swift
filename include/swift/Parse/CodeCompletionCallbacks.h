@@ -225,7 +225,7 @@ public:
 
   virtual void completePlatformCondition() {};
 
-  virtual void completeAfterIfStmt(bool hasElse) {};
+  virtual void completeAfterIfStmtElse() {};
 
   virtual void completeGenericRequirement() {};
 
