@@ -2926,7 +2926,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                     /*topLevelFunction=*/true, isMethod,
                                     /*isInitializer=*/isa<ConstructorDecl>(afd),
                                     getNumCurryLevels())
-        ->getMinimalCanonicalType(afd);
+        ->getCanonicalType();
   }
 
   if (isa<AbstractStorageDecl>(this)) {
@@ -2942,7 +2942,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                    /*topLevelFunction=*/true,
                                    /*isMethod=*/false,
                                    /*isInitializer=*/false, getNumCurryLevels())
-              ->getMinimalCanonicalType(getDeclContext());
+              ->getCanonicalType();
     }
 
     // We want to curry the default signature type with the 'self' type of the
@@ -2950,14 +2950,14 @@ CanType ValueDecl::getOverloadSignatureType() const {
     // is unique across different contexts, such as between a protocol extension
     // and struct decl.
     return defaultSignatureType->addCurriedSelfType(getDeclContext())
-        ->getMinimalCanonicalType(getDeclContext());
+        ->getCanonicalType();
   }
 
   if (isa<EnumElementDecl>(this)) {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
         /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
-    return mappedType->getMinimalCanonicalType(getDeclContext());
+    return mappedType->getCanonicalType();
   }
 
   // Note: If you add more cases to this function, you should update the

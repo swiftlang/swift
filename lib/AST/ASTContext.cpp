@@ -4423,9 +4423,8 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
     LayoutConstraint layout) {
   // FIXME: It'd be great if all of our callers could submit interface types.
-  // But the constraint solver submits archetypes when trying to issue checks
-  // against members of existential types. For now, we'll work around them by
-  // forcing an interface type.
+  // But the constraint solver submits archetypes when e.g. trying to issue
+  // checks against members of existential types.
   //  assert((!superclass || !superclass->hasArchetype())
   //         && "superclass must be interface type");
   auto arena = AllocationArena::Permanent;
@@ -4444,11 +4443,9 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
 CanTypeWrapper<OpenedArchetypeType>
 OpenedArchetypeType::get(CanType existential, const DeclContext *useDC,
                          Optional<UUID> knownID) {
-  Type interfaceType = GenericTypeParamType::get(
-      /*isTypeSequence=*/false,
-      /*depth*/ useDC->getGenericContextDepth() + 1, /*index*/ 0,
-      existential->getASTContext());
-  return get(existential, interfaceType, useDC, knownID);
+  return get(existential,
+             OpenedArchetypeType::getSelfInterfaceTypeFromContext(useDC),
+             useDC, knownID);
 }
 
 CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
@@ -4511,10 +4508,9 @@ CanType OpenedArchetypeType::getAny(CanType existential, Type interfaceType,
 
 CanType OpenedArchetypeType::getAny(CanType existential,
                                     const DeclContext *useDC) {
-  Type interfaceType = GenericTypeParamType::get(
-      /*isTypeSequence=*/false, useDC->getGenericContextDepth() + 1, 0,
-      existential->getASTContext());
-  return getAny(existential, interfaceType, useDC);
+  return getAny(existential,
+                OpenedArchetypeType::getSelfInterfaceTypeFromContext(useDC),
+                useDC);
 }
 
 void SubstitutionMap::Storage::Profile(
@@ -5191,6 +5187,18 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   return canonicalSig;
 }
 
+Type OpenedArchetypeType::getSelfInterfaceTypeFromContext(const DeclContext *useDC) {
+  auto typeContext = useDC->getInnermostTypeContext();
+  if (typeContext && typeContext->getSelfProtocolDecl()) {
+    return typeContext->getProtocolSelfType();
+  } else {
+    return GenericTypeParamType::get(
+        /*isTypeSequence=*/false,
+        /*depth*/ useDC->getGenericContextDepth() + 1, /*index*/ 0,
+        useDC->getASTContext());
+  }
+}
+
 CanGenericSignature
 ASTContext::getOpenedArchetypeSignature(Type type, const DeclContext *useDC) {
   assert(type->isExistentialType());
@@ -5218,14 +5226,21 @@ ASTContext::getOpenedArchetypeSignature(Type type, const DeclContext *useDC) {
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
 
-  auto depth = useDC->getGenericContextDepth() + 1;
-  auto genericParam =
-      GenericTypeParamType::get(/*type sequence*/ false,
-                                /*depth*/ depth, /*index*/ 0, *this);
+  GenericSignature outerSignature;
+  auto *typeContext = useDC->getInnermostTypeContext();
+  if (typeContext && typeContext->getSelfProtocolDecl()) {
+    outerSignature = GenericSignature();
+  } else {
+    outerSignature = useDC->getGenericSignatureOfContext();
+  }
+
+  auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(useDC)
+                        ->getCanonicalType()->getAs<GenericTypeParamType>();
+
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           constraint);
   auto genericSig = buildGenericSignature(
-      *this, useDC->getGenericSignatureOfContext().getCanonicalSignature(),
+      *this, outerSignature.getCanonicalSignature(),
       {genericParam}, {requirement});
 
   CanGenericSignature canGenericSig(genericSig);

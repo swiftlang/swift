@@ -4017,7 +4017,12 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
   Type superclass;
   llvm::SmallVector<Type, 2> MinimalMembers;
   bool MinimalHasExplicitAnyObject = false;
+  auto ifaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(useDC);
   for (const auto &Req : Reqs) {
+    if (!Req.getFirstType()->isEqual(ifaceTy)) {
+      continue;
+    }
+
     switch (Req.getKind()) {
     case RequirementKind::Superclass:
       assert((!superclass || superclass->isEqual(Req.getSecondType()))
@@ -4035,7 +4040,7 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
     }
   }
 
-  // Ensure any superclass bounds appears first regardless of its order among
+  // Ensure superclass bounds appear first regardless of their order among
   // the signature's requirements.
   if (superclass)
     MinimalMembers.insert(MinimalMembers.begin(), superclass->getCanonicalType());

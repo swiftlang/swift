@@ -5747,6 +5747,15 @@ class OpenedArchetypeType final : public ArchetypeType,
          LayoutConstraint layout);
 
 public:
+  /// Compute the parameter that serves as the \c Self type for an opened
+  /// archetype from the given declaration context.
+  ///
+  /// For protocol extensions, this type is the context's \c Self type. For
+  /// all other contexts, this type is a generic parameter one level deeper
+  /// than the deepest generic context depth.
+  static Type getSelfInterfaceTypeFromContext(const DeclContext *useDC);
+
+public:
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
   ///

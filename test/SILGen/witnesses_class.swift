@@ -84,9 +84,9 @@ class UsesDefaults<X : Barable> : HasDefaults {}
 
 // Invariant Self, since type signature contains an associated type:
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15witnesses_class12UsesDefaultsCyxGAA03HasD0A2aEP16hasDefaultTakesTyy1TQzFTW : $@convention(witness_method: HasDefaults) <τ_0_0 where τ_0_0 : Barable> (@in_guaranteed UsesDefaults<τ_0_0>, @in_guaranteed UsesDefaults<τ_0_0>) -> ()
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15witnesses_class12UsesDefaultsCyqd__GAA03HasD0A2aEP16hasDefaultTakesTyy1TQzFTW : $@convention(witness_method: HasDefaults) <τ_0_0><τ_1_0 where τ_0_0 : UsesDefaults<τ_1_0>, τ_1_0 : Barable> (@in_guaranteed UsesDefaults<τ_1_0>, @in_guaranteed τ_0_0) -> ()
 // CHECK: [[FN:%.*]] = function_ref @$s15witnesses_class11HasDefaultsPAAE16hasDefaultTakesTyy1TQzF : $@convention(method) <τ_0_0 where τ_0_0 : HasDefaults> (@in_guaranteed τ_0_0.T, @in_guaranteed τ_0_0) -> ()
-// CHECK: apply [[FN]]<UsesDefaults<τ_0_0>>(
+// CHECK: apply [[FN]]<τ_0_0>(
 // CHECK: return
 
 // Covariant Self:
@@ -98,9 +98,9 @@ class UsesDefaults<X : Barable> : HasDefaults {}
 
 // Invariant Self, since type signature contains an associated type:
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15witnesses_class12UsesDefaultsCyxGAA03HasD0A2aEP23hasDefaultGenericTakesTyy1TQz_qd__tAA7FooableRd__lFTW : $@convention(witness_method: HasDefaults) <τ_0_0 where τ_0_0 : Barable><τ_1_0 where τ_1_0 : Fooable> (@in_guaranteed UsesDefaults<τ_0_0>, @guaranteed τ_1_0, @in_guaranteed UsesDefaults<τ_0_0>) -> ()
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15witnesses_class12UsesDefaultsCyqd__GAA03HasD0A2aEP23hasDefaultGenericTakesTyy1TQz_qd__tAA7FooableRd__lFTW : $@convention(witness_method: HasDefaults) <τ_0_0><τ_1_0 where τ_0_0 : UsesDefaults<τ_1_0>, τ_1_0 : Barable><τ_2_0 where τ_2_0 : Fooable> (@in_guaranteed UsesDefaults<τ_1_0>, @guaranteed τ_2_0, @in_guaranteed τ_0_0) -> ()
 // CHECK: [[FN:%.*]] = function_ref @$s15witnesses_class11HasDefaultsPAAE23hasDefaultGenericTakesTyy1TQz_qd__tAA7FooableRd__lF : $@convention(method) <τ_0_0 where τ_0_0 : HasDefaults><τ_1_0 where τ_1_0 : Fooable> (@in_guaranteed τ_0_0.T, @guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
-// CHECK: apply [[FN]]<UsesDefaults<τ_0_0>, τ_1_0>(
+// CHECK: apply [[FN]]<τ_0_0, τ_2_0>(
 // CHECK: return
 
 protocol ReturnsCovariantSelf {
