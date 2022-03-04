@@ -505,6 +505,11 @@ protected:
     IsOpaqueType : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(AssociatedTypeDecl, AbstractTypeParamDecl, 1,
+    /// Whether this is a primary associated type.
+    IsPrimary : 1
+  );
+
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
@@ -3205,6 +3210,14 @@ public:
                      SourceLoc nameLoc, TrailingWhereClause *trailingWhere,
                      LazyMemberLoader *definitionResolver,
                      uint64_t resolverData);
+
+  bool isPrimary() const {
+    return Bits.AssociatedTypeDecl.IsPrimary;
+  }
+
+  void setPrimary() {
+    Bits.AssociatedTypeDecl.IsPrimary = true;
+  }
 
   /// Get the protocol in which this associated type is declared.
   ProtocolDecl *getProtocol() const {

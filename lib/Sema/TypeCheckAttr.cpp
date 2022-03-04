@@ -316,8 +316,6 @@ public:
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
 
-  void visitPrimaryAssociatedTypeAttr(PrimaryAssociatedTypeAttr *attr);
-
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
 };
 
@@ -5892,10 +5890,6 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   if (!fn->isAsyncContext()) {
     diagnose(attr->getLocation(), diag::inherits_executor_without_async);
   }
-}
-
-void AttributeChecker::visitPrimaryAssociatedTypeAttr(
-    PrimaryAssociatedTypeAttr *attr) {
 }
 
 namespace {

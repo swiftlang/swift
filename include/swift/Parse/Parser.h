@@ -1199,6 +1199,9 @@ public:
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   BodyAndFingerprint
   parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
+
+  ParserStatus parsePrimaryAssociatedTypes(
+      SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 

@@ -68,9 +68,7 @@ func testAnyDictionary(numberNames: [Int: String]) {
 }
 
 // Combine with parameterized protocol types
-protocol PrimaryCollection: Collection {
-  @_primaryAssociatedType associatedtype Element
-}
+protocol PrimaryCollection<Element>: Collection {}
 
 extension Array: PrimaryCollection { }
 extension Set: PrimaryCollection { }

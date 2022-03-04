@@ -704,7 +704,7 @@ PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
   SmallVector<AssociatedTypeDecl *, 2> assocTypes;
 
   for (auto *assocType : decl->getAssociatedTypeMembers()) {
-    if (assocType->getAttrs().hasAttribute<PrimaryAssociatedTypeAttr>())
+    if (assocType->isPrimary())
       assocTypes.push_back(assocType);
   }
 

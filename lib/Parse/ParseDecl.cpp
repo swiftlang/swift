@@ -7963,6 +7963,106 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   return DCC.fixupParserResult(Status, CD);
 }
 
+ParserStatus Parser::parsePrimaryAssociatedTypes(
+    SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes) {
+  SourceLoc LAngleLoc = consumeStartingLess();
+
+  ParserStatus Result;
+  SyntaxParsingContext PATContext(SyntaxContext,
+                                  SyntaxKind::PrimaryAssociatedTypeList);
+
+  bool HasNextParam = false;
+  do {
+    SyntaxParsingContext ATContext(SyntaxContext,
+                                   SyntaxKind::PrimaryAssociatedType);
+
+    // Note that we're parsing a declaration.
+    StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
+                                    StructureMarkerKind::Declaration);
+
+    // Parse attributes.
+    DeclAttributes Attrs;
+    if (Tok.hasComment())
+      Attrs.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
+    parseDeclAttributeList(Attrs);
+
+    // Parse the name of the parameter.
+    Identifier Name;
+    SourceLoc NameLoc;
+    if (parseIdentifier(Name, NameLoc, /*diagnoseDollarPrefix=*/true,
+                        diag::expected_primary_associated_type_name)) {
+      Result.setIsParseError();
+      break;
+    }
+
+    // Parse the ':' followed by a type.
+    SmallVector<InheritedEntry, 1> Inherited;
+    if (Tok.is(tok::colon)) {
+      (void)consumeToken();
+      ParserResult<TypeRepr> Ty;
+
+      if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol,
+                    tok::kw_Any)) {
+        Ty = parseType();
+      } else if (Tok.is(tok::kw_class)) {
+        diagnose(Tok, diag::unexpected_class_constraint);
+        diagnose(Tok, diag::suggest_anyobject)
+        .fixItReplace(Tok.getLoc(), "AnyObject");
+        consumeToken();
+        Result.setIsParseError();
+      } else {
+        diagnose(Tok, diag::expected_generics_type_restriction, Name);
+        Result.setIsParseError();
+      }
+
+      if (Ty.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
+
+      if (Ty.isNonNull())
+        Inherited.push_back({Ty.get()});
+    }
+
+    ParserResult<TypeRepr> UnderlyingTy;
+    if (Tok.is(tok::equal)) {
+      SyntaxParsingContext InitContext(SyntaxContext,
+                                       SyntaxKind::TypeInitializerClause);
+      consumeToken(tok::equal);
+      UnderlyingTy = parseType(diag::expected_type_in_associatedtype);
+      Result |= UnderlyingTy;
+      if (UnderlyingTy.isNull())
+        return Result;
+    }
+
+    auto *AssocType = new (Context)
+        AssociatedTypeDecl(CurDeclContext, NameLoc, Name, NameLoc,
+                           UnderlyingTy.getPtrOrNull(),
+                           /*trailingWhere=*/nullptr);
+    AssocType->getAttrs() = Attrs;
+    if (!Inherited.empty())
+      AssocType->setInherited(Context.AllocateCopy(Inherited));
+    AssocType->setPrimary();
+
+    AssocTypes.push_back(AssocType);
+
+    // Parse the comma, if the list continues.
+    HasNextParam = consumeIf(tok::comma);
+  } while (HasNextParam);
+
+  // Parse the closing '>'.
+  SourceLoc RAngleLoc;
+  if (startsWithGreater(Tok)) {
+    RAngleLoc = consumeStartingGreater();
+  } else {
+    diagnose(Tok, diag::expected_rangle_primary_associated_type_list);
+    diagnose(LAngleLoc, diag::opening_angle);
+
+    // Skip until we hit the '>'.
+    RAngleLoc = skipUntilGreaterInTypeList();
+  }
+
+  return Result;
+}
+
 /// Parse a 'protocol' declaration, doing no token skipping on error.
 ///
 /// \verbatim
@@ -7970,7 +8070,17 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 ///      protocol-head '{' protocol-member* '}'
 ///
 ///   protocol-head:
-///     'protocol' attribute-list identifier inheritance? 
+///     attribute-list 'protocol' identifier primary-associated-type-list?
+///     inheritance? 
+///
+///   primary-associated-type-list:
+///     '<' primary-associated-type+ '>'
+///
+///   primary-associated-type:
+///     identifier inheritance? default-associated-type
+///
+///   default-associated-type:
+///     '=' type
 ///
 ///   protocol-member:
 ///      decl-func
@@ -7991,12 +8101,20 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Status.isErrorOrHasCompletion())
     return Status;
 
-  // Protocols don't support generic parameters, but people often want them and
-  // we want to have good error recovery if they try them out.  Parse them and
-  // produce a specific diagnostic if present.
-  if (startsWithLess(Tok)) {
-    diagnose(Tok, diag::generic_arguments_protocol);
-    maybeParseGenericParams();
+  SmallVector<AssociatedTypeDecl *, 2> PrimaryAssociatedTypes;
+
+  if (Context.LangOpts.EnableParameterizedProtocolTypes) {
+    if (startsWithLess(Tok)) {
+      Status |= parsePrimaryAssociatedTypes(PrimaryAssociatedTypes);
+    }
+  } else {
+    // Protocols don't support generic parameters, but people often want them and
+    // we want to have good error recovery if they try them out.  Parse them and
+    // produce a specific diagnostic if present.
+    if (startsWithLess(Tok)) {
+      diagnose(Tok, diag::generic_arguments_protocol);
+      maybeParseGenericParams();
+    }
   }
 
   DebuggerContextChange DCC (*this);
@@ -8034,6 +8152,12 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     CodeCompletion->setParsedDecl(Proto);
 
   ContextChange CC(*this, Proto);
+
+  // Re-parent the primary associated type declarations into the protocol.
+  for (auto *AssocType : PrimaryAssociatedTypes) {
+    AssocType->setDeclContext(Proto);
+    Proto->addMember(AssocType);
+  }
 
   // Parse the body.
   {

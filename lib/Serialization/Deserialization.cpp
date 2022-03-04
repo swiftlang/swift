@@ -2777,11 +2777,13 @@ public:
     TypeID defaultDefinitionID;
     bool isImplicit;
     ArrayRef<uint64_t> rawOverriddenIDs;
+    bool isPrimary;
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
                                                       defaultDefinitionID,
                                                       isImplicit,
+                                                      isPrimary,
                                                       rawOverriddenIDs);
 
     auto DC = MF.getDeclContext(contextID);
@@ -2815,6 +2817,9 @@ public:
       }
     }
     assocType->setOverriddenDecls(overriddenAssocTypes);
+
+    if (isPrimary)
+      assocType->setPrimary();
 
     return assocType;
   }
