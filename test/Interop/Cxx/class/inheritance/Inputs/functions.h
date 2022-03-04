@@ -49,3 +49,12 @@ struct DerivedFromDerived : Derived {
 };
 
 struct DerivedFromNonTrivial : NonTrivial {};
+
+struct EmptyBaseClass {
+  const char *inBase() const { return "EmptyBaseClass::inBase"; }
+};
+
+struct DerivedFromEmptyBaseClass : EmptyBaseClass {
+  int a = 42;
+  int b = 42;
+};

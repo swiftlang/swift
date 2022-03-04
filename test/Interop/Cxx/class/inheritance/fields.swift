@@ -52,4 +52,10 @@ FieldsTestSuite.test("Fields from derived from non trivial") {
   expectEqual(mutable.f, 48)
 }
 
+FieldsTestSuite.test("Derived from class template") {
+  var derived = DerivedFromClassTemplate()
+  derived.value = 42
+  expectEqual(derived.value, 42)
+}
+
 runAllTests()

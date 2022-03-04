@@ -46,3 +46,12 @@ struct NonTrivialHasOneField {
 struct NonTrivialDerivedFromAll : NonTrivialHasOneField, NonTrivialDerivedWithOneField {
   int f = 6;
 };
+
+// Templates:
+
+template<class T>
+struct ClassTemplate {
+  T value;
+};
+
+struct DerivedFromClassTemplate : ClassTemplate<int> {};
