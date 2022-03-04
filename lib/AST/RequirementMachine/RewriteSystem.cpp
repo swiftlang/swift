@@ -659,10 +659,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
-      // which are immediately simplified away.
-      if (!rule.isLHSSimplified() &&
-          index != 0 && index != lhs.size() - 1) {
+      if (index != 0 && index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
@@ -693,9 +690,10 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
+      // Completion can produce rules like [P:T].[Q:R] => [P:T].[Q]
       // which are immediately simplified away.
-      if (!rule.isRHSSimplified() && index != 0) {
+      if (!rule.isRHSSimplified() &&
+          index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
