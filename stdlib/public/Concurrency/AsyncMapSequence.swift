@@ -59,15 +59,13 @@ public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let base: Base
 
-  @preconcurrency 
   @usableFromInline
-  let transform: @Sendable (Base.Element) async -> Transformed
+  let transform: (Base.Element) async -> Transformed
 
-  @preconcurrency 
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @Sendable @escaping (Base.Element) async -> Transformed
+    transform: @escaping (Base.Element) async -> Transformed
   ) {
     self.base = base
     self.transform = transform
@@ -89,15 +87,13 @@ extension AsyncMapSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
-    @preconcurrency 
     @usableFromInline
-    let transform: @Sendable (Base.Element) async -> Transformed
+    let transform: (Base.Element) async -> Transformed
 
-    @preconcurrency 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @Sendable @escaping (Base.Element) async -> Transformed
+      transform: @escaping (Base.Element) async -> Transformed
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -124,13 +120,13 @@ extension AsyncMapSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncMapSequence: Sendable 
+extension AsyncMapSequence: @unchecked Sendable 
   where Base: Sendable, 
         Base.Element: Sendable, 
         Transformed: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncMapSequence.Iterator: Sendable 
+extension AsyncMapSequence.Iterator: @unchecked Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable, 
         Transformed: Sendable { }

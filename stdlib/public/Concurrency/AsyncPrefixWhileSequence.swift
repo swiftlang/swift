@@ -50,19 +50,17 @@ extension AsyncSequence {
 /// An asynchronous sequence, containing the initial, consecutive
 /// elements of the base sequence that satisfy a given predicate.
 @available(SwiftStdlib 5.1, *)
-@preconcurrency
 public struct AsyncPrefixWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
 
   @usableFromInline
-  let predicate: @Sendable (Base.Element) async -> Bool
+  let predicate: (Base.Element) async -> Bool
 
-  @preconcurrency
   @usableFromInline
   init(
     _ base: Base, 
-    predicate: @Sendable @escaping (Base.Element) async -> Bool
+    predicate: @escaping (Base.Element) async -> Bool
   ) {
     self.base = base
     self.predicate = predicate
@@ -87,15 +85,13 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
-    @preconcurrency
     @usableFromInline
-    let predicate: @Sendable (Base.Element) async -> Bool
+    let predicate: (Base.Element) async -> Bool
 
-    @preconcurrency
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      predicate: @Sendable @escaping (Base.Element) async -> Bool
+      predicate: @escaping (Base.Element) async -> Bool
     ) {
       self.baseIterator = baseIterator
       self.predicate = predicate
@@ -127,11 +123,11 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncPrefixWhileSequence: Sendable 
+extension AsyncPrefixWhileSequence: @unchecked Sendable 
   where Base: Sendable, 
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncPrefixWhileSequence.Iterator: Sendable 
+extension AsyncPrefixWhileSequence.Iterator: @unchecked Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable { }

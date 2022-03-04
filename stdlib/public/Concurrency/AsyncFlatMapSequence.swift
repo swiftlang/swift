@@ -55,15 +55,13 @@ public struct AsyncFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSe
   @usableFromInline
   let base: Base
 
-  @preconcurrency 
   @usableFromInline
-  let transform: @Sendable (Base.Element) async -> SegmentOfResult
+  let transform: (Base.Element) async -> SegmentOfResult
 
-  @preconcurrency
   @usableFromInline
   init(
     _ base: Base,
-    transform: @Sendable @escaping (Base.Element) async -> SegmentOfResult
+    transform: @escaping (Base.Element) async -> SegmentOfResult
   ) {
     self.base = base
     self.transform = transform
@@ -85,9 +83,8 @@ extension AsyncFlatMapSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
-    @preconcurrency
     @usableFromInline
-    let transform: @Sendable (Base.Element) async -> SegmentOfResult
+    let transform: (Base.Element) async -> SegmentOfResult
 
     @usableFromInline
     var currentIterator: SegmentOfResult.AsyncIterator?
@@ -95,11 +92,10 @@ extension AsyncFlatMapSequence: AsyncSequence {
     @usableFromInline
     var finished = false
 
-    @preconcurrency
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      transform: @Sendable @escaping (Base.Element) async -> SegmentOfResult
+      transform: @escaping (Base.Element) async -> SegmentOfResult
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -161,14 +157,14 @@ extension AsyncFlatMapSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncFlatMapSequence: Sendable 
+extension AsyncFlatMapSequence: @unchecked Sendable 
   where Base: Sendable, 
         Base.Element: Sendable, 
         SegmentOfResult: Sendable, 
         SegmentOfResult.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncFlatMapSequence.Iterator: Sendable 
+extension AsyncFlatMapSequence.Iterator: @unchecked Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable, 
         SegmentOfResult: Sendable, 

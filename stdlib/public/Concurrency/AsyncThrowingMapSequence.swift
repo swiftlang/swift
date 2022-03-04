@@ -72,15 +72,13 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let base: Base
 
-  @preconcurrency
   @usableFromInline
-  let transform: @Sendable (Base.Element) async throws -> Transformed
+  let transform: (Base.Element) async throws -> Transformed
 
-  @preconcurrency
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @Sendable @escaping (Base.Element) async throws -> Transformed
+    transform: @escaping (Base.Element) async throws -> Transformed
   ) {
     self.base = base
     self.transform = transform
@@ -102,18 +100,16 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
-    @preconcurrency
     @usableFromInline
-    let transform: @Sendable (Base.Element) async throws -> Transformed
+    let transform: (Base.Element) async throws -> Transformed
 
     @usableFromInline
     var finished = false
 
-    @preconcurrency
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @Sendable @escaping (Base.Element) async throws -> Transformed
+      transform: @escaping (Base.Element) async throws -> Transformed
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -147,13 +143,13 @@ extension AsyncThrowingMapSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingMapSequence: Sendable 
+extension AsyncThrowingMapSequence: @unchecked Sendable 
   where Base: Sendable, 
         Base.Element: Sendable, 
         Transformed: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingMapSequence.Iterator: Sendable 
+extension AsyncThrowingMapSequence.Iterator: @unchecked Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable, 
         Transformed: Sendable { }

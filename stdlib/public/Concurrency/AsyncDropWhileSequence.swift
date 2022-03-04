@@ -58,11 +58,9 @@ public struct AsyncDropWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
 
-  @preconcurrency 
   @usableFromInline
   let predicate: @Sendable (Base.Element) async -> Bool
 
-  @preconcurrency 
   @usableFromInline
   init(
     _ base: Base, 
@@ -89,11 +87,9 @@ extension AsyncDropWhileSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
-    @preconcurrency 
     @usableFromInline
     var predicate: (@Sendable (Base.Element) async -> Bool)?
 
-    @preconcurrency 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
@@ -134,11 +130,11 @@ extension AsyncDropWhileSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncDropWhileSequence: Sendable 
+extension AsyncDropWhileSequence: @unchecked Sendable 
   where Base: Sendable, 
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncDropWhileSequence.Iterator: Sendable 
+extension AsyncDropWhileSequence.Iterator: @unchecked Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable { }

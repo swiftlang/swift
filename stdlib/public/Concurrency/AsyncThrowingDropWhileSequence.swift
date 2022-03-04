@@ -71,15 +71,13 @@ public struct AsyncThrowingDropWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
 
-  @preconcurrency
   @usableFromInline
-  let predicate: @Sendable (Base.Element) async throws -> Bool
+  let predicate: (Base.Element) async throws -> Bool
 
-  @preconcurrency
   @usableFromInline
   init(
     _ base: Base, 
-    predicate: @Sendable @escaping (Base.Element) async throws -> Bool
+    predicate: @escaping (Base.Element) async throws -> Bool
   ) {
     self.base = base
     self.predicate = predicate
@@ -101,9 +99,8 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
-    @preconcurrency
     @usableFromInline
-    let predicate: @Sendable (Base.Element) async throws -> Bool
+    let predicate: (Base.Element) async throws -> Bool
 
     @usableFromInline
     var finished = false
@@ -111,11 +108,10 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
     @usableFromInline
     var doneDropping = false
 
-    @preconcurrency
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      predicate: @Sendable @escaping (Base.Element) async throws -> Bool
+      predicate: @escaping (Base.Element) async throws -> Bool
     ) {
       self.baseIterator = baseIterator
       self.predicate = predicate
@@ -161,11 +157,11 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingDropWhileSequence: Sendable 
+extension AsyncThrowingDropWhileSequence: @unchecked Sendable 
   where Base: Sendable, 
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingDropWhileSequence.Iterator: Sendable 
+extension AsyncThrowingDropWhileSequence.Iterator: @unchecked Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable { }

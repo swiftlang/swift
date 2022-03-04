@@ -69,15 +69,13 @@ public struct AsyncThrowingFlatMapSequence<Base: AsyncSequence, SegmentOfResult:
   @usableFromInline
   let base: Base
 
-  @preconcurrency
   @usableFromInline
-  let transform: @Sendable (Base.Element) async throws -> SegmentOfResult
+  let transform: (Base.Element) async throws -> SegmentOfResult
 
-  @preconcurrency
   @usableFromInline
   init(
     _ base: Base,
-    transform: @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
+    transform: @escaping (Base.Element) async throws -> SegmentOfResult
   ) {
     self.base = base
     self.transform = transform
@@ -99,9 +97,8 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
-    @preconcurrency
     @usableFromInline
-    let transform: @Sendable (Base.Element) async throws -> SegmentOfResult
+    let transform: (Base.Element) async throws -> SegmentOfResult
 
     @usableFromInline
     var currentIterator: SegmentOfResult.AsyncIterator?
@@ -109,11 +106,10 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     @usableFromInline
     var finished = false
 
-    @preconcurrency
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      transform: @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
+      transform: @escaping (Base.Element) async throws -> SegmentOfResult
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -176,14 +172,14 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingFlatMapSequence: Sendable 
+extension AsyncThrowingFlatMapSequence: @unchecked Sendable 
   where Base: Sendable, 
         Base.Element: Sendable, 
         SegmentOfResult: Sendable, 
         SegmentOfResult.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingFlatMapSequence.Iterator: Sendable 
+extension AsyncThrowingFlatMapSequence.Iterator: @unchecked Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable, 
         SegmentOfResult: Sendable, 

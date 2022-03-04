@@ -45,7 +45,7 @@ extension AsyncSequence {
   ///   same or of a different type.
   /// - Returns: An asynchronous sequence that contains, in order, the
   ///   non-`nil` elements produced by the `transform` closure.
-  @preconcurrency 
+  @preconcurrency
   @inlinable
   public __consuming func compactMap<ElementOfResult>(
     _ transform: @Sendable @escaping (Element) async -> ElementOfResult?
@@ -61,15 +61,13 @@ public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline
   let base: Base
 
-  @preconcurrency
   @usableFromInline
-  let transform: @Sendable (Base.Element) async -> ElementOfResult?
+  let transform: (Base.Element) async -> ElementOfResult?
 
-  @preconcurrency 
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @Sendable @escaping (Base.Element) async -> ElementOfResult?
+    transform: @escaping (Base.Element) async -> ElementOfResult?
   ) {
     self.base = base
     self.transform = transform
@@ -93,15 +91,13 @@ extension AsyncCompactMapSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
-    @preconcurrency 
     @usableFromInline
-    let transform: @Sendable (Base.Element) async -> ElementOfResult?
+    let transform: (Base.Element) async -> ElementOfResult?
 
-    @preconcurrency 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @Sendable @escaping (Base.Element) async -> ElementOfResult?
+      transform: @escaping (Base.Element) async -> ElementOfResult?
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -136,13 +132,13 @@ extension AsyncCompactMapSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncCompactMapSequence: Sendable 
+extension AsyncCompactMapSequence: @unchecked Sendable 
   where Base: Sendable, 
         Base.Element: Sendable, 
         ElementOfResult: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncCompactMapSequence.Iterator: Sendable 
+extension AsyncCompactMapSequence.Iterator: @unchecked Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable, 
         ElementOfResult: Sendable { }

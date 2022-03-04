@@ -73,15 +73,13 @@ public struct AsyncThrowingCompactMapSequence<Base: AsyncSequence, ElementOfResu
   @usableFromInline
   let base: Base
 
-  @preconcurrency
   @usableFromInline
-  let transform: @Sendable (Base.Element) async throws -> ElementOfResult?
+  let transform: (Base.Element) async throws -> ElementOfResult?
 
-  @preconcurrency
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @Sendable @escaping (Base.Element) async throws -> ElementOfResult?
+    transform: @escaping (Base.Element) async throws -> ElementOfResult?
   ) {
     self.base = base
     self.transform = transform
@@ -105,18 +103,16 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
-    @preconcurrency
     @usableFromInline
-    let transform: @Sendable (Base.Element) async throws -> ElementOfResult?
+    let transform: (Base.Element) async throws -> ElementOfResult?
 
     @usableFromInline
     var finished = false
 
-    @preconcurrency
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @Sendable @escaping (Base.Element) async throws -> ElementOfResult?
+      transform: @escaping (Base.Element) async throws -> ElementOfResult?
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -158,12 +154,12 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingCompactMapSequence: Sendable 
+extension AsyncThrowingCompactMapSequence: @unchecked Sendable 
   where Base: Sendable, 
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingCompactMapSequence.Iterator: Sendable 
+extension AsyncThrowingCompactMapSequence.Iterator: @unchecked Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable { }
 

@@ -61,15 +61,13 @@ public struct AsyncThrowingFilterSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
   
-  @preconcurrency
   @usableFromInline
-  let isIncluded: @Sendable (Element) async throws -> Bool
+  let isIncluded: (Element) async throws -> Bool
 
-  @preconcurrency
   @usableFromInline
   init(
     _ base: Base, 
-    isIncluded: @Sendable @escaping (Base.Element) async throws -> Bool
+    isIncluded: @escaping (Base.Element) async throws -> Bool
   ) {
     self.base = base
     self.isIncluded = isIncluded
@@ -91,18 +89,16 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
 
-    @preconcurrency
     @usableFromInline
-    let isIncluded: @Sendable (Base.Element) async throws -> Bool
+    let isIncluded: (Base.Element) async throws -> Bool
 
     @usableFromInline
     var finished = false
 
-    @preconcurrency
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      isIncluded: @Sendable @escaping (Base.Element) async throws -> Bool
+      isIncluded: @escaping (Base.Element) async throws -> Bool
     ) {
       self.baseIterator = baseIterator
       self.isIncluded = isIncluded
@@ -143,11 +139,11 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingFilterSequence: Sendable 
+extension AsyncThrowingFilterSequence: @unchecked Sendable 
   where Base: Sendable, 
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingFilterSequence.Iterator: Sendable 
+extension AsyncThrowingFilterSequence.Iterator: @unchecked Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable { }
