@@ -9,7 +9,6 @@
 // REQUIRES: executable_test
 
 // UNSUPPORTED: linux
-// XFAIL: windows
 
 import first
 import second
