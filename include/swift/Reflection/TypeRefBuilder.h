@@ -304,7 +304,7 @@ struct AssociatedType {
   std::string SubstitutedTypeDiagnosticPrintName;
 };
 
-/// Info about a given type's associated type, as read out from an Image
+/// Info about all of a given type's associated types, as read out from an Image
 struct AssociatedTypeInfo {
   std::string MangledTypeName;
   std::string FullyQualifiedName;
@@ -328,6 +328,7 @@ struct EnumCaseInfo {
   std::string Label;
 };
 
+/// Info about all of a given type's fields, as read out from an Image
 struct FieldMetadata {
   std::string MangledTypeName;
   std::string FullyQualifiedName;
