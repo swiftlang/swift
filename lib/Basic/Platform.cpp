@@ -79,6 +79,20 @@ bool swift::triplesAreValidForZippering(const llvm::Triple &target,
   return false;
 }
 
+const Optional<llvm::VersionTuple>
+swift::minimumABIStableOSVersionForTriple(const llvm::Triple &triple) {
+  if (triple.isMacOSX())
+    return llvm::VersionTuple(10, 14, 4);
+
+  if (triple.isiOS() /* including tvOS */)
+    return llvm::VersionTuple(12, 2);
+
+  if (triple.isWatchOS())
+    return llvm::VersionTuple(5, 2);
+
+  return None;
+}
+
 bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
     const llvm::Triple &triple) {
   if (triple.isMacOSX()) {
