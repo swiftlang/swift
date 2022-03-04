@@ -317,6 +317,29 @@ struct AssociatedTypeCollectionResult {
   std::vector<std::string> Errors;
 };
 
+struct PropertyTypeInfo {
+  std::string Label;
+  std::string TypeMangledName;
+  std::string TypeFullyQualifiedName;
+  std::string TypeDiagnosticPrintName;
+};
+
+struct EnumCaseInfo {
+  std::string Label;
+};
+
+struct FieldMetadata {
+  std::string MangledTypeName;
+  std::string FullyQualifiedName;
+  std::vector<PropertyTypeInfo> Properties;
+  std::vector<EnumCaseInfo> EnumCases;
+};
+
+struct FieldTypeCollectionResult {
+  std::vector<FieldMetadata> FieldInfos;
+  std::vector<std::string> Errors;
+};
+
 /// An implementation of MetadataReader's BuilderType concept for
 /// building TypeRefs, and parsing field metadata from any images
 /// it has been made aware of.
@@ -899,6 +922,7 @@ public:
 
   void dumpTypeRef(RemoteRef<char> MangledName, std::ostream &stream,
                    bool printTypeName = false);
+  FieldTypeCollectionResult collectFieldTypes(llvm::Optional<std::string> forMangledTypeName);
   void dumpFieldSection(std::ostream &stream);
   AssociatedTypeCollectionResult collectAssociatedTypes(llvm::Optional<std::string> forMangledTypeName);
   void dumpAssociatedTypeSection(std::ostream &stream);

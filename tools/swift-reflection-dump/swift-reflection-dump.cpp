@@ -30,6 +30,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 
+#include "swift/StaticMirror/BinaryScanningTool.h"
+
 #if defined(_WIN32)
 #include <io.h>
 #else

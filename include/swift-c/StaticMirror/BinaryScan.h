@@ -25,7 +25,7 @@
 /// SWIFTSTATICMIRROR_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSTATICMIRROR_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSTATICMIRROR_VERSION_MAJOR 0
-#define SWIFTSTATICMIRROR_VERSION_MINOR 2 // Added associated-type gather
+#define SWIFTSTATICMIRROR_VERSION_MINOR 3 // Added filed type info gather
 
 SWIFTSTATICMIRROR_BEGIN_DECLS
 
