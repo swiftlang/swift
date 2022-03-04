@@ -43,7 +43,7 @@ DependentTypesTestSuite.test("Multiple dependent arguments (inferred type).") {
 }
 
 DependentTypesTestSuite.test("Multiple dependent arguments (not inferred).") {
-  let m = multipleDependentArgs(M<Int>(value: 42), M<CInt>(value: 0), T: Int.self, U: Int.self) as! M<Int>
+  let m = multipleDependentArgs(M<Int>(value: 42), M<CInt>(value: 0), T: Int.self, U: CInt.self) as! M<Int>
   expectEqual(m.getValue(), 42)
 }
 
