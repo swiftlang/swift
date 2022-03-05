@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-
+// REQUIRES: rdar89860761
 // Disabled due to test failure with `-O`: SR-13250.
 // SR-13250 is tracking the fix for compiling this test with optimizations.
 // XFAIL: swift_test_mode_optimize
