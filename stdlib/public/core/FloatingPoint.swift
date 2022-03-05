@@ -329,9 +329,9 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   static var greatestFiniteMagnitude: Self { get }
 
   /// The [mathematical constant π][wiki], approximately equal to 3.14159.
-  ///
-  /// A common application of this constant in geometry is to measure a half
-  /// revolution in radians. Used like this, it is equivalent to 180 degrees.
+  /// 
+  /// This constant is equivalent to 180°, or half a revolution of a circle,
+  /// when used in angle measurement.
   ///
   /// This value is rounded toward zero to keep user computations with angles
   /// from inadvertently ending up in the wrong quadrant. A type that conforms
