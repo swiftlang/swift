@@ -2454,8 +2454,8 @@ ERROR(protocol_composition_one_class,none,
       "contains class %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,none,
-      "type %0 constrained to non-protocol, non-class type '%1'",
-      (Type, StringRef))
+      "type %0 constrained to non-protocol, non-class type %1",
+      (Type, Type))
 NOTE(requires_conformance_nonprotocol_fixit,none,
      "use '%0 == %1' to require '%0' to be '%1'",
      (StringRef, StringRef))
@@ -2776,9 +2776,9 @@ WARNING(anyobject_class_inheritance_deprecated,Deprecation,
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,
-  "inheritance from non-protocol, non-class type '%0'", (StringRef))
+  "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,none,
-  "inheritance from non-protocol type '%0'", (StringRef))
+  "inheritance from non-protocol type %0", (Type))
 ERROR(inheritance_from_anyobject,none,
   "only protocols can inherit from 'AnyObject'", ())
 ERROR(inheritance_from_parameterized_protocol,none,

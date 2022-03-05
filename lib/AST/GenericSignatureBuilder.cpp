@@ -6307,16 +6307,8 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
       auto source = constraint.source;
       auto loc = source->getLoc();
 
-      // FIXME: The constraint string is printed directly here because
-      // the current default is to not print `any` for existential
-      // types, but this error message is super confusing without `any`
-      // if the user wrote it explicitly.
-      PrintOptions options;
-      options.PrintExplicitAny = true;
-      auto constraintString = constraintType.getString(options);
-
       Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
-                     subjectType, constraintString);
+                     subjectType, constraintType);
       
       auto getNameWithoutSelf = [&](std::string subjectTypeName) {
         std::string selfSubstring = "Self.";
@@ -6331,10 +6323,12 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
       if (allowConcreteGenericParams ||
           (subjectType->is<DependentMemberType>() &&
            !source->isProtocolRequirement())) {
-        auto subjectTypeName = subjectType.getString();
+        auto options = PrintOptions::forDiagnosticArguments();
+        auto subjectTypeName = subjectType.getString(options);
         auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
         Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
-                       subjectTypeNameWithoutSelf, constraintString)
+                       subjectTypeNameWithoutSelf,
+                       constraintType.getString(options))
              .fixItReplace(loc, " == ");
       }
     }

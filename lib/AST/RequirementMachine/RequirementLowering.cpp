@@ -547,16 +547,8 @@ bool swift::rewriting::diagnoseRequirementErrors(
       if (subjectType->hasError() || constraint->hasError())
         break;
 
-      // FIXME: The constraint string is printed directly here because
-      // the current default is to not print `any` for existential
-      // types, but this error message is super confusing without `any`
-      // if the user wrote it explicitly.
-      PrintOptions options;
-      options.PrintExplicitAny = true;
-      auto constraintString = constraint.getString(options);
-
       ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
-                         subjectType, constraintString);
+                         subjectType, constraint);
       diagnosedError = true;
 
       auto getNameWithoutSelf = [&](std::string subjectTypeName) {
@@ -570,10 +562,12 @@ bool swift::rewriting::diagnoseRequirementErrors(
       };
 
       if (allowConcreteGenericParams) {
-        auto subjectTypeName = subjectType.getString();
+        auto options = PrintOptions::forDiagnosticArguments();
+        auto subjectTypeName = subjectType.getString(options);
         auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
         ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
-                           subjectTypeNameWithoutSelf, constraintString)
+                           subjectTypeNameWithoutSelf,
+                           constraint.getString(options))
              .fixItReplace(loc, " == ");
       }
 
