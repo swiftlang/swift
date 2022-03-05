@@ -24,13 +24,13 @@ class SomeMethods {
 
 // Test self-conformance
 
-func takesObjCClass<T : ObjCClass>(_: T) {} // expected-note {{where 'T' = 'ObjCProtocol'}}
+func takesObjCClass<T : ObjCClass>(_: T) {} // expected-note {{where 'T' = 'any ObjCProtocol'}}
 func takesObjCProtocol<T : ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'ObjCClass'}}
-func takesObjCClassAndProtocol<T : ObjCClass & ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'ObjCProtocol'}} expected-note {{where 'T' = 'ObjCClass'}}
+func takesObjCClassAndProtocol<T : ObjCClass & ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'any ObjCProtocol'}} expected-note {{where 'T' = 'ObjCClass'}}
 
 func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProtocol) {
   takesObjCClass(c)
-  takesObjCClass(p) // expected-error {{global function 'takesObjCClass' requires that 'ObjCProtocol' inherit from 'ObjCClass'}}
+  takesObjCClass(p) // expected-error {{global function 'takesObjCClass' requires that 'any ObjCProtocol' inherit from 'ObjCClass'}}
   takesObjCClass(cp)
 
   takesObjCProtocol(c) // expected-error {{global function 'takesObjCProtocol' requires that 'ObjCClass' conform to 'ObjCProtocol'}}
@@ -39,7 +39,7 @@ func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProt
 
   // FIXME: Bad diagnostics
   takesObjCClassAndProtocol(c) // expected-error {{global function 'takesObjCClassAndProtocol' requires that 'ObjCClass' conform to 'ObjCProtocol'}}
-  takesObjCClassAndProtocol(p) // expected-error {{global function 'takesObjCClassAndProtocol' requires that 'ObjCProtocol' inherit from 'ObjCClass'}}
+  takesObjCClassAndProtocol(p) // expected-error {{global function 'takesObjCClassAndProtocol' requires that 'any ObjCProtocol' inherit from 'ObjCClass'}}
   takesObjCClassAndProtocol(cp)
 }
 
@@ -51,7 +51,7 @@ func takesStaticObjCProtocol<T : StaticObjCProtocol>(_: T) {}
 
 func testSelfConformance(cp: ObjCClass & StaticObjCProtocol) {
   takesStaticObjCProtocol(cp)
-  // expected-error@-1 {{'ObjCClass & StaticObjCProtocol' cannot be used as a type conforming to protocol 'StaticObjCProtocol' because 'StaticObjCProtocol' has static requirements}}
+  // expected-error@-1 {{'any ObjCClass & StaticObjCProtocol' cannot be used as a type conforming to protocol 'StaticObjCProtocol' because 'StaticObjCProtocol' has static requirements}}
 }
 
 func testMetatypeSelfConformance(m1: (ObjCClass & ObjCProtocol).Protocol,
@@ -59,6 +59,6 @@ func testMetatypeSelfConformance(m1: (ObjCClass & ObjCProtocol).Protocol,
   _ = m1 as (ObjCClass & ObjCProtocol).Type
   _ = m1 as? (ObjCClass & ObjCProtocol).Type // expected-warning {{always succeeds}}
 
-  _ = m2 as (ObjCClass & StaticObjCProtocol).Type // expected-error {{cannot convert value of type '(ObjCClass & StaticObjCProtocol).Protocol' to type '(ObjCClass & StaticObjCProtocol).Type' in coercion}}
+  _ = m2 as (ObjCClass & StaticObjCProtocol).Type // expected-error {{cannot convert value of type '(any ObjCClass & StaticObjCProtocol).Type' to type 'any (ObjCClass & StaticObjCProtocol).Type' in coercion}}
   _ = m2 as? (ObjCClass & StaticObjCProtocol).Type // FIXME should 'always fail'
 }

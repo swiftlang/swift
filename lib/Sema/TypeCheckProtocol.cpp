@@ -5371,9 +5371,8 @@ void swift::diagnoseConformanceFailure(Type T,
       Type constraintType = T;
       if (auto existential = T->getAs<ExistentialType>())
         constraintType = existential->getConstraintType();
-      diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
-                     T, constraintType->isEqual(Proto->getDeclaredInterfaceType()),
-                     Proto->getDeclaredInterfaceType());
+      diags.diagnose(ComplainLoc, diag::type_cannot_conform,
+                     T, Proto->getDeclaredInterfaceType());
       diags.diagnose(ComplainLoc,
                      diag::only_concrete_types_conform_to_protocols);
       return;

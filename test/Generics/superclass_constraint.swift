@@ -216,10 +216,10 @@ func g<T : Init & Derived>(_: T.Type) {
 struct G<T : Base> {}
 // expected-note@-1 2 {{requirement specified as 'T' : 'Base' [with T = Base & P]}}
 
-_ = G<Base & P>() // expected-error {{'G' requires that 'Base & P' inherit from 'Base'}}
+_ = G<Base & P>() // expected-error {{'G' requires that 'any Base & P' inherit from 'Base'}}
 
 func badClassConstrainedType(_: G<Base & P>) {}
-// expected-error@-1 {{'G' requires that 'Base & P' inherit from 'Base'}}
+// expected-error@-1 {{'G' requires that 'any Base & P' inherit from 'Base'}}
 
 // Reduced from CoreStore in source compat suite
 public protocol Pony {}

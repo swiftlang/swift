@@ -568,10 +568,7 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
     constraintType = existential->getConstraintType();
 
   emitDiagnostic(diag::type_cannot_conform,
-                 nonConformingType->isExistentialType(), 
-                 nonConformingType, 
-                 constraintType->isEqual(protocolType),
-                 protocolType);
+                 nonConformingType, protocolType);
 
   bool emittedSpecializedNote = false;
   if (auto protoType = protocolType->getAs<ProtocolType>()) {
@@ -2369,9 +2366,7 @@ bool ContextualFailure::diagnoseAsError() {
         if (auto existential = constraintType->getAs<ExistentialType>())
           constraintType = existential->getConstraintType();
 
-        emitDiagnostic(diag::type_cannot_conform,
-                       /*isExistentialType=*/true, fromType, 
-                       constraintType->isEqual(toType), toType);
+        emitDiagnostic(diag::type_cannot_conform, fromType, toType);
         emitDiagnostic(diag::only_concrete_types_conform_to_protocols);
         return true;
       }
@@ -3123,7 +3118,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   // Emit a diagnostic to inform the user that they need to conform to the
   // missing protocols.
   auto conformanceDiag =
-      emitDiagnostic(diag::assign_protocol_conformance_fix_it, unwrappedToType,
+      emitDiagnostic(diag::assign_protocol_conformance_fix_it, constraint,
                      nominal->getDescriptiveKind(), fromType);
   if (nominal->getInherited().size() > 0) {
     auto lastInherited = nominal->getInherited().back().getLoc();
@@ -3231,7 +3226,7 @@ bool ContextualFailure::isIntegerToStringIndexConversion() const {
 Optional<Diag<Type, Type>>
 ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
                                     Type contextualType) {
-  auto forProtocol = contextualType->isExistentialType();
+  auto forProtocol = contextualType->isConstraintType();
   switch (context) {
   case CTP_Initialization: {
     if (contextualType->isAnyObject())

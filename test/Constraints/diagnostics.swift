@@ -248,7 +248,7 @@ String().asdf  // expected-error {{value of type 'String' has no member 'asdf'}}
 // <rdar://problem/21553065> Spurious diagnostic: '_' can only appear in a pattern or on the left side of an assignment
 protocol r21553065Protocol {}
 class r21553065Class<T : AnyObject> {} // expected-note{{requirement specified as 'T' : 'AnyObject'}}
-_ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Class' requires that 'r21553065Protocol' be a class type}}
+_ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Class' requires that 'any r21553065Protocol' be a class type}}
 
 // Type variables not getting erased with nested closures
 struct Toe {
@@ -462,7 +462,7 @@ protocol r22020088P {}
 func r22020088Foo<T>(_ t: T) {}
 
 func r22020088bar(_ p: r22020088P?) {
-  r22020088Foo(p.fdafs) // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
+  r22020088Foo(p.fdafs) // expected-error {{value of type '(any r22020088P)?' has no member 'fdafs'}}
 }
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
@@ -1089,7 +1089,7 @@ class ListExpr_28456467 : AST_28456467, Expr_28456467 {
 
   override var hasStateDef: Bool {
     return elems.first(where: { $0.hasStateDef }) != nil
-    // expected-error@-1 {{value of type 'Expr_28456467' has no member 'hasStateDef'}}
+    // expected-error@-1 {{value of type 'any Expr_28456467' has no member 'hasStateDef'}}
   }
 }
 
