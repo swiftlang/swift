@@ -50,6 +50,12 @@
 // UNSUPPORTED: swift_evolve
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+Func AsyncSequence.compactMap(_:) is now with @preconcurrency
+Func AsyncSequence.drop(while:) is now with @preconcurrency
+Func AsyncSequence.filter(_:) is now with @preconcurrency
+Func AsyncSequence.flatMap(_:) is now with @preconcurrency
+Func AsyncSequence.map(_:) is now with @preconcurrency
+Func AsyncSequence.prefix(while:) is now with @preconcurrency
 Func MainActor.run(resultType:body:) has generic signature change from <T where T : Swift.Sendable> to <T>
 Func MainActor.run(resultType:body:) has mangled name changing from 'static Swift.MainActor.run<A where A: Swift.Sendable>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A' to 'static Swift.MainActor.run<A>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A'
 Struct CheckedContinuation has removed conformance to UnsafeSendable

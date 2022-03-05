@@ -135,3 +135,13 @@ extension AsyncDropFirstSequence {
     return AsyncDropFirstSequence(base, dropping: self.count + count)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncDropFirstSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncDropFirstSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

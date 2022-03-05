@@ -38,9 +38,10 @@ extension AsyncSequence {
   ///   included in the modified sequence.
   /// - Returns: An asynchronous sequence of the initial, consecutive
   ///   elements that satisfy `predicate`.
+  @preconcurrency
   @inlinable
   public __consuming func prefix(
-    while predicate: @escaping (Element) async -> Bool
+    while predicate: @Sendable @escaping (Element) async -> Bool
   ) rethrows -> AsyncPrefixWhileSequence<Self> {
     return AsyncPrefixWhileSequence(self, predicate: predicate)
   }
@@ -120,3 +121,13 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), predicate: predicate)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncPrefixWhileSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncPrefixWhileSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }
