@@ -330,10 +330,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
 
   /// The [mathematical constant π][wiki], approximately equal to 3.14159.
   ///
-  /// This constant is most often defined as the numerical value of the ratio
-  /// of a circle's circumference to its diameter, which is the same for all
-  /// circles.
-  ///
   /// A common application of this constant in geometry is to measure a half
   /// revolution in radians. Used like this, it is equivalent to 180 degrees.
   ///
