@@ -1,3 +1,4 @@
+// REQUIRES: OS=ios
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/macos)
 // RUN: %empty-directory(%t/ios)

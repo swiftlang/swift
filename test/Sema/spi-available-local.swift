@@ -1,3 +1,4 @@
+// REQUIRES: OS=ios
 // RUN: %empty-directory(%t)
 // RUN: not %target-swift-frontend -target %target-cpu-apple-macosx11.9 -parse-as-library %s -typecheck -library-level=api >& %t/macos.txt
 // RUN: %FileCheck %s < %t/macos.txt
