@@ -1267,6 +1267,18 @@ template <> struct DenseMapInfo<swift::AccessPathWithBase> {
   }
 };
 
+// Allow AccessPath::PathNode to be used as a pointer-like template argument.
+template<>
+struct PointerLikeTypeTraits<swift::AccessPath::PathNode> {
+  static inline void *getAsVoidPointer(swift::AccessPath::PathNode node) {
+    return (void *)node.node;
+  }
+  static inline swift::AccessPath::PathNode getFromVoidPointer(void *pointer) {
+    return swift::AccessPath::PathNode((swift::IndexTrieNode *)pointer);
+  }
+  enum { NumLowBitsAvailable =
+         PointerLikeTypeTraits<swift::IndexTrieNode *>::NumLowBitsAvailable };
+};
 } // end namespace llvm
 
 //===----------------------------------------------------------------------===//
