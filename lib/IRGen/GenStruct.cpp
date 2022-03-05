@@ -734,6 +734,52 @@ namespace {
                                                              isOutlined);
     }
 
+    void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                        SILType T, bool isOutlined) const override {
+      if (auto copyConstructor = findCopyConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    srcAddr.getAddress(),
+                                    destAddr.getAddress());
+        return;
+      }
+      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::assignWithCopy(IGF, destAddr,
+                                                         srcAddr, T,
+                                                         isOutlined);
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                            SILType T, bool isOutlined) const override {
+      if (auto copyConstructor = findCopyConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
+        destroy(IGF, src, T, isOutlined);
+        return;
+      }
+
+      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::initializeWithTake(IGF, dest,
+                                                             src, T,
+                                                             isOutlined);
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                        bool isOutlined) const override {
+      if (auto copyConstructor = findCopyConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
+        destroy(IGF, src, T, isOutlined);
+        return;
+      }
+
+      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::assignWithTake(IGF, dest,
+                                                         src, T,
+                                                         isOutlined);
+    }
+
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
       return None;
