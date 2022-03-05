@@ -1863,6 +1863,17 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
           dyn_cast<clang::TemplateTypeParmType>(clangDecl->getReturnType())) {
     importedType = {findGenericTypeInGenericDecls(templateType, genericParams),
                     false};
+  } else if ((isa<clang::PointerType>(clangDecl->getReturnType()) ||
+          isa<clang::ReferenceType>(clangDecl->getReturnType())) &&
+         isa<clang::TemplateTypeParmType>(clangDecl->getReturnType()->getPointeeType())) {
+    auto pointeeType = clangDecl->getReturnType()->getPointeeType();
+    auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
+    PointerTypeKind pointerKind = pointeeType.getQualifiers().hasConst()
+                                      ? PTK_UnsafePointer
+                                      : PTK_UnsafeMutablePointer;
+    auto genericType =
+        findGenericTypeInGenericDecls(templateParamType, genericParams);
+    importedType = {genericType->wrapInPointer(pointerKind), false};
   } else if (!(isa<clang::RecordType>(clangDecl->getReturnType()) ||
                isa<clang::TemplateSpecializationType>(clangDecl->getReturnType())) ||
              // TODO: we currently don't lazily load operator return types, but
