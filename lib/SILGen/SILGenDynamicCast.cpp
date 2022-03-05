@@ -252,7 +252,7 @@ namespace {
       }
 
       ManagedValue result;
-      if (!origTargetTL.isAddressOnly()) {
+      if (!origTargetTL.isAddressOnly() || !SGF.useLoweredAddresses()) {
         result = SGF.emitLoad(Loc, buffer, origTargetTL, ctx, IsTake);
       } else {
         result = SGF.emitManagedBufferWithCleanup(buffer, origTargetTL);
@@ -450,7 +450,7 @@ RValue Lowering::emitConditionalCheckedCast(
   SILValue resultObjectBuffer;
   Optional<TemporaryInitialization> resultObjectTemp;
   SGFContext resultObjectCtx;
-  if ((resultTL.isAddressOnly())
+  if ((resultTL.isAddressOnly() && SGF.useLoweredAddresses())
       || (C.getEmitInto()
           && C.getEmitInto()->canPerformInPlaceInitialization())) {
     SILType resultTy = resultTL.getLoweredType();

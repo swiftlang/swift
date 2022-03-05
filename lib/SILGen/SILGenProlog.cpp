@@ -456,11 +456,18 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   case CaptureKind::StorageAddress: {
     // Non-escaping stored decls are captured as the address of the value.
     auto type = getVarTypeInCaptureContext();
-    SILType ty = SGF.getLoweredType(type).getAddressType();
-    SILValue addr = SGF.F.begin()->createFunctionArgument(ty, VD);
-    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
+    SILType ty = SGF.getLoweredType(type);
+    if (SGF.SGM.M.useLoweredAddresses()) {
+      ty = ty.getAddressType();
+    }
+    SILValue arg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(arg);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);
-    SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
+    if (ty.isAddress()) {
+      SGF.B.createDebugValueAddr(Loc, arg, DbgVar);
+    } else {
+      SGF.B.createDebugValue(Loc, arg, DbgVar);
+    }
     break;
   }
   }

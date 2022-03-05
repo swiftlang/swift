@@ -3964,7 +3964,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
       yields.push_back(ManagedValue::forLValue(value));
     } else if (info.isConsumed()) {
       yields.push_back(emitManagedRValueWithCleanup(value));
-    } else if (info.isDirectGuaranteed()) {
+    } else if (info.isGuaranteed()) {
       yields.push_back(ManagedValue::forBorrowedRValue(value));
     } else {
       yields.push_back(ManagedValue::forTrivialRValue(value));

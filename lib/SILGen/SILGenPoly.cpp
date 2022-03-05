@@ -1167,6 +1167,10 @@ namespace {
                                    outputOrigEltType, outputEltType,
                                    elt, loweredOutputEltTy);
 
+        // Aggregation of address-only values requires ownership.
+        if (loweredOutputTy.isAddressOnly(SGF.F)) {
+          elt = elt.ensurePlusOne(SGF, Loc);
+        }
         elements.push_back(elt);
       }
 
@@ -1175,7 +1179,10 @@ namespace {
         forwarded.push_back(elt.forward(SGF));
 
       auto tuple = SGF.B.createTuple(Loc, loweredOutputTy, forwarded);
-      return SGF.emitManagedRValueWithCleanup(tuple);
+      if (tuple->getOwnershipKind() == OwnershipKind::Owned)
+        return SGF.emitManagedRValueWithCleanup(tuple);
+
+      return ManagedValue::forUnmanaged(tuple);
     }
 
     /// Handle a tuple that has been exploded in the input but wrapped in

@@ -271,6 +271,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         break;
       case CaptureKind::Immutable:
       case CaptureKind::StorageAddress:
+        // FIXME_addrlower: only call getAddressType for M.useLoweredAddresses()
         capturedArgs.push_back(emitUndef(getLoweredType(type).getAddressType()));
         break;
       case CaptureKind::Box: {
@@ -290,11 +291,13 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
     auto getAddressValue = [&](SILValue entryValue) -> SILValue {
-      if (SGM.Types.getTypeLowering(
-            valueType,
-            TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
-              expansion.getResilienceExpansion()))
-          .isAddressOnly()
+      if (SGM.M.useLoweredAddresses()
+          && SGM.Types
+                 .getTypeLowering(
+                     valueType,
+                     TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                         expansion.getResilienceExpansion()))
+                 .isAddressOnly()
           && !entryValue->getType().isAddress()) {
 
         auto addr = emitTemporaryAllocation(vd, entryValue->getType());
@@ -342,13 +345,15 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     }
     case CaptureKind::Immutable: {
       if (canGuarantee) {
-        auto entryValue = getAddressValue(Entry.value);
         // No-escaping stored declarations are captured as the
         // address of the value.
-        assert(entryValue->getType().isAddress() && "no address for captured var!");
-        capturedArgs.push_back(ManagedValue::forLValue(entryValue));
+        auto entryValue = getAddressValue(Entry.value);
+        capturedArgs.push_back(ManagedValue::forBorrowedRValue(entryValue));
       }
-      else {
+      else if (!silConv.useLoweredAddresses()) {
+        capturedArgs.push_back(
+          B.createCopyValue(loc, ManagedValue::forUnmanaged(Entry.value)));
+      } else {
         auto entryValue = getAddressValue(Entry.value);
         // We cannot pass a valid SILDebugVariable while creating the temp here
         // See rdar://60425582
