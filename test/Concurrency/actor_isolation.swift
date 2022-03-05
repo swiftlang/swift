@@ -1109,28 +1109,56 @@ actor MyServer : Server {
 // ----------------------------------------------------------------------
 // @_inheritActorContext
 // ----------------------------------------------------------------------
+@available(SwiftStdlib 5.1, *)
 func acceptAsyncSendableClosure<T>(_: @Sendable () async -> T) { }
+@available(SwiftStdlib 5.1, *)
 func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable () async -> T) { }
 
 @available(SwiftStdlib 5.1, *)
 extension MyActor {
   func testSendableAndInheriting() {
+    var counter = 0
+
     acceptAsyncSendableClosure {
-      synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}
+      _ = synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}
       // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+
+      counter += 1 // expected-error{{mutation of captured var 'counter' in concurrently-executing code}}
     }
 
     acceptAsyncSendableClosure {
-      await synchronous() // ok
+      _ = await synchronous() // ok
+      counter += 1 // expected-error{{mutation of captured var 'counter' in concurrently-executing code}}
     }
 
     acceptAsyncSendableClosureInheriting {
-      synchronous() // okay
+      _ = synchronous() // okay
+      counter += 1 // okay
     }
 
     acceptAsyncSendableClosureInheriting {
-      await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}
+      _ = await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}
+      counter += 1 // okay
     }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@SomeGlobalActor
+func testGlobalActorInheritance() {
+  var counter = 0
+
+  acceptAsyncSendableClosure {
+    counter += 1 // expected-error{{mutation of captured var 'counter' in concurrently-executing code}}
+  }
+
+  acceptAsyncSendableClosure { @SomeGlobalActor in
+    counter += 1 // ok
+  }
+
+
+  acceptAsyncSendableClosureInheriting {
+    counter += 1 // ok
   }
 }
 
