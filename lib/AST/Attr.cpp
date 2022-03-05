@@ -371,6 +371,9 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr)
     return false;
 
+  if (AvailAttr->IsSPI)
+    return false;
+
   if (!AvailAttr->Introduced.hasValue())
     return false;
 
@@ -969,9 +972,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_Available: {
-    Printer.printAttrName("@available");
-    Printer << "(";
     auto Attr = cast<AvailableAttr>(this);
+    if (!Options.PrintSPIs && Attr->IsSPI) {
+      assert(Attr->hasPlatform());
+      assert(Attr->Introduced.hasValue());
+      Printer.printAttrName("@available");
+      Printer << "(";
+      Printer << Attr->platformString();
+      Printer << ", unavailable)";
+      break;
+    }
+    Printer.printAttrName(Attr->IsSPI ? "@_spi_available": "@available");
+    Printer << "(";
     printAvailableAttr(Attr, Printer, Options);
     Printer << ")";
     break;
