@@ -844,13 +844,17 @@ function(_compile_swift_files
     endif()
   endif()
 
-  # First generate the obj dirs
+  # First generate the obj dirs if not created before
   list(REMOVE_DUPLICATES dirs_to_create)
-  add_custom_command_target(
-      create_dirs_dependency_target
-      COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
-      OUTPUT ${dirs_to_create}
-      COMMENT "Generating dirs for ${first_output}")
+  list(REMOVE_ITEM dirs_to_create ${CREATED_OBJ_DIRS})
+  if(NOT dirs_to_create STREQUAL "")
+    add_custom_command_target(
+        create_dirs_dependency_target
+        COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
+        OUTPUT ${dirs_to_create}
+        COMMENT "Generating dirs for ${first_output}")
+    set(CREATED_OBJ_DIRS ${CREATED_OBJ_DIRS} ${dirs_to_create} CACHE INTERNAL "Already created obj directories") 
+  endif()
 
   # Then we can compile both the object files and the swiftmodule files
   # in parallel in this target for the object file, and ...
