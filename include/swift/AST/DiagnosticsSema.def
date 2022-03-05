@@ -1542,6 +1542,9 @@ ERROR(optional_attribute_initializer,none,
 ERROR(unavailable_method_non_objc_protocol,none,
       "protocol members can only be marked unavailable in an @objc protocol",
       ())
+ERROR(spi_available_malformed,none,
+      "SPI available only supports introducing version on specific platform",
+      ())
 ERROR(missing_in_class_init_1,none,
       "stored property %0 requires an initial value%select{| or should be "
       "@NSManaged}1", (Identifier, bool))
