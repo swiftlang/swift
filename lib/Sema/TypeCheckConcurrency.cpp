@@ -3059,6 +3059,21 @@ namespace {
 
 bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
     const DeclContext *useContext, const DeclContext *defContext) {
+  // Fast path for when the use and definition contexts are the same.
+  if (useContext == defContext)
+    return false;
+
+  // If both contexts are isolated to the same actor, then they will not
+  // execute concurrently.
+  auto useIsolation = getActorIsolationOfContext(
+      const_cast<DeclContext *>(useContext));
+  if (useIsolation.isActorIsolated()) {
+    auto defIsolation = getActorIsolationOfContext(
+        const_cast<DeclContext *>(defContext));
+    if (useIsolation == defIsolation)
+      return false;
+  }
+
   // Walk the context chain from the use to the definition.
   while (useContext != defContext) {
     // If we find a concurrent closure... it can be run concurrently.

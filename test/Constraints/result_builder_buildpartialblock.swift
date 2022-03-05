@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-pairwise-build-block) | %FileCheck %s
 // REQUIRES: executable_test
 
-// TODO: This test is for the old method name `buildBlock(combining:into:)`. Delete this file once
-// clients have moved to `buildPartialBlock`.
-
 struct Values<T> {
   var values: T
 
@@ -18,14 +15,14 @@ struct Values<T> {
 
 @resultBuilder
 enum NestedTupleBuilder {
-  static func buildBlock<T>(_ x: T) -> Values<T> {
+  static func buildPartialBlock<T>(first x: T) -> Values<T> {
     .init(values: x)
   }
 
-  static func buildBlock<T, U>(
-    combining next: U, into combined: Values<T>
+  static func buildPartialBlock<T, U>(
+    accumulated: Values<T>, next: U
   ) -> Values<(T, U)> {
-    .init(values: (combined.values, next))
+    .init(values: (accumulated.values, next))
   }
 }
 
@@ -43,7 +40,55 @@ let nestedValues = Values(nested: {
 })
 print(nestedValues)
 
-// CHECK: Values<(((Int, String), Double), String)>(values: (((1, "2"), 3.0), "yes"))
+@resultBuilder
+enum NestedTupleBuilder_Not {
+  @available(*, unavailable)
+  static func buildPartialBlock<T>(first x: T) -> Values<T> {
+    .init(values: x)
+  }
+
+  @available(*, unavailable)
+  static func buildPartialBlock<T, U>(
+    accumulated: Values<T>, next: U
+  ) -> Values<(T, U)> {
+    .init(values: (accumulated.values, next))
+  }
+
+#if os(macOS)
+  @available(macOS 9999, *)
+  static func buildPartialBlock(first x: Never) -> Values<Never> {
+    fatalError()
+  }
+
+  @available(macOS 9999, *)
+  static func buildPartialBlock(
+    accumulated: Values<Never>, next: Never
+  ) -> Values<Never> {
+    fatalError()
+  }
+#endif
+
+  // This one will be called because no `buildPartialBlock` is available.
+  static func buildBlock(_ x: Any...) -> Values<[Any]> {
+    .init(values: x)
+  }
+}
+
+extension Values {
+  init(@NestedTupleBuilder_Not nested_not values: () -> Self) {
+    self = values()
+  }
+}
+
+let nestedValues_not = Values(nested_not: {
+  1
+  "2"
+  3.0
+  "yes"
+})
+print(nestedValues_not)
+
+// CHECK: Values<Array<Any>>(values: [1, "2", 3.0, "yes"])
 
 @resultBuilder
 enum FlatTupleBuilder {
@@ -51,36 +96,36 @@ enum FlatTupleBuilder {
     .init(values: x)
   }
 
-  static func buildBlock<T>(_ x: Values<T>) -> Values<T> {
+  static func buildPartialBlock<T>(first x: Values<T>) -> Values<T> {
     .init(values: x.values)
   }
 
-  static func buildBlock<T, N>(
-    combining new: Values<N>,
-    into combined: Values<T>
+  static func buildPartialBlock<T, N>(
+    accumulated: Values<T>,
+    next: Values<N>
   ) -> Values<(T, N)> {
-    .init(values: (combined.values, new.values))
+    .init(values: (accumulated.values, next.values))
   }
 
-  static func buildBlock<T0, T1, N>(
-    combining new: Values<N>,
-    into combined: Values<(T0, T1)>
+  static func buildPartialBlock<T0, T1, N>(
+    accumulated: Values<(T0, T1)>,
+    next: Values<N>
   ) -> Values<(T0, T1, N)> {
-    .init(values: (combined.values.0, combined.values.1, new.values))
+    .init(values: (accumulated.values.0, accumulated.values.1, next.values))
   }
 
-  static func buildBlock<T0, T1, T2, N>(
-    combining new: Values<N>,
-    into combined: Values<(T0, T1, T2)>
+  static func buildPartialBlock<T0, T1, T2, N>(
+    accumulated: Values<(T0, T1, T2)>,
+    next: Values<N>
   ) -> Values<(T0, T1, T2, N)> {
-    .init(values: (combined.values.0, combined.values.1, combined.values.2, new.values))
+    .init(values: (accumulated.values.0, accumulated.values.1, accumulated.values.2, next.values))
   }
 
-  static func buildBlock<T0, T1, T2, T3, N>(
-    combining new: Values<N>,
-    into combined: Values<(T0, T1, T2, T3)>
+  static func buildPartialBlock<T0, T1, T2, T3, N>(
+    accumulated: Values<(T0, T1, T2, T3)>,
+    next: Values<N>
   ) -> Values<(T0, T1, T2, T3, N)> {
-    .init(values: (combined.values.0, combined.values.1, combined.values.2, combined.values.3, new.values))
+    .init(values: (accumulated.values.0, accumulated.values.1, accumulated.values.2, accumulated.values.3, next.values))
   }
 
   static func buildBlock(_ x: Never...) -> Values<()> {
@@ -169,12 +214,12 @@ enum ListBuilder {
     Nil()
   }
 
-  static func buildBlock<T>(_ x: T) -> Cons<T, Nil> {
+  static func buildPartialBlock<T>(first x: T) -> Cons<T, Nil> {
     .init(head: x, tail: Nil())
   }
 
-  static func buildBlock<New, T>(combining new: New, into combined: T) -> Cons<New, T> {
-    .init(head: new, tail: combined)
+  static func buildPartialBlock<New, T>(accumulated: T, next: New) -> Cons<New, T> {
+    .init(head: next, tail: accumulated)
   }
 
   static func buildBlock<T>(_ x: T...) -> [T] {

@@ -6112,6 +6112,15 @@ WARNING(result_builder_missing_limited_availability, none,
 ERROR(result_builder_static_buildblock, none,
       "result builder must provide at least one static 'buildBlock' "
       "method", ())
+ERROR(result_builder_static_buildblock_or_buildpartialblock, none,
+      "result builder must provide at least one static 'buildBlock' "
+      "method, or both 'buildPartialBlock(first:)' and "
+      "'buildPartialBlock(accumulated:next:)'", ())
+ERROR(result_builder_missing_available_buildpartialblock, none,
+      "result builder %0 does not implement any 'buildBlock' or a combination "
+      "of 'buildPartialBlock(first:)' and "
+      "'buildPartialBlock(accumulated:next:)' with sufficient availability for "
+      "this call site", (Type))
 NOTE(result_builder_non_static_buildblock, none,
      "did you mean to make instance method 'buildBlock' static?", ())
 NOTE(result_builder_buildblock_enum_case, none,
