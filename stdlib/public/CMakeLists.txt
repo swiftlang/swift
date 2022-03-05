@@ -136,12 +136,3 @@ endif()
 if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
   add_subdirectory(Platform)
 endif()
-
-if(SWIFT_BUILD_SDK_OVERLAY)
-  # On Apple platforms, we aren't building any overlays (other than Darwin in
-  # Platform above). Instead, we're picking them up from the SDK.
-
-  if(WINDOWS IN_LIST SWIFT_SDKS)
-    add_subdirectory(Windows)
-  endif()
-endif()
