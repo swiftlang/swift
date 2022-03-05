@@ -3002,6 +3002,19 @@ static void suppressingFeaturePrimaryAssociatedTypes(PrintOptions &options,
   options.PrintPrimaryAssociatedTypes = originalPrintPrimaryAssociatedTypes;
 }
 
+static bool usesFeatureUnavailableFromAsync(Decl *decl) {
+  return decl->getAttrs().hasAttribute<UnavailableFromAsyncAttr>();
+}
+
+static void
+suppressingFeatureUnavailableFromAsync(PrintOptions &options,
+                                       llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DAK_UnavailableFromAsync);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {

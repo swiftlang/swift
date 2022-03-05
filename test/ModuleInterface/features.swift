@@ -177,4 +177,12 @@ public func unsafeInheritExecutor() async {}
 @_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
 public func multipleSuppressible<T>(value: T) async {}
 
+// CHECK:      #if compiler(>=5.3) && $UnavailableFromAsync
+// CHECK-NEXT: @_unavailableFromAsync(message: "Test") public func unavailableFromAsyncFunc()
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func unavailableFromAsyncFunc()
+// CHECK-NEXT: #endif
+@_unavailableFromAsync(message: "Test")
+public func unavailableFromAsyncFunc() { }
+
 // CHECK-NOT: extension FeatureTest.MyActor : Swift.Sendable
