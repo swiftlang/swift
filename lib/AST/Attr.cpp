@@ -126,6 +126,7 @@ DeclAttrKind DeclAttribute::getAttrKindFromString(StringRef Str) {
 #define DECL_ATTR(X, CLASS, ...) .Case(#X, DAK_##CLASS)
 #define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DAK_##CLASS)
 #include "swift/AST/Attr.def"
+  .Case("_spi_available", DAK_Available)
   .Default(DAK_Count);
 }
 
@@ -1599,7 +1600,7 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
     NoVersion, SourceRange(),
     NoVersion, SourceRange(),
     Obsoleted, SourceRange(),
-    Kind, /* isImplicit */ false);
+    Kind, /* isImplicit */ false, /*SPI*/false);
 }
 
 AvailableAttr *AvailableAttr::createForAlternative(
@@ -1610,7 +1611,7 @@ AvailableAttr *AvailableAttr::createForAlternative(
     NoVersion, SourceRange(),
     NoVersion, SourceRange(),
     NoVersion, SourceRange(),
-    PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true);
+    PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true, /*SPI*/false);
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
@@ -1628,7 +1629,8 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
                                Obsoleted ? *Obsoleted : llvm::VersionTuple(),
                                implicit ? SourceRange() : ObsoletedRange,
                                PlatformAgnostic,
-                               implicit);
+                               implicit,
+                               IsSPI);
 }
 
 Optional<OriginallyDefinedInAttr::ActiveVersion>
