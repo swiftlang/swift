@@ -1681,8 +1681,12 @@ namespace {
       }
 
       auto layout = type.getExistentialLayout();
-      
-      auto protocols = layout.getProtocols();
+
+      SmallVector<ProtocolType *, 4> protocols;
+      for (auto proto : layout.getProtocols()) {
+        if (!proto->getDecl()->isMarkerProtocol())
+          protocols.push_back(proto);
+      }
 
       // Collect references to the protocol descriptors.
       auto descriptorArrayTy
