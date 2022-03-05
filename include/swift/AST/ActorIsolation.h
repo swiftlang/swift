@@ -109,6 +109,19 @@ public:
   
   bool isIndependent() const { return kind == Independent; }
 
+  bool isActorIsolated() const {
+    switch (getKind()) {
+    case ActorInstance:
+    case GlobalActor:
+    case GlobalActorUnsafe:
+      return true;
+
+    case Unspecified:
+    case Independent:
+      return false;
+    }
+  }
+
   NominalTypeDecl *getActor() const {
     assert(getKind() == ActorInstance);
     return actor;
