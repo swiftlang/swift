@@ -2924,7 +2924,6 @@ bool ConformanceChecker::checkActorIsolation(
   // Ensure that the witness is not actor-isolated in a manner that makes it
   // unsuitable as a witness.
   bool isCrossActor = false;
-  bool witnessIsUnsafe = false;
   DiagnosticBehavior behavior = SendableCheckContext(
       Conformance->getDeclContext()).defaultDiagnosticBehavior();
   Type witnessGlobalActor;
@@ -3146,7 +3145,6 @@ bool ConformanceChecker::checkActorIsolation(
   }
 
   case ActorIsolationRestriction::GlobalActorUnsafe:
-    witnessIsUnsafe = true;
     LLVM_FALLTHROUGH;
 
   case ActorIsolationRestriction::GlobalActor: {
@@ -3167,13 +3165,11 @@ bool ConformanceChecker::checkActorIsolation(
 
   // Check whether the requirement requires some particular actor isolation.
   Type requirementGlobalActor;
-  bool requirementIsUnsafe = false;
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
     llvm_unreachable("There are not actor protocols");
 
   case ActorIsolation::GlobalActorUnsafe:
-    requirementIsUnsafe = true;
     LLVM_FALLTHROUGH;
 
   case ActorIsolation::GlobalActor: {

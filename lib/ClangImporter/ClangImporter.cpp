@@ -2259,8 +2259,9 @@ ClangImporter::Implementation::Implementation(
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       Walker(DiagnosticWalker(*this)),
+      BuffersForDiagnostics(ctx.SourceMgr),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
-      BuffersForDiagnostics(ctx.SourceMgr), platformAvailability(ctx.LangOpts),
+      platformAvailability(ctx.LangOpts),
       nameImporter(),
       DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
       DWARFImporter(dwarfImporterDelegate) {}
@@ -4587,12 +4588,6 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   casted->setType(baseStruct->getSelfInterfaceType());
   casted->setThrows(false);
 
-  // If the base class var has a clang decl, that means it's an access into a
-  // stored field. Otherwise, we're looking into another base class, so it's a
-  // another synthesized accessor.
-  AccessSemantics accessKind = baseClassVar->getClangDecl()
-                                   ? AccessSemantics::DirectToStorage
-                                   : AccessSemantics::DirectToImplementation;
   Expr *baseMember = nullptr;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
     auto paramDecl = getterDecl->getParameters()->get(0);

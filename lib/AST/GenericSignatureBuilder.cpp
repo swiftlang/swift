@@ -3330,7 +3330,6 @@ Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
   Type currentType = genericParamType;
   SmallVector<AssociatedTypeDecl *, 4> path(initialPath.getPath().begin(),
                                             initialPath.getPath().end());
-  bool simplified = false;
   do {
     CanType currentAnchor = currentType->getCanonicalType();
     if (auto rootNode = Impl->getRewriteTreeRootIfPresent(currentAnchor)) {
@@ -3366,7 +3365,6 @@ Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
         }
 
         // Move back to the beginning; we may have opened up other rewrites.
-        simplified = true;
         startIndex = 0;
         currentType = genericParamType;
         continue;
