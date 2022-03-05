@@ -109,3 +109,13 @@ extension AsyncPrefixSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), count: count)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncPrefixSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncPrefixSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

@@ -39,9 +39,10 @@ extension AsyncSequence {
   ///   of this sequence as its parameter and returns an `AsyncSequence`.
   /// - Returns: A single, flattened asynchronous sequence that contains all
   ///   elements in all the asychronous sequences produced by `transform`.
- @inlinable
+  @preconcurrency 
+  @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
-    _ transform: @escaping (Element) async -> SegmentOfResult
+    _ transform: @Sendable @escaping (Element) async -> SegmentOfResult
   ) -> AsyncFlatMapSequence<Self, SegmentOfResult> {
     return AsyncFlatMapSequence(self, transform: transform)
   }
@@ -154,3 +155,18 @@ extension AsyncFlatMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncFlatMapSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable, 
+        SegmentOfResult: Sendable, 
+        SegmentOfResult.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncFlatMapSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable, 
+        SegmentOfResult: Sendable, 
+        SegmentOfResult.Element: Sendable, 
+        SegmentOfResult.AsyncIterator: Sendable { }

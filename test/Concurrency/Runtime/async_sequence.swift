@@ -986,7 +986,7 @@ extension AsyncSequence where Element: Equatable {
     }
 
     AsyncFlatMapSequenceTests.test("flat map throwing inner") {
-      func buildSubSequence(
+      @Sendable func buildSubSequence(
         _ start: Int
       ) -> AsyncThrowingMapSequence<AsyncLazySequence<Range<Int>>, Int> {
         return (start..<4).async.map { (value: Int) throws -> Int in
@@ -1020,7 +1020,7 @@ extension AsyncSequence where Element: Equatable {
     }
 
     AsyncFlatMapSequenceTests.test("flat map throwing inner on throwing outer") {
-      func buildSubSequence(
+      @Sendable func buildSubSequence(
         _ start: Int
       ) throws -> AsyncThrowingMapSequence<AsyncLazySequence<Range<Int>>, Int> {
         return (start..<4).async.map { (value: Int) throws -> Int in
