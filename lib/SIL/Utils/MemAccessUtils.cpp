@@ -1357,6 +1357,36 @@ AccessPathWithBase AccessPathWithBase::computeInScope(SILValue address) {
       .findAccessPath(address);
 }
 
+void swift::visitProductLeafAccessPathNodes(
+    SILValue address, TypeExpansionContext tec, SILModule &module,
+    std::function<void(AccessPath::PathNode, SILType)> visitor) {
+  SmallVector<std::pair<SILType, IndexTrieNode *>, 32> worklist;
+  auto rootPath = AccessPath::compute(address);
+  auto *node = rootPath.getPathNode().node;
+  worklist.push_back({address->getType(), node});
+  while (!worklist.empty()) {
+    auto pair = worklist.pop_back_val();
+    auto silType = pair.first;
+    auto *node = pair.second;
+    if (auto tupleType = silType.getAs<TupleType>()) {
+      for (unsigned index : indices(tupleType->getElements())) {
+        auto *elementNode = node->getChild(index);
+        worklist.push_back({silType.getTupleElementType(index), elementNode});
+      }
+    } else if (auto *decl = silType.getStructOrBoundGenericStruct()) {
+      unsigned index = 0;
+      for (auto *field : decl->getStoredProperties()) {
+        auto *fieldNode = node->getChild(index);
+        worklist.push_back(
+            {silType.getFieldType(field, module, tec), fieldNode});
+        ++index;
+      }
+    } else {
+      visitor(AccessPath::PathNode(node), silType);
+    }
+  }
+}
+
 void AccessPath::Index::print(raw_ostream &os) const {
   if (isSubObjectProjection())
     os << '#' << getSubObjectIndex();

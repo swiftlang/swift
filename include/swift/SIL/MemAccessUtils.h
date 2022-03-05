@@ -1209,6 +1209,16 @@ struct AccessPathWithBase {
   void dump() const;
 };
 
+// Visits all the "product leaves" of the type tree of the specified value and
+// invokes provided visitor, identifying the leaf by its path node and
+// providing its type.
+//
+// The "product leaves" are the leaves obtained by only looking through type
+// products (structs and tuples) and NOT type sums (enums).
+void visitProductLeafAccessPathNodes(
+    SILValue address, TypeExpansionContext tec, SILModule &module,
+    std::function<void(AccessPath::PathNode, SILType)> visitor);
+
 inline AccessPath AccessPath::compute(SILValue address) {
   return AccessPathWithBase::compute(address).accessPath;
 }
