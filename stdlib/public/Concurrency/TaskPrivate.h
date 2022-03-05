@@ -298,7 +298,7 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;
   dispatch_lock_t ExecutionLock;
-  uint32_t Unused;
+  LLVM_ATTRIBUTE_UNUSED uint32_t Unused = {};
 #elif SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_8_BYTES
   uint32_t Flags;
   dispatch_lock_t ExecutionLock;
@@ -306,7 +306,7 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
   uint32_t Flags;
 #else /* !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_8_BYTES */
   uint32_t Flags;
-  uint32_t Unused;
+  LLVM_ATTRIBUTE_UNUSED uint32_t Unused = {};
 #endif
   TaskStatusRecord *Record;
 

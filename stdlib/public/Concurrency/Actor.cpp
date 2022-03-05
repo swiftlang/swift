@@ -652,7 +652,7 @@ class alignas(sizeof(void *) * 2) ActiveActorStatus {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;
   dispatch_lock_t DrainLock;
-  uint32_t Unused;
+  LLVM_ATTRIBUTE_UNUSED uint32_t Unused = {};
 #elif SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_8_BYTES
   uint32_t Flags;
   dispatch_lock_t DrainLock;
@@ -660,7 +660,7 @@ class alignas(sizeof(void *) * 2) ActiveActorStatus {
   uint32_t Flags;
 #else /* !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_8_BYTES */
   uint32_t Flags;
-  uint32_t Unused;
+  LLVM_ATTRIBUTE_UNUSED uint32_t Unused = {};
 #endif
   JobRef FirstJob;
 
@@ -701,7 +701,7 @@ public:
   bool isIdle() const {
     bool isIdle = (getActorState() == Idle);
     if (isIdle) {
-      assert(FirstJob == NULL);
+      assert(!FirstJob);
     }
     return isIdle;
   }
@@ -1063,7 +1063,7 @@ preprocessQueue(JobRef unprocessedStart, JobRef unprocessedEnd, Job *existingPro
 // Preprocess the queue starting from the top
 static Job *
 preprocessQueue(JobRef start) {
-  if (start == NULL) {
+  if (!start) {
     return NULL;
   }
 
@@ -1081,7 +1081,7 @@ preprocessQueue(JobRef start) {
   Job *wellFormedListStart = NULL;
 
   auto current = start;
-  while (current != NULL) {
+  while (current) {
     if (!current.needsPreprocessing()) {
       // We can assume that everything from here onwards as being well formed
       // and sorted
@@ -1241,7 +1241,7 @@ retry:;
       }
 
       assert(oldState.getMaxPriority() == JobPriority::Unspecified);
-      assert(oldState.getFirstJob() == NULL);
+      assert(!oldState.getFirstJob());
     }
 
     auto newState = oldState.withRunning();
@@ -1352,7 +1352,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
     }
 
     auto newState = oldState;
-    if (oldState.getFirstJob() != NULL) {
+    if (oldState.getFirstJob()) {
       // There is work left to do, don't unlock the actor
       if (!forceUnlock) {
         SWIFT_TASK_DEBUG_LOG("Unlock-ing actor %p failed", this);
@@ -1375,7 +1375,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
 
       if (newState.isScheduled()) {
         // See ownership rule (6) in DefaultActorImpl
-        assert(newState.getFirstJob() != NULL);
+        assert(newState.getFirstJob());
         scheduleActorProcessJob(newState.getMaxPriority(), true);
       } else {
         // See ownership rule (5) in DefaultActorImpl
