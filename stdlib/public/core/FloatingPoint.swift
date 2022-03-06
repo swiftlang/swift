@@ -330,8 +330,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
 
   /// The [mathematical constant π][wiki], approximately equal to 3.14159.
   /// 
-  /// π is equivalent to 180°, or a half turn, when measuring an angle in
-  /// radians.
+  /// When measuring an angle in radians, π is equivalent to a half-turn.
   ///
   /// This value is rounded toward zero to keep user computations with angles
   /// from inadvertently ending up in the wrong quadrant. A type that conforms
