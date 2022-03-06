@@ -759,7 +759,6 @@ bool swift::isIdentityAndOwnershipPreservingRefCast(
   case SILInstructionKind::BridgeObjectToRefInst:
     return true;
   case SILInstructionKind::UnconditionalCheckedCastInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
     return SILDynamicCastInst(svi).isRCIdentityPreserving();
   // Ignore markers
   case SILInstructionKind::MarkUninitializedInst:
@@ -2627,7 +2626,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::BeginUnpairedAccessInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:
-  case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
@@ -2659,7 +2657,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::UncheckedRefCastAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::ValueMetatypeInst:
   // TODO: Is this correct?
   case SILInstructionKind::GetAsyncContinuationInst:

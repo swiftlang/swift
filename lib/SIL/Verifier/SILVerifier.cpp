@@ -4025,13 +4025,6 @@ public:
     verifyOpenedArchetype(CI, CI->getType().getASTType());
   }
 
-  void checkUnconditionalCheckedCastValueInst(
-      UnconditionalCheckedCastValueInst *CI) {
-    verifyCheckedCast(/*exact*/ false, CI->getOperand()->getType(),
-                      CI->getType(), true);
-    verifyOpenedArchetype(CI, CI->getType().getASTType());
-  }
-
   // Make sure that opcodes handled by isRCIdentityPreservingCast cannot cast
   // from a trivial to a reference type. Such a cast may dynamically
   // instantiate a new reference-counted object.
@@ -4133,25 +4126,6 @@ public:
               "Failure dest of checked_cast_br must not take any argument in "
               "non-ownership qualified sil");
     }
-  }
-
-  void checkCheckedCastValueBranchInst(CheckedCastValueBranchInst *CBI) {
-    verifyCheckedCast(false,
-                      CBI->getSourceLoweredType(),
-                      CBI->getTargetLoweredType(),
-                      true);
-    verifyOpenedArchetype(CBI, CBI->getTargetFormalType());
-
-    require(CBI->getSuccessBB()->args_size() == 1,
-            "success dest of checked_cast_value_br must take one argument");
-    requireSameType(
-        CBI->getSuccessBB()->args_begin()[0]->getType(),
-        CBI->getTargetLoweredType(),
-        "success dest block argument of checked_cast_value_br must match "
-        "type of cast");
-    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
-            "failure dest of checked_cast_value_br in unqualified ownership "
-            "sil must take no arguments");
   }
 
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
