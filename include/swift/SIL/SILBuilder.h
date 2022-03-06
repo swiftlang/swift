@@ -1314,16 +1314,6 @@ public:
         dest, targetFormalType, getFunction()));
   }
 
-  UnconditionalCheckedCastValueInst *
-  createUnconditionalCheckedCastValue(SILLocation Loc,
-                                      SILValue op, CanType srcFormalTy,
-                                      SILType destLoweredTy,
-                                      CanType destFormalTy) {
-    return insert(UnconditionalCheckedCastValueInst::create(
-        getSILDebugLocation(Loc), op, srcFormalTy,
-        destLoweredTy, destFormalTy, getFunction()));
-  }
-
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
                                      Atomicity atomicity) {
     assert(!hasOwnership());
@@ -2323,18 +2313,6 @@ public:
                           ValueOwnershipKind forwardingOwnershipKind,
                           ProfileCounter Target1Count = ProfileCounter(),
                           ProfileCounter Target2Count = ProfileCounter());
-
-  CheckedCastValueBranchInst *
-  createCheckedCastValueBranch(SILLocation Loc,
-                               SILValue op, CanType srcFormalTy,
-                               SILType destLoweredTy,
-                               CanType destFormalTy,
-                               SILBasicBlock *successBB,
-                               SILBasicBlock *failureBB) {
-    return insertTerminator(CheckedCastValueBranchInst::create(
-        getSILDebugLocation(Loc), op, srcFormalTy,
-        destLoweredTy, destFormalTy, successBB, failureBB, getFunction()));
-  }
 
   CheckedCastAddrBranchInst *
   createCheckedCastAddrBranch(SILLocation Loc, CastConsumptionKind consumption,

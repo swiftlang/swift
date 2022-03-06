@@ -1546,7 +1546,6 @@ bool TermInst::isFunctionExiting() const {
   case TermKind::SwitchEnumAddrInst:
   case TermKind::DynamicMethodBranchInst:
   case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::UnreachableInst:
   case TermKind::TryApplyInst:
@@ -1571,7 +1570,6 @@ bool TermInst::isProgramTerminating() const {
   case TermKind::SwitchEnumAddrInst:
   case TermKind::DynamicMethodBranchInst:
   case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
@@ -2279,22 +2277,6 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
       forwardingOwnershipKind);
 }
 
-UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
-    SILDebugLocation DebugLoc,
-    SILValue Operand, CanType SrcFormalTy,
-    SILType DestLoweredTy, CanType DestFormalTy, SILFunction &F) {
-  SILModule &Mod = F.getModule();
-  SmallVector<SILValue, 8> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, F, DestFormalTy);
-  unsigned size =
-      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
-  void *Buffer =
-      Mod.allocateInst(size, alignof(UnconditionalCheckedCastValueInst));
-  return ::new (Buffer) UnconditionalCheckedCastValueInst(
-      DebugLoc, Operand, SrcFormalTy, TypeDependentOperands,
-      DestLoweredTy, DestFormalTy);
-}
-
 CheckedCastBranchInst *CheckedCastBranchInst::create(
     SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
     SILType DestLoweredTy, CanType DestFormalTy, SILBasicBlock *SuccessBB,
@@ -2311,24 +2293,6 @@ CheckedCastBranchInst *CheckedCastBranchInst::create(
       DebugLoc, IsExact, Operand, TypeDependentOperands, DestLoweredTy,
       DestFormalTy, SuccessBB, FailureBB, Target1Count, Target2Count,
       forwardingOwnershipKind);
-}
-
-CheckedCastValueBranchInst *
-CheckedCastValueBranchInst::create(SILDebugLocation DebugLoc,
-                                   SILValue Operand, CanType SrcFormalTy,
-                                   SILType DestLoweredTy, CanType DestFormalTy,
-                                   SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
-                                   SILFunction &F) {
-  SILModule &Mod = F.getModule();
-  SmallVector<SILValue, 8> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, F, DestFormalTy);
-  unsigned size =
-      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
-  void *Buffer = Mod.allocateInst(size, alignof(CheckedCastValueBranchInst));
-  return ::new (Buffer) CheckedCastValueBranchInst(
-      DebugLoc, Operand, SrcFormalTy, TypeDependentOperands,
-      DestLoweredTy, DestFormalTy,
-      SuccessBB, FailureBB);
 }
 
 MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,

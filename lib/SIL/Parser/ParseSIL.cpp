@@ -3849,19 +3849,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         InstLoc, SourceAddr, SourceType, DestAddr, TargetType);
     break;
 
-  case SILInstructionKind::UnconditionalCheckedCastValueInst: {
-    if (parseASTType(SourceType) || parseVerbatim("in") ||
-        parseTypedValueRef(Val, B) || parseVerbatim("to") ||
-        parseASTType(TargetType) || parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    auto opaque = Lowering::AbstractionPattern::getOpaque();
-    ResultVal = B.createUnconditionalCheckedCastValue(
-        InstLoc, Val, SourceType, F->getLoweredType(opaque, TargetType),
-        TargetType);
-    break;
-  }
-
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") ||
         parseASTType(TargetType))
@@ -3902,21 +3889,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         getBBForReference(FailureBBName, FailureBBLoc), forwardingOwnership);
     break;
   }
-  case SILInstructionKind::CheckedCastValueBranchInst: {
-    if (parseASTType(SourceType) || parseVerbatim("in")
-        || parseTypedValueRef(Val, B) || parseVerbatim("to")
-        || parseASTType(TargetType) || parseConditionalBranchDestinations()
-        || parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    auto opaque = Lowering::AbstractionPattern::getOpaque();
-    ResultVal = B.createCheckedCastValueBranch(
-        InstLoc, Val, SourceType, F->getLoweredType(opaque, TargetType),
-        TargetType, getBBForReference(SuccessBBName, SuccessBBLoc),
-        getBBForReference(FailureBBName, FailureBBLoc));
-    break;
-  }
-
   case SILInstructionKind::MarkUninitializedInst: {
     if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "["))
       return true;

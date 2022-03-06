@@ -195,7 +195,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ObjCToThickMetatypeInst:
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
@@ -275,7 +274,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DynamicMethodBranchInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastAddrBranchInst:
-  case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocRefInst:

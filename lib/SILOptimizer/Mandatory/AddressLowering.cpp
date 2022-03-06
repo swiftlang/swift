@@ -808,7 +808,7 @@ static Operand *getReusedStorageOperand(SILValue value) {
 /// user's storage. The user may compose an aggregate from its operands or
 /// forwards its operands to arguments.
 ///
-/// TODO: Handle SwitchValueInst, CheckedCastValueBranchInst.
+/// TODO: Handle SwitchValueInst
 static SILValue getProjectedUseValue(Operand *operand) {
   auto *user = operand->getUser();
   switch (user->getKind()) {
@@ -2418,13 +2418,6 @@ protected:
     use->set(SILUndef::get(use->get()->getType(), *pass.function));
   }
 
-  // Opaque checked cast source.
-  void visitCheckedCastValueBranchInst(
-      CheckedCastValueBranchInst *checkedBranchInst) {
-    // FIXME: Unimplemented
-    llvm::report_fatal_error("Unimplemented CheckCastValueBranch use.");
-  }
-
   // Copy from an opaque source operand.
   void visitCopyValueInst(CopyValueInst *copyInst) {
     SILValue srcVal = copyInst->getOperand();
@@ -2540,13 +2533,6 @@ protected:
   }
 
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *enumDataInst);
-
-  void visitUnconditionalCheckedCastValueInst(
-      UnconditionalCheckedCastValueInst *checkedCastInst) {
-
-    // FIXME: Unimplemented
-    llvm::report_fatal_error("Unimplemented UnconditionalCheckedCast use.");
-  }
 };
 } // end anonymous namespace
 
