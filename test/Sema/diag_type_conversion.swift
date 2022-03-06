@@ -38,7 +38,7 @@ protocol P1 {}
 struct S1 : P1 {}
 func foo9(s : S1) {}
 func foo10(p : P1) {
-  foo9(s : p) // expected-error {{cannot convert value of type 'P1' to expected argument type 'S1'}} {{13-13= as! S1}}
+  foo9(s : p) // expected-error {{cannot convert value of type 'any P1' to expected argument type 'S1'}} {{13-13= as! S1}}
 }
 
 func foo11(a : [AnyHashable]) {}

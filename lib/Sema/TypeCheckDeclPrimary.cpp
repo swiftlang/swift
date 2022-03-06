@@ -335,19 +335,11 @@ static void checkInheritanceClause(
       }
     }
 
-    // FIXME: The inherited type is printed directly here because
-    // the current default is to not print `any` for existential
-    // types, but this error message is super confusing without `any`
-    // if the user wrote it explicitly.
-    PrintOptions options;
-    options.PrintExplicitAny = true;
-    auto inheritedTyString = inheritedTy.getString(options);
-
     // We can't inherit from a non-class, non-protocol type.
     decl->diagnose(canHaveSuperclass
                    ? diag::inheritance_from_non_protocol_or_class
                    : diag::inheritance_from_non_protocol,
-                   inheritedTyString);
+                   inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
   }
 }

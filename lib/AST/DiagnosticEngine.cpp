@@ -670,10 +670,8 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Type type;
     bool needsQualification = false;
 
-    // TODO: We should use PrintOptions::printForDiagnostic here, or we should
-    // rename that method.
-    PrintOptions printOptions{};
-
+    // Compute the appropriate print options for this argument.
+    auto printOptions = PrintOptions::forDiagnosticArguments();
     if (Arg.getKind() == DiagnosticArgumentKind::Type) {
       type = Arg.getAsType()->getWithoutParens();
       if (type.isNull()) {

@@ -220,9 +220,9 @@ protocol P11 {
 do {
   struct Conformer: P11 {
     // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P11'}}
-    // expected-error@-2 {{type 'P11' does not conform to protocol 'Equatable'}} // FIXME: Crappy diagnostics
-    // expected-error@-3 {{'P11' requires that 'P11' conform to 'Equatable'}}
-    // expected-note@-4 {{requirement specified as 'P11' : 'Equatable'}}
+    // expected-error@-2 {{type 'any P11' does not conform to protocol 'Equatable'}} // FIXME: Crappy diagnostics
+    // expected-error@-3 {{'P11' requires that 'any P11' conform to 'Equatable'}}
+    // expected-note@-4 {{requirement specified as 'any P11' : 'Equatable'}}
     // expected-note@-5 {{requirement from conditional conformance of 'Conformer.A' (aka 'Array<P11>') to 'Equatable'}}
     typealias A = Array<any P11>
   }

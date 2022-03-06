@@ -347,137 +347,137 @@ do {
     let _: any P1 = arg.opaqueResultTypeProp
     let _: any P1 = arg[opaqueResultTypeSubscript: true]
 
-    arg.contravariantSelf1(0) // expected-error {{member 'contravariantSelf1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelf2(0) // expected-error {{member 'contravariantSelf2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelf3(0) // expected-error {{member 'contravariantSelf3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelf4(0) // expected-error {{member 'contravariantSelf4' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelf5(0) // expected-error {{member 'contravariantSelf5' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelf6(0) // expected-error {{member 'contravariantSelf6' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelf7() // expected-error {{member 'contravariantSelf7' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelf8() // expected-error {{member 'contravariantSelf8' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelf9(0) // expected-error {{member 'contravariantSelf9' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelf10() // expected-error {{member 'contravariantSelf10' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelf11(0) // expected-error {{member 'contravariantSelf11' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc1(0) // expected-error {{member 'contravariantAssoc1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc2(0) // expected-error {{member 'contravariantAssoc2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc3(0) // expected-error {{member 'contravariantAssoc3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc4(0) // expected-error {{member 'contravariantAssoc4' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc5(0) // expected-error {{member 'contravariantAssoc5' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc6(0) // expected-error {{member 'contravariantAssoc6' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc7() // expected-error {{member 'contravariantAssoc7' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc8() // expected-error {{member 'contravariantAssoc8' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc9(0) // expected-error {{member 'contravariantAssoc9' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc10() // expected-error {{member 'contravariantAssoc10' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssoc11(0) // expected-error {{member 'contravariantAssoc11' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf1(0) // expected-error {{member 'contravariantSelf1' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf2(0) // expected-error {{member 'contravariantSelf2' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf3(0) // expected-error {{member 'contravariantSelf3' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf4(0) // expected-error {{member 'contravariantSelf4' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf5(0) // expected-error {{member 'contravariantSelf5' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf6(0) // expected-error {{member 'contravariantSelf6' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf7() // expected-error {{member 'contravariantSelf7' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf8() // expected-error {{member 'contravariantSelf8' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf9(0) // expected-error {{member 'contravariantSelf9' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf10() // expected-error {{member 'contravariantSelf10' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelf11(0) // expected-error {{member 'contravariantSelf11' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc1(0) // expected-error {{member 'contravariantAssoc1' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc2(0) // expected-error {{member 'contravariantAssoc2' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc3(0) // expected-error {{member 'contravariantAssoc3' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc4(0) // expected-error {{member 'contravariantAssoc4' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc5(0) // expected-error {{member 'contravariantAssoc5' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc6(0) // expected-error {{member 'contravariantAssoc6' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc7() // expected-error {{member 'contravariantAssoc7' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc8() // expected-error {{member 'contravariantAssoc8' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc9(0) // expected-error {{member 'contravariantAssoc9' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc10() // expected-error {{member 'contravariantAssoc10' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssoc11(0) // expected-error {{member 'contravariantAssoc11' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
 
-    arg.invariantSelf1(0) // expected-error {{member 'invariantSelf1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelf2(0) // expected-error {{member 'invariantSelf2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelf3(0) // expected-error {{member 'invariantSelf3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelf4(0) // expected-error {{member 'invariantSelf4' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelf5() // expected-error {{member 'invariantSelf5' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelf6() // expected-error {{member 'invariantSelf6' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelf7(0) // expected-error {{member 'invariantSelf7' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelf8(0) // expected-error {{member 'invariantSelf8' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelf9(0) // expected-error {{member 'invariantSelf9' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelf10(0) // expected-error {{member 'invariantSelf10' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelf11() // expected-error {{member 'invariantSelf11' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc1(0) // expected-error {{member 'invariantAssoc1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc2(0) // expected-error {{member 'invariantAssoc2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc3(0) // expected-error {{member 'invariantAssoc3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc4(0) // expected-error {{member 'invariantAssoc4' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc5() // expected-error {{member 'invariantAssoc5' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc6() // expected-error {{member 'invariantAssoc6' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc7(0) // expected-error {{member 'invariantAssoc7' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc8(0) // expected-error {{member 'invariantAssoc8' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc9(0) // expected-error {{member 'invariantAssoc9' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc10(0) // expected-error {{member 'invariantAssoc10' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssoc11() // expected-error {{member 'invariantAssoc11' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
+    arg.invariantSelf1(0) // expected-error {{member 'invariantSelf1' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelf2(0) // expected-error {{member 'invariantSelf2' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelf3(0) // expected-error {{member 'invariantSelf3' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelf4(0) // expected-error {{member 'invariantSelf4' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelf5() // expected-error {{member 'invariantSelf5' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelf6() // expected-error {{member 'invariantSelf6' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelf7(0) // expected-error {{member 'invariantSelf7' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelf8(0) // expected-error {{member 'invariantSelf8' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelf9(0) // expected-error {{member 'invariantSelf9' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelf10(0) // expected-error {{member 'invariantSelf10' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelf11() // expected-error {{member 'invariantSelf11' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc1(0) // expected-error {{member 'invariantAssoc1' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc2(0) // expected-error {{member 'invariantAssoc2' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc3(0) // expected-error {{member 'invariantAssoc3' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc4(0) // expected-error {{member 'invariantAssoc4' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc5() // expected-error {{member 'invariantAssoc5' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc6() // expected-error {{member 'invariantAssoc6' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc7(0) // expected-error {{member 'invariantAssoc7' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc8(0) // expected-error {{member 'invariantAssoc8' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc9(0) // expected-error {{member 'invariantAssoc9' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc10(0) // expected-error {{member 'invariantAssoc10' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssoc11() // expected-error {{member 'invariantAssoc11' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
 
-    arg.contravariantSelfProp1 // expected-error {{member 'contravariantSelfProp1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelfProp2 // expected-error {{member 'contravariantSelfProp2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelfProp3 // expected-error {{member 'contravariantSelfProp3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelfProp4 // expected-error {{member 'contravariantSelfProp4' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelfProp5 // expected-error {{member 'contravariantSelfProp5' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelfProp6 // expected-error {{member 'contravariantSelfProp6' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelfProp7 // expected-error {{member 'contravariantSelfProp7' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelfProp8 // expected-error {{member 'contravariantSelfProp8' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelfProp9 // expected-error {{member 'contravariantSelfProp9' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelfProp10 // expected-error {{member 'contravariantSelfProp10' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantSelfProp11 // expected-error {{member 'contravariantSelfProp11' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp1 // expected-error {{member 'contravariantAssocProp1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp2 // expected-error {{member 'contravariantAssocProp2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp3 // expected-error {{member 'contravariantAssocProp3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp4 // expected-error {{member 'contravariantAssocProp4' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp5 // expected-error {{member 'contravariantAssocProp5' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp6 // expected-error {{member 'contravariantAssocProp6' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp7 // expected-error {{member 'contravariantAssocProp7' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp8 // expected-error {{member 'contravariantAssocProp8' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp9 // expected-error {{member 'contravariantAssocProp9' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp10 // expected-error {{member 'contravariantAssocProp10' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.contravariantAssocProp11 // expected-error {{member 'contravariantAssocProp11' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp1 // expected-error {{member 'contravariantSelfProp1' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp2 // expected-error {{member 'contravariantSelfProp2' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp3 // expected-error {{member 'contravariantSelfProp3' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp4 // expected-error {{member 'contravariantSelfProp4' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp5 // expected-error {{member 'contravariantSelfProp5' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp6 // expected-error {{member 'contravariantSelfProp6' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp7 // expected-error {{member 'contravariantSelfProp7' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp8 // expected-error {{member 'contravariantSelfProp8' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp9 // expected-error {{member 'contravariantSelfProp9' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp10 // expected-error {{member 'contravariantSelfProp10' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantSelfProp11 // expected-error {{member 'contravariantSelfProp11' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp1 // expected-error {{member 'contravariantAssocProp1' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp2 // expected-error {{member 'contravariantAssocProp2' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp3 // expected-error {{member 'contravariantAssocProp3' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp4 // expected-error {{member 'contravariantAssocProp4' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp5 // expected-error {{member 'contravariantAssocProp5' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp6 // expected-error {{member 'contravariantAssocProp6' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp7 // expected-error {{member 'contravariantAssocProp7' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp8 // expected-error {{member 'contravariantAssocProp8' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp9 // expected-error {{member 'contravariantAssocProp9' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp10 // expected-error {{member 'contravariantAssocProp10' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.contravariantAssocProp11 // expected-error {{member 'contravariantAssocProp11' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
 
-    arg.invariantSelfProp1 // expected-error {{member 'invariantSelfProp1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelfProp2 // expected-error {{member 'invariantSelfProp2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelfProp3 // expected-error {{member 'invariantSelfProp3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelfProp4 // expected-error {{member 'invariantSelfProp4' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelfProp5 // expected-error {{member 'invariantSelfProp5' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelfProp6 // expected-error {{member 'invariantSelfProp6' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelfProp7 // expected-error {{member 'invariantSelfProp7' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelfProp8 // expected-error {{member 'invariantSelfProp8' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelfProp9 // expected-error {{member 'invariantSelfProp9' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelfProp10 // expected-error {{member 'invariantSelfProp10' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantSelfProp11 // expected-error {{member 'invariantSelfProp11' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp1 // expected-error {{member 'invariantAssocProp1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp2 // expected-error {{member 'invariantAssocProp2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp3 // expected-error {{member 'invariantAssocProp3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp4 // expected-error {{member 'invariantAssocProp4' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp5 // expected-error {{member 'invariantAssocProp5' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp6 // expected-error {{member 'invariantAssocProp6' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp7 // expected-error {{member 'invariantAssocProp7' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp8 // expected-error {{member 'invariantAssocProp8' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp9 // expected-error {{member 'invariantAssocProp9' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp10 // expected-error {{member 'invariantAssocProp10' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg.invariantAssocProp11 // expected-error {{member 'invariantAssocProp11' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp1 // expected-error {{member 'invariantSelfProp1' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp2 // expected-error {{member 'invariantSelfProp2' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp3 // expected-error {{member 'invariantSelfProp3' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp4 // expected-error {{member 'invariantSelfProp4' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp5 // expected-error {{member 'invariantSelfProp5' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp6 // expected-error {{member 'invariantSelfProp6' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp7 // expected-error {{member 'invariantSelfProp7' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp8 // expected-error {{member 'invariantSelfProp8' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp9 // expected-error {{member 'invariantSelfProp9' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp10 // expected-error {{member 'invariantSelfProp10' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantSelfProp11 // expected-error {{member 'invariantSelfProp11' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp1 // expected-error {{member 'invariantAssocProp1' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp2 // expected-error {{member 'invariantAssocProp2' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp3 // expected-error {{member 'invariantAssocProp3' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp4 // expected-error {{member 'invariantAssocProp4' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp5 // expected-error {{member 'invariantAssocProp5' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp6 // expected-error {{member 'invariantAssocProp6' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp7 // expected-error {{member 'invariantAssocProp7' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp8 // expected-error {{member 'invariantAssocProp8' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp9 // expected-error {{member 'invariantAssocProp9' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp10 // expected-error {{member 'invariantAssocProp10' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg.invariantAssocProp11 // expected-error {{member 'invariantAssocProp11' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
 
-    arg[contravariantSelfSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantSelfSubscript2: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantSelfSubscript3: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantSelfSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantSelfSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantSelfSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantSelfSubscript7: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantSelfSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantSelfSubscript9: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantSelfSubscript10: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantSelfSubscript11: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript2: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript3: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript7: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript9: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript10: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[contravariantAssocSubscript11: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript2: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript3: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript7: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript9: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript10: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantSelfSubscript11: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript2: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript3: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript7: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript9: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript10: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[contravariantAssocSubscript11: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
 
-    arg[invariantSelfSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantSelfSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantSelfSubscript3: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantSelfSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantSelfSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantSelfSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantSelfSubscript7: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantSelfSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantAssocSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantAssocSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantAssocSubscript3: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantAssocSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantAssocSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantAssocSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantAssocSubscript7: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    arg[invariantAssocSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
+    arg[invariantSelfSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantSelfSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantSelfSubscript3: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantSelfSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantSelfSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantSelfSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantSelfSubscript7: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantSelfSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantAssocSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantAssocSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantAssocSubscript3: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantAssocSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantAssocSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantAssocSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantAssocSubscript7: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
+    arg[invariantAssocSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1'; consider using a generic constraint instead}}
   }
 }
 
@@ -503,29 +503,29 @@ do {
             existMeta: any P1_TypeMemberOnInstanceAndViceVersa.Type,
             instance: any P1_TypeMemberOnInstanceAndViceVersa) {
     // P1_TypeMemberOnInstanceAndViceVersa.Protocol
-    protoMeta.static_invariantSelfMethod() // expected-error {{static member 'static_invariantSelfMethod' cannot be used on protocol metatype '(P1_TypeMemberOnInstanceAndViceVersa).Protocol'}}
-    protoMeta.static_invariantSelfProp // expected-error {{static member 'static_invariantSelfProp' cannot be used on protocol metatype '(P1_TypeMemberOnInstanceAndViceVersa).Protocol'}}
-    protoMeta[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on protocol metatype '(P1_TypeMemberOnInstanceAndViceVersa).Protocol'}}
+    protoMeta.static_invariantSelfMethod() // expected-error {{static member 'static_invariantSelfMethod' cannot be used on protocol metatype '(any P1_TypeMemberOnInstanceAndViceVersa).Type'}}
+    protoMeta.static_invariantSelfProp // expected-error {{static member 'static_invariantSelfProp' cannot be used on protocol metatype '(any P1_TypeMemberOnInstanceAndViceVersa).Type'}}
+    protoMeta[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on protocol metatype '(any P1_TypeMemberOnInstanceAndViceVersa).Type'}}
     _ = protoMeta.covariantSelfMethod // ok
-    protoMeta.invariantSelfMethod // expected-error {{member 'invariantSelfMethod' cannot be used on value of protocol type '(P1_TypeMemberOnInstanceAndViceVersa).Protocol'; consider using a generic constraint instead}}
-    protoMeta.invariantSelfProp // expected-error {{instance member 'invariantSelfProp' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
-    protoMeta[invariantSelfSubscript: ()] // expected-error {{instance member 'subscript' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
+    protoMeta.invariantSelfMethod // expected-error {{member 'invariantSelfMethod' cannot be used on value of type '(any P1_TypeMemberOnInstanceAndViceVersa).Type'; consider using a generic constraint instead}}
+    protoMeta.invariantSelfProp // expected-error {{instance member 'invariantSelfProp' cannot be used on type 'any P1_TypeMemberOnInstanceAndViceVersa'}}
+    protoMeta[invariantSelfSubscript: ()] // expected-error {{instance member 'subscript' cannot be used on type 'any P1_TypeMemberOnInstanceAndViceVersa'}}
 
     // P1_TypeMemberOnInstanceAndViceVersa.Type
     _ = existMeta.static_covariantSelfMethod // ok
     _ = existMeta.static_covariantSelfProp // ok
     _ = existMeta[static_covariantSelfSubscript: ()] // ok
-    existMeta.static_invariantSelfMethod // expected-error {{member 'static_invariantSelfMethod' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Type'; consider using a generic constraint instead}}
-    existMeta.static_invariantSelfProp // expected-error {{member 'static_invariantSelfProp' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Type'; consider using a generic constraint instead}}
-    existMeta[static_invariantSelfSubscript: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Type'; consider using a generic constraint instead}}
+    existMeta.static_invariantSelfMethod // expected-error {{member 'static_invariantSelfMethod' cannot be used on value of type 'any P1_TypeMemberOnInstanceAndViceVersa.Type'; consider using a generic constraint instead}}
+    existMeta.static_invariantSelfProp // expected-error {{member 'static_invariantSelfProp' cannot be used on value of type 'any P1_TypeMemberOnInstanceAndViceVersa.Type'; consider using a generic constraint instead}}
+    existMeta[static_invariantSelfSubscript: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P1_TypeMemberOnInstanceAndViceVersa.Type'; consider using a generic constraint instead}}
     existMeta.invariantSelfMethod // expected-error {{instance member 'invariantSelfMethod' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
     existMeta.invariantSelfProp // expected-error {{instance member 'invariantSelfProp' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
     existMeta[invariantSelfSubscript: ()] // expected-error {{instance member 'subscript' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
 
     // P1_TypeMemberOnInstanceAndViceVersa
-    instance.static_invariantSelfMethod // expected-error {{static member 'static_invariantSelfMethod' cannot be used on instance of type 'P1_TypeMemberOnInstanceAndViceVersa'}}
-    instance.static_invariantSelfProp // expected-error {{static member 'static_invariantSelfProp' cannot be used on instance of type 'P1_TypeMemberOnInstanceAndViceVersa'}}
-    instance[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on instance of type 'P1_TypeMemberOnInstanceAndViceVersa'}}
+    instance.static_invariantSelfMethod // expected-error {{static member 'static_invariantSelfMethod' cannot be used on instance of type 'any P1_TypeMemberOnInstanceAndViceVersa'}}
+    instance.static_invariantSelfProp // expected-error {{static member 'static_invariantSelfProp' cannot be used on instance of type 'any P1_TypeMemberOnInstanceAndViceVersa'}}
+    instance[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on instance of type 'any P1_TypeMemberOnInstanceAndViceVersa'}}
   }
 }
 
@@ -571,14 +571,14 @@ do {
   _ = exist.method3(false) // ok
   exist.method4(false)
   // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>'}}
-  // expected-error@-2 {{member 'method4' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+  // expected-error@-2 {{member 'method4' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
   exist.method5(false)
   // expected-error@-1 {{instance method 'method5' requires that 'Bool' conform to 'Sequence'}}
-  // expected-error@-2 {{member 'method5' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+  // expected-error@-2 {{member 'method5' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
 
   exist.method7(false)
   // expected-error@-1 {{instance method 'method7' requires that 'U' conform to 'UnfulfillableGenericRequirements'}}
-  // expected-error@-2 {{member 'method7' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+  // expected-error@-2 {{member 'method7' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
 }
 protocol UnfulfillableGenericRequirementsDerived1: UnfulfillableGenericRequirements where A == Bool {}
 protocol UnfulfillableGenericRequirementsDerived2: UnfulfillableGenericRequirements where A == Class<Self> {}
@@ -590,7 +590,7 @@ do {
   exist1.method4(false)
   // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>}}
   exist2.method4(false)
-  // expected-error@-1 {{member 'method4' cannot be used on value of protocol type 'UnfulfillableGenericRequirementsDerived2'; consider using a generic constraint instead}}
+  // expected-error@-1 {{member 'method4' cannot be used on value of type 'any UnfulfillableGenericRequirementsDerived2'; consider using a generic constraint instead}}
   // expected-error@-2 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>'}}
 }
 protocol UnfulfillableGenericRequirementsDerived3: UnfulfillableGenericRequirements where A: Sequence, A.Element: Sequence {}
@@ -605,7 +605,7 @@ do {
   // expected-error@-2 {{instance method 'method6' requires that 'Self.A' conform to 'Sequence'}}
   // expected-error@-3 {{instance method 'method6' requires that 'Bool' conform to 'UnfulfillableGenericRequirements'}}
   exist2.method6(false)
-  // expected-error@-1 {{member 'method6' cannot be used on value of protocol type 'UnfulfillableGenericRequirementsDerived3'; consider using a generic constraint instead}}
+  // expected-error@-1 {{member 'method6' cannot be used on value of type 'any UnfulfillableGenericRequirementsDerived3'; consider using a generic constraint instead}}
   // expected-error@-2 {{instance method 'method6' requires that 'Bool' conform to 'UnfulfillableGenericRequirements'}}
 }
 
@@ -626,7 +626,7 @@ do {
   exist.method1() // expected-error {{instance method 'method1()' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
   exist.method2(false) // expected-error {{instance method 'method2' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
   exist.method3(false, false) // expected-error {{instance method 'method3' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
-  // expected-error@-1 {{member 'method3' cannot be used on value of protocol type 'InvalidTypeParameters'; consider using a generic constraint instead}}
+  // expected-error@-1 {{member 'method3' cannot be used on value of type 'any InvalidTypeParameters'; consider using a generic constraint instead}}
 }
 
 protocol GenericRequirementFailures {
@@ -646,7 +646,7 @@ do {
   exist.method1() // expected-error {{referencing instance method 'method1()' on 'GenericRequirementFailures' requires the types 'Self.A' and 'Never' be equivalent}}
   exist.method2() // expected-error {{referencing instance method 'method2()' on 'GenericRequirementFailures' requires the types 'Self.A' and 'Never' be equivalent}}
   exist.method3(false) // expected-error {{referencing instance method 'method3' on 'GenericRequirementFailures' requires the types 'Self.A' and 'Never' be equivalent}}
-  // expected-error@-1 {{member 'method3' cannot be used on value of protocol type 'GenericRequirementFailures'; consider using a generic constraint instead}}
+  // expected-error@-1 {{member 'method3' cannot be used on value of type 'any GenericRequirementFailures'; consider using a generic constraint instead}}
   exist.method4() // expected-error {{referencing instance method 'method4()' on 'GenericRequirementFailures' requires that 'Self.A' conform to 'GenericRequirementFailures'}}
 }
 protocol GenericRequirementFailuresDerived: GenericRequirementFailures where A: GenericRequirementFailures {}
@@ -665,9 +665,9 @@ protocol P2 {
 }
 func takesP2(p2: any P2) {
   _ = p2[]
-  // expected-error@-1{{member 'subscript' cannot be used on value of protocol type 'P2'; consider using a generic constraint instead}}
+  // expected-error@-1{{member 'subscript' cannot be used on value of type 'any P2'; consider using a generic constraint instead}}
   _ = p2.prop
-  // expected-error@-1{{member 'prop' cannot be used on value of protocol type 'P2'; consider using a generic constraint instead}}
+  // expected-error@-1{{member 'prop' cannot be used on value of type 'any P2'; consider using a generic constraint instead}}
 }
 
 protocol MiscTestsProto {
@@ -683,7 +683,7 @@ do {
     var r: any Sequence & IteratorProtocol = arg.getR()
     r.makeIterator() // expected-warning {{result of call to 'makeIterator()' is unused}}
     r.next() // expected-warning {{result of call to 'next()' is unused}}
-    r.nonexistent() // expected-error {{value of type 'IteratorProtocol & Sequence' has no member 'nonexistent'}}
+    r.nonexistent() // expected-error {{value of type 'any IteratorProtocol & Sequence' has no member 'nonexistent'}}
 
     arg[] // expected-warning {{expression of type 'Any' is unused}}
     arg.getAssoc // expected-warning {{expression of type 'Any?' is unused}}
@@ -768,16 +768,16 @@ protocol ConcreteAssocTypes {
 }
 do {
   func test(arg: any ConcreteAssocTypes) {
-    _ = arg.method1 // expected-error {{member 'method1' cannot be used on value of protocol type 'ConcreteAssocTypes'; consider using a generic constraint instead}}
-    _ = arg.method2 // expected-error {{member 'method2' cannot be used on value of protocol type 'ConcreteAssocTypes'; consider using a generic constraint instead}}
-    _ = arg.method3 // expected-error {{member 'method3' cannot be used on value of protocol type 'ConcreteAssocTypes'; consider using a generic constraint instead}}
-    _ = arg.property1 // expected-error {{member 'property1' cannot be used on value of protocol type 'ConcreteAssocTypes'; consider using a generic constraint instead}}
+    _ = arg.method1 // expected-error {{member 'method1' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+    _ = arg.method2 // expected-error {{member 'method2' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+    _ = arg.method3 // expected-error {{member 'method3' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+    _ = arg.property1 // expected-error {{member 'property1' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
     // Covariant 'Self' erasure works in conjunction with concrete associated types.
     let _: (Bool, any ConcreteAssocTypes) = arg.property2 // ok
-    _ = arg.property3 // expected-error {{member 'property3' cannot be used on value of protocol type 'ConcreteAssocTypes'; consider using a generic constraint instead}}
-    _ = arg[subscript1: false] // expected-error {{member 'subscript' cannot be used on value of protocol type 'ConcreteAssocTypes'; consider using a generic constraint instead}}
-    _ = arg[subscript2: false] // expected-error {{member 'subscript' cannot be used on value of protocol type 'ConcreteAssocTypes'; consider using a generic constraint instead}}
-    _ = arg[subscript3: false] // expected-error {{member 'subscript' cannot be used on value of protocol type 'ConcreteAssocTypes'; consider using a generic constraint instead}}
+    _ = arg.property3 // expected-error {{member 'property3' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+    _ = arg[subscript1: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+    _ = arg[subscript2: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+    _ = arg[subscript3: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
 
     let _: (
       Struct<Bool>, (any ConcreteAssocTypes).Type, () -> Bool
