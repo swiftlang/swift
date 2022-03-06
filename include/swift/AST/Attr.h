@@ -632,14 +632,16 @@ public:
                    const llvm::VersionTuple &Obsoleted,
                    SourceRange ObsoletedRange,
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
-                   bool Implicit)
+                   bool Implicit,
+                   bool IsSPI)
     : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
       Message(Message), Rename(Rename), RenameDecl(RenameDecl),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
       PlatformAgnostic(PlatformAgnostic),
-      Platform(Platform)
+      Platform(Platform),
+      IsSPI(IsSPI)
   {}
 
 #undef INIT_VER_TUPLE
@@ -684,6 +686,9 @@ public:
 
   /// The platform of the availability.
   const PlatformKind Platform;
+
+  /// Whether this is available as SPI.
+  const bool IsSPI;
 
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;

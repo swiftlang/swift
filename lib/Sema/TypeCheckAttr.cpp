@@ -1611,6 +1611,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
 
+  while (attr->IsSPI) {
+    if (attr->hasPlatform() && attr->Introduced.hasValue())
+      break;
+    diagnoseAndRemoveAttr(attr, diag::spi_available_malformed);
+    break;
+  }
+
   if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (VD->isProtocolRequirement()) {

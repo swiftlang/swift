@@ -29,6 +29,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -126,6 +127,7 @@ DeclAttrKind DeclAttribute::getAttrKindFromString(StringRef Str) {
 #define DECL_ATTR(X, CLASS, ...) .Case(#X, DAK_##CLASS)
 #define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DAK_##CLASS)
 #include "swift/AST/Attr.def"
+  .Case(SPI_AVAILABLE_ATTRNAME, DAK_Available)
   .Default(DAK_Count);
 }
 
@@ -368,6 +370,9 @@ LLVM_READONLY
 static bool isShortAvailable(const DeclAttribute *DA) {
   auto *AvailAttr = dyn_cast<AvailableAttr>(DA);
   if (!AvailAttr)
+    return false;
+
+  if (AvailAttr->IsSPI)
     return false;
 
   if (!AvailAttr->Introduced.hasValue())
@@ -968,9 +973,23 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_Available: {
-    Printer.printAttrName("@available");
-    Printer << "(";
     auto Attr = cast<AvailableAttr>(this);
+    if (!Options.PrintSPIs && Attr->IsSPI) {
+      assert(Attr->hasPlatform());
+      assert(Attr->Introduced.hasValue());
+      Printer.printAttrName("@available");
+      Printer << "(";
+      Printer << Attr->platformString();
+      Printer << ", unavailable)";
+      break;
+    }
+    if (Attr->IsSPI) {
+      std::string atSPI = (llvm::Twine("@") + SPI_AVAILABLE_ATTRNAME).str();
+      Printer.printAttrName(atSPI);
+    } else {
+      Printer.printAttrName("@available");
+    }
+    Printer << "(";
     printAvailableAttr(Attr, Printer, Options);
     Printer << ")";
     break;
@@ -1599,7 +1618,7 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
     NoVersion, SourceRange(),
     NoVersion, SourceRange(),
     Obsoleted, SourceRange(),
-    Kind, /* isImplicit */ false);
+    Kind, /* isImplicit */ false, /*SPI*/false);
 }
 
 AvailableAttr *AvailableAttr::createForAlternative(
@@ -1610,7 +1629,7 @@ AvailableAttr *AvailableAttr::createForAlternative(
     NoVersion, SourceRange(),
     NoVersion, SourceRange(),
     NoVersion, SourceRange(),
-    PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true);
+    PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true, /*SPI*/false);
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
@@ -1628,7 +1647,8 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
                                Obsoleted ? *Obsoleted : llvm::VersionTuple(),
                                implicit ? SourceRange() : ObsoletedRange,
                                PlatformAgnostic,
-                               implicit);
+                               implicit,
+                               IsSPI);
 }
 
 Optional<OriginallyDefinedInAttr::ActiveVersion>
