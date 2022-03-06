@@ -36,9 +36,9 @@ func min<T : MethodLessComparable>(_ x: T, y: T) -> T {
 func existential<T : EqualComparable, U : EqualComparable>(_ t1: T, t2: T, u: U) {
   var eqComp : EqualComparable = t1 // expected-warning {{protocol 'EqualComparable' as a type must be explicitly marked as 'any'}}
   eqComp = u
-  if t1.isEqual(eqComp) {} // expected-error{{cannot convert value of type 'EqualComparable' to expected argument type 'T'}}
+  if t1.isEqual(eqComp) {} // expected-error{{cannot convert value of type 'any EqualComparable' to expected argument type 'T'}}
   if eqComp.isEqual(t2) {}
-  // expected-error@-1 {{member 'isEqual' cannot be used on value of protocol type 'EqualComparable'; consider using a generic constraint instead}}
+  // expected-error@-1 {{member 'isEqual' cannot be used on value of type 'any EqualComparable'; consider using a generic constraint instead}}
 }
 
 protocol OtherEqualComparable {
@@ -47,14 +47,14 @@ protocol OtherEqualComparable {
 
 func otherExistential<T : EqualComparable>(_ t1: T) {
   var otherEqComp : OtherEqualComparable = t1 // expected-error{{value of type 'T' does not conform to specified type 'OtherEqualComparable'}}
-  otherEqComp = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
+  otherEqComp = t1 // expected-error{{cannot assign value of type 'T' to type 'any OtherEqualComparable'}}
   _ = otherEqComp
   
   var otherEqComp2 : any OtherEqualComparable // Ok
-  otherEqComp2 = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
+  otherEqComp2 = t1 // expected-error{{cannot assign value of type 'T' to type 'any OtherEqualComparable'}}
   _ = otherEqComp2
 
-  _ = t1 as any EqualComparable & OtherEqualComparable // expected-error{{value of type 'T' does not conform to 'EqualComparable & OtherEqualComparable' in coercion}}
+  _ = t1 as any EqualComparable & OtherEqualComparable // expected-error{{cannot convert value of type 'T' to type 'any EqualComparable & OtherEqualComparable' in coercion}}
 }
 
 //===----------------------------------------------------------------------===//

@@ -451,7 +451,7 @@ func testKeyPathSubscriptExistentialBase(concreteBase: inout B,
   _ = concreteBase[keyPath: pkp]
 
   concreteBase[keyPath: kp] = s // expected-error {{cannot assign through subscript: 'kp' is a read-only key path}}
-  concreteBase[keyPath: wkp] = s // expected-error {{key path with root type 'P' cannot be applied to a base of type 'B'}}
+  concreteBase[keyPath: wkp] = s // expected-error {{key path with root type 'any P' cannot be applied to a base of type 'B'}}
   concreteBase[keyPath: rkp] = s
   concreteBase[keyPath: pkp] = s // expected-error {{cannot assign through subscript: 'pkp' is a read-only key path}}
 
@@ -689,8 +689,8 @@ func testSubtypeKeypathClass(_ keyPath: ReferenceWritableKeyPath<Base, Int>) {
 
 func testSubtypeKeypathProtocol(_ keyPath: ReferenceWritableKeyPath<PP, Int>) {
   testSubtypeKeypathProtocol(\Base.i)
-  // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<Base, Int>' to expected argument type 'ReferenceWritableKeyPath<PP, Int>'}}
-  // expected-note@-2 {{arguments to generic parameter 'Root' ('Base' and 'PP') are expected to be equal}}
+  // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<Base, Int>' to expected argument type 'ReferenceWritableKeyPath<any PP, Int>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('Base' and 'any PP') are expected to be equal}}
 }
 
 // rdar://problem/32057712

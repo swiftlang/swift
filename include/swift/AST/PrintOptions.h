@@ -548,6 +548,13 @@ struct PrintOptions {
     return result;
   }
 
+  /// The print options used for formatting diagnostic arguments.
+  static PrintOptions forDiagnosticArguments() {
+    PrintOptions result;
+    result.PrintExplicitAny = true;
+    return result;
+  }
+
   /// Retrieve the set of options suitable for diagnostics printing.
   static PrintOptions printForDiagnostics(AccessLevel accessFilter,
                                           bool printFullConvention) {

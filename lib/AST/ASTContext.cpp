@@ -4260,15 +4260,17 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
                            RecursiveTypeProperties properties)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
 
-Type ExistentialType::get(Type constraint) {
+Type ExistentialType::get(Type constraint, bool forceExistential) {
   auto &C = constraint->getASTContext();
-  // FIXME: Any and AnyObject don't yet use ExistentialType.
-  if (constraint->isAny() || constraint->isAnyObject())
-    return constraint;
+  if (!forceExistential) {
+    // FIXME: Any and AnyObject don't yet use ExistentialType.
+    if (constraint->isAny() || constraint->isAnyObject())
+      return constraint;
 
-  // ExistentialMetatypeType is already an existential type.
-  if (constraint->is<ExistentialMetatypeType>())
-    return constraint;
+    // ExistentialMetatypeType is already an existential type.
+    if (constraint->is<ExistentialMetatypeType>())
+      return constraint;
+  }
 
   assert(constraint->isConstraintType());
 

@@ -5330,7 +5330,7 @@ class ExistentialType final : public TypeBase {
         ConstraintType(constraintType) {}
 
 public:
-  static Type get(Type constraint);
+  static Type get(Type constraint, bool forceExistential = false);
 
   Type getConstraintType() const { return ConstraintType; }
 
@@ -6663,9 +6663,9 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
     return false;
 
   case TypeKind::Metatype:
-  case TypeKind::ExistentialMetatype:
     return !cast<const AnyMetatypeType>(this)->hasRepresentation();
 
+  case TypeKind::ExistentialMetatype:
   case TypeKind::Existential:
     return false;
 

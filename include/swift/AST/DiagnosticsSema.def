@@ -142,7 +142,7 @@ ERROR(could_not_use_instance_member_on_type,none,
       "%select{| instance of nested}3 type %0",
       (Type, DeclNameRef, Type, bool))
 ERROR(could_not_use_member_on_existential,none,
-      "member %1 cannot be used on value of protocol type %0; consider using a"
+      "member %1 cannot be used on value of type %0; consider using a"
       " generic constraint instead",
       (Type, DeclNameRef))
 FIXIT(replace_with_type,"%0",(Type))
@@ -1945,9 +1945,8 @@ ERROR(type_cannot_conform_to_nsobject,none,
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 ERROR(type_cannot_conform, none,
-      "%select{type %1|protocol %1 as a type}0 cannot conform to "
-      "%select{%3|the protocol itself}2",
-      (bool, Type, bool, Type))
+      "type %0 cannot conform to %1",
+      (Type, Type))
 NOTE(only_concrete_types_conform_to_protocols,none,
      "only concrete types such as structs, enums and classes can conform to protocols",
      ())
@@ -2455,8 +2454,8 @@ ERROR(protocol_composition_one_class,none,
       "contains class %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,none,
-      "type %0 constrained to non-protocol, non-class type '%1'",
-      (Type, StringRef))
+      "type %0 constrained to non-protocol, non-class type %1",
+      (Type, Type))
 NOTE(requires_conformance_nonprotocol_fixit,none,
      "use '%0 == %1' to require '%0' to be '%1'",
      (StringRef, StringRef))
@@ -2777,9 +2776,9 @@ WARNING(anyobject_class_inheritance_deprecated,Deprecation,
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,
-  "inheritance from non-protocol, non-class type '%0'", (StringRef))
+  "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,none,
-  "inheritance from non-protocol type '%0'", (StringRef))
+  "inheritance from non-protocol type %0", (Type))
 ERROR(inheritance_from_anyobject,none,
   "only protocols can inherit from 'AnyObject'", ())
 ERROR(inheritance_from_parameterized_protocol,none,
@@ -3589,7 +3588,7 @@ ERROR(construct_protocol_value,none,
       "value of type %0 is a protocol; it cannot be instantiated",
       (Type))
 ERROR(construct_protocol_by_name,none,
-      "protocol type %0 cannot be instantiated",
+      "type %0 cannot be instantiated",
       (Type))
 
 // Operators

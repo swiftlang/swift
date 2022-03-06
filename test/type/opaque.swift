@@ -505,7 +505,7 @@ extension OpaqueProtocol {
 func takesOpaqueProtocol(existential: OpaqueProtocol) {
   // These are okay because we erase to the opaque type bound
   let a = existential.asSome
-  let _: Int = a // expected-error{{cannot convert value of type 'OpaqueProtocol' to specified type 'Int'}}
+  let _: Int = a // expected-error{{cannot convert value of type 'any OpaqueProtocol' to specified type 'Int'}}
   _ = existential.getAsSome()
   _ = existential[0]
 }
