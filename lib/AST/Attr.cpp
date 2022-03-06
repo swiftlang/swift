@@ -29,6 +29,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -126,7 +127,7 @@ DeclAttrKind DeclAttribute::getAttrKindFromString(StringRef Str) {
 #define DECL_ATTR(X, CLASS, ...) .Case(#X, DAK_##CLASS)
 #define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DAK_##CLASS)
 #include "swift/AST/Attr.def"
-  .Case("_spi_available", DAK_Available)
+  .Case(SPI_AVAILABLE_ATTRNAME, DAK_Available)
   .Default(DAK_Count);
 }
 
@@ -982,7 +983,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << ", unavailable)";
       break;
     }
-    Printer.printAttrName(Attr->IsSPI ? "@_spi_available": "@available");
+    if (Attr->IsSPI) {
+      std::string atSPI = (llvm::Twine("@") + SPI_AVAILABLE_ATTRNAME).str();
+      Printer.printAttrName(atSPI);
+    } else {
+      Printer.printAttrName("@available");
+    }
     Printer << "(";
     printAvailableAttr(Attr, Printer, Options);
     Printer << ")";

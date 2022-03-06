@@ -21,6 +21,7 @@
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxKind.h"
 #include "swift/Subsystems.h"
+#include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/GenericParamList.h"
@@ -574,7 +575,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
                 Obsoleted.Version, Obsoleted.Range,
                 PlatformAgnostic,
                 /*Implicit=*/false,
-                AttrName == "_spi_available");
+                AttrName == SPI_AVAILABLE_ATTRNAME);
   return makeParserResult(Attr);
 
 }
@@ -860,7 +861,7 @@ bool Parser::parseAvailability(
           /*Obsoleted=*/llvm::VersionTuple(),
           /*ObsoletedRange=*/SourceRange(), PlatformAgnostic,
           /*Implicit=*/false,
-          AttrName == "_spi_available"));
+          AttrName == SPI_AVAILABLE_ATTRNAME));
     }
 
     return true;
