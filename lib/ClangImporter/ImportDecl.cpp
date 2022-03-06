@@ -1936,7 +1936,8 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
                                       /*Obsoleted=*/noVersion,
                                       /*ObsoletedRange*/SourceRange(),
                                       PlatformAgnosticAvailabilityKind::None,
-                                      /*Implicit=*/false);
+                                      /*Implicit=*/false,
+                                      /*SPI*/false);
 
   decl->getAttrs().add(AvAttr);
 }
@@ -2681,7 +2682,8 @@ namespace {
               /*Deprecated*/llvm::VersionTuple(), SourceRange(),
               /*Obsoleted*/llvm::VersionTuple(), SourceRange(),
               PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
-              /*Implicit*/false);
+              /*Implicit*/false,
+              /*SPI*/false);
         }
       }
 
@@ -9013,18 +9015,10 @@ void ClangImporter::Implementation::importAttributes(
         AnyUnavailable = true;
       }
 
-      if (EnableClangSPI) {
-        if (isUsingMacroName(getClangASTContext().getSourceManager(),
+      auto IsSPI = isUsingMacroName(getClangASTContext().getSourceManager(),
                               avail->getLoc(), "SPI_AVAILABLE") ||
-             isUsingMacroName(getClangASTContext().getSourceManager(),
-                              avail->getLoc(), "__SPI_AVAILABLE")) {
-          // The decl has been marked as SPI in the header by using the SPI macro,
-          // thus we add the SPI attribute to it with a default group name.
-          MappedDecl->getAttrs().add(SPIAccessControlAttr::create(SwiftContext,
-            SourceLoc(), SourceRange(),
-            SwiftContext.getIdentifier(CLANG_MODULE_DEFUALT_SPI_GROUP_NAME)));
-        }
-      }
+                   isUsingMacroName(getClangASTContext().getSourceManager(),
+                              avail->getLoc(), "__SPI_AVAILABLE");
 
       StringRef message = avail->getMessage();
 
@@ -9065,7 +9059,8 @@ void ClangImporter::Implementation::importAttributes(
                                           /*DeprecatedRange=*/SourceRange(),
                                           obsoleted,
                                           /*ObsoletedRange=*/SourceRange(),
-                                          PlatformAgnostic, /*Implicit=*/false);
+                                          PlatformAgnostic, /*Implicit=*/false,
+                                          IsSPI);
 
       MappedDecl->getAttrs().add(AvAttr);
     }

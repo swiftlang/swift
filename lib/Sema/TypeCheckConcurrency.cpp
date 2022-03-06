@@ -4359,6 +4359,7 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
                                           NoVersion, SourceRange(),
                                           NoVersion, SourceRange(),
                                           PlatformAgnosticAvailabilityKind::Unavailable,
+                                          false,
                                           false);
 
       // Conformance availability is currently tied to the declaring extension.

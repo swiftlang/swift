@@ -1030,6 +1030,8 @@ public:
   // an @_spi context.
   bool isSPI() const;
 
+  bool isAvailableAsSPI() const;
+
   // List the SPI groups declared with @_spi or inherited by this decl.
   //
   // SPI groups are inherited from the parent contexts only if the local decl
