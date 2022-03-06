@@ -14,6 +14,7 @@
 #include "../SwiftShims/MetadataSections.h"
 
 #include <cstddef>
+#include <new>
 
 // Link start/stop symbols weakly to link them if they aren't synthesized by the linker. 
 #define DECLARE_SWIFT_SECTION(name)                                                             \
@@ -47,9 +48,9 @@ static void swift_image_constructor() {
   { reinterpret_cast<uintptr_t>(&__start_##name),                              \
     static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
 
-  sections = {
+  new (&sections) swift::MetadataSections {
       swift::CurrentSectionMetadataVersion,
-      0,
+      { 0 },
 
       nullptr,
       nullptr,
