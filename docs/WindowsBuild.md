@@ -17,7 +17,7 @@ An easy way to get the tools to build Swift is using the [Visual Studio installe
 ```cmd
 curl.exe -sOL https://aka.ms/vs/16/release/vs_community.exe
 vs_community ^
-  --add Component.CPython3.x64 ^
+  --add Component.CPython39.x64 ^
   --add Microsoft.VisualStudio.Component.Git ^
   --add Microsoft.VisualStudio.Component.VC.ATL ^
   --add Microsoft.VisualStudio.Component.VC.CMake.Project ^
@@ -26,9 +26,7 @@ vs_community ^
 del /q vs_community.exe
 ```
 
-> **NOTE:** For anyone who wants to use Visual Studio 2022 instead:
-> - replace `https://aka.ms/vs/16/release/vs_community.exe` with `https://aka.ms/vs/17/release/vs_community.exe`
-> - replace `Component.CPython3.x64` with `Component.CPython39.x64`
+> **NOTE:** For anyone who wants to use Visual Studio 2022, you can simply replace version number `16` with `17` in the installer URL.
 
 > **NOTE:** The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.  For anyone using VS installer in GUI, please check it out.
 
@@ -37,9 +35,9 @@ del /q vs_community.exe
 If you are building a debug version of Swift, you should also install the Python debug binaries.
 
 1. In the Windows settings, go to *Add and Remove Programs*
-2. Select the *Python 3.x.x (64-bit)* entry
+2. Select the *Python 3.9.x (64-bit)* entry
 3. Click *Modify*, then *Yes*, then *Modify* again and then *Next*
-4. Select *Download debug binaries (requires VS 2015 or later)*
+4. Select *Download debug binaries (requires VS 2017 or later)*
 5. Click *Install*
 
 ### Set up `vcpkg`
