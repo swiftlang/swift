@@ -17,30 +17,30 @@ distributed actor MyDistActor {
 
   // we only strictly check the first one as it is the most tricky
   // the other ones we check by means of "if synthesis is wrong, they'd fail to
-//  // compile":
-//
-//  distributed func funcNoop() {
-//  }
-//
-//  distributed func funcHi() -> String {
-//    "Hello"
-//  }
-//
-//  distributed func funcThrows(param: String) throws -> String {
-//    param
-//  }
-//
-//  distributed func funcThrows(one: String, two: Int) throws -> String {
-//    one
-//  }
-//
-//  distributed func funcAsync(param: String) async -> String {
-//    param
-//  }
-//
-//  distributed func funcAsyncThrows(param: String) async throws -> String {
-//    param
-//  }
+  // compile":
+
+  distributed func funcNoop() {
+  }
+
+  distributed func funcHi() -> String {
+    "Hello"
+  }
+
+  distributed func funcThrows(param: String) throws -> String {
+    param
+  }
+
+  distributed func funcThrows(one: String, two: Int) throws -> String {
+    one
+  }
+
+  distributed func funcAsync(param: String) async -> String {
+    param
+  }
+
+  distributed func funcAsyncThrows(param: String) async throws -> String {
+    param
+  }
 }
 
 // CHECK: (func_decl implicit "$dist_funcNormal(param:)" interface type='(MyDistActor) -> (String) async throws -> String' access=internal captures=(actorSystem<direct>) nonisolated

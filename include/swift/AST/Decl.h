@@ -6310,6 +6310,9 @@ public:
 
   /// For a 'distributed' target (func or computed property),
   /// get the 'thunk' responsible for performing the 'remoteCall'.
+  ///
+  /// \return the synthesized thunk, or null if the base of the call has
+  ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
   
   /// Returns 'true' if the function has the @c @_backDeploy attribute.
