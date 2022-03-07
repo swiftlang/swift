@@ -15,7 +15,7 @@ add_custom_command(
   OUTPUT
     ${features_file_dest}
   COMMAND
-    ${features_merger} -f ${features_file_swift_src} -p \"\" -f ${features_file_clang_src} -p clang- > ${features_file_dest}
+    $<TARGET_FILE:Python3::Interpreter> ${features_merger} -f ${features_file_swift_src} -p \"\" -f ${features_file_clang_src} -p clang- > ${features_file_dest}
   DEPENDS
     ${features_merger}
     ${features_file_swift_src}
