@@ -123,12 +123,9 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   auto func = static_cast<FuncDecl *>(context);
   auto funcDC = func->getDeclContext();
-  assert(funcDC && "Function must be part of distributed actor");
   NominalTypeDecl *nominal = funcDC->getSelfNominalTypeDecl();
-  assert(nominal && nominal->isDistributedActor() && "Function must be part of distributed actor");
-
-  fprintf(stderr, "[%s:%d] (%s) MAKE THUNK FOR [[[[[ %s\n", __FILE__, __LINE__, __FUNCTION__,
-          func->getName().getBaseName().getIdentifier().str().str().c_str());
+  assert(nominal && nominal->isDistributedActor() &&
+         "Distributed function must be part of distributed actor");
 
   auto selfDecl = thunk->getImplicitSelfDecl();
   selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(implicit));
@@ -141,7 +138,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   // === self.actorSystem
   ProtocolDecl *DAS = C.getDistributedActorSystemDecl();
   Type systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
-  assert(systemTy && "distributed thunk can only be synthesized for with actor system types");
+  assert(systemTy && "distributed thunk can only be synthesized with concrete "
+                     "actor system types");
   NominalTypeDecl *systemDecl = systemTy->getAnyNominal();
   assert(systemDecl);
   auto systemConfRef = module->lookupConformance(systemTy, DAS);
@@ -162,8 +160,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       ArgumentList::forImplicitSingle(C, /*label=*/Identifier(), selfRefExpr);
 
   FuncDecl *isRemoteFn = C.getIsRemoteDistributedActor();
-  assert(isRemoteFn &&
-         "Could not find 'is remote' function, is the '_Distributed' module available?");
+  assert(isRemoteFn && "Could not find 'is remote' function, is the "
+                       "'_Distributed' module available?");
   auto isRemoteDeclRef =
       UnresolvedDeclRefExpr::createImplicit(C, isRemoteFn->getName());
   auto isRemote =
@@ -506,7 +504,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
-  auto module = func->getParentModule();
 
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(func);
   assert(systemTy &&
@@ -517,10 +514,6 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   // --- Prepare generic parameters
   GenericParamList *genericParamList = nullptr;
   if (auto genericParams = func->getGenericParams()) {
-    for (auto genParam : *genericParams) {
-      fprintf(stderr, "[%s:%d] (%s) GENERIC PARAM:\n", __FILE__, __LINE__, __FUNCTION__);
-      genParam->dump();
-    }
     genericParamList = genericParams->clone(DC);
   }
 
@@ -533,10 +526,7 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   auto funcParams = func->getParameters();
   SmallVector<ParamDecl*, 2> paramDecls;
   for (auto i : indices(*func->getParameters())) {
-//    auto thunkParam = params->get(i);
     auto funcParam = funcParams->get(i);
-//    thunkParam->setInterfaceType(funcParam->getInterfaceType());
-//    thunkParam->setImplicit();
     auto paramDecl = new (C) ParamDecl(SourceLoc(),
                                SourceLoc(), funcParam->getArgumentName(),
                                SourceLoc(), funcParam->getParameterName(),
@@ -557,13 +547,7 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
                            DC);
   thunk->setSynthesized(true);
   thunk->getAttrs().add(new (C) NonisolatedAttr(/*implicit=*/true));
-  fprintf(stderr, "[%s:%d] (%s) FUNC GEN SIG:\n", __FILE__, __LINE__, __FUNCTION__);
-  func->getGenericSignature().dump();
   thunk->setGenericSignature(thunkGenSig);
-  fprintf(stderr, "[%s:%d] (%s) THUNK GEN SIG:\n", __FILE__, __LINE__, __FUNCTION__);
-  thunk->getGenericSignature().dump();
-  for (auto req : thunk->getGenericRequirements())
-    req.dump();
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
   thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
 
@@ -571,7 +555,6 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   thunk->dump();
   fprintf(stderr, "[%s:%d] (%s) ORIGINAL ::::::\n", __FILE__, __LINE__, __FUNCTION__);
   func->dump();
-
 
   return thunk;
 }
@@ -613,8 +596,6 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
     assert(nominal);
 
     // --- Prepare the "distributed thunk" which does the "maybe remote" dance:
-    fprintf(stderr, "[%s:%d] (%s) MAKE THUNK FOR %s \n", __FILE__, __LINE__, __FUNCTION__, func->getName().getBaseName().getIdentifier().str().str().c_str());
-
     return createDistributedThunkFunction(func);
   }
 

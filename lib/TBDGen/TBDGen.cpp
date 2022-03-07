@@ -719,7 +719,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 
   if (auto distributedThunk = AFD->getDistributedThunk()) {
-    auto thunk = SILDeclRef().asDistributed();
+    auto thunk = SILDeclRef(distributedThunk).asDistributed();
     addSymbol(thunk);
     addAsyncFunctionPointerSymbol(thunk);
   }

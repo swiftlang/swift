@@ -7999,22 +7999,6 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
   *selfDecl = new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                   getLoc(), ctx.Id_self, this);
   (*selfDecl)->setImplicit();
-  if (auto classDecl = dyn_cast<ClassDecl>(DC)) {
-    /// If we are in a distributed actor, and the function is NOT nonisolated,
-    /// we are guaranteed that the `self` is known-to-be-local.
-    if (classDecl->isDistributedActor() &&
-        !getAttrs().hasAttribute<NonisolatedAttr>()) {
-      (*selfDecl)->getAttrs().add(
-          new (ctx) KnownToBeLocalAttr(/*implicit=*/true));
-      fprintf(stderr, "[%s:%d] (%s) MAKE SELF KNOWN TO BE LOCAL...\n", __FILE__, __LINE__, __FUNCTION__);
-      (*selfDecl)->dump();
-      fprintf(stderr, "[%s:%d] (%s) INSIDE:\n", __FILE__, __LINE__, __FUNCTION__);
-      dump();
-      fprintf(stderr, "\n");
-      fprintf(stderr, "\n");
-    }
-  }
-
   return *selfDecl;
 }
 
