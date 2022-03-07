@@ -11,24 +11,23 @@
 //===----------------------------------------------------------------------===//
 
 module visualc [system] {
+  export *
+
   module SAL {
     header "sal.h"
-    export *
   }
 
   module vcruntime {
     header "vcruntime.h"
-    export *
+    export SAL
   }
 
   module setjmp {
     header "setjmp.h"
-    export *
   }
 
   module stdint {
     header "stdint.h"
-    export *
   }
 }
 
