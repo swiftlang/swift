@@ -551,11 +551,6 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
   thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
 
-  fprintf(stderr, "[%s:%d] (%s) THE DECL::::::\n", __FILE__, __LINE__, __FUNCTION__);
-  thunk->dump();
-  fprintf(stderr, "[%s:%d] (%s) ORIGINAL ::::::\n", __FILE__, __LINE__, __FUNCTION__);
-  func->dump();
-
   return thunk;
 }
 

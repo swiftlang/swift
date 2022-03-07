@@ -504,6 +504,80 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
 }
 
 bool
+AbstractFunctionDecl::isDistributedActorSystemMakeInvocationEncoder() const {
+  auto &C = getASTContext();
+  auto module = getParentModule();
+
+  if (getBaseIdentifier() != C.Id_makeInvocationEncoder) {
+    return false;
+  }
+
+  auto *func = dyn_cast<FuncDecl>(this);
+  if (!func) {
+    return false;
+  }
+  if (func->getParameters()->size() != 0) {
+    return false;
+  }
+  if (func->hasAsync()) {
+    return false;
+  }
+  if (func->hasThrows()) {
+    return false;
+  }
+
+  auto returnTy = func->getResultInterfaceType();
+  auto conformance = module->lookupConformance(
+      returnTy, C.getDistributedTargetInvocationEncoderDecl());
+  if (conformance.isInvalid()) {
+    return false;
+  }
+
+  return true;
+}
+
+bool
+AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitution() const {
+  auto &C = getASTContext();
+  auto module = getParentModule();
+
+  if (getBaseIdentifier() != C.Id_recordGenericSubstitution) {
+    return false;
+  }
+
+  auto *fd = dyn_cast<FuncDecl>(this);
+  if (!fd) {
+    return false;
+  }
+  if (fd->getParameters()->size() != 1) {
+    return false;
+  }
+  if (fd->hasAsync()) {
+    return false;
+  }
+  if (!fd->hasThrows()) {
+    return false;
+  }
+  // TODO(distributed): more checks
+
+  // A single generic parameter.
+  auto genericParamList = fd->getGenericParams();
+  if (genericParamList->size() != 1) {
+    return false;
+  }
+
+  // No requirements on the generic parameter
+  if (fd->getGenericRequirements().size() != 0) {
+    return false;
+  }
+
+  if (!fd->getResultInterfaceType()->isVoid())
+    return false;
+
+  return true;
+}
+
+bool
 AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const {
   auto &C = getASTContext();
   auto module = getParentModule();

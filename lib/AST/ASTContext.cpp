@@ -1258,65 +1258,21 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
   return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
 }
 
-//AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
-//    NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
-//  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
-//  const NominalTypeDecl *system = actorOrSystem;
-//  if (actorOrSystem->isDistributedActor()) {
-//
-//    auto var = actorOrSystem->getDistributedActorSystemProperty();
-//    system = var->getInterfaceType()->getAnyNominal();
-//  }
-//
-//  if (!system)
-//    system = getProtocol(KnownProtocolKind::DistributedActorSystem);
-//
-//  auto mutableSystem = const_cast<NominalTypeDecl *>(system);
-//  return evaluateOrDefault(
-//      system->getASTContext().evaluator,
-//      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem, /*isVoidReturn=*/isVoidReturn},
-//      nullptr);
-//}
-
 FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
     AbstractFunctionDecl *thunk) const {
-//  NominalTypeDecl *system = actorOrSystem;
-//  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
-//  if (actorOrSystem->isDistributedActor()) {
-//    auto ty = getDistributedActorSystemType(actorOrSystem);
-//    fprintf(stderr, "[%s:%d] (%s) getDistributedActorSystemType(actorOrSystem)\n", __FILE__, __LINE__, __FUNCTION__);
-//    ty.dump();
-//
-//    auto actor = actorOrSystem;
-//    auto var = actor->getDistributedActorSystemProperty();
-//    assert(var && "Could not locate 'actorSystem' property!");
-//    system = var->getInterfaceType()->getAnyNominal();
-//  }
+  auto &C = thunk->getASTContext();
 
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
   assert(systemTy && "No specific ActorSystem type found!");
-  fprintf(stderr, "[%s:%d] (%s) FOUND SYSTEM TYPE: %s\n", __FILE__, __LINE__, __FUNCTION__, systemTy->getAnyNominal()->getName().str().str().c_str());
 
   auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
   assert(systemNominal && "No system nominal type found!");
 
-//  // NO, since we need the specific one
-//  auto &C = thunk->getASTContext();
-//  auto systemNominal = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
-
   for (auto result : systemNominal->lookupDirect(Id_makeInvocationEncoder)) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-    if (fd->getParameters()->size() != 0)
-      continue;
-    if (fd->hasAsync())
-      continue;
-    if (fd->hasThrows())
-      continue;
-    // TODO(distributed): more checks, return type etc
-
-    return fd;
+    auto *func = dyn_cast<FuncDecl>(result);
+    if (func && func->isDistributedActorSystemMakeInvocationEncoder()) {
+      return func;
+    }
   }
 
   return nullptr;
@@ -1326,29 +1282,11 @@ FuncDecl *
 ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
   for (auto result : nominal->lookupDirect(Id_recordGenericSubstitution)) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-    if (fd->getParameters()->size() != 1)
-      continue;
-    if (fd->hasAsync())
-      continue;
-    if (!fd->hasThrows())
-      continue;
-    // TODO(distributed): more checks
-
-    auto genericParamList = fd->getGenericParams();
-
-    // A single generic parameter.
-    if (genericParamList->size() != 1)
-      continue;
-
-    // No requirements on the generic parameter
-    if (fd->getGenericRequirements().size() != 0)
-      continue;
-
-    if (fd->getResultInterfaceType()->isVoid())
-      return fd;
+    auto *func = dyn_cast<FuncDecl>(result);
+    if (func &&
+        func->isDistributedTargetInvocationEncoderRecordGenericSubstitution()) {
+      return func;
+    }
   }
 
   return nullptr;
