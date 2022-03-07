@@ -34,6 +34,11 @@ class NominalTypeDecl;
 /// Determine the concrete type of 'ActorSystem' as seen from the member.
 /// E.g. when in a protocol, and trying to determine what the actor system was
 /// constrained to.
+///
+/// \param member the member from which context the lookup should be performed,
+///        e.g. a function or computed property.
+/// \return the concrete type of the ActorSystem to be used by this member,
+///         or null if no concrete actor system was found.
 Type getConcreteReplacementForProtocolActorSystemType(ValueDecl *member);
 
 /// Determine the `ActorSystem` type for the given actor.
