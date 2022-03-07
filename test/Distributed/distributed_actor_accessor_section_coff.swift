@@ -10,6 +10,9 @@
 // FIXME: Test is temporary disabled (no way to debug)
 // REQUIRES: fix
 
+// FIXME(distributed): reenable these accessor tests
+// XFAIL: *
+
 import _Distributed
 import FakeDistributedActorSystems
 

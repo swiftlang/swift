@@ -1673,9 +1673,6 @@ public:
   void diagnoseUncoveredThrowSite(ASTContext &ctx, ASTNode E,
                                   const PotentialEffectReason &reason) {
     auto &Diags = ctx.Diags;
-    fprintf(stderr, "[%s:%d] (%s) DIAGNOSE UNCOVERED THROW\n", __FILE__, __LINE__, __FUNCTION__);
-    E.dump();
-    fprintf(stderr, "\n");
     auto message = diag::throwing_call_without_try;
     auto reasonKind = reason.getKind();
 
@@ -2493,9 +2490,6 @@ private:
       if (E->isImplicitlyAsync()) {
         assert(!getter->hasAsync()
                 && "an explicitly async decl accessed implicitly-async?");
-        fprintf(stderr, "[%s:%d] (%s) MAKE IMPLICITLY ASYNC::::\n", __FILE__, __LINE__, __FUNCTION__);
-        E->dump();
-        fprintf(stderr, "\n");
         effects.push_back(EffectKind::Async);
       }
 
@@ -2505,10 +2499,6 @@ private:
                                   PotentialEffectReason::forPropertyAccess()));
 
     } else if (E->isImplicitlyAsync()) {
-      fprintf(stderr, "[%s:%d] (%s) MAKE IMPLICITLY ASYNC::::\n", __FILE__, __LINE__, __FUNCTION__);
-      E->dump();
-      fprintf(stderr, "\n");
-
       checkThrowAsyncSite(E, /*requiresTry=*/E->isImplicitlyThrows(),
             Classification::forUnconditional(EffectKind::Async,
                                    PotentialEffectReason::forPropertyAccess()));

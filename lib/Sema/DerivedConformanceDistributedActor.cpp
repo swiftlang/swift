@@ -138,7 +138,6 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   // let actorSystem: ActorSystem
   // ```
   // (no need for @actorIndependent because it is an immutable let)
-  fprintf(stderr, "[%s:%d] (%s) get type\n", __FILE__, __LINE__, __FUNCTION__);
   auto propertyType = getDistributedActorSystemType(classDecl);
 
   VarDecl *propDecl;
