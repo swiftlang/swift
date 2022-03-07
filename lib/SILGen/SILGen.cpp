@@ -849,8 +849,6 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     f->setIsDistributed();
 
     assert(constant.isDistributedThunk());
-    fprintf(stderr, "[%s:%d] (%s) IS THUNK ===== %d\n", __FILE__, __LINE__, __FUNCTION__,
-            constant.isDistributedThunk());
     SILGenFunction(*this, *f, constant.getFuncDecl())
         .emitFunction(constant.getFuncDecl());
 
@@ -1402,10 +1400,6 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 
   if (auto thunkDecl = AFD->getDistributedThunk()) {
-    fprintf(stderr, "[%s:%d] (%s) THUNK::::::::::::::::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
-    thunkDecl->dump();
-    fprintf(stderr, "[%s:%d] (%s) ::::::::::::THUNK::::::::::::::::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
-
     auto thunk = SILDeclRef(thunkDecl).asDistributed();
     emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
                            getFunction(thunk, ForDefinition));

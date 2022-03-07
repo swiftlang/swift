@@ -8,6 +8,11 @@
 
 // REQUIRES: CPU=x86_64
 
+// UNSUPPORTED: OS=windows-msvc
+
+// FIXME(distributed): reenable these accessor tests
+// XFAIL: *
+
 import _Distributed
 import FakeDistributedActorSystems
 

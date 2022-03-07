@@ -81,8 +81,6 @@ void emitDistributedActorSystemWitnessCall(
         OpenedExistentialAccess::Immutable);
   }
 
-  fprintf(stderr, "[%s:%d] (%s) systemASTType\n", __FILE__, __LINE__, __FUNCTION__);
-  systemASTType.dump();
   if (systemASTType->isTypeParameter() || systemASTType->is<ArchetypeType>()) {
     systemConfRef = ProtocolConformanceRef(DAS);
   } else {

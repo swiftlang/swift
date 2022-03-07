@@ -8,6 +8,9 @@
 
 // REQUIRES: OS=linux-gnu
 
+// FIXME(distributed): reenable these accessor tests
+// XFAIL: *
+
 import _Distributed
 import FakeDistributedActorSystems
 

@@ -5697,13 +5697,9 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
 }
 
 void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
-  fprintf(stderr, "[%s:%d] (%s) KNOWN TO BE LOCAL\n", __FILE__, __LINE__, __FUNCTION__);
-  D->dump();
-  if (D->isImplicit()) {
-    return;
+  if (!D->isImplicit()) {
+    diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
   }
-  fprintf(stderr, "[%s:%d] (%s) KNOWN TO BE LOCAL -- BANNED!\n", __FILE__, __LINE__, __FUNCTION__);
-  diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
 }
 
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {

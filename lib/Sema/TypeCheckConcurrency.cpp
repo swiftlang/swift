@@ -1572,24 +1572,18 @@ namespace {
         bool setDistributedThunk = false) {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
 
-      fprintf(stderr, "[%s:%d] (%s) MARK NEAREST AS IMPLICITLY....\n", __FILE__, __LINE__, __FUNCTION__);
-
       const auto End = applyStack.rend();
       for (auto I = applyStack.rbegin(); I != End; ++I)
         if (auto call = dyn_cast<CallExpr>(*I)) {
           if (setAsync) {
-            fprintf(stderr, "[%s:%d] (%s) MARK NEAREST AS IMPLICITLY.... ASYNC\n", __FILE__, __LINE__, __FUNCTION__);
             call->setImplicitlyAsync(*setAsync);
           }
           if (setThrows) {
-            fprintf(stderr, "[%s:%d] (%s) MARK NEAREST AS IMPLICITLY.... THROWS\n", __FILE__, __LINE__, __FUNCTION__);
-            call->dump();
             call->setImplicitlyThrows(true);
           }else {
             call->setImplicitlyThrows(false);
           }
           if (setDistributedThunk) {
-            fprintf(stderr, "[%s:%d] (%s) MARK NEAREST AS IMPLICITLY.... DIST THUNK\n", __FILE__, __LINE__, __FUNCTION__);
             call->setShouldApplyDistributedThunk(true);
           }
           return;
@@ -2017,7 +2011,6 @@ namespace {
                          nominal->getName());
         } else {
           // it's a function or subscript
-          fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
           decl->diagnose(diag::note_distributed_actor_isolated_method,
                          decl->getDescriptiveKind(),
                          decl->getName());
@@ -2195,9 +2188,6 @@ namespace {
     Optional<std::pair<bool, bool>>
     checkDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
                            Expr *context) {
-      fprintf(stderr, "[%s:%d] (%s) CHECK DIST ACCESS\n", __FILE__, __LINE__, __FUNCTION__);
-      context->dump();
-
       // Cannot reference properties or subscripts of distributed actors.
       if (isPropOrSubscript(decl)) {
         ctx.Diags.diagnose(
@@ -2208,41 +2198,16 @@ namespace {
       }
 
       if (auto baseSelf = findReferencedBaseSelf(context)) {
-        fprintf(stderr, "[%s:%d] (%s) getReferencedParamOrCapture\n", __FILE__, __LINE__, __FUNCTION__);
-        baseSelf->dump();
         if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
-        fprintf(stderr, "[%s:%d] (%s) getReferencedParamOrCapture YES LOCAL\n", __FILE__, __LINE__, __FUNCTION__);
-//          return None;
         return std::make_pair(
             /*setThrows=*/false,
             /*isDistributedThunk=*/false);
         }
       }
 
-      if (auto base = getReferencedParamOrCapture(context)) {
-        fprintf(stderr, "[%s:%d] (%s) getReferencedParamOrCapture\n", __FILE__, __LINE__, __FUNCTION__);
-        base->dump();
-      } else
-        fprintf(stderr, "[%s:%d] (%s) MISSING getReferencedParamOrCapture\n", __FILE__, __LINE__, __FUNCTION__);
-
-      if (auto self = getReferencedSelf(context)) {
-        fprintf(stderr, "[%s:%d] (%s) getReferencedSelf\n", __FILE__, __LINE__, __FUNCTION__);
-        self->dump();
-      } else
-        fprintf(stderr, "[%s:%d] (%s) MISSING getReferencedSelf\n", __FILE__, __LINE__, __FUNCTION__);
-
-      if (auto actor = getIsolatedActor(context).actor) {
-        fprintf(stderr, "[%s:%d] (%s) ISOLATED ACTOR\n", __FILE__, __LINE__, __FUNCTION__);
-        actor->dump();
-      } else
-        fprintf(stderr, "[%s:%d] (%s) MISSING ISOLATED ACTOR\n", __FILE__, __LINE__, __FUNCTION__);
-
       // Check that we have a distributed function.
       auto func = dyn_cast<AbstractFunctionDecl>(decl);
       if (!func || !func->isDistributed()) {
-        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
-        context->dump();
-
         ctx.Diags.diagnose(declLoc,
                            diag::distributed_actor_isolated_method)
           .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
@@ -2251,9 +2216,6 @@ namespace {
         return None;
       }
 
-      fprintf(stderr, "[%s:%d] (%s) RETURN "
-                      "SET THROWS = %d "
-                      "SET THUNK\n", __FILE__, __LINE__, __FUNCTION__, !func->hasThrows(), true);
       return std::make_pair(
           /*setThrows=*/!func->hasThrows(),
           /*isDistributedThunk=*/true);
@@ -2269,11 +2231,6 @@ namespace {
       ValueDecl *decl = concDeclRef.getDecl();
       AsyncMarkingResult result = AsyncMarkingResult::NotFound;
       bool isAsyncCall = false;
-
-      fprintf(stderr, "[%s:%d] (%s) conc decl ref\n", __FILE__, __LINE__, __FUNCTION__);
-      decl->dump();
-
-      fprintf(stderr, "[%s:%d] (%s) hop target === %d\n", __FILE__, __LINE__, __FUNCTION__, target.getKind());
 
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
@@ -2967,14 +2924,10 @@ namespace {
             !isolatedActor.isPotentiallyIsolated &&
             !isa<ConstructorDecl>(member) &&
             !member->getAttrs().hasAttribute<KnownToBeLocalAttr>();
-        if (member->getAttrs().hasAttribute<KnownToBeLocalAttr>())
-          fprintf(stderr, "[%s:%d] (%s) WAS KNOWN TO BE LOCAL; SKIP DIST CHECKS\n", __FILE__, __LINE__, __FUNCTION__);
         if (performDistributedChecks) {
           if (auto access = checkDistributedAccess(memberLoc, member, context)){
             // This is a distributed access, so mark it as throwing or
             // using a distributed thunk as appropriate.
-            fprintf(stderr, "[%s:%d] (%s) MARK DIST AS IMPLICITLY THROWS: %d DIST THUNK %d\n", __FILE__, __LINE__, __FUNCTION__,
-                    access->first, access->second);
             markNearestCallAsImplicitly(None, access->first, access->second);
           } else {
             return true;
