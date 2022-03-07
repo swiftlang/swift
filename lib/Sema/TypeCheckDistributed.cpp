@@ -588,6 +588,11 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
 void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
   auto &C = decl->getASTContext();
 
+  if (isa<ProtocolDecl>(decl)) {
+    // protocols don't matter for stored property checking
+    return;
+  }
+
   for (auto member : decl->getMembers()) {
     if (auto prop = dyn_cast<VarDecl>(member)) {
       if (prop->isSynthesized())
