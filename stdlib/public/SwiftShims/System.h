@@ -173,6 +173,11 @@
 #define SWIFT_ABI_ARM64_OBJC_WEAK_REFERENCE_MARKER_VALUE \
   (1<<SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS)
 
+/*********************************** powerpc ********************************/
+
+// Heap objects are pointer-aligned, so the low two bits are unused.
+#define SWIFT_ABI_POWERPC_SWIFT_SPARE_BITS_MASK 0x00000003U
+
 /*********************************** powerpc64 ********************************/
 
 // Heap objects are pointer-aligned, so the low three bits are unused.

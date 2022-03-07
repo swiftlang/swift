@@ -88,8 +88,8 @@ UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
                                            bool forcePublicDecls,
                                            bool isStaticLibrary)
     : IsELFObject(triple.isOSBinFormatELF()),
-      UseDLLStorage(useDllStorage(triple)), HasMultipleIGMs(hasMultipleIGMs),
-      Internalize(isStaticLibrary), ForcePublicDecls(forcePublicDecls) {}
+      UseDLLStorage(useDllStorage(triple)), Internalize(isStaticLibrary),
+      HasMultipleIGMs(hasMultipleIGMs), ForcePublicDecls(forcePublicDecls) {}
 
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {

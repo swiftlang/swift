@@ -2244,7 +2244,6 @@ struct ConstExprInfo {
 
 class ConstExtractor: public ASTWalker {
   SDKContext &SCtx;
-  ASTContext &Ctx;
   SourceManager &SM;
   std::vector<ConstExprInfo> allConsts;
 
@@ -2328,7 +2327,7 @@ class ConstExtractor: public ASTWalker {
     return { true, E };
   }
 public:
-  ConstExtractor(SDKContext &SCtx, ASTContext &Ctx): SCtx(SCtx), Ctx(Ctx),
+  ConstExtractor(SDKContext &SCtx, ASTContext &Ctx): SCtx(SCtx),
     SM(Ctx.SourceMgr) {}
   void extract(ModuleDecl *MD) { MD->walk(*this); }
   std::vector<ConstExprInfo> &getAllConstValues() { return allConsts; }

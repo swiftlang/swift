@@ -58,7 +58,7 @@ void swift_get_time(
 #else
 #error Missing platform continuous time definition
 #endif
-      break;
+      return;
     }
     case swift_clock_id_suspending: {
 #if defined(__linux__) && HAS_TIME
@@ -87,11 +87,10 @@ void swift_get_time(
 #else
 #error Missing platform suspending time definition
 #endif
-      break;
+      return;
     }
-    default:
-      abort();
   }
+  abort(); // Invalid clock_id
 }
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -118,7 +117,7 @@ switch (clock_id) {
 #else
 #error Missing platform continuous time definition
 #endif
-      break;
+      return;
     }
     case swift_clock_id_suspending: {
       struct timespec suspending;
@@ -136,9 +135,8 @@ switch (clock_id) {
 #else
 #error Missing platform suspending time definition
 #endif
-      break;
+      return;
     }
-   default:
-     abort();
   }
+  abort(); // Invalid clock_id
 }

@@ -661,13 +661,12 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
   auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
 
 #if SWIFT_OBJC_INTEROP
-  void *objc_ret = nullptr;
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_retain_n(static_cast<HeapObject *>(objectRef), n);
     return object;
   }
   for (int i = 0;i < n; ++i)
-    objc_ret = objc_retain(static_cast<id>(objectRef));
+    objc_retain(static_cast<id>(objectRef));
   return object;
 #else
   swift_retain_n(static_cast<HeapObject *>(objectRef), n);
@@ -702,13 +701,12 @@ void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n) {
   auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
 
 #if SWIFT_OBJC_INTEROP
-  void *objc_ret = nullptr;
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
     return object;
   }
   for (int i = 0;i < n; ++i)
-    objc_ret = objc_retain(static_cast<id>(objectRef));
+    objc_retain(static_cast<id>(objectRef));
   return object;
 #else
   swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
