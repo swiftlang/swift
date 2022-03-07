@@ -127,8 +127,11 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   NominalTypeDecl *nominal = funcDC->getSelfNominalTypeDecl();
   assert(nominal && nominal->isDistributedActor() && "Function must be part of distributed actor");
 
+  fprintf(stderr, "[%s:%d] (%s) MAKE THUNK FOR [[[[[ %s\n", __FILE__, __LINE__, __FUNCTION__,
+          func->getName().getBaseName().getIdentifier().str().str().c_str());
+
   auto selfDecl = thunk->getImplicitSelfDecl();
-  selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(/*implicit=*/true));
+  selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(implicit));
   auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
 
   // === return type
@@ -193,7 +196,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
           C, new (C) DeclRefExpr(selfDecl, dloc, implicit), //  TODO: make createImplicit
           C.Id_actorSystem);
 
-  VarDecl *systemVar =
+  auto *systemVar =
       new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
                       C.getIdentifier("system"), thunk);
   systemVar->setInterfaceType(systemProperty->getInterfaceType());
@@ -210,7 +213,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   remoteBranchStmts.push_back(systemVar);
 
   // --- invocationEncoder = system.makeInvocationEncoder()
-  VarDecl *invocationVar =
+  auto *invocationVar =
       new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var, sloc,
                       C.getIdentifier("invocation"), thunk);
   invocationVar->setInterfaceType(invocationEncoderTy);
@@ -585,12 +588,18 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
   auto &C = afd->getASTContext();
   auto DC = afd->getDeclContext();
 
+  if (!getConcreteReplacementForProtocolActorSystemType(afd)) {
+    // Don't synthesize thunks, unless there is a *concrete* ActorSystem.
+    // TODO(distributed): we should be able to lift this eventually,
+    // and allow resolving distributed actor protocols.
+    return nullptr;
+  }
+
   // Force type-checking the original function, so we can avoid synthesizing
   // the thunks (which would have many of the same errors, if they are caused
   // by a bad source function signature, e.g. missing conformances etc).
   (void) TypeChecker::typeCheckDecl(afd);
   if (afd->getDiags().hadAnyError()) {
-    fprintf(stderr, "[%s:%d] (%s) %s HAD ERRORS\n", __FILE__, __LINE__, __FUNCTION__, afd->getNameStr().str().c_str());
     return nullptr;
   }
 
@@ -604,9 +613,9 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
     assert(nominal);
 
     // --- Prepare the "distributed thunk" which does the "maybe remote" dance:
-    auto distributedThunk = createDistributedThunkFunction(func);
+    fprintf(stderr, "[%s:%d] (%s) MAKE THUNK FOR %s \n", __FILE__, __LINE__, __FUNCTION__, func->getName().getBaseName().getIdentifier().str().str().c_str());
 
-    return distributedThunk;
+    return createDistributedThunkFunction(func);
   }
 
   llvm_unreachable("Unable to synthesize distributed thunk");

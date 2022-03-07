@@ -661,9 +661,10 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 
   for (auto member : nominal->getMembers()) {
     // --- Check all constructors
-    if (auto classDecl  = dyn_cast<ClassDecl>(nominal)) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
         checkDistributedActorConstructor(classDecl, ctor);
+        continue;
       }
     }
 
@@ -690,13 +691,12 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 swift::getDistributedSerializationRequirementProtocols(
     NominalTypeDecl *nominal, ProtocolDecl *protocol) {
-  if (!protocol) {
+  if (!protocol || !nominal) {
     return {};
   }
 
-
   auto ty = getDistributedSerializationRequirementType(nominal, protocol);
-  if (ty->hasError()) {
+  if (!ty || ty->hasError()) {
     return {};
   }
 

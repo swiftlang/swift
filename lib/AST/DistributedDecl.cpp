@@ -65,6 +65,7 @@ using namespace swift;
 /************** Distributed Actor System Associated Types *********************/
 /******************************************************************************/
 
+// TODO(distributed): make into a request
 Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) {
   auto &C = member->getASTContext();
   auto *DC = member->getDeclContext();
@@ -87,18 +88,17 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
     auto ActorSystemAssocType =
         DA->getAssociatedType(C.Id_ActorSystem)->getDeclaredInterfaceType();
 
-    auto systemTy = signature->getConcreteType(ActorSystemAssocType);
-    assert(systemTy && "couldn't find concrete type for actor system");
-    return systemTy;
+    // Note that this may be null, e.g. if we're a distributed func inside
+    // a protocol that did not declare a specific actor system requirement.
+    return signature->getConcreteType(ActorSystemAssocType);
   }
 
-  llvm_unreachable("Unable to fetch ActorSystem type!");
+  llvm_unreachable("Unable to fetch ActorSystem type! Un");
 }
 
 Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   assert(actor->isDistributedActor());
   auto &C = actor->getASTContext();
-  auto *DC = actor->getDeclContext();
 
   auto DA = C.getDistributedActorDecl();
   if (!DA)
@@ -148,6 +148,7 @@ Type swift::getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *syst
 
 Type swift::getDistributedSerializationRequirementType(
     NominalTypeDecl *nominal, ProtocolDecl *protocol) {
+  assert(nominal);
   assert(protocol);
   auto &ctx = nominal->getASTContext();
 
@@ -1071,16 +1072,13 @@ AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
   assert(actorOrSystem && "distributed actor (or system) decl must be provided");
   const NominalTypeDecl *system = actorOrSystem;
   if (actorOrSystem->isDistributedActor()) {
-    auto systemTy = getConcreteReplacementForProtocolActorSystemType(actorOrSystem);
-    fprintf(stderr, "[%s:%d] (%s) systemTy\n", __FILE__, __LINE__, __FUNCTION__);
-    systemTy.dump();
-
-    system = systemTy->getNominalOrBoundGenericNominal();
-    system->dump();
-//    auto var = actorOrSystem->getDistributedActorSystemProperty();
-//    system = var->getInterfaceType()->getAnyNominal();
+    if (auto systemTy =
+            getConcreteReplacementForProtocolActorSystemType(actorOrSystem)) {
+      system = systemTy->getNominalOrBoundGenericNominal();
+    }
   }
 
+  // If no concrete system was found, return the general protocol:
   if (!system)
     system = getProtocol(KnownProtocolKind::DistributedActorSystem);
 
@@ -1100,7 +1098,6 @@ AbstractFunctionDecl::getDistributedThunk() const {
   if (!isDistributed())
     return nullptr;
 
-  fprintf(stderr, "[%s:%d] (%s) GET DIST THUNK\n", __FILE__, __LINE__, __FUNCTION__);
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   return evaluateOrDefault(
       getASTContext().evaluator,
