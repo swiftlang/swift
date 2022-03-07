@@ -3,7 +3,7 @@
 // RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-type-inference-from-defaults -parse-as-library -I %t %s %S/Inputs/type_inference_via_defaults_other_module.swift -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx && CPU=x86_64
 
 protocol P {
   associatedtype X
