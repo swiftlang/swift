@@ -1401,17 +1401,14 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       emitNativeToForeignThunk(thunk);
   }
 
-  if (AFD->isDistributed()) {
-    auto thunkDecl = AFD->getDistributedThunk();
-
+  if (auto thunkDecl = AFD->getDistributedThunk()) {
     fprintf(stderr, "[%s:%d] (%s) THUNK::::::::::::::::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
     thunkDecl->dump();
     fprintf(stderr, "[%s:%d] (%s) ::::::::::::THUNK::::::::::::::::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
 
     auto thunk = SILDeclRef(thunkDecl).asDistributed();
-    emitFunctionDefinition(
-        SILDeclRef(thunkDecl).asDistributed(),
-        getFunction(thunk, ForDefinition));
+    emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
+                           getFunction(thunk, ForDefinition));
   }
 
   if (AFD->isBackDeployed()) {

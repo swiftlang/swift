@@ -559,9 +559,8 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   thunk->setGenericSignature(thunkGenSig);
   fprintf(stderr, "[%s:%d] (%s) THUNK GEN SIG:\n", __FILE__, __LINE__, __FUNCTION__);
   thunk->getGenericSignature().dump();
-  for (auto req : thunk->getGenericRequirements()) {
+  for (auto req : thunk->getGenericRequirements())
     req.dump();
-  }
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
   thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
 
@@ -575,7 +574,7 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 }
 
 /******************************************************************************/
-/************************ SYNTHESIS ENTRY POINT *******************************/
+/*********************** SYNTHESIS ENTRY POINTS *******************************/
 /******************************************************************************/
 
 FuncDecl *GetDistributedThunkRequest::evaluate(
@@ -585,6 +584,15 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
 
   auto &C = afd->getASTContext();
   auto DC = afd->getDeclContext();
+
+  // Force type-checking the original function, so we can avoid synthesizing
+  // the thunks (which would have many of the same errors, if they are caused
+  // by a bad source function signature, e.g. missing conformances etc).
+  (void) TypeChecker::typeCheckDecl(afd);
+  if (afd->getDiags().hadAnyError()) {
+    fprintf(stderr, "[%s:%d] (%s) %s HAD ERRORS\n", __FILE__, __LINE__, __FUNCTION__, afd->getNameStr().str().c_str());
+    return nullptr;
+  }
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     // not via `ensureDistributedModuleLoaded` to avoid generating a warning,

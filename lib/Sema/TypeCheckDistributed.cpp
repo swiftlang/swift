@@ -672,8 +672,9 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
       if (!func->isDistributed())
         continue;
 
-      auto thunk = func->getDistributedThunk();
-      SF->DelayedFunctions.push_back(thunk);
+      if (auto thunk = func->getDistributedThunk()) {
+        SF->DelayedFunctions.push_back(thunk);
+      }
     }
   }
 
