@@ -4456,8 +4456,6 @@ namespace {
       auto setterDecl = cast<AccessorDecl>(afd);
       auto setterImpl = static_cast<FuncDecl *>(context);
 
-      ASTContext &ctx = setterDecl->getASTContext();
-
       Expr *selfExpr = createSelfExpr(setterDecl);
       DeclRefExpr *valueParamRefExpr = createParamRefExpr(setterDecl, 0);
 
