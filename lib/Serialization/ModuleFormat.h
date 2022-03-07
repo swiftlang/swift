@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 675; // primary associated types
+const uint16_t SWIFTMODULE_VERSION_MINOR = 676; // Add IsSPI to @available
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1916,6 +1916,7 @@ namespace decls_block {
     BCFixed<1>, // is unconditionally unavailable?
     BCFixed<1>, // is unconditionally deprecated?
     BCFixed<1>, // is this PackageDescription version-specific kind?
+    BCFixed<1>, // is SPI?
     BC_AVAIL_TUPLE, // Introduced
     BC_AVAIL_TUPLE, // Deprecated
     BC_AVAIL_TUPLE, // Obsoleted

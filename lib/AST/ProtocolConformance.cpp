@@ -199,9 +199,8 @@ switch (getKind()) {                                                         \
   case ProtocolConformanceKind::Inherited:                                   \
     return cast<InheritedProtocolConformance>(this)->Method Args;            \
   case ProtocolConformanceKind::Builtin:                                     \
-    static_assert(&ProtocolConformance::Method !=                            \
-                    &BuiltinProtocolConformance::Method,                     \
-                  "Must override BuiltinProtocolConformance::" #Method);     \
+    assert(&ProtocolConformance::Method != &BuiltinProtocolConformance::Method \
+           && "Must override BuiltinProtocolConformance::" #Method);         \
     return cast<BuiltinProtocolConformance>(this)->Method Args;              \
 }                                                                            \
 llvm_unreachable("bad ProtocolConformanceKind");

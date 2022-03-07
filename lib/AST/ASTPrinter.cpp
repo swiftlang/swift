@@ -5171,6 +5171,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     } else if (auto existential = dyn_cast<ExistentialType>(T.getPointer())) {
       if (!Options.PrintExplicitAny)
         return isSimpleUnderPrintOptions(existential->getConstraintType());
+    } else if (auto existential = dyn_cast<ExistentialMetatypeType>(T.getPointer())) {
+      if (!Options.PrintExplicitAny)
+        return isSimpleUnderPrintOptions(existential->getInstanceType());
     }
     return T->hasSimpleTypeRepr();
   }
@@ -5591,10 +5594,32 @@ public:
       }
     }
 
-    if (T->is<ExistentialMetatypeType>() && Options.PrintExplicitAny)
-      Printer << "any ";
+    Type instanceType = T->getInstanceType();
+    if (Options.PrintExplicitAny) {
+      if (T->is<ExistentialMetatypeType>()) {
+        Printer << "any ";
 
-    printWithParensIfNotSimple(T->getInstanceType());
+        // FIXME: We need to replace nested existential metatypes so that
+        // we don't print duplicate 'any'. This will be unnecessary once
+        // ExistentialMetatypeType is split into ExistentialType(MetatypeType).
+        instanceType = Type(instanceType).transform([](Type type) -> Type {
+          if (auto existential = type->getAs<ExistentialMetatypeType>())
+            return MetatypeType::get(existential->getInstanceType());
+
+          return type;
+        });
+      } else if (instanceType->isAny() || instanceType->isAnyObject()) {
+        // FIXME: 'any' is needed to distinguish between '(any Any).Type'
+        // and 'any Any.Type'. However, this combined with the above hack
+        // to replace nested existential metatypes with metatypes causes
+        // a bug in printing nested existential metatypes for Any and AnyObject,
+        // e.g. 'any (any Any).Type.Type'. This will be fixed by using
+        // ExistentialType for Any and AnyObject.
+        instanceType = ExistentialType::get(instanceType, /*forceExistential=*/true);
+      }
+    }
+
+    printWithParensIfNotSimple(instanceType);
 
     // We spell normal metatypes of existential types as .Protocol.
     if (isa<MetatypeType>(T) &&
@@ -6294,7 +6319,11 @@ public:
       if (printNamedOpaque())
         return;
 
-      visit(T->getExistentialType());
+      auto constraint = T->getExistentialType();
+      if (auto existential = constraint->getAs<ExistentialType>())
+        constraint = existential->getConstraintType();
+
+      visit(constraint);
       return;
     }
     case PrintOptions::OpaqueReturnTypePrintingMode::StableReference: {

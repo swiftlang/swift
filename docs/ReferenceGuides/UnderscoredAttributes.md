@@ -830,3 +830,10 @@ the compiler.
 
 This `async` function uses the pre-SE-0338 semantics of unsafely inheriting the caller's executor.  This is an underscored feature because the right way of inheriting an executor is to pass in the required executor and switch to it.  Unfortunately, there are functions in the standard library which need to inherit their caller's executor but cannot change their ABI because they were not defined as `@_alwaysEmitIntoClient` in the initial release.
 
+## `@_spi_available(platform, version)`
+
+Like `@available`, this attribute indicates a decl is available only as an SPI.
+This implies several behavioral changes comparing to regular `@available`:
+1. Type checker diagnoses when a client accidently exposes such a symbol in library APIs.
+2. When emitting public interfaces, `@_spi_available` is printed as `@available(platform, unavailable)`.
+3. ClangImporter imports ObjC macros `SPI_AVAILABLE` and `__SPI_AVAILABLE` to this attribute.

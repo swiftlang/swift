@@ -1545,7 +1545,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
     }
     // Implementation-only imported, cannot be reexported.
     return DisallowedOriginKind::ImplementationOnly;
-  } else if (decl->isSPI() && !where.isSPI()) {
+  } else if ((decl->isSPI() || decl->isAvailableAsSPI()) && !where.isSPI()) {
     // SPI can only be exported in SPI.
     return where.getDeclContext()->getParentModule() == M ?
       DisallowedOriginKind::SPILocal :

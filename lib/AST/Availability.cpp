@@ -41,6 +41,7 @@ struct InferredAvailability {
   Optional<llvm::VersionTuple> Introduced;
   Optional<llvm::VersionTuple> Deprecated;
   Optional<llvm::VersionTuple> Obsoleted;
+  bool IsSPI = false;
 };
 
 /// The type of a function that merges two version tuples.
@@ -51,17 +52,20 @@ typedef const llvm::VersionTuple &(*MergeFunction)(
 
 /// Apply a merge function to two optional versions, returning the result
 /// in Inferred.
-static void
+static bool
 mergeIntoInferredVersion(const Optional<llvm::VersionTuple> &Version,
                          Optional<llvm::VersionTuple> &Inferred,
                          MergeFunction Merge) {
   if (Version.hasValue()) {
     if (Inferred.hasValue()) {
       Inferred = Merge(Inferred.getValue(), Version.getValue());
+      return *Inferred == *Version;
     } else {
       Inferred = Version;
+      return true;
     }
   }
+  return false;
 }
 
 /// Merge an attribute's availability with an existing inferred availability
@@ -75,7 +79,9 @@ static void mergeWithInferredAvailability(const AvailableAttr *Attr,
                static_cast<unsigned>(Attr->getPlatformAgnosticAvailability())));
 
   // The merge of two introduction versions is the maximum of the two versions.
-  mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max);
+  if (mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max)) {
+    Inferred.IsSPI = Attr->IsSPI;
+  }
 
   // The merge of deprecated and obsoleted versions takes the minimum.
   mergeIntoInferredVersion(Attr->Deprecated, Inferred.Deprecated, std::min);
@@ -103,7 +109,8 @@ createAvailableAttr(PlatformKind Platform,
         Introduced, /*IntroducedRange=*/SourceRange(),
         Deprecated, /*DeprecatedRange=*/SourceRange(),
         Obsoleted, /*ObsoletedRange=*/SourceRange(),
-      Inferred.PlatformAgnostic, /*Implicit=*/true);
+      Inferred.PlatformAgnostic, /*Implicit=*/true,
+      Inferred.IsSPI);
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(
@@ -173,7 +180,13 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
     return None;
 
   return AvailabilityContext{
-    VersionRange::allGTE(bestAvailAttr->Introduced.getValue())};
+    VersionRange::allGTE(bestAvailAttr->Introduced.getValue()),
+    bestAvailAttr->IsSPI};
+}
+
+bool Decl::isAvailableAsSPI() const {
+  return AvailabilityInference::availableRange(this, getASTContext())
+    .isAvailableAsSPI();
 }
 
 AvailabilityContext

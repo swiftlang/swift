@@ -1272,7 +1272,7 @@ class WeakFixItTest {
   // expected-error @+1 {{'weak' variable should have optional type 'WeakFixItTest?'}} {{31-31=?}}
   weak var foo : WeakFixItTest
 
-  // expected-error @+1 {{'weak' variable should have optional type '(WFI_P1 & WFI_P2)?'}} {{18-18=(}} {{33-33=)?}}
+  // expected-error @+1 {{'weak' variable should have optional type '(any WFI_P1 & WFI_P2)?'}} {{18-18=(}} {{33-33=)?}}
   weak var bar : WFI_P1 & WFI_P2
 }
 

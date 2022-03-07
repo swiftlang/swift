@@ -64,6 +64,10 @@ constexpr static const StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
 constexpr static const StringLiteral CLANG_MODULE_DEFUALT_SPI_GROUP_NAME =
   "OBJC_DEFAULT_SPI_GROUP";
 
+/// The attribute name for @_spi_available
+constexpr static const StringLiteral SPI_AVAILABLE_ATTRNAME =
+  "_spi_available";
+
 /// A composition class containing a StringLiteral for the names of
 /// Swift builtins. The reason we use this is to ensure that we when
 /// necessary slice off the "Builtin." prefix from these names in a
