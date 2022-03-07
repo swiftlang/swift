@@ -1553,6 +1553,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
             .Case("false", false)
             .Default(None);
   }
+
+  // Allow command line flags to override the default value of
+  // Opts.LexicalLifetimes. If no explicit flags are passed, then
+  // Opts.LexicalLifetimes retains its initial value.
   Optional<bool> enableLexicalLifetimesFlag;
   if (Arg *A = Args.getLastArg(OPT_enable_lexical_lifetimes)) {
     enableLexicalLifetimesFlag =
