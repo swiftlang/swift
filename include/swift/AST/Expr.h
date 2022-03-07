@@ -319,8 +319,7 @@ protected:
     ImplicitlyAsync : 1,
     ImplicitlyThrows : 1,
     NoAsync : 1,
-    ShouldApplyDistributedThunk : 1,
-    ShouldApplyDistributedLocalThunk : 1
+    ShouldApplyDistributedThunk : 1
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(CallExpr, ApplyExpr);
@@ -4447,7 +4446,6 @@ protected:
     Bits.ApplyExpr.ImplicitlyThrows = false;
     Bits.ApplyExpr.NoAsync = false;
     Bits.ApplyExpr.ShouldApplyDistributedThunk = false;
-    Bits.ApplyExpr.ShouldApplyDistributedLocalThunk = false;
   }
 
 public:
@@ -4538,22 +4536,7 @@ public:
     return Bits.ApplyExpr.ShouldApplyDistributedThunk;
   }
   void setShouldApplyDistributedThunk(bool flag) {
-    if (flag) {
-      setShouldApplyDistributedLocalThunk(false);
-    }
     Bits.ApplyExpr.ShouldApplyDistributedThunk = flag;
-  }
-
-  /// Informs IRGen to that this expression should be applied as its distributed
-  /// local thunk, rather than invoking the function directly.
-  bool shouldApplyDistributedLocalThunk() const {
-    return Bits.ApplyExpr.ShouldApplyDistributedLocalThunk;
-  }
-  void setShouldApplyDistributedLocalThunk(bool flag) {
-    if (flag) {
-      setShouldApplyDistributedThunk(false);
-    }
-    Bits.ApplyExpr.ShouldApplyDistributedLocalThunk = flag;
   }
 
   ValueDecl *getCalledValue() const;
