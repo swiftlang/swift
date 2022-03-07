@@ -59,24 +59,23 @@ struct ContentView: View {
 ```
 
 ```
-//In Cxx.cpp
-
-#include "Cxx.hpp"
-int cxxFunction(int n) {
-    return n;
-}
-
-```
-
-```
 //In Cxx.hpp
 
 #ifndef Cxx_hpp
 #define Cxx_hpp
 
+int cxxFunction(int n) {
+    return n;
+}
+#endif
+```
+
+```
+//In Cxx.cpp
+
+#include "Cxx.hpp"
 int cxxFunction(int n);
 
-#endif
 
 ```
 
@@ -198,7 +197,7 @@ CxxInterop.main()
 
 ```
 
-- In your projects direcetoy, run `cmake` to generate the systems build files
+- In your project's directory, run `cmake` to generate the systems build files
 
 - To generate an Xcode project run `cmake -GXcode` 
 - To generate with Ninja run `cmake -GNinja`
