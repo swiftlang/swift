@@ -2838,7 +2838,6 @@ static StringRef getLinkageString(SILLinkage linkage) {
   case SILLinkage::Private: return "private ";
   case SILLinkage::PublicExternal: return "public_external ";
   case SILLinkage::HiddenExternal: return "hidden_external ";
-  case SILLinkage::SharedExternal: return "shared_external ";
   }
   llvm_unreachable("bad linkage");
 }
@@ -2894,7 +2893,6 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   switch (isSerialized()) {
   case IsNotSerialized: break;
-  case IsSerializable: OS << "[serializable] "; break;
   case IsSerialized: OS << "[serialized] "; break;
   }
 

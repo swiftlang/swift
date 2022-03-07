@@ -159,5 +159,5 @@ bb0(%0 : @guaranteed $AnyObject):
 }
 
 // class_copyMethodList
-sil [serializable] [clang class_copyMethodList] @class_copyMethodList : $@convention(c) (Optional<@objc_metatype AnyObject.Type>, Optional<UnsafeMutablePointer<UInt32>>) -> Optional<UnsafeMutablePointer<OpaquePointer>>
-sil [serializable] @foo : $@convention(thin) (@guaranteed AnyObject) -> @thick AnyObject.Type
+sil [serialized] [clang class_copyMethodList] @class_copyMethodList : $@convention(c) (Optional<@objc_metatype AnyObject.Type>, Optional<UnsafeMutablePointer<UInt32>>) -> Optional<UnsafeMutablePointer<OpaquePointer>>
+sil [serialized] @foo : $@convention(thin) (@guaranteed AnyObject) -> @thick AnyObject.Type

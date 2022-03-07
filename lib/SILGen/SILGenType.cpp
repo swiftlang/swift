@@ -533,7 +533,7 @@ public:
 
     // Check if we already have a declaration or definition for this witness
     // table.
-    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance, false)) {
+    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance)) {
       // If we have a definition already, just return it.
       //
       // FIXME: I am not sure if this is possible, if it is not change this to an

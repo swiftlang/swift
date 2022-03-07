@@ -87,8 +87,8 @@ bb0(%0 : $Foo):
 // Test @in/@out serialization.
 // ----
 
-// CHECK-LABEL: sil hidden [serialized] @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
-sil hidden [serialized] @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK-LABEL: sil [serialized] @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
+sil [serialized] @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
 // CHECK: bb0(%0 : $T):
 bb0(%0 : $T):
   // CHECK: return %0 : $T
@@ -101,8 +101,8 @@ bb0(%0 : $T):
 
 sil @doWithS : $@convention(method) (S) -> ()
 
-// CHECK-LABEL: sil hidden [transparent] [serialized] [thunk] @serialize_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
-sil hidden [transparent] [serialized] [thunk] @serialize_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
+// CHECK-LABEL: sil [transparent] [serialized] [thunk] @serialize_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
+sil [transparent] [serialized] [thunk] @serialize_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
 // CHECK: bb0(%0 : $S):
 bb0(%0 : $S):
   %f = function_ref @doWithS : $@convention(method) (S) -> ()

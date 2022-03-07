@@ -41,4 +41,4 @@ public func test() -> Int64 {
 }
 
 // CHECK-LABEL: sil [clang __CxxTemplateInst1MIxE.getValue] @{{_ZNK1MIxE8getValueEv|\?getValue@\?\$M@_J@@QEBA_JXZ}} : $@convention(cxx_method) (@in_guaranteed __CxxTemplateInst1MIxE) -> Int64
-// CHECK-LABEL: sil [serializable] [clang dependantReturnTypeInffered]  @{{_Z27dependantReturnTypeInfferedIxE1MIT_ES1_|\?\?\$dependantReturnTypeInffered@_J@@YA\?AU\?\$M@_J@@_J@Z}} : $@convention(c) (Int64) -> __CxxTemplateInst1MIxE
+// CHECK-LABEL: sil [serialized] [clang dependantReturnTypeInffered]  @{{_Z27dependantReturnTypeInfferedIxE1MIT_ES1_|\?\?\$dependantReturnTypeInffered@_J@@YA\?AU\?\$M@_J@@_J@Z}} : $@convention(c) (Int64) -> __CxxTemplateInst1MIxE

@@ -139,7 +139,7 @@ func testCovariantSelfMethod7(p: any P) {
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $[[OPENED_TY]], #P.covariantSelfMethod8 : <Self where Self : P> (Self) -> ((Self...) -> ()) -> ()
 // CHECK: apply [[WITNESS]]<[[OPENED_TY]]>([[STEP3]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 == τ_0_1> (@guaranteed Array<τ_0_0>) -> () for <τ_0_0, τ_0_0>, @in_guaranteed τ_0_0) -> ()
 
-// CHECK: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @[[SELF_ARRAY_THUNK_NAME]]
+// CHECK: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @[[SELF_ARRAY_THUNK_NAME]]
 // CHECK: [[ARRAY_UPCAST:%[0-9]+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF
 // CHECK: apply [[ARRAY_UPCAST]]<τ_0_0, P>
 // CHECK: } // end sil function '[[SELF_ARRAY_THUNK_NAME]]'
@@ -242,7 +242,7 @@ func testCovariantSelfProperty7(p: any P) {
 // CHECK: debug_value %{{[0-9]+}} : $@callee_guaranteed (@noescape @callee_guaranteed (@guaranteed Array<P>) -> ()) -> (), let, name "x"
 // CHECK: } // end sil function '$s42existential_member_accesses_self_assoctype26testCovariantSelfProperty81pyAA1P_p_tF'
 
-// CHECK: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @[[THUNK_NAME]]
+// CHECK: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @[[THUNK_NAME]]
 // CHECK: function_ref @[[SELF_ARRAY_THUNK_NAME]]
 // CHECK: } // end sil function '[[THUNK_NAME]]'
 func testCovariantSelfProperty8(p: any P) {
@@ -423,7 +423,7 @@ func testCovariantAssocMethod7(p: any P) {
 // CHECK: [[WITNESS:%[0-9]+]] = witness_method $[[OPENED_TY]], #P.covariantAssocMethod8 : <Self where Self : P> (Self) -> ((Self.A...) -> ()) -> ()
 // CHECK: apply [[WITNESS]]<[[OPENED_TY]]>([[STEP3]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 == τ_0_1> (@guaranteed Array<τ_0_0>) -> () for <τ_0_0.A, τ_0_0.A>, @in_guaranteed τ_0_0) -> ()
 
-// CHECK: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @[[ASSOCTYPE_ARRAY_THUNK_NAME]]
+// CHECK: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @[[ASSOCTYPE_ARRAY_THUNK_NAME]]
 // CHECK: [[ARRAY_UPCAST:%[0-9]+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF
 // CHECK: apply [[ARRAY_UPCAST]]<τ_0_0.A, Any>
 // CHECK: } // end sil function '[[ASSOCTYPE_ARRAY_THUNK_NAME]]'
@@ -525,7 +525,7 @@ func testCovariantAssocProperty7(p: any P) {
 // CHECK: debug_value %{{[0-9]+}} : $@callee_guaranteed (@noescape @callee_guaranteed (@guaranteed Array<Any>) -> ()) -> (), let, name "x"
 // CHECK: } // end sil function '$s42existential_member_accesses_self_assoctype27testCovariantAssocProperty81pyAA1P_p_tF'
 
-// CHECK: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @[[THUNK_NAME]]
+// CHECK: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @[[THUNK_NAME]]
 // CHECK: function_ref @[[ASSOCTYPE_ARRAY_THUNK_NAME]]
 // CHECK: } // end sil function '[[THUNK_NAME]]'
 func testCovariantAssocProperty8(p: any P) {

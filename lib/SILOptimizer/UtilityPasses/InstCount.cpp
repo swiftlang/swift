@@ -50,7 +50,6 @@ STATISTIC(TotalPrivateFuncs, "Number of private funcs");
 STATISTIC(TotalSharedFuncs, "Number of shared funcs");
 STATISTIC(TotalPublicExternalFuncs, "Number of public external funcs");
 STATISTIC(TotalHiddenExternalFuncs, "Number of hidden external funcs");
-STATISTIC(TotalSharedExternalFuncs, "Number of shared external funcs");
 
 // Individual instruction statistics
 #define INST(Id, Parent) \
@@ -134,9 +133,6 @@ class InstCount : public SILFunctionTransform {
       break;
     case SILLinkage::HiddenExternal:
       ++TotalHiddenExternalFuncs;
-      break;
-    case SILLinkage::SharedExternal:
-      ++TotalSharedExternalFuncs;
       break;
     }
   }
