@@ -428,3 +428,6 @@ extension AsyncStream.Continuation {
     return storage.yield(())
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncStream: @unchecked Sendable where Element: Sendable { }
