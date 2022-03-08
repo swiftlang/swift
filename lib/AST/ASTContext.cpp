@@ -5234,7 +5234,7 @@ ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
   CanGenericSignature canGenericSig(genericSig);
 
   auto result = getImpl().ExistentialSignatures.insert(
-      std::make_pair(std::make_pair(constraint, canParentSig.getPointer()), canGenericSig));
+      std::make_pair(key, canGenericSig));
   assert(result.second);
   (void) result;
 
