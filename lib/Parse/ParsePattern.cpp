@@ -926,6 +926,7 @@ bool Parser::isEffectsSpecifier(const Token &T) {
   //       'parseEffectsSpecifiers()'.
 
   if (T.isContextualKeyword("async") ||
+      (T.isContextualKeyword("await") && !T.isAtStartOfLine()) ||
       T.isContextualKeyword("reasync"))
     return true;
 
@@ -981,6 +982,13 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
           *reasync = isReasync;
         asyncLoc = Tok.getLoc();
       }
+      consumeToken();
+      continue;
+    }
+    // diagnose 'await'
+    if (Tok.isContextualKeyword("await") && !Tok.isAtStartOfLine()) {
+      diagnose(Tok, diag::await_in_function_type)
+        .fixItReplace(Tok.getLoc(), "async");
       consumeToken();
       continue;
     }
