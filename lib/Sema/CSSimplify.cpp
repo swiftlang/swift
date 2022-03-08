@@ -10128,18 +10128,8 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
   if (type2->isAnyExistentialType()) {
     // We have the existential side. Produce an opened archetype and bind
     // type1 to it.
-    bool isMetatype = false;
-    auto instanceTy = type2;
-    if (auto metaTy = type2->getAs<ExistentialMetatypeType>()) {
-      isMetatype = true;
-      instanceTy = metaTy->getExistentialInstanceType();
-    }
-    assert(instanceTy->isExistentialType());
-    Type openedTy =
-        OpenedArchetypeType::get(instanceTy->getCanonicalType(),
-                                 DC->getGenericSignatureOfContext());
-    if (isMetatype)
-      openedTy = MetatypeType::get(openedTy, getASTContext());
+    Type openedTy = openExistentialType(type2, getConstraintLocator(locator))
+        .first;
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
   }
   if (!type2->isTypeVariableOrMember())
