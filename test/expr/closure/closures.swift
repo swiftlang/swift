@@ -115,13 +115,14 @@ func t() {
 func f0(_ a: Any) -> Int { return 1 }
 assert(f0(1) == 1)
 
-
+// TODO(diagnostics): Bad diagnostic - should be `circular reference`
 var selfRef = { selfRef() }
-// expected-note@-1 2{{through reference here}}
-// expected-error@-2 {{circular reference}}
+// expected-error@-1 {{unable to infer closure type in the current context}}
 
-var nestedSelfRef = { // expected-error {{circular reference}} expected-note 2 {{through reference here}}
+// TODO: should be an error `circular reference` but it's diagnosed via overlapped requests
+var nestedSelfRef = {
   var recursive = { nestedSelfRef() }
+  // expected-warning@-1 {{variable 'recursive' was never mutated; consider changing to 'let' constant}}
   recursive()
 }
 
