@@ -64,7 +64,8 @@
 using namespace swift;
 using namespace rewriting;
 
-/// Recompute RulesInEmptyContext and DecomposeCount if needed.
+/// Recompute Useful, RulesInEmptyContext, ProjectionCount and DecomposeCount
+/// if needed.
 void RewriteLoop::recompute(const RewriteSystem &system) {
   if (!Dirty)
     return;
@@ -110,6 +111,8 @@ void RewriteLoop::recompute(const RewriteSystem &system) {
     evaluator.apply(step, system);
   }
 
+  Useful = !rulesInEmptyContext.empty();
+
   RulesInEmptyContext.clear();
 
   // Collect all rules that we saw exactly once in empty context.
@@ -145,6 +148,14 @@ unsigned RewriteLoop::getDecomposeCount(
     const RewriteSystem &system) const {
   const_cast<RewriteLoop *>(this)->recompute(system);
   return DecomposeCount;
+}
+
+/// The number of Decompose steps, used by the elimination order to prioritize
+/// loops that are not concrete simplifications.
+bool RewriteLoop::isUseful(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return Useful;
 }
 
 /// If a rewrite loop contains an explicit rule in empty context, propagate the
@@ -419,15 +430,9 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     if (loop.isDeleted())
       continue;
 
-    bool foundAny = false;
-    for (unsigned ruleID : loop.findRulesAppearingOnceInEmptyContext(*this)) {
-      redundancyCandidates.emplace_back(loopID, ruleID);
-      foundAny = true;
-    }
-
     // Delete loops that don't contain any rewrite rules in empty context,
-    // since such loops do not give us useful information.
-    if (!foundAny) {
+    // since such loops do not yield any elimination candidates.
+    if (!loop.isUseful(*this)) {
       if (Debug.contains(DebugFlags::HomotopyReduction)) {
         llvm::dbgs() << "** Deleting useless loop #" << loopID << ": ";
         loop.dump(llvm::dbgs(), *this);
@@ -435,6 +440,11 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
       }
 
       loop.markDeleted();
+      continue;
+    }
+
+    for (unsigned ruleID : loop.findRulesAppearingOnceInEmptyContext(*this)) {
+      redundancyCandidates.emplace_back(loopID, ruleID);
     }
   }
 
