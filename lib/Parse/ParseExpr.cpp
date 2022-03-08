@@ -2917,7 +2917,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // reset our state to not be in a pattern for any recursive pattern parses.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
   T(InVarOrLetPattern, IVOLP_NotInVarOrLet);
-  
+
+  // Reset async attribute in parser context.
+  llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
   // Parse the opening left brace.
   SourceLoc leftBrace = consumeToken();
 
