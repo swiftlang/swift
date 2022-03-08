@@ -94,7 +94,8 @@ struct ExpectedDiagnosticInfo {
   unsigned LineNo = ~0U;
   Optional<unsigned> ColumnNo;
 
-  std::vector<ExpectedFixIt> Fixits;
+  using AlternativeExpectedFixIts = std::vector<ExpectedFixIt>;
+  std::vector<AlternativeExpectedFixIts> Fixits = {};
 
   // Loc of {{none}}
   const char *noneMarkerStartLoc = nullptr;
@@ -284,34 +285,36 @@ verifyUnknown(SourceManager &SM,
 
 /// Return true if the given \p ExpectedFixIt is in the fix-its emitted by
 /// diagnostic \p D.
-bool DiagnosticVerifier::checkForFixIt(const ExpectedFixIt &Expected,
-                                       const CapturedDiagnosticInfo &D,
-                                       unsigned BufferID) const {
+bool DiagnosticVerifier::checkForFixIt(
+    const ExpectedDiagnosticInfo::AlternativeExpectedFixIts &ExpectedAlts,
+    const CapturedDiagnosticInfo &D, unsigned BufferID) const {
   for (auto &ActualFixIt : D.FixIts) {
-    if (ActualFixIt.getText() != Expected.Text)
-      continue;
+    for (auto &Expected : ExpectedAlts) {
+      if (ActualFixIt.getText() != Expected.Text)
+        continue;
 
-    LineColumnRange ActualRange = ActualFixIt.getLineColumnRange(
-        SM, BufferID,
-        // Don't compute line numbers unless we have to.
-        /*ComputeStartLocLine=*/Expected.Range.StartLine !=
-            LineColumnRange::NoValue,
-        /*ComputeEndLocLine=*/Expected.Range.EndLine !=
-            LineColumnRange::NoValue);
+      LineColumnRange ActualRange = ActualFixIt.getLineColumnRange(
+          SM, BufferID,
+          // Don't compute line numbers unless we have to.
+          /*ComputeStartLocLine=*/Expected.Range.StartLine !=
+              LineColumnRange::NoValue,
+          /*ComputeEndLocLine=*/Expected.Range.EndLine !=
+              LineColumnRange::NoValue);
 
-    if (Expected.Range.StartCol != ActualRange.StartCol ||
-        Expected.Range.EndCol != ActualRange.EndCol) {
-      continue;
+      if (Expected.Range.StartCol != ActualRange.StartCol ||
+          Expected.Range.EndCol != ActualRange.EndCol) {
+        continue;
+      }
+      if (Expected.Range.StartLine != LineColumnRange::NoValue &&
+          Expected.Range.StartLine != ActualRange.StartLine) {
+        continue;
+      }
+      if (Expected.Range.EndLine != LineColumnRange::NoValue &&
+          Expected.Range.EndLine != ActualRange.EndLine) {
+        continue;
+      }
+      return true;
     }
-    if (Expected.Range.StartLine != LineColumnRange::NoValue &&
-        Expected.Range.StartLine != ActualRange.StartLine) {
-      continue;
-    }
-    if (Expected.Range.EndLine != LineColumnRange::NoValue &&
-        Expected.Range.EndLine != ActualRange.EndLine) {
-      continue;
-    }
-    return true;
   }
 
   return false;
@@ -521,7 +524,8 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     MatchStart = MatchStart.substr(MatchStart.find_first_not_of(" \t"));
 
     size_t TextStartIdx = MatchStart.find("{{");
-    if (TextStartIdx == StringRef::npos) {
+    if (TextStartIdx >=
+        MatchStart.find("\n")) { // Either not found, or found beyond next \n
       addError(MatchStart.data(),
                "expected {{ in expected-warning/note/error line");
       continue;
@@ -580,7 +584,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     unsigned Count = 1;
     if (TextStartIdx > 0) {
-      StringRef CountStr = MatchStart.substr(0, TextStartIdx).trim();
+      StringRef CountStr = MatchStart.substr(0, TextStartIdx).trim(" \t");
       if (CountStr == "*") {
         Expected.mayAppear = true;
       } else {
@@ -630,6 +634,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     
     // Scan for fix-its: {{10-14=replacement text}}
+    bool startNewAlternatives = true;
     StringRef ExtraChecks = MatchStart.substr(End+2).ltrim(" \t");
     while (ExtraChecks.startswith("{{")) {
       // First make sure we have a closing "}}".
@@ -658,7 +663,23 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       }
 
       // Prepare for the next round of checks.
-      ExtraChecks = ExtraChecks.substr(EndIndex + 2).ltrim();
+      ExtraChecks = ExtraChecks.substr(EndIndex + 2).ltrim(" \t");
+
+      // Handle fix-it alternation.
+      // If two fix-its are separated by `||`, we can match either of the two.
+      // This is represented by putting them in the same subarray of `Fixits`.
+      // If they are not separated by `||`, we must match both of them.
+      // This is represented by putting them in separate subarrays of `Fixits`.
+      if (startNewAlternatives &&
+          (Expected.Fixits.empty() || !Expected.Fixits.back().empty()))
+        Expected.Fixits.push_back({});
+
+      if (ExtraChecks.startswith("||")) {
+        startNewAlternatives = false;
+        ExtraChecks = ExtraChecks.substr(2).ltrim(" \t");
+      } else {
+        startNewAlternatives = true;
+      }
 
       // If this check starts with 'educational-notes=', check for one or more
       // educational notes instead of a fix-it.
@@ -747,9 +768,13 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
           FixIt.Text += *current++;
         }
       }
-      
-      Expected.Fixits.push_back(FixIt);
+
+      Expected.Fixits.back().push_back(FixIt);
     }
+
+    // If there's a trailing empty alternation, remove it.
+    if (!Expected.Fixits.empty() && Expected.Fixits.back().empty())
+      Expected.Fixits.pop_back();
 
     Expected.ExpectedEnd = ExtraChecks.data();
     
@@ -762,7 +787,6 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       ExpectedDiagnostics.push_back(Expected);
   }
 
-  
   // Make sure all the expected diagnostics appeared.
   std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
 
@@ -807,10 +831,12 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     const char *missedFixitLoc = nullptr;
     // Verify that any expected fix-its are present in the diagnostic.
-    for (auto fixit : expected.Fixits) {
+    for (auto fixitAlternates : expected.Fixits) {
+      assert(!fixitAlternates.empty() && "an empty alternation survived");
+
       // If we found it, we're ok.
-      if (!checkForFixIt(fixit, FoundDiagnostic, BufferID)) {
-        missedFixitLoc = fixit.StartLoc;
+      if (!checkForFixIt(fixitAlternates, FoundDiagnostic, BufferID)) {
+        missedFixitLoc = fixitAlternates.front().StartLoc;
         break;
       }
     }
@@ -844,8 +870,8 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       assert(!expected.Fixits.empty() &&
              "some fix-its should be expected here");
 
-      const char *replStartLoc = expected.Fixits.front().StartLoc;
-      const char *replEndLoc = expected.Fixits.back().EndLoc;
+      const char *replStartLoc = expected.Fixits.front().front().StartLoc;
+      const char *replEndLoc = expected.Fixits.back().back().EndLoc;
 
       std::string message = "expected fix-it not seen";
       std::string actualFixits;
@@ -886,8 +912,8 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         replEndLoc = expected.noneMarkerStartLoc;
       } else {
         message = "unexpected fix-it seen";
-        replStartLoc = expected.Fixits.front().StartLoc;
-        replEndLoc = expected.Fixits.back().EndLoc;
+        replStartLoc = expected.Fixits.front().front().StartLoc;
+        replEndLoc = expected.Fixits.back().back().EndLoc;
       }
 
       auto phrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);

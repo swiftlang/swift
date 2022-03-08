@@ -1118,7 +1118,8 @@ static bool printSwiftFeature(CompilerInstance &instance) {
 
 static bool
 withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
-                     llvm::function_ref<bool(CompilerInstance &)> cont) {
+                     llvm::function_ref<bool(CompilerInstance &)> cont,
+                     bool runDespiteErrors = false) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   assert(!FrontendOptions::shouldActionOnlyParse(opts.RequestedAction) &&
@@ -1141,11 +1142,12 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
-  if (Instance.getASTContext().hadError() &&
-      !opts.AllowModuleWithCompilerErrors)
+  bool hadError = Instance.getASTContext().hadError()
+                      && !opts.AllowModuleWithCompilerErrors;
+  if (hadError && !runDespiteErrors)
     return true;
 
-  return cont(Instance);
+  return cont(Instance) || hadError;
 }
 
 static bool performScanDependencies(CompilerInstance &Instance) {
@@ -1207,14 +1209,11 @@ static bool performAction(CompilerInstance &Instance,
   // MARK: Actions that Dump
   case FrontendOptions::ActionType::DumpParse:
     return dumpAST(Instance);
-  case FrontendOptions::ActionType::DumpAST: {
-    // FIXME: -dump-ast expects to be able to write output even if type checking
-    // fails which does not cleanly fit the model \c withSemanticAnalysis is
-    // trying to impose. Once there is a request for the "semantic AST", this
-    // point is moot.
-    Instance.performSema();
-    return dumpAST(Instance);
-  }
+  case FrontendOptions::ActionType::DumpAST:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          return dumpAST(Instance);
+        }, /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::PrintAST:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
@@ -1234,14 +1233,14 @@ static bool performAction(CompilerInstance &Instance,
         Instance, observer, [](CompilerInstance &Instance) {
           return dumpAndPrintScopeMap(Instance,
                                       getPrimaryOrMainSourceFile(Instance));
-        });
+        }, /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::DumpTypeRefinementContexts:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
           getPrimaryOrMainSourceFile(Instance).getTypeRefinementContext()->dump(
               llvm::errs(), Instance.getASTContext().SourceMgr);
           return Instance.getASTContext().hadError();
-        });
+        }, /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::DumpInterfaceHash:
     getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
     return Context.hadError();

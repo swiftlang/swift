@@ -134,6 +134,13 @@ namespace swift {
     /// The SDK canonical name, if known.
     std::string SDKName;
 
+    /// The lowest target OS version that code in this module may be inlined
+    /// into. In resilient modules, this should match the minimum
+    /// deployment target of the *first* resilient version of the module, since
+    /// clients may need to interoperate with versions as far back as that
+    /// deployment target.
+    llvm::VersionTuple MinimumInliningTargetVersion;
+
     /// The alternate name to use for the entry point instead of main.
     std::string entryPointFunctionName = "main";
 
