@@ -741,7 +741,8 @@ RewriteSystem::getRedundantRequirements() {
   for (unsigned ruleID : indices(getRules())) {
     auto &rule = getRules()[ruleID];
 
-    if (!rule.isExplicit() && !rule.isPermanent() && !rule.isRedundant())
+    if (!rule.isExplicit() && !rule.isPermanent() && !rule.isRedundant() &&
+        isInMinimizationDomain(rule.getLHS().getRootProtocol()))
       impliedRequirements.insert(ruleID);
 
     if (!rule.isExplicit())
