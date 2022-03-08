@@ -1348,7 +1348,8 @@ namespace {
 static Optional<
     std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
 shouldOpenExistentialCallArgument(
-    ValueDecl *callee, unsigned paramIdx, Type paramTy, Type argTy) {
+    ValueDecl *callee, unsigned paramIdx, Type paramTy, Type argTy,
+    Expr *argExpr, ConstraintSystem &cs) {
   if (!callee)
     return None;
 
@@ -1381,6 +1382,20 @@ shouldOpenExistentialCallArgument(
   // type inference won't be possible.
   if (!paramTy->hasTypeVariable())
     return None;
+
+  // An argument expression that explicitly coerces to an existential
+  // disables the implicit opening of the existential.
+  if (argExpr) {
+    if (auto argCoercion = dyn_cast<CoerceExpr>(
+            argExpr->getSemanticsProvidingExpr())) {
+      if (auto typeRepr = argCoercion->getCastTypeRepr()) {
+        if (auto toType = cs.getType(typeRepr)) {
+          if (toType->isAnyExistentialType())
+            return None;
+        }
+      }
+    }
+  }
 
   OpenedExistentialAdjustments adjustments;
 
@@ -1670,10 +1685,10 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       auto argTy = argument.getOldType();
 
       bool matchingAutoClosureResult = param.isAutoClosure();
+      auto *argExpr = getArgumentExpr(locator.getAnchor(), argIdx);
       if (param.isAutoClosure() && !isSynthesizedArgument(argument)) {
         auto &ctx = cs.getASTContext();
         auto *fnType = paramTy->castTo<FunctionType>();
-        auto *argExpr = getArgumentExpr(locator.getAnchor(), argIdx);
 
         // If this is a call to a function with a closure argument and the
         // parameter is an autoclosure, let's just increment the score here
@@ -1715,7 +1730,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       // If the argument is an existential type and the parameter is generic,
       // consider opening the existential type.
       if (auto existentialArg = shouldOpenExistentialCallArgument(
-              callee, paramIdx, paramTy, argTy)) {
+              callee, paramIdx, paramTy, argTy, argExpr, cs)) {
         // My kingdom for a decent "if let" in C++.
         TypeVariableType *openedTypeVar;
         Type existentialType;
@@ -10113,18 +10128,8 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
   if (type2->isAnyExistentialType()) {
     // We have the existential side. Produce an opened archetype and bind
     // type1 to it.
-    bool isMetatype = false;
-    auto instanceTy = type2;
-    if (auto metaTy = type2->getAs<ExistentialMetatypeType>()) {
-      isMetatype = true;
-      instanceTy = metaTy->getExistentialInstanceType();
-    }
-    assert(instanceTy->isExistentialType());
-    Type openedTy =
-        OpenedArchetypeType::get(instanceTy->getCanonicalType(),
-                                 DC->getGenericSignatureOfContext());
-    if (isMetatype)
-      openedTy = MetatypeType::get(openedTy, getASTContext());
+    Type openedTy = openExistentialType(type2, getConstraintLocator(locator))
+        .first;
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
   }
   if (!type2->isTypeVariableOrMember())
