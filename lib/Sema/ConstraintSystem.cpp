@@ -576,7 +576,8 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
 std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
     Type type, ConstraintLocator *locator) {
   OpenedArchetypeType *opened = nullptr;
-  Type result = type->openAnyExistentialType(opened, DC);
+  auto sig = DC->getGenericSignatureOfContext();
+  Type result = type->openAnyExistentialType(opened, sig);
   assert(OpenedExistentialTypes.count(locator) == 0);
   OpenedExistentialTypes.insert({locator, opened});
   return {result, opened};
@@ -1789,8 +1790,9 @@ typeEraseCovariantExistentialSelfReferences(Type refTy, Type baseTy,
     return refTy;
   }
 
+  auto contextSig = useDC->getGenericSignatureOfContext();
   const auto existentialSig =
-      baseTy->getASTContext().getOpenedArchetypeSignature(baseTy, useDC);
+      baseTy->getASTContext().getOpenedArchetypeSignature(baseTy, contextSig);
 
   unsigned metatypeDepth = 0;
 
@@ -2117,7 +2119,8 @@ ConstraintSystem::getTypeOfMemberReference(
     }
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype =
-        OpenedArchetypeType::get(baseObjTy->getCanonicalType(), useDC);
+        OpenedArchetypeType::get(baseObjTy->getCanonicalType(),
+                                 useDC->getGenericSignatureOfContext());
     OpenedExistentialTypes.insert(
         {getConstraintLocator(locator), openedArchetype});
     baseOpenedTy = openedArchetype;
@@ -6057,7 +6060,7 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
       return Action::Stop;
     }
   } isDependentOnSelfWalker(member->getASTContext().getOpenedArchetypeSignature(
-      baseTy, useDC));
+      baseTy, useDC->getGenericSignatureOfContext()));
 
   for (const auto &req : sig.getRequirements()) {
     switch (req.getKind()) {

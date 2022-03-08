@@ -4100,7 +4100,8 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
     return GenericParameterReferenceInfo();
 
   const auto sig =
-      getASTContext().getOpenedArchetypeSignature(baseTy, useDC);
+      getASTContext().getOpenedArchetypeSignature(baseTy,
+                                                  useDC->getGenericSignatureOfContext());
   auto genericParam = sig.getGenericParams().front();
   return findGenericParameterReferences(
       this, sig, genericParam, treatNonResultCovariantSelfAsInvariant, None);

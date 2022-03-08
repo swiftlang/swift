@@ -254,7 +254,7 @@ public:
 
     auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
     auto existentialTy = archetypeTy->getExistentialType()->getCanonicalType();
-    auto env = GenericEnvironment::forOpenedExistential(
+    auto env = GenericEnvironment::forOpenedArchetypeSignature(
         getOpASTType(existentialTy), sig, UUID::fromTime());
     auto replacementTy =
         env->mapTypeIntoContext(archetypeTy->getInterfaceType())

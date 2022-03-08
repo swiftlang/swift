@@ -1308,7 +1308,7 @@ public:
   /// conformances inherited from superclass constraints while existential
   /// values do.
   CanGenericSignature getOpenedArchetypeSignature(Type type,
-                                                  const DeclContext *useDC);
+                                                  GenericSignature parentSig);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);

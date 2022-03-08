@@ -328,7 +328,7 @@ struct ASTContext::Implementation {
   CanGenericSignature SingleGenericParameterSignature;
 
   /// The existential signature <T : P> for each P.
-  llvm::DenseMap<std::pair<CanType, const DeclContext *>, CanGenericSignature>
+  llvm::DenseMap<std::pair<CanType, const GenericSignatureImpl *>, CanGenericSignature>
       ExistentialSignatures;
 
   /// Overridden declarations.
@@ -4441,17 +4441,18 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
 }
 
 CanTypeWrapper<OpenedArchetypeType>
-OpenedArchetypeType::get(CanType existential, const DeclContext *useDC,
+OpenedArchetypeType::get(CanType existential, GenericSignature parentSig,
                          Optional<UUID> knownID) {
-  return get(existential,
-             OpenedArchetypeType::getSelfInterfaceTypeFromContext(useDC),
-             useDC, knownID);
+  assert(existential->isExistentialType());
+  auto interfaceType = OpenedArchetypeType::getSelfInterfaceTypeFromContext(parentSig, existential->getASTContext());
+  return get(existential, interfaceType, parentSig, knownID);
 }
 
 CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
                                                 Type interfaceType,
-                                                const DeclContext *useDC,
+                                                GenericSignature parentSig,
                                                 Optional<UUID> knownID) {
+  assert(existential->isExistentialType());
   assert(!interfaceType->hasArchetype() && "must be interface type");
   // FIXME: Opened archetypes can't be transformed because the
   // the identity of the archetype has to be preserved. This
@@ -4485,7 +4486,7 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
 
   /// Create a generic environment for this opened archetype.
   auto genericEnv =
-      GenericEnvironment::forOpenedExistential(existential, useDC, *knownID);
+      GenericEnvironment::forOpenedExistential(existential, parentSig, *knownID);
   openedExistentialEnvironments[*knownID] = genericEnv;
 
   // Map the interface type into that environment.
@@ -4495,22 +4496,22 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
 }
 
 CanType OpenedArchetypeType::getAny(CanType existential, Type interfaceType,
-                                    const DeclContext *useDC) {
+                                    GenericSignature parentSig) {
+  assert(existential->isAnyExistentialType());
   if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
     auto instanceTy =
         metatypeTy->getExistentialInstanceType()->getCanonicalType();
     return CanMetatypeType::get(
-        OpenedArchetypeType::getAny(instanceTy, interfaceType, useDC));
+        OpenedArchetypeType::getAny(instanceTy, interfaceType, parentSig));
   }
   assert(existential->isExistentialType());
-  return OpenedArchetypeType::get(existential, interfaceType, useDC);
+  return OpenedArchetypeType::get(existential, interfaceType, parentSig);
 }
 
 CanType OpenedArchetypeType::getAny(CanType existential,
-                                    const DeclContext *useDC) {
-  return getAny(existential,
-                OpenedArchetypeType::getSelfInterfaceTypeFromContext(useDC),
-                useDC);
+                                    GenericSignature parentSig) {
+  auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(parentSig, existential->getASTContext());
+  return getAny(existential, interfaceTy, parentSig);
 }
 
 void SubstitutionMap::Storage::Profile(
@@ -4666,19 +4667,14 @@ GenericEnvironment *GenericEnvironment::getIncomplete(
 
 /// Create a new generic environment for an opened archetype.
 GenericEnvironment *
-GenericEnvironment::forOpenedExistential(Type existential,
-                                         const DeclContext *useDC, UUID uuid) {
+GenericEnvironment::forOpenedExistential(
+    Type existential, GenericSignature parentSig, UUID uuid) {
   auto &ctx = existential->getASTContext();
-  auto signature = ctx.getOpenedArchetypeSignature(existential, useDC);
-
-  SubstitutionMap subs;
-  if (auto *useEnvironment = useDC->getGenericEnvironmentOfContext()) {
-    subs = useEnvironment->getForwardingSubstitutionMap();
-  }
-  return GenericEnvironment::forOpenedExistential(existential, signature, uuid);
+  auto signature = ctx.getOpenedArchetypeSignature(existential, parentSig);
+  return GenericEnvironment::forOpenedArchetypeSignature(existential, signature, uuid);
 }
 
-GenericEnvironment *GenericEnvironment::forOpenedExistential(
+GenericEnvironment *GenericEnvironment::forOpenedArchetypeSignature(
     Type existential, GenericSignature signature, UUID uuid) {
   // Allocate and construct the new environment.
   auto &ctx = existential->getASTContext();
@@ -5187,22 +5183,19 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   return canonicalSig;
 }
 
-Type OpenedArchetypeType::getSelfInterfaceTypeFromContext(const DeclContext *useDC) {
-  auto typeContext = useDC->getInnermostTypeContext();
-  if (typeContext && typeContext->getSelfProtocolDecl()) {
-    return typeContext->getProtocolSelfType();
-  } else {
-    return GenericTypeParamType::get(
-        /*isTypeSequence=*/false,
-        /*depth*/ useDC->getGenericContextDepth() + 1, /*index*/ 0,
-        useDC->getASTContext());
-  }
+Type OpenedArchetypeType::getSelfInterfaceTypeFromContext(GenericSignature parentSig,
+                                                          ASTContext &ctx) {
+  unsigned depth = 0;
+  if (!parentSig.getGenericParams().empty())
+    depth = parentSig.getGenericParams().back()->getDepth() + 1;
+  return GenericTypeParamType::get(/*isTypeSequence=*/ false,
+                                   /*depth=*/ depth, /*index=*/ 0,
+                                   ctx);
 }
 
 CanGenericSignature
-ASTContext::getOpenedArchetypeSignature(Type type, const DeclContext *useDC) {
+ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
   assert(type->isExistentialType());
-  assert(useDC && "Must have a working declaration context!");
 
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();
@@ -5213,7 +5206,7 @@ ASTContext::getOpenedArchetypeSignature(Type type, const DeclContext *useDC) {
   // The opened archetype signature for a protocol type is identical
   // to the protocol's own canonical generic signature if there aren't any
   // outer generic parameters to worry about.
-  if (!useDC->isGenericContext()) {
+  if (parentSig.isNull()) {
     if (const auto protoTy = dyn_cast<ProtocolType>(constraint)) {
       return protoTy->getDecl()->getGenericSignature().getCanonicalSignature();
     }
@@ -5222,31 +5215,23 @@ ASTContext::getOpenedArchetypeSignature(Type type, const DeclContext *useDC) {
   // Otherwise we need to build a generic signature that captures any outer
   // generic parameters. This ensures that we keep e.g. generic superclass
   // existentials contained in a well-formed generic context.
-  auto found = getImpl().ExistentialSignatures.find({constraint, useDC});
+  auto canParentSig = parentSig.getCanonicalSignature();
+  auto found = getImpl().ExistentialSignatures.find({constraint, canParentSig.getPointer()});
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
 
-  GenericSignature outerSignature;
-  auto *typeContext = useDC->getInnermostTypeContext();
-  if (typeContext && typeContext->getSelfProtocolDecl()) {
-    outerSignature = GenericSignature();
-  } else {
-    outerSignature = useDC->getGenericSignatureOfContext();
-  }
-
-  auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(useDC)
-                        ->getCanonicalType()->getAs<GenericTypeParamType>();
-
+  auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(canParentSig, type->getASTContext())
+    ->castTo<GenericTypeParamType>();
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           constraint);
   auto genericSig = buildGenericSignature(
-      *this, outerSignature.getCanonicalSignature(),
+      *this, canParentSig,
       {genericParam}, {requirement});
 
   CanGenericSignature canGenericSig(genericSig);
 
   auto result = getImpl().ExistentialSignatures.insert(
-      std::make_pair(std::make_pair(constraint, useDC), canGenericSig));
+      std::make_pair(std::make_pair(constraint, canParentSig.getPointer()), canGenericSig));
   assert(result.second);
   (void) result;
 

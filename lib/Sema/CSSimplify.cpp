@@ -10121,7 +10121,8 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
     }
     assert(instanceTy->isExistentialType());
     Type openedTy =
-        OpenedArchetypeType::get(instanceTy->getCanonicalType(), DC);
+        OpenedArchetypeType::get(instanceTy->getCanonicalType(),
+                                 DC->getGenericSignatureOfContext());
     if (isMetatype)
       openedTy = MetatypeType::get(openedTy, getASTContext());
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);

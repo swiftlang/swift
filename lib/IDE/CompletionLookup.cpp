@@ -2164,11 +2164,12 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD) {
     WasOptional = true;
   }
 
-  if (!ExprType->getMetatypeInstanceType()->isAnyObject())
-    if (ExprType->isAnyExistentialType())
+  if (!ExprType->getMetatypeInstanceType()->isAnyObject()) {
+    if (ExprType->isAnyExistentialType()) {
       ExprType = OpenedArchetypeType::getAny(ExprType->getCanonicalType(),
-                                             CurrDeclContext);
-
+                                             CurrDeclContext->getGenericSignatureOfContext());
+    }
+  }
   if (!IsSelfRefExpr && !IsSuperRefExpr && ExprType->getAnyNominal() &&
       ExprType->getAnyNominal()->isActor()) {
     IsCrossActorReference = true;

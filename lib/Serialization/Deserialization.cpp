@@ -5642,7 +5642,7 @@ public:
     if (!existentialTypeOrError)
       return existentialTypeOrError.takeError();
 
-    auto env = GenericEnvironment::forOpenedExistential(
+    auto env = GenericEnvironment::forOpenedArchetypeSignature(
         existentialTypeOrError.get(), sigOrError.get(), UUID::fromTime());
     return env->mapTypeIntoContext(interfaceTypeOrError.get())
         ->castTo<OpenedArchetypeType>();

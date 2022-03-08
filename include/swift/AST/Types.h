@@ -765,7 +765,7 @@ public:
 
   /// Opens an existential instance or meta-type and returns the opened type.
   Type openAnyExistentialType(OpenedArchetypeType *&opened,
-                              const DeclContext *useDC);
+                              GenericSignature parentSig);
 
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
@@ -5748,23 +5748,25 @@ class OpenedArchetypeType final : public ArchetypeType,
 
 public:
   /// Compute the parameter that serves as the \c Self type for an opened
-  /// archetype from the given declaration context.
+  /// archetype from the given outer generic signature.
   ///
-  /// For protocol extensions, this type is the context's \c Self type. For
-  /// all other contexts, this type is a generic parameter one level deeper
+  /// This type is a generic parameter one level deeper
   /// than the deepest generic context depth.
-  static Type getSelfInterfaceTypeFromContext(const DeclContext *useDC);
+  static Type getSelfInterfaceTypeFromContext(GenericSignature parentSig,
+                                              ASTContext &ctx);
 
 public:
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
   static CanTypeWrapper<OpenedArchetypeType> get(CanType existential,
-                                                 const DeclContext *useDC,
+                                                 GenericSignature parentSig,
                                                  Optional<UUID> knownID = None);
 
   /// Get or create an archetype that represents the opened type
@@ -5772,27 +5774,41 @@ public:
   ///
   /// \param existential The existential type to open.
   /// \param interfaceType The interface type represented by this archetype.
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
   static CanTypeWrapper<OpenedArchetypeType> get(CanType existential,
                                                  Type interfaceType,
-                                                 const DeclContext *useDC,
+                                                 GenericSignature parentSig,
                                                  Optional<UUID> knownID = None);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
   ///
+  /// Use this function when you are unsure of whether the
+  /// \c existential type is a metatype or an instance type. This function
+  /// will unwrap any existential metatype containers.
+  ///
   /// \param existential The existential type or existential metatype to open.
   /// \param interfaceType The interface type represented by this archetype.
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
   static CanType getAny(CanType existential, Type interfaceType,
-                        const DeclContext *useDC);
+                        GenericSignature parentSig);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
   ///
+  /// Use this function when you are unsure of whether the
+  /// \c existential type is a metatype or an instance type. This function
+  /// will unwrap any existential metatype containers.
+  ///
   /// \param existential The existential type or existential metatype to open.
-  static CanType getAny(CanType existential, const DeclContext *useDC);
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
+  static CanType getAny(CanType existential, GenericSignature parentSig);
 
   /// Retrieve the ID number of this opened existential.
   UUID getOpenedExistentialID() const;

@@ -480,7 +480,7 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
     return type;
 
   const auto sig = root->getASTContext().getOpenedArchetypeSignature(
-      root->getExistentialType(), useDC);
+      root->getExistentialType(), useDC->getGenericSignatureOfContext());
 
   unsigned metatypeDepth = 0;
 
@@ -4008,7 +4008,8 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
 
   // Use generic signature minimization: the requirements of the signature will
   // represent the minimal composition.
-  const auto Sig = Ctx.getOpenedArchetypeSignature(CanTy, useDC);
+  auto sig = useDC->getGenericSignatureOfContext();
+  const auto Sig = Ctx.getOpenedArchetypeSignature(CanTy, sig);
   const auto &Reqs = Sig.getRequirements();
   if (Reqs.size() == 1) {
     return Reqs.front().getSecondType()->getCanonicalType();
@@ -4017,7 +4018,7 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
   Type superclass;
   llvm::SmallVector<Type, 2> MinimalMembers;
   bool MinimalHasExplicitAnyObject = false;
-  auto ifaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(useDC);
+  auto ifaceTy = Sig.getGenericParams().back();
   for (const auto &Req : Reqs) {
     if (!Req.getFirstType()->isEqual(ifaceTy)) {
       continue;
@@ -5994,17 +5995,19 @@ SILBoxType::SILBoxType(ASTContext &C,
 }
 
 Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened,
-                                      const DeclContext *useDC) {
+                                      GenericSignature parentSig) {
   assert(isAnyExistentialType());
   if (auto metaty = getAs<ExistentialMetatypeType>()) {
     opened = OpenedArchetypeType::get(
-        metaty->getExistentialInstanceType()->getCanonicalType(), useDC);
+        metaty->getExistentialInstanceType()->getCanonicalType(),
+        parentSig.getCanonicalSignature());
     if (metaty->hasRepresentation())
       return MetatypeType::get(opened, metaty->getRepresentation());
     else
       return MetatypeType::get(opened);
   }
-  opened = OpenedArchetypeType::get(getCanonicalType(), useDC);
+  opened = OpenedArchetypeType::get(getCanonicalType(),
+                                    parentSig.getCanonicalSignature());
   return opened;
 }
 
