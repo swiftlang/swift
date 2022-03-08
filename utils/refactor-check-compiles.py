@@ -9,7 +9,7 @@ import sys
 
 def run_cmd(cmd, desc):
     try:
-        return subprocess.check_output(cmd, text=True)
+        return subprocess.check_output(cmd, universal_newlines=True)
     except subprocess.CalledProcessError:
         print('FAILED ' + desc + ':', file=sys.stderr)
         print(' '.join(cmd), file=sys.stderr)

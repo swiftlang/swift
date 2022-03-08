@@ -133,7 +133,7 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         _env.update(env)
     try:
         return subprocess.check_output(command, env=_env, stderr=stderr,
-                                       text=True)
+                                       universal_newlines=True)
     except subprocess.CalledProcessError as e:
         if allow_non_zero_exit:
             return e.output
@@ -217,7 +217,8 @@ def run(*args, **kwargs):
         return(None, 0, args)
 
     my_pipe = subprocess.Popen(
-        *args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        *args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        universal_newlines=True,
         **kwargs)
     (output, _) = my_pipe.communicate()
     ret = my_pipe.wait()

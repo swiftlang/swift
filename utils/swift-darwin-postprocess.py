@@ -33,7 +33,7 @@ def main(arguments):
 def unrpathize(filename):
     dylibsOutput = subprocess.check_output(
         ['xcrun', 'dyldinfo', '-dylibs', filename],
-        text=True)
+        universal_newlines=True)
 
     # Do not rewrite @rpath-relative load commands for these libraries:
     # they are test support libraries that are never installed under
