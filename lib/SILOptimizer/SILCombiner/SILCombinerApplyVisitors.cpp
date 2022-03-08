@@ -1572,7 +1572,9 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *fInverseApply,
 }
 
 /// Should replace a call to `getContiguousArrayStorageType<A>(for:)` by the
-/// metadata constructor.
+/// metadata constructor of the return type.
+///  getContiguousArrayStorageType<Int>(for:)
+///    => metatype @thick ContiguousArrayStorage<Int>.Type
 /// We know that `getContiguousArrayStorageType` will not return the AnyObject
 /// type optimization for any non class or objc existential type instantiation.
 static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
@@ -1588,20 +1590,17 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (!boundGenericTy)
     return false;
 
-  for (auto TP : boundGenericTy->getGenericArgs()) {
-    auto ty = TP->getCanonicalType();
-    if (ty->getStructOrBoundGenericStruct() ||
-        ty->getEnumOrBoundGenericEnum() ||
-        isa<BuiltinVectorType>(ty) ||
-        isa<BuiltinIntegerType>(ty) ||
-        isa<BuiltinFloatType>(ty) ||
-        isa<TupleType>(ty) ||
-        isa<AnyFunctionType>(ty) ||
-        (ty->isAnyExistentialType() && !ty->isObjCExistentialType()))
-      return true;
-
+  auto genericArgs = boundGenericTy->getGenericArgs();
+  if (genericArgs.size() != 1)
     return false;
-  }
+  auto ty = genericArgs[0]->getCanonicalType();
+  if (ty->getStructOrBoundGenericStruct() || ty->getEnumOrBoundGenericEnum() ||
+      isa<BuiltinVectorType>(ty) || isa<BuiltinIntegerType>(ty) ||
+      isa<BuiltinFloatType>(ty) || isa<TupleType>(ty) ||
+      isa<AnyFunctionType>(ty) ||
+      (ty->isAnyExistentialType() && !ty->isObjCExistentialType()))
+    return true;
+
   return false;
 }
 
@@ -1641,6 +1640,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     if (SF->hasSemanticsAttr(semantics::ARRAY_GET_CONTIGUOUSARRAYSTORAGETYPE)) {
       auto silTy = AI->getType();
       auto storageTy = AI->getType().getASTType();
+
+      // getContiguousArrayStorageType<Int> => ContiguousArrayStorage<Int>
       if (shouldReplaceCallByMetadataConstructor(storageTy)) {
         auto metatype = Builder.createMetatype(AI->getLoc(), silTy);
         AI->replaceAllUsesWith(metatype);
@@ -1649,7 +1650,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       }
     }
   }
-
 
   // (apply (thin_to_thick_function f)) to (apply f)
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
