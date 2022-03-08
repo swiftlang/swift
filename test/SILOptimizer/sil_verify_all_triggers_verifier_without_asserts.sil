@@ -3,6 +3,7 @@
 
 // We only run this test without asserts.
 
+// REQUIRES: rdar89986815
 // UNSUPPORTED: asserts
 
 class Klass {}
