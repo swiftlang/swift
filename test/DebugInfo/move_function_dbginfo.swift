@@ -242,7 +242,7 @@ public func addressOnlyVarTest<T : P>(_ x: T) {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo23copyableValueCCFlowTestyyF"(
 // CHECK: call void @llvm.dbg.addr(metadata %T21move_function_dbginfo5KlassC** %k.debug, metadata ![[K_COPYABLE_LET_CCFLOW_METADATA:[0-9]+]], metadata !DIExpression()), !dbg ![[ADDR_LOC:[0-9]+]]
-// CHECK-NEXT: br label %[[NEXT_BB:[0-9]+]],
+// CHECK-NEXT: br label %[[NEXT_BB:[a-z\.0-9]+]],
 //
 // CHECK: [[NEXT_BB]]:
 // CHECK:    br i1 {{%[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
@@ -261,7 +261,7 @@ public func copyableValueCCFlowTest() {
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo037copyableVarTestCCFlowReinitOutOfBlockF0yyF"(
 // CHECK: call void @llvm.dbg.declare(metadata %T21move_function_dbginfo5KlassC** %m.debug,
 // CHECK: call void @llvm.dbg.addr(metadata %T21move_function_dbginfo5KlassC** %k, metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], metadata !DIExpression()), !dbg ![[ADDR_LOC:[0-9]*]]
-// CHECK-NEXT: br label %[[BB_NEXT:[0-9]+]],
+// CHECK-NEXT: br label %[[BB_NEXT:[a-z0-9\.]+]],
 //
 // CHECK: [[BB_NEXT]]:
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
@@ -294,7 +294,7 @@ public func copyableVarTestCCFlowReinitOutOfBlockTest() {
 // CHECK: entry:
 // CHECK: call void @llvm.dbg.declare(metadata %T21move_function_dbginfo5KlassC** %m.debug,
 // CHECK: call void @llvm.dbg.addr(metadata %T21move_function_dbginfo5KlassC** %k, metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], metadata !DIExpression()), !dbg ![[ADDR_LOC:[0-9]*]]
-// CHECK-NEXT: br label %[[BB_NEXT:[0-9]+]],
+// CHECK-NEXT: br label %[[BB_NEXT:[a-z0-9\.]+]],
 //
 // CHECK: [[BB_NEXT]]:
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
@@ -303,10 +303,10 @@ public func copyableVarTestCCFlowReinitOutOfBlockTest() {
 // CHECK:      call void @llvm.dbg.value(metadata %T21move_function_dbginfo5KlassC** undef, metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
 // CHECK:      call void @llvm.dbg.addr(metadata %T21move_function_dbginfo5KlassC** %k, metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
-// CHECK-NEXT:      br label %[[BB_NEXT_2:[0-9]+]],
+// CHECK-NEXT:      br label %[[BB_NEXT_2:[a-z\.0-9]+]],
 //
 // CHECK: [[BB_NEXT_2]]:
-// CHECK:      br label %[[CONT_BB:[0-9]+]],
+// CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
 // CHECK: [[RHS]]:
 // CHECK:      br label %[[CONT_BB]],
@@ -328,14 +328,14 @@ public func copyableVarTestCCFlowReinitInBlockTest() {
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo040addressOnlyVarTestCCFlowReinitOutOfBlockG0yyxmAA1PRzlF"(
 // CHECK: entry:
 // CHECK: call void @llvm.dbg.addr(metadata %T21move_function_dbginfo1PP* %k, metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], metadata !DIExpression()), !dbg ![[ADDR_LOC:[0-9]*]]
-// CHECK-NEXT: br label %[[BB_NEXT:[0-9]+]],
+// CHECK-NEXT: br label %[[BB_NEXT:[a-z0-9\.]+]],
 //
 // CHECK: [[BB_NEXT]]:
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
 // CHECK:      call void @llvm.dbg.value(metadata %T21move_function_dbginfo1PP* undef, metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
-// CHECK:      br label %[[CONT_BB:[0-9]+]],
+// CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
 // CHECK: [[RHS]]:
 // CHECK:      br label %[[CONT_BB]],
@@ -360,7 +360,7 @@ public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo037addressOnlyVarTestCCFlowReinitInBlockG0yyxmAA1PRzlF"(
 // CHECK: entry:
 // CHECK: call void @llvm.dbg.addr(metadata %T21move_function_dbginfo1PP* %k, metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], metadata !DIExpression()), !dbg ![[ADDR_LOC:[0-9]*]]
-// CHECK-NEXT: br label %[[BB_NEXT:[0-9]+]],
+// CHECK-NEXT: br label %[[BB_NEXT:[a-z0-9\.]+]],
 //
 // CHECK: [[BB_NEXT]]:
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
@@ -369,10 +369,10 @@ public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
 // CHECK:      call void @llvm.dbg.value(metadata %T21move_function_dbginfo1PP* undef, metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
 // CHECK:      call void @llvm.dbg.addr(metadata %T21move_function_dbginfo1PP* %k, metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
-// CHECK-NEXT:      br label %[[BB_NEXT_2:[0-9]+]],
+// CHECK-NEXT:      br label %[[BB_NEXT_2:[a-z\.0-9]+]],
 //
 // CHECK: [[BB_NEXT_2]]:
-// CHECK:      br label %[[CONT_BB:[0-9]+]],
+// CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
 // CHECK: [[RHS]]:
 // CHECK:      br label %[[CONT_BB]],

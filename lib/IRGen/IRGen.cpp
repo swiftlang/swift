@@ -146,6 +146,11 @@ static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
   PM.add(createThreadSanitizerLegacyPassPass());
 }
 
+static void addSwiftDbgAddrBlockSplitterPass(const PassManagerBuilder &Builder,
+                                             legacy::PassManagerBase &PM) {
+  PM.add(createSwiftDbgAddrBlockSplitter());
+}
+
 static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
                                      legacy::PassManagerBase &PM) {
   const PassManagerBuilderWrapper &BuilderWrapper =
@@ -287,6 +292,13 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
           PM.add(createSwiftMergeFunctionsPass(schema.isEnabled(), key));
         }
       });
+  }
+
+  if (RunSwiftSpecificLLVMOptzns) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSwiftDbgAddrBlockSplitterPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addSwiftDbgAddrBlockSplitterPass);
   }
 
   // Configure the function passes.
