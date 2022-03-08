@@ -185,12 +185,6 @@ static bool injectsNoPayloadCase(InjectEnumAddrInst *IEAI) {
   return elemType.isEmpty(*function);
 }
 
-static bool isOrHasEnum(SILType type) {
-  return type.getASTType().findIf([](Type ty) {
-    return ty->getEnumOrBoundGenericEnum() != nullptr;
-  });
-}
-
 bool MemoryLifetimeVerifier::storesTrivialEnum(int locIdx,
                         SILBasicBlock::reverse_iterator start,
                         SILBasicBlock::reverse_iterator end) {
@@ -204,7 +198,7 @@ bool MemoryLifetimeVerifier::storesTrivialEnum(int locIdx,
     if (auto *SI = dyn_cast<StoreInst>(&inst)) {
       const Location *loc = locations.getLocation(SI->getDest());
       if (loc && loc->isSubLocation(locIdx) &&
-          isOrHasEnum(SI->getSrc()->getType())) {
+          SI->getSrc()->getType().isOrHasEnum()) {
         return SI->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial;
       }
     }
