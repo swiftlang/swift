@@ -36,7 +36,7 @@ func accessNSMember() {
 // CHECK-LABEL: define hidden swiftcc i32 @"$s6cxx_ir12basicMethods1as5Int32VSpySo0D0VG_tF"(i8* %0)
 // CHECK: [[THIS_PTR1:%.*]] = bitcast i8* %0 to %TSo7MethodsV*
 // CHECK: [[THIS_PTR2:%.*]] = bitcast %TSo7MethodsV* [[THIS_PTR1]] to %class.Methods*
-// CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZN7Methods12SimpleMethodEi|"\?SimpleMethod@Methods@@QEAAHH@Z"}}(%class.Methods* [[THIS_PTR2]], i32{{( signext)?}} 4)
+// CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZN7Methods12SimpleMethodEi|"\?SimpleMethod@Methods@@QEAAHH@Z"}}(%class.Methods* [[THIS_PTR2]], i32 {{%?[0-9]+}})
 // CHECK: ret i32 [[RESULT]]
 func basicMethods(a: UnsafeMutablePointer<Methods>) -> Int32 {
   return a.pointee.SimpleMethod(4)
@@ -46,7 +46,7 @@ func basicMethods(a: UnsafeMutablePointer<Methods>) -> Int32 {
 // CHECK: [[THIS_PTR1:%.*]] = alloca %TSo7MethodsV, align {{4|8}}
 // CHECK: [[THIS_PTR2:%.*]] = bitcast %TSo7MethodsV* [[THIS_PTR1]] to %class.Methods*
 // CHECK: [[THIS_PTR3:%.*]] = bitcast %TSo7MethodsV* [[THIS_PTR1]] to %class.Methods*
-// CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZNK7Methods17SimpleConstMethodEi|"\?SimpleConstMethod@Methods@@QEBAHH@Z"}}(%class.Methods* [[THIS_PTR3]], i32{{( signext)?}} 3)
+// CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZNK7Methods17SimpleConstMethodEi|"\?SimpleConstMethod@Methods@@QEBAHH@Z"}}(%class.Methods* [[THIS_PTR3]], i32 {{%?[0-9]+}})
 // CHECK: ret i32 [[RESULT]]
 func basicMethodsConst(a: UnsafeMutablePointer<Methods>) -> Int32 {
   return a.pointee.SimpleConstMethod(3)
@@ -62,7 +62,7 @@ func basicMethodsStatic() -> Int32 {
 // CHECK-LABEL: define hidden swiftcc i32 @"$s6cxx_ir12basicMethods1as5Int32VSpySo8Methods2VG_tF"(i8* %0)
 // CHECK: [[THIS_PTR1:%.*]] = bitcast i8* %0 to %TSo8Methods2V*
 // CHECK: [[THIS_PTR2:%.*]] = bitcast %TSo8Methods2V* [[THIS_PTR1]] to %class.Methods2*
-// CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZN8Methods212SimpleMethodEi|"\?SimpleMethod@Methods2@@QEAAHH@Z"}}(%class.Methods2* [[THIS_PTR2]], i32{{( signext)?}} 4)
+// CHECK: [[RESULT:%.*]] = call {{(signext )?}}i32 @{{_ZN8Methods212SimpleMethodEi|"\?SimpleMethod@Methods2@@QEAAHH@Z"}}(%class.Methods2* [[THIS_PTR2]], i32 {{%?[0-9]+}})
 // CHECK: ret i32 [[RESULT]]
 func basicMethods(a: UnsafeMutablePointer<Methods2>) -> Int32 {
   return a.pointee.SimpleMethod(4)
