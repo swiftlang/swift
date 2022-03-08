@@ -1298,8 +1298,17 @@ public:
   CanGenericSignature getSingleGenericParameterSignature() const;
 
   /// Retrieve a generic signature with a single type parameter conforming
-  /// to the given protocol or composition type, like <T: type>.
-  CanGenericSignature getOpenedArchetypeSignature(Type type);
+  /// to the given protocol or composition type, like <T: P>.
+  ///
+  /// The opened archetype may have a different set of conformances from the
+  /// corresponding existential. The opened archetype conformances are dictated
+  /// by the ABI for generic arguments, while the existential value conformances
+  /// are dictated by their layout (see \c Type::getExistentialLayout()). In
+  /// particular, the opened archetype signature does not have requirements for
+  /// conformances inherited from superclass constraints while existential
+  /// values do.
+  CanGenericSignature getOpenedArchetypeSignature(Type type,
+                                                  GenericSignature parentSig);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);

@@ -1049,6 +1049,10 @@ public:
     GenericEnv = env;
   }
 
+  /// Retrieve the generic signature from the generic environment of this
+  /// function, if any. Else returns the null \c GenericSignature.
+  GenericSignature getGenericSignature() const;
+
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.

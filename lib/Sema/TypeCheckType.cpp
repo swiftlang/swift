@@ -2757,7 +2757,9 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     } else {
       ty = GenericEnvironment::mapTypeIntoContext(
                  resolution.getGenericSignature().getGenericEnvironment(), ty);
-      ty = OpenedArchetypeType::get(ty->getCanonicalType(), attrs.OpenedID);
+      ty = OpenedArchetypeType::get(ty->getCanonicalType(),
+                                    resolution.getGenericSignature(),
+                                    attrs.OpenedID);
     }
     attrs.clearAttribute(TAK_opened);
   }

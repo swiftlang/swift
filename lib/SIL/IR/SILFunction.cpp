@@ -259,6 +259,10 @@ const SILFunction *SILFunction::getOriginOfSpecialization() const {
   return p;
 }
 
+GenericSignature SILFunction::getGenericSignature() const {
+  return GenericEnv ? GenericEnv->getGenericSignature() : GenericSignature();
+}
+
 void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
                                  ValueToNumberMap) const {
   unsigned idx = 0;

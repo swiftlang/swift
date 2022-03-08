@@ -2693,7 +2693,8 @@ public:
   /// property, or the uncurried result type of a method/subscript, e.g.
   /// '() -> () -> Self'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
-      Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
+      Type baseTy, const DeclContext *useDC,
+      bool treatNonResultCovariantSelfAsInvariant) const;
 };
 
 /// This is a common base class for declarations which declare a type.

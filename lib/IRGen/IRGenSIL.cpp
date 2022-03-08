@@ -2812,12 +2812,14 @@ void IRGenSILFunction::visitValueMetatypeInst(swift::ValueMetatypeInst *i) {
   if (instanceTy.getClassOrBoundGenericClass()) {
     e.add(emitDynamicTypeOfHeapObject(*this,
                            getClassBaseValue(*this, i->getOperand()),
-                           metaTy->getRepresentation(), instanceTy));
+                           metaTy->getRepresentation(), instanceTy,
+                           CurSILFn->getGenericSignature()));
   } else if (auto arch = instanceTy.getAs<ArchetypeType>()) {
     if (arch->requiresClass()) {
       e.add(emitDynamicTypeOfHeapObject(*this,
                              getClassBaseValue(*this, i->getOperand()),
-                             metaTy->getRepresentation(), instanceTy));
+                             metaTy->getRepresentation(), instanceTy,
+                             CurSILFn->getGenericSignature()));
     } else {
       Address base = getLoweredAddress(i->getOperand());
       e.add(emitDynamicTypeOfOpaqueArchetype(*this, base,
@@ -2850,7 +2852,8 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   case ExistentialRepresentation::Class: {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfClassExistential(*this, existential, i->getType(),
-                                   opType, result);
+                                   opType, CurSILFn->getGenericSignature(),
+                                   result);
     break;
   }
   case ExistentialRepresentation::Boxed: {
@@ -4731,8 +4734,10 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
   llvm::Value *value = base.claimNext();
 
   SILType baseTy = i->getOperand()->getType();
+  auto fnSig = CurSILFn->getGenericSignature();
   Address field = projectPhysicalClassMemberAddress(*this, value, baseTy,
-                                                    i->getType(), i->getField())
+                                                    i->getType(), i->getField(),
+                                                    fnSig)
                       .getAddress();
   setLoweredAddress(i, field);
 }
@@ -4742,7 +4747,8 @@ void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
   llvm::Value *RefValue = getLoweredExplosion(Ref).claimNext();
 
   Address TailAddr = emitTailProjection(*this, RefValue, Ref->getType(),
-                                            i->getTailType());
+                                        i->getTailType(),
+                                        CurSILFn->getGenericSignature());
   setLoweredAddress(i, TailAddr);
 }
 
@@ -5545,7 +5551,8 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
     return;
   }
   auto classType = i->getOperand()->getType();
-  emitClassDeallocation(*this, classType, selfValue);
+  emitClassDeallocation(*this, classType, selfValue,
+                        CurSILFn->getGenericSignature());
 }
 
 void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *i) {
@@ -5555,7 +5562,8 @@ void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *
   auto metadataValue = metadata.claimNext();
   auto classType = i->getInstance()->getType();
 
-  emitPartialClassDeallocation(*this, classType, selfValue, metadataValue);
+  emitPartialClassDeallocation(*this, classType, selfValue, metadataValue,
+                               CurSILFn->getGenericSignature());
 }
 
 void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
@@ -6169,7 +6177,9 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                         i->getSourceFormalType(),
                         i->getTargetLoweredType(),
                         i->getTargetFormalType(),
-                        CheckedCastMode::Unconditional, ex);
+                        CheckedCastMode::Unconditional,
+                        CurSILFn->getGenericSignature(),
+                        ex);
   setLoweredExplosion(i, ex);
 }
 
@@ -6379,7 +6389,8 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
     Explosion source = getLoweredExplosion(operand);
     castResult = emitClassIdenticalCast(*this, source.claimNext(),
                                         i->getSourceLoweredType(),
-                                        i->getTargetLoweredType());
+                                        i->getTargetLoweredType(),
+                                        CurSILFn->getGenericSignature());
   } else {
     Explosion value = getLoweredExplosion(i->getOperand());
     emitScalarCheckedCast(*this, value,
@@ -6387,7 +6398,9 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
                           i->getSourceFormalType(),
                           i->getTargetLoweredType(),
                           i->getTargetFormalType(),
-                          CheckedCastMode::Conditional, ex);
+                          CheckedCastMode::Conditional,
+                          CurSILFn->getGenericSignature(),
+                          ex);
     auto val = ex.claimNext();
     castResult.casted = val;
     llvm::Value *nil =
@@ -6671,7 +6684,8 @@ void IRGenSILFunction::visitOpenExistentialAddrInst(OpenExistentialAddrInst *i) 
   // Insert a copy of the boxed value for COW semantics if necessary.
   auto accessKind = i->getAccessKind();
   Address object = emitOpaqueBoxedExistentialProjection(
-      *this, accessKind, base, baseTy, openedArchetype);
+      *this, accessKind, base, baseTy, openedArchetype,
+      CurSILFn->getGenericSignature());
 
   setLoweredAddress(i, object);
 }
@@ -6685,7 +6699,8 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
   Explosion result;
   llvm::Value *instance
     = emitClassExistentialProjection(*this, base, baseTy,
-                                     openedArchetype);
+                                     openedArchetype,
+                                     CurSILFn->getGenericSignature());
   result.add(instance);
   setLoweredExplosion(i, result);
 }
@@ -6754,7 +6769,8 @@ void IRGenSILFunction::visitAllocExistentialBoxInst(AllocExistentialBoxInst *i){
   OwnedAddress boxWithAddr =
     emitBoxedExistentialContainerAllocation(*this, i->getExistentialType(),
                                             i->getFormalConcreteType(),
-                                            i->getConformances());
+                                            i->getConformances(),
+                                            CurSILFn->getGenericSignature());
   setLoweredBox(i, boxWithAddr);
 }
 
@@ -7014,6 +7030,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
 
   auto fn =
       emitVirtualMethodValue(*this, baseValue, baseType, method, methodType,
+                             CurSILFn->getGenericSignature(),
                              /*useSuperVTable*/ true);
 
   setLoweredFunctionPointer(i, fn);
@@ -7076,6 +7093,7 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   // FIXME: better explosion kind, map as static.
   FunctionPointer fn = emitVirtualMethodValue(
       *this, baseValue, i->getOperand()->getType(), method, methodType,
+      CurSILFn->getGenericSignature(),
       /*useSuperVTable*/ false);
 
   setLoweredFunctionPointer(i, fn);
