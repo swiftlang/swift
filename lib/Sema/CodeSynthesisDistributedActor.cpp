@@ -21,6 +21,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/Basic/Defer.h"
@@ -29,6 +30,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "DerivedConformances.h"
+
 using namespace swift;
 
 
@@ -553,6 +555,75 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 }
 
 /******************************************************************************/
+/*********************** CODABLE CONFORMANCE **********************************/
+/******************************************************************************/
+
+static NormalProtocolConformance*
+addDistributedActorCodableConformance(
+    ClassDecl *actor, ProtocolDecl *proto) {
+  assert(proto->isSpecificProtocol(swift::KnownProtocolKind::Decodable) ||
+         proto->isSpecificProtocol(swift::KnownProtocolKind::Encodable));
+  auto &C = actor->getASTContext();
+  auto DC = actor->getDeclContext();
+  auto module = actor->getParentModule();
+
+  // === Only Distributed actors can gain this implicit conformance
+  if (!actor->isDistributedActor()) {
+    return nullptr;
+  }
+
+  // === Does the actor explicitly conform to the protocol already?
+  auto explicitConformance =
+      module->lookupConformance(actor->getInterfaceType(), proto);
+  if (!explicitConformance.isInvalid()) {
+    // ok, it was conformed explicitly -- let's not synthesize;
+    return nullptr;
+  }
+
+  // Check whether we can infer conformance at all.
+  if (auto *file = dyn_cast<FileUnit>(actor->getModuleScopeContext())) {
+    switch (file->getKind()) {
+    case FileUnitKind::Source:
+      // Check what kind of source file we have.
+      if (auto sourceFile = actor->getParentSourceFile()) {
+        switch (sourceFile->Kind) {
+        case SourceFileKind::Interface:
+          return nullptr;
+
+        case SourceFileKind::Library:
+        case SourceFileKind::Main:
+        case SourceFileKind::SIL:
+          break;
+        }
+      }
+      break;
+
+    case FileUnitKind::Builtin:
+    case FileUnitKind::SerializedAST:
+    case FileUnitKind::Synthesized:
+      // Explicitly-handled modules don't infer Sendable conformances.
+      return nullptr;
+
+    case FileUnitKind::ClangModule:
+    case FileUnitKind::DWARFModule:
+      // Infer conformances for imported modules.
+      break;
+    }
+  } else {
+    return nullptr;
+  }
+
+  auto conformance = C.getConformance(actor->getDeclaredInterfaceType(), proto,
+                                      actor->getLoc(), /*dc=*/actor,
+                                      ProtocolConformanceState::Incomplete,
+                                      /*isUnchecked=*/false);
+  conformance->setSourceKindAndImplyingConformance(
+      ConformanceEntryKind::Synthesized, nullptr);
+  actor->registerProtocolConformance(conformance, /*synthesized=*/true);
+  return conformance;
+}
+
+/******************************************************************************/
 /*********************** SYNTHESIS ENTRY POINTS *******************************/
 /******************************************************************************/
 
@@ -621,7 +692,6 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   auto module = nominal->getParentModule();
 
   auto DAS = C.getDistributedActorSystemDecl();
-  auto f = DAS->lookupDirect(C.Id_makeInvocationEncoder);
 
   // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
   // we won't be emitting the offending decl after all.
@@ -661,4 +731,29 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   }
 
   return nullptr;
+}
+
+NormalProtocolConformance
+*GetDistributedActorImplicitCodableRequest::evaluate(
+    Evaluator &evaluator,
+    NominalTypeDecl *nominal,
+    KnownProtocolKind protoKind) const {
+  assert(nominal->isDistributedActor());
+  assert(protoKind == KnownProtocolKind::Encodable ||
+         protoKind == KnownProtocolKind::Decodable);
+  auto &C = nominal->getASTContext();
+
+  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+  // we won't be emitting the offending decl after all.
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return nullptr;
+
+  auto classDecl = dyn_cast<ClassDecl>(nominal);
+  if (!classDecl) {
+    // we only synthesize the conformance for concrete actors
+    return nullptr;
+  }
+
+  return addDistributedActorCodableConformance(classDecl,
+                                               C.getProtocol(protoKind));
 }

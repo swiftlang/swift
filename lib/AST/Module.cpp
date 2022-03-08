@@ -1046,8 +1046,20 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 }
 
 /// Whether we should create missing conformances to the given protocol.
-static bool shouldCreateMissingConformances(ProtocolDecl *proto) {
-  return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
+static bool shouldCreateMissingConformances(Type type, ProtocolDecl *proto) {
+  // Sendable may be able to be synthesized.
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    return true;
+  }
+
+  // A 'distributed actor' may have to create missing Codable conformances.
+  if (auto nominal = dyn_cast_or_null<ClassDecl>(type->getAnyNominal())) {
+    return nominal->isDistributedActor() &&
+           (proto->isSpecificProtocol(swift::KnownProtocolKind::Decodable) ||
+            proto->isSpecificProtocol(swift::KnownProtocolKind::Encodable));
+  }
+
+  return false;
 }
 
 ProtocolConformanceRef ProtocolConformanceRef::forMissingOrInvalid(
@@ -1055,7 +1067,7 @@ ProtocolConformanceRef ProtocolConformanceRef::forMissingOrInvalid(
   // Introduce "missing" conformances when appropriate, so that type checking
   // (and even code generation) can continue.
   ASTContext &ctx = proto->getASTContext();
-  if (shouldCreateMissingConformances(proto)) {
+  if (shouldCreateMissingConformances(type, proto)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(
           type, proto, GenericSignature(), { },
@@ -1087,7 +1099,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   // If we aren't supposed to allow missing conformances through for this
   // protocol, replace the result with an "invalid" result.
   if (!allowMissing &&
-      shouldCreateMissingConformances(protocol) &&
+      shouldCreateMissingConformances(type, protocol) &&
       result.hasMissingConformance(this))
     return ProtocolConformanceRef::forInvalid();
 
@@ -1307,18 +1319,40 @@ LookupConformanceInModuleRequest::evaluate(
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominal->lookupConformance(protocol, conformances)) {
-    if (!protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
-      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      // Try to infer Sendable conformance.
+      GetImplicitSendableRequest cvRequest{nominal};
+      if (auto conformance = evaluateOrDefault(
+              ctx.evaluator, cvRequest, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Encodable) ||
+               protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
+      if (nominal->isDistributedActor()) {
+        auto protoKind =
+            protocol->isSpecificProtocol(KnownProtocolKind::Encodable)
+                ? KnownProtocolKind::Encodable
+                : KnownProtocolKind::Decodable;
+        auto request = GetDistributedActorImplicitCodableRequest{
+          nominal, protoKind};
 
-    // Try to infer Sendable conformance.
-    GetImplicitSendableRequest cvRequest{nominal};
-    if (auto conformance = evaluateOrDefault(
-            ctx.evaluator, cvRequest, nullptr)) {
-      conformances.clear();
-      conformances.push_back(conformance);
-    } else {
-      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+        if (auto conformance =
+                evaluateOrDefault(ctx.evaluator, request, nullptr)) {
+          conformances.clear();
+          conformances.push_back(conformance);
+        } else {
+          return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+        }
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
     }
+
+    // Was unable to infer the missing conformance.
+    return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
   }
 
   assert(!conformances.empty());
