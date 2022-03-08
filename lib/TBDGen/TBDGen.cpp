@@ -848,6 +848,11 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   visitAbstractStorageDecl(VD);
 }
 
+void TBDGenVisitor::visitSubscriptDecl(SubscriptDecl *SD) {
+  visitDefaultArguments(SD, SD->getIndices());
+  visitAbstractStorageDecl(SD);
+}
+
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
