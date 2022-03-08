@@ -164,8 +164,8 @@ static llvm::AttributeList getValueWitnessAttrs(IRGenModule &IGM,
   auto &ctx = IGM.getLLVMContext();
 
   // All value witnesses are nounwind.
-  auto attrs =
-      llvm::AttributeList().addFnAttribute(ctx, llvm::Attribute::NoUnwind);
+  auto attrs = llvm::AttributeList::get(ctx, llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
 
   switch (index) {
   // These have two arguments, but they can alias.
@@ -178,19 +178,21 @@ static llvm::AttributeList getValueWitnessAttrs(IRGenModule &IGM,
   case ValueWitness::DestructiveProjectEnumData:
   case ValueWitness::GetEnumTag:
   case ValueWitness::StoreEnumTagSinglePayload:
-    return attrs.addParamAttribute(ctx, 0, llvm::Attribute::NoAlias);
+    return attrs.addAttribute(ctx, 1, llvm::Attribute::NoAlias);
 
   case ValueWitness::GetEnumTagSinglePayload:
-    return attrs.addFnAttribute(ctx, llvm::Attribute::ReadOnly)
-        .addParamAttribute(ctx, 0, llvm::Attribute::NoAlias);
+    return attrs
+        .addAttribute(ctx, llvm::AttributeList::FunctionIndex,
+                      llvm::Attribute::ReadOnly)
+        .addAttribute(ctx, 1, llvm::Attribute::NoAlias);
 
   // These have two arguments and they don't alias each other.
   case ValueWitness::AssignWithTake:
   case ValueWitness::InitializeBufferWithCopyOfBuffer:
   case ValueWitness::InitializeWithCopy:
   case ValueWitness::InitializeWithTake:
-    return attrs.addParamAttribute(ctx, 0, llvm::Attribute::NoAlias)
-        .addParamAttribute(ctx, 1, llvm::Attribute::NoAlias);
+    return attrs.addAttribute(ctx, 1, llvm::Attribute::NoAlias)
+                .addAttribute(ctx, 2, llvm::Attribute::NoAlias);
 
   case ValueWitness::Size:
   case ValueWitness::Flags:

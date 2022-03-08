@@ -188,22 +188,22 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   case Getter:
     // Original accessor's args should be @in or @out, meaning they won't be
     // captured or aliased.
-    accessorThunk->addParamAttr(0, llvm::Attribute::NoCapture);
-    accessorThunk->addParamAttr(0, llvm::Attribute::NoAlias);
-    accessorThunk->addParamAttr(1, llvm::Attribute::NoCapture);
-    accessorThunk->addParamAttr(1, llvm::Attribute::NoAlias);
+    accessorThunk->addAttribute(1, llvm::Attribute::NoCapture);
+    accessorThunk->addAttribute(1, llvm::Attribute::NoAlias);
+    accessorThunk->addAttribute(2, llvm::Attribute::NoCapture);
+    accessorThunk->addAttribute(2, llvm::Attribute::NoAlias);
     // Output is sret.
-    accessorThunk->addParamAttr(
-        0, llvm::Attribute::getWithStructRetType(
+    accessorThunk->addAttribute(
+        1, llvm::Attribute::getWithStructRetType(
                IGM.getLLVMContext(), thunkParams[0]->getPointerElementType()));
     break;
   case Setter:
     // Original accessor's args should be @in or @out, meaning they won't be
     // captured or aliased.
-    accessorThunk->addParamAttr(0, llvm::Attribute::NoCapture);
-    accessorThunk->addParamAttr(0, llvm::Attribute::NoAlias);
-    accessorThunk->addParamAttr(1, llvm::Attribute::NoCapture);
-    accessorThunk->addParamAttr(1, llvm::Attribute::NoAlias);
+    accessorThunk->addAttribute(1, llvm::Attribute::NoCapture);
+    accessorThunk->addAttribute(1, llvm::Attribute::NoAlias);
+    accessorThunk->addAttribute(2, llvm::Attribute::NoCapture);
+    accessorThunk->addAttribute(2, llvm::Attribute::NoAlias);
     break;
   case Equals:
   case Hash:

@@ -42,6 +42,9 @@
 // Remote test execution does not support dynamically loaded libraries.
 // UNSUPPORTED: remote_run
 
+// Requires rdar://85970023 which is only fixed in the 20211026 branch of LLVM.
+// UNSUPPORTED: CPU=arm64e
+
 #if LIBRARY
 
 public class MyClass {

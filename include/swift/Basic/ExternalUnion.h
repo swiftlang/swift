@@ -24,9 +24,8 @@
 
 #include "llvm/Support/ErrorHandling.h"
 #include "swift/Basic/type_traits.h"
-#include <cassert>
-#include <cstdint>
 #include <utility>
+#include <assert.h>
 
 namespace swift {
 

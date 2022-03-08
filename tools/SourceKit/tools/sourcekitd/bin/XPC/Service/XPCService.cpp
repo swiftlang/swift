@@ -343,11 +343,11 @@ static void sourcekitdServer_event_handler(xpc_connection_t peer) {
   });
 }
 
-static void fatal_error_handler(void *user_data, const char *reason,
+static void fatal_error_handler(void *user_data, const std::string& reason,
                                 bool gen_crash_diag) {
   // Write the result out to stderr avoiding errs() because raw_ostreams can
   // call report_fatal_error.
-  fprintf(stderr, "SOURCEKITD SERVER FATAL ERROR: %s\n", reason);
+  fprintf(stderr, "SOURCEKITD SERVER FATAL ERROR: %s\n", reason.c_str());
   if (gen_crash_diag)
     ::abort();
 }

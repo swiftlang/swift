@@ -505,7 +505,9 @@ void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
 
   StringRef Str = Name.getIdentifier().str();
   if (Str.startswith(C.TypeCheckerOpts.DebugForbidTypecheckPrefix)) {
-    llvm::report_fatal_error(Twine("forbidden typecheck occurred: ") + Str);
+    std::string Msg = "forbidden typecheck occurred: ";
+    Msg += Str;
+    llvm::report_fatal_error(Msg);
   }
 }
 
