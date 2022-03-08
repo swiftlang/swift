@@ -17,18 +17,20 @@
 
 namespace swift {
 
-/// Track a value's storage. Stages in the storage life-cycle:
+/// Track an opaque value's storage. An opaque value is a SILValue with
+/// address-only type. Stages in the storage life-cycle:
 ///
 /// 1. Unallocated
 ///
-/// 2. Allocated. Either (a) 'storageAddress' is an alloc_stack, or (b)
-/// 'projectedStorageID' refers to a different ValueStorage, which recursively
-/// leads to a valid 'storageAddress'.
+/// 2. Allocated. Either (a) it is a root value where 'storageAddress' is an
+/// alloc_stack, or (b) it is a projection where 'projectedStorageID' refers to
+/// the parent ValueStorage, which recursively leads to a root value with a
+/// valid 'storageAddress'.
 ///
 /// 3. Materialized. 'storageAddress' is valid. Address projections have been
 /// emitted at the point that this value is defined.
 ///
-/// 4. Rewritten. The definition of this address-only value is fully translated
+/// 4. Rewritten. The definition of this opaque value is fully translated
 /// into lowered SIL. Instructions are typically materialized and rewritten at
 /// the same time. A indirect result, however, is materialized as soon as its
 /// alloc_stack is emitted, but only rewritten once the call itself is
@@ -45,19 +47,23 @@ namespace swift {
 ///
 ///   %struct_addr = alloc_stack      // storage for %struct
 ///   %result = apply : $() -> @out T // use-projection of %struct at operand #0
-///   %struct = struct %result
+///   %struct = struct (%result)
 ///
 /// A phi-projection is a use projection that projects its entire value
 /// through a phi rather than into a composing use. It has an invalid
-/// 'projectedOperandNum'.
+/// 'projectedOperandNum':
 ///
-/// Operations that destructively resuse storage (open_existential_value,
+///     %result = apply : $() -> @out T // use-projection of %phi
+///     br bb1(%result)
+///   bb1(%phi : @owned $T)
+///
+/// Operations that destructively reuse storage (open_existential_value,
 /// unchecked_enum_data, and switch_enum), are not considered storage
 /// projections. Instead, these values have no ValueStorage but are rewritten to
 /// directly reuse their operand's storage.
 ///
 /// To materialize projections, address lowering follows the original def-use
-/// edges for address-only values. Consequently, values that have storage cannot
+/// edges for opaque values. Consequently, values that have storage cannot
 /// be removed from SIL or from the storage map until rewriting is
 /// complete. Mapped values can, however, be substituted on-the-fly by emitting
 /// a place-holder value and updating the map entry. This works because the
@@ -76,11 +82,11 @@ struct ValueStorage {
   /// When either isDefProjection or isUseProjection is set, this refers to the
   /// storage whose "def" this value projects out of or whose operand this
   /// storage projects into via its "use.
-  uint32_t projectedStorageID;
+  uint32_t projectedStorageID = InvalidID;
 
   /// For use-projections, identifies the operand index of the composing use.
   /// Only valid for non-phi use projections.
-  uint16_t projectedOperandNum;
+  uint16_t projectedOperandNum = InvalidOper;
 
   /// Projection out of a storage def. e.g. this value is a destructure.
   unsigned isDefProjection : 1;
@@ -96,16 +102,17 @@ struct ValueStorage {
   // across phis, which would result in piecewise initialization.
   unsigned initializesEnum : 1;
 
-  ValueStorage() { clear(); }
-
-  void clear() {
-    storageAddress = SILValue();
-    projectedStorageID = InvalidID;
-    projectedOperandNum = InvalidOper;
-    isUseProjection = false;
+  ValueStorage(SILValue storageAddress): storageAddress(storageAddress) {
     isDefProjection = false;
+    isUseProjection = false;
     isRewritten = false;
     initializesEnum = false;
+
+    // The initial storage address is only valid when the value is effectively
+    // already rewritten.
+    if (storageAddress) {
+      isRewritten = true;
+    }
   }
 
   bool isAllocated() const {
@@ -251,10 +258,10 @@ public:
 
   /// Insert a value in the map, creating a ValueStorage object for it. This
   /// must be called in RPO order.
-  ValueStorage &insertValue(SILValue value);
+  void insertValue(SILValue value, SILValue storageAddress);
 
   /// Replace a value that is mapped to storage with another value. This allows
-  /// limited rewritting of original address-only values. For example, block
+  /// limited rewriting of original opaque values. For example, block
   /// arguments can be replaced with fake loads in order to rewrite their
   /// corresponding terminator.
   void replaceValue(SILValue oldValue, SILValue newValue);
