@@ -7,6 +7,9 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
+// Temporarily disable for asan (rdar://89808212)
+// UNSUPPORTED: asan
+
 import def_objc_async
 import Foundation
 
