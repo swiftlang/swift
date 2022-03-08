@@ -14,21 +14,23 @@
 /// memory locations such as a stack locations. This is mandatory for IRGen.
 ///
 /// Lowering to LLVM IR requires each SILValue's type to be a valid "SIL storage
-/// type". Opaque SILValues have address-only types. Address-only values require
-/// indirect storage in LLVM, so their SIL storage type must be an address type.
+/// type". Opaque SILValues have address-only types. These require indirect
+/// storage in LLVM, so their SIL storage type must be an address type.
 ///
-/// This pass should not introduce any semantic copies. Guaranteed values always
-/// reuse the borrowed value's storage. This means that we SIL cannot allow
-/// guaranteed opaque uses unless they are projections of the definition. In
-/// particular, borrowed structs, tuples, and enums of address-only types are
-/// not allowed.
+/// This pass never creates copies except to replace explicit value copies
+/// (copy_value, load [copy], store). For move-only values, this allows complete
+/// diagnostics. And in general, it makes it impossible for SIL passes to
+/// "accidentally" create copies.
 ///
-/// When owned values are consumed by phis, multiple storage locations are
-/// required to avoid interfering with other phi operands. However, the value
-/// never needs to be live in multiple storage locations a once. When the value
-/// is consumed by a phi, either it's own storage is coalesced with the phi
-/// storage (they have the same address), or the value is bitwise moved into the
-/// phi's storage.
+/// This pass inserts moves (copy_addr [take] [initialize]) of owned values to
+/// - compose aggregates
+/// - resolve phi interference
+///
+/// For guarantee values, this pass inserts neither copies nor moves. Opaque
+/// values are potentially unmovable when borrowed. This means that guaranteed
+/// address-only aggregates and phis are prohibited. This SIL invariant is
+/// enforced by SILVerifier::checkOwnershipForwardingInst() and
+/// SILVerifier::visitSILPhiArgument().
 ///
 /// ## Step #1: Map opaque values
 ///
@@ -58,7 +60,8 @@
 /// during rewriting.
 ///
 /// After allocating storage for all non-phi opaque values, phi storage is
-/// allocated. This is handled by a PhiStorageOptimizer that checks for
+/// allocated. (Phi values are block arguments in which phi's arguments are
+/// branch operands). This is handled by a PhiStorageOptimizer that checks for
 /// interference among the phi operands and reuses storage allocated to other
 /// values.
 ///
@@ -169,7 +172,7 @@ cleanupAfterCall(FullApplySite apply,
 // Calls are currently SILValues, but when the result type is a tuple, the call
 // value does not represent a real value with storage. This is a bad situation
 // for address lowering because there's no way to tell from any given value
-// whether its legal to assign storage to that value. As a result, the
+// whether it's legal to assign storage to that value. As a result, the
 // implementation of call lowering doesn't fall out naturally from the algorithm
 // that lowers values to storage.
 //===----------------------------------------------------------------------===//
@@ -218,7 +221,7 @@ visitCallResults(FullApplySite apply,
 
 /// Return true if the given value is either a "fake" tuple that represents all
 /// of a call's results or an empty tuple of no results. This may return true
-/// for either tuple_inst or a block argument.
+/// for either an apply instruction or a block argument.
 static bool isPseudoCallResult(SILValue value) {
   if (auto *apply = dyn_cast<ApplyInst>(value))
     return ApplySite(apply).getSubstCalleeConv().getNumDirectSILResults() > 1;
@@ -255,7 +258,7 @@ static bool isPseudoReturnValue(SILValue value) {
 /// the tuple is a pseudo-return value, return the indirect function argument
 /// for the corresponding result after lowering.
 ///
-///   bb0(%loweredIndirectResult : $*T, ...)
+///   bb0(..., %loweredIndirectResult : $*T, ...)
 ///     ....
 ///     %tuple = tuple(..., %operand, ...)
 ///     return %tuple
@@ -268,16 +271,12 @@ static bool isPseudoReturnValue(SILValue value) {
 ///               (see insertIndirectReturnArgs()).
 static SILValue getTupleStorageValue(Operand *operand) {
   auto *tuple = cast<TupleInst>(operand->getUser());
-  Operand *singleUse = tuple->getSingleUse();
-  if (!singleUse || !isa<ReturnInst>(singleUse->getUser()))
-    return tuple;
-
-  SILFunction *function = tuple->getFunction();
-  if (function->getConventions().getNumDirectSILResults() < 2)
+  if (!isPseudoReturnValue(tuple))
     return tuple;
 
   unsigned resultIdx = tuple->getElementIndex(operand);
 
+  auto *function = tuple->getFunction();
   auto loweredFnConv = getLoweredFnConv(function);
   assert(loweredFnConv.getResults().size() == tuple->getElements().size());
 
@@ -286,14 +285,14 @@ static SILValue getTupleStorageValue(Operand *operand) {
     if (loweredFnConv.isSILIndirect(result))
       ++indirectResultIdx;
   }
-  // Cannot call F->getIndirectSILResults here because that API uses the
+  // Cannot call function->getIndirectSILResults here because that API uses the
   // function conventions before address lowering.
   return function->getArguments()[indirectResultIdx];
 }
 
 /// Return the value representing storage for a single return value.
 ///
-///   bb0(%loweredIndirectResult : $*T, ...) // function entry
+///   bb0(..., %loweredIndirectResult : $*T, ...) // function entry
 ///     return %oper
 ///
 ///   For %oper, return %loweredIndirectResult
@@ -301,9 +300,7 @@ static SILValue getSingleReturnAddress(Operand *operand) {
   assert(!isPseudoReturnValue(operand->get()));
 
   auto *function = operand->getParentFunction();
-  auto loweredFnConv = getLoweredFnConv(function);
-  assert(loweredFnConv.getNumIndirectSILResults() == 1);
-  (void)loweredFnConv;
+  assert(getLoweredFnConv(function).getNumIndirectSILResults() == 1);
 
   // Cannot call getIndirectSILResults here because that API uses the
   // function conventions before address lowering.
@@ -331,7 +328,7 @@ static bool isStoreCopy(SILValue value) {
   return isa<StoreInst>(user) || isa<AssignInst>(user);
 }
 
-ValueStorage &ValueStorageMap::insertValue(SILValue value) {
+void ValueStorageMap::insertValue(SILValue value, SILValue storageAddress) {
   assert(!stableStorage && "cannot grow stable storage map");
 
   auto hashResult =
@@ -339,9 +336,7 @@ ValueStorage &ValueStorageMap::insertValue(SILValue value) {
   (void)hashResult;
   assert(hashResult.second && "SILValue already mapped");
 
-  valueVector.emplace_back(value, ValueStorage());
-
-  return valueVector.back().storage;
+  valueVector.emplace_back(value, ValueStorage(storageAddress));
 }
 
 void ValueStorageMap::replaceValue(SILValue oldValue, SILValue newValue) {
@@ -409,7 +404,7 @@ struct AddressLoweringState {
   SmallBlotSetVector<FullApplySite, 16> indirectApplies;
 
   // All function-exiting terminators (return or throw instructions).
-  SmallVector<SILInstruction *, 8> exitingInsts;
+  SmallVector<TermInst *, 8> exitingInsts;
 
   // Copies from a phi's operand storage to the phi storage. These logically
   // occur on the CFG edge. Keep track of them to resolve anti-dependencies.
@@ -462,7 +457,7 @@ protected:
 /// Before populating the ValueStorageMap, replace each value-typed argument to
 /// the current function with an address-typed argument by inserting a temporary
 /// load instruction.
-static void convertIndirectFunctionArgs(AddressLoweringState &pass) {
+static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
   // Insert temporary argument loads at the top of the function.
   SILBuilder argBuilder =
       pass.getBuilder(pass.function->getEntryBlock()->begin());
@@ -490,9 +485,7 @@ static void convertIndirectFunctionArgs(AddressLoweringState &pass) {
       // Indirect calling convention may be used for loadable types. In that
       // case, generating the argument loads is sufficient.
       if (addrType.isAddressOnly(*pass.function)) {
-        auto &storage = pass.valueStorageMap.insertValue(loadArg);
-        storage.storageAddress = arg;
-        storage.isRewritten = true;
+        pass.valueStorageMap.insertValue(loadArg, arg);
       }
     }
     ++argIdx;
@@ -520,10 +513,9 @@ static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
             argIdx, bodyResultTy.getAddressType(), OwnershipKind::None, var);
     // Insert function results into valueStorageMap so that the caller storage
     // can be projected onto values inside the function as use projections.
-    auto &storage = pass.valueStorageMap.insertValue(funcArg);
+    //
     // This is the only case where a value defines its own storage.
-    storage.storageAddress = funcArg;
-    storage.isRewritten = true;
+    pass.valueStorageMap.insertValue(funcArg, funcArg);
 
     ++argIdx;
   }
@@ -621,10 +613,11 @@ void OpaqueValueVisitor::visitValue(SILValue value) {
         pass.valueStorageMap.getStorage(value).storageAddress));
     return;
   }
-  pass.valueStorageMap.insertValue(value);
+  pass.valueStorageMap.insertValue(value, SILValue());
 }
 
-// Canonicalize returned values.
+// Canonicalize returned values. For multiple direct results, the operand of the
+// return instruction must be a tuple with no other uses.
 //
 // Given $() -> @out (T, T):
 //   %t = def  : $(T, T)
@@ -688,7 +681,7 @@ void OpaqueValueVisitor::canonicalizeReturnValues() {
 /// function.
 static void prepareValueStorage(AddressLoweringState &pass) {
   // Fixup this function's argument types with temporary loads.
-  convertIndirectFunctionArgs(pass);
+  convertDirectToIndirectFunctionArgs(pass);
 
   // Create a new function argument for each indirect result.
   insertIndirectReturnArgs(pass);
@@ -2012,7 +2005,7 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
 
 // Replace \p tryApply with a new try_apply using \p newCallArgs.
 //
-// If the old result was a single address-only value, then create and return a
+// If the old result was a single opaque value, then create and return a
 // fake load that takes its place in the storage map. Otherwise, return an
 // invalid SILValue.
 //
@@ -3056,8 +3049,8 @@ static void removeOpaquePhis(SILBasicBlock *bb, AddressLoweringState &pass) {
   }
 }
 
-// Instructions that use an address-only value without producing one are already
-// deleted. The rest of the address-only definitions are now removed bottom-up
+// Instructions that use an opaque value without producing one are already
+// deleted. The rest of the opaque definitions are now removed bottom-up
 // by visiting valuestorageMap.
 //
 // Phis are removed here after all other instructions.
@@ -3145,12 +3138,12 @@ void AddressLowering::runOnFunction(SILFunction *function) {
   // ## Step #1: Map opaque values
   //
   // First, rewrite this function's arguments and return values, then populate
-  // pass.valueStorageMap with an entry for each address-only value.
+  // pass.valueStorageMap with an entry for each opaque value.
   prepareValueStorage(pass);
 
   // ## Step #2: Allocate storage
   //
-  // For each address-only value mapped in step #1, either create an
+  // For each opaque value mapped in step #1, either create an
   // alloc_stack/dealloc_stack pair, or mark its ValueStorage entry as a
   // def-projection out of its operand's def or a use projection into its
   // composing use or into a phi (branch operand).
@@ -3162,7 +3155,7 @@ void AddressLowering::runOnFunction(SILFunction *function) {
 
   // ## Step #3. Rewrite opaque values
   //
-  // Rewrite all instructions that either define or use an address-only value.
+  // Rewrite all instructions that either define or use an opaque value.
   // Creates new '_addr' variants of instructions, obtaining the storage
   // address from the 'valueStorageMap'. This materializes projections in
   // forward order, setting 'storageAddress' for each projection as it goes.
