@@ -231,6 +231,14 @@ public:
   EnumDecl *getEnumOrBoundGenericEnum() const {
     return getASTType().getEnumOrBoundGenericEnum();
   }
+  
+  /// Returns true if this type is an enum or contains an enum.
+  bool isOrHasEnum() const {
+    return getASTType().findIf([](Type ty) {
+      return ty->getEnumOrBoundGenericEnum() != nullptr;
+    });
+  }
+
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
