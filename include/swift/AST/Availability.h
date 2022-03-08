@@ -220,6 +220,10 @@ public:
   /// deployment target.
   static AvailabilityContext forDeploymentTarget(ASTContext &Ctx);
 
+  /// Creates a context that imposes the constraints of the ASTContext's
+  /// inlining target (i.e. minimum inlining version).
+  static AvailabilityContext forInliningTarget(ASTContext &Ctx);
+
   /// Creates a context that imposes no constraints.
   ///
   /// \see isAlwaysAvailable
