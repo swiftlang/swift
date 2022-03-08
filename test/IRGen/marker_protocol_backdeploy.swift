@@ -9,6 +9,9 @@
 // REQUIRES: PTRSIZE=64
 // REQUIRES: OS=macosx
 
+// Temporarily disable on arm (rdar://89910199)
+// UNSUPPORTED: CPU=arm64, CPU=arm64e
+
 @_marker public protocol P { }
 public protocol Q: P { }
 protocol R { }
