@@ -4115,12 +4115,17 @@ class ExistentialTypeVisitor
   ASTContext &Ctx;
   bool checkStatements;
   bool hitTopStmt;
+
+  unsigned exprCount = 0;
+  llvm::SmallVector<TypeRepr *, 4> reprStack;
     
 public:
   ExistentialTypeVisitor(ASTContext &ctx, bool checkStatements)
     : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) { }
 
   bool walkToTypeReprPre(TypeRepr *T) override {
+    reprStack.push_back(T);
+
     if (T->isInvalid())
       return false;
     if (auto compound = dyn_cast<CompoundIdentTypeRepr>(T)) {
@@ -4141,6 +4146,11 @@ public:
     return true;
   }
 
+  bool walkToTypeReprPost(TypeRepr *T) override {
+    reprStack.pop_back();
+    return true;
+  }
+
   std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
     if (checkStatements && !hitTopStmt) {
       hitTopStmt = true;
@@ -4154,13 +4164,86 @@ public:
     return !checkStatements;
   }
 
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    ++exprCount;
+    return {true, E};
+  }
+
+  Expr * walkToExprPost(Expr *E) override {
+    --exprCount;
+    return E;
+  }
+
   void visitTypeRepr(TypeRepr *T) {
     // Do nothing for all TypeReprs except the ones listed below.
+  }
+
+  bool existentialNeedsParens(TypeRepr *parent) {
+    switch (parent->getKind()) {
+    case TypeReprKind::Optional:
+    case TypeReprKind::Protocol:
+      return true;
+    case TypeReprKind::Metatype:
+    case TypeReprKind::Attributed:
+    case TypeReprKind::Error:
+    case TypeReprKind::Function:
+    case TypeReprKind::InOut:
+    case TypeReprKind::Composition:
+    case TypeReprKind::OpaqueReturn:
+    case TypeReprKind::NamedOpaqueReturn:
+    case TypeReprKind::Existential:
+    case TypeReprKind::SimpleIdent:
+    case TypeReprKind::GenericIdent:
+    case TypeReprKind::CompoundIdent:
+    case TypeReprKind::Dictionary:
+    case TypeReprKind::ImplicitlyUnwrappedOptional:
+    case TypeReprKind::Tuple:
+    case TypeReprKind::Fixed:
+    case TypeReprKind::Array:
+    case TypeReprKind::SILBox:
+    case TypeReprKind::Shared:
+    case TypeReprKind::Owned:
+    case TypeReprKind::Isolated:
+    case TypeReprKind::Placeholder:
+    case TypeReprKind::CompileTimeConst:
+      return false;
+    }
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T) {
     if (T->isInvalid())
       return;
+
+    // Compute the type repr to attach 'any' to.
+    TypeRepr *replaceRepr = T;
+    // Insert parens in expression context for '(any P).self'
+    bool needsParens = (exprCount != 0);
+    if (reprStack.size() > 1) {
+      auto parentIt = reprStack.end() - 2;
+      needsParens = existentialNeedsParens(*parentIt);
+
+      // Expand to include parenthesis before checking if the parent needs
+      // to be replaced.
+      while (parentIt != reprStack.begin() &&
+             (*parentIt)->getWithoutParens() != *parentIt)
+        parentIt -= 1;
+
+      // For existential metatypes, 'any' is applied to the metatype.
+      if ((*parentIt)->getKind() == TypeReprKind::Metatype) {
+        replaceRepr = *parentIt;
+        if (parentIt != reprStack.begin())
+          needsParens = existentialNeedsParens(*(parentIt - 1));
+      }
+    }
+
+    std::string fix;
+    llvm::raw_string_ostream OS(fix);
+    if (needsParens)
+      OS << "(";
+    ExistentialTypeRepr existential(SourceLoc(), replaceRepr);
+    existential.print(OS);
+    if (needsParens)
+      OS << ")";
 
     auto comp = T->getComponentRange().back();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
@@ -4169,7 +4252,8 @@ public:
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
                            /*isAlias=*/false)
-            .limitBehavior(DiagnosticBehavior::Warning);
+            .limitBehavior(DiagnosticBehavior::Warning)
+            .fixItReplace(replaceRepr->getSourceRange(), fix);
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
@@ -4187,7 +4271,8 @@ public:
                              diag::existential_requires_any,
                              alias->getDeclaredInterfaceType(),
                              /*isAlias=*/true)
-              .limitBehavior(DiagnosticBehavior::Warning);
+              .limitBehavior(DiagnosticBehavior::Warning)
+              .fixItReplace(replaceRepr->getSourceRange(), fix);
         }
       }
     }
