@@ -214,6 +214,8 @@ public:
 
   void visitVarDecl(VarDecl *VD);
 
+  void visitSubscriptDecl(SubscriptDecl *SD);
+
   void visitEnumDecl(EnumDecl *ED);
 
   void visitEnumElementDecl(EnumElementDecl *EED);
