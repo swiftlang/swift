@@ -41,4 +41,20 @@ struct swift_static_mirror_associated_type_info_s {
   swift_static_mirror_type_alias_set_t *type_alias_set;
 };
 
+struct swift_static_mirror_enum_case_info_s {
+  swift_static_mirror_string_ref_t label;
+};
+
+struct swift_static_mirror_property_info_s {
+  swift_static_mirror_string_ref_t label;
+  swift_static_mirror_string_ref_t type_name;
+  swift_static_mirror_string_ref_t mangled_type_name;
+};
+
+struct swift_static_mirror_field_info_s {
+  swift_static_mirror_string_ref_t mangled_type_name;
+  swift_static_mirror_property_info_set_t *property_set;
+  swift_static_mirror_enum_case_info_set_t *enum_case_set;
+};
+
 #endif // SWIFT_C_BINARY_SCAN_IMPL_H

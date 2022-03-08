@@ -304,7 +304,7 @@ struct AssociatedType {
   std::string SubstitutedTypeDiagnosticPrintName;
 };
 
-/// Info about a given type's associated type, as read out from an Image
+/// Info about all of a given type's associated types, as read out from an Image
 struct AssociatedTypeInfo {
   std::string MangledTypeName;
   std::string FullyQualifiedName;
@@ -314,6 +314,30 @@ struct AssociatedTypeInfo {
 
 struct AssociatedTypeCollectionResult {
   std::vector<AssociatedTypeInfo> AssociatedTypeInfos;
+  std::vector<std::string> Errors;
+};
+
+struct PropertyTypeInfo {
+  std::string Label;
+  std::string TypeMangledName;
+  std::string TypeFullyQualifiedName;
+  std::string TypeDiagnosticPrintName;
+};
+
+struct EnumCaseInfo {
+  std::string Label;
+};
+
+/// Info about all of a given type's fields, as read out from an Image
+struct FieldMetadata {
+  std::string MangledTypeName;
+  std::string FullyQualifiedName;
+  std::vector<PropertyTypeInfo> Properties;
+  std::vector<EnumCaseInfo> EnumCases;
+};
+
+struct FieldTypeCollectionResult {
+  std::vector<FieldMetadata> FieldInfos;
   std::vector<std::string> Errors;
 };
 
@@ -899,6 +923,7 @@ public:
 
   void dumpTypeRef(RemoteRef<char> MangledName, std::ostream &stream,
                    bool printTypeName = false);
+  FieldTypeCollectionResult collectFieldTypes(llvm::Optional<std::string> forMangledTypeName);
   void dumpFieldSection(std::ostream &stream);
   AssociatedTypeCollectionResult collectAssociatedTypes(llvm::Optional<std::string> forMangledTypeName);
   void dumpAssociatedTypeSection(std::ostream &stream);
