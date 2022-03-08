@@ -124,7 +124,8 @@ extension AsyncStream {
       let limit = state.limit
       let count = state.pending.count
       
-      if let continuation = state.continuations.first {
+      if !state.continuations.isEmpty {
+        let continuation = state.continuations.removeFirst()
         if count > 0 {
           if !state.terminal {
             switch limit {
@@ -152,17 +153,14 @@ extension AsyncStream {
           } else {
             result = .terminated
           }
-          state.continuations.removeFirst()
           let toSend = state.pending.removeFirst()
           unlock()
           continuation.resume(returning: toSend)
         } else if state.terminal {
-          state.continuations.removeFirst()
           result = .terminated
           unlock()
           continuation.resume(returning: nil)
         } else {
-          state.continuations.removeFirst()
           switch limit {
           case .unbounded:
             result = .enqueued(remaining: .max)
