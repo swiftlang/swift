@@ -56,7 +56,7 @@ distributed actor OK6 {
 distributed actor OKMulti {
 
   convenience init(y: Int, system: FakeActorSystem) { // ok
-    self.init(system: system)
+    self.init(actorSystem: system)
   }
 
 }
@@ -64,7 +64,7 @@ distributed actor OKMulti {
 distributed actor OKMultiDefaultValues {
 
   convenience init(y: Int, system: FakeActorSystem, x: Int = 1234) { // ok
-    self.init(system: system)
+    self.init(actorSystem: system)
   }
 
 }

@@ -28,7 +28,7 @@ func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
   let system = DefaultDistributedActorSystem()
 
-  let local = SomeSpecificDistributedActor(system: system)
+  let local = SomeSpecificDistributedActor(actorSystem: system)
   assert(__isLocalActor(local) == true, "should be local")
   assert(__isRemoteActor(local) == false, "should be local")
   print("isRemote(local) = \(__isRemoteActor(local))") // CHECK: isRemote(local) = false

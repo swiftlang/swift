@@ -262,7 +262,7 @@ func test() {
 
   // CHECK: assign type:DA, address:ActorAddress(address: "xxx")
   // CHECK: ready actor:DA(ActorAddress(address: "xxx"))
-  let da = DA(system: system)
+  let da = DA(actorSystem: system)
 
   // CHECK: encode: ActorAddress(address: "xxx")
   let encoder = TestEncoder(system: system)
