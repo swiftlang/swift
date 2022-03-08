@@ -2299,9 +2299,71 @@ namespace {
                            locator);
         }
 
-        // If we have a type to ascribe to the variable, do so now.
-        if (oneWayVarType)
+        // Ascribe a type to the declaration so it's always available to
+        // constraint system.
+        if (oneWayVarType) {
           CS.setType(var, oneWayVarType);
+        } else if (externalPatternType) {
+          // If there is an externally imposed type, that's what the
+          // declaration is going to be bound to.
+          CS.setType(var, externalPatternType);
+        } else {
+          // Otherwise, let's use the type of the pattern. The type
+          // of the declaration has to be r-value, so let's add an
+          // equality constraint if pattern type has any type variables
+          // that are allowed to be l-value.
+          bool foundLValueVars = false;
+
+          // Note that it wouldn't be always correct to allocate a single type
+          // variable, that disallows l-value types, to use as a declaration
+          // type because equality constraint would drop TVO_CanBindToLValue
+          // from the right-hand side (which is not the case for `OneWayEqual`)
+          // e.g.:
+          //
+          // sturct S { var x, y: Int }
+          //
+          // func test(s: S) {
+          //   let (x, y) = (s.x, s.y)
+          // }
+          //
+          // Single type variable approach results in the following constraint:
+          // `$T_x_y = ($T_s_x, $T_s_y)` where both `$T_s_x` and `$T_s_y` have
+          // to allow l-value, but `$T_x_y` does not. Early simplication of `=`
+          // constraint (due to right-hand side being a "concrete" tuple type)
+          // would drop l-value option from `$T_s_x` and `$T_s_y` which leads to
+          // a failure during member lookup because `x` and `y` are both
+          // `@lvalue Int`. To avoid that, declaration type would mimic pattern
+          // type with all l-value options stripped, so the equality constraint
+          // becomes `($T_x, $_T_y) = ($T_s_x, $T_s_y)` which doesn't result in
+          // stripping of l-value flag from the right-hand side since
+          // simplification can only happen when either side is resolved.
+          auto declTy = varType.transform([&](Type type) -> Type {
+            if (auto *typeVar = type->getAs<TypeVariableType>()) {
+              if (typeVar->getImpl().canBindToLValue()) {
+                foundLValueVars = true;
+
+                // Drop l-value from the options but preserve the rest.
+                auto options = typeVar->getImpl().getRawOptions();
+                options &= ~TVO_CanBindToLValue;
+
+                return CS.createTypeVariable(typeVar->getImpl().getLocator(),
+                                             options);
+              }
+            }
+            return type;
+          });
+
+          // If pattern types allows l-value types, let's create an
+          // equality constraint between r-value only declaration type
+          // and l-value pattern type that would take care of looking
+          // through l-values when necessary.
+          if (foundLValueVars) {
+            CS.addConstraint(ConstraintKind::Equal, declTy, varType,
+                             CS.getConstraintLocator(locator));
+          }
+
+          CS.setType(var, declTy);
+        }
 
         return setType(varType);
       }
