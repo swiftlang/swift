@@ -132,12 +132,11 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         _env = dict(os.environ)
         _env.update(env)
     try:
-        out = subprocess.check_output(command, env=_env, stderr=stderr)
-        # Coerce to `str` hack. not py3 `byte`, not py2 `unicode`.
-        return str(out.decode())
+        return subprocess.check_output(command, env=_env, stderr=stderr,
+                                       text=True)
     except subprocess.CalledProcessError as e:
         if allow_non_zero_exit:
-            return str(e.output.decode())
+            return e.output
         if optional:
             return None
         _fatal_error(
@@ -218,8 +217,9 @@ def run(*args, **kwargs):
         return(None, 0, args)
 
     my_pipe = subprocess.Popen(
-        *args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
-    (stdout, stderr) = my_pipe.communicate()
+        *args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        **kwargs)
+    (output, _) = my_pipe.communicate()
     ret = my_pipe.wait()
 
     if lock:
@@ -227,10 +227,8 @@ def run(*args, **kwargs):
     if echo_output:
         print(repo_path)
         _echo_command(dry_run, *args, env=env)
-        if stdout:
-            print(stdout, end="")
-        if stderr:
-            print(stderr, end="")
+        if output:
+            print(output, end="")
         print()
     if lock:
         lock.release()
@@ -240,6 +238,6 @@ def run(*args, **kwargs):
         eout.ret = ret
         eout.args = args
         eout.repo_path = repo_path
-        eout.stderr = stderr
+        eout.stderr = output
         raise eout
-    return (stdout, 0, args)
+    return (output, 0, args)
