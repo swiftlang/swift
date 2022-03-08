@@ -429,8 +429,6 @@ namespace {
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
-      auto &layout = ClangDecl->getASTContext().getASTRecordLayout(ClangDecl);
-
       forEachNonEmptyBase([&](clang::QualType type, clang::CharUnits offset,
                               clang::CharUnits) {
         lowering.addTypedData(type, offset);

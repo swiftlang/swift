@@ -71,11 +71,11 @@ private:
   /// The first slab.
   Slab *firstSlab;
 
+  /// True if the first slab is pre-allocated.
   uint32_t firstSlabIsPreallocated:1;
   /// Used for unit testing.
-  uint32_t numAllocatedSlabs:31 = 0;
+  uint32_t numAllocatedSlabs:31;
 
-  /// True if the first slab is pre-allocated.
 
   /// The minimal alignment of allocated memory.
   static constexpr size_t alignment = MaximumAlignment;
@@ -278,7 +278,9 @@ private:
 
 public:
   /// Construct a StackAllocator without a pre-allocated first slab.
-  StackAllocator() : firstSlab(nullptr), firstSlabIsPreallocated(false) { }
+  StackAllocator()
+      : firstSlab(nullptr), firstSlabIsPreallocated(false),
+        numAllocatedSlabs(0) {}
 
   /// Construct a StackAllocator with a pre-allocated first slab.
   StackAllocator(void *firstSlabBuffer, size_t bufferCapacity) {
@@ -289,6 +291,7 @@ public:
            "buffer for first slab too small");
     firstSlab = new (start) Slab(end - start - Slab::headerSize());
     firstSlabIsPreallocated = true;
+    numAllocatedSlabs = 0;
   }
 
   ~StackAllocator() {

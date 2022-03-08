@@ -721,9 +721,12 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
   case SymbolKind::Module:
     return KindRefModule;
 
+  case SymbolKind::CommentTag:
+    return KindCommentTag;
+
   default:
     // TODO: reconsider whether having a default case is a good idea.
-    return UIdent();
+    llvm_unreachable("unhandled symbol kind Swift doesn't use");
   }
 
 #undef SIMPLE_CASE

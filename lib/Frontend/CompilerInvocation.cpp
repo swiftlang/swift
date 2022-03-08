@@ -800,29 +800,63 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
   }
 
-  // Parse the SDK version.
-  if (Arg *A = Args.getLastArg(options::OPT_target_sdk_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
-    if (vers.hasValue()) {
-      Opts.SDKVersion = *vers;
-    } else {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    }
-  }
+  // First, set up default minimum inlining target versions.
+  auto getDefaultMinimumInliningTargetVersion =
+      [&](const llvm::Triple &triple) -> llvm::VersionTuple {
+#if SWIFT_DEFAULT_TARGET_MIN_INLINING_VERSION_TO_ABI
+    // In ABI-stable modules, default to the version where the target's ABI
+    // was first frozen; older versions will use that one's backwards
+    // compatibility libraries.
+    if (FrontendOpts.EnableLibraryEvolution)
+      if (auto abiStability = minimumABIStableOSVersionForTriple(triple))
+        // FIXME: Should we raise it to the minimum supported OS version for
+        //        architectures which were born ABI-stable?
+        return *abiStability;
+#endif
 
-  // Parse the target variant SDK version.
-  if (Arg *A = Args.getLastArg(options::OPT_target_variant_sdk_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
-    if (vers.hasValue()) {
-      Opts.VariantSDKVersion = *vers;
-    } else {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    }
-  }
+    // In ABI-unstable modules, we will never have to interoperate with
+    // older versions of the module, so we should default to the minimum
+    // deployment target.
+    unsigned major, minor, patch;
+    if (triple.isMacOSX())
+      triple.getMacOSXVersion(major, minor, patch);
+    else
+      triple.getOSVersion(major, minor, patch);
+    return llvm::VersionTuple(major, minor, patch);
+  };
+
+  Opts.MinimumInliningTargetVersion =
+      getDefaultMinimumInliningTargetVersion(Opts.Target);
+
+  // Parse OS version number arguments.
+  auto parseVersionArg = [&](OptSpecifier opt) -> Optional<llvm::VersionTuple> {
+    Arg *A = Args.getLastArg(opt);
+    if (!A)
+      return None;
+
+    if (StringRef(A->getValue()) == "target")
+      return Opts.getMinPlatformVersion();
+    if (StringRef(A->getValue()) == "abi")
+      return minimumABIStableOSVersionForTriple(Opts.Target);
+
+    if (auto vers = version::Version::parseVersionString(A->getValue(),
+                                                         SourceLoc(), &Diags))
+      return (llvm::VersionTuple)*vers;
+
+    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                   A->getAsString(Args), A->getValue());
+    return None;
+  };
+
+  if (auto vers = parseVersionArg(OPT_min_inlining_target_version))
+    // FIXME: Should we diagnose if it's below the default?
+    Opts.MinimumInliningTargetVersion = *vers;
+
+  if (auto vers = parseVersionArg(OPT_target_sdk_version))
+    Opts.SDKVersion = *vers;
+
+  if (auto vers = parseVersionArg(OPT_target_variant_sdk_version))
+    Opts.VariantSDKVersion = *vers;
 
   // Get the SDK name.
   if (Arg *A = Args.getLastArg(options::OPT_target_sdk_name)) {
@@ -1553,6 +1587,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
             .Case("false", false)
             .Default(None);
   }
+
+  // Allow command line flags to override the default value of
+  // Opts.LexicalLifetimes. If no explicit flags are passed, then
+  // Opts.LexicalLifetimes retains its initial value.
   Optional<bool> enableLexicalLifetimesFlag;
   if (Arg *A = Args.getLastArg(OPT_enable_lexical_lifetimes)) {
     enableLexicalLifetimesFlag =

@@ -371,6 +371,7 @@ UID_KINDS = [
     KIND('DeclGenericTypeParam', 'source.lang.swift.decl.generic_type_param'),
     KIND('RefGenericTypeParam', 'source.lang.swift.ref.generic_type_param'),
     KIND('RefModule', 'source.lang.swift.ref.module'),
+    KIND('CommentTag', 'source.lang.swift.commenttag'),
     KIND('StmtForEach', 'source.lang.swift.stmt.foreach'),
     KIND('StmtFor', 'source.lang.swift.stmt.for'),
     KIND('StmtWhile', 'source.lang.swift.stmt.while'),

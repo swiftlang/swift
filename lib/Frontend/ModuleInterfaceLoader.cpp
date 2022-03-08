@@ -1654,6 +1654,13 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
   SmallVector<const char *, 64> SubArgs;
+
+  // If the interface was emitted by a compiler that didn't print
+  // `-target-min-inlining-version` into it, default to using the version from
+  // the target triple, emulating previous behavior.
+  SubArgs.push_back("-target-min-inlining-version");
+  SubArgs.push_back("target");
+
   std::string CompilerVersion;
   // Extract compiler arguments from the interface file and use them to configure
   // the compiler invocation.

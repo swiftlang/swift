@@ -2174,7 +2174,6 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
                                  DeclContext *dc) {
   DirectlyReferencedTypeDecls current;
 
-  bool firstComponent = true;
   for (const auto &component : ident->getComponentRange()) {
     // If we already set a declaration, use it.
     if (auto typeDecl = component->getBoundDecl()) {
@@ -2194,7 +2193,6 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
       if (current.empty())
         return current;
 
-      firstComponent = false;
       continue;
     }
 
