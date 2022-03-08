@@ -13,17 +13,6 @@
 import Swift
 import _Concurrency
 
-// ==== Any Actor -------------------------------------------------------------
-
-/// Shared "base" protocol for both (local) `Actor` and (potentially remote)
-/// `DistributedActor`.
-///
-/// FIXME(distributed): We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
-@_marker
-@available(SwiftStdlib 5.7, *)
-public protocol AnyActor: Sendable, AnyObject {
-}
-
 // ==== Distributed Actor -----------------------------------------------------
 
 /// Common protocol to which all distributed actors conform implicitly.
