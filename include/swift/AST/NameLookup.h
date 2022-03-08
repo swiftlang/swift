@@ -491,6 +491,9 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
 
 namespace namelookup {
 
+/// Add semantic members to \p type before attempting a semantic lookup.
+void installSemanticMembersIfNeeded(Type type, DeclNameRef name);
+
 void extractDirectlyReferencedNominalTypes(
     Type type, SmallVectorImpl<NominalTypeDecl *> &decls);
 
