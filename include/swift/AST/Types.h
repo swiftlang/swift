@@ -507,7 +507,7 @@ public:
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
   /// slower, but stricter minimization at need (e.g. redeclaration checking).
-  CanType getMinimalCanonicalType() const;
+  CanType getMinimalCanonicalType(const DeclContext *useDC) const;
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
@@ -648,7 +648,8 @@ public:
 
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
-  Type typeEraseOpenedArchetypesWithRoot(const OpenedArchetypeType *root) const;
+  Type typeEraseOpenedArchetypesWithRoot(const OpenedArchetypeType *root,
+                                         const DeclContext *useDC) const;
 
   /// Given a declaration context, returns a function type with the 'self'
   /// type curried as the input if the declaration context describes a type.
@@ -763,7 +764,8 @@ public:
   bool isClassExistentialType();
 
   /// Opens an existential instance or meta-type and returns the opened type.
-  Type openAnyExistentialType(OpenedArchetypeType *&opened);
+  Type openAnyExistentialType(OpenedArchetypeType *&opened,
+                              GenericSignature parentSig);
 
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
@@ -5189,7 +5191,7 @@ public:
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
   /// slower, but stricter minimization at need (e.g. redeclaration checking).
-  CanType getMinimalCanonicalType() const;
+  CanType getMinimalCanonicalType(const DeclContext *useDC) const;
 
   /// Retrieve the set of members composed to create this type.
   ///
@@ -5272,7 +5274,6 @@ class ParameterizedProtocolType final : public TypeBase,
   friend TrailingObjects;
 
   ProtocolType *Base;
-  Type Arg;
 
 public:
   /// Retrieve an instance of a protocol composition type with the
@@ -5746,39 +5747,68 @@ class OpenedArchetypeType final : public ArchetypeType,
          LayoutConstraint layout);
 
 public:
+  /// Compute the parameter that serves as the \c Self type for an opened
+  /// archetype from the given outer generic signature.
+  ///
+  /// This type is a generic parameter one level deeper
+  /// than the deepest generic context depth.
+  static Type getSelfInterfaceTypeFromContext(GenericSignature parentSig,
+                                              ASTContext &ctx);
+
+public:
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType> get(
-      CanType existential, Optional<UUID> knownID = None);
+  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential,
+                                                 GenericSignature parentSig,
+                                                 Optional<UUID> knownID = None);
 
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
   /// \param interfaceType The interface type represented by this archetype.
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType> get(
-      CanType existential, Type interfaceType, Optional<UUID> knownID = None);
+  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential,
+                                                 Type interfaceType,
+                                                 GenericSignature parentSig,
+                                                 Optional<UUID> knownID = None);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
+  ///
+  /// Use this function when you are unsure of whether the
+  /// \c existential type is a metatype or an instance type. This function
+  /// will unwrap any existential metatype containers.
   ///
   /// \param existential The existential type or existential metatype to open.
   /// \param interfaceType The interface type represented by this archetype.
-  static CanType getAny(CanType existential, Type interfaceType);
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
+  static CanType getAny(CanType existential, Type interfaceType,
+                        GenericSignature parentSig);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
   ///
+  /// Use this function when you are unsure of whether the
+  /// \c existential type is a metatype or an instance type. This function
+  /// will unwrap any existential metatype containers.
+  ///
   /// \param existential The existential type or existential metatype to open.
-  static CanType getAny(CanType existential);
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
+  static CanType getAny(CanType existential, GenericSignature parentSig);
 
   /// Retrieve the ID number of this opened existential.
   UUID getOpenedExistentialID() const;

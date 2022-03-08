@@ -4085,7 +4085,8 @@ GenericParameterReferenceInfo swift::findGenericParameterReferences(
 }
 
 GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
-    Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const {
+    Type baseTy, const DeclContext *useDC,
+    bool treatNonResultCovariantSelfAsInvariant) const {
   assert(baseTy->isExistentialType());
 
   // Types never refer to 'Self'.
@@ -4098,7 +4099,9 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
   if (type->hasError())
     return GenericParameterReferenceInfo();
 
-  const auto sig = getASTContext().getOpenedArchetypeSignature(baseTy);
+  const auto sig =
+      getASTContext().getOpenedArchetypeSignature(baseTy,
+                                                  useDC->getGenericSignatureOfContext());
   auto genericParam = sig.getGenericParams().front();
   return findGenericParameterReferences(
       this, sig, genericParam, treatNonResultCovariantSelfAsInvariant, None);

@@ -856,8 +856,8 @@ namespace {
       Type resultTy;
       resultTy = cs.getType(result);
       if (resultTy->hasOpenedExistentialWithRoot(record.Archetype)) {
-        Type erasedTy =
-            resultTy->typeEraseOpenedArchetypesWithRoot(record.Archetype);
+        Type erasedTy = resultTy->typeEraseOpenedArchetypesWithRoot(
+            record.Archetype, cs.DC);
         auto range = result->getSourceRange();
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion
@@ -1352,7 +1352,7 @@ namespace {
           // Erase opened existentials from the type of the thunk; we're
           // going to open the existential inside the thunk's body.
           containerTy = containerTy->typeEraseOpenedArchetypesWithRoot(
-              knownOpened->second);
+              knownOpened->second, cs.DC);
           selfTy = containerTy;
         }
       }
@@ -1412,7 +1412,7 @@ namespace {
         // existential.
         if (openedExistential) {
           refType = refType->typeEraseOpenedArchetypesWithRoot(
-              baseTy->castTo<OpenedArchetypeType>());
+              baseTy->castTo<OpenedArchetypeType>(), cs.DC);
         }
 
         cs.setType(ref, refType);
@@ -1551,10 +1551,10 @@ namespace {
                              getConstraintSystem().getConstraintLocator(
                                memberLocator));
         if (knownOpened != solution.OpenedExistentialTypes.end()) {
-          curryThunkTy =
-              curryThunkTy
-                  ->typeEraseOpenedArchetypesWithRoot(knownOpened->second)
-                  ->castTo<FunctionType>();
+          curryThunkTy = curryThunkTy
+                             ->typeEraseOpenedArchetypesWithRoot(
+                                 knownOpened->second, cs.DC)
+                             ->castTo<FunctionType>();
         }
 
         auto discriminator = AutoClosureExpr::InvalidDiscriminator;
@@ -5232,8 +5232,9 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType) {
   if (fromInstanceType->isExistentialType()) {
     // Coercion from superclass-constrained existential to its
     // concrete superclass.
-    auto fromArchetype = OpenedArchetypeType::getAny(
-        fromType->getCanonicalType());
+    auto fromArchetype =
+        OpenedArchetypeType::getAny(fromType->getCanonicalType(),
+                                    cs.DC->getGenericSignatureOfContext());
 
     auto *archetypeVal = cs.cacheType(new (ctx) OpaqueValueExpr(
         expr->getSourceRange(), fromArchetype));
@@ -5296,7 +5297,8 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType) {
 
   // For existential-to-existential coercions, open the source existential.
   if (fromType->isAnyExistentialType()) {
-    fromType = OpenedArchetypeType::getAny(fromType->getCanonicalType());
+    fromType = OpenedArchetypeType::getAny(fromType->getCanonicalType(),
+                                           cs.DC->getGenericSignatureOfContext());
 
     auto *archetypeVal = cs.cacheType(
         new (ctx) OpaqueValueExpr(expr->getSourceRange(), fromType));

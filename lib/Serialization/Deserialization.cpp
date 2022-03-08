@@ -5625,13 +5625,27 @@ public:
                                                 StringRef blobData) {
     TypeID existentialID;
     TypeID interfaceID;
+    GenericSignatureID sigID;
 
-    decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
-                                                       existentialID,
-                                                       interfaceID);
+    decls_block::OpenedArchetypeTypeLayout::readRecord(scratch, existentialID,
+                                                       interfaceID, sigID);
 
-    return OpenedArchetypeType::get(MF.getType(existentialID)->getCanonicalType(),
-                                    MF.getType(interfaceID));
+    auto sigOrError = MF.getGenericSignatureChecked(sigID);
+    if (!sigOrError)
+      return sigOrError.takeError();
+
+    auto interfaceTypeOrError = MF.getTypeChecked(interfaceID);
+    if (!interfaceTypeOrError)
+      return interfaceTypeOrError.takeError();
+
+    auto existentialTypeOrError = MF.getTypeChecked(existentialID);
+    if (!existentialTypeOrError)
+      return existentialTypeOrError.takeError();
+
+    auto env = GenericEnvironment::forOpenedArchetypeSignature(
+        existentialTypeOrError.get(), sigOrError.get(), UUID::fromTime());
+    return env->mapTypeIntoContext(interfaceTypeOrError.get())
+        ->castTo<OpenedArchetypeType>();
   }
       
   Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,

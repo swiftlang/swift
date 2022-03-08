@@ -88,7 +88,8 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
 FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                                  llvm::Value *from,
                                                  SILType fromType,
-                                                 SILType toType) {
+                                                 SILType toType,
+                                                 GenericSignature fnSig) {
   // Check metatype objects directly. Don't try to find their meta-metatype.
   auto isMetatype = false;
   if (auto metaType = toType.getAs<MetatypeType>()) {
@@ -125,7 +126,7 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // =>
   // icmp eq %1, @metadata.Sub
   llvm::Value *objectMetadata = isMetatype ? from :
-    emitHeapMetadataRefForHeapObject(IGF, from, fromType);
+    emitHeapMetadataRefForHeapObject(IGF, from, fromType, fnSig);
 
   objectMetadata = IGF.Builder.CreateBitCast(objectMetadata,
                                              targetMetadata->getType());
@@ -547,6 +548,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
                                   SILType destType,
                                   CheckedCastMode mode,
                                   Optional<MetatypeRepresentation> metatypeKind,
+                                  GenericSignature fnSig,
                                   Explosion &ex) {
   auto srcInstanceType = srcType.getASTType();
   auto destInstanceType = destType.getASTType();
@@ -783,7 +785,8 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     // Get the type metadata for the instance.
     metadataValue = emitDynamicTypeOfHeapObject(IGF, value,
                                                 MetatypeRepresentation::Thick,
-                                                srcType);
+                                                srcType,
+                                                fnSig);
   }
 
   // Look up witness tables for the protocols that need them.
@@ -866,6 +869,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                   SILType targetLoweredType,
                                   CanType targetFormalType,
                                   CheckedCastMode mode,
+                                  GenericSignature fnSig,
                                   Explosion &out) {
   assert(sourceLoweredType.isObject());
   assert(targetLoweredType.isObject());
@@ -949,6 +953,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
       emitScalarExistentialDowncast(IGF, metatypeVal, sourceLoweredType,
                                     targetLoweredType, mode,
                                     existential->getRepresentation(),
+                                    fnSig,
                                     out);
       return;
 
@@ -1017,7 +1022,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   llvm::Value *instance;
   if (sourceLoweredType.isExistentialType()) {
     instance = emitClassExistentialProjection(IGF, value, sourceLoweredType,
-                                              CanArchetypeType());
+                                              CanArchetypeType(), fnSig);
   } else {
     instance = value.claimNext();
   }
@@ -1026,7 +1031,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     Explosion outRes;
     emitScalarExistentialDowncast(IGF, instance, sourceLoweredType,
                                   targetLoweredType, mode,
-                                  /*not a metatype*/ None, outRes);
+                                  /*not a metatype*/ None,
+                                  fnSig,
+                                  outRes);
     returnNilCheckedResult(IGF.Builder, outRes);
     return;
   }

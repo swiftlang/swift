@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_SILCLONER_H
 #define SWIFT_SIL_SILCLONER_H
 
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -251,10 +252,14 @@ public:
   void remapRootOpenedType(CanOpenedArchetypeType archetypeTy) {
     assert(archetypeTy->isRoot());
 
+    auto sig = Builder.getFunction().getGenericSignature();
     auto existentialTy = archetypeTy->getExistentialType()->getCanonicalType();
-    auto replacementTy = OpenedArchetypeType::get(
-        getOpASTType(existentialTy),
-        archetypeTy->getInterfaceType());
+    auto env = GenericEnvironment::forOpenedExistential(
+        getOpASTType(existentialTy), sig, UUID::fromTime());
+    auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(sig, existentialTy->getASTContext());
+    auto replacementTy =
+        env->mapTypeIntoContext(interfaceTy)
+            ->template castTo<OpenedArchetypeType>();
     registerOpenedExistentialRemapping(archetypeTy, replacementTy);
   }
 
