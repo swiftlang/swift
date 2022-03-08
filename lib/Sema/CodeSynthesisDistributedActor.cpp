@@ -114,7 +114,6 @@ static std::pair<BraceStmt *, bool>
 deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   auto implicit = true;
   ASTContext &C = thunk->getASTContext();
-  DeclContext *DC = thunk->getDeclContext();
   auto module = thunk->getParentModule();
 
   // mock locations, we're a thunk and don't really need detailed locations
