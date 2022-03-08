@@ -19,20 +19,6 @@ distributed actor OK1 {
   // ok, since all fields are initialized, the constructor can be synthesized
 }
 
-// TODO(distributed): test all the FIXITs in this file
-
-distributed actor Bad1 {
-  init() {
-    // expected-error@-1 {{designated distributed actor initializer 'init()' is missing required DistributedActorSystem parameter}}
-  }
-}
-
-distributed actor Bad12 {
-  init(x: String) {
-    // expected-error@-1 {{designated distributed actor initializer 'init(x:)' is missing required DistributedActorSystem parameter}}
-  }
-}
-
 distributed actor OK2 {
   var x: Int
 
@@ -41,15 +27,25 @@ distributed actor OK2 {
   }
 }
 
-distributed actor Bad2 {
-  var x: Int = 1
+// NOTE: keep in mind this is only through typechecking, so no explicit
+// actorSystem is being assigned here.
+distributed actor OK3 {
+  init() {}
+}
 
-  init(system: FakeActorSystem, too many: FakeActorSystem) {
-    // expected-error@-1{{designated distributed actor initializer 'init(system:too:)' must accept exactly one DistributedActorSystem parameter, found 2}}
+distributed actor OK4 {
+  init(x: String) {
   }
 }
 
-distributed actor OK3 {
+distributed actor OK5 {
+  var x: Int = 1
+
+  init(system: FakeActorSystem, too many: FakeActorSystem) {
+  }
+}
+
+distributed actor OK6 {
   var x: Int
 
   init(y: Int, system: FakeActorSystem) {

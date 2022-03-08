@@ -40,9 +40,6 @@ bool ensureDistributedModuleLoaded(Decl *decl);
 /// Check for illegal property declarations (e.g. re-declaring transport or id)
 void checkDistributedActorProperties(const NominalTypeDecl *decl);
 
-/// The local and resolve distributed actor constructors have special rules to check.
-void checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ctor);
-
 /// Type-check additional ad-hoc protocol requirements.
 /// Ad-hoc requirements are protocol requirements currently not expressible
 /// in the Swift type-system.

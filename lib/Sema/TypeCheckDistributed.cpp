@@ -595,47 +595,6 @@ void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
   }
 }
 
-void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ctor) {
-  // bail out unless distributed actor, only those have special rules to check here
-  if (!decl->isDistributedActor())
-    return;
-
-  // Only designated initializers need extra checks
-  if (!ctor->isDesignatedInit())
-    return;
-
-  // === Designated initializers must accept exactly one actor transport that
-  // matches the actor transport type of the actor.
-  SmallVector<ParamDecl*, 2> transportParams;
-  int transportParamsCount = 0;
-  Type actorSystemTy = ctor->mapTypeIntoContext(
-      getDistributedActorSystemType(const_cast<ClassDecl *>(decl)));
-  for (auto param : *ctor->getParameters()) {
-    auto paramTy = ctor->mapTypeIntoContext(param->getInterfaceType());
-    if (paramTy->isEqual(actorSystemTy)) {
-      transportParamsCount += 1;
-      transportParams.push_back(param);
-    }
-  }
-
-  // missing transport parameter
-  if (transportParamsCount == 0) {
-    ctor->diagnose(diag::distributed_actor_designated_ctor_missing_transport_param,
-                   ctor->getName());
-    // TODO(distributed): offer fixit to insert 'system: DistributedActorSystem'
-    return;
-  }
-
-  // ok! We found exactly one transport parameter
-  if (transportParamsCount == 1)
-    return;
-
-  // TODO(distributed): rdar://81824959 report the error on the offending (2nd) matching parameter
-  //                    Or maybe we can issue a note about the other offending params?
-  ctor->diagnose(diag::distributed_actor_designated_ctor_must_have_one_distributedactorsystem_param,
-                 ctor->getName(), transportParamsCount);
-}
-
 // ==== ------------------------------------------------------------------------
 
 void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal) {
@@ -653,14 +612,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   (void)nominal->getDefaultInitializer();
 
   for (auto member : nominal->getMembers()) {
-    // --- Check all constructors
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-        checkDistributedActorConstructor(classDecl, ctor);
-        continue;
-      }
-    }
-
     // --- Ensure all thunks
     if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
       if (!func->isDistributed())
