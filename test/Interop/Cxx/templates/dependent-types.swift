@@ -2,8 +2,8 @@
 //
 // REQUIRES: executable_test
 //
-// For some reason this is failing on i386: rdar://89166707.
-// XFAIL: CPU=i386
+// Failing on 32-bit platforms (rdar://89296327) (rdar://89166707)
+// XFAIL: PTRSIZE=32
 
 import DependentTypes
 import StdlibUnittest
