@@ -380,7 +380,6 @@ bool MoveKillsCopyableValuesChecker::check() {
   //
   // TODO: We should add llvm.dbg.addr support for fastisel and also teach
   // CodeGen how to handle llvm.dbg.addr better.
-  SmallVector<SILInstruction *, 8> successMovesDbgInfoCarryingInsts;
   bool emittedDiagnostic = false;
   while (!valuesToProcess.empty()) {
     auto lexicalValue = valuesToProcess.front();
@@ -421,7 +420,6 @@ bool MoveKillsCopyableValuesChecker::check() {
         } else {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: No!\n");
           if (auto varInfo = dbgVarInst.getVarInfo()) {
-            successMovesDbgInfoCarryingInsts.push_back(*dbgVarInst);
             auto *next = mvi->getNextInstruction();
             SILBuilderWithScope builder(next);
             // We need to make sure any undefs we put in are the same loc/debug
@@ -443,24 +441,6 @@ bool MoveKillsCopyableValuesChecker::check() {
     if (foundMove) {
       dbgVarInst.markAsMoved();
     }
-  }
-
-  // If we emitted any diagnostics, we are going to fail and thus don't need to
-  // use any compile time to break blocks since a user will never debug such
-  // programs.
-  if (emittedDiagnostic)
-    return false;
-
-  // Ok! Now break before the instruction after our debug info generating inst
-  // so that the SelectionDAG behavior mentioned above on the declaration of
-  // successMovesDbgInfoCarryingInst.
-  if (!successMovesDbgInfoCarryingInsts.empty()) {
-    SILBuilderContext ctx(mod);
-    do {
-      auto *next = successMovesDbgInfoCarryingInsts.pop_back_val();
-      splitBasicBlockAndBranch(ctx, next->getNextInstruction(),
-                               dominanceToUpdate, loopInfoToUpdate);
-    } while (!successMovesDbgInfoCarryingInsts.empty());
   }
 
   return false;

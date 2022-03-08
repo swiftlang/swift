@@ -12,7 +12,6 @@ import Builtin
 // CHECK-LABEL: sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK: debug_value [moved] [[ARG]] : $Builtin.NativeObject, let, name "myName"
-// CHECK-NEXT: br bb1
 // CHECK: [[MOVED_VAL:%.*]] = move_value [[ARG]]
 // CHECK: debug_value [moved] undef : $Builtin.NativeObject, let, name "myName"
 // CHECK: } // end sil function 'singleBlock'
@@ -32,12 +31,9 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // we llvm.dbg.addr the shadow copy, we avoid bad LLVM behavior in SelectionDAG
 // that sinks llvm.dbg.addr to end of block.
 // CHECK:   debug_value [moved] [[ARG]]
-// CHECK-NEXT:   br bb1
+// CHECK:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
-// CHECK:   cond_br undef, bb2, bb3
-//
-// CHECK: bb2:
 // CHECK:   [[MV:%.*]] = move_value [[ARG]]
 //
 // We don't break the block after the undefs since they become llvm.dbg.value
