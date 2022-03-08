@@ -539,7 +539,6 @@ AbstractFunctionDecl::isDistributedActorSystemMakeInvocationEncoder() const {
 bool
 AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitution() const {
   auto &C = getASTContext();
-  auto module = getParentModule();
 
   if (getBaseIdentifier() != C.Id_recordGenericSubstitution) {
     return false;
