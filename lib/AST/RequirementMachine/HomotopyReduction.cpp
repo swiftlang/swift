@@ -59,6 +59,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include "RewriteContext.h"
 #include "RewriteSystem.h"
 
 using namespace swift;
@@ -627,6 +628,10 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     if (!changed)
       continue;
 
+    if (Context.getASTContext().LangOpts.EnableRequirementMachineLoopNormalization) {
+      loop.computeNormalForm(*this);
+    }
+
     // The loop's path has changed, so we must invalidate the cached
     // result of findRulesAppearingOnceInEmptyContext().
     loop.markDirty();
@@ -722,6 +727,12 @@ void RewriteSystem::minimizeRewriteSystem() {
 
   propagateExplicitBits();
   processConflicts();
+
+  if (Context.getASTContext().LangOpts.EnableRequirementMachineLoopNormalization) {
+    for (auto &loop : Loops) {
+      loop.computeNormalForm(*this);
+    }
+  }
 
   // First pass:
   // - Eliminate all LHS-simplified non-conformance rules.

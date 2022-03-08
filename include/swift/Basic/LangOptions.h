@@ -545,6 +545,10 @@ namespace swift {
     /// enabled. It can be disabled for debugging and testing.
     bool EnableRequirementMachineConcreteContraction = true;
 
+    /// Enable the stronger minimization algorithm. This is just for debugging;
+    /// if you have a testcase which requires this, please submit a bug report.
+    bool EnableRequirementMachineLoopNormalization = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
