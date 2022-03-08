@@ -230,4 +230,69 @@ func testMirrored(instance: ClassWithAsync) async {
   func g() async { }
 }
 
+
+@MainActor func mainActorFn() {}
+@SomeGlobalActor func sgActorFn() {}
+
+// Check inferred isolation for overridden decls from ObjC.
+// Note that even if the override is not present, it
+// can have an affect. -- rdar://87217618 / SR-15694
+@MainActor
+class FooFrame: PictureFrame {
+  init() {
+    super.init(size: 0)
+  }
+
+  override init(size n: Int) {
+    super.init(size: n)
+  }
+
+  override func rotate() {
+    mainActorFn()
+  }
+}
+
+class BarFrame: PictureFrame {
+  init() {
+    super.init(size: 0)
+  }
+
+  override init(size n: Int) {
+    super.init(size: n)
+  }
+
+  override func rotate() {
+    mainActorFn()
+  }
+}
+
+@SomeGlobalActor
+class BazFrame: NotIsolatedPictureFrame {
+  init() {
+    super.init(size: 0)
+  }
+
+  override init(size n: Int) {
+    super.init(size: n)
+  }
+
+  override func rotate() {
+    sgActorFn()
+  }
+}
+
+@SomeGlobalActor
+class BazFrameIso: PictureFrame { // expected-error {{global actor 'SomeGlobalActor'-isolated class 'BazFrameIso' has different actor isolation from main actor-isolated superclass 'PictureFrame'}}
+}
+
+func check() async {
+  _ = await BarFrame()
+  _ = await FooFrame()
+  _ = await BazFrame()
+
+  _ = await BarFrame(size: 0)
+  _ = await FooFrame(size: 0)
+  _ = await BazFrame(size: 0)
+}
+
 } // SwiftStdlib 5.5

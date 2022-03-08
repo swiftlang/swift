@@ -403,11 +403,11 @@ struct GenericGlobalActor<T> {
 }
 
 @available(SwiftStdlib 5.1, *)
-@SomeGlobalActor func onions() {} // expected-note{{calls to global function 'onions()' from outside of its actor context are implicitly asynchronous}}
+@SomeGlobalActor func onions_sga() {} // expected-note 2{{calls to global function 'onions_sga()' from outside of its actor context are implicitly asynchronous}}
 
 @available(SwiftStdlib 5.1, *)
-@MainActor func beets() { onions() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'onions()' in a synchronous main actor-isolated context}}
-// expected-note@-1{{calls to global function 'beets()' from outside of its actor context are implicitly asynchronous}}
+@MainActor func beets_ma() { onions_sga() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
+// expected-note@-1 4{{calls to global function 'beets_ma()' from outside of its actor context are implicitly asynchronous}}
 
 @available(SwiftStdlib 5.1, *)
 actor Crystal {
@@ -942,7 +942,7 @@ class SomeClassWithInits {
   deinit {
     print(mutableState) // Okay, we're actor-isolated
     print(SomeClassWithInits.shared) // expected-error{{static property 'shared' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
-    beets() //expected-error{{call to main actor-isolated global function 'beets()' in a synchronous nonisolated context}}
+    beets_ma() //expected-error{{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
   }
 
   func isolated() { }
@@ -1383,4 +1383,69 @@ actor DunkTracker {
       
     }
   }
+}
+
+@MainActor
+class MA {
+  func method() {}
+}
+
+@SomeGlobalActor class SGA: MA {} // expected-error {{global actor 'SomeGlobalActor'-isolated class 'SGA' has different actor isolation from main actor-isolated superclass 'MA'}}
+
+protocol SGA_Proto {
+  @SomeGlobalActor func method() // expected-note {{'method()' declared here}}
+}
+
+// try to override a MA method with inferred isolation from a protocol requirement
+class SGA_MA: MA, SGA_Proto {
+  // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
+  // expected-warning@+1 {{instance method 'method()' isolated to global actor 'MainActor' can not satisfy corresponding requirement from protocol 'SGA_Proto' isolated to global actor 'SomeGlobalActor'}}
+  override func method() { onions_sga() }
+}
+
+class None_MA: MA {
+  override func method() { beets_ma() }
+}
+
+class None {
+  func method() {} // expected-note{{overridden declaration is here}}
+}
+
+// try to add inferred isolation while overriding
+@MainActor
+class MA_None1: None {
+  // FIXME: bad note, since the problem is a mismatch in overridden vs inferred isolation; this wont help.
+  // expected-note@+1 {{add '@MainActor' to make instance method 'method()' part of global actor 'MainActor'}}
+  override func method() {
+    beets_ma() // expected-error {{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
+  }
+}
+
+class MA_None2: None {
+  @MainActor
+  override func method() { // expected-error {{main actor-isolated instance method 'method()' has different actor isolation from nonisolated overridden declaration}}
+    beets_ma()
+  }
+}
+
+class MADirect {
+  @MainActor func method1() {}
+  @MainActor func method2() {}
+}
+
+class None_MADirect: MADirect {
+  // default-isolation vs overridden-MainActor = mainactor
+  override func method1() { beets_ma() }
+
+  // directly-nonisolated vs overridden mainactor = nonisolated
+  nonisolated override func method2() { beets_ma() } // expected-error {{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
+}
+
+@SomeGlobalActor
+class SGA_MADirect: MADirect {
+  // inferred-SomeGlobalActor vs overridden-MainActor = mainactor
+  override func method1() { beets_ma() }
+
+  // directly-nonisolated vs overridden-MainActor = nonisolated
+  nonisolated override func method2() { beets_ma() } // expected-error {{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
 }

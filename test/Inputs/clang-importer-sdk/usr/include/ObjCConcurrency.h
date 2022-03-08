@@ -4,6 +4,7 @@
 #pragma clang assume_nonnull begin
 
 #define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
+#define UI_ACTOR __attribute__((swift_attr("@UIActor")))
 
 #ifdef __SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS
   #define SENDABLE __attribute__((__swift_attr__("@Sendable")))
@@ -246,6 +247,17 @@ typedef NS_ERROR_ENUM(unsigned, NonSendableErrorCode, NonSendableErrorDomain) {
   NonSendableErrorCodeFoo, NonSendableErrorCodeBar
 } NONSENDABLE;
 // expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-sendable because Swift errors are always sendable}}
+
+UI_ACTOR
+@interface PictureFrame : NSObject
+- (instancetype)initWithSize:(NSInteger)frame NS_DESIGNATED_INITIALIZER;
+- (void)rotate;
+@end
+
+@interface NotIsolatedPictureFrame : NSObject
+- (instancetype)initWithSize:(NSInteger)frame NS_DESIGNATED_INITIALIZER;
+- (void)rotate;
+@end
 
 typedef NSString *SendableStringEnum NS_STRING_ENUM;
 typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE;
