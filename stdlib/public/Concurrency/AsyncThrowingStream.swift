@@ -471,3 +471,6 @@ extension AsyncThrowingStream.Continuation {
     storage.yield(())
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingStream: @unchecked Sendable where Element: Sendable { }

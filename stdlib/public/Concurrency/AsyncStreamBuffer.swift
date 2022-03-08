@@ -17,7 +17,7 @@ import Swift
 import Darwin
 
 func _lockWordCount() -> Int {
-  let sz = 
+  let sz =
     MemoryLayout<os_unfair_lock>.size / MemoryLayout<UnsafeRawPointer>.size
   return max(sz, 1)
 }
@@ -57,7 +57,7 @@ extension AsyncStream {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
 
     struct State {
-      var continuation: UnsafeContinuation<Element?, Never>?
+      var continuations = [UnsafeContinuation<Element?, Never>]()
       var pending = _Deque<Element>()
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
@@ -105,7 +105,7 @@ extension AsyncStream {
       }
     }
 
-    func cancel() {
+    @Sendable func cancel() {
       lock()
       // swap out the handler before we invoke it to prevent double cancel
       let handler = state.onTermination
@@ -123,7 +123,8 @@ extension AsyncStream {
       lock()
       let limit = state.limit
       let count = state.pending.count
-      if let continuation = state.continuation {
+      
+      if let continuation = state.continuations.first {
         if count > 0 {
           if !state.terminal {
             switch limit {
@@ -151,17 +152,17 @@ extension AsyncStream {
           } else {
             result = .terminated
           }
-          state.continuation = nil
+          state.continuations.removeFirst()
           let toSend = state.pending.removeFirst()
           unlock()
           continuation.resume(returning: toSend)
         } else if state.terminal {
-          state.continuation = nil
+          state.continuations.removeFirst()
           result = .terminated
           unlock()
           continuation.resume(returning: nil)
         } else {
-          state.continuation = nil
+          state.continuations.removeFirst()
           switch limit {
           case .unbounded:
             result = .enqueued(remaining: .max)
@@ -212,15 +213,15 @@ extension AsyncStream {
       state.onTermination = nil
       state.terminal = true
 
-      if let continuation = state.continuation {
+      if let continuation = state.continuations.first {
         if state.pending.count > 0 {
-          state.continuation = nil
+          state.continuations.removeFirst()
           let toSend = state.pending.removeFirst()
           unlock()
           handler?(.finished)
           continuation.resume(returning: toSend)
         } else if state.terminal {
-          state.continuation = nil
+          state.continuations.removeFirst()
           unlock()
           handler?(.finished)
           continuation.resume(returning: nil)
@@ -236,22 +237,20 @@ extension AsyncStream {
 
     func next(_ continuation: UnsafeContinuation<Element?, Never>) {
       lock()
-      if state.continuation == nil {
-        if state.pending.count > 0 {
-          let toSend = state.pending.removeFirst()
-          unlock()
-          continuation.resume(returning: toSend)
-        } else if state.terminal {
-          unlock()
-          continuation.resume(returning: nil)
-        } else {
-          state.continuation = continuation
-          unlock()
-        }
+      state.continuations.append(continuation)
+      if state.pending.count > 0 {
+        let cont = state.continuations.removeFirst()
+        let toSend = state.pending.removeFirst()
+        unlock()
+        cont.resume(returning: toSend)
+      } else if state.terminal {
+        let cont = state.continuations.removeFirst()
+        unlock()
+        cont.resume(returning: nil)
       } else {
         unlock()
-        fatalError("attempt to await next() on more than one task")
       }
+      
     }
     
     func next() async -> Element? {
@@ -341,7 +340,7 @@ extension AsyncThrowingStream {
       }
     }
 
-    func cancel() {
+    @Sendable func cancel() {
       lock()
       // swap out the handler before we invoke it to prevent double cancel
       let handler = state.onTermination
@@ -595,3 +594,4 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     return storage
   }
 }
+
