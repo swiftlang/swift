@@ -221,19 +221,20 @@ void SILGenFunction::destroyClassMember(SILLocation cleanupLoc,
   }
 }
 
-// Finds stored properties that have the same type as `cd` and thus form
-// a recursive structure.
-//
-// Example:
-//
-//   class Node<T> {
-//     let element: T
-//     let next: Node<T>?
-//   }
-//
-// In the above example `next` is a recursive link and would be recognized
-// by this function and added to the result set.
-void findRecursiveLinks(ClassDecl *cd, llvm::SmallSetVector<VarDecl*, 4> &result) {
+/// Finds stored properties that have the same type as `cd` and thus form
+/// a recursive structure.
+///
+/// Example:
+///
+///   class Node<T> {
+///     let element: T
+///     let next: Node<T>?
+///   }
+///
+/// In the above example `next` is a recursive link and would be recognized
+/// by this function and added to the result set.
+static void findRecursiveLinks(ClassDecl *cd,
+                               llvm::SmallSetVector<VarDecl *, 4> &result) {
   auto selfTy = cd->getDeclaredInterfaceType();
 
   // Collect all stored properties that would form a recursive structure,
@@ -309,11 +310,6 @@ void SILGenFunction::emitRecursiveChainDestruction(ManagedValue selfValue,
   {
     B.emitBlock(uniqueBB);
 
-    // NOTE: We increment the ref count of the tail instead of unlinking it,
-    //       because custom deinit implementations of subclasses may access
-    //       it and it would be semantically wrong to unset it before that.
-    //       Making the tail non-uniquely referenced prevents the recursion.
-
     // let tail = iter.unsafelyUnwrapped.next
     // iter = tail
     SILValue iterBorrow = B.createLoadBorrow(cleanupLoc, iterAddr);
@@ -373,10 +369,10 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
   /// For other cases, the basic blocks are not necessary and the destructor
   /// can just emit all the normal destruction code right into the current block.
   // If set, used as the basic block for the destroying of all members.
-  SILBasicBlock* normalMemberDestroyBB = nullptr;
+  SILBasicBlock *normalMemberDestroyBB = nullptr;
   // If set, used as the basic block after members have been destroyed,
   // and we're ready to perform final cleanups before returning.
-  SILBasicBlock* finishBB = nullptr;
+  SILBasicBlock *finishBB = nullptr;
 
   /// A distributed actor may be 'remote' in which case there is no need to
   /// destroy "all" members, because they never had storage to begin with.
@@ -393,7 +389,8 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
   // recursively the same type as `self`, so we can iteratively
   // deinitialize them, to prevent deep recursion and potential
   // stack overflows.
-  llvm::SmallSetVector<VarDecl*, 4> recursiveLinks;
+
+  llvm::SmallSetVector<VarDecl *, 4> recursiveLinks;
   findRecursiveLinks(cd, recursiveLinks);
 
   /// Destroy all members.

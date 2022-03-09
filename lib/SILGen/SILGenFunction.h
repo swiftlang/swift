@@ -683,7 +683,7 @@ public:
   /// Generates code to destroy linearly recursive data structures, without
   /// building up the call stack.
   ///
-  /// Example:
+  /// E.x.: In the following we want to deinit next without recursing into next.
   ///
   /// class Node<A> {
   ///   let value: A
