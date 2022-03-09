@@ -860,7 +860,9 @@ static SILValue getProjectedUseValue(Operand *operand) {
 //===----------------------------------------------------------------------===//
 //                          OpaqueStorageAllocation
 //
-// Generate alloc_stack and address projections for abstract storage locations.
+// For each ValueStorage, first determine whether it can project out of its
+// definition's storage or into the storage of a use. If so, record the
+// projection information. Otherwise emit an alloc_stack for this storage root.
 // ===---------------------------------------------------------------------===//
 
 // Record a storage projection from the source of the given operand into its
