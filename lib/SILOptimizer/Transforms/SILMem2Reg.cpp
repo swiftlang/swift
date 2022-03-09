@@ -1410,19 +1410,12 @@ public:
 /// 1. (load %ASI)
 /// 2. (load (struct_element_addr/tuple_element_addr/unchecked_addr_cast %ASI))
 static bool isAddressForLoad(SILInstruction *load, SILBasicBlock *&singleBlock,
-                             bool &hasGuaranteedOwnership) {
-
-  if (isa<LoadInst>(load)) {
-    // SILMem2Reg is disabled when we find:
-    // (load [take] (struct_element_addr/tuple_element_addr %ASI))
-    // struct_element_addr and tuple_element_addr are lowered into
-    // struct_extract and tuple_extract and these SIL instructions have a
-    // guaranteed ownership. For replacing load's users, we need an owned value.
-    // We will need a new copy and destroy of the running val placed after the
-    // last use. This is not implemented currently.
-    if (hasGuaranteedOwnership &&
-        cast<LoadInst>(load)->getOwnershipQualifier() ==
-            LoadOwnershipQualifier::Take) {
+                             bool &involvesUntakableProjection) {
+  if (auto *li = dyn_cast<LoadInst>(load)) {
+    // SILMem2Reg is disabled when we find a load [take] of an untakable
+    // projection.  See below for further discussion.
+    if (involvesUntakableProjection &&
+        li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
       return false;
     }
     return true;
@@ -1432,17 +1425,40 @@ static bool isAddressForLoad(SILInstruction *load, SILBasicBlock *&singleBlock,
       !isa<TupleElementAddrInst>(load))
     return false;
 
-  if (isa<StructElementAddrInst>(load) || isa<TupleElementAddrInst>(load)) {
-    hasGuaranteedOwnership = true;
-  }
+  // None of the projections are lowered to owned values:
+  //
+  // struct_element_addr and tuple_element_addr instructions are lowered to
+  // struct_extract and tuple_extract instructions respectively.  These both
+  // have guaranteed ownership (since they forward ownership and can only be
+  // used on a guaranteed value).
+  //
+  // unchecked_addr_cast instructions are lowered to unchecked_bitwise_cast
+  // instructions.  These have unowned ownership.
+  //
+  // So in no case can a load [take] be lowered into the new projected value
+  // (some sequence of struct_extract, tuple_extract, and
+  // unchecked_bitwise_cast instructions) taking over ownership of the original
+  // value.  Without additional changes.
+  //
+  // For example, for a sequence of element_addr projections could be
+  // transformed into a sequence of destructure instructions, followed by a
+  // sequence of structure instructions where all the original values are
+  // kept in place but the taken value is "knocked out" and replaced with
+  // undef.  The running value would then be set to the newly structed
+  // "knockout" value.
+  //
+  // Alternatively, a new copy of the running value could be created and a new
+  // set of destroys placed after its last uses.
+  involvesUntakableProjection = true;
 
   // Recursively search for other (non-)loads in the instruction's uses.
-  for (auto *use : cast<SingleValueInstruction>(load)->getUses()) {
+  auto *svi = cast<SingleValueInstruction>(load);
+  for (auto *use : svi->getUses()) {
     SILInstruction *user = use->getUser();
     if (user->getParent() != singleBlock)
       singleBlock = nullptr;
 
-    if (!isAddressForLoad(user, singleBlock, hasGuaranteedOwnership))
+    if (!isAddressForLoad(user, singleBlock, involvesUntakableProjection))
       return false;
   }
   return true;
@@ -1476,8 +1492,8 @@ static bool isCaptured(AllocStackInst *asi, bool &inSingleBlock) {
       singleBlock = nullptr;
 
     // Loads are okay.
-    bool hasGuaranteedOwnership = false;
-    if (isAddressForLoad(user, singleBlock, hasGuaranteedOwnership))
+    bool involvesUntakableProjection = false;
+    if (isAddressForLoad(user, singleBlock, involvesUntakableProjection))
       continue;
 
     // We can store into an AllocStack (but not the pointer).
