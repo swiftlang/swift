@@ -38,10 +38,15 @@
 #include "swift/Subsystems.h"
 #include "swift/Syntax/SyntaxKind.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 using namespace swift::syntax;
+
+static llvm::cl::opt<bool>
+ParseSerializedSIL("parse-serialized-sil",
+                   llvm::cl::desc("Parse the output of a serialized module"));
 
 //===----------------------------------------------------------------------===//
 // SILParserState implementation
@@ -83,6 +88,10 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   SILParserState parserState(*silMod.get());
   Parser parser(*bufferID, *SF, &parserState);
   PrettyStackTraceParser StackTrace(parser);
+
+  if (ParseSerializedSIL) {
+    silMod.get()->setParsedAsSerializedSIL();
+  }
 
   auto hadError = parser.parseTopLevelSIL();
   if (hadError) {
@@ -798,7 +807,6 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
     .Case("shared", SILLinkage::Shared)
     .Case("public_external", SILLinkage::PublicExternal)
     .Case("hidden_external", SILLinkage::HiddenExternal)
-    .Case("shared_external", SILLinkage::SharedExternal)
     .Default(None);
 
   // If we succeed, consume the token.
@@ -1000,8 +1008,6 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isDistributed = IsDistributed;
     else if (isExactSelfClass && SP.P.Tok.getText() == "exact_self_class")
       *isExactSelfClass = IsExactSelfClass;
-    else if (isSerialized && SP.P.Tok.getText() == "serializable")
-      *isSerialized = IsSerializable;
     else if (isCanonical && SP.P.Tok.getText() == "canonical")
       *isCanonical = true;
     else if (hasOwnershipSSA && SP.P.Tok.getText() == "ossa")
@@ -7256,7 +7262,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
 
   SILWitnessTable *wt = nullptr;
   if (theConformance) {
-    wt = M.lookUpWitnessTable(theConformance, false);
+    wt = M.lookUpWitnessTable(theConformance);
     assert((!wt || wt->isDeclaration()) &&
            "Attempting to create duplicate witness table.");
   }

@@ -47,7 +47,7 @@ class HasBlockImpl: HasBlock {
 // CHECK-LABEL: } // end sil function '$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo'
 
 // thunk for @callee_unowned @convention(block) (@unowned Int) -> (@unowned Int)
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sS2iIyByd_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sS2iIyByd_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int {
 // CHECK: bb0(%0 : $Int, %1 : @guaranteed $@convention(block) @noescape (Int) -> Int):
 // CHECK:   %{{.*}} = apply %1(%0) : $@convention(block) @noescape (Int) -> Int
 // CHECK:  return %{{.*}} : $Int                               

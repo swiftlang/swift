@@ -189,7 +189,7 @@ bool CrossModuleOptimization::canSerializeFunction(
       return false;
   }
 
-  if (function->isSerialized() == IsSerialized)
+  if (function->isSerialized())
     return true;
 
   if (!function->isDefinition() || function->isAvailableExternally())
@@ -375,10 +375,9 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 
   switch (function->getLinkage()) {
   case SILLinkage::PublicNonABI:
-  case SILLinkage::Shared:
   case SILLinkage::HiddenExternal:
     return false;
-  case SILLinkage::SharedExternal:
+  case SILLinkage::Shared:
     // static inline C functions
     if (!function->isDefinition() && function->hasClangNode())
       return true;
@@ -395,7 +394,7 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 /// Decide whether to serialize a function.
 bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
   // Check if we already handled this function before.
-  if (function->isSerialized() == IsSerialized)
+  if (function->isSerialized())
     return false;
 
   if (function->hasSemanticsAttr("optimize.no.crossmodule"))
@@ -431,7 +430,7 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(SILFunction *function,
                                        const FunctionFlags &canSerializeFlags) {
-  if (function->isSerialized() == IsSerialized)
+  if (function->isSerialized())
     return;
   
   if (!canSerializeFlags.lookup(function))
@@ -482,8 +481,7 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
       }
     }
     serializeFunction(callee, canSerializeFlags);
-    assert(callee->isSerialized() == IsSerialized ||
-           callee->getLinkage() == SILLinkage::Public);
+    assert(callee->isSerialized() || callee->getLinkage() == SILLinkage::Public);
     return;
   }
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {

@@ -60,7 +60,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateFunction(
       constant.getDecl(), name, SILLinkage::Shared, constantTy, IsBare,
-      IsTransparent, IsSerializable, IsNotDynamic, IsNotDistributed,
+      IsTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
       ProfileCounter(), IsThunk);
 
   if (F->empty()) {
@@ -261,7 +261,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateSharedFunction(loc, name, implTy,
-                                           IsBare, IsTransparent, IsSerializable,
+                                           IsBare, IsTransparent, IsSerialized,
                                            ProfileCounter(),
                                            IsThunk,
                                            IsNotDynamic,
@@ -514,11 +514,11 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   
   // The thunk that converts an actor-constrained, non-async function to an
   // async function is not serializable if the actor's visibility precludes it.
-  auto serializable = IsSerializable;
+  auto serializable = IsSerialized;
   if (fromGlobalActorBound) {
     auto globalActorLinkage = getTypeLinkage(fromGlobalActorBound);
     serializable = globalActorLinkage >= FormalLinkage::PublicNonUnique
-      ? IsSerializable : IsNotSerialized;
+      ? IsSerialized : IsNotSerialized;
   }
 
   SILGenFunctionBuilder builder(*this);

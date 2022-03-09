@@ -19,7 +19,7 @@ bb0:
   return %7 : $()
 }
 
-sil shared [serializable] @calledFromFuncPtr : $@convention(thin) () -> () {
+sil shared [serialized] @calledFromFuncPtr : $@convention(thin) () -> () {
 bb0:
   %6 = tuple ()
   return %6 : $()
