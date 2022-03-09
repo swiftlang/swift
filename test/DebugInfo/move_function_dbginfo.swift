@@ -3,6 +3,9 @@
 // RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-disable-pass=alloc-stack-hoisting -g -c %s -o %t/out.o
 // RUN: %llvm-dwarfdump --show-children %t/out.o | %FileCheck -check-prefix=DWARF %s
 
+// rdar://90028779
+// REQUIRES: rdar90028779
+
 // This test checks that:
 //
 // 1. At the IR level, we insert the appropriate llvm.dbg.addr, llvm.dbg.value.
