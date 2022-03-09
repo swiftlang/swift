@@ -226,7 +226,6 @@ def run(*args, **kwargs):
     if lock:
         lock.acquire()
     if echo_output:
-        print(repo_path)
         _echo_command(dry_run, *args, env=env)
         if output:
             print(output, end="")
