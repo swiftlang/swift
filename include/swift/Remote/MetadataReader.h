@@ -1002,10 +1002,6 @@ public:
   readContextDescriptor(const RemoteAbsolutePointer &address) {
     // Map an unresolved pointer to an unresolved context ref.
     if (!address.isResolved()) {
-      // We can only handle references to a symbol without an offset currently.
-      if (address.getOffset() != 0) {
-        return ParentContextDescriptorRef();
-      }
       return ParentContextDescriptorRef(address.getSymbol());
     }
     
