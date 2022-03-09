@@ -531,6 +531,9 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     auto funcParam = funcParams->get(i);
 
     auto paramName = funcParam->getParameterName();
+    // If internal name is empty it could only mean either
+    // `_:` or `x _: ...`, so let's auto-generate a name
+    // to be used in the body of a thunk.
     if (paramName.empty()) {
       paramName = C.getIdentifier("p" + llvm::utostr(i));
     }
