@@ -8,13 +8,10 @@
 
 // REQUIRES: VENDOR=apple
 
-// FIXME(distributed): reenable these accessor tests
-// XFAIL: *
-
 import _Distributed
 import FakeDistributedActorSystems
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.7, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 enum SimpleE : Codable {
@@ -89,54 +86,53 @@ public distributed actor MyOtherActor {
 /// ---> Let's check that distributed accessors and thunks are emitted as accessible functions
 
 /// -> `MyActor.simple1`
-             ///  s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTE
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTE" = private constant
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic Si___________pIetMHygzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTETFTu" to i{{32|64}})
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyActor.simple2`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTE" = private constant
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic Si_____SS______pIetMHygozo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFTu" to i{{32|64}})
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyActor.simple3`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTE" = private constant
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic SS_____Si______pIetMHggdzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTETFTu" to i{{32|64}})
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyActor.single_case_enum`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFYaKFTE" = private constant
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic __________AA______pIetMHygdzo_ 27distributed_actor_accessors7SimpleEO AA7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTETFTu" to i{{32|64}})
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFYaKFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyActor.with_indirect_enums`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitYaKFTE" = private constant
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic _____Si_____AA______pIetMHgygozo_ 27distributed_actor_accessors9IndirectEO AA7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitFTETFTu" to i{{32|64}})
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitYaKFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyActor.complex`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTE" = private constant
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic SaySiG_____SSSg__________AD______pIetMHgggngrzo_ 27distributed_actor_accessors3ObjC AA11LargeStructV AA7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTETFTu" to i{{32|64}})
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyOtherActor.empty`
-// CHECK:      @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTE" = private constant
+// CHECK:      @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic ___________pIetMHgzo_ 27distributed_actor_accessors12MyOtherActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETFTu" to i{{32|64}})
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 // CHECK:      @llvm.used = appending global [{{.*}} x i8*] [
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTE"
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTE"
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTE"
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFYaKFTE"
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitYaKFTE"
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTE"
-// CHECK-SAME: @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTE"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFYaKFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitYaKFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTEHF"
 // CHECK-SAME: ], section "llvm.metadata"
