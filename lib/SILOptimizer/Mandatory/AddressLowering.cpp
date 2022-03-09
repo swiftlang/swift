@@ -406,8 +406,7 @@ struct AddressLoweringState {
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
 
-  // Copies from a phi's operand storage to the phi storage. These logically
-  // occur on the CFG edge. Keep track of them to resolve anti-dependencies.
+  // Handle moves from a phi's operand storage to the phi storage.
   std::unique_ptr<PhiRewriter> phiRewriter;
 
   AddressLoweringState(SILFunction *function, DominanceInfo *domInfo)
@@ -758,10 +757,11 @@ static Operand *getProjectedDefOperand(SILValue value) {
   }
 }
 
-/// Return the operand of the reused storage. These operations are always
-/// rewritten by the use rewriter and destructively reuse their operand's
-/// storage. If the result is address-only, then the operand must be
-/// address-only (otherwise, the operand would not necessarilly have storage).
+/// If \p value is a an existential or enum, then return the existential or enum
+/// operand. These operations are always rewritten by the UseRewriter and always
+/// destructively reuse the same storage as their operand. Note that if the
+/// operation's result is address-only, then the operand must be address-only
+/// and therefore must mapped to ValueStorage.
 static Operand *getReusedStorageOperand(SILValue value) {
   switch (value->getKind()) {
   default:
@@ -785,7 +785,7 @@ static Operand *getReusedStorageOperand(SILValue value) {
 }
 
 /// If \p operand can project into its user, return the SILValue representing
-/// user's storage. The user may composes an aggregate from its operands or
+/// user's storage. The user may compose an aggregate from its operands or
 /// forwards its operands to arguments.
 ///
 /// TODO: Handle SwitchValueInst, CheckedCastValueBranchInst.
@@ -1446,7 +1446,7 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
 //===----------------------------------------------------------------------===//
 //                              PhiRewriter
 //
-// Insert copies on CFG edges to break phi operand interferences.
+// Insert moves on CFG edges to break phi operand interferences.
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -1456,18 +1456,18 @@ namespace {
 // 1. Materialize the phi address. If the phi projects into a use, this requires
 // initialization of the user's storage in each predecessor.
 //
-// 2. If the phi operand is not coalesced, then copy the operand into the
+// 2. If the phi operand is not coalesced, then move the operand into the
 // materialized phi address.
 //
-// For blocks with multiple phis, all copies of phi operands semantically occur
+// For blocks with multiple phis, all moves of phi operands semantically occur
 // in parallel on the CFG edge from the predecessor to the phi block. As these
-// copies are inserted into the predecessor's intruction list, maintain the
-// illusion of parallel copies by resolving any interference between the phi
-// copies. This is done by checking for anti-dependencies to or from other phi
-// copies. If one phi copy's source reads from another phi copy's dest, then the
+// moves are inserted into the predecessor's intruction list, maintain the
+// illusion of parallel moves by resolving any interference between the phi
+// moves. This is done by checking for anti-dependencies to or from other phi
+// moves. If one phi move's source reads from another phi move's dest, then the
 // read must occur before the write.
 //
-// Insert a second copy to break an anti-dependence cycle when both the source
+// Insert a second move to break an anti-dependence cycle when both the source
 // and destination of the new phi interferes with other phis (the classic
 // phi-swap problem).
 //
@@ -1486,18 +1486,18 @@ namespace {
 //     br bb3(val0, val1)
 //   bb2:
 //     temp = alloc_stack
-//     copy_addr addr0 to temp
-//     copy_addr addr1 to addr0
-//     copy_addr temp to addr1
+//     copy_addr [take] addr0 to [initialization] temp
+//     copy_addr [take] addr1 to [initialization] addr0
+//     copy_addr [take] temp to [initialization] addr1
 //     dealloc_stack temp
 //     br bb3(val1, val1)
 //   bb3(phi0, phi1):
 class PhiRewriter {
   AddressLoweringState &pass;
 
-  // A set of copies from a phi operand storage to phi storage. These logically
+  // A set of moves from a phi operand storage to phi storage. These logically
   // occur on the CFG edge. Keep track of them to resolve anti-dependencies.
-  SmallPtrSet<CopyAddrInst *, 16> phiCopies;
+  SmallPtrSet<CopyAddrInst *, 16> phiMoves;
 
 public:
   PhiRewriter(AddressLoweringState &pass) : pass(pass) {}
@@ -1508,18 +1508,18 @@ protected:
   PhiRewriter(const PhiRewriter &) = delete;
   PhiRewriter &operator=(const PhiRewriter &) = delete;
 
-  CopyAddrInst *createPhiCopy(SILBuilder &builder, SILValue from, SILValue to) {
-    auto *copy = builder.createCopyAddr(pass.genLoc(), from, to, IsTake,
+  CopyAddrInst *createPhiMove(SILBuilder &builder, SILValue from, SILValue to) {
+    auto *move = builder.createCopyAddr(pass.genLoc(), from, to, IsTake,
                                         IsInitialization);
-    phiCopies.insert(copy);
-    return copy;
+    phiMoves.insert(move);
+    return move;
   }
 
-  struct CopyPosition {
-    SILBasicBlock::iterator latestCopyPos;
+  struct MovePosition {
+    SILBasicBlock::iterator latestMovePos;
     bool foundAntiDependenceCycle = false;
   };
-  CopyPosition findPhiCopyPosition(PhiOperand phiOper);
+  MovePosition findPhiMovePosition(PhiOperand phiOper);
 };
 } // anonymous namespace
 
@@ -1529,15 +1529,15 @@ void PhiRewriter::materializeOperand(PhiOperand phiOper) {
   if (operStorage.isPhiProjection()) {
     if (operStorage.projectedStorageID
         == pass.valueStorageMap.getOrdinal(phiOper.getValue())) {
-      // This operand was coalesced with this particular phi. No copy needed.
+      // This operand was coalesced with this particular phi. No move needed.
       return;
     }
   }
   auto phiOperAddress = operStorage.getMaterializedAddress();
 
-  auto copyPos = findPhiCopyPosition(phiOper);
+  auto movePos = findPhiMovePosition(phiOper);
 
-  auto builder = pass.getBuilder(copyPos.latestCopyPos);
+  auto builder = pass.getBuilder(movePos.latestMovePos);
   AddressMaterialization addrMat(pass, builder);
 
   auto &phiStorage = pass.valueStorageMap.getStorage(phiOper.getValue());
@@ -1545,16 +1545,16 @@ void PhiRewriter::materializeOperand(PhiOperand phiOper) {
       addrMat.materializeUseProjectionStorage(phiStorage,
                                               /*intoPhiOperand*/ true);
 
-  if (!copyPos.foundAntiDependenceCycle) {
-    createPhiCopy(builder, phiOperAddress, phiAddress);
+  if (!movePos.foundAntiDependenceCycle) {
+    createPhiMove(builder, phiOperAddress, phiAddress);
     return;
   }
   AllocStackInst *alloc =
       builder.createAllocStack(pass.genLoc(), phiOper.getValue()->getType());
-  createPhiCopy(builder, phiOperAddress, alloc);
+  createPhiMove(builder, phiOperAddress, alloc);
 
   auto tempBuilder = pass.getBuilder(phiOper.getBranch()->getIterator());
-  createPhiCopy(tempBuilder, alloc, phiAddress);
+  createPhiMove(tempBuilder, alloc, phiAddress);
   tempBuilder.createDeallocStack(pass.genLoc(), alloc);
 }
 
@@ -1565,9 +1565,9 @@ PhiRewriter &AddressLoweringState::getPhiRewriter() {
   return *(this->phiRewriter.get());
 }
 
-// Return the latest position at which a copy into this phi may be emitted
-// without violating an anti-dependence on another phi copy.
-PhiRewriter::CopyPosition PhiRewriter::findPhiCopyPosition(PhiOperand phiOper) {
+// Return the latest position at which a move into this phi may be emitted
+// without violating an anti-dependence on another phi move.
+PhiRewriter::MovePosition PhiRewriter::findPhiMovePosition(PhiOperand phiOper) {
   auto phiBaseAddress =
       pass.valueStorageMap.getBaseStorage(phiOper.getValue()).storageAddress;
 
@@ -1578,34 +1578,34 @@ PhiRewriter::CopyPosition PhiRewriter::findPhiCopyPosition(PhiOperand phiOper) {
   auto insertPt = phiOper.getBranch()->getIterator();
   bool foundEarliestInsertPoint = false;
 
-  CopyPosition copyPos;
-  copyPos.latestCopyPos = insertPt;
+  MovePosition movePos;
+  movePos.latestMovePos = insertPt;
 
-  // Continue scanning until all phi copies have been checked for interference.
+  // Continue scanning until all phi moves have been checked for interference.
   for (auto beginIter = phiOper.predBlock->begin(); insertPt != beginIter;) {
     --insertPt;
 
-    auto *phiCopy = dyn_cast<CopyAddrInst>(&*insertPt);
-    if (!phiCopy || !phiCopies.contains(phiCopy))
+    auto *phiMove = dyn_cast<CopyAddrInst>(&*insertPt);
+    if (!phiMove || !phiMoves.contains(phiMove))
       break;
 
     if (!foundEarliestInsertPoint
-        && getAccessBase(phiCopy->getSrc()) == phiBaseAddress) {
-      // Anti-dependence from the phi copy to the phi value. Do not copy into
+        && getAccessBase(phiMove->getSrc()) == phiBaseAddress) {
+      // Anti-dependence from the phi move to the phi value. Do not move into
       // the phi storage before this point.
       foundEarliestInsertPoint = true;
     }
-    if (getAccessBase(phiCopy->getDest()) == operBaseAddress) {
-      // Anti-dependence from the phi operand to the phi copy. Do not copy out
+    if (getAccessBase(phiMove->getDest()) == operBaseAddress) {
+      // Anti-dependence from the phi operand to the phi move. Do not move out
       // of the operand storage after this point.
-      copyPos.latestCopyPos = insertPt;
+      movePos.latestMovePos = insertPt;
       // If the earliest and latest points conflict, allocate a temporary.
       if (foundEarliestInsertPoint) {
-        copyPos.foundAntiDependenceCycle = true;
+        movePos.foundAntiDependenceCycle = true;
       }
     }
   }
-  return copyPos;
+  return movePos;
 }
 
 //===----------------------------------------------------------------------===//
