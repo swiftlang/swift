@@ -18,40 +18,6 @@
 
 namespace swift {
 
-SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
-  auto *module = F.getModule().getSwiftModule();
-  auto &C = F.getASTContext();
-
-  auto *transportProto = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
-  Type transportTy = transportProto->getDeclaredInterfaceType();
-
-  for (auto arg : F.getArguments()) {
-    // TODO(distributed): also be able to locate a generic transport
-    Type argTy = arg->getType().getASTType();
-    auto argDecl = arg->getDecl();
-
-    auto conformsToTransport =
-        module->lookupConformance(argDecl->getInterfaceType(), transportProto);
-
-    // Is it a protocol that conforms to DistributedActorSystem?
-    if (argTy->isEqual(transportTy) || conformsToTransport) {
-      return arg;
-    }
-
-    // Is it some specific DistributedActorSystem?
-    auto result = module->lookupConformance(argTy, transportProto);
-    if (!result.isInvalid()) {
-      return arg;
-    }
-  }
-
-#ifndef NDEBUG
-  llvm_unreachable("Missing required DistributedActorSystem argument!");
-#endif
-
-  return nullptr;
-}
-
 void emitDistributedActorSystemWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName,
     SILValue base,

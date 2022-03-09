@@ -32,10 +32,6 @@ class SILLocation;
 class SILType;
 class SILValue;
 
-/// Finds the first `DistributedActorSystem`-compatible parameter of the given function.
-/// \returns nullptr if the function does not have such a parameter.
-SILArgument *findFirstDistributedActorSystemArg(SILFunction &F);
-
 /// Emit a call to a witness of the DistributedActorSystem protocol.
 ///
 /// \param methodName The name of the method on the DistributedActorSystem protocol.
