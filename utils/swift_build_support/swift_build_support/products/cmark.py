@@ -52,6 +52,8 @@ class CMark(cmake_product.CMakeProduct):
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING',
                                   self.args.cmark_build_variant)
 
+        self.cmake_options.define('CMARK_THREADING', 'ON')
+
         (platform, arch) = host_target.split('-')
 
         common_c_flags = ' '.join(self.common_cross_c_flags(platform, arch))
