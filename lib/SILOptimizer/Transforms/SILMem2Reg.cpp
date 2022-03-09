@@ -1757,6 +1757,14 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
       b.createDeallocStack(next->getLoc(), alloc);
     }
     return true;
+  } else {
+    // For enums we require that all uses are in the same block.
+    // Otherwise there could be a switch_enum of an optional where the none-case
+    // does not have a destroy of the enum value.
+    // After transforming such an alloc_stack, the value would leak in the none-
+    // case block.
+    if (f.hasOwnership() && alloc->getType().isOrHasEnum())
+      return false;
   }
 
   LLVM_DEBUG(llvm::dbgs() << "*** Need to insert BB arguments for " << *alloc);
