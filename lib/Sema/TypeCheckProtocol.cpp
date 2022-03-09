@@ -1043,7 +1043,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
         // the default witness for 'Collection.Iterator', which is defined
         // as 'IndexingIterator<Self>'.
         const auto selfRefInfo = req->findExistentialSelfReferences(
-            proto->getDeclaredInterfaceType(), dc,
+            proto->getDeclaredInterfaceType(),
             /*treatNonResultCovariantSelfAsInvariant=*/true);
         if (!selfRefInfo.assocTypeRef) {
           covariantSelf = classDecl;
@@ -4065,7 +4065,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   // Check whether this requirement uses Self in a way that might
   // prevent conformance from succeeding.
   const auto selfRefInfo = requirement->findExistentialSelfReferences(
-      Proto->getDeclaredInterfaceType(), DC,
+      Proto->getDeclaredInterfaceType(),
       /*treatNonResultCovariantSelfAsInvariant=*/true);
 
   if (selfRefInfo.selfRef == TypePosition::Invariant) {
