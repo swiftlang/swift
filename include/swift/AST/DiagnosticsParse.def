@@ -1561,17 +1561,8 @@ ERROR(attr_availability_duplicate,none,
       (StringRef, StringRef))
 
 // originallyDefinedIn
-// FIXME(backDeploy): Refactor to share with back deployment attr
 ERROR(originally_defined_in_missing_rparen,none,
       "expected ')' in @_originallyDefinedIn argument list", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-ERROR(originally_defined_in_unrecognized_platform,none,
-      "unrecognized platform name in @_originallyDefinedIn argument list", ())
-
-// FIXME: This is unused and can be removed
-ERROR(originally_defined_in_unrecognized_property,none,
-      "unrecognized property in @_originallyDefinedIn argument list", ())
 
 ERROR(originally_defined_in_need_original_module_name,none,
       "expected 'module: \"original\"' in the first argument to "
@@ -1579,27 +1570,6 @@ ERROR(originally_defined_in_need_original_module_name,none,
 
 ERROR(originally_defined_in_need_nonempty_module_name,none,
       "original module name cannot be empty in @_originallyDefinedIn", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-ERROR(originally_defined_in_need_platform_version,none,
-     "expected at least one platform version in @_originallyDefinedIn", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-WARNING(originally_defined_in_major_minor_only,none,
-        "@_originallyDefinedIn only uses major and minor version number", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-WARNING(originally_defined_in_missing_platform_name,none,
-        "* as platform name has no effect", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-WARNING(originally_defined_in_swift_version, none,
-        "Swift language version checks has no effect "
-        "in @_originallyDefinedIn", ())
-
-WARNING(originally_defined_in_package_description, none,
-        "PackageDescription version checks has no effect "
-        "in @_originallyDefinedIn", ())
 
 // backDeploy
 ERROR(attr_back_deploy_missing_rparen,none,
