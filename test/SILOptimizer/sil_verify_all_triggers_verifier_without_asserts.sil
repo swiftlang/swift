@@ -5,6 +5,8 @@
 
 // UNSUPPORTED: asserts
 
+// REQUIRES: rdar89986815
+
 class Klass {}
 
 sil [ossa] @leaky_code : $@convention(thin) () -> () {
