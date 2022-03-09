@@ -230,6 +230,8 @@ def run(*args, **kwargs):
         if output:
             print(output, end="")
         print()
+        sys.stdout.flush()
+        sys.stderr.flush()
     if lock:
         lock.release()
 
