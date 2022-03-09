@@ -176,30 +176,6 @@ static SILFunctionConventions getLoweredCallConv(ApplySite call) {
       SILModuleConventions::getLoweredAddressConventions(call.getModule()));
 }
 
-/// Invoke \p cleanup on all paths exiting a call.
-static void
-cleanupAfterCall(FullApplySite apply,
-                 llvm::function_ref<void(SILBasicBlock::iterator)> cleanup) {
-  switch (apply.getKind()) {
-  case FullApplySiteKind::ApplyInst: {
-    cleanup(std::next(apply.getInstruction()->getIterator()));
-    break;
-  }
-  case FullApplySiteKind::TryApplyInst: {
-    auto *tryApply = cast<TryApplyInst>(apply.getInstruction());
-    cleanup(tryApply->getNormalBB()->begin());
-    cleanup(tryApply->getErrorBB()->begin());
-    break;
-  }
-  case FullApplySiteKind::BeginApplyInst: {
-    // FIXME: Unimplemented
-    //
-    // This should be as simple as calling cleanup for all the end_applies.
-    llvm::report_fatal_error("Unimplemented coroutine");
-  }
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                                Multi-Result
 //
@@ -482,6 +458,12 @@ protected:
     builder.setCurrentDebugScope(originalInst->getDebugScope());
     return builder;
   }
+
+  void prepareBuilder(SILBuilder &builder) {
+    builder.setSILConventions(
+      SILModuleConventions::getLoweredAddressConventions(
+        builder.getModule()));
+  };
 };
 } // end anonymous namespace
 
@@ -1733,22 +1715,20 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
   if (apply.getArgumentConvention(*operand).isOwnedConvention()) {
     argBuilder.createTrivialStoreOr(apply.getLoc(), argValue, allocInst,
                                     StoreOwnershipQualifier::Init);
-    cleanupAfterCall(apply, [&](SILBasicBlock::iterator insertPt) {
-      auto deallocBuilder = pass.getBuilder(insertPt);
-      deallocBuilder.createDeallocStack(callLoc, allocInst);
+    apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
+      callBuilder.createDeallocStack(callLoc, allocInst);
     });
   } else {
     auto borrow = argBuilder.emitBeginBorrowOperation(callLoc, argValue);
     auto *storeInst =
         argBuilder.emitStoreBorrowOperation(callLoc, borrow, allocInst);
 
-    cleanupAfterCall(apply, [&](SILBasicBlock::iterator insertPt) {
-      auto cleanupBuilder = pass.getBuilder(insertPt);
+    apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
       if (auto *storeBorrow = dyn_cast<StoreBorrowInst>(storeInst)) {
-        cleanupBuilder.emitEndBorrowOperation(callLoc, storeBorrow);
+        callBuilder.emitEndBorrowOperation(callLoc, storeBorrow);
       }
-      cleanupBuilder.emitEndBorrowOperation(callLoc, borrow);
-      cleanupBuilder.createDeallocStack(callLoc, allocInst);
+      callBuilder.emitEndBorrowOperation(callLoc, borrow);
+      callBuilder.createDeallocStack(callLoc, allocInst);
     });
   }
 }
@@ -2020,9 +2000,8 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(SILValue oldResult,
 
   // Instead of using resultBuilder, insert dealloc immediately after the call
   // for stack discpline across loadable indirect results.
-  cleanupAfterCall(apply, [&](SILBasicBlock::iterator insertPt) {
-    auto cleanupBuilder = pass.getBuilder(insertPt);
-    cleanupBuilder.createDeallocStack(callLoc, allocInst);
+  apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
+    callBuilder.createDeallocStack(callLoc, allocInst);
   });
 
   if (oldResult && !oldResult->use_empty()) {
