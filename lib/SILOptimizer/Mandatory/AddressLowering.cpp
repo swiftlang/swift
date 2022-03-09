@@ -19,18 +19,53 @@
 ///
 /// This pass never creates copies except to replace explicit value copies
 /// (copy_value, load [copy], store). For move-only values, this allows complete
-/// diagnostics. And in general, it makes it impossible for SIL passes to
+/// diagnostics. And in general, this makes it impossible for SIL passes to
 /// "accidentally" create copies.
 ///
 /// This pass inserts moves (copy_addr [take] [initialize]) of owned values to
 /// - compose aggregates
 /// - resolve phi interference
 ///
-/// For guarantee values, this pass inserts neither copies nor moves. Opaque
+/// For guaranteed values, this pass inserts neither copies nor moves. Opaque
 /// values are potentially unmovable when borrowed. This means that guaranteed
 /// address-only aggregates and phis are prohibited. This SIL invariant is
 /// enforced by SILVerifier::checkOwnershipForwardingInst() and
 /// SILVerifier::visitSILPhiArgument().
+///
+/// The simplest approach to address lowering is to map each opaque SILValue to
+/// a separate alloc_stack. This pass avoids doing that in the following cases:
+///
+/// 1. Reused-storage: Some operations are guaranteed to reuse their operand's
+/// storage. This includes extracting an enum payload and opening an existential
+/// value. This is required avoid introducing new copies or moves.
+///
+///   // %data's storage must reuse storage allocated for %enum
+///   %data = unchecked_enum_data %enum : $Optional<T>, #Optional.some!enumelt
+///
+/// 2. Def-projection: Some operations are guaranteed to directly project out of
+/// their operand's storage. This is also required to avoid introducing new
+/// copies or moves. Unlike reused-storage, such projections are non-destructive
+/// and repeatable.
+///
+///   // %field's storage is part of the storage allocated for %struct
+///   %field = struct_extract %struct, #field
+///
+/// 3. Use-projection: Operations that compose aggregates may optionally allow
+/// their operands to project into the storage allocated for their result. This
+/// is only an optimization but is essential for reasonable code generation.
+///
+///  // %field's storage may be part of the storage allocated for %struct
+///  %struct = struct(..., %field, ...)
+///
+/// 4. Phi-projection: Phi's may optionally allow their (branch) operands to
+/// reuse the storage allocated for their result (block argument). This is only
+/// an optimization, but is important to avoid many useless moves:
+///
+///   // %arg's storage may be part of the storage allocated for %phi
+///   br bb(%arg)
+///   bb(%phi : @owned $T)
+///
+/// The algorithm proceeds as follows:
 ///
 /// ## Step #1: Map opaque values
 ///
@@ -38,18 +73,21 @@
 /// order (RPO). Each opaque value is mapped to an ordinal ID representing the
 /// storage. Storage locations can now be optimized by remapping the values.
 ///
+/// Reused-storage operations are not mapped to ValueStorage.
+///
 /// ## Step #2: Allocate storage
 ///
 /// In reverse order (PO), allocate the parent storage object for each opaque
 /// value.
 ///
-/// If the value is a subobject extraction (struct_extract, tuple_extract,
-/// open_existential_value, unchecked_enum_data), then mark the value's storage
-/// as a projection from the def's storage.
+/// Handle def-projection: If the value is a subobject extraction
+/// (struct_extract, tuple_extract, open_existential_value,
+/// unchecked_enum_data), then mark the value's storage as a projection from the
+/// def's storage.
 ///
-/// If the value's use composes a parent object from this value (struct, tuple,
-/// enum), and the use's storage dominates this value, then mark the value's
-/// storage as a projection into the use's storage.
+/// Handle use-projection: If the value's use composes a parent object from this
+/// value (struct, tuple, enum), and the use's storage dominates this value,
+/// then mark the value's storage as a projection into the use's storage.
 ///
 /// ValueStorage projections can be chained. A non-projection ValueStorage is
 /// the root of a tree of projections.
@@ -59,11 +97,11 @@
 /// projections are not mapped to a `storageAddress` at this point. That happens
 /// during rewriting.
 ///
-/// After allocating storage for all non-phi opaque values, phi storage is
-/// allocated. (Phi values are block arguments in which phi's arguments are
-/// branch operands). This is handled by a PhiStorageOptimizer that checks for
-/// interference among the phi operands and reuses storage allocated to other
-/// values.
+/// Handle phi-projection: After allocating storage for all non-phi opaque
+/// values, phi storage is allocated. (Phi values are block arguments in which
+/// phi's arguments are branch operands). This is handled by a
+/// PhiStorageOptimizer that checks for interference among the phi operands and
+/// reuses storage allocated to other values.
 ///
 /// ## Step #3. Rewrite opaque values
 ///
