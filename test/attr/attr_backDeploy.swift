@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library \
+// RUN:   -define-availability "_myProject 2.0:macOS 12.0"
 
 // MARK: - Valid declarations
 
@@ -192,6 +193,7 @@ public func transparentFunc() {}
 
 // MARK: - Attribute parsing
 
+@available(macOS 11.0, *)
 @_backDeploy(macOS 12.0, unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@_backDeploy'}}
 public func unknownOSFunc() {}
 
@@ -230,8 +232,27 @@ public func trailingWildcardFunc() {}
 @_backDeploy(macOS 12.0, *, iOS 15.0) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
 public func embeddedWildcardFunc() {}
 
+@_backDeploy(_myProject 3.0) // expected-error {{reference to undefined version '3.0' for availability macro '_myProject'}}
+public func macroVersionned() {}
+
+@_backDeploy(_myProject) // expected-error {{reference to undefined version '0' for availability macro '_myProject'}}
+public func missingMacroVersion() {}
+
+// Fall back to the default diagnostic when the macro is unknown.
+@_backDeploy(_unknownMacro) // expected-warning {{unknown platform '_unknownMacro' for attribute '@_backDeploy'}}
+// expected-error@-1 {{expected version number in '@_backDeploy' attribute}}
+public func unknownMacroMissingVersion() {}
+
+@_backDeploy(_unknownMacro 1.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@_backDeploy'}}
+// expected-error@-1 {{expected at least one platform version in '@_backDeploy' attribute}}
+public func unknownMacroVersionned() {}
+
+@available(macOS 11.0, *)
+@_backDeploy(_unknownMacro 1.0, _myProject 2.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@_backDeploy'}}
+public func knownAndUnknownMacroVersionned() {}
+
 @_backDeploy() // expected-error {{expected at least one platform version in '@_backDeploy' attribute}}
-public func zeroPlatformVersionsFunc() {}
+public func emptyPlatformVersionsFunc() {}
 
 @_backDeploy // expected-error {{expected '(' in '_backDeploy' attribute}}
 public func expectedLeftParenFunc() {}
