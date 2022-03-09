@@ -527,15 +527,23 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   // --- Prepare parameters
   auto funcParams = func->getParameters();
   SmallVector<ParamDecl*, 2> paramDecls;
-  for (auto i : indices(*func->getParameters())) {
+  for (unsigned i : indices(*func->getParameters())) {
     auto funcParam = funcParams->get(i);
-    auto paramDecl = new (C) ParamDecl(SourceLoc(),
-                               SourceLoc(), funcParam->getArgumentName(),
-                               SourceLoc(), funcParam->getParameterName(),
-                               DC);
+
+    auto paramName = funcParam->getParameterName();
+    if (paramName.empty()) {
+      paramName = C.getIdentifier("p" + llvm::utostr(i));
+    }
+
+    auto paramDecl = new (C)
+        ParamDecl(SourceLoc(),
+                  /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
+                  /*parameterNameLoc=*/SourceLoc(), paramName, DC);
+
     paramDecl->setImplicit(true);
     paramDecl->setSpecifier(funcParam->getSpecifier());
     paramDecl->setInterfaceType(funcParam->getInterfaceType());
+
     paramDecls.push_back(paramDecl);
   }
   ParameterList *params = ParameterList::create(C, paramDecls); // = funcParams->clone(C);
