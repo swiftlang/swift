@@ -3757,6 +3757,10 @@ namespace {
           auto *subscriptImpl = getterAndSetter.first ? getterAndSetter.first : getterAndSetter.second;
           Impl.addAlternateDecl(subscriptImpl, subscript);
         }
+
+        for(auto &recordOp : Impl.cxxOperators) {
+          result->addMember(makeOperator(recordOp));
+        }
       }
 
       result->setMemberLoader(&Impl, 0);
@@ -5391,6 +5395,8 @@ namespace {
     SubscriptDecl *makeSubscript(FuncDecl *getter, FuncDecl *setter);
     VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                                 FuncDecl *setter);
+
+    FuncDecl *makeOperator(FuncDecl *operatorMethod);
 
     /// Import the accessor and its attributes.
     AccessorDecl *importAccessor(const clang::ObjCMethodDecl *clangAccessor,
@@ -8074,6 +8080,67 @@ SwiftDeclConverter::makeSubscript(FuncDecl *getter, FuncDecl *setter) {
                                    getterImpl->isImplicitlyUnwrappedOptional());
 
   return subscript;
+}
+
+
+static std::pair<BraceStmt *, bool>
+synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
+  ASTContext &ctx = afd->getASTContext();
+
+  auto funcDecl = cast<FuncDecl>(afd);
+  auto methodDecl = cast<FuncDecl>(context);
+
+  SmallVector<Expr *, 8> forwardingParams;
+  for (auto param : *methodDecl->getParameters()) {
+    auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
+                                              /*Implicit=*/true);
+    paramRefExpr->setType(param->getType());
+    forwardingParams.push_back(paramRefExpr);
+  }
+
+  auto methodExpr = new (ctx) DeclRefExpr(methodDecl, DeclNameLoc(), /*implicit*/ true);
+
+  auto *selfDecl = methodDecl->getImplicitSelfDecl();
+  auto selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/ true);
+  selfExpr->setType(selfDecl->getType());
+  auto dotCallExpr = DotSyntaxCallExpr::create(ctx, methodExpr, SourceLoc(), selfExpr);
+  dotCallExpr->setType(methodDecl->getInterfaceType());
+  dotCallExpr->setThrows(false);
+
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, forwardingParams);
+  auto callExpr = CallExpr::createImplicit(ctx, dotCallExpr, argList);
+
+  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), callExpr,
+                                         /*implicit=*/true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
+                                /*implicit=*/true);
+  return {body, /*isTypeChecked=*/true};
+}
+
+FuncDecl *SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod) {
+  auto &ctx = Impl.SwiftContext;
+  auto loc = operatorMethod->getLoc();
+  auto paramList = operatorMethod->getParameters();
+  auto topLevelStaticFuncDecl = FuncDecl::create(
+          ctx, SourceLoc(),
+          StaticSpellingKind::None, SourceLoc(),
+          operatorMethod->getName(), /*NameLoc=*/ SourceLoc(),
+          false, /*AsyncLoc=*/ SourceLoc(),
+          false, /*ThrowsLoc=*/ SourceLoc(),
+          nullptr,
+          paramList,
+          operatorMethod->getResultTypeRepr(),
+          operatorMethod->getModuleContext()
+      );
+
+  topLevelStaticFuncDecl->setAccess(AccessLevel::Public);
+  topLevelStaticFuncDecl->setImplicit();
+  topLevelStaticFuncDecl->setIsDynamic(false);
+
+  topLevelStaticFuncDecl->setBodySynthesizer(synthesizeOperatorMethodBody, operatorMethod);
+
+  return topLevelStaticFuncDecl;
 }
 
 void SwiftDeclConverter::addProtocols(

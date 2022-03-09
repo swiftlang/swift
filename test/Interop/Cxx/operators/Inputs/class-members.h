@@ -11,6 +11,10 @@ struct ClassMembers {
     return ClassMembers{.value = value + rhs.value};
   }
 
+  void operator+=(ClassMembers rhs) {
+     value += rhs.value;
+  }
+
   int operator()() {
     return value;
   }

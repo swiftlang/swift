@@ -57,6 +57,19 @@ using namespace importer;
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
+static const char *getOperatorName(clang::OverloadedOperatorKind Operator) {
+  switch (Operator) {
+  case clang::OO_None:
+  case clang::NUM_OVERLOADED_OPERATORS:
+    return nullptr;
+
+#define OVERLOADED_OPERATOR(Name,Spelling,Token,Unary,Binary,MemberOnly) \
+  case clang::OO_##Name: return #Name;
+#include "clang/Basic/OperatorKinds.def"
+  }
+
+  llvm_unreachable("Invalid OverloadedOperatorKind!");
+}
 
 /// Determine whether the given Clang selector matches the given
 /// selector pieces.
@@ -1843,17 +1856,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
     case clang::OverloadedOperatorKind::OO_PipePipe:
-      baseName = StringRef{std::string{"__operator"} + clang::getOperatorSpelling(op)};
+      baseName = StringRef{"__operator" + std::string{getOperatorName(op)}};
       isFunction = true;
-//      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
-
-//      argumentNames.resize(
-//          functionDecl->param_size() +
-//              // C++ operators that are implemented as non-static member functions
-//              // get imported into Swift as static member functions that use an
-//              // additional parameter for the left-hand side operand instead of
-//              // the receiver object.
-//              (isa<clang::CXXMethodDecl>(D) ? 1 : 0));
+      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
       break;
     case clang::OverloadedOperatorKind::OO_Call:
       baseName = "callAsFunction";
