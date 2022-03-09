@@ -1699,6 +1699,11 @@ public:
   }
 
   bool
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    return true;
+  }
+
+  bool
   visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return true;
   }
@@ -1811,6 +1816,11 @@ public:
 
   MetatypeRepresentation
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
     return MetatypeRepresentation::Thin;
   }
 
@@ -2258,6 +2268,11 @@ public:
     ExistentialTypeInfoBuilder builder(TC);
     builder.addProtocolComposition(PC);
     return builder.build(ExternalTypeInfo);
+  }
+
+  const TypeInfo *
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    return visitProtocolCompositionTypeRef(PPT->getBase());
   }
 
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {

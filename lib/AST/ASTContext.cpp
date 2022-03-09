@@ -4444,7 +4444,8 @@ CanTypeWrapper<OpenedArchetypeType>
 OpenedArchetypeType::get(CanType existential, GenericSignature parentSig,
                          Optional<UUID> knownID) {
   assert(existential->isExistentialType());
-  auto interfaceType = OpenedArchetypeType::getSelfInterfaceTypeFromContext(parentSig, existential->getASTContext());
+  auto interfaceType = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
+      parentSig, existential->getASTContext());
   return get(existential, interfaceType, parentSig, knownID);
 }
 
@@ -4510,7 +4511,8 @@ CanType OpenedArchetypeType::getAny(CanType existential, Type interfaceType,
 
 CanType OpenedArchetypeType::getAny(CanType existential,
                                     GenericSignature parentSig) {
-  auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(parentSig, existential->getASTContext());
+  auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
+      parentSig, existential->getASTContext());
   return getAny(existential, interfaceTy, parentSig);
 }
 
