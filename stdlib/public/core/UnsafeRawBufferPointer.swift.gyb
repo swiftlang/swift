@@ -695,10 +695,11 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// After calling this method on a raw buffer with non-nil `baseAddress` `b`, 
   /// the region starting at `b` and continuing up to
-  /// `b + self.count - self.count % MemoryLayout<T>.stride` is bound to type `T` and
-  /// initialized. If `T` is a nontrivial type, you must eventually deinitialize
-  /// or move the values in this region to avoid leaks. If `baseAddress` is 
-  /// `nil`, this function does nothing and returns an empty buffer pointer.
+  /// `b + self.count - self.count % MemoryLayout<T>.stride` is bound
+  /// to type `T` and initialized. If `T` is a nontrivial type, you must
+  /// eventually deinitialize or move the values in this region to avoid leaks.
+  /// If `baseAddress` is `nil`, this function does nothing
+  /// and returns an empty buffer pointer.
   ///
   /// - Parameters:
   ///   - type: The type to bind this buffer’s memory to.
@@ -735,7 +736,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// collection, the buffer has no more room for its elements. After calling
   /// `initializeMemory(as:from:)`, the memory referenced by the returned
   /// `UnsafeMutableBufferPointer` instance is bound and initialized to type
-  /// `S.Element`.
+  /// `S.Element`. This method does not change
+  /// the binding state of the unused portion of `b`, if any.
   ///
   /// - Parameters:
   ///   - type: The type of element to which this buffer's memory will be bound.
@@ -800,10 +802,10 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   - type: The type of element to which this buffer's memory will be bound.
   ///   - fromElements: A collection of elements to be used to
   ///     initialize the buffer's storage.
-  /// - Returns: A typed buffer of the initialized elements. The returned
-  ///   buffer references memory starting at the same base address as this
-  ///   buffer, and its count indicates the number of elements copied from
-  ///   the collection `elements`.
+  /// - Returns: A typed buffer containing the initialized elements.
+  ///     The returned buffer references memory starting at the same
+  ///     base address as this buffer, and its count indicates
+  ///     the number of elements copied from the collection `elements`.
   @discardableResult
   @inlinable
   @_alwaysEmitIntoClient
