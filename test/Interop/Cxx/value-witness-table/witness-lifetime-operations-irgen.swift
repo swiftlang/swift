@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -enable-cxx-interop -I %S/Inputs %s -emit-ir | %FileCheck %s
 
+// Temporarily restrict to x86 (rdar://89908618)
+// REQUIRES: CPU=x86_64
+
 import WitnessLifetimeOperations
 
 struct Holder<T> {

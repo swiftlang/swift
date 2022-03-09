@@ -432,28 +432,74 @@ void TypeRefBuilder::dumpTypeRef(RemoteRef<char> MangledName,
   stream << "\n";
 }
 
-void TypeRefBuilder::dumpFieldSection(std::ostream &stream) {
+FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
+    llvm::Optional<std::string> forMangledTypeName) {
+  FieldTypeCollectionResult result;
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.Field) {
-      auto TypeDemangling =
-          demangleTypeRef(readTypeRef(descriptor, descriptor->MangledTypeName));
-      auto TypeName = nodeToString(TypeDemangling);
+      auto typeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
+      auto typeName = nodeToString(demangleTypeRef(typeRef));
+      auto optionalMangledTypeName = normalizeReflectionName(typeRef);
       clearNodeFactory();
-      stream << TypeName.c_str() << "\n";
-      for (size_t i = 0; i < TypeName.size(); ++i)
-        stream << "-";
-      stream << "\n";
-      for (auto &fieldRef : *descriptor.getLocalBuffer()) {
-        auto field = descriptor.getField(fieldRef);
-        auto fieldName = getTypeRefString(readTypeRef(field, field->FieldName));
-        stream.write(fieldName.data(), fieldName.size());
-        if (field->hasMangledTypeName()) {
-          stream << ": ";
-          dumpTypeRef(readTypeRef(field, field->MangledTypeName), stream);
-        } else {
-          stream << "\n\n";
+      if (optionalMangledTypeName.hasValue()) {
+        auto mangledTypeName =
+            optionalMangledTypeName.getValue().insert(0, "$s");
+        if (forMangledTypeName.hasValue()) {
+          if (mangledTypeName != forMangledTypeName.getValue())
+            continue;
         }
+
+        std::vector<PropertyTypeInfo> properties;
+        std::vector<EnumCaseInfo> enumCases;
+        for (auto &fieldRef : *descriptor.getLocalBuffer()) {
+          auto field = descriptor.getField(fieldRef);
+          auto fieldName = getTypeRefString(readTypeRef(field, field->FieldName));
+          if (field->hasMangledTypeName()) {
+            std::string mangledFieldTypeName =
+                std::string(field->MangledTypeName);
+            auto fieldTypeRef = readTypeRef(field, field->MangledTypeName);
+            auto optionalMangledfieldTypeName =
+                normalizeReflectionName(fieldTypeRef);
+            if (optionalMangledfieldTypeName.hasValue()) {
+              mangledFieldTypeName =
+                  "$s" + optionalMangledfieldTypeName.getValue();
+            }
+            auto fieldTypeDemangleTree = demangleTypeRef(fieldTypeRef);
+            auto fieldTypeName = nodeToString(fieldTypeDemangleTree);
+            std::stringstream OS;
+            dumpTypeRef(fieldTypeRef, OS);
+            properties.emplace_back(PropertyTypeInfo{fieldName.str(),
+                                                     mangledFieldTypeName,
+                                                     fieldTypeName, OS.str()});
+          } else {
+            enumCases.emplace_back(EnumCaseInfo{fieldName.str()});
+          }
+        }
+        result.FieldInfos.emplace_back(FieldMetadata{
+            mangledTypeName, typeName, properties, enumCases});
       }
+    }
+  }
+
+  return result;
+}
+
+void TypeRefBuilder::dumpFieldSection(std::ostream &stream) {
+  auto fieldInfoCollectionResult =
+      collectFieldTypes(llvm::Optional<std::string>());
+  for (const auto &info : fieldInfoCollectionResult.FieldInfos) {
+    stream << info.FullyQualifiedName << "\n";
+    for (size_t i = 0; i < info.FullyQualifiedName.size(); ++i)
+      stream << "-";
+    stream << "\n";
+    for (const auto &field : info.Properties) {
+      stream << field.Label;
+      stream << ": ";
+      stream << field.TypeDiagnosticPrintName;
+    }
+    for (const auto &field : info.EnumCases) {
+      stream << field.Label;
+      stream << "\n\n";
     }
   }
 }

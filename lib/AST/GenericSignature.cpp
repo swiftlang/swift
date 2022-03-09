@@ -472,7 +472,7 @@ bool GenericSignatureImpl::isValidTypeInContext(Type type) const {
 
 ArrayRef<CanTypeWrapper<GenericTypeParamType>>
 CanGenericSignature::getGenericParams() const {
-  auto params = getPointer()->getGenericParams().getOriginalArray();
+  auto params = this->GenericSignature::getGenericParams().getOriginalArray();
   auto base = static_cast<const CanTypeWrapper<GenericTypeParamType>*>(
                                                               params.data());
   return {base, params.size()};

@@ -1398,10 +1398,9 @@ struct DataflowState {
         applySiteToPromotedArgIndices(applySiteToPromotedArgIndices),
         closureConsumes(closureConsumes) {}
   void init();
-  bool
-  process(SILValue address,
-          SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
-          SmallSetVector<SILInstruction *, 8> &debugInfoBlockSplitPoints);
+  bool process(
+      SILValue address,
+      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
   bool handleSingleBlockClosure(SILArgument *address,
                                 ClosureOperandState &state);
   bool cleanupAllDestroyAddr(
@@ -1409,8 +1408,7 @@ struct DataflowState {
       SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
       BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
       BasicBlockSet &blocksWithMovesThatAreNowTakes,
-      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
-      SmallSetVector<SILInstruction *, 8> &debugInfoBlockSplitPoints);
+      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
   void clear() {
     useBlocks.clear();
     initBlocks.clear();
@@ -1429,8 +1427,7 @@ bool DataflowState::cleanupAllDestroyAddr(
     SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
     BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
     BasicBlockSet &blocksWithMovesThatAreNowTakes,
-    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
-    SmallSetVector<SILInstruction *, 8> &debugInfoBlockSplitPoints) {
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
   bool madeChange = false;
   BasicBlockWorklist worklist(fn);
 
@@ -1544,12 +1541,8 @@ bool DataflowState::cleanupAllDestroyAddr(
       if (auto varInfo = debugVarInst.getVarInfo()) {
         SILBuilderWithScope reinitBuilder(*reinit);
         reinitBuilder.setCurrentDebugScope(debugVarInst->getDebugScope());
-        auto *dvi =
-            reinitBuilder.createDebugValue(debugVarInst.inst->getLoc(), address,
-                                           *varInfo, false, /*was moved*/ true);
-        // After we are done processing, we are going to split at the reinit
-        // point.
-        debugInfoBlockSplitPoints.insert(dvi);
+        reinitBuilder.createDebugValue(debugVarInst.inst->getLoc(), address,
+                                       *varInfo, false, /*was moved*/ true);
       }
     }
     madeChange = true;
@@ -1591,8 +1584,7 @@ bool DataflowState::cleanupAllDestroyAddr(
 
 bool DataflowState::process(
     SILValue address,
-    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
-    SmallSetVector<SILInstruction *, 8> &debugInfoBlockSplitPoints) {
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
   SILFunction *fn = address->getFunction();
   assert(fn);
 
@@ -1811,25 +1803,13 @@ bool DataflowState::process(
   if (!convertedMarkMoveToTake)
     return madeChange;
 
-  // Now if we had a debug var carrying inst for our address, add the debug var
-  // carrying inst to debugInfoBlockSplitPoints so when we are done processing
-  // we can break blocks at those locations. This is done to ensure that we
-  // don't have to worry about the CFG changing while we are processing. The
-  // reason why we do this is that we are working around a bug in SelectionDAG
-  // that results in llvm.dbg.addr being sunk to the end of blocks. This can
-  // cause the value to appear to not be available after it is initialized. By
-  // breaking the block here, we guarantee that SelectionDAG's sinking has no
-  // effect since we are the end of the block.
-  if (auto debug = DebugVarCarryingInst::getFromValue(address))
-    debugInfoBlockSplitPoints.insert(*debug);
-
   // Now that we have processed all of our mark_moves, eliminate all of the
   // destroy_addr.
   madeChange |= cleanupAllDestroyAddr(
       address, fn, getIndicesOfPairedDestroys(), getIndicesOfPairedReinits(),
       getIndicesOfPairedConsumingClosureUses(),
       blocksVisitedWhenProcessingNewTakes, blocksWithMovesThatAreNowTakes,
-      postDominatingConsumingUsers, debugInfoBlockSplitPoints);
+      postDominatingConsumingUsers);
 
   return madeChange;
 }
@@ -1932,19 +1912,6 @@ struct MoveKillsCopyableAddressesChecker {
       applySiteToPromotedArgIndices;
   SmallBlotSetVector<SILInstruction *, 8> closureConsumes;
 
-  /// A list of instructions where to work around the behavior of SelectionDAG,
-  /// we break the block. These are debug var carrying insts or debug_value
-  /// associated with reinits. This is initialized when we process all of the
-  /// addresses. Then as a final step after wards we use this as a worklist and
-  /// break blocks at each of these instructions. We update DebugInfo, LoopInfo
-  /// if we found that they already exist.
-  ///
-  /// We on purpose use a set vector to ensure that we only ever split a block
-  /// once.
-  SmallSetVector<SILInstruction *, 8> debugInfoBlockSplitPoints;
-  DominanceInfo *dominanceToUpdate = nullptr;
-  SILLoopInfo *loopInfoToUpdate = nullptr;
-
   MoveKillsCopyableAddressesChecker(SILFunction *fn,
                                     SILOptFunctionBuilder &funcBuilder)
       : fn(fn), useState(),
@@ -1952,12 +1919,6 @@ struct MoveKillsCopyableAddressesChecker {
                       closureConsumes),
         closureUseState(), closureUseDataflowState(closureUseState),
         funcBuilder(funcBuilder) {}
-
-  void setDominanceToUpdate(DominanceInfo *newInfo) {
-    dominanceToUpdate = newInfo;
-  }
-
-  void setLoopInfoToUpdate(SILLoopInfo *newInfo) { loopInfoToUpdate = newInfo; }
 
   void cloneDeferCalleeAndRewriteUses(
       SmallVectorImpl<SILValue> &temporaryStorage,
@@ -1970,20 +1931,6 @@ struct MoveKillsCopyableAddressesChecker {
 
   void emitDiagnosticForMove(SILValue borrowedValue,
                              StringRef borrowedValueName, MoveValueInst *mvi);
-  bool splitBlocksAfterDebugInfoCarryingInst(SILModule &mod) {
-    if (debugInfoBlockSplitPoints.empty())
-      return false;
-
-    SILBuilderContext ctx(mod);
-    do {
-      auto *next = debugInfoBlockSplitPoints.pop_back_val();
-      splitBasicBlockAndBranch(ctx, next->getNextInstruction(),
-                               dominanceToUpdate, loopInfoToUpdate);
-    } while (!debugInfoBlockSplitPoints.empty());
-
-    return true;
-  }
-
   bool performSingleBasicBlockAnalysis(SILValue address,
                                        MarkUnresolvedMoveAddrInst *mvi);
 
@@ -2131,7 +2078,6 @@ bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
       if (auto varInfo = debug.getVarInfo()) {
         SILBuilderWithScope undefBuilder(builder);
-        debugInfoBlockSplitPoints.insert(*debug);
         undefBuilder.setCurrentDebugScope(debug->getDebugScope());
         undefBuilder.createDebugValue(
             debug->getLoc(),
@@ -2242,7 +2188,6 @@ bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
       if (auto varInfo = debug.getVarInfo()) {
         {
-          debugInfoBlockSplitPoints.insert(*debug);
           SILBuilderWithScope undefBuilder(builder);
           undefBuilder.setCurrentDebugScope(debug->getDebugScope());
           undefBuilder.createDebugValue(
@@ -2257,10 +2202,9 @@ bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
           auto *next = interestingUser->getNextInstruction();
           SILBuilderWithScope reinitBuilder(next);
           reinitBuilder.setCurrentDebugScope(debug->getDebugScope());
-          auto *dvi = reinitBuilder.createDebugValue(debug->getLoc(),
-                                                     address, *varInfo, false,
-                                                     /*was moved*/ true);
-          debugInfoBlockSplitPoints.insert(dvi);
+          reinitBuilder.createDebugValue(debug->getLoc(), address, *varInfo,
+                                         false,
+                                         /*was moved*/ true);
         }
       }
       debug.markAsMoved();
@@ -2296,7 +2240,6 @@ bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
                dumpBitVector(llvm::dbgs(), bitVector); llvm::dbgs() << '\n');
     if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
       if (auto varInfo = debug.getVarInfo()) {
-        debugInfoBlockSplitPoints.insert(*debug);
         SILBuilderWithScope undefBuilder(builder);
         undefBuilder.setCurrentDebugScope(debug->getDebugScope());
         undefBuilder.createDebugValue(
@@ -2415,8 +2358,7 @@ bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   // Ok, we need to perform global dataflow for one of our moves. Initialize our
   // dataflow state engine and then run the dataflow itself.
   dataflowState.init();
-  bool result = dataflowState.process(address, closureConsumes,
-                                      debugInfoBlockSplitPoints);
+  bool result = dataflowState.process(address, closureConsumes);
   return result;
 }
 
@@ -2471,15 +2413,6 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
 
     MoveKillsCopyableAddressesChecker checker(getFunction(), funcBuilder);
 
-    // If we already had dominance or loop info generated, update them when
-    // splitting blocks.
-    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
-    if (dominanceAnalysis->hasFunctionInfo(fn))
-      checker.setDominanceToUpdate(dominanceAnalysis->get(fn));
-    auto *loopAnalysis = getAnalysis<SILLoopAnalysis>();
-    if (loopAnalysis->hasFunctionInfo(fn))
-      checker.setLoopInfoToUpdate(loopAnalysis->get(fn));
-
     bool madeChange = false;
     while (!addressToProcess.empty()) {
       auto address = addressToProcess.front();
@@ -2490,13 +2423,6 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
 
     if (madeChange) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-    }
-
-    // We update debug info/loop info here, so we just invalidate instructions.
-    if (checker.splitBlocksAfterDebugInfoCarryingInst(fn->getModule())) {
-      AnalysisPreserver preserveDominance(dominanceAnalysis);
-      AnalysisPreserver preserveLoop(loopAnalysis);
-      invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
 
     // Now go through and clone any apply sites that we need to clone.

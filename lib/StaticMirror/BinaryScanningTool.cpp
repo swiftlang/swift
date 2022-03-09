@@ -87,5 +87,15 @@ AssociatedTypeCollectionResult
 BinaryScanningTool::collectAllAssociatedTypes() {
   return Context->Builder.collectAssociatedTypes(llvm::Optional<std::string>());
 }
+
+FieldTypeCollectionResult
+BinaryScanningTool::collectFieldTypes(const std::string &mangledTypeName) {
+  return Context->Builder.collectFieldTypes(mangledTypeName);
+}
+
+FieldTypeCollectionResult
+BinaryScanningTool::collectAllFieldTypes() {
+  return Context->Builder.collectFieldTypes(llvm::Optional<std::string>());
+}
 } // end namespace static_mirror
 } // end namespace swift

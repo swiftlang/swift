@@ -5585,7 +5585,8 @@ Expr *getArgumentLabelTargetExpr(Expr *fn);
 /// the given type variable, type-erase occurences of that opened type
 /// variable and anything that depends on it to their non-dependent bounds.
 Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
-                                         TypeVariableType *openedTypeVar);
+                                         TypeVariableType *openedTypeVar,
+                                         const DeclContext *useDC);
 
 /// Returns true if a reference to a member on a given base type will apply
 /// its curried self parameter, assuming it has one.

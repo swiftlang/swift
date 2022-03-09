@@ -1278,7 +1278,7 @@ static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
 }
 
 /// Expand the result and parameter types to the appropriate LLVM IR
-/// types for C and Objective-C signatures.
+/// types for C, C++ and Objective-C signatures.
 void SignatureExpansion::expandExternalSignatureTypes() {
   assert(FnType->getLanguage() == SILFunctionLanguage::C);
 
@@ -1319,7 +1319,15 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangCtx.VoidPtrTy);
     break;
 
-  case SILFunctionTypeRepresentation::CXXMethod:
+  case SILFunctionTypeRepresentation::CXXMethod: {
+    // Cxx methods take their 'self' argument first.
+    auto &self = params.back();
+    auto clangTy = IGM.getClangType(self, FnType);
+    paramTys.push_back(clangTy);
+    params = params.drop_back();
+    break;
+  }
+
   case SILFunctionTypeRepresentation::CFunctionPointer:
     // No implicit arguments.
     break;
@@ -1437,9 +1445,14 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     case clang::CodeGen::ABIArgInfo::IndirectAliased:
       llvm_unreachable("not implemented");
     case clang::CodeGen::ABIArgInfo::Indirect: {
-      assert(i >= clangToSwiftParamOffset &&
+      // When `i` is 0, if the clang offset is 1, that means we mapped the last
+      // Swift parameter (self) to the first Clang parameter (this). In this
+      // case, the corresponding Swift param is the last function parameter.
+      assert((i >= clangToSwiftParamOffset || clangToSwiftParamOffset == 1) &&
              "Unexpected index for indirect byval argument");
-      auto &param = params[i - clangToSwiftParamOffset];
+      auto &param = i < clangToSwiftParamOffset
+                        ? FnType->getParameters().back()
+                        : params[i - clangToSwiftParamOffset];
       auto paramTy = getSILFuncConventions().getSILType(
           param, IGM.getMaximalTypeExpansionContext());
       auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(paramTy));
@@ -3544,7 +3557,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   } else if (callee.getRepresentation() ==
              SILFunctionTypeRepresentation::CXXMethod) {
     // Skip the "self" param.
-    paramEnd--;
+    firstParam += 1;
+    params = params.drop_back();
   }
 
   if (fnType->getNumResults() > 0 &&

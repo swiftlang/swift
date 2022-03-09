@@ -914,6 +914,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_disable_subst_sil_function_types);
 
   Opts.RequirementMachineProtocolSignatures = RequirementMachineMode::Verify;
+  Opts.RequirementMachineAbstractSignatures = RequirementMachineMode::Verify;
 
   if (auto A = Args.getLastArg(OPT_requirement_machine_protocol_signatures_EQ)) {
     auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())

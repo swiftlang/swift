@@ -263,10 +263,13 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
       unsigned index = GenericParamKey(genericParam).findIndexIn(genericParams);
 
       if (index == genericParams.size()) {
-        llvm::errs() << "Invalid generic parameter: " << genericParam << "\n";
-        llvm::errs() << "Valid generic parameters are";
+        llvm::errs() << "Cannot build interface type for term "
+                     << MutableTerm(begin, end) << "\n";
+        llvm::errs() << "Invalid generic parameter: "
+                     << Type(genericParam) << "\n";
+        llvm::errs() << "Valid generic parameters: ";
         for (auto *otherParam : genericParams)
-          llvm::errs() << " " << Type(otherParam);
+          llvm::errs() << " " << otherParam->getCanonicalType();
         llvm::errs() << "\n";
         abort();
       }
