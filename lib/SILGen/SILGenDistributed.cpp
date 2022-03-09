@@ -118,7 +118,9 @@ static void emitDistributedIfRemoteBranch(SILGenFunction &SGF, SILLocation Loc,
                        "'Distributed' module available?");
 
   ManagedValue selfAnyObject = B.createInitExistentialRef(
-      Loc, SGF.getLoweredType(ctx.getAnyObjectType()), CanType(selfTy),
+      Loc,
+      /*existentialType=*/SGF.getLoweredType(ctx.getAnyObjectType()),
+      /*formalConcreteType=*/selfValue.getType().getASTType(),
       selfValue, {});
   auto result = SGF.emitApplyOfLibraryIntrinsic(
       Loc, isRemoteFn, SubstitutionMap(), {selfAnyObject}, SGFContext());
@@ -379,6 +381,7 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
   ///       having at least one call to the resolve function.
 
   auto &C = getASTContext();
+  auto DC = fd->getDeclContext();
   SILLocation loc = fd;
 
   // ==== Prepare argument references
@@ -392,12 +395,12 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
   ManagedValue selfArg = ManagedValue::forUnmanaged(selfArgValue);
 
   // type: SpecificDistributedActor.Type
-  auto selfArgType = F.mapTypeIntoContext(selfArg.getType().getASTType());
+  auto selfArgType = selfArg.getType().getASTType();
   auto selfMetatype = getLoweredType(selfArgType);
   SILValue selfMetatypeValue = B.createMetatype(loc, selfMetatype);
 
   // type: SpecificDistributedActor
-  auto *selfTyDecl = fd->getParent()->getSelfNominalTypeDecl();
+  auto *selfTyDecl = DC->getSelfClassDecl();
   assert(selfTyDecl->isDistributedActor());
   auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType());
   auto returnTy = getLoweredType(selfTy);
@@ -533,7 +536,8 @@ SILGenFunction::emitConditionalResignIdentityCall(SILLocation loc,
   assert(actorDecl->isDistributedActor() &&
   "only distributed actors have actorSystem lifecycle hooks in deinit");
 
-  auto selfTy = actorDecl->getDeclaredInterfaceType();
+  auto selfTy = F.mapTypeIntoContext(actorDecl->getDeclaredInterfaceType());
+  fprintf(stderr, "[%s:%d] (%s) OKEY!!!!!\n", __FILE__, __LINE__, __FUNCTION__);
   
   // we only system.resignID if we are a local actor,
   // and thus the address was created by system.assignID.
