@@ -840,7 +840,11 @@ void ValueStorageMap::recordComposingUseProjection(Operand *oper,
   auto &storage = getStorage(oper->get());
   assert(!storage.isAllocated());
   storage.projectedStorageID = getOrdinal(userValue);
+
   storage.projectedOperandNum = oper->getOperandNumber();
+  assert(storage.projectedOperandNum == oper->getOperandNumber() &&
+         "operand overflow");
+
   storage.isUseProjection = true;
 
   if (EnumDecl *enumDecl = userValue->getType().getEnumOrBoundGenericEnum()) {
@@ -1010,6 +1014,10 @@ bool OpaqueStorageAllocation::findProjectionIntoUseImpl(
 
     assert(!getProjectedDefOperand(userValue)
            && "storage cannot project in two directions.");
+
+    // Avoid handling preposterous types.
+    if (use->getOperandNumber() > UINT16_MAX)
+      continue;
 
     // Recurse through all storage projections to find the uniquely allocated
     // storage. Enum storage cannot be reused across multiple subobjects because
