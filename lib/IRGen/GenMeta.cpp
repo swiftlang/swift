@@ -2080,7 +2080,6 @@ namespace {
         return true;
         
       case SILLinkage::Shared:
-      case SILLinkage::SharedExternal:
       case SILLinkage::PublicNonABI:
         return false;
       }

@@ -249,7 +249,7 @@ class Derived<Foo> : Base {
 // CHECK:         [[OUTER:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s13vtable_thunks1SVIegd_ACSgIegd_TR
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s13vtable_thunks1SVIegd_ACSgIegd_TR
 // CHECK:         [[INNER:%.*]] = apply %0()
 // CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.some!enumelt, [[INNER]] : $S
 // CHECK:         return [[OUTER]] : $Optional<S>
@@ -261,7 +261,7 @@ class Derived<Foo> : Base {
 // CHECK:         [[OUTER:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s13vtable_thunks1SVSgAA4NootCIego_Iegyo_AcA3AapCSgIego_Iegyo_TR
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s13vtable_thunks1SVSgAA4NootCIego_Iegyo_AcA3AapCSgIego_Iegyo_TR
 // CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.some!enumelt, %0
 // CHECK:         [[INNER:%.*]] = apply %1([[ARG]])
 // CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_guaranteed () -> @owned Noot to $@callee_guaranteed () -> @owned Optional<Aap>

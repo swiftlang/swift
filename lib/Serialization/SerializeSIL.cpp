@@ -65,7 +65,6 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
   case SILLinkage::Private: return SIL_LINKAGE_PRIVATE;
   case SILLinkage::PublicExternal: return SIL_LINKAGE_PUBLIC_EXTERNAL;
   case SILLinkage::HiddenExternal: return SIL_LINKAGE_HIDDEN_EXTERNAL;
-  case SILLinkage::SharedExternal: return SIL_LINKAGE_SHARED_EXTERNAL;
   }
   llvm_unreachable("bad linkage");
 }
@@ -363,9 +362,8 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
     return;
   }
 
-  if (F->getLinkage() == SILLinkage::Shared && !DeclOnly) {
-    assert(F->isSerialized() == IsSerializable ||
-           F->hasForeignBody());
+  if (F->getLinkage() == SILLinkage::Shared) {
+    assert(F->isSerialized() || F->hasForeignBody());
 
     FuncsToEmit[F] = false;
     functionWorklist.push_back(F);
@@ -2601,22 +2599,20 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 
   for (auto &entry : vt.getEntries()) {
     SmallVector<uint64_t, 4> ListOfValues;
-    // Do not emit entries which are not public or serialized, unless everything
-    // has to be serialized.
-    if (!ShouldSerializeAll && entry.getImplementation() &&
-        !entry.getImplementation()->isPossiblyUsedExternally() &&
-        !entry.getImplementation()->isSerialized())
-      continue;
-    handleSILDeclRef(S, entry.getMethod(), ListOfValues);
-    addReferencedSILFunction(entry.getImplementation(), true);
-    // Each entry is a pair of SILDeclRef and SILFunction.
-    VTableEntryLayout::emitRecord(
-        Out, ScratchRecord, SILAbbrCodes[VTableEntryLayout::Code],
-        // SILFunction name
-        S.addUniquedStringRef(entry.getImplementation()->getName()),
-        toStableVTableEntryKind(entry.getKind()),
-        entry.isNonOverridden(),
-        ListOfValues);
+    SILFunction *impl = entry.getImplementation();
+
+    if (ShouldSerializeAll || impl->hasValidLinkageForFragileRef()) {
+      handleSILDeclRef(S, entry.getMethod(), ListOfValues);
+      addReferencedSILFunction(impl, true);
+      // Each entry is a pair of SILDeclRef and SILFunction.
+      VTableEntryLayout::emitRecord(
+          Out, ScratchRecord, SILAbbrCodes[VTableEntryLayout::Code],
+          // SILFunction name
+          S.addUniquedStringRef(impl->getName()),
+          toStableVTableEntryKind(entry.getKind()),
+          entry.isNonOverridden(),
+          ListOfValues);
+    }
   }
 }
 
@@ -2807,12 +2803,8 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   if (F->isExternalDeclaration())
     return false;
 
-  // Never serialize any function definitions available externally, unless
-  // it is a referenced shared function (see the explanation in
-  // SILSerializer::writeSILFunction).
-  // TODO: Special handling for resilient mode.
-  if (F->isAvailableExternally() &&
-      !(isReference && hasSharedVisibility(F->getLinkage())))
+  // Never serialize any function definitions available externally.
+  if (F->isAvailableExternally())
     return false;
 
   // If we are asked to serialize everything, go ahead and do it.
@@ -2820,7 +2812,9 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
     return true;
 
   // If F is serialized, we should always emit its body.
-  if (F->isSerialized() == IsSerialized)
+  // Shared functions are only serialized if they are referenced from another
+  // serialized function. This is handled in `addReferencedSILFunction`.
+  if (F->isSerialized() && !hasSharedVisibility(F->getLinkage()))
     return true;
 
   return false;

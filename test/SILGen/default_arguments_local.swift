@@ -65,7 +65,7 @@ class ArtClass<T> {
 @inlinable public func outer() {
   // CHECK-LABEL: sil shared [serialized] [ossa] @$s23default_arguments_local5outeryyF5innerL_1xySi_tFfA_ : $@convention(thin) () -> Int {
 
-  // CHECK-LABEL: sil shared [serializable] [ossa] @$s23default_arguments_local5outeryyF5innerL_1xySi_tF : $@convention(thin) (Int) -> () {
+  // CHECK-LABEL: sil shared [serialized] [ossa] @$s23default_arguments_local5outeryyF5innerL_1xySi_tF : $@convention(thin) (Int) -> () {
   func inner(x: Int = 0) {}
 
   inner()

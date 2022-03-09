@@ -339,7 +339,7 @@ entry(%x : $OA):
 
 @objc class OB {}
 sil_vtable OB {}
-sil hidden_external @$s5casts2OBCACycfcTo : $@convention(thin) (OB) -> OB {
+sil hidden @$s5casts2OBCACycfcTo : $@convention(thin) (OB) -> OB {
 entry(%x : $OB):
   return %x : $OB
 }

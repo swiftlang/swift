@@ -80,7 +80,7 @@ public func testStructWithSubobjectCopyConstructorAndValue() -> Bool {
 }
 
 // StructWithSubobjectCopyConstructorAndValue.init(member:)
-// CHECK-LABEL: sil shared [transparent] [serializable] [ossa] @$sSo42StructWithSubobjectCopyConstructorAndValueV6memberABSo0abdefG0V_tcfC : $@convention(method) (@in StructWithCopyConstructorAndValue, @thin StructWithSubobjectCopyConstructorAndValue.Type) -> @out StructWithSubobjectCopyConstructorAndValue
+// CHECK-LABEL: sil shared [transparent] [serialized] [ossa] @$sSo42StructWithSubobjectCopyConstructorAndValueV6memberABSo0abdefG0V_tcfC : $@convention(method) (@in StructWithCopyConstructorAndValue, @thin StructWithSubobjectCopyConstructorAndValue.Type) -> @out StructWithSubobjectCopyConstructorAndValue
 // CHECK: [[MEMBER:%.*]] = struct_element_addr %0 : $*StructWithSubobjectCopyConstructorAndValue, #StructWithSubobjectCopyConstructorAndValue.member
 // CHECK: copy_addr [take] %1 to [initialization] [[MEMBER]] : $*StructWithCopyConstructorAndValue
 // CHECK-LABEL: end sil function '$sSo42StructWithSubobjectCopyConstructorAndValueV6memberABSo0abdefG0V_tcfC'

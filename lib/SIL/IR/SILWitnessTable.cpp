@@ -143,7 +143,6 @@ void SILWitnessTable::convertToDefinition(
     IsSerialized_t isSerialized) {
   assert(isDeclaration() && "Definitions should never call this method.");
   IsDeclaration = false;
-  assert(isSerialized != IsSerializable);
   Serialized = (isSerialized == IsSerialized);
 
   Entries = Mod.allocateCopy(entries);

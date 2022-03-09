@@ -57,8 +57,8 @@ bool CalleeList::allCalleesVisible() const {
     // TODO: exclude functions which are deserialized from modules in the same
     // resilience domain.
     if (Callee->isAvailableExternally() &&
-        // shared_external functions are always emitted in the client.
-        Callee->getLinkage() != SILLinkage::SharedExternal)
+        // shared functions are always emitted in the client.
+        Callee->getLinkage() != SILLinkage::Shared)
       return false;
   }
   return true;
@@ -214,7 +214,7 @@ CalleeCache::getSingleCalleeForWitnessMethod(WitnessMethodInst *WMI) const {
 
   // Attempt to find a specific callee for the given conformance and member.
   std::tie(CalleeFn, WT) = WMI->getModule().lookUpFunctionInWitnessTable(
-      WMI->getConformance(), WMI->getMember());
+      WMI->getConformance(), WMI->getMember(), SILModule::LinkingMode::LinkNormal);
 
   return CalleeFn;
 }

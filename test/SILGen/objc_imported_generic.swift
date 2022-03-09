@@ -11,7 +11,7 @@ func callInitializer() {
   _ = GenericClass(thing: NSObject())
 }
 
-// CHECK-LABEL: sil shared [serializable] [ossa] @$sSo12GenericClassC5thingAByxGSgxSg_tcfC
+// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo12GenericClassC5thingAByxGSgxSg_tcfC
 // CHECK:         thick_to_objc_metatype {{%.*}} : $@thick GenericClass<T>.Type to $@objc_metatype GenericClass<T>.Type
 
 public func genericMethodOnAnyObject(o: AnyObject, b: Bool) -> AnyObject {
@@ -115,13 +115,13 @@ func configureWithoutOptions() {
   _ = GenericClass<NSObject>(options: nil)
 }
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo12GenericClassC13arrayOfThingsAByxGSgSayxG_tcfcTO
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo12GenericClassC13arrayOfThingsAByxGSgSayxG_tcfcTO
 // CHECK:         objc_method {{%.*}} : $GenericClass<T>, #GenericClass.init!initializer.foreign {{.*}}, $@convention(objc_method) @pseudogeneric <τ_0_0 where τ_0_0 : AnyObject> (NSArray, @owned GenericClass<τ_0_0>) -> @owned Optional<GenericClass<τ_0_0>>
 
 // foreign to native thunk for init(options:), uses GenericOption : Hashable
 // conformance
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo12GenericClassC7optionsAByxGSgSDySo0A6OptionaypGSg_tcfcTO : $@convention(method) <T where T : AnyObject> (@owned Optional<Dictionary<GenericOption, Any>>, @owned GenericClass<T>) -> @owned Optional<GenericClass<T>>
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo12GenericClassC7optionsAByxGSgSDySo0A6OptionaypGSg_tcfcTO : $@convention(method) <T where T : AnyObject> (@owned Optional<Dictionary<GenericOption, Any>>, @owned GenericClass<T>) -> @owned Optional<GenericClass<T>>
 // CHECK: [[FN:%.*]] = function_ref @$sSD10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
 // CHECK: apply [[FN]]<GenericOption, Any>({{.*}}) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
 // CHECK: return
