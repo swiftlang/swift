@@ -3,6 +3,8 @@
 
 // We only run this test without asserts.
 
+// Disable the test on AArch64 - 89986815
+// UNSUPPORTED: CPU=aarch64
 // UNSUPPORTED: asserts
 
 class Klass {}
