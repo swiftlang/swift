@@ -212,8 +212,9 @@ def run(*args, **kwargs):
     echo_output = kwargs.pop('echo', False)
     dry_run = kwargs.pop('dry_run', False)
     env = kwargs.pop('env', None)
+    prefix = kwargs.pop('prefix', '')
     if dry_run:
-        _echo_command(dry_run, *args, env=env)
+        _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
         return(None, 0, args)
 
     my_pipe = subprocess.Popen(
@@ -226,10 +227,12 @@ def run(*args, **kwargs):
     if lock:
         lock.acquire()
     if echo_output:
-        _echo_command(dry_run, *args, env=env)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
         if output:
-            print(output, end="")
-        print()
+            for line in output.splitlines():
+                print("{0}{1}".format(prefix, line))
         sys.stdout.flush()
         sys.stderr.flush()
     if lock:
