@@ -988,8 +988,9 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   - type: The type to which this memory will be bound.
   ///   - value: The value used to initialize this memory.
   /// - Returns: A typed pointer to the memory referenced by this raw pointer.
-  @inlinable
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func initializeMemory<T>(
     as type: T.Type, to value: T
   ) -> UnsafeMutablePointer<T> {

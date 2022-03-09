@@ -696,6 +696,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An index to the next uninitialized element in the buffer,
   ///   or `endIndex`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func initialize<C: Collection>(
     fromElements source: C
   ) -> Index where C.Element == Element {
@@ -727,6 +729,7 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameters:
   ///   - repeatedValue: The value used when updating this pointer's memory.
   @inlinable // unsafe-performance
+  @_alwaysEmitIntoClient
   @_silgen_name("$sSr6assign9repeatingyx_tF")
   public func update(repeating repeatedValue: Element) {
     guard let dstBase = _position else {
@@ -736,6 +739,7 @@ extension Unsafe${Mutable}BufferPointer {
     dstBase.update(repeating: repeatedValue, count: count)
   }
 
+  @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(repeating:)")
   @_silgen_name("_deprecated_assign_repeating")
@@ -752,6 +756,8 @@ extension Unsafe${Mutable}BufferPointer {
   ///   the buffer's contents.
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
   ///   buffer, and the index one past the last updated element in the buffer.
+  @inlinable
+  @_alwaysEmitIntoClient
   public func update<S: Sequence>(
     from source: S
   ) -> (unwritten: S.Iterator, updated: Index) where S.Element == Element {
@@ -777,6 +783,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An index one past the last updated element in the buffer,
   ///   or `endIndex`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func update<C: Collection>(
     fromElements source: C
   ) -> Index where C.Element == Element {
@@ -812,6 +820,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An index to the next uninitialized element in the buffer,
   ///   or `endIndex`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func moveInitialize(fromElements source: Self) -> Index {
     guard let pointer = source.baseAddress, source.count > 0 else { return 0 }
     _debugPrecondition(count >= source.count)
@@ -836,6 +846,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An index one past the last replaced element in the buffer,
   ///   or `endIndex`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func moveInitialize(fromElements source: Slice<Self>) -> Index {
     return moveInitialize(fromElements: Self(rebasing: source))
   }
@@ -856,6 +868,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An index one past the last updated element in the buffer,
   ///   or `endIndex`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func moveUpdate(fromElements source: Self) -> Index {
     guard let pointer = source.baseAddress, source.count > 0 else { return 0 }
     _debugPrecondition(count >= source.count)
@@ -880,6 +894,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An index one past the last updated element in the buffer,
   ///   or `endIndex`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func moveUpdate(fromElements source: Slice<Self>) -> Index {
     return moveUpdate(fromElements: Self(rebasing: source))
   }
@@ -895,6 +911,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: A raw buffer to the same range of memory as this buffer.
   ///   The range of memory is still bound to `Element`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func deinitialize() -> UnsafeMutableRawBufferPointer {
     guard let rawValue = baseAddress?._rawValue
       else { return .init(start: nil, count: 0) }
@@ -912,6 +930,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameters:
   ///   - value: The value used to initialize the buffer element's memory.
   ///   - index: The index of the element to initialize
+  @inlinable
+  @_alwaysEmitIntoClient
   public func initializeElement(at index: Index, to value: Element) {
     precondition(startIndex <= index && index < endIndex)
     let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
@@ -928,6 +948,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameters:
   ///   - value: The value used to update the buffer element's memory.
   ///   - index: The index of the element to update
+  @inlinable
+  @_alwaysEmitIntoClient
   public func updateElement(at index: Index, to value: Element) {
     precondition(startIndex <= index && index < endIndex)
     let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
@@ -944,6 +966,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameters:
   ///   - index: The index of the buffer element to retrieve and deinitialize.
   /// - Returns: The instance referenced by this index in this buffer.
+  @inlinable
+  @_alwaysEmitIntoClient
   public func moveElement(from index: Index) -> Element {
     precondition(startIndex <= index && index < endIndex)
     return baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index).move()
@@ -957,6 +981,8 @@ extension Unsafe${Mutable}BufferPointer {
   ///
   /// - Parameters:
   ///   - index: The index of the buffer element to deinitialize.
+  @inlinable
+  @_alwaysEmitIntoClient
   public func deinitializeElement(at index: Index) {
     precondition(startIndex <= index && index < endIndex)
     let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)

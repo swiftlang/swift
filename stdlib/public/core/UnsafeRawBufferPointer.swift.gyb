@@ -805,6 +805,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   buffer, and its count indicates the number of elements copied from
   ///   the collection `elements`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func initializeMemory<C: Collection>(
     as type: C.Element.Type,
     fromElements source: C
@@ -852,6 +854,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   buffer references memory starting at the same base address as this
   ///   buffer, and it contains every element copied from `source`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func moveInitializeMemory<T>(
     as type: T.Type,
     fromElements source: UnsafeMutableBufferPointer<T>
@@ -889,6 +893,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   buffer references memory starting at the same base address as this
   ///   buffer, and it contains every element copied from `source`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func moveInitializeMemory<T>(
     as type: T.Type,
     fromElements source: Slice<UnsafeMutableBufferPointer<T>>
