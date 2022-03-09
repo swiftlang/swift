@@ -5201,7 +5201,8 @@ ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
     type = existential->getConstraintType();
 
   const CanType constraint = type->getCanonicalType();
-  assert(!constraint->hasTypeParameter() && "This only works with archetypes");
+  assert(parentSig || !constraint->hasTypeParameter() &&
+         "Interface type here requires a parent signature");
 
   // The opened archetype signature for a protocol type is identical
   // to the protocol's own canonical generic signature if there aren't any
@@ -5216,11 +5217,13 @@ ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
   // generic parameters. This ensures that we keep e.g. generic superclass
   // existentials contained in a well-formed generic context.
   auto canParentSig = parentSig.getCanonicalSignature();
-  auto found = getImpl().ExistentialSignatures.find({constraint, canParentSig.getPointer()});
+  auto key = std::make_pair(constraint, canParentSig.getPointer());
+  auto found = getImpl().ExistentialSignatures.find(key);
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
 
-  auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(canParentSig, type->getASTContext())
+  auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
+      canParentSig, type->getASTContext())
     ->castTo<GenericTypeParamType>();
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           constraint);
@@ -5231,7 +5234,7 @@ ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
   CanGenericSignature canGenericSig(genericSig);
 
   auto result = getImpl().ExistentialSignatures.insert(
-      std::make_pair(std::make_pair(constraint, canParentSig.getPointer()), canGenericSig));
+      std::make_pair(key, canGenericSig));
   assert(result.second);
   (void) result;
 
