@@ -1129,8 +1129,9 @@ createStackAllocation(SILValue value) {
 
   // For opened existential types, allocate stack space at the type
   // definition. Allocating as early as possible provides more opportunity for
-  // creating use projections into value.
-  SILInstruction *firstOpeningInst = nullptr;
+  // creating use projections into value. But allocation must be no earlier then
+  // the latest type definition.
+  SILInstruction *latestOpeningInst = nullptr;
   allocTy.getASTType().visit([&](CanType type) {
     auto archetype = dyn_cast<ArchetypeType>(type);
     if (!archetype)
@@ -1142,15 +1143,15 @@ createStackAllocation(SILValue value) {
 
       auto *openingInst = openingVal->getDefiningInstruction();
       assert(openingVal && "all opened archetypes should be resolved");
-      if (firstOpeningInst
-          && pass.domInfo->dominates(firstOpeningInst, openingInst)) {
+      if (latestOpeningInst
+          && pass.domInfo->dominates(openingInst, latestOpeningInst)) {
         return;
       }
-      firstOpeningInst = openingInst;
+      latestOpeningInst = openingInst;
     }
   });
-  auto allocPt = firstOpeningInst ? std::next(firstOpeningInst->getIterator())
-                                  : pass.function->begin()->begin();
+  auto allocPt = latestOpeningInst ? std::next(latestOpeningInst->getIterator())
+    : pass.function->begin()->begin();
   auto allocBuilder = pass.getBuilder(allocPt);
   AllocStackInst *alloc = allocBuilder.createAllocStack(pass.genLoc(), allocTy);
 
@@ -1158,7 +1159,7 @@ createStackAllocation(SILValue value) {
     auto deallocBuilder = pass.getBuilder(insertPt);
     deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
   };
-  if (firstOpeningInst) {
+  if (latestOpeningInst) {
     // Deallocate at the dominance frontier to ensure that allocation encloses
     // not only the uses of the current value, but also of any values reusing
     // this storage as a use projection.
