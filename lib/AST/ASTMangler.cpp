@@ -1269,8 +1269,11 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     }
 
     case TypeKind::ParameterizedProtocol: {
-      llvm::errs() << "Not implemented\n";
-      abort();
+      auto layout = type->getExistentialLayout();
+      appendExistentialLayout(layout, sig, forDecl);
+      bool isFirstArgList = true;
+      appendBoundGenericArgs(type, sig, isFirstArgList, forDecl);
+      return appendOperator("XP");
     }
 
     case TypeKind::Existential: {
@@ -1574,6 +1577,9 @@ void ASTMangler::appendBoundGenericArgs(Type type, GenericSignature sig,
     if (Type parent = nominalType->getParent())
       appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
                              forDecl);
+  } else if (auto *ppt = dyn_cast<ParameterizedProtocolType>(typePtr)) {
+    assert(!ppt->getBaseType()->getParent());
+    genericArgs = ppt->getArgs();
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
