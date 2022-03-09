@@ -158,10 +158,8 @@ func returnsSequenceOfInt1() -> Sequence<Int> {}
 // expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 
 func takesSequenceOfInt2(_: any Sequence<Int>) {}
-// expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 
 func returnsSequenceOfInt2() -> any Sequence<Int> {}
-// expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 
 func typeExpr() {
   _ = Sequence<Int>.self
