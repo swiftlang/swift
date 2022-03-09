@@ -695,7 +695,29 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
-  
+
+  Expr *visitErasureExpr(ErasureExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+    } else {
+      return nullptr;
+    }
+
+    for (unsigned i = 0; i < E->getArgumentConversions().size(); ++i) {
+      const auto &conv = E->getArgumentConversions()[i];
+      auto kConv = conv.Conversion;
+      if (!kConv) {
+        return nullptr;
+      } else if (Expr *E2 = doIt(kConv)) {
+        E->setArgumentConversion(i, {conv.OrigValue, E2});
+      } else {
+        return nullptr;
+      }
+    }
+    
+    return E;
+  }
+
   Expr *visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);

@@ -3474,24 +3474,52 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   // With two parameterized protocols, we've already made sure conformance
   // constraints are satisified. Try to match the arguments!
   if (ppt1 && ppt2) {
-    return matchDeepTypeArguments(*this, subflags,
-                                  ppt1->getArgs(), ppt2->getArgs(),
-                                  locator);
-  } else if (!type1->isExistentialType() && ppt2) {
-    // Discharge the requirements of parameterized protocols.
+    ArrayRef<Type> longerArgs = ppt1->getArgs();
+    ArrayRef<Type> shorterArgs = ppt2->getArgs();
+    // The more constrained of the two types had better be the first type -
+    // otherwise we're forgetting requirements.
+    if (longerArgs.size() < shorterArgs.size()) {
+      return getTypeMatchFailure(locator);
+    }
+
+    // Line up the the arguments of the parameterized protocol.
+    // FIXME: Extend the locator path to point to the argument
+    // inducing the requirement.
+    for (const auto &pair : llvm::zip_first(shorterArgs, longerArgs)) {
+      auto result = matchTypes(std::get<0>(pair), std::get<1>(pair),
+                               ConstraintKind::Bind,
+                               subflags, locator);
+      if (result.isFailure())
+        return result;
+    }
+  } else if (ppt1 && type2->isExistentialType()) {
+    // P<T, U, V, ...> converts to (P & Q & ...) trivially...
+    return getTypeMatchSuccess();
+  } else if (ppt2 && type1->isExistentialType()) {
+    // But (P & Q & ...) does not convert to P<T, U, V, ...>
+    return getTypeMatchFailure(locator);
+  } else if (ppt1 || ppt2) {
+    auto parameterized = constraintType1;
+    auto base = constraintType2;
+    if (ppt2)
+      std::swap(parameterized, base);
+
+    // One of the two is parameterized, and the other is a concrete type.
+    // Substitute the base into the requirements of the parameterized type and
+    // discharge the requirements of the parameterized protocol.
     // FIXME: Extend the locator path to point to the argument
     // inducing the requirement.
     SmallVector<Requirement, 2> reqs;
-    ppt2->getRequirements(type1, reqs);
+    parameterized->castTo<ParameterizedProtocolType>()
+                 ->getRequirements(base, reqs);
     for (const auto &req : reqs) {
+      assert(req.getKind() == RequirementKind::SameType);
       auto result = matchTypes(req.getFirstType(), req.getSecondType(),
                                ConstraintKind::Bind,
                                subflags, locator);
       if (result.isFailure())
         return result;
     }
-  } else if (ppt1 && !type2->isExistentialType()) {
-    llvm_unreachable("Malformed constraint!");
   }
 
   return getTypeMatchSuccess();

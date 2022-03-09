@@ -1178,14 +1178,16 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   assert(elements.size() & 1 && "even number of elements in sequence");
   size_t bytes = totalSizeToAlloc<Expr *>(elements.size());
   void *Buffer = ctx.Allocate(bytes, alignof(SequenceExpr));
-  return ::new(Buffer) SequenceExpr(elements);
+  return ::new (Buffer) SequenceExpr(elements);
 }
 
 ErasureExpr *ErasureExpr::create(ASTContext &ctx, Expr *subExpr, Type type,
-                                 ArrayRef<ProtocolConformanceRef> conformances){
-  auto size = totalSizeToAlloc<ProtocolConformanceRef>(conformances.size());
+                                 ArrayRef<ProtocolConformanceRef> conformances,
+                                 ArrayRef<ConversionPair> argConversions) {
+  auto size = totalSizeToAlloc<ProtocolConformanceRef, ConversionPair>(conformances.size(),
+                                                                       argConversions.size());
   auto mem = ctx.Allocate(size, alignof(ErasureExpr));
-  return ::new(mem) ErasureExpr(subExpr, type, conformances);
+  return ::new (mem) ErasureExpr(subExpr, type, conformances, argConversions);
 }
 
 UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
@@ -1194,8 +1196,8 @@ UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
                                              SourceLoc RAngleLoc) {
   auto size = totalSizeToAlloc<TypeRepr *>(UnresolvedParams.size());
   auto mem = ctx.Allocate(size, alignof(UnresolvedSpecializeExpr));
-  return ::new(mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
-                                             UnresolvedParams, RAngleLoc);
+  return ::new (mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
+                                              UnresolvedParams, RAngleLoc);
 }
 
 CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
