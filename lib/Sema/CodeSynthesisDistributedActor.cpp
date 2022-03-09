@@ -279,10 +279,11 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     auto recordArgumentDecl =
         C.getRecordArgumentOnDistributedInvocationEncoder(invocationEncoderDecl);
     assert(recordArgumentDecl);
-    auto recordArgumentDeclRef =
-        UnresolvedDeclRefExpr::createImplicit(C, recordArgumentDecl->getName());
 
     for (auto param : *thunk->getParameters()) {
+      auto recordArgumentDeclRef = UnresolvedDeclRefExpr::createImplicit(
+          C, recordArgumentDecl->getName());
+
       auto recordArgArgsList = ArgumentList::forImplicitCallTo(
           recordArgumentDeclRef->getName(),
           {
@@ -291,6 +292,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
                AccessSemantics::Ordinary,
                thunk->mapTypeIntoContext(param->getInterfaceType()))
           }, C);
+
       auto tryRecordArgExpr = TryExpr::createImplicit(C, sloc,
         CallExpr::createImplicit(C,
           UnresolvedDotExpr::createImplicit(C,
