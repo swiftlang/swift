@@ -627,7 +627,7 @@ void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
   if (!RecordLoops)
     return;
 
-  // Ignore the rewrite rule if it is not part of our minimization domain.
+  // Ignore the rewrite loop if it is not part of our minimization domain.
   if (!isInMinimizationDomain(basepoint.getRootProtocol()))
     return;
 

@@ -359,6 +359,9 @@ def disable_requirement_machine_concrete_contraction : Flag<["-"], "disable-requ
   HelpText<"Disable preprocessing pass to eliminate conformance requirements "
            "on generic parameters which are made concrete">;
 
+def enable_requirement_machine_loop_normalization : Flag<["-"], "enable-requirement-machine-loop-normalization">,
+  HelpText<"Enable stronger minimization algorithm, for debugging only">;
+
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 

@@ -355,6 +355,11 @@ struct RewriteStep {
             RewritePathEvaluator &evaluator,
             const RewriteSystem &system) const;
 
+  bool isInverseOf(const RewriteStep &other) const;
+
+  bool maybeSwapRewriteSteps(RewriteStep &other,
+                             const RewriteSystem &system);
+
 private:
   static unsigned getConcreteProjectionArg(unsigned differenceID,
                                            unsigned substitutionIndex) {
@@ -406,6 +411,15 @@ public:
 
   void invert();
 
+  bool computeFreelyReducedForm();
+
+  bool computeCyclicallyReducedForm(MutableTerm &basepoint,
+                                    const RewriteSystem &system);
+
+  bool computeLeftCanonicalForm(const RewriteSystem &system);
+
+  void computeNormalForm(const RewriteSystem &system);
+
   void dump(llvm::raw_ostream &out,
             MutableTerm term,
             const RewriteSystem &system) const;
@@ -440,12 +454,18 @@ private:
   /// Cached value for getDecomposeCount().
   unsigned DecomposeCount : 15;
 
-  /// Loops are deleted once they no longer contain rules in empty context,
-  /// since at that point they don't participate in minimization and do not
-  /// need to be considered.
+  /// A useful loop contains at least one rule in empty context, even if that
+  /// rule appears multiple times or also in non-empty context. The only loops
+  /// that are elimination candidates contain a rule in empty context *exactly
+  /// once*. A useful loop can become an elimination candidate after
+  /// normalization.
+  unsigned Useful : 1;
+
+  /// Loops are deleted once they are no longer useful, as defined above.
   unsigned Deleted : 1;
 
-  /// If true, RulesInEmptyContext should be recomputed.
+  /// If true, Useful, RulesInEmptyContext, ProjectionCount, and DecomposeCount
+  /// should be recomputed.
   unsigned Dirty : 1;
 
   void recompute(const RewriteSystem &system);
@@ -455,11 +475,11 @@ public:
     : Basepoint(basepoint), Path(path) {
     ProjectionCount = 0;
     DecomposeCount = 0;
-
+    Useful = 0;
     Deleted = 0;
 
-    // Initially, RulesInEmptyContext and ProjectionCount are not valid because
-    // they have not been computed yet.
+    // Initially, cached values are not valid because they have not been
+    // computed yet.
     Dirty = 1;
   }
 
@@ -477,7 +497,7 @@ public:
     Dirty = 1;
   }
 
-  bool isInContext(const RewriteSystem &system) const;
+  bool isUseful(const RewriteSystem &system) const;
 
   ArrayRef<unsigned>
   findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
@@ -490,6 +510,8 @@ public:
       llvm::SmallDenseMap<const ProtocolDecl *,
                           ProtocolConformanceRules, 2> &result,
       const RewriteSystem &system) const;
+
+  void computeNormalForm(const RewriteSystem &system);
 
   void verify(const RewriteSystem &system) const;
 

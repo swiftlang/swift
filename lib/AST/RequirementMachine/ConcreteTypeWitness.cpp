@@ -483,12 +483,27 @@ void PropertyMap::recordConcreteConformanceRule(
 
   auto protocolSymbol = *conformanceRule.isPropertyRule();
 
-  // Now, transform T''.[concrete: C].[P] into T''.[concrete: C : P].
+  // Now, transform T''.[concrete: C].[P] into T''.[concrete: C].[concrete: C : P].
   unsigned relationID = System.recordConcreteConformanceRelation(
       concreteSymbol, protocolSymbol, concreteConformanceSymbol);
 
   path.add(RewriteStep::forRelation(
       /*startOffset=*/rhs.size(), relationID,
+      /*inverse=*/false));
+
+  // If T' is a suffix of T, prepend the prefix to the concrete type's
+  // substitutions.
+  if (prefixLength > 0 &&
+      !concreteConformanceSymbol.getSubstitutions().empty()) {
+    path.add(RewriteStep::forPrefixSubstitutions(prefixLength, /*endOffset=*/1,
+                                                 /*inverse=*/true));
+  }
+
+  // Finally, apply the concrete type rule to obtain T''.[concrete: C : P].
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/rhs.size() - concreteRule.getRHS().size(),
+      /*endOffset=*/1,
+      /*ruleID=*/concreteRuleID,
       /*inverse=*/false));
 
   MutableTerm lhs(rhs);

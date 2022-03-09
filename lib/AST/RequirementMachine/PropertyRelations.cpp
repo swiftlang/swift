@@ -65,9 +65,9 @@ unsigned RewriteSystem::recordRelation(Symbol lhsProperty,
       Term::get(rhsTerm, Context));
 }
 
-/// Record a relation ([concrete: C].[P] => [concrete: C : P])
-/// or ([superclass: C].[P] => [concrete: C : P]) which combines a
-/// concrete type symbol (or a superclass symbol) with a protocol
+/// Record a relation ([concrete: C].[P] => [concrete: C].[concrete: C : P])
+/// or ([superclass: C].[P] => [superclass: C].[concrete: C : P]) which combines
+/// a concrete type symbol (or a superclass symbol) with a protocol
 /// symbol to form a single a concrete conformance symbol.
 unsigned RewriteSystem::recordConcreteConformanceRelation(
     Symbol concreteSymbol, Symbol protocolSymbol,
@@ -83,6 +83,7 @@ unsigned RewriteSystem::recordConcreteConformanceRelation(
   lhsTerm.add(protocolSymbol);
 
   MutableTerm rhsTerm;
+  rhsTerm.add(concreteSymbol);
   rhsTerm.add(concreteConformanceSymbol);
 
   return recordRelation(
