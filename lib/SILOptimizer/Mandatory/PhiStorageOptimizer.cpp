@@ -13,11 +13,66 @@
 /// PhiStorageOptimizer implements an analysis used by AddressLowering
 /// to reuse storage across block arguments.
 ///
+/// In OSSA, phi operands can often be coalesced because they are
+/// consuming--they end the lifetime of their operand. This optimization may
+/// fail to coalesce an operand for two major reasons:
+///
+/// 1. This phi operand is already coalesced with other storage, possibly of a
+/// different type:
+///
+///     %field = struct_extract %struct : $Struct<T>, #field
+///     br bb(%field : $T)
+///
+///   bb(%phi : @owned $T):
+///     ...
+///
+/// 2. This phi operand interferes with another coalesced phi operand.
+///
+/// Only one of the call results below, either %get0 or %get1, can be coalesced
+/// with %phi. The %phi will itself be coalesced with this function's indirect
+/// @out argument.
+///
+///   sil [ossa] @function : $@convention(thin) <T> () -> @out T {
+///   bb0:
+///     %get0 = apply %get<T>() : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+///     %get1 = apply %get<T>() : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+///     cond_br undef, bb2, bb1
+///
+///   bb1:
+///     destroy_value %get0 : $T
+///     br bb3(%get1 : $T)
+///
+///   bb2:
+///     destroy_value %get1 : $T
+///     br bb3(%get0 : $T)
+///
+///   bb3(%phi : @owned $T):
+///     return %phi : $T
+///
+/// TODO: Liveness is currently recorded at the block level. This could be
+/// extended to handle operand with nonoverlapping liveness in the same
+/// block. In this case, %get0 and %get1 could both be coalesced with a bit of
+/// extra book-keeping:
+///
+///   bb0:
+///     %get0 = apply %get<T>() : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+///
+///   bb1:
+///     destroy_value %get0 : $T
+///     %get1 = apply %get<T>() : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+///     br bb3(%get1 : $T)
+///
+///   bb2:
+///     br bb3(%get0 : $T)
+///
+///   bb3(%phi : @owned $T):
+///
 /// TODO: This does not yet coalesce the copy_value instructions that produce a
 /// phi operand. Such a copy implies that both the operand and phi value are
 /// live past the phi. Nonetheleses, they could still be coalesced as
 /// follows... First coalesce all direct phi operands. Then transitively
-/// coalesce copies by redoing the liveness traversal from the uses of the copy.
+/// coalesce copies by checking if the copy's source is coalescable, then
+/// redoing the liveness traversal from the uses of the copy.
 ///
 /// TODO: This approach uses on-the-fly liveness discovery for all incoming
 /// values at once. It requires no storage for liveness. Hopefully this is
