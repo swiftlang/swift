@@ -12,9 +12,27 @@
 
 import Swift
 
+public struct LocalTestingActorAddress: Hashable, Sendable, Codable {
+  public let address: String
+
+  public init(parse address: String) {
+    self.address = address
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    self.address = try container.decode(String.self)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(self.address)
+  }
+}
+
 // TODO(distributed): not thread safe...
 public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @unchecked Sendable {
-  public typealias ActorID = ActorAddress
+  public typealias ActorID = LocalTestingActorAddress
   public typealias InvocationEncoder = LocalTestingInvocationEncoder
   public typealias InvocationDecoder = LocalTestingInvocationDecoder
   public typealias SerializationRequirement = Codable
@@ -98,9 +116,9 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
 
     init() {}
 
-    mutating func next() -> ActorAddress {
+    mutating func next() -> LocalTestingActorAddress {
       self.counter += 1
-      return ActorAddress(parse: "\(self.counter)")
+      return LocalTestingActorAddress(parse: "\(self.counter)")
     }
   }
 }
