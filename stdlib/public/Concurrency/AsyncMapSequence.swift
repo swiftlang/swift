@@ -62,7 +62,7 @@ public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let transform: (Base.Element) async -> Transformed
 
-  @usableFromInline
+  @inlinable
   init(
     _ base: Base, 
     transform: @escaping (Base.Element) async -> Transformed
@@ -90,7 +90,7 @@ extension AsyncMapSequence: AsyncSequence {
     @usableFromInline
     let transform: (Base.Element) async -> Transformed
 
-    @usableFromInline
+    @inlinable
     init(
       _ baseIterator: Base.AsyncIterator, 
       transform: @escaping (Base.Element) async -> Transformed

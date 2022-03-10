@@ -75,7 +75,7 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let transform: (Base.Element) async throws -> Transformed
 
-  @usableFromInline
+  @inlinable
   init(
     _ base: Base, 
     transform: @escaping (Base.Element) async throws -> Transformed
@@ -106,7 +106,7 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     @usableFromInline
     var finished = false
 
-    @usableFromInline
+    @inlinable
     init(
       _ baseIterator: Base.AsyncIterator, 
       transform: @escaping (Base.Element) async throws -> Transformed
