@@ -8,7 +8,7 @@
 
 // REQUIRES: OS=linux-gnu
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 @available(SwiftStdlib 5.5, *)

@@ -8,7 +8,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-import _Distributed
+import Distributed
 
 distributed actor SomeSpecificDistributedActor {
   deinit {

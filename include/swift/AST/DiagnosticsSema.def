@@ -4534,7 +4534,7 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "non-isolated context",
       (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
-      "'_Distributed' module not imported, required for 'distributed actor'",
+      "'Distributed' module not imported, required for 'distributed actor'",
       ())
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"

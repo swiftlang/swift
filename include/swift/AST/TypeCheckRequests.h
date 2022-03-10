@@ -2738,7 +2738,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Checks if the _Distributed module is available.
+/// Checks if the Distributed module is available.
 class DistributedModuleIsAvailableRequest
     : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(Decl *),
                            RequestFlags::Cached> {

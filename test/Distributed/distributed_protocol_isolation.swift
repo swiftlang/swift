@@ -4,7 +4,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 /// Use the existential wrapper as the default actor system.

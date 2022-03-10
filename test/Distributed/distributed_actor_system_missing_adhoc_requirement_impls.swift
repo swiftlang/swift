@@ -4,7 +4,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 struct MissingRemoteCall: DistributedActorSystem {
   // expected-error@-1{{struct 'MissingRemoteCall' is missing witness for protocol requirement 'remoteCall'}}

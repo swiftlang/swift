@@ -14,7 +14,7 @@ set(swift_distributed_link_libraries
   swiftCore)
 
 
-add_swift_target_library(swift_Distributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   DistributedActor.cpp
   DistributedActor.swift
   DistributedActorSystem.swift

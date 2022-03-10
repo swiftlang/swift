@@ -3,7 +3,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 // Type descriptor.
 // CHECK-LABEL: @"$s17distributed_actor7MyActorC2idAA0D7AddressVvpWvd"

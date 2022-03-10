@@ -6,7 +6,7 @@
 // RUN: %target-swift-frontend %s -enable-testing -disable-availability-checking -emit-ir -o %t/test.ll -emit-tbd -emit-tbd-path %t/test.tbd -I %t
 // RUN cat %t/test.tbd | %FileCheck %s --dump-input=always
 
-import _Distributed
+import Distributed
 
 // CHECK: @"$s4test1AC13_remote_helloyyYaKFTE" = hidden global %swift.async_func_pointer
 // CHECK: @"$s4test1AC13_remote_helloyyYaKFTETu" = hidden global %swift.async_func_pointer
