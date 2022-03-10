@@ -14,6 +14,9 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
+// FIXME(distributed): rdar://90078069
+// UNSUPPORTED: linux
+
 import _Distributed
 
 final class Obj: @unchecked Sendable, Codable  {}
@@ -281,19 +284,19 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // actual mangled name:
-let emptyName = "$s4main7GreeterC5emptyyyFTE"
-let helloName = "$s4main7GreeterC5helloSSyFTE"
-let answerName = "$s4main7GreeterC6answerSiyFTE"
-let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
-let enumResultName = "$s4main7GreeterC10enumResultAA1EOyFTE"
-let echoName = "$s4main7GreeterC4echo4name3ageS2S_SitFTE"
-let generic1Name = "$s4main7GreeterC8generic11ayx_tSeRzSERzlFTE"
-let generic2Name = "$s4main7GreeterC8generic21a1byx_q_tSeRzSERzSeR_SER_r0_lFTE"
-let generic3Name = "$s4main7GreeterC8generic31a1b1cyx_Sayq_Gq0_tSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
-let generic4Name = "$s4main7GreeterC8generic41a1b1cyx_AA1SVyq_GSayq0_GtSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
-let generic5Name = "$s4main7GreeterC8generic51a1b1c1dyx_AA1SVyq_Gq0_q1_tSeRzSERzSeR_SER_SeR0_SER0_SeR1_SER1_r2_lFTE"
-let genericOptionalName = "$s4main7GreeterC15genericOptional1tyxSg_tSeRzSERzlFTE"
-let expectsDecodeErrorName = "$s4main7GreeterC18expectsDecodeError1vySiSgSgSg_tFTE"
+let emptyName = "$s4main7GreeterC5emptyyyYaKFTE"
+let helloName = "$s4main7GreeterC5helloSSyYaKFTE"
+let answerName = "$s4main7GreeterC6answerSiyYaKFTE"
+let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyYaKFTE"
+let enumResultName = "$s4main7GreeterC10enumResultAA1EOyYaKFTE"
+let echoName = "$s4main7GreeterC4echo4name3ageS2S_SitYaKFTE"
+let generic1Name = "$s4main7GreeterC8generic11ayx_tYaKSeRzSERzlFTE"
+let generic2Name = "$s4main7GreeterC8generic21a1byx_q_tYaKSeRzSERzSeR_SER_r0_lFTE"
+let generic3Name = "$s4main7GreeterC8generic31a1b1cyx_Sayq_Gq0_tYaKSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
+let generic4Name = "$s4main7GreeterC8generic41a1b1cyx_AA1SVyq_GSayq0_GtYaKSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
+let generic5Name = "$s4main7GreeterC8generic51a1b1c1dyx_AA1SVyq_Gq0_q1_tYaKSeRzSERzSeR_SER_SeR0_SER0_SeR1_SER1_r2_lFTE"
+let genericOptionalName = "$s4main7GreeterC15genericOptional1tyxSg_tYaKSeRzSERzlFTE"
+let expectsDecodeErrorName = "$s4main7GreeterC18expectsDecodeError1vySiSgSgSg_tYaKFTE"
 
 func test() async throws {
   let system = DefaultDistributedActorSystem()

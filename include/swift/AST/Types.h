@@ -773,6 +773,10 @@ public:
   /// Determines whether this type is an actor type.
   bool isActorType();
 
+  /// Determines whether this type conforms or inherits (if it's a protocol
+  /// type) from `DistributedActor`.
+  bool isDistributedActor();
+
   /// Determines the element type of a known
   /// [Autoreleasing]Unsafe[Mutable][Raw]Pointer variant, or returns null if the
   /// type is not a pointer.

@@ -14,42 +14,40 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
-// FIXME(distributed): rdar://90078069
-// UNSUPPORTED: linux
 
 import _Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
-final class SomeClass: Sendable, Codable {}
+protocol LifecycleWatch: DistributedActor where ActorSystem == FakeRoundtripActorSystem {
+}
 
-distributed actor Greeter {
-  distributed func take(name: String, int: Int) {
-    print("take: \(name), int: \(int)")
+extension LifecycleWatch {
+  func watch() async throws {
+    // nothing here
+    print("executed: \(#function)")
   }
 
-  distributed func take(name: String, int: Int, clazz: SomeClass) {
-    print("take: \(name), int: \(int), clazz: \(clazz)")
+  distributed func test() async throws {
+    print("executed: \(#function)")
+    try await self.watch()
+    print("done executed: \(#function)")
   }
 }
 
-func test() async throws {
-  let system = DefaultDistributedActorSystem()
-
-  let local = Greeter(system: system)
-  let ref = try Greeter.resolve(id: local.id, using: system)
-
-  try await ref.take(name: "Caplin", int: 1337)
-  // CHECK: >> remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC4take4name3intySS_SitYaKFTE"), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Caplin", 1337], returnType: nil, errorType: nil), throwing:Swift.Never
-
-  // try await ref.take(name: "Caplin", int: 1337, clazz: .init()) // FIXME(distributed): crashes
-
+distributed actor Worker: LifecycleWatch {
 }
 
 @main struct Main {
   static func main() async {
-    try! await test()
+    let worker: any LifecycleWatch = Worker(system: DefaultDistributedActorSystem())
+    try! await worker.test()
+
+    // CHECK: executed: test()
+    // CHECK: executed: watch()
+    // CHECK: done executed: test()
+
+    print("OK") // CHECK: OK
   }
 }
-

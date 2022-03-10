@@ -4490,10 +4490,6 @@ public:
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
 
-  /// Is a protocol that can only be conformed by distributed actors.
-  /// Such protocols are allowed to contain distributed functions.
-  bool inheritsFromDistributedActor() const;
-
 private:
   void computeKnownProtocolKind() const;
 
@@ -5253,6 +5249,10 @@ public:
 
   /// Does this have a 'distributed' modifier?
   bool isDistributed() const;
+
+  /// Is this var known to be a "local" distributed actor,
+  /// if so the implicit throwing ans some isolation checks can be skipped.
+  bool isKnownToBeLocal() const;
 
   /// Is this a stored property that will _not_ trigger any user-defined code
   /// upon any kind of access?
@@ -6308,6 +6308,13 @@ public:
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
 
+  /// For a 'distributed' target (func or computed property),
+  /// get the 'thunk' responsible for performing the 'remoteCall'.
+  ///
+  /// \return the synthesized thunk, or null if the base of the call has
+  ///         diagnosed errors during type checking.
+  FuncDecl *getDistributedThunk() const;
+  
   /// Returns 'true' if the function has the @c @_backDeploy attribute.
   bool isBackDeployed() const;
 
@@ -6454,6 +6461,16 @@ public:
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedActorSystem' protocol.
   bool isDistributedActorSystemRemoteCall(bool isVoidReturn) const;
+
+  /// Determines whether this function is a 'makeInvocationEncoder' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedActorSystem' protocol.
+  bool isDistributedActorSystemMakeInvocationEncoder() const;
+
+  /// Determines if this function is a 'recordGenericSubstitution' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordGenericSubstitution() const;
 
   /// Determines if this function is a 'recordArgument' function,
   /// which is used as ad-hoc protocol requirement by the

@@ -5313,11 +5313,6 @@ bool ProtocolDecl::isMarkerProtocol() const {
   return getAttrs().hasAttribute<MarkerAttr>();
 }
 
-bool ProtocolDecl::inheritsFromDistributedActor() const {
-  auto &C = getASTContext();
-  return inheritsFrom(C.getDistributedActorDecl());
-}
-
 ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
@@ -6378,6 +6373,10 @@ bool VarDecl::isAsyncLet() const {
 
 bool VarDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
+}
+
+bool VarDecl::isKnownToBeLocal() const {
+  return getAttrs().hasAttribute<KnownToBeLocalAttr>();
 }
 
 bool VarDecl::isOrdinaryStoredProperty() const {
@@ -7999,7 +7998,6 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
   *selfDecl = new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                   getLoc(), ctx.Id_self, this);
   (*selfDecl)->setImplicit();
-
   return *selfDecl;
 }
 
