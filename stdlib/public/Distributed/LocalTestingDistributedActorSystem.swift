@@ -58,7 +58,6 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   public func assignID<Act>(_ actorType: Act.Type) -> ActorID
     where Act: DistributedActor {
     let id = ActorAddress(parse: "\(self.idProvider.next())")
-    print("| assign id: \(id) for \(actorType)")
     self.assignedIDs.insert(id)
     return id
   }
@@ -69,7 +68,6 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
     guard self.assignedIDs.contains(actor.id) else {
       fatalError("Attempted to mark an unknown actor '\(actor.id)' ready")
     }
-    print("| actor ready: \(actor)")
     self.activeActors[actor.id] = actor
   }
 
