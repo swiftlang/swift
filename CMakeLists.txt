@@ -241,7 +241,7 @@ option(SWIFT_INCLUDE_DOCS
     TRUE)
 
 set(_swift_include_apinotes_default FALSE)
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(_swift_include_apinotes_default TRUE)
 endif()
 

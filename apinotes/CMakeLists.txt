@@ -1,7 +1,11 @@
-set(sources
-  Dispatch.apinotes
-  os.apinotes
-)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(sources vcruntime.apinotes)
+else()
+  set(sources
+    Dispatch.apinotes
+    os.apinotes
+  )
+endif()
 
 set(output_dir "${SWIFTLIB_DIR}/apinotes")
 
