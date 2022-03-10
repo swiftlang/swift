@@ -1261,8 +1261,6 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
 
 FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
     AbstractFunctionDecl *thunk) const {
-  auto &C = thunk->getASTContext();
-
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
   assert(systemTy && "No specific ActorSystem type found!");
 

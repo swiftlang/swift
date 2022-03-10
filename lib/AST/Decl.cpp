@@ -7995,7 +7995,6 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
 
   // Create and save our 'self' parameter.
   auto &ctx = getASTContext();
-  auto DC = getDeclContext();
   *selfDecl = new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                   getLoc(), ctx.Id_self, this);
   (*selfDecl)->setImplicit();
