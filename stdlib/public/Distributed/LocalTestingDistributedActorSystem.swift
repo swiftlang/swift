@@ -10,11 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
+
 // TODO(distributed): not thread safe...
 public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = ActorAddress
-  public typealias InvocationEncoder = LocalInvocationEncoder
-  public typealias InvocationDecoder = LocalInvocationDecoder
+  public typealias InvocationEncoder = LocalTestingInvocationEncoder
+  public typealias InvocationDecoder = LocalTestingInvocationDecoder
   public typealias SerializationRequirement = Codable
 
   private var activeActors: [ActorID: any DistributedActor] = [:]
@@ -103,7 +105,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 }
 
-public struct LocalInvocationEncoder: DistributedTargetInvocationEncoder {
+public struct LocalTestingInvocationEncoder: DistributedTargetInvocationEncoder {
   public typealias SerializationRequirement = Codable
 
   public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
@@ -127,7 +129,7 @@ public struct LocalInvocationEncoder: DistributedTargetInvocationEncoder {
   }
 }
 
-public class LocalInvocationDecoder : DistributedTargetInvocationDecoder {
+public class LocalTestingInvocationDecoder : DistributedTargetInvocationDecoder {
   public typealias SerializationRequirement = Codable
 
   public func decodeGenericSubstitutions() throws -> [Any.Type] {
