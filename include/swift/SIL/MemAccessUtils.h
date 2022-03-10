@@ -1523,28 +1523,14 @@ inline Operand *getAccessProjectionOperand(SingleValueInstruction *svi) {
   };
 }
 
-/// An address, pointer, or box cast that occurs outside of the formal
-/// access. These convert the base of accessed storage without affecting the
-/// AccessPath. Useful for both use-def and def-use traversal. The source
-/// address must be at operand(0).
-///
-/// Some of these casts, such as address_to_pointer, may also occur inside of a
-/// formal access.
-///
-/// TODO: Add stricter structural guarantee such that these never
-/// occur within an access. It's important to be able to get the accessed
-/// address without looking though type casts or pointer_to_address [strict],
-/// which we can't do if those operations are behind access projections.
-inline bool isAccessStorageCast(SingleValueInstruction *svi) {
+/// A cast for the purposes of AccessStorage which may change the
+/// underlying type but doesn't affect the AccessPath.  See isAccessStorageCast.
+inline bool isAccessStorageTypeCast(SingleValueInstruction *svi) {
   switch (svi->getKind()) {
   default:
     return false;
-
-  // Simply pass-thru the incoming address.
-  case SILInstructionKind::MarkUninitializedInst:
+  // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::UncheckedAddrCastInst:
-  case SILInstructionKind::MarkDependenceInst:
-  case SILInstructionKind::CopyValueInst:
   // Casting to RawPointer does not affect the AccessPath. When converting
   // between address types, they must be layout compatible (with truncation).
   case SILInstructionKind::AddressToPointerInst:
@@ -1572,6 +1558,37 @@ inline bool isAccessStorageCast(SingleValueInstruction *svi) {
   case SILInstructionKind::PointerToAddressInst:
     return true;
   }
+}
+
+/// A cast for the purposes of AccessStorage which doesn't change the
+/// underlying type and doesn't affect the AccessPath.  See isAccessStorageCast.
+inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
+  switch (svi->getKind()) {
+  default:
+    return false;
+
+  // Simply pass-thru the incoming address.
+  case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::CopyValueInst:
+    return true;
+  }
+}
+
+/// An address, pointer, or box cast that occurs outside of the formal
+/// access. These convert the base of accessed storage without affecting the
+/// AccessPath. Useful for both use-def and def-use traversal. The source
+/// address must be at operand(0).
+///
+/// Some of these casts, such as address_to_pointer, may also occur inside of a
+/// formal access.
+///
+/// TODO: Add stricter structural guarantee such that these never
+/// occur within an access. It's important to be able to get the accessed
+/// address without looking though type casts or pointer_to_address [strict],
+/// which we can't do if those operations are behind access projections.
+inline bool isAccessStorageCast(SingleValueInstruction *svi) {
+  return isAccessStorageTypeCast(svi) || isAccessStorageIdentityCast(svi);
 }
 
 /// Abstract CRTP class for a visiting instructions that are part of the use-def
