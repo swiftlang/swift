@@ -133,9 +133,11 @@ RequirementMachine *RewriteContext::getRequirementMachine(
   auto *newMachine = new rewriting::RequirementMachine(*this);
   machine = newMachine;
 
+  SmallVector<RequirementError, 4> errors;
+
   // This might re-entrantly invalidate 'machine', which is a reference
   // into Protos.
-  auto status = newMachine->initWithGenericSignature(sig);
+  auto status = newMachine->initWithGenericSignature(sig, errors);
   newMachine->checkCompletionResult(status.first);
 
   return newMachine;

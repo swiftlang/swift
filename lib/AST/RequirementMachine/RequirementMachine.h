@@ -91,15 +91,18 @@ class RequirementMachine final {
   void checkCompletionResult(CompletionResult result) const;
 
   std::pair<CompletionResult, unsigned>
-  initWithGenericSignature(CanGenericSignature sig);
+  initWithGenericSignature(CanGenericSignature sig,
+                           SmallVectorImpl<RequirementError> &errors);
 
   std::pair<CompletionResult, unsigned>
-  initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
+  initWithProtocols(ArrayRef<const ProtocolDecl *> protos,
+                    SmallVectorImpl<RequirementError> &errors);
 
   std::pair<CompletionResult, unsigned>
   initWithWrittenRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
-      ArrayRef<StructuralRequirement> requirements);
+      ArrayRef<StructuralRequirement> requirements,
+      SmallVectorImpl<RequirementError> &errors);
 
   bool isComplete() const;
 

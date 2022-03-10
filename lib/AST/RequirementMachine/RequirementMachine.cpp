@@ -75,7 +75,8 @@ void RequirementMachine::checkCompletionResult(CompletionResult result) const {
 ///
 /// Returns failure if completion fails within the configured number of steps.
 std::pair<CompletionResult, unsigned>
-RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
+RequirementMachine::initWithGenericSignature(CanGenericSignature sig,
+                                             SmallVectorImpl<RequirementError> &errors) {
   Sig = sig;
   Params.append(sig.getGenericParams().begin(),
                 sig.getGenericParams().end());
@@ -98,7 +99,8 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
                     std::move(builder.WrittenRequirements),
                     std::move(builder.PermanentRules),
-                    std::move(builder.RequirementRules));
+                    std::move(builder.RequirementRules),
+                    errors);
 
   auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
 
@@ -123,7 +125,8 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 ///
 /// Returns failure if completion fails within the configured number of steps.
 std::pair<CompletionResult, unsigned>
-RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
+RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos,
+                                      SmallVectorImpl<RequirementError> &errors) {
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
   if (Dump) {
@@ -141,7 +144,8 @@ RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
   System.initialize(/*recordLoops=*/true, protos,
                     std::move(builder.WrittenRequirements),
                     std::move(builder.PermanentRules),
-                    std::move(builder.RequirementRules));
+                    std::move(builder.RequirementRules),
+                    errors);
 
   auto result = computeCompletion(RewriteSystem::AllowInvalidRequirements);
 
@@ -167,7 +171,8 @@ RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
 std::pair<CompletionResult, unsigned>
 RequirementMachine::initWithWrittenRequirements(
     ArrayRef<GenericTypeParamType *> genericParams,
-    ArrayRef<StructuralRequirement> requirements) {
+    ArrayRef<StructuralRequirement> requirements,
+    SmallVectorImpl<RequirementError> &errors) {
   Params.append(genericParams.begin(), genericParams.end());
 
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
@@ -189,7 +194,8 @@ RequirementMachine::initWithWrittenRequirements(
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
                     std::move(builder.WrittenRequirements),
                     std::move(builder.PermanentRules),
-                    std::move(builder.RequirementRules));
+                    std::move(builder.RequirementRules),
+                    errors);
 
   auto result = computeCompletion(RewriteSystem::AllowInvalidRequirements);
 

@@ -242,9 +242,6 @@ class RewriteSystem final {
   /// The requirements written in source code.
   std::vector<StructuralRequirement> WrittenRequirements;
 
-  /// The invalid requirements.
-  std::vector<RequirementError> Errors;
-
   /// The rules added so far, including rules from our client, as well
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
@@ -303,7 +300,8 @@ public:
   void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
                   ArrayRef<StructuralRequirement> writtenRequirements,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-                  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
+                  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules,
+                  SmallVectorImpl<RequirementError> &errors);
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
     return Protos;
@@ -336,7 +334,8 @@ public:
   bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
 
   bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
-                       Optional<unsigned> requirementID);
+                       Optional<unsigned> requirementID,
+                       SmallVectorImpl<RequirementError> &errors);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
@@ -376,11 +375,7 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
-  ArrayRef<RequirementError> getErrors() {
-    return Errors;
-  }
-
-  std::vector<RequirementError> getRedundantRequirements();
+  void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
 
 private:
   struct CriticalPair {

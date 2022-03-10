@@ -279,7 +279,8 @@ void RewriteSystem::initialize(
     ArrayRef<StructuralRequirement> writtenRequirements,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
     std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>>
-        &&requirementRules) {
+        &&requirementRules,
+    SmallVectorImpl<RequirementError> &errors) {
   assert(!Initialized);
   Initialized = 1;
 
@@ -294,7 +295,7 @@ void RewriteSystem::initialize(
     auto lhs = std::get<0>(rule);
     auto rhs = std::get<1>(rule);
     auto requirementID = std::get<2>(rule);
-    addExplicitRule(lhs, rhs, requirementID);
+    addExplicitRule(lhs, rhs, requirementID, errors);
   }
 }
 
@@ -495,13 +496,14 @@ bool RewriteSystem::addPermanentRule(MutableTerm lhs, MutableTerm rhs) {
 
 /// Add a new rule, marking it explicit.
 bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
-                                    Optional<unsigned> requirementID) {
+                                    Optional<unsigned> requirementID,
+                                    SmallVectorImpl<RequirementError> &errors) {
   bool added = addRule(std::move(lhs), std::move(rhs));
   if (added) {
     Rules.back().markExplicit(requirementID);
   } else if (requirementID.hasValue()) {
     auto req = WrittenRequirements[requirementID.getValue()];
-    Errors.push_back(
+    errors.push_back(
         RequirementError::forRedundantRequirement(req.req, req.loc));
   }
 
@@ -720,11 +722,10 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 #undef ASSERT_RULE
 }
 
-std::vector<RequirementError>
-RewriteSystem::getRedundantRequirements() {
-  // The resulting set of redundant requirements.
-  std::vector<RequirementError> redundantRequirements;
-
+/// Computes the set of explicit redundant requirements to
+/// emit warnings for in the source code.
+void RewriteSystem::computeRedundantRequirementDiagnostics(
+    SmallVectorImpl<RequirementError> &errors) {
   // Map redundant rule IDs to their rewrite path for easy access
   // in the `isRedundantRule` lambda.
   llvm::SmallDenseMap<unsigned, RewritePath> redundantRules;
@@ -792,13 +793,11 @@ RewriteSystem::getRedundantRequirements() {
     // then the requirement is unnecessary in the source code.
     if (llvm::all_of(ruleIDs, isRedundantRule)) {
       auto requirement = WrittenRequirements[requirementID];
-      redundantRequirements.push_back(
+      errors.push_back(
           RequirementError::forRedundantRequirement(requirement.req,
                                                     requirement.loc));
     }
   }
-
-  return redundantRequirements;
 }
 
 void RewriteSystem::dump(llvm::raw_ostream &out) const {

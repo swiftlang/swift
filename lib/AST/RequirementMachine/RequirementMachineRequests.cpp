@@ -352,7 +352,9 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
       ctx.getRewriteContext()));
 
-  auto status = machine->initWithProtocols(component);
+  SmallVector<RequirementError, 4> errors;
+
+  auto status = machine->initWithProtocols(component, errors);
   if (status.first != CompletionResult::Success) {
     // All we can do at this point is diagnose and give each protocol an empty
     // requirement signature.
@@ -421,15 +423,8 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
   if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
       RequirementMachineMode::Enabled) {
-    // Diagnose trivially invalid requirements from the rewrite
-    // system.
-    diagnoseRequirementErrors(ctx, machine->System.getErrors(),
-                              /*allowConcreteGenericParams=*/false);
-
-    // Diagnose redundant requirements found during signature
-    // minimization.
-    auto redundancies = machine->System.getRedundantRequirements();
-    diagnoseRequirementErrors(ctx, redundancies,
+    machine->System.computeRedundantRequirementDiagnostics(errors);
+    diagnoseRequirementErrors(ctx, errors,
                               /*allowConcreteGenericParams=*/false);
   }
 
@@ -529,7 +524,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
       ctx.getRewriteContext()));
 
   auto status =
-      machine->initWithWrittenRequirements(genericParams, requirements);
+      machine->initWithWrittenRequirements(genericParams, requirements, errors);
   machine->checkCompletionResult(status.first);
 
   auto minimalRequirements =
@@ -657,7 +652,7 @@ InferredGenericSignatureRequestRQM::evaluate(
       ctx.getRewriteContext()));
 
   auto status =
-      machine->initWithWrittenRequirements(genericParams, requirements);
+      machine->initWithWrittenRequirements(genericParams, requirements, errors);
   if (status.first != CompletionResult::Success) {
     ctx.Diags.diagnose(loc,
                        diag::requirement_machine_completion_failed,
@@ -681,19 +676,8 @@ InferredGenericSignatureRequestRQM::evaluate(
 
   if (ctx.LangOpts.RequirementMachineInferredSignatures ==
       RequirementMachineMode::Enabled) {
-    // Diagnose invalid requirements dropped during desugaring.
+    machine->System.computeRedundantRequirementDiagnostics(errors);
     hadError |= diagnoseRequirementErrors(ctx, errors,
-                                          allowConcreteGenericParams);
-
-    // Diagnose trivially invalid requirements from the rewrite
-    // system.
-    hadError |= diagnoseRequirementErrors(ctx, machine->System.getErrors(),
-                                          allowConcreteGenericParams);
-
-    // Diagnose redundant requirements found during signature
-    // minimization.
-    auto redundancies = machine->System.getRedundantRequirements();
-    hadError |= diagnoseRequirementErrors(ctx, redundancies,
                                           allowConcreteGenericParams);
   }
 
