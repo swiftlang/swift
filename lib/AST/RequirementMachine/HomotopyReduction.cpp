@@ -910,9 +910,14 @@ void RewriteSystem::minimizeRewriteSystem() {
   }
 
   performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
+    const auto &loop = Loops[loopID];
     const auto &rule = getRule(ruleID);
 
-    if (!rule.isAnyConformanceRule())
+    if (rule.isProtocolTypeAliasRule())
+      return true;
+
+    if (!loop.hasConcreteTypeAliasRule(*this) &&
+        !rule.isAnyConformanceRule())
       return true;
 
     return false;
