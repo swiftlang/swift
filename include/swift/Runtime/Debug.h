@@ -254,6 +254,9 @@ std::atomic<const void *> _swift_debug_metadataAllocationBacktraceList;
 SWIFT_RUNTIME_STDLIB_SPI
 const void * const _swift_debug_protocolConformanceStatePointer;
 
+SWIFT_RUNTIME_STDLIB_SPI
+const uint64_t _swift_debug_multiPayloadEnumPointerSpareBitsMask;
+
 // namespace swift
 }
 

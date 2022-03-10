@@ -469,10 +469,14 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   if (ObjCInterop)
     this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
 
-  // Automatically with libc++ when possible.
-  if (Context.LangOpts.EnableCXXInterop && Context.LangOpts.Target.isOSDarwin())
-    this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
-  
+  // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
+  if (Context.LangOpts.EnableCXXInterop) {
+    if (Context.LangOpts.Target.isOSDarwin())
+      this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
+    else if (Context.LangOpts.Target.isOSLinux())
+      this->addLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
+  }
+
   // FIXME: It'd be better to have the driver invocation or build system that
   // executes the linker introduce these compatibility libraries, since at
   // that point we know whether we're building an executable, which is the only
@@ -2020,7 +2024,11 @@ void IRGenModule::emitVTableStubs() {
     if (F.getEffectiveSymbolLinkage() == SILLinkage::Hidden)
       alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
     else
-      ApplyIRLinkage(IRLinkage::ExternalExport).to(alias);
+      ApplyIRLinkage(IRGen.Opts.InternalizeSymbols
+                        ? IRLinkage{llvm::GlobalValue::ExternalLinkage,
+                                    llvm::GlobalValue::HiddenVisibility,
+                                    llvm::GlobalValue::DefaultStorageClass}
+                        : IRLinkage::ExternalExport).to(alias);
   }
 }
 
@@ -2090,14 +2098,14 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
   switch (linkage) {
   case SILLinkage::Public:
     return {llvm::GlobalValue::ExternalLinkage, PublicDefinitionVisibility,
-            ExportedStorage};
+            info.Internalize ? llvm::GlobalValue::DefaultStorageClass
+                             : ExportedStorage};
 
   case SILLinkage::PublicNonABI:
     return isDefinition ? RESULT(WeakODR, Hidden, Default)
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
     return isDefinition ? RESULT(LinkOnceODR, Hidden, Default)
                         : RESULT(External, Hidden, Default);
 
@@ -2205,11 +2213,9 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
                        SILLinkage linkage, ForDefinition_t isDefinition,
                        bool isWeakImported) {
   LinkInfo result;
-
-  // TODO(compnerd) handle this properly
-
   result.Name += name;
-  result.IRL = getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported);
+  result.IRL = getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported,
+                            linkInfo.Internalize);
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2756,27 +2762,27 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     auto *realReplFn = Builder.CreateBitCast(ReplFn, fnType);
     auto asyncFnPtr =
         FunctionPointer(silFunctionType, realReplFn, authInfo, signature);
+    // We never emit a function that uses special conventions, so we
+    // can just use the default async kind.
+    FunctionPointerKind fpKind =
+        FunctionPointerKind::AsyncFunctionPointer;
     PointerAuthInfo codeAuthInfo =
         asyncFnPtr.getAuthInfo().getCorrespondingCodeAuthInfo();
     auto newFnPtr = FunctionPointer(
         FunctionPointer::Kind::Function, asyncFnPtr.getPointer(IGF),
         codeAuthInfo,
-        Signature::forAsyncAwait(IGM, silFunctionType,
-                                 /*useSpecialConvention*/ false));
+        Signature::forAsyncAwait(IGM, silFunctionType, fpKind));
     SmallVector<llvm::Value *, 16> forwardedArgs;
     for (auto &arg : IGF.CurFn->args())
       forwardedArgs.push_back(&arg);
     auto layout = getAsyncContextLayout(
         IGM, silFunctionType, silFunctionType,
-        f->getForwardingSubstitutionMap(), false,
-        FunctionPointer::Kind(
-            FunctionPointer::BasicKind::AsyncFunctionPointer));
+        f->getForwardingSubstitutionMap());
     llvm::Value *dynamicContextSize32;
     llvm::Value *calleeFunction;
-    auto initialContextSize = Size(0);
     std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
         IGF, silFunctionType->getRepresentation(), asyncFnPtr, nullptr,
-        std::make_pair(false, true), initialContextSize);
+        std::make_pair(false, true));
     auto *dynamicContextSize =
         Builder.CreateZExt(dynamicContextSize32, IGM.SizeTy);
     auto calleeContextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
@@ -3225,7 +3231,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   }
   auto fpKind = irgen::classifyFunctionPointerKind(f);
   Signature signature =
-      getSignature(f->getLoweredFunctionType(), fpKind.useSpecialConvention());
+      getSignature(f->getLoweredFunctionType(), fpKind);
   addLLVMFunctionAttributes(f, signature);
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);

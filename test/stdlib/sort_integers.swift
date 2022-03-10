@@ -49,7 +49,13 @@ func randomize(_ size: Int, _ verify: ([Int]) -> Void) {
 
 // Verify the permute method itself:
 let printer: ([Int]) -> Void = {
-  print($0)
+  var output = ""
+  var prefix = ""
+  for x in $0 {
+    output += "\(prefix)\(x)"
+    prefix = ", "
+  }
+  print("[\(output)]")
 }
 //CHECK: [0, 1, 2]
 //CHECK: [0, 2, 1]
@@ -86,7 +92,7 @@ let partition_verifier: ([Int]) -> Void = {
     // the pivot value.
     for i in 0..<idx {
       if y[i] >= first! {
-        print("Error!\n", terminator: "")
+        print("Error!")
         return
       }
     }
@@ -94,7 +100,7 @@ let partition_verifier: ([Int]) -> Void = {
     // equal to the pivot value.
     for i in idx..<y.count - 1 {
       if y[i] < first! {
-        print("Error!\n", terminator: "")
+        print("Error!")
         return
       }
     }

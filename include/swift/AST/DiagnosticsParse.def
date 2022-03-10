@@ -424,7 +424,7 @@ ERROR(initializer_has_name,PointsToFirstBadToken,
 
 // Destructor
 ERROR(destructor_decl_outside_class,none,
-      "deinitializers may only be declared within a class", ())
+      "deinitializers may only be declared within a class or actor", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,
@@ -804,6 +804,8 @@ ERROR(expected_dynamic_func_attr,none,
 ERROR(async_after_throws,none,
       "%select{'async'|'reasync'}0 must precede %select{'throws'|'rethrows'}1",
       (bool, bool))
+ERROR(await_in_function_type,none,
+      "expected async specifier; did you mean 'async'?", ())
 ERROR(duplicate_effects_specifier,none,
       "'%0' has already been specified", (StringRef))
 
@@ -1503,6 +1505,8 @@ WARNING(attr_availability_invalid_duplicate,none,
         "'%0' argument has already been specified", (StringRef))
 WARNING(attr_availability_unknown_platform,none,
       "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+ERROR(attr_availability_expected_platform,none,
+      "expected platform in '%0' attribute", (StringRef))
 ERROR(attr_availability_invalid_renamed,none,
       "'renamed' argument of '%0' attribute must be an operator, identifier, "
       "or full function name, optionally prefixed by a type name", (StringRef))
@@ -1531,6 +1535,15 @@ WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
 
+WARNING(attr_availability_wildcard_ignored,none,
+        "* as platform name has no effect in '%0' attribute", (StringRef))
+
+ERROR(attr_availability_need_platform_version,none,
+     "expected at least one platform version in '%0' attribute", (StringRef))
+
+WARNING(attr_availability_platform_version_major_minor_only,none,
+        "'%0' only uses major and minor version number", (StringRef))
+
 // availability macro
 ERROR(attr_availability_wildcard_in_macro, none,
       "future platforms identified by '*' cannot be used in "
@@ -1551,12 +1564,6 @@ ERROR(attr_availability_duplicate,none,
 ERROR(originally_defined_in_missing_rparen,none,
       "expected ')' in @_originallyDefinedIn argument list", ())
 
-ERROR(originally_defined_in_unrecognized_platform,none,
-      "unrecognized platform name in @_originallyDefinedIn argument list", ())
-
-ERROR(originally_defined_in_unrecognized_property,none,
-      "unrecognized property in @_originallyDefinedIn argument list", ())
-
 ERROR(originally_defined_in_need_original_module_name,none,
       "expected 'module: \"original\"' in the first argument to "
       "@_originallyDefinedIn", ())
@@ -1564,22 +1571,9 @@ ERROR(originally_defined_in_need_original_module_name,none,
 ERROR(originally_defined_in_need_nonempty_module_name,none,
       "original module name cannot be empty in @_originallyDefinedIn", ())
 
-ERROR(originally_defined_in_need_platform_version,none,
-     "expected at least one platform version in @_originallyDefinedIn", ())
-
-WARNING(originally_defined_in_major_minor_only,none,
-        "@_originallyDefinedIn only uses major and minor version number", ())
-
-WARNING(originally_defined_in_missing_platform_name,none,
-        "* as platform name has no effect", ())
-
-WARNING(originally_defined_in_swift_version, none,
-        "Swift language version checks has no effect "
-        "in @_originallyDefinedIn", ())
-
-WARNING(originally_defined_in_package_description, none,
-        "PackageDescription version checks has no effect "
-        "in @_originallyDefinedIn", ())
+// backDeploy
+ERROR(attr_back_deploy_missing_rparen,none,
+      "expected ')' in '@_backDeploy' argument list", ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,
@@ -1775,8 +1769,14 @@ ERROR(redundant_class_requirement,none,
 ERROR(late_class_requirement,none,
       "'class' must come first in the requirement list", ())
 ERROR(where_inside_brackets,none,
-        "'where' clause next to generic parameters is obsolete, "
-        "must be written following the declaration's type", ())
+      "'where' clause next to generic parameters is obsolete, "
+      "must be written following the declaration's type", ())
+
+
+ERROR(expected_rangle_primary_associated_type_list,PointsToFirstBadToken,
+      "expected '>' to complete primary associated type list", ())
+ERROR(expected_primary_associated_type_name,PointsToFirstBadToken,
+      "expected an identifier to name primary associated type", ())
 
 //------------------------------------------------------------------------------
 // MARK: Conditional compilation parsing diagnostics

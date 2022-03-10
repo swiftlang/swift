@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on -enable-requirement-machine-loop-normalization 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: redundant_parent_path_in_protocol.(file).P1@
 // CHECK-NEXT: Requirement signature: <Self>

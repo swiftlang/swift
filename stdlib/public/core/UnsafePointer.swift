@@ -315,10 +315,11 @@ public struct UnsafePointer<Pointee>: _Pointer {
   ) rethrows -> Result {
     _debugPrecondition(
       Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
-      MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
-      ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
-      : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
-    )
+      ( count == 1 ||
+        ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
+          ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
+          : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
+    )))
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try body(.init(_rawValue))
@@ -351,6 +352,23 @@ public struct UnsafePointer<Pointee>: _Pointer {
     unsafeAddress {
       return self + i
     }
+  }
+
+  /// Obtain a pointer to the stored property referred to by a key path.
+  ///
+  /// If the key path represents a computed property,
+  /// this function will return `nil`.
+  ///
+  /// - Parameter property: A `KeyPath` whose `Root` is `Pointee`.
+  /// - Returns: A pointer to the stored property represented
+  ///            by the key path, or `nil`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func pointer<Property>(
+    to property: KeyPath<Pointee, Property>
+  ) -> UnsafePointer<Property>? {
+    guard let o = property._storedInlineOffset else { return nil }
+    return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
 
   @inlinable // unsafe-performance
@@ -582,25 +600,25 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     self.init(mutating: unwrapped)
   }
   
-  /// Creates an immutable typed pointer referencing the same memory as the		
-  /// given mutable pointer.		
-  ///		
-  /// - Parameter other: The pointer to convert.		
-  @_transparent		
+  /// Creates an immutable typed pointer referencing the same memory as the
+  /// given mutable pointer.
+  ///
+  /// - Parameter other: The pointer to convert.
+  @_transparent
   public init(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>) {
-   self._rawValue = other._rawValue		
-  }		
+   self._rawValue = other._rawValue
+  }
 
-  /// Creates an immutable typed pointer referencing the same memory as the		
-  /// given mutable pointer.		
-  ///		
-  /// - Parameter other: The pointer to convert. If `other` is `nil`, the		
-  ///   result is `nil`.		
-  @_transparent		
+  /// Creates an immutable typed pointer referencing the same memory as the
+  /// given mutable pointer.
+  ///
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
+  @_transparent
   public init?(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>?) {
-   guard let unwrapped = other else { return nil }		
-   self.init(unwrapped)		
-  }		
+   guard let unwrapped = other else { return nil }
+   self.init(unwrapped)
+  }
   
 
   /// Allocates uninitialized memory for the specified number of instances of
@@ -1001,10 +1019,11 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ) rethrows -> Result {
     _debugPrecondition(
       Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
-      MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
-      ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
-      : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
-    )
+      ( count == 1 ||
+        ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
+          ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
+          : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
+    )))
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try body(.init(_rawValue))
@@ -1047,6 +1066,40 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     nonmutating unsafeMutableAddress {
       return self + i
     }
+  }
+
+  /// Obtain a pointer to the stored property referred to by a key path.
+  ///
+  /// If the key path represents a computed property,
+  /// this function will return `nil`.
+  ///
+  /// - Parameter property: A `KeyPath` whose `Root` is `Pointee`.
+  /// - Returns: A pointer to the stored property represented
+  ///            by the key path, or `nil`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func pointer<Property>(
+    to property: KeyPath<Pointee, Property>
+  ) -> UnsafePointer<Property>? {
+    guard let o = property._storedInlineOffset else { return nil }
+    return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
+  }
+
+  /// Obtain a mutable pointer to the stored property referred to by a key path.
+  ///
+  /// If the key path represents a computed property,
+  /// this function will return `nil`.
+  ///
+  /// - Parameter property: A `WritableKeyPath` whose `Root` is `Pointee`.
+  /// - Returns: A mutable pointer to the stored property represented
+  ///            by the key path, or `nil`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func pointer<Property>(
+    to property: WritableKeyPath<Pointee, Property>
+  ) -> UnsafeMutablePointer<Property>? {
+    guard let o = property._storedInlineOffset else { return nil }
+    return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
 
   @inlinable // unsafe-performance

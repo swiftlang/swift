@@ -568,7 +568,7 @@ void SILGenFunction::emitDistributedActorClassMemberDestruction(
     B.emitBlock(remoteMemberDestroyBB);
 
     for (VarDecl *vd : cd->getStoredProperties()) {
-      if (getActorIsolation(vd) == ActorIsolation::DistributedActorInstance)
+      if (getActorIsolation(vd) == ActorIsolation::ActorInstance)
         continue;
 
       destroyClassMember(cleanupLoc, selfValue, vd);
@@ -1058,7 +1058,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       }
       nextNormalBB = nullptr;
 
-      FuncDecl *recordArgumentFnDecl =
+      AbstractFunctionDecl *recordArgumentFnDecl =
           ctx.getRecordArgumentOnDistributedInvocationEncoder(
               invocationEncoderNominal);
       auto recordArgumentFnRef = SILDeclRef(recordArgumentFnDecl);
@@ -1154,15 +1154,17 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           subTypes.push_back(paramTy);
 
           // --- Codable: Decodable
-          auto decodableRequirementTy =
-              ctx.getProtocol(KnownProtocolKind::Decodable); // FIXME: actually use SerializatioNRequirement
+          auto decodableRequirementTy = ctx.getProtocol(
+              KnownProtocolKind::Decodable); // FIXME(distributed): actually use
+                                             // SerializationRequirement
           auto paramDecodableTypeConfRef = module->lookupConformance(
               paramTy, decodableRequirementTy);
           subConformances.push_back(paramDecodableTypeConfRef);
 
           // --- Codable: Encodable
           auto encodableRequirementTy = ctx.getProtocol(
-              KnownProtocolKind::Encodable); // FIXME: actually use SerializatioNRequirement
+              KnownProtocolKind::Encodable); // FIXME(distributed): actually use
+                                             // SerializationRequirement
           auto paramEncodableTypeConfRef = module->lookupConformance(
               paramTy, encodableRequirementTy);
           subConformances.push_back(paramEncodableTypeConfRef);
@@ -1208,7 +1210,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto errorMetatypeValue = B.createMetatype(loc, errorMetatype);
 
       // Get the function
-      FuncDecl *recordErrorTypeFnDecl =
+      AbstractFunctionDecl *recordErrorTypeFnDecl =
           ctx.getRecordErrorTypeOnDistributedInvocationEncoder(
               invocationEncoderNominal);
       assert(recordErrorTypeFnDecl);
@@ -1256,7 +1258,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto returnMetatypeValue = B.createMetatype(loc, returnMetatype);
 
       // Get the function
-      FuncDecl *recordReturnTypeFnDecl =
+      AbstractFunctionDecl *recordReturnTypeFnDecl =
           ctx.getRecordReturnTypeOnDistributedInvocationEncoder(
               invocationEncoderNominal);
       assert(recordReturnTypeFnDecl);

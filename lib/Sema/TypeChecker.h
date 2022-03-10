@@ -251,6 +251,10 @@ void checkExistentialTypes(Decl *decl);
 /// Check for invalid existential types in the given statement.
 void checkExistentialTypes(ASTContext &ctx, Stmt *stmt);
 
+/// Check for invalid existential types in the underlying type of
+/// the given type alias.
+void checkExistentialTypes(ASTContext &ctx, TypeAliasDecl *typeAlias);
+
 /// Check for invalid existential types in the given generic requirement
 /// list.
 void checkExistentialTypes(ASTContext &ctx,
@@ -672,6 +676,12 @@ Type typeCheckPattern(ContextualPattern pattern);
 Pattern *coercePatternToType(ContextualPattern pattern, Type type,
                              TypeResolutionOptions options);
 bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC, Type type);
+
+/// Synthesize ~= operator application used to infer enum members
+/// in `case` patterns.
+Optional<std::pair<VarDecl *, BinaryExpr *>>
+synthesizeTildeEqualsOperatorApplication(ExprPattern *EP, DeclContext *DC,
+                                         Type enumType);
 
 /// Coerce the specified parameter list of a ClosureExpr to the specified
 /// contextual type.
@@ -1175,7 +1185,8 @@ UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
 /// are verified against any candidates.
 bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
                            ArrayRef<Identifier> argLabels = {},
-                           SmallVectorImpl<ValueDecl *> *allResults = nullptr);
+                           SmallVectorImpl<ValueDecl *> *allResults = nullptr,
+                           bool checkAvailability = false);
 
 /// Forces all changes specified by the module's access notes file to be
 /// applied to this declaration. It is safe to call this function more than

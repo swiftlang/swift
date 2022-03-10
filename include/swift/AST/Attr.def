@@ -494,7 +494,7 @@ SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   84)
 DECL_ATTR(_custom, Custom,
-  OnAnyDecl | UserInaccessible |
+  OnAnyDecl | RejectByParser |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   85)
 SIMPLE_DECL_ATTR(propertyWrapper, PropertyWrapper,
@@ -636,7 +636,11 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   112)
 
 // 113 was experimental _unsafeSendable and is now unused
-// 114 was experimental _unsafeMainActor and is now unused
+
+SIMPLE_DECL_ATTR(_unsafeInheritExecutor, UnsafeInheritExecutor,
+  OnFunc | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
+  114) // previously experimental _unsafeMainActor
 
 SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
   OnParam | UserInaccessible |
@@ -651,16 +655,13 @@ SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
 // 117 was 'spawn' and is now unused
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
-  DeclModifier | OnClass | OnFunc |
+  DeclModifier | OnClass | OnFunc | OnVar |
   DistributedOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   118)
 
-SIMPLE_DECL_ATTR(_primaryAssociatedType,
-  PrimaryAssociatedType, OnAssociatedType | UserInaccessible |
-  APIStableToAdd | ABIStableToAdd | APIBreakingToRemove | ABIStableToRemove,
-  119)
+// 119 is unused
 
 SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
   OnFunc | UserInaccessible | NotSerialized | OnNominalType |
@@ -712,6 +713,12 @@ DECL_ATTR(exclusivity, Exclusivity,
   OnVar |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   128)
+
+DECL_ATTR(_backDeploy, BackDeploy,
+  OnAbstractFunction | OnAccessor | OnSubscript | OnVar |
+  AllowMultipleAttributes | LongAttribute | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
+  129)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.

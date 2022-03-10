@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -enable-experimental-distributed -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
+
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -63,6 +64,7 @@ distributed actor MyDistActor {
 
 // CHECK: [[CONTINUE]]:
 // CHECK:        hop_to_executor [[SELF]] : $MyDistActor
+// One of the following retain_value operations could be optimized away.
 // CHECK-NEXT:   retain_value [[SYSTEM]] : $FakeActorSystem
 // CHECK-NEXT:   retain_value [[SYSTEM]] : $FakeActorSystem
 // CHECK-NEXT:   // function_ref FakeActorSystem.actorReady<A>(_:)

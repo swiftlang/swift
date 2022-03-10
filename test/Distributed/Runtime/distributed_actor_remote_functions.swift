@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -7,9 +7,6 @@
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-
-// rdar://77798215
-// UNSUPPORTED: OS=windows-msvc
 
 import _Distributed
 import _Concurrency
@@ -76,55 +73,6 @@ distributed actor SomeSpecificDistributedActor {
   }
 }
 
-//extension SomeSpecificDistributedActor {
-//  @_dynamicReplacement(for:_remote_helloAsyncThrows())
-//  nonisolated func _remote_impl_helloAsyncThrows() async throws -> String {
-//    "remote(\(#function))"
-//  }
-//
-//  @_dynamicReplacement(for:_remote_helloAsync())
-//  nonisolated func _remote_impl_helloAsync() async throws -> String {
-//    "remote(\(#function))"
-//  }
-//
-//  @_dynamicReplacement(for:_remote_helloThrows())
-//  nonisolated func _remote_impl_helloThrows() async throws -> String {
-//    "remote(\(#function))"
-//  }
-//
-//  @_dynamicReplacement(for:_remote_hello())
-//  nonisolated func _remote_impl_hello() async throws -> String {
-//    "remote(\(#function))"
-//  }
-//
-//  @_dynamicReplacement(for:_remote_callTaskSelf())
-//  nonisolated func _remote_impl_callTaskSelf() async throws -> String {
-//    "remote(\(#function))"
-//  }
-//
-//  @_dynamicReplacement(for:_remote_callDetachedSelf())
-//  nonisolated func _remote_impl_callDetachedSelf() async throws -> String {
-//    "remote(\(#function))"
-//  }
-//
-//  @_dynamicReplacement(for:_remote_callTaskSelf_inner())
-//  nonisolated func _remote_impl_callTaskSelf_inner() async throws -> String {
-//    "remote(\(#function))"
-//  }
-//
-//  // === errors
-//
-//  @_dynamicReplacement(for:_remote_helloThrowsImplBoom())
-//  nonisolated func _remote_impl_helloThrowsImplBoom() async throws -> String {
-//    "remote(\(#function))"
-//  }
-//
-//  @_dynamicReplacement(for:_remote_helloThrowsTransportBoom())
-//  nonisolated func _remote_impl_helloThrowsTransportBoom() async throws -> String {
-//    throw Boom("system")
-//  }
-//}
-
 // ==== Execute ----------------------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
@@ -169,7 +117,7 @@ struct FakeActorSystem: DistributedActorSystem {
     .init()
   }
 
-  func remoteCall<Act, Err, Res>(
+  public func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
     invocation invocationEncoder: inout InvocationEncoder,
@@ -177,9 +125,9 @@ struct FakeActorSystem: DistributedActorSystem {
     returning: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
-    Err: Error,
-//          Act.ID == ActorID,
-    Res: SerializationRequirement {
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
     guard target.mangledName != "$s4main28SomeSpecificDistributedActorC24helloThrowsTransportBoomSSyKFTE" else {
       throw Boom("system")
     }
@@ -194,9 +142,8 @@ struct FakeActorSystem: DistributedActorSystem {
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
-    Err: Error
-//          Act.ID == ActorID
-  {
+          Act.ID == ActorID,
+          Err: Error {
     fatalError("not implemented: \(#function)")
   }
 }

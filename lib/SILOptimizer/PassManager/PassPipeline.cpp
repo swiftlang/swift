@@ -66,6 +66,10 @@ llvm::cl::opt<bool> SILDisableLateOMEByDefault(
     llvm::cl::desc(
         "Disable late OME for non-transparent functions by default"));
 
+llvm::cl::opt<bool>
+    EnableDestroyHoisting("enable-destroy-hoisting", llvm::cl::init(true),
+                          llvm::cl::desc("Enable the DestroyHoisting pass."));
+
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
 //===----------------------------------------------------------------------===//
@@ -145,7 +149,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addSILSkippingChecker();
 #endif
 
-  if (Options.shouldOptimize()) {
+  if (Options.shouldOptimize() && EnableDestroyHoisting) {
     P.addDestroyHoisting();
   }
   P.addMandatoryInlining();
@@ -345,6 +349,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
                        OptimizationLevelKind OpLevel) {
   // Promote box allocations to stack allocations.
   P.addAllocBoxToStack();
+
+  P.addSSADestroyHoisting();
 
   // Propagate copies through stack locations.  Should run after
   // box-to-stack promotion since it is limited to propagating through
@@ -910,10 +916,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
-  if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
-    // MandatoryCopyPropagation should only be run at -Onone, not -O.
-    P.addMandatoryCopyPropagation();
-  }
+
   // TODO: MandatoryARCOpts should be subsumed by CopyPropagation. There should
   // be no need to run another analysis of copies at -Onone.
   P.addMandatoryARCOpts();

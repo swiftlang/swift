@@ -255,7 +255,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -266,7 +266,11 @@ protected:
 
     /// True if this @Sendable async closure parameter should implicitly
     /// inherit the actor context from where it was formed.
-    InheritActorContext : 1
+    InheritActorContext : 1,
+
+    /// True if this closure's actor isolation behavior was determined by an
+    /// \c \@preconcurrency declaration.
+    IsolatedByPreconcurrency : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -293,9 +297,10 @@ protected:
     IsNonAccessing : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32+20,
     : NumPadBits,
-    NumConformances : 32
+    NumConformances : 32,
+    NumArgumentConversions : 20
   );
 
   SWIFT_INLINE_BITFIELD_FULL(UnresolvedSpecializeExpr, Expr, 32,
@@ -491,6 +496,7 @@ public:
     return getSemanticsProvidingExpr()->getKind() == ExprKind::InOut;
   }
 
+  bool printConstExprValue(llvm::raw_ostream *OS) const;
   bool isSemanticallyConstExpr() const;
 
   /// Returns false if this expression needs to be wrapped in parens when
@@ -3239,20 +3245,35 @@ public:
 /// "Appropriate kind" means e.g. a concrete/existential metatype if the
 /// result is an existential metatype.
 class ErasureExpr final : public ImplicitConversionExpr,
-    private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef> {
+    private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef,
+                                  CollectionUpcastConversionExpr::ConversionPair> {
   friend TrailingObjects;
+  using ConversionPair = CollectionUpcastConversionExpr::ConversionPair;
 
   ErasureExpr(Expr *subExpr, Type type,
-              ArrayRef<ProtocolConformanceRef> conformances)
+              ArrayRef<ProtocolConformanceRef> conformances,
+              ArrayRef<ConversionPair> argConversions)
     : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type) {
     Bits.ErasureExpr.NumConformances = conformances.size();
     std::uninitialized_copy(conformances.begin(), conformances.end(),
                             getTrailingObjects<ProtocolConformanceRef>());
+
+    Bits.ErasureExpr.NumArgumentConversions = argConversions.size();
+    std::uninitialized_copy(argConversions.begin(), argConversions.end(),
+                            getTrailingObjects<ConversionPair>());
   }
 
 public:
   static ErasureExpr *create(ASTContext &ctx, Expr *subExpr, Type type,
-                             ArrayRef<ProtocolConformanceRef> conformances);
+                             ArrayRef<ProtocolConformanceRef> conformances,
+                             ArrayRef<ConversionPair> argConversions);
+
+  size_t numTrailingObjects(OverloadToken<ProtocolConformanceRef>) const {
+    return Bits.ErasureExpr.NumConformances;
+  }
+  size_t numTrailingObjects(OverloadToken<ConversionPair>) const {
+    return Bits.ErasureExpr.NumArgumentConversions;
+  }
 
   /// Retrieve the mapping specifying how the type of the subexpression
   /// maps to the resulting existential type. If the resulting existential
@@ -3267,6 +3288,30 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return {getTrailingObjects<ProtocolConformanceRef>(),
             Bits.ErasureExpr.NumConformances };
+  }
+
+  /// Retrieve the conversion expressions mapping requirements from any
+  /// parameterized existentials involved in this erasure.
+  ///
+  /// If the destination type is not a parameterized protocol type,
+  /// this array will be empty
+  ArrayRef<ConversionPair> getArgumentConversions() const {
+    return {getTrailingObjects<ConversionPair>(),
+            Bits.ErasureExpr.NumArgumentConversions };
+  }
+
+  /// Retrieve the conversion expressions mapping requirements from any
+  /// parameterized existentials involved in this erasure.
+  ///
+  /// If the destination type is not a parameterized protocol type,
+  /// this array will be empty
+  MutableArrayRef<ConversionPair> getArgumentConversions() {
+    return {getTrailingObjects<ConversionPair>(),
+            Bits.ErasureExpr.NumArgumentConversions };
+  }
+
+  void setArgumentConversion(unsigned i, const ConversionPair &p) {
+    getArgumentConversions()[i] = p;
   }
 
   static bool classof(const Expr *E) {
@@ -3536,40 +3581,46 @@ public:
   };
 
 private:
-    /// The actor to which this closure is isolated.
+    /// The actor to which this closure is isolated, plus a bit indicating
+    /// whether the isolation was imposed by a preconcurrency declaration.
     ///
-    /// There are three possible states:
+    /// There are three possible states for the pointer:
     ///   - NULL: The closure is independent of any actor.
     ///   - VarDecl*: The 'self' variable for the actor instance to which
     ///     this closure is isolated. It will always have a type that conforms
     ///     to the \c Actor protocol.
     ///   - Type: The type of the global actor on which
-  llvm::PointerUnion<VarDecl *, Type> storage;
+  llvm::PointerIntPair<llvm::PointerUnion<VarDecl *, Type>, 1, bool> storage;
 
-  ClosureActorIsolation(VarDecl *selfDecl) : storage(selfDecl) { }
-  ClosureActorIsolation(Type globalActorType) : storage(globalActorType) { }
+  ClosureActorIsolation(VarDecl *selfDecl, bool preconcurrency)
+      : storage(selfDecl, preconcurrency) { }
+  ClosureActorIsolation(Type globalActorType, bool preconcurrency)
+      : storage(globalActorType, preconcurrency) { }
 
 public:
-  ClosureActorIsolation() : storage() { }
+  ClosureActorIsolation(bool preconcurrency = false)
+      : storage(nullptr, preconcurrency) { }
 
-  static ClosureActorIsolation forIndependent() {
-    return ClosureActorIsolation();
+  static ClosureActorIsolation forIndependent(bool preconcurrency) {
+    return ClosureActorIsolation(preconcurrency);
   }
 
-  static ClosureActorIsolation forActorInstance(VarDecl *selfDecl) {
-    return ClosureActorIsolation(selfDecl);
+  static ClosureActorIsolation forActorInstance(VarDecl *selfDecl,
+                                                bool preconcurrency) {
+    return ClosureActorIsolation(selfDecl, preconcurrency);
   }
 
-  static ClosureActorIsolation forGlobalActor(Type globalActorType) {
-    return ClosureActorIsolation(globalActorType);
+  static ClosureActorIsolation forGlobalActor(Type globalActorType,
+                                              bool preconcurrency) {
+    return ClosureActorIsolation(globalActorType, preconcurrency);
   }
 
   /// Determine the kind of isolation.
   Kind getKind() const {
-    if (storage.isNull())
+    if (storage.getPointer().isNull())
       return Kind::Independent;
 
-    if (storage.is<VarDecl *>())
+    if (storage.getPointer().is<VarDecl *>())
       return Kind::ActorInstance;
 
     return Kind::GlobalActor;
@@ -3586,11 +3637,15 @@ public:
   }
 
   VarDecl *getActorInstance() const {
-    return storage.dyn_cast<VarDecl *>();
+    return storage.getPointer().dyn_cast<VarDecl *>();
   }
 
   Type getGlobalActor() const {
-    return storage.dyn_cast<Type>();
+    return storage.getPointer().dyn_cast<Type>();
+  }
+
+  bool preconcurrency() const {
+    return storage.getInt();
   }
 };
 
@@ -3861,6 +3916,16 @@ public:
 
   void setInheritsActorContext(bool value = true) {
     Bits.ClosureExpr.InheritActorContext = value;
+  }
+
+  /// Whether the closure's concurrency behavior was determined by an
+  /// \c \@preconcurrency declaration.
+  bool isIsolatedByPreconcurrency() const {
+    return Bits.ClosureExpr.IsolatedByPreconcurrency;
+  }
+
+  void setIsolatedByPreconcurrency(bool value = true) {
+    Bits.ClosureExpr.IsolatedByPreconcurrency = value;
   }
 
   /// Determine whether this closure expression has an

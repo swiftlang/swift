@@ -406,10 +406,32 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
                            return t->isEqual(interfaceTy->getRootGenericParam());
                          }) != genericParams.end()) {
           types.insert(interfaceTy->getCanonicalType());
+
           for (auto *proto : at->getConformsTo()) {
             reqs.push_back(Requirement(RequirementKind::Conformance,
                                        interfaceTy,
                                        proto->getDeclaredInterfaceType()));
+          }
+
+          // The GSB would add conformance requirements if a nested type
+          // requirement involving a resolved DependentMemberType was added;
+          // eg, if you start with <T> and add T.[P]A == Int, it would also
+          // add the conformance requirement T : P.
+          //
+          // This was not an intended behavior on the part of the GSB, and the
+          // logic here is a complete mess, so just simulate the old behavior
+          // here.
+          auto parentTy = interfaceTy;
+          while (parentTy) {
+            if (auto memberTy = parentTy->getAs<DependentMemberType>()) {
+              parentTy = memberTy->getBase();
+              if (auto *assocTy = memberTy->getAssocType()) {
+                reqs.push_back(Requirement(RequirementKind::Conformance,
+                                           parentTy,
+                                           assocTy->getProtocol()->getDeclaredInterfaceType()));
+              }
+            } else
+              parentTy = Type();
           }
         }
       }
@@ -714,7 +736,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
   for (auto &param : diffParams) {
     // Skip `inout` parameters, which semantically behave as original results
     // and always appear as pullback parameters.
-    if (param.isIndirectInOut())
+    if (param.isIndirectMutating())
       continue;
     auto paramTanType = getAutoDiffTangentTypeForLinearMap(
         param.getInterfaceType(), lookupConformance,
@@ -1301,6 +1323,14 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 
     return true;
   }
+
+  // Pass C++ const reference types indirectly. Right now there's no way to
+  // express immutable borrowed params, so we have to have this hack.
+  // Eventually, we should just express these correctly: rdar://89647503
+  if (clangTy->isReferenceType() &&
+      clangTy->getPointeeType().isConstQualified())
+    return true;
+
   return false;
 }
 

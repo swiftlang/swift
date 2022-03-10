@@ -1445,7 +1445,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
     T = existential->getConstraintType()->getCanonicalType();
   }
   llvm::StructType *type;
-  if (isa<ProtocolType>(T))
+  if (isa<ProtocolType>(T) || isa<ParameterizedProtocolType>(T))
     type = IGM.createNominalType(T);
   else
     type = IGM.createNominalType(cast<ProtocolCompositionType>(T.getPointer()));
@@ -1699,7 +1699,8 @@ Address irgen::emitOpenExistentialBox(IRGenFunction &IGF,
 OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                   SILType destType,
                                   CanType formalSrcType,
-                                ArrayRef<ProtocolConformanceRef> conformances) {
+                                  ArrayRef<ProtocolConformanceRef> conformances,
+                                  GenericSignature sig) {
   // TODO: Non-Error boxed existentials.
   assert(destType.canUseExistentialRepresentation(
            ExistentialRepresentation::Boxed, Type()));
@@ -1726,7 +1727,8 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   auto box = IGF.Builder.CreateExtractValue(result, 0);
   auto addr = IGF.Builder.CreateExtractValue(result, 1);
 
-  auto archetype = OpenedArchetypeType::get(destType.getASTType());
+  auto archetype =
+      OpenedArchetypeType::get(destType.getASTType(), sig);
   auto &srcTI = IGF.getTypeInfoForUnlowered(AbstractionPattern(archetype),
                                             formalSrcType);
   addr = IGF.Builder.CreateBitCast(addr,
@@ -1942,6 +1944,7 @@ void irgen::emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
 void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
                                            SILType metatypeTy,
                                            SILType existentialTy,
+                                           GenericSignature fnSig,
                                            Explosion &out) {
   assert(existentialTy.isClassExistentialType());
   auto &baseTI = IGF.getTypeInfo(existentialTy).as<ClassExistentialTypeInfo>();
@@ -1961,6 +1964,7 @@ void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
 
   auto dynamicType = emitDynamicTypeOfHeapObject(IGF, instance, repr,
                                                  existentialTy,
+                                                 fnSig,
                                                  /*allow artificial*/ false);
   out.add(dynamicType);
 
@@ -1995,7 +1999,8 @@ llvm::Value *
 irgen::emitClassExistentialProjection(IRGenFunction &IGF,
                                       Explosion &base,
                                       SILType baseTy,
-                                      CanArchetypeType openedArchetype) {
+                                      CanArchetypeType openedArchetype,
+                                      GenericSignature sigFn) {
   assert(baseTy.isClassExistentialType());
   auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
 
@@ -2010,6 +2015,7 @@ irgen::emitClassExistentialProjection(IRGenFunction &IGF,
   auto metadata = emitDynamicTypeOfHeapObject(IGF, value,
                                               MetatypeRepresentation::Thick,
                                               baseTy,
+                                              sigFn,
                                               /*allow artificial*/ false);
   IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
                     wtables);
@@ -2343,7 +2349,8 @@ getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
 
 Address irgen::emitOpaqueBoxedExistentialProjection(
     IRGenFunction &IGF, OpenedExistentialAccess accessKind, Address base,
-    SILType existentialTy, CanArchetypeType openedArchetype) {
+    SILType existentialTy, CanArchetypeType openedArchetype,
+    GenericSignature fnSig) {
 
   assert(existentialTy.isExistentialType());
   if (existentialTy.isClassExistentialType()) {
@@ -2354,6 +2361,7 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
     auto metadata = emitDynamicTypeOfHeapObject(IGF, value,
                                                 MetatypeRepresentation::Thick,
                                                 existentialTy,
+                                                fnSig,
                                                 /*allow artificial*/ false);
 
     // If we are projecting into an opened archetype, capture the

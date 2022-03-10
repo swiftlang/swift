@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
 import SILBridging
 
 public struct Type : CustomStringConvertible, CustomReflectable {

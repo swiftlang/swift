@@ -168,7 +168,6 @@ KNOWN_SETTINGS=(
     ## LLDB Options
     lldb-assertions                               "1"               "build lldb with assertions enabled"
     lldb-extra-cmake-args                         ""                "extra command line args to pass to lldb cmake"
-    lldb-no-debugserver                           ""                "delete debugserver after building it, and don't try to codesign it"
     lldb-test-cc                                  ""                "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-swift-compatibility                 ""                "specify additional Swift compilers to test lldb with"
     lldb-test-swift-only                          "0"               "when running lldb tests, only include Swift-specific tests"
@@ -196,6 +195,7 @@ KNOWN_SETTINGS=(
     extra-swift-args                              ""                "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
     sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
+    sil-verify-all-macos-only                     "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process when building a macos stdlib"
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
     swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Darwin platforms, 0 otherwise"
     swift-enable-dispatch                         "1"               "whether to enable use of libdispatch"
@@ -458,9 +458,11 @@ function verify_host_is_supported() {
       | haiku-x86_64            \
       | linux-x86_64            \
       | linux-i686              \
+      | linux-armv5             \
       | linux-armv6             \
       | linux-armv7             \
       | linux-aarch64           \
+      | linux-powerpc           \
       | linux-powerpc64         \
       | linux-powerpc64le       \
       | linux-s390x             \
@@ -550,6 +552,10 @@ function set_build_options_for_host() {
                     llvm_target_arch="X86"
                     ;;
             esac
+            ;;
+        linux-armv5)
+            SWIFT_HOST_TRIPLE="armv5-unknown-linux-gnueabi"
+            llvm_target_arch="ARM"
             ;;
         linux-armv6)
             SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
@@ -1105,7 +1111,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        macosx* | iphone* | appletv* | watch* | linux-armv6 | linux-armv7 | android-* )
+        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1690,6 +1696,7 @@ for host in "${ALL_HOSTS[@]}"; do
         "${swift_cmake_options[@]}"
         -DSWIFT_AST_VERIFIER:BOOL=$(true_false "${SWIFT_ENABLE_AST_VERIFIER}")
         -DSWIFT_SIL_VERIFY_ALL:BOOL=$(true_false "${SIL_VERIFY_ALL}")
+        -DSWIFT_SIL_VERIFY_ALL_MACOS_ONLY:BOOL=$(true_false "${SIL_VERIFY_ALL_MACOS_ONLY}")
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
     )
 

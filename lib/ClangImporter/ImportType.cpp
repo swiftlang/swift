@@ -546,6 +546,12 @@ namespace {
         return importFunctionPointerLikeType(*type, pointeeType);
       }
 
+      // Currently, we can't generate thunks for references to dependent types
+      // because there's no way to cast without a copy (without writing the SIL
+      // manually).
+      if (pointeeQualType->isDependentType())
+        return Type();
+
       if (Impl.isOverAligned(pointeeQualType)) {
         return importOverAlignedFunctionPointerLikeType(*type, Impl);
       }
@@ -881,6 +887,8 @@ namespace {
     ImportResult Visit##KIND##Type(const clang::KIND##Type *type) {            \
       if (type->isSugared())                                                   \
         return Visit(type->desugar());                                         \
+      if (type->isDependentType())                                             \
+        return Impl.SwiftContext.TheAnyType;                                   \
       return Type();                                                           \
     }
     MAYBE_SUGAR_TYPE(TypeOfExpr)
@@ -1855,11 +1863,24 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
           dyn_cast<clang::TemplateTypeParmType>(clangDecl->getReturnType())) {
     importedType = {findGenericTypeInGenericDecls(templateType, genericParams),
                     false};
+  } else if ((isa<clang::PointerType>(clangDecl->getReturnType()) ||
+          isa<clang::ReferenceType>(clangDecl->getReturnType())) &&
+         isa<clang::TemplateTypeParmType>(clangDecl->getReturnType()->getPointeeType())) {
+    auto pointeeType = clangDecl->getReturnType()->getPointeeType();
+    auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
+    PointerTypeKind pointerKind = pointeeType.getQualifiers().hasConst()
+                                      ? PTK_UnsafePointer
+                                      : PTK_UnsafeMutablePointer;
+    auto genericType =
+        findGenericTypeInGenericDecls(templateParamType, genericParams);
+    importedType = {genericType->wrapInPointer(pointerKind), false};
   } else if (!(isa<clang::RecordType>(clangDecl->getReturnType()) ||
                isa<clang::TemplateSpecializationType>(clangDecl->getReturnType())) ||
              // TODO: we currently don't lazily load operator return types, but
              // this should be trivial to add.
-             clangDecl->isOverloadedOperator()) {
+             clangDecl->isOverloadedOperator() ||
+             // Dependant types are trivially mapped as Any.
+             clangDecl->getReturnType()->isDependentType()) {
     importedType =
         importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
     if (!importedType) {
@@ -1945,7 +1966,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     Type swiftParamTy;
     bool isParamTypeImplicitlyUnwrapped = false;
     bool isInOut = false;
-    if ((isa<clang::ReferenceType>(paramTy) || isa<clang::PointerType>(paramTy)) &&
+    if (isa<clang::PointerType>(paramTy) &&
         isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
       auto pointeeType = paramTy->getPointeeType();
       auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
@@ -1957,6 +1978,14 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       swiftParamTy = genericType->wrapInPointer(pointerKind);
       if (!swiftParamTy)
         return nullptr;
+    } else if (isa<clang::ReferenceType>(paramTy) &&
+               isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
+      auto templateParamType =
+          cast<clang::TemplateTypeParmType>(paramTy->getPointeeType());
+      swiftParamTy =
+          findGenericTypeInGenericDecls(templateParamType, genericParams);
+      if (!paramTy->getPointeeType().isConstQualified())
+        isInOut = true;
     } else if (auto *templateParamType =
                    dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
       swiftParamTy =
@@ -1964,7 +1993,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     } else {
       if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
         paramTy = refType->getPointeeType();
-        isInOut = true;
+        if (!paramTy.isConstQualified())
+          isInOut = true;
       }
       auto importedType = importType(paramTy, importKind, allowNSUIntegerAsInt,
                                      Bridgeability::Full, OptionalityOfParam);

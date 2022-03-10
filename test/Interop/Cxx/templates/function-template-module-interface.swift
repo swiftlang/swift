@@ -14,13 +14,13 @@
 // CHECK:   mutating func test2(_: Int32, _ varargs: Any...)
 // CHECK: }
 
-// CHECK: func lvalueReference<T>(_ ref: UnsafeMutablePointer<T>)
-// CHECK: func constLvalueReference<T>(_: UnsafePointer<T>)
-// CHECK: func forwardingReference<T>(_: UnsafeMutablePointer<T>)
+// CHECK: func lvalueReference<T>(_ ref: inout T)
+// CHECK: func constLvalueReference<T>(_: T)
+// CHECK: func forwardingReference<T>(_: inout T)
 // CHECK: func PointerTemplateParameter<T>(_: UnsafeMutablePointer<T>)
 
 // CHECK: enum Orbiters {
 // CHECK:   static func galileo<T>(_: T)
 // CHECK:   static func cassini<T, U>(_: T, _: U)
-// CHECK:   static func magellan<T>(_: UnsafeMutablePointer<T>)
+// CHECK:   static func magellan<T>(_: inout T)
 // CHECK: }

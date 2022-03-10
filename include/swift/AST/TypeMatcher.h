@@ -229,8 +229,26 @@ class TypeMatcher {
     }
 
     TRIVIAL_CASE(ModuleType)
-    TRIVIAL_CASE(DynamicSelfType)
     TRIVIAL_CASE(ArchetypeType)
+
+    bool visitDynamicSelfType(CanDynamicSelfType firstDynamicSelf,
+                              Type secondType,
+                              Type sugaredFirstType) {
+      if (auto secondDynamicSelf = secondType->getAs<DynamicSelfType>()) {
+        auto firstBase = firstDynamicSelf->getSelfType();
+        auto secondBase = secondDynamicSelf->getSelfType();
+        auto firstSugaredBase = sugaredFirstType->getAs<DynamicSelfType>()
+            ->getSelfType();
+
+        if (!this->visit(CanType(firstBase), secondBase, firstSugaredBase))
+          return false;
+
+        return true;
+      }
+
+      return mismatch(firstDynamicSelf.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     bool visitDependentMemberType(CanDependentMemberType firstType,
                                    Type secondType,
@@ -303,7 +321,33 @@ class TypeMatcher {
     TRIVIAL_CASE(SILFunctionType)
     TRIVIAL_CASE(SILBlockStorageType)
     TRIVIAL_CASE(SILBoxType)
-    TRIVIAL_CASE(ProtocolCompositionType)
+
+    bool visitProtocolCompositionType(CanProtocolCompositionType firstProtocolComposition,
+                                      Type secondType,
+                                      Type sugaredFirstType) {
+      if (auto secondProtocolComposition = secondType->getAs<ProtocolCompositionType>()) {
+        auto firstMembers = firstProtocolComposition->getMembers();
+        auto secondMembers = secondProtocolComposition->getMembers();
+
+        if (firstMembers.size() == secondMembers.size()) {
+          for (unsigned i : indices(firstMembers)) {
+            auto firstMember = firstMembers[i];
+            auto secondMember = secondMembers[i];
+
+            // FIXME: We lose sugar here, because the sugared type might have a different
+            // number of members, or the members might appear in a different order.
+            if (!this->visit(CanType(firstMember), secondMember, firstMember)) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+      }
+
+      return mismatch(firstProtocolComposition.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     bool visitParameterizedProtocolType(CanParameterizedProtocolType firstParametrizedProto,
                                         Type secondType,
@@ -316,10 +360,19 @@ class TypeMatcher {
           return false;
         }
 
-        return this->visit(firstParametrizedProto.getArgumentType(),
-                           secondParametrizedProto->getArgumentType(),
-                           sugaredFirstType->castTo<ParameterizedProtocolType>()
-                               ->getArgumentType());
+        auto firstArgs = firstParametrizedProto->getArgs();
+        auto secondArgs = secondParametrizedProto->getArgs();
+
+        if (firstArgs.size() == secondArgs.size()) {
+          for (unsigned i : indices(firstArgs)) {
+            return this->visit(CanType(firstArgs[i]),
+                               secondArgs[i],
+                               sugaredFirstType->castTo<ParameterizedProtocolType>()
+                                   ->getArgs()[i]);
+          }
+
+          return true;
+        }
       }
 
       return mismatch(firstParametrizedProto.getPointer(), secondType,

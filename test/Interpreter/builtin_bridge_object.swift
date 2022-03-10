@@ -13,7 +13,7 @@ class C {
   deinit { print("deallocated") }
 }
 
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(powerpc)
 
 // We have no ObjC tagged pointers, and two low spare bits due to alignment.
 let NATIVE_SPARE_BITS: UInt = 0x0000_0003
@@ -65,7 +65,6 @@ if true {
   // CHECK-NEXT: true
   print(x === x2)
   // CHECK-OPT-NEXT: deallocated
-  // CHECK-DBG-NEXT: deallocated
 
   print(nonPointerBits(bo) == 0)
   // CHECK-NEXT: true
@@ -79,6 +78,7 @@ if true {
   _fixLifetime(bo3)
   _fixLifetime(bo4)
 }
+// CHECK-DBG-NEXT: deallocated
 // CHECK-NEXT: deallocated
 
 // Try with all spare bits set.
@@ -94,7 +94,6 @@ if true {
   // CHECK-NEXT: true
   print(x === x2)
   // CHECK-OPT-NEXT: deallocated
-  // CHECK-DBG-NEXT: deallocated
   
   print(nonPointerBits(bo) == NATIVE_SPARE_BITS)
   // CHECK-NEXT: true
@@ -108,6 +107,7 @@ if true {
   _fixLifetime(bo3)
   _fixLifetime(bo4)
 }
+// CHECK-DBG-NEXT: deallocated
 // CHECK-NEXT: deallocated
 
 

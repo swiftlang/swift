@@ -135,6 +135,7 @@ namespace irgen {
   class ForeignClassMetadataLayout;
   class ForeignFunctionInfo;
   class FormalType;
+  class FunctionPointerKind;
   class HeapLayout;
   class StructLayout;
   class IRGenDebugInfo;
@@ -1233,6 +1234,7 @@ public:
   std::string CaptureDescriptorSection;
   std::string ReflectionStringsSection;
   std::string ReflectionTypeRefSection;
+  std::string MultiPayloadEnumDescriptorSection;
 
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
@@ -1312,6 +1314,7 @@ public:
   const char *getCaptureDescriptorMetadataSectionName();
   const char *getReflectionStringsSectionName();
   const char *getReflectionTypeRefSectionName();
+  const char *getMultiPayloadEnumDescriptorSectionName();
 
 //--- Runtime ---------------------------------------------------------------
 public:
@@ -1421,8 +1424,9 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
+  Signature getSignature(CanSILFunctionType fnType);
   Signature getSignature(CanSILFunctionType fnType,
-                         bool useSpecialConvention = false);
+                         FunctionPointerKind kind);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);

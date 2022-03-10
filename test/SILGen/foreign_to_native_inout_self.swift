@@ -6,7 +6,7 @@ protocol FakeIterator {
 
 extension MyIterator : FakeIterator {}
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10MyIteratora4nextyyFTO : $@convention(method) (@inout MyIterator) -> () {
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo10MyIteratora4nextyyFTO : $@convention(method) (@inout MyIterator) -> () {
 // CHECK: bb0(%0 : $*MyIterator):
 // CHECK: [[FN:%.*]] = function_ref @MyIteratorNext : $@convention(c) (@inout MyIterator) -> ()
 // CHECK:   apply [[FN]](%0) : $@convention(c) (@inout MyIterator) -> ()

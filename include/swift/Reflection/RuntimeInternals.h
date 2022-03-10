@@ -96,7 +96,7 @@ struct StackAllocator {
 template <typename Runtime>
 struct ActiveTaskStatusWithEscalation {
   uint32_t Flags;
-  uint32_t DrainLock[(sizeof(typename Runtime::StoredPointer) == 8) ? 1 : 2];
+  uint32_t ExecutionLock[(sizeof(typename Runtime::StoredPointer) == 8) ? 1 : 2];
   typename Runtime::StoredPointer Record;
 };
 
@@ -108,11 +108,12 @@ struct ActiveTaskStatusWithoutEscalation {
 
 template <typename Runtime, typename ActiveTaskStatus>
 struct AsyncTaskPrivateStorage {
+  typename Runtime::StoredPointer ExclusivityAccessSet[2];
   ActiveTaskStatus Status;
   StackAllocator<Runtime> Allocator;
   typename Runtime::StoredPointer Local;
-  typename Runtime::StoredPointer ExclusivityAccessSet[2];
   uint32_t Id;
+  uint32_t BasePriority;
 };
 
 template <typename Runtime, typename ActiveTaskStatus>
@@ -130,7 +131,6 @@ template <typename Runtime>
 struct AsyncContext {
   typename Runtime::StoredSignedPointer Parent;
   typename Runtime::StoredSignedPointer ResumeParent;
-  uint32_t Flags;
 };
 
 template <typename Runtime>
@@ -149,10 +149,22 @@ struct FutureAsyncContextPrefix {
 };
 
 template <typename Runtime>
+struct ActiveActorStatusWithEscalation {
+  uint32_t Flags;
+  uint32_t DrainLock[(sizeof(typename Runtime::StoredPointer) == 8) ? 1 : 2];
+  typename Runtime::StoredPointer FirstJob;
+};
+
+template <typename Runtime>
+struct ActiveActorStatusWithoutEscalation {
+  uint32_t Flags[sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
+  typename Runtime::StoredPointer FirstJob;
+};
+
+template <typename Runtime, typename ActiveActorStatus>
 struct DefaultActorImpl {
   HeapObject<Runtime> HeapObject;
-  typename Runtime::StoredPointer FirstJob;
-  typename Runtime::StoredSize Flags;
+  ActiveActorStatus Status;
 };
 
 template <typename Runtime>

@@ -46,6 +46,22 @@ public:
   reflection::ConformanceCollectionResult
   collectConformances(const std::vector<std::string> &protocolNames);
 
+  /// Collect all associated types of the specified type
+  reflection::AssociatedTypeCollectionResult
+  collectAssociatedTypes(const std::string &mangledTypeName);
+
+  /// Collect associated types of all discovered types
+  reflection::AssociatedTypeCollectionResult
+  collectAllAssociatedTypes();
+
+  /// Collect all field type infos of the specified type
+  reflection::FieldTypeCollectionResult
+  collectFieldTypes(const std::string &mangledTypeName);
+
+  /// Collect field type infos of all discovered types
+  reflection::FieldTypeCollectionResult
+  collectAllFieldTypes();
+
 private:
   // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
   // once they go out of scope, we can no longer do anything.

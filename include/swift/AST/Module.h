@@ -780,7 +780,7 @@ public:
   /// shadowed clang module. It does not force synthesized top-level decls that
   /// should be printed to be added; use \c swift::getTopLevelDeclsForDisplay()
   /// for that.
-  void getDisplayDecls(SmallVectorImpl<Decl*> &results) const;
+  void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const;
 
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 
@@ -938,6 +938,9 @@ inline bool DeclContext::isModuleScopeContext() const {
 inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
+
+/// Collects modules that this module imports via `@_exported import`.
+void collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports);
 
 } // end namespace swift
 

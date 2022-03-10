@@ -14,6 +14,7 @@
 #define SWIFT_REQUIREMENTMACHINE_H
 
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/RequirementSignature.h"
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
 
@@ -87,12 +88,14 @@ class RequirementMachine final {
   RequirementMachine &operator=(const RequirementMachine &) = delete;
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
-  void initWithGenericSignature(CanGenericSignature sig);
+  void checkCompletionResult(CompletionResult result) const;
+
+  std::pair<CompletionResult, unsigned>
+  initWithGenericSignature(CanGenericSignature sig);
+
   std::pair<CompletionResult, unsigned>
   initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
-  void initWithAbstractRequirements(
-      ArrayRef<GenericTypeParamType *> genericParams,
-      ArrayRef<Requirement> requirements);
+
   std::pair<CompletionResult, unsigned>
   initWithWrittenRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
@@ -106,6 +109,10 @@ class RequirementMachine final {
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
   std::vector<Requirement> buildRequirementsFromRules(
+    ArrayRef<unsigned> rules,
+    TypeArrayView<GenericTypeParamType> genericParams) const;
+
+  std::vector<ProtocolTypeAlias> buildProtocolTypeAliasesFromRules(
     ArrayRef<unsigned> rules,
     TypeArrayView<GenericTypeParamType> genericParams) const;
 
@@ -140,7 +147,7 @@ public:
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
-  llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>>
+  llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
   computeMinimalProtocolRequirements();
 
   std::vector<Requirement> computeMinimalGenericSignatureRequirements();

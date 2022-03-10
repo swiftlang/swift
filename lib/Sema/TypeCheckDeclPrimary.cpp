@@ -212,7 +212,15 @@ static void checkInheritanceClause(
       inheritedAnyObject = { i, inherited.getSourceRange() };
     }
 
-    if (inheritedTy->isExistentialType()) {
+    if (inheritedTy->is<ParameterizedProtocolType>()) {
+      if (!isa<ProtocolDecl>(decl)) {
+        decl->diagnose(diag::inheritance_from_parameterized_protocol,
+                       inheritedTy);
+      }
+      continue;
+    }
+
+    if (inheritedTy->isConstraintType()) {
       auto layout = inheritedTy->getExistentialLayout();
 
       // Subclass existentials are not allowed except on classes and
@@ -227,10 +235,7 @@ static void checkInheritanceClause(
       // AnyObject is not allowed except on protocols.
       if (layout.hasExplicitAnyObject &&
           !isa<ProtocolDecl>(decl)) {
-        decl->diagnose(canHaveSuperclass
-                       ? diag::inheritance_from_non_protocol_or_class
-                       : diag::inheritance_from_non_protocol,
-                       inheritedTy);
+        decl->diagnose(diag::inheritance_from_anyobject);
         continue;
       }
 
@@ -247,14 +252,6 @@ static void checkInheritanceClause(
       assert(isa<ClassDecl>(decl));
       assert(canHaveSuperclass);
       inheritedTy = layout.explicitSuperclass;
-    }
-
-    if (inheritedTy->is<ParameterizedProtocolType>()) {
-      if (!isa<ProtocolDecl>(decl)) {
-        decl->diagnose(diag::inheritance_from_parameterized_protocol,
-                       inheritedTy);
-      }
-      continue;
     }
 
     // If this is an enum inheritance clause, check for a raw type.
@@ -1061,6 +1058,13 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   TypeChecker::checkInitializerEffects(dc, initExpr);
 
   return initExpr;
+}
+
+Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
+                                          ParamDecl *param) const {
+  if (auto expr = param->getTypeCheckedDefaultExpr())
+    return expr->getType();
+  return Type();
 }
 
 Initializer *
@@ -2531,7 +2535,7 @@ public:
 
         for (auto *member : superclass->getMembers()) {
           if (auto *vd = dyn_cast<ValueDecl>(member)) {
-            if (vd->isPotentiallyOverridable()) {
+            if (vd->isSyntacticallyOverridable()) {
               (void) vd->isObjC();
             }
           }
@@ -2645,6 +2649,12 @@ public:
 
     TypeChecker::checkDeclAttributes(PD);
 
+    // Explicity compute the requirement signature to detect errors.
+    // Do this before visiting members, to avoid a request cycle if
+    // a member referenecs another declaration whose generic signature
+    // has a conformance requirement to this protocol.
+    auto reqSig = PD->getRequirementSignature().getRequirements();
+
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);
@@ -2657,9 +2667,6 @@ public:
     if (PD->isResilient())
       if (!SF || SF->Kind != SourceFileKind::Interface)
         TypeChecker::inferDefaultWitnesses(PD);
-
-    // Explicity compute the requirement signature to detect errors.
-    auto reqSig = PD->getRequirementSignature();
 
     if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
       auto requirementsSig =
@@ -3249,6 +3256,44 @@ void TypeChecker::checkParameterList(ParameterList *params,
             addAsyncNotes(func);
         }
       }
+    }
+
+    // Opaque types cannot occur in parameter position.
+    Type interfaceType = param->getInterfaceType();
+    if (interfaceType->hasTypeParameter()) {
+      interfaceType.findIf([&](Type type) {
+        if (auto fnType = type->getAs<FunctionType>()) {
+          for (auto innerParam : fnType->getParams()) {
+            auto paramType = innerParam.getPlainType();
+            if (!paramType->hasTypeParameter())
+              continue;
+
+            bool hadError = paramType.findIf([&](Type innerType) {
+              auto genericParam = innerType->getAs<GenericTypeParamType>();
+              if (!genericParam)
+                return false;
+
+              auto genericParamDecl = genericParam->getDecl();
+              if (!genericParamDecl)
+                return false;
+
+              if (!genericParamDecl->isOpaqueType())
+                return false;
+
+              param->diagnose(
+                 diag::opaque_type_in_parameter, true, interfaceType);
+              return true;
+            });
+
+            if (hadError)
+              return true;
+          }
+
+          return false;
+        }
+
+        return false;
+      });
     }
 
     if (param->hasAttachedPropertyWrapper())

@@ -673,6 +673,7 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
       emitDynamicTypeOfHeapObject(IGF, instanceRef,
                                   MetatypeRepresentation::Thick,
                                   instanceType,
+                                  Fn.getGenericSignature(),
                                   /*allow artificial subclasses*/ true);
     IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                           MetadataState::Complete);
@@ -736,6 +737,7 @@ void BindPolymorphicParameter::emit(Explosion &nativeParam, unsigned paramIndex)
     emitDynamicTypeOfHeapObject(IGF, instanceRef,
                                 MetatypeRepresentation::Thick,
                                 instanceType,
+                                SubstFnType->getInvocationGenericSignature(),
                                 /* allow artificial subclasses */ true);
   IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                         MetadataState::Complete);
@@ -944,7 +946,7 @@ static bool isDependentConformance(
 
   // Check whether any of the conformances are dependent.
   auto proto = conformance->getProtocol();
-  for (const auto &req : proto->getRequirementSignature()) {
+  for (const auto &req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 

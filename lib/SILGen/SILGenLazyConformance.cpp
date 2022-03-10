@@ -351,7 +351,7 @@ void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
       useConformancesFromType(superclass->getCanonicalType(genericSig));
 
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-    for (auto reqt : PD->getRequirementSignature()) {
+    for (auto reqt : PD->getRequirementSignature().getRequirements()) {
       if (reqt.getKind() != RequirementKind::Layout)
         useConformancesFromType(reqt.getSecondType()->getCanonicalType());
     }

@@ -457,10 +457,14 @@ StringRef swift::matchLeadingTypeName(StringRef name,
   return nameMismatch.getRestOfStr();
 }
 
-StringRef StringScratchSpace::copyString(StringRef string) {
-  void *memory = Allocator.Allocate(string.size(), alignof(char));
+const char *swift::copyCString(StringRef string,
+                               llvm::BumpPtrAllocator &Allocator) {
+  if (string.empty())
+    return "";
+  char *memory = Allocator.Allocate<char>(string.size() + 1);
   memcpy(memory, string.data(), string.size());
-  return StringRef(static_cast<char *>(memory), string.size());
+  memory[string.size()] = '\0';
+  return memory;
 }
 
 void InheritedNameSet::add(StringRef name) {
@@ -671,8 +675,8 @@ static Words::iterator matchTypeNameFromBackWithSpecialCases(
 
       if (shortenedNameWord != newShortenedNameWord) {
         unsigned targetSize = newShortenedNameWord.size();
-        auto newIter = llvm::make_reverse_iterator(WordIterator(name,
-                                                                targetSize));
+        auto newIter = std::make_reverse_iterator(WordIterator(name,
+                                                               targetSize));
 #ifndef NDEBUG
         while (nameWordRevIter.base().getPosition() > targetSize)
           ++nameWordRevIter;

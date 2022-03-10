@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-pairwise-build-block) | %FileCheck %s
 // REQUIRES: executable_test
 
+// TODO: This test is for the old method name `buildBlock(combining:into:)`. Delete this file once
+// clients have moved to `buildPartialBlock`.
+
 struct Values<T> {
   var values: T
 

@@ -26,6 +26,7 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/BridgingUtils.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -256,6 +257,10 @@ const SILFunction *SILFunction::getOriginOfSpecialization() const {
     p = p->getSpecializationInfo()->getParent();
   }
   return p;
+}
+
+GenericSignature SILFunction::getGenericSignature() const {
+  return GenericEnv ? GenericEnv->getGenericSignature() : GenericSignature();
 }
 
 void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &

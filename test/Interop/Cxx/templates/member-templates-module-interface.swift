@@ -8,8 +8,8 @@
 // CHECK:   mutating func passThroughConst<T>(_ val: T) -> T
 // CHECK:   func passThroughOnConst<T>(_ val: T) -> T
 // CHECK:   func passThroughConstOnConst<T>(_ val: T) -> T
-// CHECK:   mutating func doNothingConstRef<T>(_ val: UnsafePointer<T>)
-// CHECK:   mutating func make42Ref<T>(_ val: UnsafeMutablePointer<T>)
+// CHECK:   mutating func doNothingConstRef<T>(_ val: T)
+// CHECK:   mutating func make42Ref<T>(_ val: inout T)
 // CHECK: }
 
 // CHECK: struct __CxxTemplateInst32TemplateClassWithMemberTemplatesIiE {
@@ -24,5 +24,5 @@
 // CHECK:   init()
 // CHECK:   static func add<T>(_ a: T, _ b: T) -> T
 // CHECK:   static func addTwoTemplates<T, U>(_ a: T, _ b: U) -> T
-// CHECK:   static func removeReference<T>(_ a: UnsafeMutablePointer<T>) -> T
+// CHECK:   static func removeReference<T>(_ a: inout T) -> T
 // CHECK: }

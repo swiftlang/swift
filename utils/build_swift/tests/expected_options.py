@@ -220,6 +220,7 @@ EXPECTED_DEFAULTS = {
     'swift_freestanding_is_darwin': False,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
+    'swift_tools_ld64_lto_codegen_only_for_supporting_targets': False,
     'swift_tools_max_parallel_lto_link_jobs':
         defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
@@ -714,6 +715,7 @@ EXPECTED_OPTIONS = [
     IntOption('--jobs', dest='build_jobs'),
     IntOption('--llvm-max-parallel-lto-link-jobs'),
     IntOption('--swift-tools-max-parallel-lto-link-jobs'),
+    EnableOption('--swift-tools-ld64-lto-codegen-only-for-supporting-targets'),
     IntOption('-j', dest='build_jobs'),
     IntOption('--dsymutil-jobs', dest='dsymutil_jobs'),
 

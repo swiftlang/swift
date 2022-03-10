@@ -52,9 +52,6 @@ namespace swift {
           (unsigned long)_swift_get_thread_id(),                               \
           __FILE__, __LINE__, __FUNCTION__,                                    \
           __VA_ARGS__)
-#else
-#define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
-#endif
 
 #if defined(_WIN32)
 using ThreadID = decltype(GetCurrentThreadId());
@@ -69,6 +66,10 @@ inline ThreadID _swift_get_thread_id() {
   return pthread_self();
 #endif
 }
+
+#else
+#define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
+#endif
 
 class AsyncTask;
 class TaskGroup;
@@ -144,9 +145,16 @@ namespace {
 ///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
+  // The ABI reserves three words of storage for these contexts, which
+  // we currently use as follows.  These fields are not accessed by
+  // generated code; they're purely internal to the runtime, and only
+  // when the calling task actually suspends.
+  //
+  // (If you think three words is an odd choice, one of them used to be
+  // the context flags.)
   SwiftError *errorResult;
-
   OpaqueValue *successResultPointer;
+  void *_reserved;
 
   void fillWithSuccess(AsyncTask::FutureFragment *future) {
     fillWithSuccess(future->getStoragePtr(), future->getResultType(),
@@ -229,7 +237,28 @@ public:
 /// only need to do double wide atomics if we need to reach for the
 /// StatusRecord pointers and therefore have to update the flags at the same
 /// time.
-class alignas(sizeof(void*) * 2) ActiveTaskStatus {
+///
+/// Size requirements:
+///     On 64 bit systems or if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION=1,
+///     the field is 16 bytes long.
+///
+///     Otherwise, it is 8 bytes long.
+///
+/// Alignment requirements:
+///     On 64 bit systems or if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION=1,
+///     this 16-byte field needs to be 16 byte aligned to be able to do aligned
+///     atomic stores field.
+///
+///     On all other systems, it needs to be 8 byte aligned for the atomic
+///     stores.
+///
+///     As a result of varying alignment needs, we've marked the class as
+///     needing 2-word alignment but on arm64_32 with
+///     SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION=1, 16 byte alignment is
+///     achieved through careful arrangement of the storage for this in the
+///     AsyncTask::PrivateStorage. The additional alignment requirements are
+///     enforced by static asserts below.
+class alignas(2 * sizeof(void*)) ActiveTaskStatus {
   enum : uint32_t {
     /// The max priority of the task. This is always >= basePriority in the task
     PriorityMask = 0xFF,
@@ -258,12 +287,18 @@ class alignas(sizeof(void*) * 2) ActiveTaskStatus {
     /// actor. This bit is cleared when a starts running on a thread, suspends
     /// or is completed.
     IsEnqueued = 0x1000,
+
+#ifndef NDEBUG
+    /// Task has been completed.  This is purely used to enable an assertion
+    /// that the task is completed when we destroy it.
+    IsComplete = 0x2000,
+#endif
   };
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;
   dispatch_lock_t ExecutionLock;
-  uint32_t Unused;
+  LLVM_ATTRIBUTE_UNUSED uint32_t Unused = {};
 #elif SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_8_BYTES
   uint32_t Flags;
   dispatch_lock_t ExecutionLock;
@@ -271,7 +306,7 @@ class alignas(sizeof(void*) * 2) ActiveTaskStatus {
   uint32_t Flags;
 #else /* !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_8_BYTES */
   uint32_t Flags;
-  uint32_t Unused;
+  LLVM_ATTRIBUTE_UNUSED uint32_t Unused = {};
 #endif
   TaskStatusRecord *Record;
 
@@ -371,6 +406,20 @@ public:
 #endif
   }
 
+#ifndef NDEBUG
+  bool isComplete() const {
+    return Flags & IsComplete;
+  }
+
+  ActiveTaskStatus withComplete() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags | IsComplete, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags | IsComplete);
+#endif
+  }
+#endif
+
   /// Is there a lock on the linked list of status records?
   bool isStatusRecordLocked() const { return Flags & IsStatusRecordLocked; }
   ActiveTaskStatus withLockingRecord(TaskStatusRecord *lockRecord) const {
@@ -463,12 +512,12 @@ public:
 };
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
-static_assert(sizeof(ActiveTaskStatus) == 4 * sizeof(uintptr_t),
-  "ActiveTaskStatus is 4 words large");
+#define ACTIVE_TASK_STATUS_SIZE (4 * (sizeof(uintptr_t)))
 #else
-static_assert(sizeof(ActiveTaskStatus) == 2 * sizeof(uintptr_t),
-  "ActiveTaskStatus is 2 words large");
+#define ACTIVE_TASK_STATUS_SIZE (2 * (sizeof(uintptr_t)))
 #endif
+static_assert(sizeof(ActiveTaskStatus) == ACTIVE_TASK_STATUS_SIZE,
+  "ActiveTaskStatus is of incorrect size");
 
 /// The size of an allocator slab. We want the full allocation to fit into a
 /// 1024-byte malloc quantum. We subtract off the slab header size, plus a
@@ -481,9 +530,16 @@ using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata>;
 
 /// Private storage in an AsyncTask object.
 struct AsyncTask::PrivateStorage {
-  /// The currently-active information about cancellation.
-  /// Currently two words.
-  swift::atomic<ActiveTaskStatus> Status;
+  /// State inside the AsyncTask whose state is only managed by the exclusivity
+  /// runtime in stdlibCore. We zero initialize to provide a safe initial value,
+  /// but actually initialize its bit state to a const global provided by
+  /// libswiftCore so that libswiftCore can control the layout of our initial
+  /// state.
+  uintptr_t ExclusivityAccessSet[2] = {0, 0};
+
+  /// Storage for the ActiveTaskStatus. See doc for ActiveTaskStatus for size
+  /// and alignment requirements.
+  alignas(2 * sizeof(void *)) char StatusStorage[sizeof(ActiveTaskStatus)];
 
   /// The allocator for the task stack.
   /// Currently 2 words + 8 bytes.
@@ -492,13 +548,6 @@ struct AsyncTask::PrivateStorage {
   /// Storage for task-local values.
   /// Currently one word.
   TaskLocal::Storage Local;
-
-  /// State inside the AsyncTask whose state is only managed by the exclusivity
-  /// runtime in stdlibCore. We zero initialize to provide a safe initial value,
-  /// but actually initialize its bit state to a const global provided by
-  /// libswiftCore so that libswiftCore can control the layout of our initial
-  /// state.
-  uintptr_t ExclusivityAccessSet[2] = {0, 0};
 
   /// The top 32 bits of the task ID. The bottom 32 bits are in Job::Id.
   uint32_t Id;
@@ -514,19 +563,22 @@ struct AsyncTask::PrivateStorage {
   // Always create an async task with max priority in ActiveTaskStatus = base
   // priority. It will be updated later if needed.
   PrivateStorage(JobPriority basePri)
-      : Status(ActiveTaskStatus(basePri)), Local(TaskLocal::Storage()),
-        BasePriority(basePri) {}
+      : Local(TaskLocal::Storage()), BasePriority(basePri) {
+    _status().store(ActiveTaskStatus(basePri), std::memory_order_relaxed);
+  }
 
   PrivateStorage(JobPriority basePri, void *slab, size_t slabCapacity)
-      : Status(ActiveTaskStatus(basePri)), Allocator(slab, slabCapacity),
-        Local(TaskLocal::Storage()), BasePriority(basePri) {}
+      : Allocator(slab, slabCapacity), Local(TaskLocal::Storage()),
+          BasePriority(basePri) {
+    _status().store(ActiveTaskStatus(basePri), std::memory_order_relaxed);
+  }
 
   /// Called on the thread that was previously executing the task that we are
   /// now trying to complete.
   void complete(AsyncTask *task) {
     // Drain unlock the task and remove any overrides on thread as a
     // result of the task
-    auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
+    auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
     while (true) {
       // Task is completing, it shouldn't have any records and therefore
       // cannot be status record locked.
@@ -539,10 +591,13 @@ struct AsyncTask::PrivateStorage {
       auto newStatus = oldStatus.withRunning(false);
       newStatus = newStatus.withoutStoredPriorityEscalation();
       newStatus = newStatus.withoutEnqueued();
+#ifndef NDEBUG
+      newStatus = newStatus.withComplete();
+#endif
 
       // This can fail since the task can still get concurrently cancelled or
       // escalated.
-      if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
+      if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /* success */ std::memory_order_relaxed,
               /* failure */ std::memory_order_relaxed)) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -561,12 +616,21 @@ struct AsyncTask::PrivateStorage {
 
     this->~PrivateStorage();
   }
+
+  swift::atomic<ActiveTaskStatus> &_status() {
+    return reinterpret_cast<swift::atomic<ActiveTaskStatus>&> (this->StatusStorage);
+  }
+
+  const swift::atomic<ActiveTaskStatus> &_status() const {
+    return reinterpret_cast<const swift::atomic<ActiveTaskStatus>&> (this->StatusStorage);
+  }
 };
 
-static_assert(sizeof(AsyncTask::PrivateStorage)
-                <= sizeof(AsyncTask::OpaquePrivateStorage) &&
-              alignof(AsyncTask::PrivateStorage)
-                <= alignof(AsyncTask::OpaquePrivateStorage),
+// It will be aligned to 2 words on all platforms. On arm64_32, we have an
+// additional requirement where it is aligned to 4 words.
+static_assert(((offsetof(AsyncTask, Private) + offsetof(AsyncTask::PrivateStorage, StatusStorage)) % ACTIVE_TASK_STATUS_SIZE == 0),
+   "StatusStorage is not aligned in the AsyncTask");
+static_assert(sizeof(AsyncTask::PrivateStorage) <= sizeof(AsyncTask::OpaquePrivateStorage),
               "Task-private storage doesn't fit in reserved space");
 
 inline AsyncTask::PrivateStorage &
@@ -599,7 +663,7 @@ inline const AsyncTask::PrivateStorage &AsyncTask::_private() const {
 }
 
 inline bool AsyncTask::isCancelled() const {
-  return _private().Status.load(std::memory_order_relaxed)
+  return _private()._status().load(std::memory_order_relaxed)
                           .isCancelled();
 }
 
@@ -612,10 +676,11 @@ inline void AsyncTask::flagAsRunning() {
   qos_class_t overrideFloor = threadOverrideInfo.override_qos_floor;
 retry:;
 #endif
-  auto oldStatus = _private().Status.load(std::memory_order_relaxed);
+  auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   while (true) {
     // We can get here from being suspended or being enqueued
     assert(!oldStatus.isRunning());
+    assert(!oldStatus.isComplete());
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     // Task's priority is greater than the thread's - do a self escalation
@@ -636,7 +701,7 @@ retry:;
     newStatus = newStatus.withoutStoredPriorityEscalation();
     newStatus = newStatus.withoutEnqueued();
 
-    if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
+    if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
              /* success */ std::memory_order_relaxed,
              /* failure */ std::memory_order_relaxed)) {
       newStatus.traceStatusChanged(this);
@@ -664,10 +729,10 @@ retry:;
 /// original enqueueing thread.
 ///
 /// rdar://88366470 (Direct handoff behaviour when tasks switch executors)
-inline void AsyncTask::flagAsEnqueuedOnExecutor(ExecutorRef newExecutor) {
+inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
 
-  SWIFT_TASK_DEBUG_LOG("%p->flagAsEnqueuedOnExecutor()", this);
-  auto oldStatus = _private().Status.load(std::memory_order_relaxed);
+  SWIFT_TASK_DEBUG_LOG("%p->flagAsAndEnqueueOnExecutor()", this);
+  auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
 
   while (true) {
@@ -682,7 +747,7 @@ inline void AsyncTask::flagAsEnqueuedOnExecutor(ExecutorRef newExecutor) {
     newStatus = newStatus.withoutStoredPriorityEscalation();
     newStatus = newStatus.withEnqueued();
 
-    if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
+    if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
             /* success */std::memory_order_relaxed,
             /* failure */std::memory_order_relaxed)) {
       break;
@@ -713,7 +778,7 @@ inline void AsyncTask::flagAsEnqueuedOnExecutor(ExecutorRef newExecutor) {
 
 inline void AsyncTask::flagAsSuspended() {
   SWIFT_TASK_DEBUG_LOG("%p->flagAsSuspended()", this);
-  auto oldStatus = _private().Status.load(std::memory_order_relaxed);
+  auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
   while (true) {
     // We can only be suspended if we were previously running. See state
@@ -723,7 +788,7 @@ inline void AsyncTask::flagAsSuspended() {
     newStatus = oldStatus.withRunning(false);
     newStatus = newStatus.withoutStoredPriorityEscalation();
 
-    if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
+    if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
             /* success */std::memory_order_relaxed,
             /* failure */std::memory_order_relaxed)) {
       break;

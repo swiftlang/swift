@@ -55,13 +55,17 @@ int serializeSymbolGraph(SymbolGraph &SG,
 int
 symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
                                          const SymbolGraphOptions &Options) {
-  SymbolGraphASTWalker Walker(*M, Options);
   SmallVector<Decl *, 64> ModuleDecls;
-  swift::getTopLevelDeclsForDisplay(M, ModuleDecls);
+  swift::getTopLevelDeclsForDisplay(M, ModuleDecls, /*recursive*/true);
+  
+  SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
+  swift::collectParsedExportedImports(M, ExportedImportedModules);
 
   if (Options.PrintMessages)
     llvm::errs() << ModuleDecls.size()
         << " top-level declarations in this module.\n";
+    
+  SymbolGraphASTWalker Walker(*M, ExportedImportedModules, Options);
 
   for (auto *Decl : ModuleDecls) {
     Walker.walk(Decl);
@@ -98,7 +102,7 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
 
   llvm::json::OStream JOS(OS, Options.PrettyPrint ? 2 : 0);
   ModuleDecl *MD = D->getModuleContext();
-  SymbolGraphASTWalker Walker(*MD, Options);
+  SymbolGraphASTWalker Walker(*MD, {}, Options);
   markup::MarkupContext MarkupCtx;
   SymbolGraph Graph(Walker, *MD, None, MarkupCtx, None,
                     /*IsForSingleNode=*/true);

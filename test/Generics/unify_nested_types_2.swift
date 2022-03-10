@@ -25,7 +25,7 @@ struct G<T : P1 & P2> {}
 // CHECK-LABEL: Adding generic signature <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> {
 // CHECK-LABEL: Rewrite system: {
 // CHECK: - [P1:T].T => [P1:T].[P1:T]
-// CHECK: - τ_0_0.[P1:T].[concrete: X<τ_0_0> with <τ_0_0.[P2:U]>] => τ_0_0.[P1:T]
+// CHECK: - τ_0_0.[P1:T].[concrete: X<τ_0_0.[P2:U]>] => τ_0_0.[P1:T]
 // CHECK: - τ_0_0.[P1:T].[P1:T] => τ_0_0.[P1:T]
 // CHECK: }
 // CHECK: }

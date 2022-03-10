@@ -3,16 +3,36 @@
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -enable-parameterized-protocol-types -requirement-machine-inferred-signatures=verify -disable-availability-checking 2>&1 | %FileCheck %s
 
 
-protocol Sequence {
-  @_primaryAssociatedType associatedtype Element
+/// Test some invalid syntax first
+
+protocol Invalid1<> {}
+// expected-error@-1 {{expected an identifier to name primary associated type}}
+
+protocol Invalid2<A B> {}
+// expected-error@-1 {{expected '>' to complete primary associated type list}}
+// expected-note@-2 {{to match this opening '<'}}
+
+protocol Invalid3<Element, +> {}
+// expected-error@-1 {{expected an identifier to name primary associated type}}
+// expected-error@-2 {{expected '>' to complete primary associated type list}}
+// expected-note@-3 {{to match this opening '<'}}
+
+
+/// Test semantics
+
+protocol Sequence<Element> {
   // expected-note@-1 {{protocol requires nested type 'Element'; do you want to add it?}}
+}
+
+extension Sequence {
+  func map<Other>(_ transform: (Self.Element) -> Other) -> ConcreteSequence<Other> {
+    return ConcreteSequence<Other>()
+  }
 }
 
 struct ConcreteSequence<Element> : Sequence {}
 
-protocol EquatableSequence {
-  @_primaryAssociatedType associatedtype Element : Equatable
-}
+protocol EquatableSequence<Element : Equatable> {}
 
 struct ConcreteEquatableSequence<Element : Equatable> : EquatableSequence {}
 
@@ -85,6 +105,18 @@ protocol SequenceWrapperProtocol2 {
 }
 
 
+/// Multiple primary associated types
+protocol Collection<Element, Index> {}
+
+// CHECK-LABEL: .testCollection1@
+// CHECK-NEXT: Generic signature: <T where T : Collection, T.[Collection]Element == String>
+func testCollection1<T : Collection<String>>(_: T) {}
+
+// CHECK-LABEL: .testCollection2@
+// CHECK-NEXT: Generic signature: <T where T : Collection, T.[Collection]Element == String, T.[Collection]Index == Int>
+func testCollection2<T : Collection<String, Int>>(_: T) {}
+
+
 /// Parametrized protocol in opaque result type
 
 struct OpaqueTypes<E> {
@@ -126,20 +158,18 @@ extension Sequence<Int> {
 /// Cannot use parameterized protocol as the type of a value
 
 func takesSequenceOfInt1(_: Sequence<Int>) {}
-// expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}
+// expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 
 func returnsSequenceOfInt1() -> Sequence<Int> {}
-// expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}
+// expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 
 func takesSequenceOfInt2(_: any Sequence<Int>) {}
-// expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}
 
 func returnsSequenceOfInt2() -> any Sequence<Int> {}
-// expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}
 
 func typeExpr() {
   _ = Sequence<Int>.self
-  // expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}
+  // expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 }
 
 /// Not supported as a protocol composition term for now
@@ -148,6 +178,46 @@ protocol SomeProto {}
 
 func protocolCompositionNotSupported(_: SomeProto & Sequence<Int>) {}
 // expected-error@-1 {{non-protocol, non-class type 'Sequence<Int>' cannot be used within a protocol-constrained type}}
-// expected-warning@-2 {{protocol 'Sequence' as a type must be explicitly marked as 'any'}}
 
-// FIXME: The second diagnostic is bogus.
+protocol DoubleWide<X, Y> {
+  var x: X { get }
+  var y: Y { get }
+}
+
+extension Int: DoubleWide {
+  typealias X = Int
+  typealias Y = Int
+  var x: X { 0 }
+  var y: X { 0 }
+}
+
+struct Collapse<T: DoubleWide>: DoubleWide {
+  typealias X = T
+  typealias Y = T
+
+  var x: X
+  var y: X { self.x }
+}
+
+func test() -> any DoubleWide<some DoubleWide<Int, Int>, some DoubleWide<Int, Int>> { return Collapse<Int>(x: 42) }
+
+func diagonalizeAny(_ x: any Sequence<Int>) -> any Sequence<(Int, Int)> {
+  return x.map { ($0, $0) }
+}
+
+func erase<T>(_ x: ConcreteSequence<T>) -> any Sequence<T> {
+  return x as any Sequence<T>
+}
+
+protocol Sponge<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z> {}
+
+func saturation(_ dry: any Sponge, _ wet: any Sponge<Int, Int, Int, Int, Int, Int>) {
+  _ = dry as any Sponge<Int, Int>
+  // expected-error@-1 {{'any Sponge' is not convertible to 'any Sponge<Int, Int>'}}
+  // expected-note@-2 {{did you mean to use 'as!' to force downcast?}}
+  _ = dry as any Sponge
+
+  _ = wet as any Sponge<Int, Int> // Ok
+  _ = wet as any Sponge // Ok
+  _ = wet as any Sponge<String> // expected-error {{cannot convert value of type 'any Sponge<Int, Int, Int, Int, Int, Int>' to type 'any Sponge<String>' in coercion}}
+}

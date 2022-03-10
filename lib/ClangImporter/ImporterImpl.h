@@ -26,6 +26,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/StringExtras.h"
@@ -559,6 +560,8 @@ public:
   /// Keep track of subscript declarations based on getter/setter
   /// pairs.
   llvm::DenseMap<std::pair<FuncDecl *, FuncDecl *>, SubscriptDecl *> Subscripts;
+  llvm::DenseMap<llvm::StringRef, std::pair<FuncDecl *, FuncDecl *>>
+      GetterSetterMap;
 
   /// Keep track of getter/setter pairs for functions imported from C++
   /// subscript operators based on the type in which they are declared and
@@ -568,6 +571,19 @@ public:
   /// `.second` corresponds to a setter
   llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
                   std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
+
+  /// Keep track of cxx function names, params etc in order to
+  /// allow for de-duping functions that differ strictly on "constness".
+  llvm::DenseMap<llvm::StringRef,
+                 std::pair<
+                     llvm::DenseSet<clang::FunctionDecl *>,
+                     llvm::DenseSet<clang::FunctionDecl *>>>
+      cxxMethods;
+
+  // Cache for already-specialized function templates and any thunks they may
+  // have.
+  llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
+      specializedFunctionTemplates;
 
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
@@ -1455,7 +1471,8 @@ private:
   void
   loadAllMembersOfObjcContainer(Decl *D,
                                 const clang::ObjCContainerDecl *objcContainer);
-  void loadAllMembersOfRecordDecl(NominalTypeDecl *recordDecl);
+  void loadAllMembersOfRecordDecl(NominalTypeDecl *swiftDecl,
+                                  const clang::RecordDecl *clangRecord);
 
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,
@@ -1512,7 +1529,8 @@ public:
   }
 
   void loadRequirementSignature(const ProtocolDecl *decl, uint64_t contextData,
-                                SmallVectorImpl<Requirement> &reqs) override {
+                                SmallVectorImpl<Requirement> &reqs,
+                                SmallVectorImpl<ProtocolTypeAlias> &typeAliases) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 

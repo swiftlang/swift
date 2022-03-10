@@ -61,10 +61,12 @@ class CompilerInvocation;
 class ClangImporterOptions;
 class ClangModuleUnit;
 class ClangNode;
+class ConcreteDeclRef;
 class Decl;
 class DeclContext;
 class EffectiveClangContext;
 class EnumDecl;
+class FuncDecl;
 class ImportDecl;
 class IRGenOptions;
 class ModuleDecl;
@@ -72,6 +74,7 @@ class NominalTypeDecl;
 class StructDecl;
 class SwiftLookupTable;
 class TypeDecl;
+class ValueDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
 
@@ -110,9 +113,12 @@ public:
   virtual void anchor();
 };
 
+// ⚠️ DANGER ⚠️
+// Putting more than four types in this `PointerUnion` will break the build for
+// 32-bit hosts. If we need five or more types in the future, we'll need to
+// design a proper larger-than-word-sized type.
 typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
-                           const clang::ModuleMacro *, const clang::Type *,
-                           const clang::Token *>
+                           const clang::Type *, const clang::Token *>
     ImportDiagnosticTarget;
 
 /// Class that imports Clang modules into Swift, mapping directly
@@ -257,6 +263,9 @@ public:
   StructDecl *
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) override;
+
+  ConcreteDeclRef getCXXFunctionTemplateSpecialization(
+          SubstitutionMap subst, ValueDecl *decl) override;
 
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.

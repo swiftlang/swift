@@ -2174,7 +2174,6 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
                                  DeclContext *dc) {
   DirectlyReferencedTypeDecls current;
 
-  bool firstComponent = true;
   for (const auto &component : ident->getComponentRange()) {
     // If we already set a declaration, use it.
     if (auto typeDecl = component->getBoundDecl()) {
@@ -2194,7 +2193,6 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
       if (current.empty())
         return current;
 
-      firstComponent = false;
       continue;
     }
 
@@ -2507,9 +2505,6 @@ static SmallVector<GenericTypeParamDecl *, 2>
 createOpaqueParameterGenericParams(
     GenericContext *genericContext, GenericParamList *parsedGenericParams) {
   ASTContext &ctx = genericContext->getASTContext();
-  if (!ctx.LangOpts.EnableExperimentalOpaqueParameters)
-    return { };
-
   auto value = dyn_cast_or_null<ValueDecl>(genericContext->getAsDecl());
   if (!value)
     return { };
@@ -2773,7 +2768,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // anything. Ask the requirement signature instead.
   if (protoDecl->wasDeserialized()) {
     auto protoSelfTy = protoDecl->getSelfInterfaceType();
-    for (auto &req : protoDecl->getRequirementSignature()) {
+    for (auto &req : protoDecl->getRequirementSignature().getRequirements()) {
       // Dig out a conformance requirement...
       if (req.getKind() != RequirementKind::Conformance)
         continue;

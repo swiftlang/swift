@@ -46,6 +46,12 @@ namespace swift {
   class ValueDecl;
   struct PrintOptions;
 
+  namespace constraints {
+  class ConstraintSystem;
+  class Solution;
+  class SolutionApplicationTarget;
+  }
+
   /// Typecheck binding initializer at \p bindingIndex.
   void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex,
                                bool leaveClosureBodiesUnchecked);
@@ -137,6 +143,36 @@ namespace swift {
   /// Type check a function body element which is at \p TagetLoc .
   bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
 
+  /// Thunk around \c TypeChecker::typeCheckForCodeCompletion to make it
+  /// available to \c swift::ide.
+  /// Type check the given expression and provide results back to code
+  /// completion via specified callback.
+  ///
+  /// This method is designed to be used for code completion which means that
+  /// it doesn't mutate given expression, even if there is a single valid
+  /// solution, and constraint solver is allowed to produce partially correct
+  /// solutions. Such solutions can have any number of holes in them.
+  ///
+  /// \returns `true` if target was applicable and it was possible to infer
+  /// types for code completion, `false` othrewise.
+  bool typeCheckForCodeCompletion(
+      constraints::SolutionApplicationTarget &target, bool needsPrecheck,
+      llvm::function_ref<void(const constraints::Solution &)> callback);
+
+  Type getTypeForCompletion(const constraints::Solution &S, Expr *E);
+
+  /// Whether the given completion expression is the only expression in its
+  /// containing closure or function body and its value is implicitly returned.
+  ///
+  /// If these conditions are met, code completion needs to avoid penalizing
+  /// completion results that don't match the expected return type when
+  /// computing type relations, as since no return statement was explicitly
+  /// written by the user, it's possible they intend the single expression not
+  /// as the return value but merely the first entry in a multi-statement body
+  /// they just haven't finished writing yet.
+  bool isImplicitSingleExpressionReturn(constraints::ConstraintSystem &CS,
+                                        Expr *CompletionExpr);
+
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
 
@@ -145,7 +181,7 @@ namespace swift {
   /// \c ModuleDecl::getDisplayDecls() would only return if previous
   /// work happened to have synthesized them.
   void
-  getTopLevelDeclsForDisplay(ModuleDecl *M, SmallVectorImpl<Decl*> &Results);
+  getTopLevelDeclsForDisplay(ModuleDecl *M, SmallVectorImpl<Decl*> &Results, bool Recursive = false);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.

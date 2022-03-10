@@ -430,7 +430,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
                         UnknownReason::UnknownWitnessMethodConformance);
     auto &module = wmi->getModule();
     SILFunction *fn =
-        module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
+        module.lookUpFunctionInWitnessTable(conf, wmi->getMember(),
+            SILModule::LinkingMode::LinkAll).first;
     // If we were able to resolve it, then we can proceed.
     if (fn)
       return SymbolicValue::getFunction(fn);

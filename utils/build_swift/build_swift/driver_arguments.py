@@ -515,6 +515,14 @@ def create_argument_parser():
            help='the maximum number of parallel link jobs to use when '
                 'compiling swift tools.')
 
+    option('--swift-tools-ld64-lto-codegen-only-for-supporting-targets',
+           toggle_true,
+           default=False,
+           help='When building ThinLTO using ld64 on Darwin, controls whether '
+                'to opt out of LLVM IR optimizations when linking targets that '
+                'will get little benefit from it (e.g. tools for '
+                'bootstrapping or debugging Swift)')
+
     option('--dsymutil-jobs', store_int,
            default=defaults.DSYMUTIL_JOBS,
            metavar='COUNT',
@@ -546,7 +554,10 @@ def create_argument_parser():
 
     option('--bootstrapping', store('bootstrapping_mode'),
            choices=['off', 'hosttools', 'bootstrapping', 'bootstrapping-with-hostlibs'],
-           help='The bootstrapping build mode for swift compiler modules')
+           help='The bootstrapping build mode for swift compiler modules. '
+                'Available modes: `off`, `hosttools`, `bootstrapping`, '
+                '`bootstrapping-with-hostlibs`, `crosscompile`, and '
+                '`crosscompile-with-hostlibs`')
 
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
@@ -990,7 +1001,7 @@ def create_argument_parser():
            help='Build optional StdlibUnittest components')
 
     option('--build-swift-stdlib-static-print', toggle_true,
-           help='Build constant_vprintf support')
+           help='Build constant-folding print() support')
 
     option('--build-swift-stdlib-unicode-data', toggle_true,
            default=True,

@@ -1,3 +1,14 @@
+module BasicBridging {
+  header "Basic/BridgedSwiftObject.h"
+  header "Basic/BasicBridging.h"
+  export *
+}
+
+module ASTBridging {
+  header "AST/ASTBridging.h"
+  export *
+}
+
 module SILBridging {
   header "SIL/SILBridging.h"
   export *

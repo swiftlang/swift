@@ -632,14 +632,16 @@ public:
                    const llvm::VersionTuple &Obsoleted,
                    SourceRange ObsoletedRange,
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
-                   bool Implicit)
+                   bool Implicit,
+                   bool IsSPI)
     : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
       Message(Message), Rename(Rename), RenameDecl(RenameDecl),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
       PlatformAgnostic(PlatformAgnostic),
-      Platform(Platform)
+      Platform(Platform),
+      IsSPI(IsSPI)
   {}
 
 #undef INIT_VER_TUPLE
@@ -684,6 +686,9 @@ public:
 
   /// The platform of the availability.
   const PlatformKind Platform;
+
+  /// Whether this is available as SPI.
+  const bool IsSPI;
 
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;
@@ -2171,6 +2176,30 @@ public:
     return DA->getKind() == DAK_UnavailableFromAsync;
   }
 };
+
+/// The @_backDeploy(...) attribute, used to make function declarations available
+/// for back deployment to older OSes via emission into the client binary.
+class BackDeployAttr: public DeclAttribute {
+public:
+  BackDeployAttr(SourceLoc AtLoc, SourceRange Range,
+                 PlatformKind Platform,
+                 const llvm::VersionTuple Version,
+                 bool Implicit)
+    : DeclAttribute(DAK_BackDeploy, AtLoc, Range, Implicit),
+      Platform(Platform),
+      Version(Version) {}
+
+  /// The platform the symbol is available for back deployment on.
+  const PlatformKind Platform;
+
+  /// The earliest platform version that may use the back deployed implementation.
+  const llvm::VersionTuple Version;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_BackDeploy;
+  }
+};
+
 
 /// Attributes that may be applied to declarations.
 class DeclAttributes {

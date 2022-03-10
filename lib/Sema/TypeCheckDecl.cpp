@@ -698,15 +698,17 @@ ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-AssociatedTypeDecl *
-PrimaryAssociatedTypeRequest::evaluate(Evaluator &evaluator,
-                                       ProtocolDecl *decl) const {
+ArrayRef<AssociatedTypeDecl *>
+PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *decl) const {
+  SmallVector<AssociatedTypeDecl *, 2> assocTypes;
+
   for (auto *assocType : decl->getAssociatedTypeMembers()) {
-    if (assocType->getAttrs().hasAttribute<PrimaryAssociatedTypeAttr>())
-      return assocType;
+    if (assocType->isPrimary())
+      assocTypes.push_back(assocType);
   }
 
-  return nullptr;
+  return decl->getASTContext().AllocateCopy(assocTypes);
 }
 
 bool
@@ -1609,7 +1611,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   return requirementInfo.isContainedIn(witnessInfo);
 }
 
-// Returns 'nullptr' if this is the setter's 'newValue' parameter;
+// Returns 'nullptr' if this is the 'newValue' or 'oldValue' parameter;
 // otherwise, returns the corresponding parameter of the subscript
 // declaration.
 static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
@@ -1621,11 +1623,9 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   switch (accessor->getAccessorKind()) {
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
-      return nullptr;
-
   case AccessorKind::Set:
     if (param == accessorParams->get(0)) {
-      // This is the 'newValue' parameter.
+      // This is the 'newValue' or 'oldValue' parameter.
       return nullptr;
     }
 

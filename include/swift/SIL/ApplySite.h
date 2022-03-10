@@ -580,18 +580,19 @@ public:
     return getSubstCalleeConv().hasIndirectSILResults();
   }
 
-  /// If our apply site has a single direct result SILValue, return that
-  /// SILValue. Return SILValue() otherwise.
+  /// Get the SIL value that represents all of the given call's results. For a
+  /// single direct result, returns the result. For multiple results, returns a
+  /// fake tuple value. The tuple has no storage of its own. The real results
+  /// must be extracted from it.
   ///
-  /// This means that:
+  /// For ApplyInst, returns the single-value instruction itself.
   ///
-  /// 1. If we have an ApplyInst, we just visit the apply.
-  /// 2. If we have a TryApplyInst, we visit the first argument of the normal
-  ///    block.
-  /// 3. If we have a BeginApplyInst, we return SILValue() since the begin_apply
-  ///    yields values instead of returning them. A returned value should only
-  ///    be valid after a full apply site has completely finished executing.
-  SILValue getSingleDirectResult() const {
+  /// For TryApplyInst returns the continuation block argument.
+  ///
+  /// For BeginApplyInst, returns an invalid value. For coroutines, there is no
+  /// single value representing all results. Yielded values are generally
+  /// handled differently since they have the convention of incoming arguments.
+  SILValue getPseudoResult() const {
     switch (getKind()) {
     case FullApplySiteKind::ApplyInst:
       return SILValue(cast<ApplyInst>(getInstruction()));

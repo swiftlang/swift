@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
 import SILBridging
 
 private func register<T: AnyObject>(_ cl: T.Type) {

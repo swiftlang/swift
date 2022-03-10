@@ -17,13 +17,12 @@ StdStringTestSuite.test("init") {
     expectTrue(s.empty())
 }
 
-// LLVM module verification fails for calls to std::string::push_back: rdar://88343327
-// StdStringTestSuite.test("push back") {
-//     var s = CxxString()
-//     s.push_back(42)
-//     expectEqual(s.size(), 1)
-//     expectFalse(s.empty())
-//     expectEqual(s[0], 42)
-// }
+StdStringTestSuite.test("push back") {
+    var s = CxxString()
+    s.push_back(42)
+    expectEqual(s.size(), 1)
+    expectFalse(s.empty())
+    expectEqual(s[0], 42)
+}
 
 runAllTests()

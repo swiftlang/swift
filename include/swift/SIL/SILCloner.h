@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_SILCLONER_H
 #define SWIFT_SIL_SILCLONER_H
 
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -248,11 +249,17 @@ public:
     return asImpl().remapASTType(ty);
   }
 
-  void remapOpenedType(CanOpenedArchetypeType archetypeTy) {
-    auto existentialTy = archetypeTy->getOpenedExistentialType()->getCanonicalType();
-    auto replacementTy = OpenedArchetypeType::get(
-        getOpASTType(existentialTy),
-        archetypeTy->getInterfaceType());
+  void remapRootOpenedType(CanOpenedArchetypeType archetypeTy) {
+    assert(archetypeTy->isRoot());
+
+    auto sig = Builder.getFunction().getGenericSignature();
+    auto existentialTy = archetypeTy->getExistentialType()->getCanonicalType();
+    auto env = GenericEnvironment::forOpenedExistential(
+        getOpASTType(existentialTy), sig, UUID::fromTime());
+    auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(sig, existentialTy->getASTContext());
+    auto replacementTy =
+        env->mapTypeIntoContext(interfaceTy)
+            ->template castTo<OpenedArchetypeType>();
     registerOpenedExistentialRemapping(archetypeTy, replacementTy);
   }
 
@@ -800,7 +807,7 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
   }
   auto *NewInst = getBuilder().createAllocStack(
       Loc, getOpType(Inst->getElementType()), VarInfo,
-      Inst->hasDynamicLifetime(), Inst->isLexical());
+      Inst->hasDynamicLifetime(), Inst->isLexical(), Inst->getWasMoved());
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }
@@ -837,6 +844,7 @@ SILCloner<ImplClass>::visitAllocRefDynamicInst(AllocRefDynamicInst *Inst) {
                                       getOpValue(Inst->getMetatypeOperand()),
                                       getOpType(Inst->getType()),
                                       Inst->isObjC(),
+                                      Inst->canAllocOnStack(),
                                       ElemTypes, CountArgs);
   recordClonedInstruction(Inst, NewInst);
 }
@@ -1277,9 +1285,9 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   // Since we want the debug info to survive, we do not remap the location here.
   SILDebugVariable VarInfo = *Inst->getVarInfo();
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  auto *NewInst = getBuilder().createDebugValue(Inst->getLoc(),
-                                                getOpValue(Inst->getOperand()),
-                                                VarInfo, Inst->poisonRefs());
+  auto *NewInst = getBuilder().createDebugValue(
+      Inst->getLoc(), getOpValue(Inst->getOperand()), VarInfo,
+      Inst->poisonRefs(), Inst->getWasMoved());
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }
@@ -2199,7 +2207,7 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
+  remapRootOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -2212,7 +2220,7 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitOpenExistentialValueInst(
     OpenExistentialValueInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
+  remapRootOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -2235,7 +2243,7 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
     exType = exMetatype->getExistentialInstanceType()->getCanonicalType();
     openedType = cast<MetatypeType>(openedType).getInstanceType();
   }
-  remapOpenedType(cast<OpenedArchetypeType>(openedType));
+  remapRootOpenedType(cast<OpenedArchetypeType>(openedType));
 
   if (!Inst->getOperand()->getType().canUseExistentialRepresentation(
           ExistentialRepresentation::Class)) {
@@ -2259,7 +2267,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
+  remapRootOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -2276,7 +2284,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialBoxInst(OpenExistentialBoxInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
+  remapRootOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createOpenExistentialBox(
@@ -2290,7 +2298,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *Inst) {
   // Create a new archetype for this opened existential type.
-  remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
+  remapRootOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(

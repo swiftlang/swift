@@ -360,6 +360,11 @@ public:
   getClassInstanceTypeInfo(const TypeRef *TR, unsigned start,
                            remote::TypeInfoProvider *ExternalTypeInfo);
 
+  unsigned targetPointerSize() {
+    auto *rawPointerTI = getTypeInfo(getRawPointerTypeRef(), nullptr);
+    return rawPointerTI->getSize();
+  }
+
 private:
   friend class swift::reflection::LowerType;
   friend class swift::reflection::EnumTypeInfoBuilder;

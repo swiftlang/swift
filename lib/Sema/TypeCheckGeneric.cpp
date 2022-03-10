@@ -226,17 +226,20 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       if (constraintType->hasError())
         return nullptr;
 
-      // Error out if the constraint type isn't a class or existential type.
-      if (!constraintType->isConstraintType() &&
-          !constraintType->getClassOrBoundGenericClass()) {
+      RequirementKind kind;
+      if (constraintType->isConstraintType())
+        kind = RequirementKind::Conformance;
+      else if (constraintType->getClassOrBoundGenericClass())
+        kind = RequirementKind::Superclass;
+      else {
+        // Error out if the constraint type isn't a class or existential type.
         ctx.Diags.diagnose(currentRepr->getLoc(),
                            diag::opaque_type_invalid_constraint);
         return nullptr;
       }
 
       assert(!constraintType->hasArchetype());
-      requirements.emplace_back(RequirementKind::Conformance, paramType,
-                                constraintType);
+      requirements.emplace_back(kind, paramType, constraintType);
     }
 
     interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
@@ -274,7 +277,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
 
         ctx.Diags.diagnose(repr->getLoc(),
                            diag::opaque_type_in_parameter,
-                           interfaceType);
+                           false, interfaceType);
         return true;
       }
     }
@@ -533,12 +536,9 @@ static Type formExtensionInterfaceType(
     auto *protoTy = paramProtoTy->getBaseType();
     type = protoTy;
 
-    auto *depMemTy = DependentMemberType::get(
+    paramProtoTy->getRequirements(
         protoTy->getDecl()->getSelfInterfaceType(),
-        paramProtoTy->getAssocType());
-    sameTypeReqs.emplace_back(
-      RequirementKind::SameType, depMemTy,
-      paramProtoTy->getArgumentType());
+        sameTypeReqs);
   }
 
   Type parentType = type->getNominalParent();

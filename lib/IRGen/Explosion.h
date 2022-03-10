@@ -45,8 +45,7 @@ public:
   Explosion &operator=(const Explosion &) = delete;
   Explosion(Explosion &&other) : NextValue(0) {
     // Do an uninitialized copy of the non-consumed elements.
-    Values.reserve(other.size());
-    Values.set_size(other.size());
+    Values.resize_for_overwrite(other.size());
     std::uninitialized_copy(other.begin(), other.end(), Values.begin());
 
     // Remove everything from the other explosion.

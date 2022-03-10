@@ -11,7 +11,7 @@ func convMetatypeToObject(_ f: @escaping (NSObject) -> NSObject.Type) {
   let _: (NSObject) -> AnyObject = f
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSo8NSObjectCABXMTIeggd_AByXlIeggo_TR : $@convention(thin) (@guaranteed NSObject, @guaranteed @callee_guaranteed (@guaranteed NSObject) -> @thick NSObject.Type) -> @owned AnyObject {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSo8NSObjectCABXMTIeggd_AByXlIeggo_TR : $@convention(thin) (@guaranteed NSObject, @guaranteed @callee_guaranteed (@guaranteed NSObject) -> @thick NSObject.Type) -> @owned AnyObject {
 // CHECK:         apply %1(%0)
 // CHECK:         thick_to_objc_metatype {{.*}} : $@thick NSObject.Type to $@objc_metatype NSObject.Type
 // CHECK:         objc_metatype_to_object {{.*}} : $@objc_metatype NSObject.Type to $AnyObject
@@ -26,7 +26,7 @@ func convExistentialMetatypeToObject(_ f: @escaping (NSBurrito) -> NSBurrito.Typ
   let _: (NSBurrito) -> AnyObject = f
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s24function_conversion_objc9NSBurrito_pAaB_pXmTIeggd_AaB_pyXlIeggo_TR : $@convention(thin) (@guaranteed NSBurrito, @guaranteed @callee_guaranteed (@guaranteed NSBurrito) -> @thick NSBurrito.Type) -> @owned AnyObject
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s24function_conversion_objc9NSBurrito_pAaB_pXmTIeggd_AaB_pyXlIeggo_TR : $@convention(thin) (@guaranteed NSBurrito, @guaranteed @callee_guaranteed (@guaranteed NSBurrito) -> @thick NSBurrito.Type) -> @owned AnyObject
 // CHECK:         apply %1(%0)
 // CHECK:         thick_to_objc_metatype {{.*}} : $@thick NSBurrito.Type to $@objc_metatype NSBurrito.Type
 // CHECK:         objc_existential_metatype_to_object {{.*}} : $@objc_metatype NSBurrito.Type to $AnyObject
@@ -39,7 +39,7 @@ func convProtocolMetatypeToObject(_ f: @escaping () -> NSBurrito.Protocol) {
   let _: () -> Protocol = f
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s24function_conversion_objc9NSBurrito_pXMtIegd_So8ProtocolCIego_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @thin NSBurrito.Protocol) -> @owned Protocol
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s24function_conversion_objc9NSBurrito_pXMtIegd_So8ProtocolCIego_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @thin NSBurrito.Protocol) -> @owned Protocol
 // CHECK:         apply %0() : $@callee_guaranteed () -> @thin NSBurrito.Protocol
 // CHECK:         objc_protocol #NSBurrito : $Protocol
 // CHECK:         copy_value
@@ -83,9 +83,9 @@ func blockToFuncExistential(_ x: @escaping @convention(block) () -> Int) -> () -
   return x
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSiIeyBd_SiIegd_TR : $@convention(thin) (@guaranteed @convention(block) () -> Int) -> Int
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiIeyBd_SiIegd_TR : $@convention(thin) (@guaranteed @convention(block) () -> Int) -> Int
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSiIegd_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> @out Any
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiIegd_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> @out Any
 
 // C function pointer conversions
 

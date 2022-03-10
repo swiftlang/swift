@@ -19,16 +19,24 @@ void ModuleSearchPathLookup::addFilesInPathToLookupTable(
     llvm::vfs::FileSystem *FS, StringRef SearchPath, ModuleSearchPathKind Kind,
     bool IsSystem, unsigned SearchPathIndex) {
   std::error_code Error;
-  assert(llvm::all_of(LookupTable, [&](const auto &LookupTableEntry) {
-    return llvm::none_of(LookupTableEntry.second, [&](const ModuleSearchPath &ExistingSearchPath) -> bool {
-      return ExistingSearchPath.Kind == Kind && ExistingSearchPath.Index == SearchPathIndex;
+  auto entryAlreadyExists = [this](ModuleSearchPathKind Kind,
+                                   unsigned SearchPathIndex) -> bool {
+    return llvm::any_of(LookupTable, [&](const auto &LookupTableEntry) {
+      return llvm::any_of(
+          LookupTableEntry.second, [&](ModuleSearchPathPtr ExistingSearchPath) {
+            return ExistingSearchPath->getKind() == Kind &&
+                   ExistingSearchPath->getIndex() == SearchPathIndex;
+          });
     });
-  }) && "Search path with this kind and index already exists");
+  };
+  assert(!entryAlreadyExists(Kind, SearchPathIndex) &&
+         "Search path with this kind and index already exists");
+  ModuleSearchPathPtr TableEntry =
+      new ModuleSearchPath(SearchPath, Kind, IsSystem, SearchPathIndex);
   for (auto Dir = FS->dir_begin(SearchPath, Error);
        !Error && Dir != llvm::vfs::directory_iterator(); Dir.increment(Error)) {
     StringRef Filename = llvm::sys::path::filename(Dir->path());
-    LookupTable[Filename].push_back(
-        {SearchPath, Kind, IsSystem, SearchPathIndex});
+    LookupTable[Filename].push_back(TableEntry);
   }
 }
 
@@ -92,8 +100,9 @@ ModuleSearchPathLookup::searchPathsContainingFile(
 
   for (auto &Filename : Filenames) {
     for (auto &Entry : LookupTable[Filename]) {
-      if (ResultIds.insert(std::make_pair(Entry.Kind, Entry.Index)).second) {
-        Result.push_back(&Entry);
+      if (ResultIds.insert(std::make_pair(Entry->getKind(), Entry->getIndex()))
+              .second) {
+        Result.push_back(Entry.get());
       }
     }
   }

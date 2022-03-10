@@ -1,0 +1,257 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -alloc-stack-hoisting -opt-mode=none | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// Make sure that we hoist the debug info and split its debug info into a
+// separate debug_value.
+//
+// CHECK-LABEL: sil @hoist_generic_1 :
+// CHECK: bb0({{.*}}):
+// Make sure the debug info isn't on the alloc_stack any more.
+// CHECK:   [[STACK:%.*]] = alloc_stack [moved] $T{{[ ]*}} // users:
+// CHECK: bb1:
+// CHECK:   debug_value [moved] [[STACK]] : $*T, let, name "x"
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+// CHECK: bb2:
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+// CHECK: bb3:
+// CHECK: dealloc_stack
+// CHECK:   return
+sil @hoist_generic_1 : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %2 = alloc_stack [moved] $T, let, name "x"
+  copy_addr [take] %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  br bb3
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+bb3:
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @hoist_generic_2 :
+// CHECK: bb0([[ARG:%.*]] : $*T,
+// CHECK-NEXT:   [[STACK:%.*]] = alloc_stack [moved] $T{{[ ]*}} // users:
+// CHECK-NEXT:   cond_br {{%.*}}, bb1, bb4
+//
+// CHECK: bb1:
+// CHECK-NEXT:   debug_value [moved] [[STACK]] : $*T, let, name "x"
+// CHECK-NEXT:   br bb2
+//
+// CHECK: bb2:
+// CHECK:        debug_value [moved] [[STACK]] : $*T, let, name "y"
+// CHECK-NEXT:   br bb3
+//
+// CHECK: bb3:
+// CHECK-NEXT:   copy_addr [[ARG]] to [initialization] [[STACK]]
+// CHECK-NEXT:   destroy_addr [[STACK]]
+// CHECK-NEXT:   destroy_addr [[ARG]]
+// CHECK-NEXT:   br bb5
+//
+// CHECK: bb4:
+// CHECK-NEXT:   destroy_addr [[ARG]]
+// CHECK-NEXT:   br bb5
+//
+// CHECK: bb5:
+// CHECK-NEXT: br bb6
+//
+// CHECK: bb6:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: dealloc_stack [[STACK]]
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'hoist_generic_2'
+sil @hoist_generic_2 : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %2 = alloc_stack [moved] $T, let, name "x"
+  copy_addr %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %3 = alloc_stack [moved] $T, let, name "y"
+  copy_addr %0 to [initialization] %3 : $*T
+  destroy_addr %3 : $*T
+  dealloc_stack %3 : $*T
+  destroy_addr %0 : $*T
+  br bb3
+
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// This case we are not moving anything so we are leaving in the default
+// behavior which is not breaking blocks and not inserting debug_info.
+//
+// CHECK-LABEL: sil @hoist_generic_3 :
+// CHECK: bb0([[ARG:%.*]] : $*T,
+// CHECK-NEXT:   [[STACK:%.*]] = alloc_stack $T{{[ ]*}}, let, name "x"
+// CHECK-NOT:    debug_value
+// CHECK: } // end sil function 'hoist_generic_3'
+sil @hoist_generic_3 : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %2 = alloc_stack $T, let, name "x"
+  copy_addr %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %3 = alloc_stack $T, let, name "y"
+  copy_addr %0 to [initialization] %3 : $*T
+  destroy_addr %3 : $*T
+  dealloc_stack %3 : $*T
+  destroy_addr %0 : $*T
+  br bb3
+
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+////////////////////////////////////////////////
+// Mix and Match Moved and Non Moved -> Moved //
+////////////////////////////////////////////////
+
+// CHECK-LABEL: sil @mix_and_match_1 :
+// CHECK: bb0([[ARG:%.*]] : $*T,
+// CHECK-NEXT:   [[STACK:%.*]] = alloc_stack [moved] $T{{[ ]*}} // users:
+// CHECK-NEXT:   cond_br {{%.*}}, bb1, bb4
+//
+// CHECK: bb1:
+// CHECK-NEXT:   debug_value [moved] [[STACK]] : $*T, let, name "x"
+// CHECK-NEXT:   br bb2
+//
+// CHECK: bb2:
+// CHECK:        debug_value [moved] [[STACK]] : $*T, let, name "y"
+// CHECK-NEXT:   br bb3
+//
+// CHECK: bb3:
+// CHECK-NEXT:   copy_addr [[ARG]] to [initialization] [[STACK]]
+// CHECK-NEXT:   destroy_addr [[STACK]]
+// CHECK-NEXT:   destroy_addr [[ARG]]
+// CHECK-NEXT:   br bb5
+//
+// CHECK: bb4:
+// CHECK-NEXT:   destroy_addr [[ARG]]
+// CHECK-NEXT:   br bb5
+//
+// CHECK: bb5:
+// CHECK-NEXT: br bb6
+//
+// CHECK: bb6:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: dealloc_stack [[STACK]]
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'mix_and_match_1'
+sil @mix_and_match_1 : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %2 = alloc_stack $T, let, name "x"
+  copy_addr %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %3 = alloc_stack [moved] $T, let, name "y"
+  copy_addr %0 to [initialization] %3 : $*T
+  destroy_addr %3 : $*T
+  dealloc_stack %3 : $*T
+  destroy_addr %0 : $*T
+  br bb3
+
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @mix_and_match_2 :
+// CHECK: bb0([[ARG:%.*]] : $*T,
+// CHECK-NEXT:   [[STACK:%.*]] = alloc_stack [moved] $T{{[ ]*}} // users:
+// CHECK-NEXT:   cond_br {{%.*}}, bb1, bb4
+//
+// CHECK: bb1:
+// CHECK-NEXT:   debug_value [moved] [[STACK]] : $*T, let, name "x"
+// CHECK-NEXT:   br bb2
+//
+// CHECK: bb2:
+// CHECK:        debug_value [moved] [[STACK]] : $*T, let, name "y"
+// CHECK-NEXT:   br bb3
+//
+// CHECK: bb3:
+// CHECK-NEXT:   copy_addr [[ARG]] to [initialization] [[STACK]]
+// CHECK-NEXT:   destroy_addr [[STACK]]
+// CHECK-NEXT:   destroy_addr [[ARG]]
+// CHECK-NEXT:   br bb5
+//
+// CHECK: bb4:
+// CHECK-NEXT:   destroy_addr [[ARG]]
+// CHECK-NEXT:   br bb5
+//
+// CHECK: bb5:
+// CHECK-NEXT: br bb6
+//
+// CHECK: bb6:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: dealloc_stack [[STACK]]
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'mix_and_match_2'
+sil @mix_and_match_2 : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %2 = alloc_stack [moved] $T, let, name "x"
+  copy_addr %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %3 = alloc_stack $T, let, name "y"
+  copy_addr %0 to [initialization] %3 : $*T
+  destroy_addr %3 : $*T
+  dealloc_stack %3 : $*T
+  destroy_addr %0 : $*T
+  br bb3
+
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  %9999 = tuple ()
+  return %9999 : $()
+}

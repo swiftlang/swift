@@ -42,7 +42,7 @@ import Foundation
     return f(x)
   }
 
-  // GUARANTEED-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSo8NSStringCABIyBya_S2SIeggo_TR : $@convention(thin) (@guaranteed String, @guaranteed @convention(block) @noescape (NSString) -> @autoreleased NSString) -> @owned String {
+  // GUARANTEED-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSo8NSStringCABIyBya_S2SIeggo_TR : $@convention(thin) (@guaranteed String, @guaranteed @convention(block) @noescape (NSString) -> @autoreleased NSString) -> @owned String {
   // GUARANTEED: bb0(%0 : @guaranteed $String, [[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape (NSString) -> @autoreleased NSString):
   // GUARANTEED:   [[BRIDGE:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // GUARANTEED:   [[NSSTR:%.*]] = apply [[BRIDGE]](%0)
@@ -146,7 +146,7 @@ class Test: NSObject {
   @objc func blockTakesBlock() -> ((Int) -> Int) -> Int {}
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sS2iIgyd_SiIegyd_S2iIyByd_SiIeyByd_TR
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sS2iIgyd_SiIegyd_S2iIyByd_SiIeyByd_TR
 // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[ORIG_BLOCK:%.*]] :
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BLOCK_COPY]])
 // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
@@ -156,14 +156,14 @@ class Test: NSObject {
 func clearDraggingItemImageComponentsProvider(_ x: NSDraggingItem) {
   x.imageComponentsProvider = { [] }
 }
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSayypGIego_So7NSArrayCSgIeyBa_TR
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSayypGIego_So7NSArrayCSgIeyBa_TR
 // CHECK:         [[CONVERT:%.*]] = function_ref @$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF
 // CHECK:         [[CONVERTED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.some!enumelt, [[CONVERTED]]
 // CHECK:         return [[OPTIONAL]]
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}bridgeNonnullBlockResult{{.*}}
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSSIego_So8NSStringCSgIeyBa_TR
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSSIego_So8NSStringCSgIeyBa_TR
 // CHECK:         [[CONVERT:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:         [[BRIDGED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[BRIDGED]]
@@ -296,8 +296,8 @@ struct GenericStruct<T> {
     o.someDynamicMethod(closure: closure)
   }
 }
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sIg_Iegy_IyB_IyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@noescape @callee_guaranteed () -> ()) -> (), @convention(block) @noescape () -> ()) -> () {
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sIyB_Ieg_TR : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIg_Iegy_IyB_IyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@noescape @callee_guaranteed () -> ()) -> (), @convention(block) @noescape () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIyB_Ieg_TR : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
 
 // rdar://35402696
 func takeOptStringFunction(fn: (String) -> String?) {}

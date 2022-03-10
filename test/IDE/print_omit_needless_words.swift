@@ -94,7 +94,7 @@
 // CHECK-FOUNDATION: var uppercased: String
 
 // Note: ok to map base name down to a keyword.
-// CHECK-FOUNDATION: func `do`(_: Selector!)
+// CHECK-FOUNDATION: func `do`(_: Selector)
 
 // Note: Strip names preceded by a gerund.
 // CHECK-FOUNDATION: func startSquashing(_: Bee)

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
 import SILBridging
 
 //===----------------------------------------------------------------------===//
@@ -220,7 +221,7 @@ final public class DeallocStackInst : Instruction, UnaryInstruction {
 }
 
 final public class DeallocStackRefInst : Instruction, UnaryInstruction {
-  public var allocRef: AllocRefInst { operand as! AllocRefInst }
+  public var allocRef: AllocRefInstBase { operand as! AllocRefInstBase }
 }
 
 final public class CondFailInst : Instruction, UnaryInstruction {

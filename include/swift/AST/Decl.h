@@ -29,6 +29,7 @@
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
@@ -144,6 +145,7 @@ enum class DescriptiveDeclKind : uint8_t {
   Property,
   StaticProperty,
   ClassProperty,
+  DistributedProperty,
   InfixOperator,
   PrefixOperator,
   PostfixOperator,
@@ -503,6 +505,11 @@ protected:
     IsOpaqueType : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(AssociatedTypeDecl, AbstractTypeParamDecl, 1,
+    /// Whether this is a primary associated type.
+    IsPrimary : 1
+  );
+
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
@@ -524,7 +531,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -563,10 +570,7 @@ protected:
 
     /// If this is a compiler-known protocol, this will be a KnownProtocolKind
     /// value, plus one. Otherwise, it will be 0.
-    KnownProtocol : 8, // '8' for speed. This only needs 6.
-
-    /// The number of requirements in the requirement signature.
-    NumRequirementsInSignature : 16
+    KnownProtocol : 8 // '8' for speed. This only needs 6.
   );
 
   SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+1+2+1+1+1+1+1+1,
@@ -826,6 +830,11 @@ public:
   /// This function won't consider the parent context to get the information.
   Optional<llvm::VersionTuple> getIntroducedOSVersion(PlatformKind Kind) const;
 
+  /// Returns the OS version in which the decl became ABI as specified by the
+  /// @_backDeploy attribute.
+  Optional<llvm::VersionTuple>
+  getBackDeployBeforeOSVersion(PlatformKind Kind) const;
+
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
 
@@ -999,12 +1008,10 @@ public:
   /// deployment target.
   bool isWeakImported(ModuleDecl *fromModule) const;
 
-  /// Returns true if the nature of this declaration allows overrides.
-  /// Note that this does not consider whether it is final or whether
-  /// the class it's on is final.
+  /// Returns true if the nature of this declaration allows overrides syntactically.
   ///
   /// If this returns true, the decl can be safely casted to ValueDecl.
-  bool isPotentiallyOverridable() const;
+  bool isSyntacticallyOverridable() const;
 
   /// Retrieve the global actor attribute that applies to this declaration,
   /// if any.
@@ -1022,6 +1029,8 @@ public:
   // Is this Decl an SPI? It can be directly marked with @_spi or is defined in
   // an @_spi context.
   bool isSPI() const;
+
+  bool isAvailableAsSPI() const;
 
   // List the SPI groups declared with @_spi or inherited by this decl.
   //
@@ -2160,9 +2169,9 @@ public:
 class OpaqueTypeDecl;
 
 /// Describes the least favorable positions at which a requirement refers
-/// to 'Self' in terms of variance, for use in the is-inheritable and
-/// is-available-existential checks.
-class SelfReferenceInfo final {
+/// to a given generic parameter in terms of variance, for use in the
+/// is-inheritable and is-available-existential checks.
+class GenericParameterReferenceInfo final {
   using OptionalTypePosition = OptionalEnum<decltype(TypePosition::Covariant)>;
 
 public:
@@ -2172,27 +2181,27 @@ public:
   OptionalTypePosition assocTypeRef;
 
   /// A reference to 'Self'.
-  static SelfReferenceInfo forSelfRef(TypePosition position) {
-    return SelfReferenceInfo(false, position, llvm::None);
+  static GenericParameterReferenceInfo forSelfRef(TypePosition position) {
+    return GenericParameterReferenceInfo(false, position, llvm::None);
   }
 
   /// A reference to 'Self' through an associated type.
-  static SelfReferenceInfo forAssocTypeRef(TypePosition position) {
-    return SelfReferenceInfo(false, llvm::None, position);
+  static GenericParameterReferenceInfo forAssocTypeRef(TypePosition position) {
+    return GenericParameterReferenceInfo(false, llvm::None, position);
   }
 
-  SelfReferenceInfo &operator|=(const SelfReferenceInfo &other);
+  GenericParameterReferenceInfo &operator|=(const GenericParameterReferenceInfo &other);
 
   explicit operator bool() const {
     return hasCovariantSelfResult || selfRef || assocTypeRef;
   }
 
-  SelfReferenceInfo()
+  GenericParameterReferenceInfo()
       : hasCovariantSelfResult(false), selfRef(llvm::None),
         assocTypeRef(llvm::None) {}
 
 private:
-  SelfReferenceInfo(bool hasCovariantSelfResult, OptionalTypePosition selfRef,
+  GenericParameterReferenceInfo(bool hasCovariantSelfResult, OptionalTypePosition selfRef,
                     OptionalTypePosition assocTypeRef)
       : hasCovariantSelfResult(hasCovariantSelfResult), selfRef(selfRef),
         assocTypeRef(assocTypeRef) {}
@@ -2683,7 +2692,7 @@ public:
   /// is considered covariant only when it appears as the immediate type of a
   /// property, or the uncurried result type of a method/subscript, e.g.
   /// '() -> () -> Self'.
-  SelfReferenceInfo findExistentialSelfReferences(
+  GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
 };
 
@@ -3204,6 +3213,14 @@ public:
                      LazyMemberLoader *definitionResolver,
                      uint64_t resolverData);
 
+  bool isPrimary() const {
+    return Bits.AssociatedTypeDecl.IsPrimary;
+  }
+
+  void setPrimary() {
+    Bits.AssociatedTypeDecl.IsPrimary = true;
+  }
+
   /// Get the protocol in which this associated type is declared.
   ProtocolDecl *getProtocol() const {
     return cast<ProtocolDecl>(getDeclContext());
@@ -3496,7 +3513,9 @@ public:
          SmallVectorImpl<ProtocolConformance *> &conformances) const;
 
   /// Retrieve all of the protocols that this nominal type conforms to.
-  SmallVector<ProtocolDecl *, 2> getAllProtocols() const;
+  ///
+  /// \param sorted Whether to sort the protocols in canonical order.
+  SmallVector<ProtocolDecl *, 2> getAllProtocols(bool sorted = false) const;
 
   /// Retrieve all of the protocol conformances for this nominal type.
   SmallVector<ProtocolConformance *, 2> getAllConformances(
@@ -4025,7 +4044,7 @@ public:
   ClassDecl *getSuperclassDecl() const;
 
   /// Check if this class is a superclass or equal to the given class.
-  bool isSuperclassOf(ClassDecl *other) const;
+  bool isSuperclassOf(const ClassDecl *other) const;
 
   /// Set the superclass of this class.
   void setSuperclass(Type superclass);
@@ -4120,7 +4139,7 @@ public:
 
   /// Whether the class uses the ObjC object model (reference counting,
   /// allocation, etc.), the Swift model, or has no reference counting at all.
-  ReferenceCounting getObjectModel() {
+  ReferenceCounting getObjectModel() const {
     if (isForeignReferenceType())
       return ReferenceCounting::None;
 
@@ -4130,7 +4149,7 @@ public:
     return ReferenceCounting::Native;
   }
 
-  LayoutConstraintKind getLayoutConstraintKind() {
+  LayoutConstraintKind getLayoutConstraintKind() const {
     if (getObjectModel() == ReferenceCounting::ObjC)
       return LayoutConstraintKind::Class;
 
@@ -4260,7 +4279,7 @@ public:
   /// Used to determine if this class decl is a foriegn reference type. I.e., a
   /// non-reference-counted swift reference type that was imported from a C++
   /// record.
-  bool isForeignReferenceType();
+  bool isForeignReferenceType() const;
 };
 
 /// The set of known protocols for which derived conformances are supported.
@@ -4312,7 +4331,7 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
-  const Requirement *RequirementSignature = nullptr;
+  Optional<RequirementSignature> RequirementSig;
 
   /// Returns the cached result of \c requiresClass or \c None if it hasn't yet
   /// been computed.
@@ -4403,10 +4422,10 @@ public:
   /// a protocol having nested types (ObjC protocols).
   ArrayRef<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
 
-  /// Returns the primary associated type, or nullptr if there isn't one. This is
-  /// the associated type that is parametrized with a same-type requirement in a
-  /// parametrized protocol type of the form SomeProtocol<SomeArgType>.
-  AssociatedTypeDecl *getPrimaryAssociatedType() const;
+  /// Returns the list of primary associated types. These are the associated
+  /// types that is parametrized with same-type requirements in a
+  /// parametrized protocol type of the form SomeProtocol<Arg1, Arg2...>.
+  ArrayRef<AssociatedTypeDecl *> getPrimaryAssociatedTypes() const;
 
   /// Returns a protocol requirement with the given name, or nullptr if the
   /// name has multiple overloads, or no overloads at all.
@@ -4573,33 +4592,25 @@ public:
   /// requirements. Computed from the structural requirements, above.
   ArrayRef<ProtocolDecl *> getProtocolDependencies() const;
 
-  /// Retrieve the requirements that describe this protocol.
-  ///
-  /// These are the requirements including any inherited protocols
-  /// and conformances for associated types that are introduced in this
-  /// protocol. Requirements implied via any other protocol (e.g., inherited
-  /// protocols of the inherited protocols) are not mentioned. The conformance
-  /// requirements listed here become entries in the witness table.
-  ArrayRef<Requirement> getRequirementSignature() const;
+  /// Retrieve the requirements that describe this protocol from the point of
+  /// view of the generic system; see RequirementSignature.h for details.
+  RequirementSignature getRequirementSignature() const;
 
   /// Is the requirement signature currently being computed?
   bool isComputingRequirementSignature() const;
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
-    return RequirementSignature != nullptr;
+    return RequirementSig.hasValue();
   }
 
-  void setRequirementSignature(ArrayRef<Requirement> requirements);
+  void setRequirementSignature(RequirementSignature requirementSig);
 
   void setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
                                    uint64_t requirementSignatureData);
 
   void setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
                                     uint64_t associatedTypesData);
-
-private:
-  ArrayRef<Requirement> getCachedRequirementSignature() const;
 
 public:
   // Implement isa/cast/dyncast/etc.
@@ -5240,6 +5251,9 @@ public:
   /// Is this an "async let" property?
   bool isAsyncLet() const;
 
+  /// Does this have a 'distributed' modifier?
+  bool isDistributed() const;
+
   /// Is this a stored property that will _not_ trigger any user-defined code
   /// upon any kind of access?
   bool isOrdinaryStoredProperty() const;
@@ -5508,6 +5522,7 @@ enum class ParamSpecifier : uint8_t {
 class ParamDecl : public VarDecl {
   friend class DefaultArgumentInitContextRequest;
   friend class DefaultArgumentExprRequest;
+  friend class DefaultArgumentTypeRequest;
 
   enum class ArgumentNameFlags : uint8_t {
     /// Whether or not this parameter is destructed.
@@ -5527,6 +5542,9 @@ class ParamDecl : public VarDecl {
 
   struct alignas(1 << StoredDefaultArgumentAlignInBits) StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
+
+    /// The type of the default argument expression.
+    Type ExprType;
 
     /// Stores the context for the default argument as well as a bit to
     /// indicate whether the default expression has been type-checked.
@@ -5645,6 +5663,10 @@ public:
     return nullptr;
   }
 
+  /// Retrieve the type of the default expression (if any) associated with
+  /// this parameter declaration.
+  Type getTypeOfDefaultExpr() const;
+
   VarDecl *getStoredProperty() const {
     if (auto stored = DefaultValueAndFlags.getPointer())
       return stored->DefaultArg.dyn_cast<VarDecl *>();
@@ -5658,6 +5680,10 @@ public:
   /// \param isTypeChecked Whether this argument should be used as the
   /// parameter's fully type-checked default argument.
   void setDefaultExpr(Expr *E, bool isTypeChecked);
+
+  /// Sets a type of default expression associated with this parameter.
+  /// This should only be called by deserialization.
+  void setDefaultExprType(Type type);
 
   void setStoredProperty(VarDecl *var);
 
@@ -5919,6 +5945,14 @@ public:
                                StaticSpellingKind StaticSpelling,
                                SourceLoc SubscriptLoc, ParameterList *Indices,
                                SourceLoc ArrowLoc, TypeRepr *ElementTyR,
+                               DeclContext *Parent,
+                               GenericParamList *GenericParams);
+
+  static SubscriptDecl *create(ASTContext &Context, DeclName Name,
+                               SourceLoc StaticLoc,
+                               StaticSpellingKind StaticSpelling,
+                               SourceLoc SubscriptLoc, ParameterList *Indices,
+                               SourceLoc ArrowLoc, Type ElementTy,
                                DeclContext *Parent,
                                GenericParamList *GenericParams);
 
@@ -6274,6 +6308,9 @@ public:
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
 
+  /// Returns 'true' if the function has the @c @_backDeploy attribute.
+  bool isBackDeployed() const;
+
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
   // FIXME: Hack that provides names with keyword arguments for accessors.
@@ -6417,6 +6454,31 @@ public:
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedActorSystem' protocol.
   bool isDistributedActorSystemRemoteCall(bool isVoidReturn) const;
+
+  /// Determines if this function is a 'recordArgument' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordArgument() const;
+
+  /// Determines if this function is a 'recordReturnType' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordReturnType() const;
+
+  /// Determines if this function is a 'recordErrorType' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordErrorType() const;
+
+  /// Determines if this function is a 'decodeNextArgument' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationDecoder' protocol.
+  bool isDistributedTargetInvocationDecoderDecodeNextArgument() const;
+
+  /// Determines if this function is a 'onReturn' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationResultHandler' protocol.
+  bool isDistributedTargetInvocationResultHandlerOnReturn() const;
 
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.
@@ -7781,6 +7843,14 @@ public:
   }
 };
 
+/// Find references to the given generic paramaeter in the generic signature
+/// and the type of the given value.
+GenericParameterReferenceInfo findGenericParameterReferences(
+    const ValueDecl *value,
+    CanGenericSignature sig, GenericTypeParamType *genericParam,
+    bool treatNonResultCovarianceAsInvariant,
+    Optional<unsigned> skipParamIndex);
+
 inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
                                             const DeclRefExpr *base) const {
   if (auto vd = dyn_cast<VarDecl>(this))
@@ -7878,13 +7948,16 @@ inline unsigned ValueDecl::getNumCurryLevels() const {
   return curryLevels;
 }
 
-inline bool Decl::isPotentiallyOverridable() const {
+inline bool Decl::isSyntacticallyOverridable() const {
   if (isa<VarDecl>(this) ||
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
+    if (static_cast<const ValueDecl*>(this)->isFinal()) {
+      return false;
+    }
     auto classDecl = getDeclContext()->getSelfClassDecl();
-    return classDecl && !classDecl->isActor();
+    return classDecl && !classDecl->isActor() && !classDecl->isFinal();
   } else {
     return false;
   }

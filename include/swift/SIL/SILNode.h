@@ -21,7 +21,7 @@
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/SIL/SwiftObjectHeader.h"
+#include "swift/Basic/SwiftObjectHeader.h"
 #include <type_traits>
 
 namespace swift {

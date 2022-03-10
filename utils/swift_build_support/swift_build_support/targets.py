@@ -266,9 +266,11 @@ class StdlibDeploymentTarget(object):
     Linux = Platform("linux", archs=[
         "x86_64",
         "i686",
+        "armv5",
         "armv6",
         "armv7",
         "aarch64",
+        "powerpc",
         "powerpc64",
         "powerpc64le",
         "s390x"])
@@ -346,8 +348,13 @@ class StdlibDeploymentTarget(object):
             elif machine.startswith('armv6'):
                 # linux-armv6* is canonicalized to 'linux-armv6'
                 return StdlibDeploymentTarget.Linux.armv6
+            elif machine.startswith('armv5'):
+                # linux-armv5* is canonicalized to 'linux-armv5'
+                return StdlibDeploymentTarget.Linux.armv5
             elif machine == 'aarch64':
                 return StdlibDeploymentTarget.Linux.aarch64
+            elif machine == 'ppc':
+                return StdlibDeploymentTarget.Linux.powerpc
             elif machine == 'ppc64':
                 return StdlibDeploymentTarget.Linux.powerpc64
             elif machine == 'ppc64le':

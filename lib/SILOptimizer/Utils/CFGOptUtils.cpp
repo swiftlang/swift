@@ -133,7 +133,7 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
 }
 
 void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex) {
-  assert(block->getArgument(argIndex)->isPhiArgument()
+  assert(block->getArgument(argIndex)->isPhi()
          && "Only should be used on phi arguments");
   block->eraseArgument(argIndex);
 

@@ -661,16 +661,28 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   return false;
 }
 
+bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
+  return llvm::any_of(D->getAttrs(), [](const auto *Attr) { 
+    if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+      return !AvAttr->hasPlatform()
+        && AvAttr->isUnconditionallyUnavailable();
+    }
+
+    return false;
+  });
+}
+
 /// Returns `true` if the symbol should be included as a node in the graph.
 bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
-  // If this decl isn't in this module, don't record it,
+  // If this decl isn't in this module or module that this module imported with `@_exported`, don't record it,
   // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName()) {
+  if (D->getModuleContext()->getName() != M.getName() && !Walker.isFromExportedImportedModule(D)) {
     return false;
   }
-
+  
   if (!isa<ValueDecl>(D)) {
     return false;
   }
-  return !isImplicitlyPrivate(cast<ValueDecl>(D));
+  return !isImplicitlyPrivate(cast<ValueDecl>(D)) 
+    && !isUnconditionallyUnavailableOnAllPlatforms(cast<ValueDecl>(D));
 }

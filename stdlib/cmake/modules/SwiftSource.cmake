@@ -457,9 +457,12 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
-  # The standard library and overlays are built with -requirement-machine-protocol-signatures=verify.
-  if(SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-requirement-machine-protocol-signatures=verify")
+  if(SWIFT_SIL_VERIFY_ALL_MACOS_ONLY)
+    # Only add if we have a macOS build triple
+    if ("${SWIFTFILE_SDK}" STREQUAL "OSX" AND
+        "${SWIFTFILE_ARCHITECTURE}" STREQUAL "x86_64")
+      list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
+    endif()
   endif()
 
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
@@ -948,6 +951,13 @@ function(_compile_swift_files
         OUTPUT ${module_outputs_static}
         DEPENDS
           "${module_dependency_target}"
+          "${line_directive_tool}"
+          "${file_path}"
+          ${swift_compiler_tool_dep}
+          ${source_files} ${SWIFTFILE_DEPENDS}
+          ${swift_ide_test_dependency}
+          ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT "Generating ${module_file}")
       set("${dependency_module_target_out_var_name}" "${module_dependency_target_static}" PARENT_SCOPE)
     else()

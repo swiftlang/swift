@@ -169,6 +169,9 @@ def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
 def serialized_path_obfuscate : Separate<["-"], "serialized-path-obfuscate">,
     HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
 
+def empty_abi_descriptor : Flag<["-"], "empty-abi-descriptor">,
+  HelpText<"Avoid printing actual module content into ABI descriptor file">;
+
 def no_serialize_debugging_options :
   Flag<["-"], "no-serialize-debugging-options">,
   HelpText<"Never serialize options for debugging (default: only for apps)">;
@@ -237,6 +240,15 @@ def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
 class DebugCrashOpt : Group<debug_crash_Group>;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_lexical_lifetimes :
+    Joined<["-"], "enable-lexical-lifetimes=">,
+    HelpText<"Whether to enable lexical lifetimes">,
+    MetaVarName<"true|false">;
+  def enable_lexical_lifetimes_noArg :
+    Flag<["-"], "enable-lexical-lifetimes">,
+    HelpText<"Enable lexical lifetimes">;
+}
 
 // Flags that are saved into module interfaces
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
@@ -266,14 +278,6 @@ def enable_lexical_borrow_scopes :
   Joined<["-"], "enable-lexical-borrow-scopes=">,
   HelpText<"Whether to emit lexical borrow scopes (default: true)">,
   MetaVarName<"true|false">;
-          
-def enable_lexical_lifetimes :
-  Joined<["-"], "enable-lexical-lifetimes=">,
-  HelpText<"Whether to enable lexical lifetimes">,
-  MetaVarName<"true|false">;
-def enable_lexical_lifetimes_noArg :
-  Flag<["-"], "enable-lexical-lifetimes">,
-  HelpText<"Enable lexical lifetimes">;
 
 def enable_experimental_move_only :
   Flag<["-"], "enable-experimental-move-only">,
@@ -294,10 +298,6 @@ def disable_experimental_clang_importer_diagnostics :
 def enable_experimental_eager_clang_module_diagnostics :
   Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
   HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
-
-def enable_experimental_opaque_parameters :
-  Flag<["-"], "enable-experimental-opaque-parameters">,
-  HelpText<"Enable experimental support for opaque parameters">;
 
 def enable_experimental_pairwise_build_block :
   Flag<["-"], "enable-experimental-pairwise-build-block">,
@@ -354,6 +354,16 @@ def requirement_machine_max_rule_length : Joined<["-"], "requirement-machine-max
 def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machine-max-concrete-nesting=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete type nesting depth before giving up">;
+
+def disable_requirement_machine_concrete_contraction : Flag<["-"], "disable-requirement-machine-concrete-contraction">,
+  HelpText<"Disable preprocessing pass to eliminate conformance requirements "
+           "on generic parameters which are made concrete">;
+
+def enable_requirement_machine_loop_normalization : Flag<["-"], "enable-requirement-machine-loop-normalization">,
+  HelpText<"Enable stronger minimization algorithm, for debugging only">;
+
+def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
+  HelpText<"Enables dumping type witness systems from associated type inference">;
 
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
@@ -517,6 +527,14 @@ def enable_parameterized_protocol_types :
   Flag<["-"], "enable-parameterized-protocol-types">,
   HelpText<"Enable experimental support for primary associated types and parameterized protocols">;
 
+def enable_experimental_opened_existential_types :
+  Flag<["-"], "enable-experimental-opened-existential-types">,
+  HelpText<"Enable experimental support for implicitly opened existentials">;
+
+def disable_experimental_opened_existential_types :
+  Flag<["-"], "disble-experimental-opened-existential-types">,
+  HelpText<"Disable experimental support for implicitly opened existentials">;
+
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -585,6 +603,10 @@ def conditional_runtime_records : Flag<["-"], "conditional-runtime-records">,
 def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocated-instantiation-caches">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Avoid preallocating metadata instantiation caches in globals">;
+
+def trap_function
+  : Separate<["-"], "trap-function">, MetaVarName<"<name>">,
+    HelpText<"Lower traps to calls to this function instead of trap instructions">;
 
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
@@ -849,6 +871,10 @@ def experimental_multi_statement_closures :
   Flag<["-"], "experimental-multi-statement-closures">,
   HelpText<"Enable experimental support for type inference in multi-statement closures">;
 
+def experimental_type_inference_from_defaults :
+  Flag<["-"], "enable-experimental-type-inference-from-defaults">,
+  HelpText<"Enable experimental support for generic parameter inference from default values">;
+
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
   HelpText<"Directory of prebuilt modules for loading module interfaces">;
@@ -992,5 +1018,10 @@ def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
+
+def skip_import_in_public_interface:
+  Separate<["-"], "skip-import-in-public-interface">,
+  HelpText<"Skip the import statement corresponding to a module name "
+           "when printing the public interface.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

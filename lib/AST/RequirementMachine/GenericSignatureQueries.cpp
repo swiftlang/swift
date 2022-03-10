@@ -53,7 +53,7 @@ RequirementMachine::getLocalRequirements(
     result.superclass = props->getSuperclassBound({}, term, Map);
   }
 
-  for (const auto *proto : props->getConformsToExcludingSuperclassConformances())
+  for (const auto *proto : props->getConformsTo())
     result.protos.push_back(const_cast<ProtocolDecl *>(proto));
 
   result.layout = props->getLayoutConstraint();
@@ -560,7 +560,8 @@ RequirementMachine::getConformanceAccessPath(Type type,
       // A copy of the current path, populated as needed.
       SmallVector<ConformanceAccessPath::Entry, 4> entries;
 
-      for (const auto &req : lastProto->getRequirementSignature()) {
+      auto reqs = lastProto->getRequirementSignature().getRequirements();
+      for (const auto &req : reqs) {
         // We only care about conformance requirements.
         if (req.getKind() != RequirementKind::Conformance)
           continue;

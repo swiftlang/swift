@@ -44,6 +44,16 @@ namespace rewriting {
 class MutableTerm;
 class Term;
 
+/// Records superclass requirements at a given level in the class hierarchy.
+struct SuperclassRequirement {
+  /// The most specific superclass constraint (in type difference order) for
+  /// this level in the class hierarchy.
+  Optional<Symbol> SuperclassType;
+
+  /// Superclass rules that apply to this key.
+  llvm::SmallVector<std::pair<Symbol, unsigned>, 1> SuperclassRules;
+};
+
 /// Stores a convenient representation of all "property-like" rewrite rules of
 /// the form T.[p] => T, where [p] is a property symbol, for some term 'T'.
 class PropertyBag {
@@ -64,25 +74,20 @@ class PropertyBag {
   /// The corresponding layout rule for the above.
   Optional<unsigned> LayoutRule;
 
-  /// The most specific superclass constraint this type satisfies.
-  Optional<Symbol> Superclass;
+  /// The most specific superclass declaration for which this type has a
+  /// superclass constraint.
+  const ClassDecl *SuperclassDecl = nullptr;
 
-  /// The corresponding superclass rule for the above.
-  Optional<unsigned> SuperclassRule;
-
-  /// All concrete conformances of Superclass to the protocols in the
-  /// ConformsTo list.
-  llvm::TinyPtrVector<ProtocolConformance *> SuperclassConformances;
+  /// Used for unifying superclass rules at different levels in the class
+  /// hierarchy. For each class declaration, stores a symbol and rule pair
+  /// for the most specific substituted type.
+  llvm::SmallDenseMap<const ClassDecl *, SuperclassRequirement, 2> Superclasses;
 
   /// The most specific concrete type constraint this type satisfies.
   Optional<Symbol> ConcreteType;
 
-  /// The corresponding layout rule for the above.
-  Optional<unsigned> ConcreteTypeRule;
-
-  /// All concrete conformances of ConcreteType to the protocols in the
-  /// ConformsTo list.
-  llvm::TinyPtrVector<ProtocolConformance *> ConcreteConformances;
+  /// Concrete type rules that apply to this key.
+  llvm::SmallVector<std::pair<Symbol, unsigned>, 1> ConcreteTypeRules;
 
   /// Cache of associated type declarations.
   llvm::SmallDenseMap<Identifier, AssociatedTypeDecl *, 2> AssocTypes;
@@ -97,16 +102,24 @@ class PropertyBag {
   PropertyBag &operator=(const PropertyBag &) = delete;
   PropertyBag &operator=(PropertyBag &&) = delete;
 
+  const SuperclassRequirement &getSuperclassRequirement() const {
+    assert(SuperclassDecl != nullptr);
+    auto found = Superclasses.find(SuperclassDecl);
+    return found->second;
+  }
+
+  MutableTerm getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const;
+
 public:
   Term getKey() const { return Key; }
   void dump(llvm::raw_ostream &out) const;
 
   bool hasSuperclassBound() const {
-    return Superclass.hasValue();
+    return SuperclassDecl != nullptr;
   }
 
   CanType getSuperclassBound() const {
-    return Superclass->getConcreteType();
+    return getSuperclassRequirement().SuperclassType->getConcreteType();
   }
 
   Type getSuperclassBound(
@@ -135,12 +148,11 @@ public:
     return ConformsTo;
   }
 
-  llvm::TinyPtrVector<const ProtocolDecl *>
-  getConformsToExcludingSuperclassConformances() const;
-
-  MutableTerm getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const;
-
   AssociatedTypeDecl *getAssociatedType(Identifier name);
+
+  Symbol concretelySimplifySubstitution(const MutableTerm &mutTerm,
+                                        RewriteContext &ctx,
+                                        RewritePath *path) const;
 
   void verify(const RewriteSystem &system) const;
 };
@@ -243,13 +255,24 @@ private:
 
   void addProperty(Term key, Symbol property, unsigned ruleID);
 
-  void processTypeDifference(const TypeDifference &difference,
-                             unsigned differenceID,
-                             unsigned lhsRuleID,
-                             unsigned rhsRuleID);
-
   void addConformanceProperty(Term key, Symbol property, unsigned ruleID);
   void addLayoutProperty(Term key, Symbol property, unsigned ruleID);
+
+  void unifyConcreteTypes(Term key,
+                          Symbol lhsProperty, unsigned lhsRuleID,
+                          Symbol rhsProperty, unsigned rhsRuleID);
+
+  void unifyConcreteTypes(Term key,
+                          Optional<Symbol> &bestProperty,
+                          llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &
+                              existingRules,
+                          Symbol property, unsigned ruleID);
+
+  void recordSuperclassRelation(Term key,
+                                Symbol superclassType,
+                                unsigned superclassRuleID,
+                                const ClassDecl *otherClass);
+
   void addSuperclassProperty(Term key, Symbol property, unsigned ruleID);
   void addConcreteTypeProperty(Term key, Symbol property, unsigned ruleID);
 
@@ -263,8 +286,7 @@ private:
                    CanType concreteType,
                    ArrayRef<Term> substitutions,
                    ArrayRef<unsigned> conformsToRules,
-                   ArrayRef<const ProtocolDecl *> conformsTo,
-                   llvm::TinyPtrVector<ProtocolConformance *> &conformances);
+                   ArrayRef<const ProtocolDecl *> conformsTo);
 
   void concretizeTypeWitnessInConformance(
                    Term key, RequirementKind requirementKind,
@@ -288,12 +310,6 @@ private:
     unsigned conformanceRuleID,
     RequirementKind requirementKind,
     Symbol concreteConformanceSymbol) const;
-
-  Optional<unsigned> concretelySimplifySubstitutions(Term baseTerm,
-                                                     Symbol symbol,
-                                                     RewritePath *path) const;
-
-  void concretelySimplifyLeftHandSideSubstitutions() const;
 
   void verify() const;
 };

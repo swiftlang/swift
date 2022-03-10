@@ -93,7 +93,7 @@ func invalidDiffWrtClass(_ x: Class) -> Class {
 }
 
 protocol Proto {}
-// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Proto' does not conform to 'Differentiable'}}
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'any Proto' does not conform to 'Differentiable'}}
 @differentiable(reverse, wrt: x)
 func invalidDiffWrtExistential(_ x: Proto) -> Proto {
   return x

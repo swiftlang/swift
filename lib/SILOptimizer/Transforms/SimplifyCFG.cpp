@@ -90,6 +90,7 @@ struct ThreadInfo;
 class SimplifyCFG {
   SILOptFunctionBuilder FuncBuilder;
   SILFunction &Fn;
+  SILFunctionTransform &transform;
   SILPassManager *PM;
 
   // DeadEndBlocks remains conservatively valid across updates that rewrite
@@ -134,9 +135,9 @@ class SimplifyCFG {
   bool EnableJumpThread;
 
 public:
-  SimplifyCFG(SILFunction &Fn, SILTransform &T, bool Verify,
+  SimplifyCFG(SILFunction &Fn, SILFunctionTransform &T, bool Verify,
               bool EnableJumpThread)
-      : FuncBuilder(T), Fn(Fn), PM(T.getPassManager()),
+      : FuncBuilder(T), Fn(Fn), transform(T), PM(T.getPassManager()),
         ConstFolder(FuncBuilder, PM->getOptions().AssertConfig,
                     /* EnableDiagnostics */ false,
                     [&](SILInstruction *I) { constFoldingCallback(I); }),
@@ -619,17 +620,24 @@ bool SimplifyCFG::dominatorBasedSimplifications(SILFunction &Fn,
   BasicBlockFlag isThreadable(&Fn);
   BasicBlockFlag threadableComputed(&Fn);
   llvm::DenseSet<std::pair<SILBasicBlock *, SILBasicBlock *>> ThreadedEdgeSet;
-  for (auto &BB : Fn)
-    if (DT->getNode(&BB)) // Only handle reachable blocks.
+  for (auto &BB : Fn) {
+    if (DT->getNode(&BB)) {
+      if (!transform.continueWithNextSubpassRun(BB.getTerminator()))
+        return Changed;
+      // Only handle reachable blocks.
       Changed |= tryDominatorBasedSimplifications(
           &BB, DT, LoopHeaders, JumpThreadableEdges, ThreadedEdgeSet,
           EnableJumpThread, isThreadable, threadableComputed);
+    }
+  }
 
   // Nothing to jump thread?
   if (JumpThreadableEdges.empty())
     return Changed;
 
   for (auto &ThreadInfo : JumpThreadableEdges) {
+    if (!transform.continueWithNextSubpassRun())
+      return Changed;
     if (threadEdge(ThreadInfo)) {
       Changed = true;
     }
@@ -643,6 +651,8 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
   bool HaveChangedCFG = false;
   for (auto &BB : Fn) {
     auto *Term = BB.getTerminator();
+    if (!transform.continueWithNextSubpassRun(Term))
+      return HaveChangedCFG;
     // Simplify a switch_enum.
     if (auto *SEI = dyn_cast<SwitchEnumInst>(Term)) {
       if (auto *EI = dyn_cast<EnumInst>(SEI->getOperand())) {
@@ -706,6 +716,9 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   do {
     HasChangedInCurrentIter = false;
 
+    if (!transform.continueWithNextSubpassRun())
+      return Changed;
+
     // Do dominator based simplification of terminator condition. This does not
     // and MUST NOT change the CFG without updating the dominator tree to
     // reflect such change.
@@ -727,14 +740,20 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
     // one optimization out of simplifyArgs ... I am squinting at you
     // simplifySwitchEnumToSelectEnum.
     // simplifyArgs does use the dominator tree, though.
-    for (auto &BB : Fn)
+    for (auto &BB : Fn) {
+      if (!transform.continueWithNextSubpassRun(BB.getTerminator()))
+        return Changed;
+
       HasChangedInCurrentIter |= simplifyArgs(&BB);
+    }
 
     if (ShouldVerify)
       DT->verify();
 
     // Jump thread.
     if (dominatorBasedSimplifications(Fn, DT)) {
+      if (!transform.continueWithNextSubpassRun())
+        return true;
       DominanceInfo *InvalidDT = DT;
       DT = nullptr;
       HasChangedInCurrentIter = true;
@@ -1305,7 +1324,7 @@ TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
   for (SILValue branchArg : targetBranch->getArgs()) {
     if (branchArg->getParentBlock() == targetBB) {
       auto *phi = dyn_cast<SILPhiArgument>(branchArg);
-      if (!phi || !phi->isPhiArgument()) {
+      if (!phi || !phi->isPhi()) {
         return;
       }
       branchArg = phi->getIncomingPhiValue(sourceBB);
@@ -2846,6 +2865,9 @@ bool SimplifyCFG::simplifyBlocks() {
     // Otherwise, try to simplify the terminator.
     TermInst *TI = BB->getTerminator();
 
+    if (!transform.continueWithNextSubpassRun(TI))
+      return Changed;
+
     switch (TI->getTermKind()) {
     case TermKind::BranchInst:
       if (simplifyBranchBlock(cast<BranchInst>(TI))) {
@@ -2920,6 +2942,11 @@ bool SimplifyCFG::simplifyBlocks() {
     Changed |= simplifyProgramTerminationBlock(BB);
   }
 
+  if (Changed) {
+    // Simplifying other blocks might have resulted in unreachable
+    // loops.
+    removeUnreachableBlocks(Fn);
+  }
   return Changed;
 }
 
@@ -2932,6 +2959,9 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
   bool Changed = false;
   for (auto &BB : Fn) {
     TermInst *TI = BB.getTerminator();
+    if (!transform.continueWithNextSubpassRun(TI))
+      return Changed;
+
 
     SwitchEnumTermInst SWI(TI);
     if (!SWI)
@@ -3369,6 +3399,9 @@ bool SimplifyCFG::run() {
   // Disable some expensive optimizations if the function is huge.
   isVeryLargeFunction = (Fn.size() > 10000);
 
+  if (!transform.continueWithNextSubpassRun())
+    return false;
+
   // First remove any block not reachable from the entry.
   bool Changed = removeUnreachableBlocks(Fn);
 
@@ -3386,17 +3419,16 @@ bool SimplifyCFG::run() {
   findLoopHeaders();
 
   DT = nullptr;
+  if (!transform.continueWithNextSubpassRun())
+    return Changed;
 
   // Perform SROA on BB arguments.
   Changed |= splitBBArguments(Fn);
 
-  if (simplifyBlocks()) {
-    // Simplifying other blocks might have resulted in unreachable
-    // loops.
-    removeUnreachableBlocks(Fn);
+  Changed |= simplifyBlocks();
 
-    Changed = true;
-  }
+  if (!transform.continueWithNextSubpassRun())
+    return Changed;
 
   // Do simplifications that require the dominator tree to be accurate.
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
@@ -3412,20 +3444,23 @@ bool SimplifyCFG::run() {
 
   Changed |= dominatorBasedSimplify(DA);
 
+  if (!transform.continueWithNextSubpassRun())
+    return Changed;
+
   DT = nullptr;
   // Now attempt to simplify the remaining blocks.
-  if (simplifyBlocks()) {
-    // Simplifying other blocks might have resulted in unreachable
-    // loops.
-    removeUnreachableBlocks(Fn);
-    Changed = true;
-  }
+  Changed |= simplifyBlocks();
+
+  if (!transform.continueWithNextSubpassRun())
+    return Changed;
 
   if (tailDuplicateObjCMethodCallSuccessorBlocks()) {
     Changed = true;
-    if (simplifyBlocks())
-      removeUnreachableBlocks(Fn);
+    simplifyBlocks();
   }
+
+  if (!transform.continueWithNextSubpassRun())
+    return Changed;
 
   if (Fn.getModule().getOptions().VerifyAll)
     Fn.verifyCriticalEdges();

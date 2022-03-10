@@ -1352,7 +1352,9 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
                                            TheTrivialPropertyDescriptor);
       ApplyIRLinkage({linkInfo.getLinkage(),
                       linkInfo.getVisibility(),
-                      llvm::GlobalValue::DLLExportStorageClass})
+                      IRGen.Opts.InternalizeSymbols
+                          ? llvm::GlobalValue::DefaultStorageClass
+                          : llvm::GlobalValue::DLLExportStorageClass})
           .to(GA, linkInfo.isForDefinition());
     }
     return;

@@ -82,20 +82,15 @@ struct RewriteStep {
     ///
     ///    T.[concrete: C<...> with <X1, X2...>] X1 X2...
     ///
-    /// If inverted: pop concrete substitutions Xn' from the primary stack,
+    /// If inverted: pop concrete substitutions Xn from the primary stack,
     /// which must follow a term ending with a superclass or concrete type
     /// symbol:
     ///
-    ///    T.[concrete: C<...> with <X1, X2...>] X1' X2'...
-    ///
-    /// The new substitutions replace the substitutions in that symbol:
-    ///
-    ///    T.[concrete: C<...> with <X1', X2'...>]
+    ///    T.[concrete: C<...> with <X1, X2...>] X1 X2...
     ///
     /// The Arg field encodes the number of substitutions.
     ///
-    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions() and
-    /// PropertyMap::concretelySimplifyLeftHandSideSubstitutions().
+    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions().
     Decompose,
 
     ///
@@ -155,8 +150,7 @@ struct RewriteStep {
     ///
     ///    T.[concrete: C'<...> with <X1', X2'...>]
     ///
-    /// Used by PropertyMap::concretelySimplifyLeftHandSideSubstitutions() and
-    /// PropertyMap::processTypeDifference().
+    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions().
     DecomposeConcrete,
 
     /// For decomposing the left hand side of an induced rule in concrete type
@@ -361,6 +355,11 @@ struct RewriteStep {
             RewritePathEvaluator &evaluator,
             const RewriteSystem &system) const;
 
+  bool isInverseOf(const RewriteStep &other) const;
+
+  bool maybeSwapRewriteSteps(RewriteStep &other,
+                             const RewriteSystem &system);
+
 private:
   static unsigned getConcreteProjectionArg(unsigned differenceID,
                                            unsigned substitutionIndex) {
@@ -412,9 +411,22 @@ public:
 
   void invert();
 
+  bool computeFreelyReducedForm();
+
+  bool computeCyclicallyReducedForm(MutableTerm &basepoint,
+                                    const RewriteSystem &system);
+
+  bool computeLeftCanonicalForm(const RewriteSystem &system);
+
+  void computeNormalForm(const RewriteSystem &system);
+
   void dump(llvm::raw_ostream &out,
             MutableTerm term,
             const RewriteSystem &system) const;
+
+  void dumpLong(llvm::raw_ostream &out,
+                MutableTerm term,
+                const RewriteSystem &system) const;
 };
 
 /// Information about protocol conformance rules appearing in a rewrite loop.
@@ -433,21 +445,41 @@ public:
   RewritePath Path;
 
 private:
-  unsigned Deleted : 1;
-
   /// Cached value for findRulesAppearingOnceInEmptyContext().
   SmallVector<unsigned, 1> RulesInEmptyContext;
 
-  /// If true, RulesInEmptyContext should be recomputed.
+  /// Cached value for getProjectionCount().
+  unsigned ProjectionCount : 15;
+
+  /// Cached value for getDecomposeCount().
+  unsigned DecomposeCount : 15;
+
+  /// A useful loop contains at least one rule in empty context, even if that
+  /// rule appears multiple times or also in non-empty context. The only loops
+  /// that are elimination candidates contain a rule in empty context *exactly
+  /// once*. A useful loop can become an elimination candidate after
+  /// normalization.
+  unsigned Useful : 1;
+
+  /// Loops are deleted once they are no longer useful, as defined above.
+  unsigned Deleted : 1;
+
+  /// If true, Useful, RulesInEmptyContext, ProjectionCount, and DecomposeCount
+  /// should be recomputed.
   unsigned Dirty : 1;
+
+  void recompute(const RewriteSystem &system);
 
 public:
   RewriteLoop(MutableTerm basepoint, RewritePath path)
     : Basepoint(basepoint), Path(path) {
+    ProjectionCount = 0;
+    DecomposeCount = 0;
+    Useful = 0;
     Deleted = 0;
 
-    // Initially, the RulesInEmptyContext vector is not valid because
-    // it has not been computed yet.
+    // Initially, cached values are not valid because they have not been
+    // computed yet.
     Dirty = 1;
   }
 
@@ -465,15 +497,21 @@ public:
     Dirty = 1;
   }
 
-  bool isInContext(const RewriteSystem &system) const;
+  bool isUseful(const RewriteSystem &system) const;
 
   ArrayRef<unsigned>
   findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
+
+  unsigned getProjectionCount(const RewriteSystem &system) const;
+
+  unsigned getDecomposeCount(const RewriteSystem &system) const;
 
   void findProtocolConformanceRules(
       llvm::SmallDenseMap<const ProtocolDecl *,
                           ProtocolConformanceRules, 2> &result,
       const RewriteSystem &system) const;
+
+  void computeNormalForm(const RewriteSystem &system);
 
   void verify(const RewriteSystem &system) const;
 

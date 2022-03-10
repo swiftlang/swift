@@ -15,6 +15,8 @@
 
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/IDE/CodeCompletionString.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/Chrono.h"
@@ -67,6 +69,10 @@ public:
     llvm::sys::TimePoint<> ModuleModificationTime;
 
     std::vector<const ContextFreeCodeCompletionResult *> Results;
+
+    /// The arena that contains the \c USRBasedTypes of the
+    /// \c ContextFreeCodeCompletionResult in this cache value.
+    USRBasedTypeArena USRTypeArena;
 
     Value() : Allocator(std::make_shared<llvm::BumpPtrAllocator>()) {}
   };

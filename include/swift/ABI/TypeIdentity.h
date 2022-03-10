@@ -19,6 +19,7 @@
 #define SWIFT_ABI_TYPEIDENTITY_H
 
 #include "swift/Basic/LLVM.h"
+#include <llvm/ADT/Optional.h>
 #include <llvm/ADT/StringRef.h>
 
 namespace swift {

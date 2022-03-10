@@ -18,6 +18,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include <vector>
+#include "Diagnostics.h"
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -30,6 +31,7 @@ namespace swift {
 
 class AssociatedTypeDecl;
 class ProtocolDecl;
+class ProtocolTypeAlias;
 class Requirement;
 
 namespace rewriting {
@@ -39,18 +41,26 @@ namespace rewriting {
 // documentation
 // comments.
 
-void desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
+void desugarRequirement(Requirement req,
+                        SmallVectorImpl<Requirement> &result,
+                        SmallVectorImpl<RequirementError> &errors);
 
 void inferRequirements(Type type, SourceLoc loc, ModuleDecl *module,
                        SmallVectorImpl<StructuralRequirement> &result);
 
 void realizeRequirement(Requirement req, RequirementRepr *reqRepr,
                         ModuleDecl *moduleForInference,
-                        SmallVectorImpl<StructuralRequirement> &result);
+                        SmallVectorImpl<StructuralRequirement> &result,
+                        SmallVectorImpl<RequirementError> &errors);
 
 void realizeInheritedRequirements(TypeDecl *decl, Type type,
                                   ModuleDecl *moduleForInference,
-                                  SmallVectorImpl<StructuralRequirement> &result);
+                                  SmallVectorImpl<StructuralRequirement> &result,
+                                  SmallVectorImpl<RequirementError> &errors);
+
+bool diagnoseRequirementErrors(ASTContext &ctx,
+                               SmallVectorImpl<RequirementError> &errors,
+                               bool allowConcreteGenericParams);
 
 std::pair<MutableTerm, MutableTerm>
 getRuleForRequirement(const Requirement &req,
@@ -116,8 +126,16 @@ struct RuleBuilder {
                       const ProtocolDecl *proto);
   void addRequirement(const StructuralRequirement &req,
                       const ProtocolDecl *proto);
+  void addTypeAlias(const ProtocolTypeAlias &alias,
+                    const ProtocolDecl *proto);
   void collectRulesFromReferencedProtocols();
 };
+
+// Defined in ConcreteContraction.cpp.
+bool performConcreteContraction(
+    ArrayRef<StructuralRequirement> requirements,
+    SmallVectorImpl<StructuralRequirement> &result,
+    bool debug);
 
 } // end namespace rewriting
 

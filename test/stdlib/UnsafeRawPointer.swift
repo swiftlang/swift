@@ -252,4 +252,43 @@ UnsafeMutableRawPointerExtraTestSuite.test("withMemoryRebound") {
   }
 }
 
+UnsafeMutableRawPointerExtraTestSuite.test("realignment-functions") {
+  var m = UnsafeMutableRawPointer(bitPattern: 1)!
+  expectEqual(m.alignedUp(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(m.alignedUp(for: Int32.self), .init(bitPattern: 4)!)
+  expectEqual(m.alignedUp(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(m.alignedUp(toMultipleOf: 16), .init(bitPattern: 16)!)
+
+  m = .init(bitPattern: 13)!
+  expectEqual(m.alignedDown(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(m.alignedDown(for: Int32.self), .init(bitPattern: 12)!)
+  expectEqual(m.alignedDown(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(m.alignedDown(toMultipleOf: 4), .init(bitPattern: 12)!)
+
+  var p = UnsafeRawPointer(bitPattern: 1)!
+  expectEqual(p.alignedUp(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(p.alignedUp(for: Int32.self), .init(bitPattern: 4)!)
+  expectEqual(p.alignedUp(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(p.alignedUp(toMultipleOf: 16), .init(bitPattern: 16)!)
+
+  p = .init(bitPattern: 13)!
+  expectEqual(p.alignedDown(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(p.alignedDown(for: Int32.self), .init(bitPattern: 12)!)
+  expectEqual(p.alignedDown(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(p.alignedDown(toMultipleOf: 4), .init(bitPattern: 12)!)
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("pointer-comparisons") {
+  let a = UnsafeMutableRawPointer(bitPattern: 0x8000)!
+  let b = UnsafeRawPointer(bitPattern: 0x9000)!
+
+  expectTrue(a.assumingMemoryBound(to: Int.self) == UnsafeRawPointer(a))
+  expectTrue(b.assumingMemoryBound(to: UInt.self) >= b)
+  expectTrue(a <= a.assumingMemoryBound(to: Double.self))
+
+  expectTrue(a.assumingMemoryBound(to: Int.self) != b)
+  expectTrue(b.assumingMemoryBound(to: UInt.self) > UnsafeMutableRawPointer(a))
+  expectTrue(a < b.assumingMemoryBound(to: Double.self))
+}
+
 runAllTests()

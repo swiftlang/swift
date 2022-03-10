@@ -85,7 +85,7 @@ func shared_to_owned_conversion(_ f : (__shared Int, __shared ValueAggregate, __
   
   // ======== REABSTRACTION THUNK =========
   
-  // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sSi6shared14ValueAggregateVAA03RefC0CIgyxx_SiAcEIegygg_TR : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate, @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
+  // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] @$sSi6shared14ValueAggregateVAA03RefC0CIgyxx_SiAcEIegygg_TR : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate, @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
   // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate, [[FUNC:%[0-9]+]] : $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()):
   // CHECK: [[COPY_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
   // CHECK: [[COPY_REF_VAL:%[0-9]+]] = copy_value [[REF_VAL]] : $RefAggregate
@@ -111,7 +111,7 @@ func owned_to_shared_conversion(_ f : (Int, ValueAggregate, RefAggregate) -> Voi
 
   // ======== REABSTRACTION THUNK =========
 
-  // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sSi6shared14ValueAggregateVAA03RefC0CIgygg_SiAcEIegyxx_TR : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate, @noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
+  // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] @$sSi6shared14ValueAggregateVAA03RefC0CIgygg_SiAcEIegyxx_TR : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate, @noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
   // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate, [[FUNC:%[0-9]+]] : $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()):
   // CHECK: [[BORROW_VALUE_VAL:%[0-9]+]] = begin_borrow [[VALUE_VAL]] : $ValueAggregate
   // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate

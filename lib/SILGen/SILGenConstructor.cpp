@@ -343,7 +343,6 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
   // must be instance isolated
   switch (isolation) {
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
       return true;
 
     case ActorIsolation::Unspecified:
@@ -666,7 +665,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     }
 
     selfValue = B.createAllocRefDynamic(Loc, allocArg, selfTy,
-                                        useObjCAllocation, {}, {});
+                                        useObjCAllocation, false, {}, {});
   } else {
     assert(ctor->isDesignatedInit());
     // For a designated initializer, we know that the static type being

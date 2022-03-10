@@ -9,6 +9,16 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// A mechanism for working with types that are related via the transformation
+// of replacing a type parameter term with another type parameter term or
+// concrete type.
+//
+// Used by concrete type unification (in PropertyUnification.cpp) and for
+// substitution simplification (SimplifySubstitutions.cpp) to define rewrite
+// loops relating various rules for rewrite system minimization.
+//
+//===----------------------------------------------------------------------===//
 
 #include "TypeDifference.h"
 #include "swift/AST/Types.h"
@@ -68,8 +78,6 @@ void TypeDifference::dump(llvm::raw_ostream &out) const {
 }
 
 void TypeDifference::verify(RewriteContext &ctx) const {
-#ifndef NDEBUG
-
 #define VERIFY(expr, str) \
   if (!(expr)) { \
     llvm::errs() << "TypeDifference::verify(): " << str << "\n"; \
@@ -103,7 +111,6 @@ void TypeDifference::verify(RewriteContext &ctx) const {
   }
 
 #undef VERIFY
-#endif
 }
 
 namespace {
@@ -203,8 +210,6 @@ namespace {
     }
 
     void verify() const {
-#ifndef NDEBUG
-
 #define VERIFY(expr, str) \
   if (!(expr)) { \
     llvm::errs() << "ConcreteTypeMatcher::verify(): " << str << "\n"; \
@@ -220,6 +225,9 @@ namespace {
         VERIFY(*first.compare(pair.second, Context) > 0, "Order violation");
 
         VERIFY(rhsVisited.insert(pair.first).second, "Duplicate substitution");
+
+        VERIFY(first.getRootProtocol() == pair.second.getRootProtocol(),
+               "Transformation does not preserve domain");
       }
 
       for (const auto &pair : SameTypesOnRHS) {
@@ -227,6 +235,9 @@ namespace {
         VERIFY(*first.compare(pair.second, Context) > 0, "Order violation");
 
         VERIFY(lhsVisited.insert(pair.first).second, "Duplicate substitution");
+
+        VERIFY(first.getRootProtocol() == pair.second.getRootProtocol(),
+               "Transformation does not preserve domain");
       }
 
       for (const auto &pair : ConcreteTypesOnLHS) {
@@ -242,7 +253,6 @@ namespace {
       }
 
 #undef VERIFY
-#endif
     }
 
     void dump(llvm::raw_ostream &out) const {
@@ -444,7 +454,6 @@ RewriteSystem::computeTypeDifference(Term baseTerm, Symbol lhs, Symbol rhs,
 
   bool isConflict = (matcher.ConcreteConflicts.size() > 0);
 
-#ifndef NDEBUG
   if (!isConflict) {
     // The meet operation should be commutative.
     if (lhsMeetRhs.RHS != rhsMeetLhs.RHS) {
@@ -507,7 +516,6 @@ RewriteSystem::computeTypeDifference(Term baseTerm, Symbol lhs, Symbol rhs,
       }
     }
   }
-#endif
 
   if (lhs != lhsMeetRhs.RHS)
     lhsDifferenceID = recordTypeDifference(lhsMeetRhs);

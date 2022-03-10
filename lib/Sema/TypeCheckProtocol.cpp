@@ -2924,7 +2924,6 @@ bool ConformanceChecker::checkActorIsolation(
   // Ensure that the witness is not actor-isolated in a manner that makes it
   // unsuitable as a witness.
   bool isCrossActor = false;
-  bool witnessIsUnsafe = false;
   DiagnosticBehavior behavior = SendableCheckContext(
       Conformance->getDeclContext()).defaultDiagnosticBehavior();
   Type witnessGlobalActor;
@@ -2937,12 +2936,13 @@ bool ConformanceChecker::checkActorIsolation(
 
     // An actor-isolated witness can only conform to an actor-isolated
     // requirement.
-    if (requirementIsolation == ActorIsolation::ActorInstance) {
+    auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
+    if (requirementIsolation == ActorIsolation::ActorInstance &&
+        !(requirementFunc && requirementFunc->isDistributed())) {
       return false;
     }
 
     auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness);
-    auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
     auto nominal = dyn_cast<NominalTypeDecl>(witness->getDeclContext());
     auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
     if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
@@ -3145,7 +3145,6 @@ bool ConformanceChecker::checkActorIsolation(
   }
 
   case ActorIsolationRestriction::GlobalActorUnsafe:
-    witnessIsUnsafe = true;
     LLVM_FALLTHROUGH;
 
   case ActorIsolationRestriction::GlobalActor: {
@@ -3166,18 +3165,11 @@ bool ConformanceChecker::checkActorIsolation(
 
   // Check whether the requirement requires some particular actor isolation.
   Type requirementGlobalActor;
-  bool requirementIsUnsafe = false;
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
     llvm_unreachable("There are not actor protocols");
-  case ActorIsolation::DistributedActorInstance:
-    // A requirement inside a distributed actor, where it has a protocol that was
-    // bound requiring a `DistributedActor` conformance (`protocol D: DistributedActor`),
-    // results in the requirement being isolated to given distributed actor.
-    break;
 
   case ActorIsolation::GlobalActorUnsafe:
-    requirementIsUnsafe = true;
     LLVM_FALLTHROUGH;
 
   case ActorIsolation::GlobalActor: {
@@ -4851,24 +4843,42 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
   Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
-
-  if (CheckedRequirementSignature)
-    return;
-
-  CheckedRequirementSignature = true;
+  auto &diags = proto->getASTContext().Diags;
 
   auto DC = Conformance->getDeclContext();
   auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, substitutingType, ProtocolConformanceRef(Conformance));
 
+  auto reqSig = proto->getRequirementSignature().getRequirements();
+
   auto result = TypeChecker::checkGenericArguments(
       DC->getParentModule(), Loc, Loc,
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(),
       { proto->getSelfInterfaceType() },
-      proto->getRequirementSignature(),
-      QuerySubstitutionMap{substitutions});
+      reqSig, QuerySubstitutionMap{substitutions});
+
+  // Non-final classes should not be able to conform to protocols with a
+  // same-type requirement on 'Self', since such a conformance would no
+  // longer be covariant. For now, this is a warning. Once this becomes
+  // an error, we can handle it as part of the above checkGenericArguments()
+  // call by passing in a superclass-bound archetype for the 'self' type
+  // instead of the concrete class type itself.
+  if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {
+    if (!classDecl->isSemanticallyFinal()) {
+      for (auto req : reqSig) {
+        if (req.getKind() == RequirementKind::SameType &&
+            req.getFirstType()->isEqual(proto->getSelfInterfaceType())) {
+          diags.diagnose(Loc, diag::non_final_class_cannot_conform_to_self_same_type,
+                         Adoptee, proto->getDeclaredInterfaceType(),
+                         req.getSecondType())
+              .warnUntilSwiftVersion(6);
+          break;
+        }
+      }
+    }
+  }
 
   switch (result) {
   case RequirementCheckResult::Success:
@@ -4883,9 +4893,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     // Diagnose the failure generically.
     // FIXME: Would be nice to give some more context here!
     if (!Conformance->isInvalid()) {
-      proto->getASTContext().Diags.diagnose(Loc, diag::type_does_not_conform,
-                                            Adoptee,
-                                            Proto->getDeclaredInterfaceType());
+      diags.diagnose(Loc, diag::type_does_not_conform,
+                     Adoptee,
+                     Proto->getDeclaredInterfaceType());
       Conformance->setInvalid();
     }
     return;
@@ -4897,7 +4907,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   if (where.isImplicit())
     return;
 
-  for (auto req : proto->getRequirementSignature()) {
+  for (auto req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() == RequirementKind::Conformance) {
       auto depTy = req.getFirstType();
       auto *proto = req.getProtocolDecl();
@@ -4914,6 +4924,71 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 }
 
 #pragma mark Protocol conformance checking
+
+/// Determine whether mapping the interface type of the given protocol non-type
+/// requirement into the context of the given conformance produces a well-formed
+/// type.
+static bool
+hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
+                                   NormalProtocolConformance *conformance) {
+  assert(!isa<TypeDecl>(requirement));
+  assert(requirement->getDeclContext()->getSelfProtocolDecl() ==
+         conformance->getProtocol());
+
+  // FIXME: getInterfaceType() on properties returns contextual types that have
+  // been mapped out of context, but mapTypeOutOfContext() does not reconstitute
+  // type parameters that were substituted with concrete types. Instead,
+  // patterns should be refactored to use interface types, at least if they
+  // appear in type contexts.
+  auto interfaceTy = requirement->getInterfaceType();
+
+  // Skip the curried 'self' parameter.
+  if (requirement->hasCurriedSelf())
+    interfaceTy = interfaceTy->castTo<AnyFunctionType>()->getResult();
+
+  // For subscripts, build a regular function type to skip walking generic
+  // requirements.
+  if (auto *gft = interfaceTy->getAs<GenericFunctionType>()) {
+    interfaceTy = FunctionType::get(gft->getParams(), gft->getResult(),
+                                    gft->getExtInfo());
+  }
+
+  if (!interfaceTy->hasTypeParameter())
+    return false;
+
+  const auto subs = SubstitutionMap::getProtocolSubstitutions(
+      conformance->getProtocol(),
+      conformance->getDeclContext()->mapTypeIntoContext(conformance->getType()),
+      ProtocolConformanceRef(conformance));
+
+  class Walker final : public TypeWalker {
+    const SubstitutionMap &Subs;
+    const ProtocolDecl *Proto;
+
+  public:
+    explicit Walker(const SubstitutionMap &Subs, const ProtocolDecl *Proto)
+        : Subs(Subs), Proto(Proto) {}
+
+    Action walkToTypePre(Type ty) override {
+      if (!ty->hasTypeParameter())
+        return Action::SkipChildren;
+
+      auto *const dmt = ty->getAs<DependentMemberType>();
+      if (!dmt)
+        return Action::Continue;
+
+      // We only care about 'Self'-rooted type parameters.
+      if (!dmt->getRootGenericParam()->isEqual(Proto->getSelfInterfaceType()))
+        return Action::SkipChildren;
+
+      if (ty.subst(Subs)->hasError())
+        return Action::Stop;
+      return Action::SkipChildren;
+    }
+  };
+
+  return interfaceTy.walk(Walker(subs, conformance->getProtocol()));
+}
 
 void ConformanceChecker::resolveValueWitnesses() {
   for (auto member : Proto->getMembers()) {
@@ -5066,10 +5141,6 @@ void ConformanceChecker::resolveValueWitnesses() {
       continue;
     }
 
-    // If this is an accessor for a storage decl, ignore it.
-    if (isa<AccessorDecl>(requirement))
-      continue;
-
     // If this requirement is part of a pair of imported async requirements,
     // where one has already been witnessed, we can skip it.
     //
@@ -5083,6 +5154,13 @@ void ConformanceChecker::resolveValueWitnesses() {
                      !cand->isImplicit() &&
                      this->Conformance->hasWitness(cand);
             })) {
+      continue;
+    }
+
+    // Try substituting into the requirement's interface type. If we fail,
+    // either a generic requirement was not satisfied or we tripped on an
+    // invalid type witness, and there's no point in resolving a witness.
+    if (hasInvalidTypeInConformanceContext(requirement, Conformance)) {
       continue;
     }
 
@@ -5102,8 +5180,15 @@ void ConformanceChecker::resolveValueWitnesses() {
     }
   }
 
-  // Finally, check some ad-hoc protocol requirements
-  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem)) {
+  // Finally, check some ad-hoc protocol requirements.
+  //
+  // These protocol requirements are not expressible in Swift today, but as
+  // the type system gains the required abilities, we should strive to move
+  // them to plain-old protocol requirements.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem) ||
+      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder) ||
+      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder) ||
+      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler)) {
     checkDistributedActorSystemAdHocProtocolRequirements(
         Context, Proto, Conformance, Adoptee, /*diagnose=*/true);
   }
@@ -5165,14 +5250,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // Diagnose missing type witnesses for now.
   diagnoseMissingWitnesses(Kind);
-
-  // If we complain about any associated types, there is no point in continuing.
-  // FIXME: Not really true. We could check witnesses that don't involve the
-  // failed associated types.
-  if (AlreadyComplained) {
-    Conformance->setInvalid();
-    return;
-  }
 
   // Diagnose missing value witnesses later.
   SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
@@ -5290,9 +5367,8 @@ void swift::diagnoseConformanceFailure(Type T,
       Type constraintType = T;
       if (auto existential = T->getAs<ExistentialType>())
         constraintType = existential->getConstraintType();
-      diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
-                     T, constraintType->isEqual(Proto->getDeclaredInterfaceType()),
-                     Proto->getDeclaredInterfaceType());
+      diags.diagnose(ComplainLoc, diag::type_cannot_conform,
+                     T, Proto->getDeclaredInterfaceType());
       diags.diagnose(ComplainLoc,
                      diag::only_concrete_types_conform_to_protocols);
       return;
@@ -5380,8 +5456,8 @@ void swift::diagnoseConformanceFailure(Type T,
 }
 
 void ConformanceChecker::diagnoseOrDefer(
-       ValueDecl *requirement, bool isError,
-       std::function<void(NormalProtocolConformance *)> fn) {
+    const ValueDecl *requirement, bool isError,
+    std::function<void(NormalProtocolConformance *)> fn) {
   if (isError)
     Conformance->setInvalid();
 
@@ -6866,7 +6942,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
   // Find defaults for any associated conformances rooted on defaulted
   // associated types.
-  for (const auto &req : proto->getRequirementSignature()) {
+  for (const auto &req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
     if (req.getFirstType()->isEqual(proto->getSelfInterfaceType()))

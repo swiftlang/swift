@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 666; // mark_must_check initial
+const uint16_t SWIFTMODULE_VERSION_MINOR = 678; // remove shared_external linkage
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -133,10 +133,10 @@ public:
   }
 };
 
-// NormalConformanceID must be the same as DeclID because it is stored
+// ProtocolConformanceID must be the same as DeclID because it is stored
 // in the same way.
-using NormalConformanceID = DeclID;
-using NormalConformanceIDField = DeclIDField;
+using ProtocolConformanceID = DeclID;
+using ProtocolConformanceIDField = DeclIDField;
 
 // GenericSignatureID must be the same as DeclID because it is stored in the
 // same way.
@@ -959,7 +959,7 @@ namespace input_block {
 ///
 /// \sa DECLS_AND_TYPES_BLOCK_ID
 namespace decls_block {
-  enum RecordKind : uint8_t {
+  enum RecordKind : uint16_t {
 #define RECORD(Id) Id,
 #define RECORD_VAL(Id, Value) Id = Value,
 #include "DeclTypeRecordNodes.def"
@@ -1077,10 +1077,11 @@ namespace decls_block {
 
   using OpenedArchetypeTypeLayout = BCRecordLayout<
     OPENED_ARCHETYPE_TYPE,
-    TypeIDField,         // the existential type
-    TypeIDField          // the interface type
+    TypeIDField,            // the existential type
+    TypeIDField,            // the interface type
+    GenericSignatureIDField // generic signature
   >;
-  
+
   using OpaqueArchetypeTypeLayout = BCRecordLayout<
     OPAQUE_ARCHETYPE_TYPE,
     DeclIDField,           // the opaque type decl
@@ -1108,7 +1109,7 @@ namespace decls_block {
   using ParameterizedProtocolTypeLayout = BCRecordLayout<
     PARAMETERIZED_PROTOCOL_TYPE,
     TypeIDField,         // base
-    TypeIDWithBitField   // argument
+    BCArray<TypeIDField> // arguments
   >;
 
   using BoundGenericTypeLayout = BCRecordLayout<
@@ -1233,6 +1234,7 @@ namespace decls_block {
     DeclContextIDField,  // context decl
     TypeIDField,         // default definition
     BCFixed<1>,          // implicit flag
+    BCFixed<1>,          // is primary
     BCArray<DeclIDField> // overridden associated types
   >;
 
@@ -1376,6 +1378,7 @@ namespace decls_block {
     BCFixed<1>,              // isIsolated?
     BCFixed<1>,              // isCompileTimeConst?
     DefaultArgumentField,    // default argument kind
+    TypeIDField,             // default argument type
     BCBlob                   // default argument text
   >;
 
@@ -1628,9 +1631,8 @@ namespace decls_block {
   using SubstitutionMapLayout = BCRecordLayout<
     SUBSTITUTION_MAP,
     GenericSignatureIDField,     // generic signature
-    BCVBR<5>,                    // # of conformances
-    BCArray<TypeIDField>         // replacement types
-    // Conformances trail the record.
+    BCVBR<5>,                    // # of replacement types
+    BCArray<TypeIDField>         // replacement types and conformances
   >;
 
   using SILGenericSignatureLayout = BCRecordLayout<
@@ -1639,19 +1641,9 @@ namespace decls_block {
                                  //  type) pairs
   >;
 
-  using GenericRequirementLayout = BCRecordLayout<
-    GENERIC_REQUIREMENT,
-    GenericRequirementKindField, // requirement kind
-    TypeIDField,                 // subject type
-    TypeIDField                  // constraint type
-  >;
-
-  using LayoutRequirementLayout = BCRecordLayout<
-    LAYOUT_REQUIREMENT,
-    LayoutRequirementKindField,  // requirement kind
-    TypeIDField,                 // type being constrained
-    BCVBR<16>,                   // size
-    BCVBR<8>                     // alignment
+  using RequirementSignatureLayout = BCRecordLayout<
+    REQUIREMENT_SIGNATURE,
+    BCArray<BCVBR<6>>            // requirements and protocol type aliases
   >;
 
   using AssociatedTypeLayout = BCRecordLayout<
@@ -1676,17 +1668,6 @@ namespace decls_block {
     IdentifierIDField  // the file name, as an identifier
   >;
 
-  /// A placeholder for lack of concrete conformance information.
-  using AbstractProtocolConformanceLayout = BCRecordLayout<
-    ABSTRACT_PROTOCOL_CONFORMANCE,
-    DeclIDField // the protocol
-  >;
-
-  /// A placeholder for an invalid conformance.
-  using InvalidProtocolConformanceLayout = BCRecordLayout<
-    INVALID_PROTOCOL_CONFORMANCE
-  >;
-
   using NormalProtocolConformanceLayout = BCRecordLayout<
     NORMAL_PROTOCOL_CONFORMANCE,
     DeclIDField, // the protocol
@@ -1696,9 +1677,8 @@ namespace decls_block {
     BCVBR<5>, // requirement signature conformance count
     BCFixed<1>, // unchecked
     BCArray<DeclIDField>
-    // The array contains type witnesses, then value witnesses.
-    // Requirement signature conformances follow, then the substitution records
-    // for the associated types.
+    // The array contains requirement signature conformances, then
+    // type witnesses, then value witnesses.
   >;
 
   using SelfProtocolConformanceLayout = BCRecordLayout<
@@ -1708,14 +1688,15 @@ namespace decls_block {
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
     SPECIALIZED_PROTOCOL_CONFORMANCE,
+    ProtocolConformanceIDField, // underlying conformance
     TypeIDField,           // conforming type
     SubstitutionMapIDField // substitution map
-    // trailed by the underlying conformance
   >;
 
   using InheritedProtocolConformanceLayout = BCRecordLayout<
     INHERITED_PROTOCOL_CONFORMANCE,
-    TypeIDField // the conforming type
+    ProtocolConformanceIDField,  // underlying conformance
+    TypeIDField                  // the conforming type
   >;
 
   using BuiltinProtocolConformanceLayout = BCRecordLayout<
@@ -1723,14 +1704,8 @@ namespace decls_block {
     TypeIDField, // the conforming type
     DeclIDField, // the protocol
     GenericSignatureIDField, // the generic signature
-    BCFixed<2> // the builtin conformance kind
-    // the (optional) conditional requirements follow
-  >;
-
-  // Refers to a normal protocol conformance in the given module via its id.
-  using NormalProtocolConformanceIdLayout = BCRecordLayout<
-    NORMAL_PROTOCOL_CONFORMANCE_ID,
-    NormalConformanceIDField // the normal conformance ID
+    BCFixed<2>, // the builtin conformance kind
+    BCArray<BCVBR<6>> // conditional requirements
   >;
 
   using ProtocolConformanceXrefLayout = BCRecordLayout<
@@ -1923,7 +1898,7 @@ namespace decls_block {
 
   using NonSendableDeclAttrLayout = BCRecordLayout<
     NonSendable_DECL_ATTR,
-    BCFixed<1>  // assumed flag
+    BCFixed<1>  // non-sendable kind
   >;
 
   using OptimizeDeclAttrLayout = BCRecordLayout<
@@ -1942,6 +1917,7 @@ namespace decls_block {
     BCFixed<1>, // is unconditionally unavailable?
     BCFixed<1>, // is unconditionally deprecated?
     BCFixed<1>, // is this PackageDescription version-specific kind?
+    BCFixed<1>, // is SPI?
     BC_AVAIL_TUPLE, // Introduced
     BC_AVAIL_TUPLE, // Deprecated
     BC_AVAIL_TUPLE, // Obsoleted
@@ -2043,6 +2019,13 @@ namespace decls_block {
     BCFixed<1>, // Implicit flag
     BCBlob      // Message
   >;
+
+  using BackDeployDeclAttrLayout = BCRecordLayout<
+    BackDeploy_DECL_ATTR,
+    BCFixed<1>,     // implicit flag
+    BC_AVAIL_TUPLE, // OS version
+    BCVBR<5>        // platform
+  >;
 }
 
 /// Returns the encoding kind for the given decl.
@@ -2122,7 +2105,7 @@ namespace index_block {
     LOCAL_TYPE_DECLS,
     OPAQUE_RETURN_TYPE_DECLS,
     GENERIC_SIGNATURE_OFFSETS,
-    NORMAL_CONFORMANCE_OFFSETS,
+    PROTOCOL_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 
     PRECEDENCE_GROUPS,

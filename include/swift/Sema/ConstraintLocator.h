@@ -85,6 +85,9 @@ enum ContextualTypePurpose : uint8_t {
   CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
                                ///< former 'wrappedValue' type
 
+  CTP_ExprPattern,      ///< `~=` operator application associated with expression
+                        /// pattern.
+
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 
@@ -1036,7 +1039,7 @@ public:
     if (auto *repr = node.dyn_cast<TypeRepr *>())
       return repr;
 
-    if (auto *cond = node.dyn_cast<StmtCondition *>())
+    if (auto *cond = node.dyn_cast<StmtConditionElement *>())
       return cond;
 
     if (auto *caseItem = node.dyn_cast<CaseLabelItem *>())

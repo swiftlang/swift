@@ -618,8 +618,8 @@ namespace {
 
       OS << " requirement signature=";
       if (PD->isRequirementSignatureComputed()) {
-        OS << GenericSignature::get({PD->getProtocolSelfType()} ,
-                                    PD->getRequirementSignature())
+        auto requirements = PD->getRequirementSignature().getRequirements();
+        OS << GenericSignature::get({PD->getProtocolSelfType()}, requirements)
                 ->getAsString();
       } else {
         OS << "<null>";
@@ -3743,7 +3743,8 @@ namespace {
     }
     void visitOpenedArchetypeType(OpenedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "opened_archetype_type", label);
-      printRec("opened_existential", T->getOpenedExistentialType());
+      printRec("opened_existential",
+               T->getGenericEnvironment()->getOpenedExistentialType());
       printField("opened_existential_id", T->getOpenedExistentialID());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -3946,7 +3947,9 @@ namespace {
                                         StringRef label) {
       printCommon(label, "parameterized_protocol_type");
       printRec("base", T->getBaseType());
-      printRec("arg", T->getArgumentType());
+      for (auto arg : T->getArgs()) {
+        printRec(arg);
+      }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

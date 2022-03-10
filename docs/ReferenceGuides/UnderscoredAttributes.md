@@ -39,6 +39,15 @@ Most notably, default argument expressions are implicitly
 `@_alwaysEmitIntoClient`, which means that adding a default argument to a
 function which did not have one previously does not break ABI.
 
+## `@_backDeploy(availabilitySpec ...)`
+
+Causes the body of a function to be emitted into the module interface to be
+available for inlining in clients with deployment targets lower than the formal
+availability of the function. When inlined, the body of the function is
+transformed such that it calls the library's copy of the function if it is
+available at runtime. Otherwise, the copy of the original function body is
+executed.
+
 ## `@_assemblyVision`
 
 Forces emission of assembly vision remarks for a function or method, showing
@@ -816,3 +825,15 @@ also locks.
 Marks a synchronous API as being unavailable from asynchronous contexts. Direct
 usage of annotated API from asynchronous contexts will result in a warning from
 the compiler.
+
+## `@_unsafeInheritExecutor`
+
+This `async` function uses the pre-SE-0338 semantics of unsafely inheriting the caller's executor.  This is an underscored feature because the right way of inheriting an executor is to pass in the required executor and switch to it.  Unfortunately, there are functions in the standard library which need to inherit their caller's executor but cannot change their ABI because they were not defined as `@_alwaysEmitIntoClient` in the initial release.
+
+## `@_spi_available(platform, version)`
+
+Like `@available`, this attribute indicates a decl is available only as an SPI.
+This implies several behavioral changes comparing to regular `@available`:
+1. Type checker diagnoses when a client accidently exposes such a symbol in library APIs.
+2. When emitting public interfaces, `@_spi_available` is printed as `@available(platform, unavailable)`.
+3. ClangImporter imports ObjC macros `SPI_AVAILABLE` and `__SPI_AVAILABLE` to this attribute.

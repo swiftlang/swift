@@ -191,8 +191,8 @@ func curry_initializer() -> (Int) -> Gizmo? {
   return Gizmo.init(bellsOn:)
 }
 
-// CHECK-LABEL: sil shared [serializable] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo> {
+// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo> {
 
 // CHECK-LABEL: sil private [ossa] @$s13objc_currying17curry_initializerSo5GizmoCSgSicyFAESicfu_ : $@convention(thin) (Int) -> @owned Optional<Gizmo> {
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfcTO : $@convention(method) (Int, @owned Gizmo) -> @owned Optional<Gizmo> {
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfcTO : $@convention(method) (Int, @owned Gizmo) -> @owned Optional<Gizmo> {

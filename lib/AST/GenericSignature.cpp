@@ -472,7 +472,7 @@ bool GenericSignatureImpl::isValidTypeInContext(Type type) const {
 
 ArrayRef<CanTypeWrapper<GenericTypeParamType>>
 CanGenericSignature::getGenericParams() const {
-  auto params = getPointer()->getGenericParams().getOriginalArray();
+  auto params = this->GenericSignature::getGenericParams().getOriginalArray();
   auto base = static_cast<const CanTypeWrapper<GenericTypeParamType>*>(
                                                               params.data());
   return {base, params.size()};
@@ -729,7 +729,12 @@ int Requirement::compare(const Requirement &other) const {
     return compareKind;
 
   // We should only have multiple conformance requirements.
-  assert(getKind() == RequirementKind::Conformance);
+  if (getKind() != RequirementKind::Conformance) {
+    llvm::errs() << "Unordered generic requirements\n";
+    llvm::errs() << "LHS: "; dump(llvm::errs()); llvm::errs() << "\n";
+    llvm::errs() << "RHS: "; other.dump(llvm::errs()); llvm::errs() << "\n";
+    abort();
+  }
 
   int compareProtos =
     TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
@@ -822,6 +827,9 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
   // We collect conformance requirements to check that they're minimal.
   llvm::SmallDenseMap<CanType, SmallVector<ProtocolDecl *, 2>, 2> conformances;
 
+  // We collect same-type requirements to check that they're minimal.
+  llvm::SmallDenseMap<CanType, SmallVector<Type, 2>, 2> sameTypeComponents;
+
   // Check that the requirements satisfy certain invariants.
   for (unsigned idx : indices(reqts)) {
     const auto &reqt = reqts[idx].getCanonical();
@@ -868,6 +876,10 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
 
       auto firstType = reqt.getFirstType();
       auto secondType = reqt.getSecondType();
+
+      auto canType = canSig->getCanonicalTypeInContext(firstType);
+      auto &component = sameTypeComponents[canType];
+
       if (!hasCanonicalOrConcreteParent(firstType)) {
         llvm::errs() << "Left hand side does not have a canonical parent: ";
         reqt.dump(llvm::errs());
@@ -888,9 +900,30 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
           llvm::errs() << "\n";
           abort();
         }
+
+        if (component.empty()) {
+          component.push_back(firstType);
+        } else if (!component.back()->isEqual(firstType)) {
+          llvm::errs() << "Same-type requirement within an equiv. class "
+                       << "is out-of-order: ";
+          reqt.dump(llvm::errs());
+          llvm::errs() << "\n";
+          abort();
+        }
+
+        component.push_back(secondType);
       } else {
         if (!canSig->isCanonicalTypeInContext(secondType)) {
           llvm::errs() << "Right hand side is not canonical: ";
+          reqt.dump(llvm::errs());
+          llvm::errs() << "\n";
+          abort();
+        }
+
+        if (component.empty()) {
+          component.push_back(secondType);
+        } else if (!component.back()->isEqual(secondType)) {
+          llvm::errs() << "Inconsistent concrete requirement in equiv. class: ";
           reqt.dump(llvm::errs());
           llvm::errs() << "\n";
           abort();
@@ -920,33 +953,6 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
       abort();
     }
 
-    // If we have two same-type requirements where the left-hand sides differ
-    // but fall into the same equivalence class, we can check the form.
-    if (compareLHS < 0 && reqt.getKind() == RequirementKind::SameType &&
-        prevReqt.getKind() == RequirementKind::SameType &&
-        canSig->areSameTypeParameterInContext(prevReqt.getFirstType(),
-                                              reqt.getFirstType())) {
-      // If it's a it's a type parameter, make sure the equivalence class is
-      // wired together sanely.
-      if (prevReqt.getSecondType()->isTypeParameter()) {
-        if (!prevReqt.getSecondType()->isEqual(reqt.getFirstType())) {
-          llvm::errs() << "Same-type requirement within an equiv. class "
-                       << "is out-of-order: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          abort();
-        }
-      } else {
-        // Otherwise, the concrete types must match up.
-        if (!prevReqt.getSecondType()->isEqual(reqt.getSecondType())) {
-          llvm::errs() << "Inconsistent concrete requirement in equiv. class: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          abort();
-        }
-      }
-    }
-
     // If we have a concrete same-type requirement, we shouldn't have any
     // other requirements on the same type.
     if (reqt.getKind() == RequirementKind::SameType &&
@@ -969,7 +975,7 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
   }
 
   // Make sure we don't have redundant protocol conformance requirements.
-  for (auto pair : conformances) {
+  for (const auto &pair : conformances) {
     const auto &protos = pair.second;
     auto canonicalProtos = protos;
 
@@ -987,6 +993,51 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
       abort();
     }
   }
+
+  // Check same-type components for consistency.
+  for (const auto &pair : sameTypeComponents) {
+    if (pair.second.front()->isTypeParameter() &&
+        !canSig->isCanonicalTypeInContext(pair.second.front())) {
+      llvm::errs() << "Abstract same-type requirement involving concrete types\n";
+      llvm::errs() << "Canonical type: " << pair.first << "\n";
+      llvm::errs() << "Left hand side of first requirement: "
+                   << pair.second.front() << "\n";
+      abort();
+    }
+  }
+}
+
+static Type stripBoundDependentMemberTypes(Type t) {
+  if (auto *depMemTy = t->getAs<DependentMemberType>()) {
+    return DependentMemberType::get(
+      stripBoundDependentMemberTypes(depMemTy->getBase()),
+      depMemTy->getName());
+  }
+
+  return t;
+}
+
+static Requirement stripBoundDependentMemberTypes(Requirement req) {
+  auto subjectType = stripBoundDependentMemberTypes(req.getFirstType());
+
+  switch (req.getKind()) {
+  case RequirementKind::Conformance:
+    return Requirement(RequirementKind::Conformance, subjectType,
+                       req.getSecondType());
+
+  case RequirementKind::Superclass:
+  case RequirementKind::SameType:
+    return Requirement(req.getKind(), subjectType,
+                       req.getSecondType().transform([](Type t) {
+                         return stripBoundDependentMemberTypes(t);
+                       }));
+
+  case RequirementKind::Layout:
+    return Requirement(RequirementKind::Layout, subjectType,
+                       req.getLayoutConstraint());
+  }
+
+  llvm_unreachable("Bad requirement kind");
 }
 
 void swift::validateGenericSignature(ASTContext &context,
@@ -1002,7 +1053,7 @@ void swift::validateGenericSignature(ASTContext &context,
 
   SmallVector<Requirement, 2> requirements;
   for (auto requirement : sig.getRequirements())
-    requirements.push_back(requirement);
+    requirements.push_back(stripBoundDependentMemberTypes(requirement));
 
   {
     PrettyStackTraceGenericSignature debugStack("verifying", sig);
@@ -1038,7 +1089,7 @@ void swift::validateGenericSignature(ASTContext &context,
     SmallVector<Requirement, 2> newRequirements;
     for (unsigned i : indices(requirements)) {
       if (i != victimIndex)
-        newRequirements.push_back(requirements[i]);
+        newRequirements.push_back(stripBoundDependentMemberTypes(requirements[i]));
     }
 
     auto newSigWithError = evaluateOrDefault(

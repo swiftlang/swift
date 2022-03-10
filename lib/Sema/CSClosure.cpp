@@ -531,6 +531,15 @@ private:
            "Unsupported statement: Fallthrough");
   }
 
+  void visitStmtCondition(LabeledConditionalStmt *S,
+                          SmallVectorImpl<ElementInfo> &elements,
+                          ConstraintLocator *locator) {
+    auto *condLocator =
+        cs.getConstraintLocator(locator, ConstraintLocator::Condition);
+    for (auto &condition : S->getCond())
+      elements.push_back(makeElement(&condition, condLocator));
+  }
+
   void visitIfStmt(IfStmt *ifStmt) {
     assert(isSupportedMultiStatementClosure() &&
            "Unsupported statement: If");
@@ -538,11 +547,7 @@ private:
     SmallVector<ElementInfo, 4> elements;
 
     // Condition
-    {
-      auto *condLoc =
-        cs.getConstraintLocator(locator, ConstraintLocator::Condition);
-      elements.push_back(makeElement(ifStmt->getCondPointer(), condLoc));
-    }
+    visitStmtCondition(ifStmt, elements, locator);
 
     // Then Branch
     {
@@ -565,24 +570,24 @@ private:
     assert(isSupportedMultiStatementClosure() &&
            "Unsupported statement: Guard");
 
-    createConjunction(cs,
-                      {makeElement(guardStmt->getCondPointer(),
-                                   cs.getConstraintLocator(
-                                       locator, ConstraintLocator::Condition)),
-                       makeElement(guardStmt->getBody(), locator)},
-                      locator);
+    SmallVector<ElementInfo, 4> elements;
+
+    visitStmtCondition(guardStmt, elements, locator);
+    elements.push_back(makeElement(guardStmt->getBody(), locator));
+
+    createConjunction(cs, elements, locator);
   }
 
   void visitWhileStmt(WhileStmt *whileStmt) {
     assert(isSupportedMultiStatementClosure() &&
            "Unsupported statement: While");
 
-    createConjunction(cs,
-                      {makeElement(whileStmt->getCondPointer(),
-                                   cs.getConstraintLocator(
-                                       locator, ConstraintLocator::Condition)),
-                       makeElement(whileStmt->getBody(), locator)},
-                      locator);
+    SmallVector<ElementInfo, 4> elements;
+
+    visitStmtCondition(whileStmt, elements, locator);
+    elements.push_back(makeElement(whileStmt->getBody(), locator));
+
+    createConjunction(cs, elements, locator);
   }
 
   void visitDoStmt(DoStmt *doStmt) {
@@ -970,8 +975,8 @@ ConstraintSystem::simplifyClosureBodyElementConstraint(
     return SolutionKind::Solved;
   } else if (auto *stmt = element.dyn_cast<Stmt *>()) {
     generator.visit(stmt);
-  } else if (auto *cond = element.dyn_cast<StmtCondition *>()) {
-    if (generateConstraints(*cond, closure))
+  } else if (auto *cond = element.dyn_cast<StmtConditionElement *>()) {
+    if (generateConstraints({*cond}, closure))
       return SolutionKind::Error;
   } else if (auto *pattern = element.dyn_cast<Pattern *>()) {
     generator.visitPattern(pattern, context);
@@ -998,6 +1003,9 @@ class ClosureConstraintApplication
   Type resultType;
   RewriteTargetFn rewriteTarget;
   bool isSingleExpression;
+
+  /// All `func`s declared in the body of the closure.
+  SmallVector<FuncDecl *, 4> LocalFuncs;
 
 public:
   /// Whether an error was encountered while generating constraints.
@@ -1041,6 +1049,14 @@ private:
       // Allow `typeCheckDecl` to be called after solution is applied
       // to a pattern binding. That would materialize required
       // information e.g. accessors and do access/availability checks.
+    }
+
+    // Local functions cannot be type-checked in-order because they can
+    // capture variables declared after them. Let's save them to be
+    // processed after the solution has been applied to the body.
+    if (auto *func = dyn_cast<FuncDecl>(decl)) {
+      LocalFuncs.push_back(func);
+      return;
     }
 
     TypeChecker::typeCheckDecl(decl);
@@ -1451,6 +1467,19 @@ private:
   UNSUPPORTED_STMT(Fail)
 #undef UNSUPPORTED_STMT
 
+public:
+  /// Apply solution to the closure and return updated body.
+  ASTNode apply() {
+    auto body = visit(closure->getBody());
+
+    // Since local functions can capture variables that are declared
+    // after them, let's type-check them after all of the pattern
+    // bindings have been resolved by applying solution to the body.
+    for (auto *func : LocalFuncs)
+      TypeChecker::typeCheckDecl(func);
+
+    return body;
+  }
 };
 
 }
@@ -1547,7 +1576,7 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   auto closureType = cs.getType(closure)->castTo<FunctionType>();
   ClosureConstraintApplication application(
       solution, closure, closureType->getResult(), rewriteTarget);
-  auto body = application.visit(closure->getBody());
+  auto body = application.apply();
 
   if (!body || application.hadError)
     return true;
@@ -1571,7 +1600,7 @@ void ConjunctionElement::findReferencedVariables(
 
   TypeVariableRefFinder refFinder(cs, locator->getAnchor(), typeVars);
 
-  if (element.is<Decl *>() || element.is<StmtCondition *>() ||
+  if (element.is<Decl *>() || element.is<StmtConditionElement *>() ||
       element.is<Expr *>() || element.isStmt(StmtKind::Return))
     element.walk(refFinder);
 }

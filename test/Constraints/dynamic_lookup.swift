@@ -212,7 +212,7 @@ type(of: obj).foo!(obj)(5) // expected-error{{instance member 'foo' cannot be us
 // Checked casts to AnyObject
 var p: P = Y()
 var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{cannot force unwrap value of non-optional type 'AnyObject'}} {{41-42=}}
-// expected-warning@-1{{forced cast from 'P' to 'AnyObject' always succeeds; did you mean to use 'as'?}} {{27-30=as}}
+// expected-warning@-1{{forced cast from 'any P' to 'AnyObject' always succeeds; did you mean to use 'as'?}} {{27-30=as}}
 
 // Implicit force of an implicitly unwrapped optional
 let uopt : AnyObject! = nil
@@ -455,7 +455,7 @@ func test_dynamic_subscript_accepts_type_name_argument() {
 }
 
 func testAnyObjectConstruction(_ x: AnyObject) {
-  AnyObject() // expected-error {{protocol type 'AnyObject' cannot be instantiated}}
+  AnyObject() // expected-error {{type 'AnyObject' cannot be instantiated}}
 
   // FIXME(SR-15210): This should also be rejected.
   _ = type(of: x).init()

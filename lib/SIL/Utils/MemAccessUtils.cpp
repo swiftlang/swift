@@ -405,13 +405,13 @@ static bool isBarrierApply(FullApplySite) {
 static bool mayAccessPointer(SILInstruction *instruction) {
   if (!instruction->mayReadOrWriteMemory())
     return false;
-  bool fail = false;
-  visitAccessedAddress(instruction, [&fail](Operand *operand) {
+  bool isUnidentified = false;
+  visitAccessedAddress(instruction, [&isUnidentified](Operand *operand) {
     auto accessStorage = AccessStorage::compute(operand->get());
-    if (accessStorage.getKind() != AccessRepresentation::Kind::Unidentified)
-      fail = true;
+    if (accessStorage.getKind() == AccessRepresentation::Kind::Unidentified)
+      isUnidentified = true;
   });
-  return fail;
+  return isUnidentified;
 }
 
 static bool mayLoadWeakOrUnowned(SILInstruction *instruction) {
@@ -789,7 +789,7 @@ protected:
       ref = svi->getOperand(0);
     };
     auto *phi = dyn_cast<SILPhiArgument>(ref);
-    if (!phi || !phi->isPhiArgument()) {
+    if (!phi || !phi->isPhi()) {
       return ref;
     }
     // Handle phis...
@@ -1533,7 +1533,7 @@ protected:
   void initializeDFS(SILValue root) {
     // If root is a phi, record it so that its uses aren't visited twice.
     if (auto *phi = dyn_cast<SILPhiArgument>(root)) {
-      if (phi->isPhiArgument())
+      if (phi->isPhi())
         visitedPhis.insert(phi);
     }
     pushUsers(root,
@@ -1941,10 +1941,34 @@ struct GatherUniqueStorageUses : public AccessUseVisitor {
 };
 
 bool UniqueStorageUseVisitor::findUses(UniqueStorageUseVisitor &visitor) {
-  assert(visitor.storage.isUniquelyIdentified());
+  assert(visitor.storage.isUniquelyIdentified() ||
+         visitor.storage.getKind() == AccessStorage::Kind::Nested);
 
   GatherUniqueStorageUses gather(visitor);
   return visitAccessStorageUses(gather, visitor.storage, visitor.function);
+}
+
+static bool
+visitApplyOperand(Operand *use, UniqueStorageUseVisitor &visitor,
+                  bool (UniqueStorageUseVisitor::*visit)(Operand *)) {
+  auto *user = use->getUser();
+  if (auto *bai = dyn_cast<BeginApplyInst>(user)) {
+    if (!(visitor.*visit)(use))
+      return false;
+    SmallVector<Operand *, 2> endApplyUses;
+    SmallVector<Operand *, 2> abortApplyUses;
+    bai->getCoroutineEndPoints(endApplyUses, abortApplyUses);
+    for (auto *endApplyUse : endApplyUses) {
+      if (!(visitor.*visit)(endApplyUse))
+        return false;
+    }
+    for (auto *abortApplyUse : abortApplyUses) {
+      if (!(visitor.*visit)(abortApplyUse))
+        return false;
+    }
+    return true;
+  }
+  return (visitor.*visit)(use);
 }
 
 bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
@@ -1959,74 +1983,69 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Indirect_Out:
-      visitor.visitStore(use);
-      break;
+      return visitApplyOperand(use, visitor,
+                               &UniqueStorageUseVisitor::visitStore);
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_In_Constant:
-      visitor.visitLoad(use);
-      break;
+      return visitApplyOperand(use, visitor,
+                               &UniqueStorageUseVisitor::visitLoad);
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Guaranteed:
       // most likely an escape of a box
-      visitor.visitUnknownUse(use);
-      break;
+      return visitApplyOperand(use, visitor,
+                               &UniqueStorageUseVisitor::visitUnknownUse);
     }
-    return true;
   }
   switch (user->getKind()) {
+  case SILInstructionKind::BeginAccessInst:
+    return visitor.visitBeginAccess(use);
+
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::DestroyValueInst:
     if (useTy == AccessUseType::Exact) {
-      visitor.visitDestroy(use);
-      return true;
+      return visitor.visitDestroy(use);
     }
-    visitor.visitUnknownUse(use);
-    return true;
+    return visitor.visitUnknownUse(use);
 
   case SILInstructionKind::DebugValueInst:
-    visitor.visitDebugUse(use);
+    return visitor.visitDebugUse(use);
+
+  case SILInstructionKind::EndAccessInst:
     return true;
 
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadWeakInst:
   case SILInstructionKind::LoadUnownedInst:
   case SILInstructionKind::ExistentialMetatypeInst:
-    visitor.visitLoad(use);
-    return true;
+    return visitor.visitLoad(use);
 
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreWeakInst:
   case SILInstructionKind::StoreUnownedInst:
     if (operIdx == CopyLikeInstruction::Dest) {
-      visitor.visitStore(use);
-      return true;
+      return visitor.visitStore(use);
     }
     break;
 
   case SILInstructionKind::InjectEnumAddrInst:
-    visitor.visitStore(use);
-    return true;
+    return visitor.visitStore(use);
 
   case SILInstructionKind::CopyAddrInst:
     if (operIdx == CopyLikeInstruction::Dest) {
-      visitor.visitStore(use);
-      return true;
+      return visitor.visitStore(use);
     }
     assert(operIdx == CopyLikeInstruction::Src);
-    visitor.visitLoad(use);
-    return true;
+    return visitor.visitLoad(use);
 
   case SILInstructionKind::DeallocStackInst:
-    visitor.visitDealloc(use);
-    return true;
+    return visitor.visitDealloc(use);
 
   default:
     break;
   }
-  visitor.visitUnknownUse(use);
-  return true;
+  return visitor.visitUnknownUse(use);
 }
 
 //===----------------------------------------------------------------------===//

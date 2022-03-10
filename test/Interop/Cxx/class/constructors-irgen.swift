@@ -11,6 +11,9 @@ typealias Void = ()
 struct UnsafePointer<T> { }
 struct UnsafeMutablePointer<T> { }
 
+struct Int { }
+struct UInt { }
+
 public func createHasVirtualBase() -> HasVirtualBase {
   // ITANIUM_X64: define swiftcc void @"$ss20createHasVirtualBaseSo0bcD0VyF"(%TSo14HasVirtualBaseV* noalias nocapture sret({{.*}}) %0)
   // ITANIUM_X64-NOT: define
@@ -58,8 +61,6 @@ public func createStructWithSubobjectCopyConstructorAndValue() {
   // ITANIUM_X64: [[TMP_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[TMP]] to %struct.StructWithCopyConstructorAndValue*
   // ITANIUM_X64: [[MEMBER_AS_STRUCT_2:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[MEMBER]] to %struct.StructWithCopyConstructorAndValue*
   // ITANIUM_X64: call void @_ZN33StructWithCopyConstructorAndValueC1ERKS_(%struct.StructWithCopyConstructorAndValue* [[TMP_STRUCT]], %struct.StructWithCopyConstructorAndValue* [[MEMBER_AS_STRUCT_2]])
-  // ITANIUM_X64: [[OBJ_MEMBER:%.*]] = getelementptr inbounds %TSo42StructWithSubobjectCopyConstructorAndValueV, %TSo42StructWithSubobjectCopyConstructorAndValueV* [[OBJ]], i32 0, i32 0
-  // ITANIUM_X64: call %TSo33StructWithCopyConstructorAndValueV* @"$sSo33StructWithCopyConstructorAndValueVWOb"(%TSo33StructWithCopyConstructorAndValueV* [[TMP]], %TSo33StructWithCopyConstructorAndValueV* [[OBJ_MEMBER]])
   // ITANIUM_X64: ret void
   
   // ITANIUM_ARM-LABEL: define protected swiftcc void @"$ss48createStructWithSubobjectCopyConstructorAndValueyyF"()
@@ -71,8 +72,6 @@ public func createStructWithSubobjectCopyConstructorAndValue() {
   // ITANIUM_ARM: [[TMP_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[TMP]] to %struct.StructWithCopyConstructorAndValue*
   // ITANIUM_ARM: [[MEMBER_AS_STRUCT_2:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[MEMBER]] to %struct.StructWithCopyConstructorAndValue*
   // ITANIUM_ARM: call %struct.StructWithCopyConstructorAndValue* @_ZN33StructWithCopyConstructorAndValueC2ERKS_(%struct.StructWithCopyConstructorAndValue* [[TMP_STRUCT]], %struct.StructWithCopyConstructorAndValue* [[MEMBER_AS_STRUCT_2]])
-  // ITANIUM_ARM: [[OBJ_MEMBER:%.*]] = getelementptr inbounds %TSo42StructWithSubobjectCopyConstructorAndValueV, %TSo42StructWithSubobjectCopyConstructorAndValueV* [[OBJ]], i32 0, i32 0
-  // ITANIUM_ARM: call %TSo33StructWithCopyConstructorAndValueV* @"$sSo33StructWithCopyConstructorAndValueVWOb"(%TSo33StructWithCopyConstructorAndValueV* [[TMP]], %TSo33StructWithCopyConstructorAndValueV* [[OBJ_MEMBER]])
   // ITANIUM_ARM: ret void
 
   // MICROSOFT_X64-LABEL: define dllexport swiftcc void @"$ss48createStructWithSubobjectCopyConstructorAndValueyyF"()
@@ -84,8 +83,6 @@ public func createStructWithSubobjectCopyConstructorAndValue() {
   // MICROSOFT_X64: [[TMP_STRUCT:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[TMP]] to %struct.StructWithCopyConstructorAndValue*
   // MICROSOFT_X64: [[MEMBER_AS_STRUCT_2:%.*]] = bitcast %TSo33StructWithCopyConstructorAndValueV* [[MEMBER]] to %struct.StructWithCopyConstructorAndValue*
   // MICROSOFT_X64: call %struct.StructWithCopyConstructorAndValue* @"??0StructWithCopyConstructorAndValue@@QEAA@AEBU0@@Z"(%struct.StructWithCopyConstructorAndValue* [[TMP_STRUCT]], %struct.StructWithCopyConstructorAndValue* [[MEMBER_AS_STRUCT_2]])
-  // MICROSOFT_X64: [[OBJ_MEMBER:%.*]] = getelementptr inbounds %TSo42StructWithSubobjectCopyConstructorAndValueV, %TSo42StructWithSubobjectCopyConstructorAndValueV* [[OBJ]], i32 0, i32 0
-  // MICROSOFT_X64: call %TSo33StructWithCopyConstructorAndValueV* @"$sSo33StructWithCopyConstructorAndValueVWOb"(%TSo33StructWithCopyConstructorAndValueV* [[TMP]], %TSo33StructWithCopyConstructorAndValueV* [[OBJ_MEMBER]])
   // MICROSOFT_X64: ret void
   let member = StructWithCopyConstructorAndValue()
   let obj = StructWithSubobjectCopyConstructorAndValue(member: member)

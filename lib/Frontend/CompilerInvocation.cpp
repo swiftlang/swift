@@ -360,6 +360,9 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
       Opts.PrintSPIs = true;
     }
   }
+  for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {
+    Opts.ModulesToSkipInPublicInterface.push_back(val);
+  }
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -445,14 +448,18 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalNamedOpaqueTypes |=
       Args.hasArg(OPT_enable_experimental_named_opaque_types);
 
-  Opts.EnableExperimentalOpaqueParameters |=
-      Args.hasArg(OPT_enable_experimental_opaque_parameters);
-
-  Opts.EnableExplicitExistentialTypes |=
-      Args.hasArg(OPT_enable_explicit_existential_types);
-
   Opts.EnableParameterizedProtocolTypes |=
       Args.hasArg(OPT_enable_parameterized_protocol_types);
+
+  Opts.EnableOpenedExistentialTypes =
+    Args.hasFlag(OPT_enable_experimental_opened_existential_types,
+                 OPT_disable_experimental_opened_existential_types,
+                 false);
+
+  // SwiftOnoneSupport produces different symbols when opening existentials,
+  // so disable it.
+  if (FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT)
+    Opts.EnableOpenedExistentialTypes = false;
 
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
@@ -793,29 +800,63 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
   }
 
-  // Parse the SDK version.
-  if (Arg *A = Args.getLastArg(options::OPT_target_sdk_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
-    if (vers.hasValue()) {
-      Opts.SDKVersion = *vers;
-    } else {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    }
-  }
+  // First, set up default minimum inlining target versions.
+  auto getDefaultMinimumInliningTargetVersion =
+      [&](const llvm::Triple &triple) -> llvm::VersionTuple {
+#if SWIFT_DEFAULT_TARGET_MIN_INLINING_VERSION_TO_ABI
+    // In ABI-stable modules, default to the version where the target's ABI
+    // was first frozen; older versions will use that one's backwards
+    // compatibility libraries.
+    if (FrontendOpts.EnableLibraryEvolution)
+      if (auto abiStability = minimumABIStableOSVersionForTriple(triple))
+        // FIXME: Should we raise it to the minimum supported OS version for
+        //        architectures which were born ABI-stable?
+        return *abiStability;
+#endif
 
-  // Parse the target variant SDK version.
-  if (Arg *A = Args.getLastArg(options::OPT_target_variant_sdk_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
-    if (vers.hasValue()) {
-      Opts.VariantSDKVersion = *vers;
-    } else {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    }
-  }
+    // In ABI-unstable modules, we will never have to interoperate with
+    // older versions of the module, so we should default to the minimum
+    // deployment target.
+    unsigned major, minor, patch;
+    if (triple.isMacOSX())
+      triple.getMacOSXVersion(major, minor, patch);
+    else
+      triple.getOSVersion(major, minor, patch);
+    return llvm::VersionTuple(major, minor, patch);
+  };
+
+  Opts.MinimumInliningTargetVersion =
+      getDefaultMinimumInliningTargetVersion(Opts.Target);
+
+  // Parse OS version number arguments.
+  auto parseVersionArg = [&](OptSpecifier opt) -> Optional<llvm::VersionTuple> {
+    Arg *A = Args.getLastArg(opt);
+    if (!A)
+      return None;
+
+    if (StringRef(A->getValue()) == "target")
+      return Opts.getMinPlatformVersion();
+    if (StringRef(A->getValue()) == "abi")
+      return minimumABIStableOSVersionForTriple(Opts.Target);
+
+    if (auto vers = version::Version::parseVersionString(A->getValue(),
+                                                         SourceLoc(), &Diags))
+      return (llvm::VersionTuple)*vers;
+
+    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                   A->getAsString(Args), A->getValue());
+    return None;
+  };
+
+  if (auto vers = parseVersionArg(OPT_min_inlining_target_version))
+    // FIXME: Should we diagnose if it's below the default?
+    Opts.MinimumInliningTargetVersion = *vers;
+
+  if (auto vers = parseVersionArg(OPT_target_sdk_version))
+    Opts.SDKVersion = *vers;
+
+  if (auto vers = parseVersionArg(OPT_target_variant_sdk_version))
+    Opts.VariantSDKVersion = *vers;
 
   // Get the SDK name.
   if (Arg *A = Args.getLastArg(options::OPT_target_sdk_name)) {
@@ -872,11 +913,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableSubstSILFunctionTypes =
       Args.hasArg(OPT_disable_subst_sil_function_types);
 
+  Opts.RequirementMachineProtocolSignatures = RequirementMachineMode::Verify;
+  Opts.RequirementMachineAbstractSignatures = RequirementMachineMode::Verify;
+
   if (auto A = Args.getLastArg(OPT_requirement_machine_protocol_signatures_EQ)) {
     auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
         .Case("off", RequirementMachineMode::Disabled)
         .Case("on", RequirementMachineMode::Enabled)
         .Case("verify", RequirementMachineMode::Verify)
+        .Case("check", RequirementMachineMode::Check)
         .Default(None);
 
     if (value)
@@ -891,6 +936,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         .Case("off", RequirementMachineMode::Disabled)
         .Case("on", RequirementMachineMode::Enabled)
         .Case("verify", RequirementMachineMode::Verify)
+        .Case("check", RequirementMachineMode::Check)
         .Default(None);
 
     if (value)
@@ -905,6 +951,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         .Case("off", RequirementMachineMode::Disabled)
         .Case("on", RequirementMachineMode::Enabled)
         .Case("verify", RequirementMachineMode::Verify)
+        .Case("check", RequirementMachineMode::Check)
         .Default(None);
 
     if (value)
@@ -954,6 +1001,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.RequirementMachineMaxConcreteNesting = limit;
     }
   }
+
+  if (Args.hasArg(OPT_disable_requirement_machine_concrete_contraction))
+    Opts.EnableRequirementMachineConcreteContraction = false;
+
+  if (Args.hasArg(OPT_enable_requirement_machine_loop_normalization))
+    Opts.EnableRequirementMachineLoopNormalization = true;
+
+  Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 
   return HadError || UnsupportedOS || UnsupportedArch;
 }
@@ -1044,6 +1099,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   Opts.EnableMultiStatementClosureInference |=
       Args.hasArg(OPT_experimental_multi_statement_closures);
+
+  Opts.EnableTypeInferenceFromDefaultArguments |=
+      Args.hasArg(OPT_experimental_type_inference_from_defaults);
 
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);
@@ -1533,6 +1591,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
             .Case("false", false)
             .Default(None);
   }
+
+  // Allow command line flags to override the default value of
+  // Opts.LexicalLifetimes. If no explicit flags are passed, then
+  // Opts.LexicalLifetimes retains its initial value.
   Optional<bool> enableLexicalLifetimesFlag;
   if (Arg *A = Args.getLastArg(OPT_enable_lexical_lifetimes)) {
     enableLexicalLifetimesFlag =
@@ -1649,6 +1711,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
   Opts.ParseStdlib = FEOpts.ParseStdlib;
+
+  Opts.emitTBD = FEOpts.InputsAndOutputs.hasTBDPath();
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_EQ)) {
     llvm::Expected<llvm::remarks::Format> formatOrErr =
@@ -1923,6 +1987,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.StackPromotionSizeLimit = limit;
   }
 
+  if (Args.hasArg(OPT_trap_function))
+    Opts.TrapFuncName = Args.getLastArgValue(OPT_trap_function).str();
+
   Opts.FunctionSections = Args.hasArg(OPT_function_sections);
 
   if (Args.hasArg(OPT_autolink_force_load))
@@ -2195,6 +2262,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_internalize_at_link)) {
     Opts.InternalizeAtLink = true;
   }
+
+  Opts.InternalizeSymbols = FrontendOpts.Static;
 
   if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
     Opts.NoPreallocatedInstantiationCaches = true;

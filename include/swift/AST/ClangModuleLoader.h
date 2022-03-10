@@ -31,10 +31,12 @@ class Type;
 
 namespace swift {
 
+class ConcreteDeclRef;
 class Decl;
 class DeclContext;
 class EffectiveClangContext;
 class SwiftLookupTable;
+class ValueDecl;
 class VisibleDeclConsumer;
 
 /// Represents the different namespaces for types in C.
@@ -201,6 +203,10 @@ public:
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) = 0;
 
+  virtual ConcreteDeclRef
+  getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
+                                       ValueDecl *decl) = 0;
+
   /// Try to parse the string as a Clang function type.
   ///
   /// Returns null if there was a parsing failure.
@@ -268,7 +274,7 @@ public:
              clang::DeclarationName givenName = clang::DeclarationName()) = 0;
 
   /// Determine the effective Clang context for the given Swift nominal type.
-  EffectiveClangContext virtual getEffectiveClangContext(
+  virtual EffectiveClangContext getEffectiveClangContext(
       const NominalTypeDecl *nominal) = 0;
 };
 

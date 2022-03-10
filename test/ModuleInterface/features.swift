@@ -152,4 +152,37 @@ public func stage(with actor: MyActor) { }
 // CHECK-NEXT: #endif
 public func asyncIsh(@_inheritActorContext operation: @Sendable @escaping () async -> Void) { }
 
+// CHECK:      #if compiler(>=5.3) && $AsyncAwait
+// CHECK-NEXT: #if $UnsafeInheritExecutor
+// CHECK-NEXT: @_unsafeInheritExecutor public func unsafeInheritExecutor() async
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func unsafeInheritExecutor() async
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #endif
+@_unsafeInheritExecutor
+public func unsafeInheritExecutor() async {}
+
+// CHECK:      #if compiler(>=5.3) && $AsyncAwait
+// CHECK-NEXT: #if $UnsafeInheritExecutor
+// CHECK-NEXT: @_specialize{{.*}}
+// CHECK-NEXT: @_unsafeInheritExecutor public func multipleSuppressible<T>(value: T) async
+// CHECK-NEXT: #elsif $SpecializeAttributeWithAvailability
+// CHECK-NEXT: @_specialize{{.*}}
+// CHECK-NEXT: public func multipleSuppressible<T>(value: T) async
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func multipleSuppressible<T>(value: T) async
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #endif
+@_unsafeInheritExecutor
+@_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
+public func multipleSuppressible<T>(value: T) async {}
+
+// CHECK:      #if compiler(>=5.3) && $UnavailableFromAsync
+// CHECK-NEXT: @_unavailableFromAsync(message: "Test") public func unavailableFromAsyncFunc()
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func unavailableFromAsyncFunc()
+// CHECK-NEXT: #endif
+@_unavailableFromAsync(message: "Test")
+public func unavailableFromAsyncFunc() { }
+
 // CHECK-NOT: extension FeatureTest.MyActor : Swift.Sendable

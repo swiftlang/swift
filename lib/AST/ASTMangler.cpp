@@ -857,6 +857,8 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::DistributedThunk: return appendOperator("TE");
     case SymbolKind::DistributedAccessor: return appendOperator("TF");
     case SymbolKind::AccessibleFunctionRecord: return appendOperator("HF");
+    case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
+    case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
   }
 }
 
@@ -1267,8 +1269,11 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     }
 
     case TypeKind::ParameterizedProtocol: {
-      llvm::errs() << "Not implemented\n";
-      abort();
+      auto layout = type->getExistentialLayout();
+      appendExistentialLayout(layout, sig, forDecl);
+      bool isFirstArgList = true;
+      appendBoundGenericArgs(type, sig, isFirstArgList, forDecl);
+      return appendOperator("XP");
     }
 
     case TypeKind::Existential: {
@@ -1572,6 +1577,9 @@ void ASTMangler::appendBoundGenericArgs(Type type, GenericSignature sig,
     if (Type parent = nominalType->getParent())
       appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
                              forDecl);
+  } else if (auto *ppt = dyn_cast<ParameterizedProtocolType>(typePtr)) {
+    assert(!ppt->getBaseType()->getParent());
+    genericArgs = ppt->getArgs();
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
@@ -3284,9 +3292,8 @@ void ASTMangler::appendDependentProtocolConformance(
 
     // Conformances are relative to the current protocol's requirement
     // signature.
-    auto index =
-      conformanceRequirementIndex(entry,
-                                  currentProtocol->getRequirementSignature());
+    auto reqs = currentProtocol->getRequirementSignature().getRequirements();
+    auto index = conformanceRequirementIndex(entry, reqs);
 
     // Inherited conformance.
     bool isInheritedConformance =

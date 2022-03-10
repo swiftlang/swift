@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -parse-serialized-sil -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -530,22 +530,6 @@ bb0:
 sil @call_public_external_func : $@convention(thin) () -> () {
 bb0:
   %u = function_ref @public_external_func : $@convention(thin) () -> ()
-  %a = apply %u() : $@convention(thin) () -> ()
-  %r = tuple ()
-  return %r : $()
-}
-
-sil shared_external @shared_external_func : $@convention(thin) () -> () {
-bb0:
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: sil @call_shared_external_func
-// CHECK-NEXT: <func=>
-sil @call_shared_external_func : $@convention(thin) () -> () {
-bb0:
-  %u = function_ref @shared_external_func : $@convention(thin) () -> ()
   %a = apply %u() : $@convention(thin) () -> ()
   %r = tuple ()
   return %r : $()

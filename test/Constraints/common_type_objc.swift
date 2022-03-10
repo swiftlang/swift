@@ -1,9 +1,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s -debug-constraints 2>%t.err
 // RUN: %FileCheck %s < %t.err
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -enable-explicit-existential-types %s -debug-constraints 2>%t.err
-// RUN: %FileCheck %s < %t.err
-
 // REQUIRES: objc_interop
 
 import Foundation

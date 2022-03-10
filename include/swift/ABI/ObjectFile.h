@@ -12,16 +12,11 @@
 
 namespace swift {
 
-/// Represents the eight reflection sections used by Swift
+/// Represents the nine reflection sections used by Swift
 enum ReflectionSectionKind : uint8_t {
-  fieldmd,
-  assocty,
-  builtin,
-  capture,
-  typeref,
-  reflstr,
-  conform,
-  protocs
+#define HANDLE_SWIFT_SECTION(KIND, MACHO, ELF, COFF) KIND,
+#include "llvm/BinaryFormat/Swift.def"
+#undef HANDLE_SWIFT_SECTION
 };
 
 /// Abstract base class responsible for providing the correct reflection section
@@ -33,6 +28,11 @@ public:
   virtual llvm::Optional<llvm::StringRef> getSegmentName() {
     return {};
   }
+  /// Get the name of the segment in the symbol rich binary that may contain
+  /// Swift meteadata.
+  virtual llvm::Optional<llvm::StringRef> getSymbolRichSegmentName() {
+    return {};
+  }
   /// Predicate to identify if the named section can contain reflection data.
   virtual bool sectionContainsReflectionData(llvm::StringRef sectionName) = 0;
 };
@@ -42,27 +42,21 @@ class SwiftObjectFileFormatMachO : public SwiftObjectFileFormat {
 public:
   llvm::StringRef getSectionName(ReflectionSectionKind section) override {
     switch (section) {
-    case fieldmd:
-      return "__swift5_fieldmd";
-    case assocty:
-      return "__swift5_assocty";
-    case builtin:
-      return "__swift5_builtin";
-    case capture:
-      return "__swift5_capture";
-    case typeref:
-      return "__swift5_typeref";
-    case reflstr:
-      return "__swift5_reflstr";
-    case conform:
-      return "__swift5_proto";
-    case protocs:
-      return "__swift5_protos";
+#define HANDLE_SWIFT_SECTION(KIND, MACHO, ELF, COFF)                           \
+  case KIND:                                                                   \
+    return MACHO;
+#include "llvm/BinaryFormat/Swift.def"
+#undef HANDLE_SWIFT_SECTION
     }
     llvm_unreachable("Section type not found.");
   }
+
   llvm::Optional<llvm::StringRef> getSegmentName() override {
     return {"__TEXT"};
+  }
+
+  llvm::Optional<llvm::StringRef> getSymbolRichSegmentName() override {
+    return {"__DWARF"};
   }
 
   bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
@@ -75,22 +69,11 @@ class SwiftObjectFileFormatELF : public SwiftObjectFileFormat {
 public:
   llvm::StringRef getSectionName(ReflectionSectionKind section) override {
     switch (section) {
-    case fieldmd:
-      return "swift5_fieldmd";
-    case assocty:
-      return "swift5_assocty";
-    case builtin:
-      return "swift5_builtin";
-    case capture:
-      return "swift5_capture";
-    case typeref:
-      return "swift5_typeref";
-    case reflstr:
-      return "swift5_reflstr";
-    case conform:
-      return "swift5_protocol_conformances";
-    case protocs:
-      return "swift5_protocols";
+#define HANDLE_SWIFT_SECTION(KIND, MACHO, ELF, COFF)                           \
+  case KIND:                                                                   \
+    return ELF;
+#include "llvm/BinaryFormat/Swift.def"
+#undef HANDLE_SWIFT_SECTION
     }
     llvm_unreachable("Section type not found.");
   }
@@ -105,22 +88,11 @@ class SwiftObjectFileFormatCOFF : public SwiftObjectFileFormat {
 public:
   llvm::StringRef getSectionName(ReflectionSectionKind section) override {
     switch (section) {
-    case fieldmd:
-      return ".sw5flmd";
-    case assocty:
-      return ".sw5asty";
-    case builtin:
-      return ".sw5bltn";
-    case capture:
-      return ".sw5cptr";
-    case typeref:
-      return ".sw5tyrf";
-    case reflstr:
-      return ".sw5rfst";
-    case conform:
-      return ".sw5prtc$B";
-    case protocs:
-      return ".sw5prt$B";
+#define HANDLE_SWIFT_SECTION(KIND, MACHO, ELF, COFF)                           \
+  case KIND:                                                                   \
+    return COFF;
+#include "llvm/BinaryFormat/Swift.def"
+#undef HANDLE_SWIFT_SECTION
     }
     llvm_unreachable("Section  not found.");
   }

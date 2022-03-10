@@ -23,11 +23,11 @@ extension String {
 RegexBasicTests.test("Basic") {
   let input = "aabccd"
 
-  let match1 = input.expectMatch('/aabcc./')
+  let match1 = input.expectMatch(#/aabcc./#)
   expectEqual("aabccd", input[match1.range])
   expectTrue("aabccd" == match1.match)
 
-  let match2 = input.expectMatch('/a*b.+./')
+  let match2 = input.expectMatch(#/a*b.+./#)
   expectEqual("aabccd", input[match2.range])
   expectTrue("aabccd" == match2.match)
 }
@@ -35,7 +35,7 @@ RegexBasicTests.test("Basic") {
 RegexBasicTests.test("Modern") {
   let input = "aabccd"
 
-  let match1 = input.expectMatch('|a a  bc c /*hello*/ .|')
+  let match1 = input.expectMatch(#|a a  bc c /*hello*/ .|#)
   expectEqual("aabccd", input[match1.range])
   expectTrue("aabccd" == match1.match)
 }
@@ -45,9 +45,9 @@ RegexBasicTests.test("Captures") {
     A6F0..A6F1    ; Extend # Mn   [2] BAMUM COMBINING MARK KOQNDON..BAMUM \
     COMBINING MARK TUKWENTIS
     """
-  let regex = '/([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s+;\s+(\w+).*/'
+  let regex = #/([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s+;\s+(\w+).*/#
   // Test inferred type.
-  let _: Regex<Tuple4<Substring, Substring, Substring?, Substring>>.Type
+  let _: Regex<(Substring, Substring, Substring?, Substring)>.Type
     = type(of: regex)
   let match1 = input.expectMatch(regex)
   expectEqual(input[...], input[match1.range])

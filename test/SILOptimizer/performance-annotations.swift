@@ -85,6 +85,11 @@ func testUnsafePerformance(_ idx: Int) -> [Int] {
   return _unsafePerformance { [10, 20, 30, 40] }
 }
 
+@_noAllocation
+func testMemoryLayout() -> Int {
+  return MemoryLayout<Int>.size + MemoryLayout<Int>.stride + MemoryLayout<Int>.alignment
+}
+
 class MyError : Error {}
 
 @_noLocks

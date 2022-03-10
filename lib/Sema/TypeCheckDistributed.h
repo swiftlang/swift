@@ -56,15 +56,9 @@ bool checkDistributedActorSystemAdHocProtocolRequirements(
 /// Typecheck a distributed method declaration
 bool checkDistributedFunction(FuncDecl *decl, bool diagnose);
 
-/// Determine the distributed actor transport type for the given actor.
-Type getDistributedActorSystemType(NominalTypeDecl *actor);
-
-/// Determine the distributed actor identity type for the given actor.
-Type getDistributedActorIDType(NominalTypeDecl *actor);
-
-/// Determine the serialization requirement for the given actor, actor system
-/// or other type that has the SerializationRequirement associated type.
-Type getDistributedSerializationRequirementType(NominalTypeDecl *nominal);
+/// Typecheck a distributed computed (get-only) property declaration.
+/// They are effectively checked the same way as argument-less methods.
+bool checkDistributedActorProperty(VarDecl *decl, bool diagnose);
 
 /// Diagnose a distributed func declaration in a not-distributed actor protocol.
 void diagnoseDistributedFunctionInNonDistributedActorProtocol(

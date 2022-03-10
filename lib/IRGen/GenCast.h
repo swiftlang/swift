@@ -52,7 +52,9 @@ namespace irgen {
                              CanType sourceFormalType,
                              SILType targetLoweredType,
                              CanType targetFormalType,
-                             CheckedCastMode mode, Explosion &out);
+                             CheckedCastMode mode,
+                             GenericSignature fnSig,
+                             Explosion &out);
 
   /// Convert a class object to the given destination type,
   /// using a runtime-checked cast.
@@ -71,9 +73,10 @@ namespace irgen {
 
   /// Convert the given value to the exact destination type.
   FailableCastResult emitClassIdenticalCast(IRGenFunction &IGF,
-                                                  llvm::Value *from,
-                                                  SILType fromType,
-                                                  SILType toType);
+                                            llvm::Value *from,
+                                            SILType fromType,
+                                            SILType toType,
+                                            GenericSignature fnSig);
 
   /// Emit a checked cast of a metatype.
   void emitMetatypeDowncast(IRGenFunction &IGF,
@@ -93,6 +96,7 @@ namespace irgen {
                                   SILType destType,
                                   CheckedCastMode mode,
                                   Optional<MetatypeRepresentation> metatypeKind,
+                                  GenericSignature fnSig,
                                   Explosion &ex);
 
   /// Emit a checked cast from a metatype to AnyObject.

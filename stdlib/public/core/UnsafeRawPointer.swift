@@ -235,31 +235,31 @@ public struct UnsafeRawPointer: _Pointer {
     _rawValue = unwrapped._rawValue
   }
 
-  /// Creates a new raw pointer from the given typed pointer.		
-  ///		
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`		
-  /// instance. This initializer creates a new pointer to the same address as		
-  /// `other` and performs no allocation or copying.		
-  ///		
-  /// - Parameter other: The typed pointer to convert.		
-  @_transparent		
+  /// Creates a new raw pointer from the given typed pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The typed pointer to convert.
+  @_transparent
   public init<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
-   _rawValue = other._rawValue		
-  }		
+   _rawValue = other._rawValue
+  }
 
-  /// Creates a new raw pointer from the given typed pointer.		
-  ///		
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`		
-  /// instance. This initializer creates a new pointer to the same address as		
-  /// `other` and performs no allocation or copying.		
-  ///		
-  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the		
-  ///   result is `nil`.		
-  @_transparent		
+  /// Creates a new raw pointer from the given typed pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
+  @_transparent
   public init?<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
-   guard let unwrapped = other else { return nil }		
-   _rawValue = unwrapped._rawValue		
-  }		
+   guard let unwrapped = other else { return nil }
+   _rawValue = unwrapped._rawValue
+  }
 
   /// Deallocates the previously allocated memory block referenced by this pointer.
   ///
@@ -441,6 +441,82 @@ extension UnsafeRawPointer: Strideable {
   @_transparent
   public func advanced(by n: Int) -> UnsafeRawPointer {
     return UnsafeRawPointer(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
+  }
+}
+
+extension UnsafeRawPointer {
+  /// Obtain the next pointer properly aligned to store a value of type `T`.
+  ///
+  /// If `self` is properly aligned for accessing `T`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - type: the type to be stored at the returned address.
+  /// - Returns: a pointer properly aligned to store a value of type `T`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedUp<T>(for type: T.Type) -> Self {
+    let mask = UInt(Builtin.alignof(T.self)) &- 1
+    let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the preceding pointer properly aligned to store a value of type `T`.
+  ///
+  /// If `self` is properly aligned for accessing `T`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - type: the type to be stored at the returned address.
+  /// - Returns: a pointer properly aligned to store a value of type `T`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedDown<T>(for type: T.Type) -> Self {
+    let mask = UInt(Builtin.alignof(T.self)) &- 1
+    let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the next pointer whose bit pattern is a multiple of `alignment`.
+  ///
+  /// If the bit pattern of `self` is a multiple of `alignment`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - alignment: the alignment of the returned pointer, in bytes.
+  ///     `alignment` must be a whole power of 2.
+  /// - Returns: a pointer aligned to `alignment`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedUp(toMultipleOf alignment: Int) -> Self {
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the preceding pointer whose bit pattern is a multiple of `alignment`.
+  ///
+  /// If the bit pattern of `self` is a multiple of `alignment`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - alignment: the alignment of the returned pointer, in bytes.
+  ///     `alignment` must be a whole power of 2.
+  /// - Returns: a pointer aligned to `alignment`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedDown(toMultipleOf alignment: Int) -> Self {
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 }
 
@@ -1142,6 +1218,82 @@ extension UnsafeMutableRawPointer: Strideable {
   @_transparent
   public func advanced(by n: Int) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
+  }
+}
+
+extension UnsafeMutableRawPointer {
+  /// Obtain the next pointer properly aligned to store a value of type `T`.
+  ///
+  /// If `self` is properly aligned for accessing `T`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - type: the type to be stored at the returned address.
+  /// - Returns: a pointer properly aligned to store a value of type `T`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedUp<T>(for type: T.Type) -> Self {
+    let mask = UInt(Builtin.alignof(T.self)) &- 1
+    let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the preceding pointer properly aligned to store a value of type `T`.
+  ///
+  /// If `self` is properly aligned for accessing `T`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - type: the type to be stored at the returned address.
+  /// - Returns: a pointer properly aligned to store a value of type `T`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedDown<T>(for type: T.Type) -> Self {
+    let mask = UInt(Builtin.alignof(T.self)) &- 1
+    let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the next pointer whose bit pattern is a multiple of `alignment`.
+  ///
+  /// If the bit pattern of `self` is a multiple of `alignment`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - alignment: the alignment of the returned pointer, in bytes.
+  ///     `alignment` must be a whole power of 2.
+  /// - Returns: a pointer aligned to `alignment`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedUp(toMultipleOf alignment: Int) -> Self {
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  /// Obtain the preceding pointer whose bit pattern is a multiple of `alignment`.
+  ///
+  /// If the bit pattern of `self` is a multiple of `alignment`,
+  /// this function returns `self`.
+  ///
+  /// - Parameters:
+  ///   - alignment: the alignment of the returned pointer, in bytes.
+  ///     `alignment` must be a whole power of 2.
+  /// - Returns: a pointer aligned to `alignment`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func alignedDown(toMultipleOf alignment: Int) -> Self {
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 }
 

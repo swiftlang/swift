@@ -60,41 +60,6 @@
 using namespace swift;
 using namespace rewriting;
 
-/// This papers over a behavioral difference between
-/// GenericSignature::getRequiredProtocols() and ArchetypeType::getConformsTo();
-/// the latter drops any protocols to which the superclass requirement
-/// conforms to concretely.
-llvm::TinyPtrVector<const ProtocolDecl *>
-PropertyBag::getConformsToExcludingSuperclassConformances() const {
-  llvm::TinyPtrVector<const ProtocolDecl *> result;
-
-  if (SuperclassConformances.empty()) {
-    result = ConformsTo;
-    return result;
-  }
-
-  // The conformances in SuperclassConformances should appear in the same order
-  // as the protocols in ConformsTo.
-  auto conformanceIter = SuperclassConformances.begin();
-
-  for (const auto *proto : ConformsTo) {
-    if (conformanceIter == SuperclassConformances.end()) {
-      result.push_back(proto);
-      continue;
-    }
-
-    if (proto == (*conformanceIter)->getProtocol()) {
-      ++conformanceIter;
-      continue;
-    }
-
-    result.push_back(proto);
-  }
-
-  assert(conformanceIter == SuperclassConformances.end());
-  return result;
-}
-
 void PropertyBag::dump(llvm::raw_ostream &out) const {
   out << Key << " => {";
 
@@ -115,11 +80,12 @@ void PropertyBag::dump(llvm::raw_ostream &out) const {
     out << " layout: " << Layout;
   }
 
-  if (Superclass) {
-    out << " superclass: " << *Superclass;
+  if (hasSuperclassBound()) {
+    const auto &superclassReq = getSuperclassRequirement();
+    out << " superclass: " << *superclassReq.SuperclassType;
   }
 
-  if (ConcreteType) {
+  if (isConcreteType()) {
     out << " concrete_type: " << *ConcreteType;
   }
 
@@ -154,8 +120,10 @@ Type PropertyBag::getSuperclassBound(
     const MutableTerm &lookupTerm,
     const PropertyMap &map) const {
   MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
-  return map.getTypeFromSubstitutionSchema(Superclass->getConcreteType(),
-                                           Superclass->getSubstitutions(),
+
+  const auto &req = getSuperclassRequirement();
+  return map.getTypeFromSubstitutionSchema(req.SuperclassType->getConcreteType(),
+                                           req.SuperclassType->getSubstitutions(),
                                            genericParams, prefix);
 }
 
@@ -199,17 +167,64 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   // T := UV should have substitutions {UX1, ..., UXn}.
   MutableTerm prefix(Key.begin(), Key.begin() + prefixLength);
 
-  if (next->Superclass) {
-    Superclass = next->Superclass->prependPrefixToConcreteSubstitutions(
-        prefix, ctx);
-    SuperclassRule = next->SuperclassRule;
-  }
-
   if (next->ConcreteType) {
     ConcreteType = next->ConcreteType->prependPrefixToConcreteSubstitutions(
         prefix, ctx);
-    ConcreteTypeRule = next->ConcreteTypeRule;
+    ConcreteTypeRules = next->ConcreteTypeRules;
+    for (auto &pair : ConcreteTypeRules) {
+      pair.first = pair.first.prependPrefixToConcreteSubstitutions(
+          prefix, ctx);
+    }
   }
+
+  // Copy over class hierarchy information.
+  SuperclassDecl = next->SuperclassDecl;
+  if (!next->Superclasses.empty()) {
+    Superclasses = next->Superclasses;
+
+    for (auto &req : Superclasses) {
+      req.second.SuperclassType =
+          req.second.SuperclassType->prependPrefixToConcreteSubstitutions(
+              prefix, ctx);
+      for (auto &pair : req.second.SuperclassRules) {
+        pair.first = pair.first.prependPrefixToConcreteSubstitutions(
+            prefix, ctx);
+      }
+    }
+  }
+}
+
+Symbol PropertyBag::concretelySimplifySubstitution(const MutableTerm &mutTerm,
+                                                   RewriteContext &ctx,
+                                                   RewritePath *path) const {
+  assert(!ConcreteTypeRules.empty());
+  auto &pair = ConcreteTypeRules.front();
+
+  // The property map entry might apply to a suffix of the substitution
+  // term, so prepend the appropriate prefix to its own substitutions.
+  auto prefix = getPrefixAfterStrippingKey(mutTerm);
+  auto concreteSymbol =
+    pair.first.prependPrefixToConcreteSubstitutions(
+        prefix, ctx);
+
+  // If U.V is the substitution term and V is the property map key,
+  // apply the rewrite step U.(V => V.[concrete: C]) followed by
+  // prepending the prefix U to each substitution in the concrete type
+  // symbol if |U| > 0.
+  if (path) {
+    path->add(RewriteStep::forRewriteRule(/*startOffset=*/prefix.size(),
+                                          /*endOffset=*/0,
+                                          /*ruleID=*/pair.second,
+                                          /*inverse=*/true));
+
+    if (!prefix.empty()) {
+      path->add(RewriteStep::forPrefixSubstitutions(/*length=*/prefix.size(),
+                                                    /*endOffset=*/0,
+                                                    /*inverse=*/false));
+    }
+  }
+
+  return concreteSymbol;
 }
 
 void PropertyBag::verify(const RewriteSystem &system) const {
@@ -221,11 +236,18 @@ void PropertyBag::verify(const RewriteSystem &system) const {
     assert(symbol.getProtocol() == ConformsTo[i]);
   }
 
-  // FIXME: Once unification introduces new rules, add asserts requiring
-  // that the layout, superclass and concrete type symbols match, as above
+  // FIXME: Add asserts requiring that the layout, superclass and
+  // concrete type symbols match, as above
   assert(!Layout.isNull() == LayoutRule.hasValue());
-  assert(Superclass.hasValue() == SuperclassRule.hasValue());
-  assert(ConcreteType.hasValue() == ConcreteTypeRule.hasValue());
+  assert(ConcreteType.hasValue() == !ConcreteTypeRules.empty());
+
+  assert((SuperclassDecl == nullptr) == Superclasses.empty());
+  for (const auto &pair : Superclasses) {
+    const auto &req = pair.second;
+    assert(req.SuperclassType.hasValue());
+    assert(!req.SuperclassRules.empty());
+  }
+
 #endif
 }
 
@@ -350,8 +372,7 @@ void PropertyMap::buildPropertyMap() {
 
   for (const auto &rule : System.getRules()) {
     if (rule.isLHSSimplified() ||
-        rule.isRHSSimplified() ||
-        rule.isSubstitutionSimplified())
+        rule.isRHSSimplified())
       continue;
 
     // Identity conformances ([P].[P] => [P]) are permanent rules, but we
@@ -392,179 +413,10 @@ void PropertyMap::buildPropertyMap() {
 
   // Finally, a post-processing pass to reduce substitutions down to
   // concrete types.
-  concretelySimplifyLeftHandSideSubstitutions();
+  System.simplifyLeftHandSideSubstitutions(this);
 
   // Check invariants of the constructed property map.
   verify();
-}
-
-/// Similar to RewriteSystem::simplifySubstitutions(), but also replaces type
-/// parameters with concrete types and builds a type difference describing
-/// the transformation.
-///
-/// Returns None if the concrete type symbol cannot be simplified further.
-///
-/// Otherwise returns an index which can be passed to
-/// RewriteSystem::getTypeDifference().
-Optional<unsigned>
-PropertyMap::concretelySimplifySubstitutions(Term baseTerm, Symbol symbol,
-                                             RewritePath *path) const {
-  assert(symbol.hasSubstitutions());
-
-  // Fast path if the type is fully concrete.
-  auto substitutions = symbol.getSubstitutions();
-  if (substitutions.empty())
-    return None;
-
-  // Save the original rewrite path length so that we can reset if if we don't
-  // find anything to simplify.
-  unsigned oldSize = (path ? path->size() : 0);
-
-  if (path) {
-    // The term is at the top of the primary stack. Push all substitutions onto
-    // the primary stack.
-    path->add(RewriteStep::forDecompose(substitutions.size(),
-                                        /*inverse=*/false));
-
-    // Move all substitutions but the first one to the secondary stack.
-    for (unsigned i = 1; i < substitutions.size(); ++i)
-      path->add(RewriteStep::forShift(/*inverse=*/false));
-  }
-
-  // Simplify and collect substitutions.
-  llvm::SmallVector<std::pair<unsigned, Term>, 1> sameTypes;
-  llvm::SmallVector<std::pair<unsigned, Symbol>, 1> concreteTypes;
-
-  for (unsigned index : indices(substitutions)) {
-    // Move the next substitution from the secondary stack to the primary stack.
-    if (index != 0 && path)
-      path->add(RewriteStep::forShift(/*inverse=*/true));
-
-    auto term = symbol.getSubstitutions()[index];
-    MutableTerm mutTerm(term);
-
-    // Note that it's of course possible that the term both requires
-    // simplification, and the simplified term has a concrete type.
-    //
-    // This isn't handled with our current representation of
-    // TypeDifference, but that should be fine since the caller
-    // has to iterate until fixed point anyway.
-    //
-    // This should be rare in practice.
-    if (System.simplify(mutTerm, path)) {
-      // Record a mapping from this substitution to the simplified term.
-      sameTypes.emplace_back(index, Term::get(mutTerm, Context));
-    } else {
-      auto *props = lookUpProperties(mutTerm);
-
-      if (props && props->ConcreteType) {
-        // The property map entry might apply to a suffix of the substitution
-        // term, so prepend the appropriate prefix to its own substitutions.
-        auto prefix = props->getPrefixAfterStrippingKey(mutTerm);
-        auto concreteSymbol =
-          props->ConcreteType->prependPrefixToConcreteSubstitutions(
-              prefix, Context);
-
-        // Record a mapping from this substitution to the concrete type.
-        concreteTypes.emplace_back(index, concreteSymbol);
-
-        // If U.V is the substitution term and V is the property map key,
-        // apply the rewrite step U.(V => V.[concrete: C]) followed by
-        // prepending the prefix U to each substitution in the concrete type
-        // symbol if |U| > 0.
-        if (path) {
-          path->add(RewriteStep::forRewriteRule(/*startOffset=*/prefix.size(),
-                                                /*endOffset=*/0,
-                                                /*ruleID=*/*props->ConcreteTypeRule,
-                                                /*inverse=*/true));
-
-          path->add(RewriteStep::forPrefixSubstitutions(/*length=*/prefix.size(),
-                                                        /*endOffset=*/0,
-                                                        /*inverse=*/false));
-        }
-      }
-    }
-  }
-
-  // If nothing changed, we don't have to build the type difference.
-  if (sameTypes.empty() && concreteTypes.empty()) {
-    if (path) {
-      // The rewrite path should consist of a Decompose, followed by a number
-      // of Shifts, followed by a Compose.
-  #ifndef NDEBUG
-      for (auto iter = path->begin() + oldSize; iter < path->end(); ++iter) {
-        assert(iter->Kind == RewriteStep::Shift ||
-               iter->Kind == RewriteStep::Decompose);
-      }
-  #endif
-
-      path->resize(oldSize);
-    }
-    return None;
-  }
-
-  auto difference = buildTypeDifference(baseTerm, symbol,
-                                        sameTypes, concreteTypes,
-                                        Context);
-  assert(difference.LHS != difference.RHS);
-
-  unsigned differenceID = System.recordTypeDifference(difference);
-
-  // All simplified substitutions are now on the primary stack. Collect them to
-  // produce the new term.
-  if (path) {
-    path->add(RewriteStep::forDecomposeConcrete(differenceID,
-                                                /*inverse=*/true));
-  }
-
-  return differenceID;
-}
-
-void PropertyMap::concretelySimplifyLeftHandSideSubstitutions() const {
-  for (unsigned ruleID = 0, e = System.getRules().size(); ruleID < e; ++ruleID) {
-    auto &rule = System.getRule(ruleID);
-    if (rule.isLHSSimplified() ||
-        rule.isRHSSimplified() ||
-        rule.isSubstitutionSimplified())
-      continue;
-
-    auto optSymbol = rule.isPropertyRule();
-    if (!optSymbol || !optSymbol->hasSubstitutions())
-      continue;
-
-    auto symbol = *optSymbol;
-
-    RewritePath path;
-
-    auto differenceID = concretelySimplifySubstitutions(
-        rule.getRHS(), symbol, &path);
-    if (!differenceID)
-      continue;
-
-    rule.markSubstitutionSimplified();
-
-    auto difference = System.getTypeDifference(*differenceID);
-    assert(difference.LHS == symbol);
-
-    // If the original rule is (T.[concrete: C] => T) and [concrete: C'] is
-    // the simplified symbol, then difference.LHS == [concrete: C] and
-    // difference.RHS == [concrete: C'], and the rewrite path we just
-    // built takes T.[concrete: C] to T.[concrete: C'].
-    //
-    // We want a path from T.[concrete: C'] to T, so invert the path to get
-    // a path from T.[concrete: C'] to T.[concrete: C], and add a final step
-    // applying the original rule (T.[concrete: C] => T).
-    path.invert();
-    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
-                                         /*endOffset=*/0,
-                                         /*ruleID=*/ruleID,
-                                         /*inverted=*/false));
-    MutableTerm rhs(rule.getRHS());
-    MutableTerm lhs(rhs);
-    lhs.add(difference.RHS);
-
-    System.addRule(lhs, rhs, &path);
-  }
 }
 
 void PropertyMap::dump(llvm::raw_ostream &out) const {

@@ -197,12 +197,22 @@ static void printImports(raw_ostream &out,
   // imports and filter them later.
   llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> ioiImportSet;
   if (Opts.PrintSPIs && Opts.ExperimentalSPIImports) {
-    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
 
-    SmallVector<ImportedModule, 4> ioiImport;
-    M->getImportedModules(ioiImport,
+    SmallVector<ImportedModule, 4> ioiImports, allImports;
+    M->getImportedModules(ioiImports,
                           ModuleDecl::ImportFilterKind::ImplementationOnly);
-    ioiImportSet.insert(ioiImport.begin(), ioiImport.end());
+
+    // Only consider modules imported consistently as implementation-only.
+    M->getImportedModules(allImports,
+                          allImportFilter);
+    llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> allImportSet;
+    allImportSet.insert(allImports.begin(), allImports.end());
+
+    for (auto import: ioiImports)
+      if (allImportSet.count(import) == 0)
+        ioiImportSet.insert(import);
+
+    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   }
 
   SmallVector<ImportedModule, 8> allImports;
@@ -222,6 +232,11 @@ static void printImports(raw_ostream &out,
     auto importedModule = import.importedModule;
     if (importedModule->isOnoneSupportModule() ||
         importedModule->isBuiltinModule()) {
+      continue;
+    }
+
+    if (llvm::count(Opts.ModulesToSkipInPublicInterface,
+                    importedModule->getName().str())) {
       continue;
     }
 
@@ -605,40 +620,46 @@ public:
       auto isUnchecked = std::get<2>(protoAndAvailability);
       auto otherAttrs = std::get<3>(protoAndAvailability);
 
-      bool haveFeatureChecks = printOptions.PrintCompatibilityFeatureChecks &&
-        printCompatibilityFeatureChecksPre(printer, proto);
+      PrintOptions curPrintOptions = printOptions;
+      auto printBody = [&] {
+        // FIXME: Shouldn't this be an implicit conversion?
+        TinyPtrVector<const DeclAttribute *> attrs;
+        attrs.insert(attrs.end(), availability.begin(), availability.end());
+        auto spiAttributes = proto->getAttrs().getAttributes<SPIAccessControlAttr>();
+        attrs.insert(attrs.end(), spiAttributes.begin(), spiAttributes.end());
+        attrs.insert(attrs.end(), otherAttrs.begin(), otherAttrs.end());
+        DeclAttributes::print(printer, curPrintOptions, attrs);
 
-      // FIXME: Shouldn't this be an implicit conversion?
-      TinyPtrVector<const DeclAttribute *> attrs;
-      attrs.insert(attrs.end(), availability.begin(), availability.end());
-      auto spiAttributes = proto->getAttrs().getAttributes<SPIAccessControlAttr>();
-      attrs.insert(attrs.end(), spiAttributes.begin(), spiAttributes.end());
-      attrs.insert(attrs.end(), otherAttrs.begin(), otherAttrs.end());
-      DeclAttributes::print(printer, printOptions, attrs);
+        printer << "extension ";
+        {
+          bool oldFullyQualifiedTypesIfAmbiguous =
+            curPrintOptions.FullyQualifiedTypesIfAmbiguous;
+          curPrintOptions.FullyQualifiedTypesIfAmbiguous =
+            curPrintOptions.FullyQualifiedExtendedTypesIfAmbiguous;
+          nominal->getDeclaredType().print(printer, curPrintOptions);
+          curPrintOptions.FullyQualifiedTypesIfAmbiguous =
+            oldFullyQualifiedTypesIfAmbiguous;
+        }
+        printer << " : ";
 
-      printer << "extension ";
-      {
-        PrintOptions typePrintOptions = printOptions;
-        bool oldFullyQualifiedTypesIfAmbiguous =
-          typePrintOptions.FullyQualifiedTypesIfAmbiguous;
-        typePrintOptions.FullyQualifiedTypesIfAmbiguous =
-          typePrintOptions.FullyQualifiedExtendedTypesIfAmbiguous;
-        nominal->getDeclaredType().print(printer, typePrintOptions);
-        typePrintOptions.FullyQualifiedTypesIfAmbiguous =
-          oldFullyQualifiedTypesIfAmbiguous;
+        if (isUnchecked)
+          printer << "@unchecked ";
+
+        proto->getDeclaredInterfaceType()->print(printer, curPrintOptions);
+
+        printer << " {}";
+      };
+
+      bool printedNewline = false;
+      if (printOptions.PrintCompatibilityFeatureChecks) {
+        printedNewline =
+          printWithCompatibilityFeatureChecks(printer, curPrintOptions,
+                                              proto, printBody);
+      } else {
+        printBody();
+        printedNewline = false;
       }
-      printer << " : ";
-
-      if (isUnchecked)
-        printer << "@unchecked ";
-
-      proto->getDeclaredInterfaceType()->print(printer, printOptions);
-
-      printer << " {}";
-
-      if (haveFeatureChecks)
-        printCompatibilityFeatureChecksPost(printer);
-      else
+      if (!printedNewline)
         printer << "\n";
     }
   }

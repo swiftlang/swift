@@ -1347,8 +1347,9 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     SearchPathOpts.DeserializedPathRecoverer);
   SearchPathOpts.DeserializedPathRecoverer
     .forEachPair([&](StringRef lhs, StringRef rhs) {
-      GenericArgs.push_back(ArgSaver.save(llvm::Twine("-serialized-path-obfuscate ")
-        + lhs + "=" + rhs).str());
+      GenericArgs.push_back("-serialized-path-obfuscate");
+      std::string pair = (llvm::Twine(lhs) + "=" + rhs).str();
+      GenericArgs.push_back(ArgSaver.save(pair));
   });
 }
 
@@ -1653,6 +1654,13 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
   SmallVector<const char *, 64> SubArgs;
+
+  // If the interface was emitted by a compiler that didn't print
+  // `-target-min-inlining-version` into it, default to using the version from
+  // the target triple, emulating previous behavior.
+  SubArgs.push_back("-target-min-inlining-version");
+  SubArgs.push_back("target");
+
   std::string CompilerVersion;
   // Extract compiler arguments from the interface file and use them to configure
   // the compiler invocation.

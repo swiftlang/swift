@@ -788,7 +788,7 @@ bool ModuleDecl::shouldCollectDisplayDecls() const {
   return true;
 }
 
-static void collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports) {
+void swift::collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports) {
   for (const FileUnit *file : M->getFiles()) {
     if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
       if (source->hasImports()) {
@@ -949,22 +949,32 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   return Result;
 }
 
-void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
-  if (isParsedModule(this)) {
+void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive) const {
+  if (Recursive && isParsedModule(this)) {
     SmallPtrSet<ModuleDecl *, 4> Modules;
     collectParsedExportedImports(this, Modules);
     for (const ModuleDecl *import : Modules) {
-      import->getDisplayDecls(Results);
+      import->getDisplayDecls(Results, Recursive);
     }
   }
   // FIXME: Should this do extra access control filtering?
   FORWARD(getDisplayDecls, (Results));
 
 #ifndef NDEBUG
-  llvm::DenseSet<Decl *> visited;
-  for (auto *D : Results) {
-    auto inserted = visited.insert(D).second;
-    assert(inserted && "there should be no duplicate decls");
+  if (Recursive) {
+    llvm::DenseSet<Decl *> visited;
+    for (auto *D : Results) {
+      // decls synthesized from implicit clang decls may appear multiple times;
+      // e.g. if multiple modules with underlying clang modules are re-exported.
+      // including duplicates of these is harmless, so skip them when counting
+      // this assertion
+      if (const auto *CD = D->getClangDecl()) {
+        if (CD->isImplicit()) continue;
+      }
+
+      auto inserted = visited.insert(D).second;
+      assert(inserted && "there should be no duplicate decls");
+    }
   }
 #endif
 }

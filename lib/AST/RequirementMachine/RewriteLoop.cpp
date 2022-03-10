@@ -188,8 +188,21 @@ void RewritePath::dump(llvm::raw_ostream &out,
   }
 }
 
+void RewritePath::dumpLong(llvm::raw_ostream &out,
+                           MutableTerm term,
+                           const RewriteSystem &system) const {
+  RewritePathEvaluator evaluator(term);
+
+  for (const auto &step : Steps) {
+    evaluator.dump(out);
+    evaluator.apply(step, system);
+    out << "\n";
+  }
+
+  evaluator.dump(out);
+}
+
 void RewriteLoop::verify(const RewriteSystem &system) const {
-#ifndef NDEBUG
   RewritePathEvaluator evaluator(Basepoint);
 
   for (const auto &step : Path) {
@@ -208,7 +221,6 @@ void RewriteLoop::verify(const RewriteSystem &system) const {
     evaluator.dump(llvm::errs());
     abort();
   }
-#endif
 }
 
 void RewriteLoop::dump(llvm::raw_ostream &out,
@@ -220,13 +232,17 @@ void RewriteLoop::dump(llvm::raw_ostream &out,
 }
 
 void RewritePathEvaluator::dump(llvm::raw_ostream &out) const {
-  out << "Primary stack:\n";
-  for (const auto &term : Primary) {
-    out << term << "\n";
+  for (unsigned i = 0, e = Primary.size(); i < e; ++i) {
+    if (i == Primary.size() - 1)
+      out << "-> ";
+    else
+      out << "   ";
+
+    out << Primary[i] << "\n";
   }
-  out << "\nSecondary stack:\n";
-  for (const auto &term : Secondary) {
-    out << term << "\n";
+
+  for (unsigned i = 0, e = Secondary.size(); i < e; ++i) {
+    out << "   " << Secondary[Secondary.size() - i - 1] << "\n";
   }
 }
 
@@ -295,6 +311,8 @@ RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
 std::pair<MutableTerm, MutableTerm>
 RewritePathEvaluator::applyPrefixSubstitutions(const RewriteStep &step,
                                                const RewriteSystem &system) {
+  assert(step.Arg != 0);
+
   auto &term = getCurrentTerm();
 
   assert(step.Kind == RewriteStep::PrefixSubstitutions);
@@ -365,7 +383,6 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
                                           const RewriteSystem &system) {
   assert(step.Kind == RewriteStep::Decompose);
 
-  auto &ctx = system.getRewriteContext();
   unsigned numSubstitutions = step.Arg;
 
   if (!step.Inverse) {
@@ -403,15 +420,8 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
 
     // The term immediately underneath the substitutions is the one we're
     // updating with new substitutions.
-    auto &term = *(Primary.end() - numSubstitutions - 1);
-
-    auto &symbol = *(term.end() - step.EndOffset - 1);
-    if (!symbol.hasSubstitutions()) {
-      llvm::errs() << "Expected term with superclass or concrete type symbol"
-                   << " on primary stack\n";
-      dump(llvm::errs());
-      abort();
-    }
+    const auto &term = *(Primary.end() - numSubstitutions - 1);
+    auto symbol = *(term.end() - step.EndOffset - 1);
 
     // The symbol at the end of this term must have the expected number of
     // substitutions.
@@ -421,16 +431,15 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
       abort();
     }
 
-    // Collect the substitutions from the primary stack.
-    SmallVector<Term, 2> substitutions;
-    substitutions.reserve(numSubstitutions);
     for (unsigned i = 0; i < numSubstitutions; ++i) {
       const auto &substitution = *(Primary.end() - numSubstitutions + i);
-      substitutions.push_back(Term::get(substitution, ctx));
+      if (MutableTerm(symbol.getSubstitutions()[i]) != substitution) {
+        llvm::errs() << "Expected " << symbol.getSubstitutions()[i] << "\n";
+        llvm::errs() << "Got " << substitution << "\n";
+        dump(llvm::errs());
+        abort();
+      }
     }
-
-    // Build the new symbol with the new substitutions.
-    symbol = symbol.withConcreteSubstitutions(substitutions, ctx);
 
     // Pop the substitutions from the primary stack.
     Primary.resize(Primary.size() - numSubstitutions);
@@ -627,8 +636,6 @@ RewritePathEvaluator::applyRightConcreteProjection(const RewriteStep &step,
     llvm::errs() << "- RightBaseTerm: " << rightBaseTerm << "\n";
     llvm::errs() << "- DifferenceID: " << step.getTypeDifferenceID() << "\n";
     llvm::errs() << "\nType difference:\n";
-    difference.dump(llvm::errs());
-    llvm::errs() << ":\n";
     difference.dump(llvm::errs());
     llvm::errs() << "\nEvaluator state:\n";
     dump(llvm::errs());

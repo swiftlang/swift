@@ -3330,7 +3330,6 @@ Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
   Type currentType = genericParamType;
   SmallVector<AssociatedTypeDecl *, 4> path(initialPath.getPath().begin(),
                                             initialPath.getPath().end());
-  bool simplified = false;
   do {
     CanType currentAnchor = currentType->getCanonicalType();
     if (auto rootNode = Impl->getRewriteTreeRootIfPresent(currentAnchor)) {
@@ -3366,7 +3365,6 @@ Type GenericSignatureBuilder::getCanonicalTypeParameter(Type type) {
         }
 
         // Move back to the beginning; we may have opened up other rewrites.
-        simplified = true;
         startIndex = 0;
         currentType = genericParamType;
         continue;
@@ -3891,7 +3889,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     auto innerSource =
       FloatingRequirementSource::viaProtocolRequirement(source, proto,
                                                         /*inferred=*/false);
-    for (const auto &req : proto->getRequirementSignature()) {
+    for (const auto &req : proto->getRequirementSignature().getRequirements()) {
       // If we're only looking at same-type constraints, skip everything else.
       if (onlySameTypeConstraints && req.getKind() != RequirementKind::SameType)
         continue;
@@ -4523,14 +4521,13 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                                                 source)))
         anyErrors = true;
 
-    auto *assocType = paramProtoType->getAssocType();
-    auto depType = DependentMemberType::get(
-        resolvedSubject.getDependentType(*this), assocType);
-    if (isErrorResult(addSameTypeRequirement(Type(depType),
-                                             paramProtoType->getArgumentType(),
-                                             source,
-                                             UnresolvedHandlingKind::GenerateConstraints)))
-      anyErrors = true;
+    SmallVector<Requirement, 2> reqs;
+    auto baseType = resolvedSubject.getDependentType(*this);
+    paramProtoType->getRequirements(baseType, reqs);
+    for (auto req : reqs) {
+      if (isErrorResult(addRequirement(req, source, inferForModule)))
+        anyErrors = true;
+    }
 
     return anyErrors ? ConstraintResult::Conflicting
                      : ConstraintResult::Resolved;
@@ -6308,16 +6305,8 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
       auto source = constraint.source;
       auto loc = source->getLoc();
 
-      // FIXME: The constraint string is printed directly here because
-      // the current default is to not print `any` for existential
-      // types, but this error message is super confusing without `any`
-      // if the user wrote it explicitly.
-      PrintOptions options;
-      options.PrintExplicitAny = true;
-      auto constraintString = constraintType.getString(options);
-
       Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
-                     subjectType, constraintString);
+                     subjectType, constraintType);
       
       auto getNameWithoutSelf = [&](std::string subjectTypeName) {
         std::string selfSubstring = "Self.";
@@ -6332,10 +6321,12 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
       if (allowConcreteGenericParams ||
           (subjectType->is<DependentMemberType>() &&
            !source->isProtocolRequirement())) {
-        auto subjectTypeName = subjectType.getString();
+        auto options = PrintOptions::forDiagnosticArguments();
+        auto subjectTypeName = subjectType.getString(options);
         auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
         Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
-                       subjectTypeNameWithoutSelf, constraintString)
+                       subjectTypeNameWithoutSelf,
+                       constraintType.getString(options))
              .fixItReplace(loc, " == ");
       }
     }
@@ -8383,7 +8374,8 @@ AbstractGenericSignatureRequest::evaluate(
   case RequirementMachineMode::Enabled:
     return buildViaRQM();
 
-  case RequirementMachineMode::Verify: {
+  case RequirementMachineMode::Verify:
+  case RequirementMachineMode::Check: {
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
@@ -8391,11 +8383,20 @@ AbstractGenericSignatureRequest::evaluate(
       return rqmResult;
 
     if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
-      llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
-      llvm::errs() << "RequirementMachine says:      " << rqmResult.getPointer() << "\n";
-      llvm::errs() << "GenericSignatureBuilder says: " << gsbResult.getPointer() << "\n";
+      PrintOptions opts;
+      opts.ProtocolQualifiedDependentMemberTypes = true;
 
-      abort();
+      llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
+      llvm::errs() << "RequirementMachine says:      ";
+      rqmResult.getPointer()->print(llvm::errs(), opts);
+      llvm::errs() << "\n";
+      llvm::errs() << "GenericSignatureBuilder says: ";
+      gsbResult.getPointer()->print(llvm::errs(), opts);
+      llvm::errs() << "\n";
+
+      if (ctx.LangOpts.RequirementMachineAbstractSignatures
+          == RequirementMachineMode::Verify)
+        abort();
     }
 
     return rqmResult;
@@ -8553,7 +8554,8 @@ InferredGenericSignatureRequest::evaluate(
   case RequirementMachineMode::Enabled:
     return buildViaRQM();
 
-  case RequirementMachineMode::Verify: {
+  case RequirementMachineMode::Verify:
+  case RequirementMachineMode::Check: {
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
@@ -8561,11 +8563,20 @@ InferredGenericSignatureRequest::evaluate(
       return rqmResult;
 
     if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
-      llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
-      llvm::errs() << "RequirementMachine says:      " << rqmResult.getPointer() << "\n";
-      llvm::errs() << "GenericSignatureBuilder says: " << gsbResult.getPointer() << "\n";
+      PrintOptions opts;
+      opts.ProtocolQualifiedDependentMemberTypes = true;
 
-      abort();
+      llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
+      llvm::errs() << "RequirementMachine says:      ";
+      rqmResult.getPointer()->print(llvm::errs(), opts);
+      llvm::errs() << "\n";
+      llvm::errs() << "GenericSignatureBuilder says: ";
+      gsbResult.getPointer()->print(llvm::errs(), opts);
+      llvm::errs() << "\n";
+
+      if (ctx.LangOpts.RequirementMachineInferredSignatures
+          == RequirementMachineMode::Verify)
+        abort();
     }
 
     return rqmResult;
@@ -8573,7 +8584,7 @@ InferredGenericSignatureRequest::evaluate(
   }
 }
 
-ArrayRef<Requirement>
+RequirementSignature
 RequirementSignatureRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *proto) const {
   ASTContext &ctx = proto->getASTContext();
@@ -8588,12 +8599,13 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto contextData = static_cast<LazyProtocolData *>(
         ctx.getOrCreateLazyContextData(proto, nullptr));
 
-    SmallVector<Requirement, 8> requirements;
+    SmallVector<Requirement, 2> requirements;
+    SmallVector<ProtocolTypeAlias, 2> typeAliases;
     contextData->loader->loadRequirementSignature(
-        proto, contextData->requirementSignatureData, requirements);
-    if (requirements.empty())
-      return None;
-    return ctx.AllocateCopy(requirements);
+        proto, contextData->requirementSignatureData,
+        requirements, typeAliases);
+    return RequirementSignature(ctx.AllocateCopy(requirements),
+                                ctx.AllocateCopy(typeAliases));
   }
 
   auto buildViaGSB = [&]() {
@@ -8620,14 +8632,14 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto reqSignature = std::move(builder).computeGenericSignature(
                           /*allowConcreteGenericParams=*/false,
                           /*requirementSignatureSelfProto=*/proto);
-    return reqSignature.getRequirements();
+    return RequirementSignature(reqSignature.getRequirements(), None);
   };
 
   auto buildViaRQM = [&]() {
     return evaluateOrDefault(
         ctx.evaluator,
         RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(proto)},
-        ArrayRef<Requirement>());
+        RequirementSignature());
   };
 
   auto compare = [&](ArrayRef<Requirement> rqmResult,
@@ -8658,23 +8670,35 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   case RequirementMachineMode::Enabled:
     return buildViaRQM();
 
-  case RequirementMachineMode::Verify: {
+  case RequirementMachineMode::Verify:
+  case RequirementMachineMode::Check: {
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
-    if (!compare(rqmResult, gsbResult)) {
+    if (!compare(rqmResult.getRequirements(), gsbResult.getRequirements())) {
+      PrintOptions opts;
+      opts.ProtocolQualifiedDependentMemberTypes = true;
+
       llvm::errs() << "RequirementMachine protocol signature minimization is broken:\n";
       llvm::errs() << "Protocol: " << proto->getName() << "\n";
 
+      llvm::errs() << "RequirementMachine says:      ";
       auto rqmSig = GenericSignature::get(
-          proto->getGenericSignature().getGenericParams(), rqmResult);
-      llvm::errs() << "RequirementMachine says:      " << rqmSig << "\n";
+          proto->getGenericSignature().getGenericParams(),
+          rqmResult.getRequirements());
+      rqmSig.print(llvm::errs(), opts);
+      llvm::errs() << "\n";
 
+      llvm::errs() << "GenericSignatureBuilder says: ";
       auto gsbSig = GenericSignature::get(
-          proto->getGenericSignature().getGenericParams(), gsbResult);
-      llvm::errs() << "GenericSignatureBuilder says: " << gsbSig << "\n";
+          proto->getGenericSignature().getGenericParams(),
+          gsbResult.getRequirements());
+      gsbSig.print(llvm::errs(), opts);
+      llvm::errs() << "\n";
 
-      abort();
+      if (ctx.LangOpts.RequirementMachineProtocolSignatures
+          == RequirementMachineMode::Verify)
+        abort();
     }
 
     return rqmResult;

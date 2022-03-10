@@ -88,30 +88,24 @@ AsyncContextLayout irgen::getAsyncContextLayout(IRGenModule &IGM,
       IGM.getSILModule(), forwardingSubstitutionMap,
       IGM.getMaximalTypeExpansionContext());
   auto layout = getAsyncContextLayout(
-      IGM, originalType, substitutedType, forwardingSubstitutionMap,
-      /*useSpecialConvention*/ false,
-      FunctionPointer::Kind(FunctionPointer::BasicKind::AsyncFunctionPointer));
+      IGM, originalType, substitutedType, forwardingSubstitutionMap);
   return layout;
+}
+
+static Size getAsyncContextHeaderSize(IRGenModule &IGM) {
+  return 2 * IGM.getPointerSize();
 }
 
 AsyncContextLayout irgen::getAsyncContextLayout(
     IRGenModule &IGM, CanSILFunctionType originalType,
-    CanSILFunctionType substitutedType, SubstitutionMap substitutionMap,
-    bool useSpecialConvention, FunctionPointer::Kind kind) {
+    CanSILFunctionType substitutedType, SubstitutionMap substitutionMap) {
+  // FIXME: everything about this type is way more complicated than it
+  // needs to be now that we no longer pass and return things in memory
+  // in the async context and therefore the layout is totally static.
+
   SmallVector<const TypeInfo *, 4> typeInfos;
   SmallVector<SILType, 4> valTypes;
-  SmallVector<AsyncContextLayout::ArgumentInfo, 4> paramInfos;
-  SmallVector<SILResultInfo, 4> indirectReturnInfos;
-  SmallVector<SILResultInfo, 4> directReturnInfos;
 
-  SILFunctionConventions fnConv(substitutedType, IGM.getSILModule());
-
-  auto addTaskContinuationFunction = [&]() {
-    auto ty = SILType();
-    auto &ti = IGM.getTaskContinuationFunctionPtrTypeInfo();
-    valTypes.push_back(ty);
-    typeInfos.push_back(&ti);
-  };
   // AsyncContext * __ptrauth_swift_async_context_parent Parent;
   {
     auto ty = SILType();
@@ -122,32 +116,13 @@ AsyncContextLayout irgen::getAsyncContextLayout(
 
   // TaskContinuationFunction * __ptrauth_swift_async_context_resume
   //     ResumeParent;
-  addTaskContinuationFunction();
-
-  // AsyncContextFlags Flags;
   {
-    auto ty = SILType::getPrimitiveObjectType(
-        BuiltinIntegerType::get(32, IGM.IRGen.SIL.getASTContext())
-            ->getCanonicalType());
-    const auto &ti = IGM.getTypeInfo(ty);
+    auto ty = SILType();
+    auto &ti = IGM.getTaskContinuationFunctionPtrTypeInfo();
     valTypes.push_back(ty);
     typeInfos.push_back(&ti);
   }
 
-  // Add storage for data used by runtime entry points.
-  // See TaskFutureWaitAsyncContext.
-  if (kind.isSpecial()) {
-      // This needs to match the layout of TaskFutureWaitAsyncContext.
-      // Add storage for the waiting future's result pointer (OpaqueValue *).
-      auto ty = SILType();
-      auto &ti = IGM.getSwiftContextPtrTypeInfo();
-      // SwiftError *
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-      // OpaqueValue *successResultPointer
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-  }
   return AsyncContextLayout(IGM, LayoutStrategy::Optimal, valTypes, typeInfos,
                             originalType, substitutedType, substitutionMap);
 }
@@ -160,15 +135,42 @@ AsyncContextLayout::AsyncContextLayout(
                    fieldTypeInfos, /*typeToFill*/ nullptr),
       originalType(originalType), substitutedType(substitutedType),
       substitutionMap(substitutionMap)  {
-#ifndef NDEBUG
   assert(fieldTypeInfos.size() == fieldTypes.size() &&
          "type infos don't match types");
   assert(this->isFixedLayout());
-#endif
+  assert(this->getSize() == getAsyncContextHeaderSize(IGM));
 }
 
 Alignment IRGenModule::getAsyncContextAlignment() const {
   return Alignment(MaximumAlignment);
+}
+
+Optional<Size>
+FunctionPointerKind::getStaticAsyncContextSize(IRGenModule &IGM) const {
+  if (!isSpecial()) return None;
+
+  auto headerSize = getAsyncContextHeaderSize(IGM);
+  headerSize = headerSize.roundUpToAlignment(IGM.getPointerAlignment());
+
+  switch (getSpecialKind()) {
+  case SpecialKind::TaskFutureWaitThrowing:
+  case SpecialKind::TaskFutureWait:
+  case SpecialKind::AsyncLetWait:
+  case SpecialKind::AsyncLetWaitThrowing:
+  case SpecialKind::AsyncLetGet:
+  case SpecialKind::AsyncLetGetThrowing:
+  case SpecialKind::AsyncLetFinish:
+  case SpecialKind::TaskGroupWaitNext:
+  case SpecialKind::DistributedExecuteTarget:
+    // The current guarantee for all of these functions is the same.
+    // See TaskFutureWaitAsyncContext.
+    //
+    // If you add a new special runtime function, it is highly recommended
+    // that you make calls to it allocate a little more memory than this!
+    // These frames being this small is very arguably a mistake.
+    return headerSize + 3 * IGM.getPointerSize();
+  }
+  llvm_unreachable("covered switch");
 }
 
 void IRGenFunction::setupAsync(unsigned asyncContextIndex) {
@@ -386,13 +388,13 @@ namespace {
     bool CanUseSRet = true;
     bool CanUseError = true;
     bool CanUseSelf = true;
-    bool useSpecialConvention;
     unsigned AsyncContextIdx;
     unsigned AsyncResumeFunctionSwiftSelfIdx = 0;
+    FunctionPointerKind FnKind;
 
     SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType,
-                       bool useSpecialConvention)
-        : IGM(IGM), FnType(fnType), useSpecialConvention(useSpecialConvention) {
+                       FunctionPointerKind fnKind)
+        : IGM(IGM), FnType(fnType), FnKind(fnKind) {
     }
 
     /// Expand the components of the primary entrypoint of the function type.
@@ -1276,7 +1278,7 @@ static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
 }
 
 /// Expand the result and parameter types to the appropriate LLVM IR
-/// types for C and Objective-C signatures.
+/// types for C, C++ and Objective-C signatures.
 void SignatureExpansion::expandExternalSignatureTypes() {
   assert(FnType->getLanguage() == SILFunctionLanguage::C);
 
@@ -1317,7 +1319,15 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangCtx.VoidPtrTy);
     break;
 
-  case SILFunctionTypeRepresentation::CXXMethod:
+  case SILFunctionTypeRepresentation::CXXMethod: {
+    // Cxx methods take their 'self' argument first.
+    auto &self = params.back();
+    auto clangTy = IGM.getClangType(self, FnType);
+    paramTys.push_back(clangTy);
+    params = params.drop_back();
+    break;
+  }
+
   case SILFunctionTypeRepresentation::CFunctionPointer:
     // No implicit arguments.
     break;
@@ -1435,9 +1445,14 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     case clang::CodeGen::ABIArgInfo::IndirectAliased:
       llvm_unreachable("not implemented");
     case clang::CodeGen::ABIArgInfo::Indirect: {
-      assert(i >= clangToSwiftParamOffset &&
+      // When `i` is 0, if the clang offset is 1, that means we mapped the last
+      // Swift parameter (self) to the first Clang parameter (this). In this
+      // case, the corresponding Swift param is the last function parameter.
+      assert((i >= clangToSwiftParamOffset || clangToSwiftParamOffset == 1) &&
              "Unexpected index for indirect byval argument");
-      auto &param = params[i - clangToSwiftParamOffset];
+      auto &param = i < clangToSwiftParamOffset
+                        ? FnType->getParameters().back()
+                        : params[i - clangToSwiftParamOffset];
       auto paramTy = getSILFuncConventions().getSILType(
           param, IGM.getMaximalTypeExpansionContext());
       auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(paramTy));
@@ -1605,12 +1620,12 @@ void SignatureExpansion::expandParameters() {
   }
 
   // Next, the generic signature.
-  if (hasPolymorphicParameters(FnType) && !useSpecialConvention)
+  if (hasPolymorphicParameters(FnType) &&
+      !FnKind.shouldSuppressPolymorphicArguments())
     expandPolymorphicSignature(IGM, FnType, ParamIRTypes);
-  if (useSpecialConvention) {
-    // Async waiting functions add the resume function pointer, and the context
-    // for the call.
-    // (But skip passing the metadata.)
+
+  // Certain special functions are passed the continuation directly.
+  if (FnKind.shouldPassContinuationDirectly()) {
     ParamIRTypes.push_back(IGM.Int8PtrTy);
     ParamIRTypes.push_back(IGM.SwiftContextPtrTy);
   }
@@ -1772,9 +1787,10 @@ void SignatureExpansion::expandAsyncEntryType() {
   }
 
   // Next, the generic signature.
-  if (hasPolymorphicParameters(FnType) && !useSpecialConvention)
+  if (hasPolymorphicParameters(FnType) &&
+      !FnKind.shouldSuppressPolymorphicArguments())
     expandPolymorphicSignature(IGM, FnType, ParamIRTypes);
-  if (useSpecialConvention) {
+  if (FnKind.shouldPassContinuationDirectly()) {
     // Async waiting functions add the resume function pointer.
     // (But skip passing the metadata.)
     ParamIRTypes.push_back(IGM.Int8PtrTy);
@@ -1908,9 +1924,9 @@ Signature SignatureExpansion::getSignature() {
 
 Signature Signature::getUncached(IRGenModule &IGM,
                                  CanSILFunctionType formalType,
-                                 bool useSpecialConvention) {
+                                 FunctionPointerKind fpKind) {
   GenericContextScope scope(IGM, formalType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, formalType, useSpecialConvention);
+  SignatureExpansion expansion(IGM, formalType, fpKind);
   expansion.expandFunctionType();
   return expansion.getSignature();
 }
@@ -1918,7 +1934,7 @@ Signature Signature::getUncached(IRGenModule &IGM,
 Signature Signature::forCoroutineContinuation(IRGenModule &IGM,
                                               CanSILFunctionType fnType) {
   assert(fnType->isCoroutine());
-  SignatureExpansion expansion(IGM, fnType, /*suppress generics*/false);
+  SignatureExpansion expansion(IGM, fnType, FunctionPointerKind(fnType));
   expansion.expandCoroutineContinuationType();
   return expansion.getSignature();
 }
@@ -1927,28 +1943,25 @@ Signature Signature::forAsyncReturn(IRGenModule &IGM,
                                     CanSILFunctionType fnType) {
   assert(fnType->isAsync());
   GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, fnType,
-                               /*suppress generics*/ false);
+  SignatureExpansion expansion(IGM, fnType, FunctionPointerKind(fnType));
   expansion.expandAsyncReturnType();
   return expansion.getSignature();
 }
 
 Signature Signature::forAsyncAwait(IRGenModule &IGM, CanSILFunctionType fnType,
-                                   bool useSpecialConvention) {
+                                   FunctionPointerKind fnKind) {
   assert(fnType->isAsync());
   GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, fnType,
-                               /*suppress generics*/ useSpecialConvention);
+  SignatureExpansion expansion(IGM, fnType, fnKind);
   expansion.expandAsyncAwaitType();
   return expansion.getSignature();
 }
 
 Signature Signature::forAsyncEntry(IRGenModule &IGM, CanSILFunctionType fnType,
-                                   bool useSpecialConvention) {
+                                   FunctionPointerKind fnKind) {
   assert(fnType->isAsync());
   GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, fnType,
-                               /*suppress generics*/ useSpecialConvention);
+  SignatureExpansion expansion(IGM, fnType, fnKind);
   expansion.expandAsyncEntryType();
   return expansion.getSignature();
 }
@@ -2024,11 +2037,14 @@ llvm::Value *emitIndirectAsyncFunctionPointer(IRGenFunction &IGF,
 std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
     FunctionPointer functionPointer, llvm::Value *thickContext,
-    std::pair<bool, bool> values, Size initialContextSize) {
+    std::pair<bool, bool> values) {
   assert(values.first || values.second);
   assert(functionPointer.getKind() != FunctionPointer::Kind::Function);
+
   bool emitFunction = values.first;
   bool emitSize = values.second;
+  assert(emitFunction || emitSize);
+
   // Ensure that the AsyncFunctionPointer is not auth'd if it is not used and
   // that it is not auth'd more than once if it is needed.
   //
@@ -2050,12 +2066,22 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     }
     return *afpPtrValue;
   };
+
   llvm::Value *fn = nullptr;
   if (emitFunction) {
-    if (functionPointer.useStaticContextSize()) {
+    // If the FP is not an async FP, then we just have the direct
+    // address of the async function.  This only happens for special
+    // async functions right now.
+    if (!functionPointer.getKind().isAsyncFunctionPointer()) {
+      assert(functionPointer.getStaticAsyncContextSize(IGF.IGM));
       fn = functionPointer.getRawPointer();
+
+    // If we've opportunistically also emitted the direct address of the
+    // function, always prefer that.
     } else if (auto *function = functionPointer.getRawAsyncFunction()) {
       fn = function;
+
+    // Otherwise, extract the function pointer from the async FP structure.
     } else {
       llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(
           getAFPPtr()->getType()->getScalarType()->getPointerElementType(),
@@ -2064,18 +2090,18 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
           Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
           /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
     }
+
     if (auto authInfo =
             functionPointer.getAuthInfo().getCorrespondingCodeAuthInfo()) {
       fn = emitPointerAuthSign(IGF, fn, authInfo);
     }
   }
+
   llvm::Value *size = nullptr;
   if (emitSize) {
-    if (functionPointer.useStaticContextSize()) {
-      size = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                    initialContextSize.getValue());
+    if (auto staticSize = functionPointer.getStaticAsyncContextSize(IGF.IGM)) {
+      size = llvm::ConstantInt::get(IGF.IGM.Int32Ty, staticSize->getValue());
     } else {
-      assert(!functionPointer.useStaticContextSize());
       auto *sizePtr = IGF.Builder.CreateStructGEP(
           getAFPPtr()->getType()->getScalarType()->getPointerElementType(),
           getAFPPtr(), 1);
@@ -2330,23 +2356,23 @@ class AsyncCallEmission final : public CallEmission {
   llvm::Value *calleeFunction = nullptr;
   llvm::Value *currentResumeFn = nullptr;
   llvm::Value *thickContext = nullptr;
-  Size initialContextSize = Size(0);
+  Size staticContextSize = Size(0);
   Optional<AsyncContextLayout> asyncContextLayout;
 
   AsyncContextLayout getAsyncContextLayout() {
     if (!asyncContextLayout) {
       asyncContextLayout.emplace(::getAsyncContextLayout(
           IGF.IGM, getCallee().getOrigFunctionType(),
-          getCallee().getSubstFunctionType(), getCallee().getSubstitutions(),
-          getCallee().useSpecialConvention(),
-          getCallee().getFunctionPointer().getKind()));
+          getCallee().getSubstFunctionType(), getCallee().getSubstitutions()));
     }
     return *asyncContextLayout;
   }
 
-  void saveValue(ElementLayout layout, Explosion &explosion, bool isOutlined) {
+  void saveValue(ElementLayout layout, llvm::Value *value, bool isOutlined) {
     Address addr = layout.project(IGF, context, /*offsets*/ llvm::None);
     auto &ti = cast<LoadableTypeInfo>(layout.getType());
+    Explosion explosion;
+    explosion.add(value);
     ti.initialize(IGF, explosion, addr, isOutlined);
   }
   void loadValue(ElementLayout layout, Explosion &explosion) {
@@ -2368,30 +2394,30 @@ public:
     auto layout = getAsyncContextLayout();
     // Allocate space for the async context.
 
-    initialContextSize = Size(0);
-    // Only c++ runtime functions should use the initial context size.
-    if (CurCallee.getFunctionPointer().getKind().isSpecial()) {
-      initialContextSize = layout.getSize();
-    }
     llvm::Value *dynamicContextSize32;
     std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
         IGF, CurCallee.getOrigFunctionType()->getRepresentation(),
-        CurCallee.getFunctionPointer(), thickContext,
-        std::make_pair(true, true), initialContextSize);
+        CurCallee.getFunctionPointer(), thickContext);
     auto *dynamicContextSize =
         IGF.Builder.CreateZExt(dynamicContextSize32, IGF.IGM.SizeTy);
-    contextBuffer = getCallee().useSpecialConvention()
-                        ? emitStaticAllocAsyncContext(IGF, initialContextSize)
-                        : emitAllocAsyncContext(IGF, dynamicContextSize);
+    if (auto staticSize = dyn_cast<llvm::ConstantInt>(dynamicContextSize)) {
+      staticContextSize = Size(staticSize->getZExtValue());
+      assert(!staticContextSize.isZero());
+      contextBuffer = emitStaticAllocAsyncContext(IGF, staticContextSize);
+    } else {
+      contextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
+    }
     context = layout.emitCastTo(IGF, contextBuffer.getAddress());
   }
   void end() override {
     assert(contextBuffer.isValid());
     assert(context.isValid());
-    if (getCallee().useSpecialConvention())
-      emitStaticDeallocAsyncContext(IGF, contextBuffer, initialContextSize);
-    else
+    if (getCallee().getStaticAsyncContextSize(IGF.IGM)) {
+      assert(!staticContextSize.isZero());
+      emitStaticDeallocAsyncContext(IGF, contextBuffer, staticContextSize);
+    } else {
       emitDeallocAsyncContext(IGF, contextBuffer);
+    }
     super::end();
   }
   void setFromCallee() override {
@@ -2408,7 +2434,6 @@ public:
         Args[--LastArgWritten] = nullptr;
       }
     }
-    // We store the error pointer in the async context.
 
     llvm::Value *contextPtr = CurCallee.getSwiftContext();
     // Add the data pointer if we have one.
@@ -2427,7 +2452,7 @@ public:
     return FunctionPointer(
         FunctionPointer::Kind::Function, calleeFunction, codeAuthInfo,
         Signature::forAsyncAwait(IGF.IGM, getCallee().getOrigFunctionType(),
-                                 getCallee().useSpecialConvention()));
+                                 getCallee().getFunctionPointer().getKind()));
   }
 
   SILType getParameterType(unsigned index) override {
@@ -2448,9 +2473,10 @@ public:
     // Pass along the indirect result pointers.
     original.transferInto(asyncExplosion, fnConv.getNumIndirectSILResults());
 
-    // Pass the async context.
-    if (getCallee().useSpecialConvention()) {
-      // Pass the caller context.
+    // Pass the async context.  For special direct-continuation functions,
+    // we pass our own async context; otherwise we pass the context
+    // we created.
+    if (getCallee().shouldPassContinuationDirectly()) {
       asyncExplosion.add(IGF.getAsyncContext());
     } else
       asyncExplosion.add(contextBuffer.getAddress());
@@ -2511,40 +2537,42 @@ public:
     super::setArgs(asyncExplosion, false, witnessMetadata);
 
     auto layout = getAsyncContextLayout();
-    // Set caller info into the context.
-    if (!getCallee().useSpecialConvention()) { // caller context
+
+    // Innitialize the async context for returning if we're not using
+    // the special convention which suppresses that.
+    if (!getCallee().shouldPassContinuationDirectly()) {
+      // Set the caller context to the current context.
       Explosion explosion;
-      auto fieldLayout = layout.getParentLayout();
+      auto parentContextField = layout.getParentLayout();
       auto *context = IGF.getAsyncContext();
       if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
         Address fieldAddr =
-            fieldLayout.project(IGF, this->context, /*offsets*/ llvm::None);
+            parentContextField.project(IGF, this->context,
+                                       /*offsets*/ llvm::None);
         auto authInfo = PointerAuthInfo::emit(
             IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
         context = emitPointerAuthSign(IGF, context, authInfo);
       }
-      explosion.add(context);
-      saveValue(fieldLayout, explosion, isOutlined);
-    }
-    if (!getCallee().useSpecialConvention()) { // Return to caller function.
+      saveValue(parentContextField, context, isOutlined);
+
+      // Set the caller resumption function to the resumption function
+      // for this suspension.
       assert(currentResumeFn == nullptr);
-      auto fieldLayout = layout.getResumeParentLayout();
+      auto resumeParentField = layout.getResumeParentLayout();
       currentResumeFn = IGF.Builder.CreateIntrinsicCall(
           llvm::Intrinsic::coro_async_resume, {});
       auto fnVal = currentResumeFn;
       // Sign the pointer.
       if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextResume) {
         Address fieldAddr =
-            fieldLayout.project(IGF, this->context, /*offsets*/ llvm::None);
+            resumeParentField.project(IGF, this->context, /*offsets*/ llvm::None);
         auto authInfo = PointerAuthInfo::emit(
             IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
         fnVal = emitPointerAuthSign(IGF, fnVal, authInfo);
       }
       fnVal = IGF.Builder.CreateBitCast(fnVal,
                                         IGF.IGM.TaskContinuationFunctionPtrTy);
-      Explosion explosion;
-      explosion.add(fnVal);
-      saveValue(fieldLayout, explosion, isOutlined);
+      saveValue(resumeParentField, fnVal, isOutlined);
     }
   }
   void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
@@ -2655,7 +2683,10 @@ public:
     arguments.push_back(
         IGM.getInt32(paramAttributeFlags));
     arguments.push_back(currentResumeFn);
-    auto resumeProjFn = getCallee().useSpecialConvention()
+    // The special direct-continuation convention will pass our context
+    // when it resumes.  The standard convention passes the callee's
+    // context, so we'll need to pop that off to get ours.
+    auto resumeProjFn = getCallee().shouldPassContinuationDirectly()
                             ? IGF.getOrCreateResumeFromSuspensionFn()
                             : IGF.getOrCreateResumePrjFn();
     arguments.push_back(
@@ -2676,7 +2707,7 @@ public:
     return IGF.emitSuspendAsyncCall(asyncContextIndex, resultTy, arguments);
   }
   llvm::Value *getResumeFunctionPointer() override {
-    assert(getCallee().useSpecialConvention());
+    assert(getCallee().shouldPassContinuationDirectly());
     assert(currentResumeFn == nullptr);
     currentResumeFn =
         IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
@@ -3222,8 +3253,7 @@ void CallEmission::setFromCallee() {
 
   // Set up the args array.
   assert(Args.empty());
-  Args.reserve(numArgs);
-  Args.set_size(numArgs);
+  Args.resize_for_overwrite(numArgs);
   LastArgWritten = numArgs;
 }
 
@@ -3527,7 +3557,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   } else if (callee.getRepresentation() ==
              SILFunctionTypeRepresentation::CXXMethod) {
     // Skip the "self" param.
-    paramEnd--;
+    firstParam += 1;
+    params = params.drop_back();
   }
 
   if (fnType->getNumResults() > 0 &&

@@ -41,5 +41,7 @@ protocol P7 {
 }
 
 // CHECK-LABEL: protocol_typealias_same_type_requirement.(file).P8@
-// CHECK-LABEL: Requirement signature: <Self where Self : P6, Self : P7, Self.[P7]X == Int>
+// CHECK-LABEL: Requirement signature: <Self where Self : P6, Self : P7>
 protocol P8 : P6, P7 {}
+
+func testP8<T : P8>(_: T, x: T.X) -> Int { return x }

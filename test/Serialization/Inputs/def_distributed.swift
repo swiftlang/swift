@@ -65,7 +65,7 @@ public struct FakeActorSystem: DistributedActorSystem {
     .init()
   }
 
-  func remoteCall<Act, Err, Res>(
+  public func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
     invocation invocationEncoder: inout InvocationEncoder,
@@ -80,16 +80,15 @@ public struct FakeActorSystem: DistributedActorSystem {
     return "<REMOTE CALL>" as! Res
   }
 
-  func remoteCallVoid<Act, Err>(
+  public func remoteCallVoid<Act, Err>(
     on actor: Act,
     target: RemoteCallTarget,
     invocation invocationEncoder: inout InvocationEncoder,
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
-    Err: Error
-//          Act.ID == ActorID
-  {
+          Act.ID == ActorID,
+          Err: Error {
     print("remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocationEncoder), throwing:\(throwing)")
     return ()
   }

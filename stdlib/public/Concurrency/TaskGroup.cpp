@@ -38,7 +38,7 @@
 #include <dispatch/dispatch.h>
 #endif
 
-#if !defined(_WIN32) && !defined(__wasi__)
+#if !defined(_WIN32) && !defined(__wasi__) && __has_include(<dlfcn.h>)
 #include <dlfcn.h>
 #endif
 
@@ -622,7 +622,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
         _swift_tsan_acquire(static_cast<Job *>(waitingTask));
 
         // TODO: allow the caller to suggest an executor
-        waitingTask->flagAsEnqueuedOnExecutor(ExecutorRef::generic());
+        waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
         return;
       } // else, try again
     }

@@ -202,7 +202,8 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
   FormalEvaluationScope scope(SGF);
 
   if (inputType->isAnyExistentialType()) {
-    CanType openedType = OpenedArchetypeType::getAny(inputType);
+    CanType openedType = OpenedArchetypeType::getAny(inputType,
+                                                     SGF.F.getGenericSignature());
     SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
     input = SGF.emitOpenExistential(loc, input,
@@ -588,7 +589,9 @@ ManagedValue Transform::transform(ManagedValue v,
 
     auto layout = instanceType.getExistentialLayout();
     if (layout.getSuperclass()) {
-      CanType openedType = OpenedArchetypeType::getAny(inputSubstType);
+      CanType openedType =
+          OpenedArchetypeType::getAny(inputSubstType,
+                                      SGF.F.getGenericSignature());
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
       FormalEvaluationScope scope(SGF);
@@ -3049,7 +3052,8 @@ buildThunkSignature(SILGenFunction &SGF,
   auto *newGenericParam =
       GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
 
-  auto constraint = openedExistential->getOpenedExistentialType();
+  assert(openedExistential->isRoot());
+  auto constraint = openedExistential->getExistentialType();
   if (auto existential = constraint->getAs<ExistentialType>())
     constraint = existential->getConstraintType();
 

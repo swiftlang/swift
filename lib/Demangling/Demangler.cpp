@@ -139,6 +139,8 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
     case Node::Kind::AccessibleFunctionRecord:
+    case Node::Kind::BackDeploymentThunk:
+    case Node::Kind::BackDeploymentFallback:
       return true;
     default:
       return false;
@@ -1813,6 +1815,12 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
   case Node::Kind::Constructor:
     // Well, not really a nominal type.
     return createWithChildren(Node::Kind::BoundGenericFunction, Nominal, args);
+  case Node::Kind::Type:
+    if (!Nominal->hasChildren())
+      return nullptr;
+    if (Nominal->getFirstChild()->getKind() != Node::Kind::ProtocolList)
+      return nullptr;
+    return createWithChildren(Node::Kind::ParameterizedProtocol, Nominal, args);
   default:
     return nullptr;
   }
@@ -2641,6 +2649,13 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
         return demangleAutoDiffFunctionOrSimpleThunk(
             Node::Kind::AutoDiffFunction);
       }
+    case 'w':
+      switch (nextChar()) {
+      case 'b': return createNode(Node::Kind::BackDeploymentThunk);
+      case 'B': return createNode(Node::Kind::BackDeploymentFallback);
+      default:
+        return nullptr;
+      }
     default:
       return nullptr;
   }
@@ -3243,6 +3258,22 @@ NodePointer Demangler::demangleSpecialType() {
       NodePointer Type = popNode(Node::Kind::Type);
       return createType(createWithChildren(Node::Kind::ExistentialMetatype,
                                            MTR, Type));
+    }
+    case 'P': {
+      NodePointer RetroactiveConformances;
+      Vector<NodePointer> TypeListList(*this, 4);
+
+      if (!demangleBoundGenerics(TypeListList, RetroactiveConformances))
+        return nullptr;
+
+      NodePointer Type = popNode(Node::Kind::Type);
+      if (!Type)
+        return nullptr;
+
+      NodePointer BoundNode = demangleBoundGenericArgs(Type, TypeListList, 0);
+      NodePointer NTy = createType(BoundNode);
+      addSubstitution(NTy);
+      return NTy;
     }
     case 'p':
       return createType(createWithChild(Node::Kind::ExistentialMetatype,

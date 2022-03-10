@@ -20,9 +20,9 @@ public func testit() {
 // To create something like `alloc_stack ..., (name "foo", loc ..., scope 0)...`
 // as our testing input, we're only running SROA over the input swift code.
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false %s -disable-debugger-shadow-copies -emit-sil -g -o %t/stage1.sil
-// RUN: %target-sil-opt -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -sil-print-debuginfo -access-marker-elim -sroa %t/stage1.sil -o %t/stage2.sil
+// RUN: %target-sil-opt -parse-serialized-sil -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -sil-print-debuginfo -access-marker-elim -sroa %t/stage1.sil -o %t/stage2.sil
 // The verification shouldn't fail
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false %t/stage2.sil -sil-verify-all -sil-based-debuginfo -g -emit-sil -o %t/out.sil
+// RUN: %target-swift-frontend -Xllvm -parse-serialized-sil -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false %t/stage2.sil -sil-verify-all -sil-based-debuginfo -g -emit-sil -o %t/out.sil
 // RUN: %FileCheck %s --check-prefix=CHECK_DBG_SCOPE < %t/out.sil
 struct TheStruct {
     var the_member : Int

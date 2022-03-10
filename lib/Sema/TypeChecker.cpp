@@ -488,6 +488,13 @@ bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
                             true);
 }
 
+bool swift::typeCheckForCodeCompletion(
+    constraints::SolutionApplicationTarget &target, bool needsPrecheck,
+    llvm::function_ref<void(const constraints::Solution &)> callback) {
+  return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
+                                                 callback);
+}
+
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
   if (C.TypeCheckerOpts.DebugForbidTypecheckPrefix.empty())
     return;
@@ -536,6 +543,12 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                               Optional<FunctionTypeRepr *>repr,
                                               DeclContext *dc,
                                               Optional<TypeResolutionStage> stage) {
+  // Some of the below checks trigger cycles if we don't have a generic
+  // signature yet; we'll run the checks again in
+  // TypeResolutionStage::Interface.
+  if (stage == TypeResolutionStage::Structural)
+    return false;
+
   // If the type has a placeholder, don't try to diagnose anything now since
   // we'll produce a better diagnostic when (if) the expression successfully
   // typechecks.
@@ -575,8 +588,7 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
 
   // `@differentiable` function types must return a differentiable type and have
   // differentiable (or `@noDerivative`) parameters.
-  if (extInfo.isDifferentiable() &&
-      stage != TypeResolutionStage::Structural) {
+  if (extInfo.isDifferentiable()) {
     auto result = fnTy->getResult();
     auto params = fnTy->getParams();
     auto diffKind = extInfo.getDifferentiabilityKind();

@@ -35,7 +35,6 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CompletionInstance.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ConformingMethodList.h"
@@ -814,7 +813,7 @@ AllowCompilerErrors("allow-compiler-errors",
                     llvm::cl::desc("Whether to attempt to continue despite compiler errors"),
                     llvm::cl::init(false));
 
-static llvm::cl::opt<std::string>
+static llvm::cl::list<std::string>
   DefineAvailability("define-availability",
                      llvm::cl::desc("Define a macro for @available"),
                      llvm::cl::cat(Category));
@@ -1091,8 +1090,7 @@ printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
       Result->getCompletionString()->print(OS);
     }
 
-    OS << "; name=";
-    printCodeCompletionResultFilterName(*Result, OS);
+    OS << "; name=" << Result->getFilterName();
 
     if (IncludeSourceText) {
       OS << "; sourcetext=";
@@ -2962,11 +2960,10 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
-  // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
-  if (!Stdlib) {
-    llvm::errs() << "Failed loading stdlib\n";
-    return 1;
+  // Load implict imports so that Clang importer can use it.
+  for (auto unloadedImport :
+       CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Context.getModule(unloadedImport.module.getModulePath());
   }
 
   // If needed, load _Concurrency library so that the Clang importer can use it.
@@ -3030,11 +3027,10 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
-  // Load standard library so that Clang importer can use it.
-  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
-  if (!Stdlib) {
-    llvm::errs() << "Failed loading stdlib\n";
-    return 1;
+  // Load implict imports so that Clang importer can use it.
+  for (auto unloadedImport :
+       CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
+    (void)Context.getModule(unloadedImport.module.getModulePath());
   }
 
   auto &FEOpts = Invocation.getFrontendOptions();
@@ -4189,9 +4185,8 @@ int main(int argc, char *argv[]) {
         auto contextualResult = new CodeCompletionResult(
             *contextFreeResult, SemanticContextKind::OtherModule,
             CodeCompletionFlair(),
-            /*numBytesToErase=*/0,
-            CodeCompletionResult::ExpectedTypeRelation::Unknown,
-            ContextualNotRecommendedReason::None,
+            /*numBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
+            /*USRTypeContext=*/nullptr, ContextualNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
         contextualResults.push_back(contextualResult);
       }
@@ -4238,8 +4233,8 @@ int main(int argc, char *argv[]) {
 
   InitInvok.setSDKPath(options::SDK);
 
-  if (!options::DefineAvailability.empty()) {
-    InitInvok.getLangOptions().AvailabilityMacros.push_back(options::DefineAvailability);
+  for (auto macro : options::DefineAvailability) {
+    InitInvok.getLangOptions().AvailabilityMacros.push_back(macro);
   }
   for (auto map: options::SerializedPathObfuscate) {
     auto SplitMap = StringRef(map).split('=');
