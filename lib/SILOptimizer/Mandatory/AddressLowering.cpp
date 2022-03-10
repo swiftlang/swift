@@ -1092,8 +1092,7 @@ checkStorageDominates(AllocStackInst *allocInst,
 
 void OpaqueStorageAllocation::allocatePhi(PhiValue phi) {
   // Coalesces phi operand storage with the phi storage. The algorithm processes
-  // all incoming values at once, so it is is run when visiting the block
-  // argument.
+  // all incoming values at once, so it is run when visiting the block argument.
   //
   // The phi operand projections are computed first to give them priority. Then
   // we determine if the phi itself can share storage with one of its users.
@@ -1143,17 +1142,12 @@ createStackAllocation(SILValue value) {
   assert(value.getOwnershipKind() != OwnershipKind::Guaranteed && 
          "creating storage for a guaranteed value implies a copy");
 
-#ifndef NDEBUG
   // Instructions that produce an opened type never reach here because they
   // have guaranteed ownership--they project their storage. We reach this
   // point after the opened value has been copied.
-  if (auto *defInst = value->getDefiningInstruction()) {
-    if (auto *singleValue = dyn_cast<SingleValueInstruction>(defInst)) {
-      assert(!cast<SingleValueInstruction>(defInst)->getDefinedOpenedArchetype()
-             && "owned open_existential is unsupported");
-    }
-  }
-#endif
+  assert((!isa<SingleValueInstruction>(value)
+          || !cast<SingleValueInstruction>(value)->getDefinedOpenedArchetype())
+         && "owned open_existential is unsupported");
 
   SILType allocTy = value->getType();
 
