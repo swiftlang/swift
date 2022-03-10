@@ -365,6 +365,44 @@ entry(%addr : $*X, %instance : @owned $X):
   return %retval : $()
 }
 
+// Hoist up to a (transitive) use of an address_to_pointer instruction.  In
+// particular, do _some_ hoisting despite the fact that such an instruction is
+// a use.
+//
+// CHECK-LABEL: sil [ossa] @hoist_upto_address_to_pointer_use : {{.*}} {
+// CHECK:         address_to_pointer
+// CHECK:         pointer_to_address
+// CHECK:         load [copy]
+// CHECK:         destroy_addr
+// CHECK:         tuple
+// CHECK-LABEL: } // end sil function 'hoist_upto_address_to_pointer_use'
+sil [ossa] @hoist_upto_address_to_pointer_use : $@convention(thin) (@in X) -> (@owned X) {
+entry(%instance : $*X):
+  %pointer = address_to_pointer %instance : $*X to $Builtin.RawPointer
+  %addr = pointer_to_address %pointer : $Builtin.RawPointer to $*X
+  %value = load [copy] %addr : $*X
+  %retval = tuple ()
+  destroy_addr %instance : $*X
+  return %value : $X
+}
+
+// Hoist even if the pointerified address gets used.
+//
+// CHECK-LABEL: sil [ossa] @hoist_despite_use_of_pointer : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK-NEXT:    destroy_addr [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_despite_use_of_pointer'
+sil [ossa] @hoist_despite_use_of_pointer : $@convention(thin) (@inout X) -> () {
+entry(%instance : $*X):
+   %addr_for_pointer = alloc_stack $Builtin.RawPointer
+   %pointer = address_to_pointer %instance : $*X to $Builtin.RawPointer
+   store %pointer to [trivial] %addr_for_pointer : $*Builtin.RawPointer
+   %retval = tuple ()
+   destroy_addr %instance : $*X
+   dealloc_stack %addr_for_pointer : $*Builtin.RawPointer
+   return %retval : $()
+}
+
 // Fold destroy_addr and a load [copy] into a load [take] even when that
 // load [take] is guarded by an access scope.
 //
