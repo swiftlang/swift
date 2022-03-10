@@ -1568,15 +1568,24 @@ namespace {
     /// and we reach up to mark the CallExpr.
     void markNearestCallAsImplicitly(
         Optional<ImplicitActorHopTarget> setAsync,
-        bool setThrows = false, bool setDistributedThunk = false) {
+        bool setThrows = false,
+        bool setDistributedThunk = false) {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
 
       const auto End = applyStack.rend();
       for (auto I = applyStack.rbegin(); I != End; ++I)
         if (auto call = dyn_cast<CallExpr>(*I)) {
-          if (setAsync) call->setImplicitlyAsync(*setAsync);
-          if (setThrows) call->setImplicitlyThrows(true);
-          if (setDistributedThunk) call->setShouldApplyDistributedThunk(true);
+          if (setAsync) {
+            call->setImplicitlyAsync(*setAsync);
+          }
+          if (setThrows) {
+            call->setImplicitlyThrows(true);
+          }else {
+            call->setImplicitlyThrows(false);
+          }
+          if (setDistributedThunk) {
+            call->setShouldApplyDistributedThunk(true);
+          }
           return;
         }
       llvm_unreachable("expected a CallExpr in applyStack!");
@@ -1903,6 +1912,39 @@ namespace {
       return nullptr;
     }
 
+    VarDecl *findReferencedBaseSelf(Expr *expr) {
+      if (auto selfVar = getReferencedParamOrCapture(expr))
+        if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
+          return selfVar;
+
+      // Look through identity expressions and implicit conversions.
+      Expr *prior;
+      do {
+        prior = expr;
+
+        expr = expr->getSemanticsProvidingExpr();
+
+        if (auto conversion = dyn_cast<ImplicitConversionExpr>(expr))
+          expr = conversion->getSubExpr();
+      } while (prior != expr);
+
+      if (auto call = dyn_cast<DotSyntaxCallExpr>(expr)) {
+        for (auto arg : *call->getArgs()) {
+          if (auto declRef = dyn_cast<DeclRefExpr>(arg.getExpr())) {
+            if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
+              if (var->isSelfParameter()) {
+                return var;
+              }
+            }
+          }
+        }
+      }
+
+
+      // Not a self reference.
+      return nullptr;
+    }
+
     static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
       auto fn = dyn_cast<FuncDecl>(dc);
       if (!fn) return nullptr;
@@ -2149,6 +2191,14 @@ namespace {
         return None;
       }
 
+      if (auto baseSelf = findReferencedBaseSelf(context)) {
+        if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+        return std::make_pair(
+            /*setThrows=*/false,
+            /*isDistributedThunk=*/false);
+        }
+      }
+
       // Check that we have a distributed function.
       auto func = dyn_cast<AbstractFunctionDecl>(decl);
       if (!func || !func->isDistributed()) {
@@ -2160,7 +2210,9 @@ namespace {
         return None;
       }
 
-      return std::make_pair(!func->hasThrows(), true);
+      return std::make_pair(
+          /*setThrows=*/!func->hasThrows(),
+          /*isDistributedThunk=*/true);
     }
 
     /// Attempts to identify and mark a valid cross-actor use of a synchronous
@@ -2863,7 +2915,8 @@ namespace {
         bool performDistributedChecks =
             isolation.getActorType()->isDistributedActor() &&
             !isolatedActor.isPotentiallyIsolated &&
-            !isa<ConstructorDecl>(member);
+            !isa<ConstructorDecl>(member) &&
+            !member->getAttrs().hasAttribute<KnownToBeLocalAttr>();
         if (performDistributedChecks) {
           if (auto access = checkDistributedAccess(memberLoc, member, context)){
             // This is a distributed access, so mark it as throwing or
@@ -3050,10 +3103,6 @@ namespace {
     }
     }
 
-    /// Determine whether the given reference is to a method on
-    /// a remote distributed actor in the given context.
-    bool isDistributedThunk(ConcreteDeclRef ref, Expr *context,
-                            bool isInAsyncLetInitializer);
   };
 }
 
@@ -3119,7 +3168,7 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
     if (auto superInit = ctor->getSuperInitCall())
       superInit->walk(checker);
   }
-  if (auto attr = decl->getAttrs().getAttribute<DistributedActorAttr>()) {
+  if (decl->getAttrs().hasAttribute<DistributedActorAttr>()) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       checkDistributedFunction(func, /*diagnose=*/true);
     }

@@ -65,8 +65,8 @@ void emitDistributedActorSystemWitnessCall(
   auto &C = F.getASTContext();
 
   // Dig out the conformance to DistributedActorSystem.
-  ProtocolDecl *systemProto = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
-  assert(systemProto);
+  ProtocolDecl *DAS = C.getDistributedActorSystemDecl();
+  assert(DAS);
   auto systemASTType = base->getType().getASTType();
   auto *module = M.getSwiftModule();
   ProtocolConformanceRef systemConfRef;
@@ -83,16 +83,16 @@ void emitDistributedActorSystemWitnessCall(
   }
 
   if (systemASTType->isTypeParameter() || systemASTType->is<ArchetypeType>()) {
-    systemConfRef = ProtocolConformanceRef(systemProto);
+    systemConfRef = ProtocolConformanceRef(DAS);
   } else {
-    systemConfRef = module->lookupConformance(systemASTType, systemProto);
+    systemConfRef = module->lookupConformance(systemASTType, DAS);
   }
 
   assert(!systemConfRef.isInvalid() &&
          "Missing conformance to `DistributedActorSystem`");
 
   // Dig out the method.
-  auto method = cast<FuncDecl>(systemProto->getSingleRequirement(methodName));
+  auto method = cast<FuncDecl>(DAS->getSingleRequirement(methodName));
   auto methodRef = SILDeclRef(method, SILDeclRef::Kind::Func);
   auto methodSILTy =
       M.Types.getConstantInfo(B.getTypeExpansionContext(), methodRef)
@@ -147,7 +147,6 @@ void emitDistributedActorSystemWitnessCall(
   auto params = methodSILFnTy->getParameters();
   for (size_t i = 0; i < args.size(); ++i) {
     auto arg = args[i];
-    // FIXME(distributed): handle multiple ones (!!!!)
     if (params[i].isFormalIndirect() &&
         !arg->getType().isAddress() &&
         !dyn_cast<AnyMetatypeType>(arg->getType().getASTType())) {

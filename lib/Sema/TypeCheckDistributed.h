@@ -38,7 +38,7 @@ class NominalTypeDecl;
 bool ensureDistributedModuleLoaded(Decl *decl);
 
 /// Check for illegal property declarations (e.g. re-declaring transport or id)
-void checkDistributedActorProperties(const ClassDecl *decl);
+void checkDistributedActorProperties(const NominalTypeDecl *decl);
 
 /// The local and resolve distributed actor constructors have special rules to check.
 void checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ctor);

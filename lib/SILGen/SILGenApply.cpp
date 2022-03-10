@@ -1058,8 +1058,8 @@ public:
     }
 
     SILDeclRef constant = SILDeclRef(afd);
-    if (afd->isDistributed()) {
-      constant = constant.asDistributed(true);
+    if (auto distributedThunk = afd->getDistributedThunk()) {
+      constant = SILDeclRef(distributedThunk).asDistributed();
     } else {
       constant = constant.asForeign(requiresForeignEntryPoint(afd));
     }
@@ -1119,9 +1119,13 @@ public:
     }
 
     // Otherwise, we have a statically-dispatched call.
-    auto constant = SILDeclRef(e->getDecl());
+    SILDeclRef constant = SILDeclRef(e->getDecl());
+
+    /// Some special handling may be necessary for thunks:
     if (callSite && callSite->shouldApplyDistributedThunk()) {
-      constant = constant.asDistributed(true);
+      if (auto distributedThunk = cast<AbstractFunctionDecl>(e->getDecl())->getDistributedThunk()) {
+        constant = SILDeclRef(distributedThunk).asDistributed();
+      }
     } else if (afd->isBackDeployed()) {
       // If we're calling a back deployed function then we need to call a
       // thunk instead that will handle the fallback when the original
@@ -5155,8 +5159,8 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   auto callRef = SILDeclRef(call, SILDeclRef::Kind::Func)
                      .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
 
-  if (call->isDistributed()) {
-    callRef = callRef.asDistributed(true);
+  if (auto distributedThunk = call->getDistributedThunk()) {
+    callRef = SILDeclRef(distributedThunk).asDistributed();
   } else if (call->isBackDeployed()) {
     callRef =
         callRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);

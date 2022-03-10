@@ -8,6 +8,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// FIXME(distributed): rdar://90078069
+// UNSUPPORTED: linux
+
 import _Distributed
 import _Concurrency
 
@@ -128,7 +131,7 @@ struct FakeActorSystem: DistributedActorSystem {
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    guard target.mangledName != "$s4main28SomeSpecificDistributedActorC24helloThrowsTransportBoomSSyKFTE" else {
+    guard target.mangledName != "$s4main28SomeSpecificDistributedActorC24helloThrowsTransportBoomSSyYaKFTE" else {
       throw Boom("system")
     }
 
@@ -237,15 +240,15 @@ func test_remote_invoke(address: ActorAddress, system: FakeActorSystem) async {
   // TODO(distributed): remote - helloAsyncThrows: remote(_remote_impl_helloAsyncThrows())
   // CHECK: remote - helloAsyncThrows: remote($s4main28SomeSpecificDistributedActorC16helloAsyncThrowsSSyYaKFTE)
   // TODO(distributed): remote - helloAsync: remote()
-  // CHECK: remote - helloAsync: remote($s4main28SomeSpecificDistributedActorC10helloAsyncSSyYaFTE)
+  // CHECK: remote - helloAsync: remote($s4main28SomeSpecificDistributedActorC10helloAsyncSSyYaKFTE)
   // TODO(distributed): remote - helloThrows: remote(_remote_impl_helloThrows())
-  // CHECK: remote - helloThrows: remote($s4main28SomeSpecificDistributedActorC11helloThrowsSSyKFTE)
+  // CHECK: remote - helloThrows: remote($s4main28SomeSpecificDistributedActorC11helloThrowsSSyYaKFTE)
   // TODO(distributed): remote - hello: remote(_remote_impl_hello())
-  // CHECK: remote - hello: remote($s4main28SomeSpecificDistributedActorC5helloSSyFTE)
+  // CHECK: remote - hello: remote($s4main28SomeSpecificDistributedActorC5helloSSyYaKFTE)
   // TODO(distributed): remote - callTaskSelf: remote(_remote_impl_callTaskSelf())
-  // CHECK: remote - callTaskSelf: remote($s4main28SomeSpecificDistributedActorC12callTaskSelfSSyYaFTE)
+  // CHECK: remote - callTaskSelf: remote($s4main28SomeSpecificDistributedActorC12callTaskSelfSSyYaKFTE)
   // TODO(distributed): remote - callDetachedSelf: remote(_remote_impl_callDetachedSelf())
-  // CHECK: remote - callDetachedSelf: remote($s4main28SomeSpecificDistributedActorC16callDetachedSelfSSyYaFTE)
+  // CHECK: remote - callDetachedSelf: remote($s4main28SomeSpecificDistributedActorC16callDetachedSelfSSyYaKFTE)
   // CHECK: remote - helloThrowsTransportBoom: Boom(whoFailed: "system")
 
   print(local)

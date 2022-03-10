@@ -292,8 +292,8 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       params.push_back(arg);
     }
   } else if (ICK == ImplicitConstructorKind::DefaultDistributedActor) {
-    assert(isa<ClassDecl>(decl));
-    assert(decl->isDistributedActor() &&
+    auto classDecl = dyn_cast<ClassDecl>(decl);
+    assert(classDecl && decl->isDistributedActor() &&
            "Only 'distributed actor' type can gain implicit distributed actor init");
 
     /// Add 'system' parameter to default init of distributed actors.
@@ -305,7 +305,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_system, Loc,
                                       ctx.Id_system, decl);
       arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(getDistributedActorSystemType(decl));
+      arg->setInterfaceType(getDistributedActorSystemType(classDecl));
       arg->setImplicit();
 
       params.push_back(arg);
