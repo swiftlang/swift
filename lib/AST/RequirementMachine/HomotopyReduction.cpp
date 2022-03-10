@@ -805,11 +805,18 @@ void RewriteSystem::minimizeRewriteSystem() {
   // First pass:
   // - Eliminate all LHS-simplified non-conformance rules.
   // - Eliminate all RHS-simplified and substitution-simplified rules.
-  // - Eliminate all rules with unresolved symbols.
+  //
+  // An example of a conformance rule that is LHS-simplified but not
+  // RHS-simplified is (T.[P] => T) where T is irreducible, but there
+  // is a rule (V.[P] => V) for some V with T == U.V.
+  //
+  // Such conformance rules can still be minimal, as part of a hack to
+  // maintain compatibility with the GenericSignatureBuilder's minimization
+  // algorithm.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    llvm::dbgs() << "---------------------------------------------\n";
-    llvm::dbgs() << "First pass: simplified and unresolved rules -\n";
-    llvm::dbgs() << "---------------------------------------------\n";
+    llvm::dbgs() << "------------------------------\n";
+    llvm::dbgs() << "First pass: simplified rules -\n";
+    llvm::dbgs() << "------------------------------\n";
   }
 
   performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
@@ -823,8 +830,31 @@ void RewriteSystem::minimizeRewriteSystem() {
         rule.isSubstitutionSimplified())
       return true;
 
-    if (rule.containsUnresolvedSymbols() &&
-        !rule.isProtocolTypeAliasRule())
+    return false;
+  });
+
+  // Second pass:
+  // - Eliminate all rules with unresolved symbols which were *not*
+  //   simplified.
+  //
+  // Two examples of such rules:
+  //
+  //  - (T.X => T.[P:X]) obtained from resolving the overlap between
+  //    (T.[P] => T) and ([P].X => [P:X]).
+  //
+  // - (T.X.[concrete: C] => T.X) obtained from resolving the overlap
+  //   between (T.[P] => T) and a protocol typealias rule
+  //   ([P].X.[concrete: C] => [P].X).
+  if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    llvm::dbgs() << "-------------------------------\n";
+    llvm::dbgs() << "Second pass: unresolved rules -\n";
+    llvm::dbgs() << "-------------------------------\n";
+  }
+
+  performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
+    const auto &rule = getRule(ruleID);
+
+    if (rule.containsUnresolvedSymbols())
       return true;
 
     return false;
@@ -840,11 +870,11 @@ void RewriteSystem::minimizeRewriteSystem() {
   llvm::DenseSet<unsigned> redundantConformances;
   computeMinimalConformances(redundantConformances);
 
-  // Second pass: Eliminate all non-minimal conformance rules.
+  // Third pass: Eliminate all non-minimal conformance rules.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    llvm::dbgs() << "--------------------------------------------\n";
-    llvm::dbgs() << "Second pass: non-minimal conformance rules -\n";
-    llvm::dbgs() << "--------------------------------------------\n";
+    llvm::dbgs() << "-------------------------------------------\n";
+    llvm::dbgs() << "Third pass: non-minimal conformance rules -\n";
+    llvm::dbgs() << "-------------------------------------------\n";
   }
 
   performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
@@ -857,11 +887,11 @@ void RewriteSystem::minimizeRewriteSystem() {
     return false;
   });
 
-  // Third pass: Eliminate all other redundant non-conformance rules.
+  // Fourth pass: Eliminate all remaining redundant non-conformance rules.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    llvm::dbgs() << "---------------------------------------\n";
-    llvm::dbgs() << "Third pass: all other redundant rules -\n";
-    llvm::dbgs() << "---------------------------------------\n";
+    llvm::dbgs() << "----------------------------------------\n";
+    llvm::dbgs() << "Fourth pass: all other redundant rules -\n";
+    llvm::dbgs() << "----------------------------------------\n";
   }
 
   performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
