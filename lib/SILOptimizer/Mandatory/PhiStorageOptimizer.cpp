@@ -116,7 +116,6 @@ void PhiStorageOptimizer::optimize() {
     coalescedPhi.coalescedOperands.push_back(phi.getOperand(predecessor));
     return;
   }
-  occupiedBlocks.insert(phi.phiBlock);
   for (auto *incomingPred : phi.phiBlock->getPredecessorBlocks()) {
     tryCoalesceOperand(incomingPred);
   }
@@ -145,14 +144,15 @@ bool PhiStorageOptimizer::canCoalesceValue(SILValue incomingVal) {
 
   auto &incomingStorage = valueStorageMap.getStorage(incomingVal);
 
-  // If the incoming use is pre-allocated it can't be coalesced.
-  // This also handles incoming values that are already coalesced with
-  // another use.
+  // If the incoming use directly reuses its def storage, projects out of its
+  // def storage, or is pre-allocated, then it can't be coalesced. When incoming
+  // storage is directly reused, isAllocated() is false. isProjection() covers
+  // the other cases.
   //
   // Coalescing use projections from incomingVal into its other non-phi uses
-  // would require by recursively following uses across projections when
-  // computing liveness.
-  if (incomingStorage.isProjection())
+  // could be handled, but would require by recursively following uses across
+  // projections when computing liveness.
+  if (!incomingStorage.isAllocated() || incomingStorage.isProjection())
     return false;
 
   auto *defInst = incomingVal->getDefiningInstruction();
@@ -163,7 +163,6 @@ bool PhiStorageOptimizer::canCoalesceValue(SILValue incomingVal) {
     // analysis of the whole phi web before coalescing phi operands.
     return false;
   }
-  assert(incomingStorage.isAllocated() && "nonphi must be allocated");
 
   // Don't coalesce an incoming value unless it's storage is from a stack
   // allocation, which can be replaced with another alloc_stack.
@@ -213,7 +212,11 @@ bool PhiStorageOptimizer::recordUseLiveness(SILValue incomingVal,
   for (auto *use : incomingVal->getUses()) {
     StackList<SILBasicBlock *> liveBBWorklist(getFunction());
 
+    // If \p liveBB is already occupied by another value, return
+    // false. Otherwise, mark \p liveBB live and push it onto liveBBWorklist.
     auto visitLiveBlock = [&](SILBasicBlock *liveBB) {
+      assert(liveBB != phi.phiBlock && "phi operands are consumed");
+
       if (occupiedBlocks.contains(liveBB))
         return false;
 
