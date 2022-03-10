@@ -601,36 +601,6 @@ extension String.UTF16View {
       }
     }
   }
-  
-  @inline(__always)
-  private func transcodeOneAtATime(
-    _ readIdx: inout Int,
-    _ writePtr: inout UnsafeMutablePointer<UInt16>,
-    _ readEnd: Int,
-    _ utf8: UnsafeBufferPointer<UInt8>
-  ) {
-    let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
-    writePtr.pointee = scalar.utf16[0]
-    writePtr += 1
-    readIdx &+= len
-    if _slowPath(scalar.utf16.count == 2) {
-      writePtr.pointee = scalar.utf16[1]
-      writePtr += 1
-    }
-  }
-
-  @inline(__always)
-  private func transcodeOneASCIIWord(
-    _ readIdx: inout Int,
-    _ writePtr: inout UnsafeMutablePointer<UInt16>,
-    _ utf8: UnsafeBufferPointer<UInt8>
-  ) {
-    for _ in 0 ..< (MemoryLayout<UInt>.stride) {
-      writePtr.pointee = UInt16(truncatingIfNeeded: utf8[_unchecked: readIdx])
-      writePtr += 1
-      readIdx &+= 1
-    }
-  }
 
   // Copy (i.e. transcode to UTF-16) our contents into a buffer. `alignedRange`
   // means that the indices are part of the UTF16View.indices -- they are either
@@ -677,28 +647,15 @@ extension String.UTF16View {
         writeIdx &+= 1
       }
 
-      var writePtr = buffer.baseAddress.unsafelyUnwrapped
-
-      let stride = MemoryLayout<UInt>.stride
-      let wordASCIIMask = UInt(truncatingIfNeeded: 0x8080_8080_8080_8080 as UInt64)
-
-      while readIdx < readEnd && (UInt(bitPattern: utf8.baseAddress.unsafelyUnwrapped + readIdx)) % UInt(stride) != 0 {
-        transcodeOneAtATime(&readIdx, &writePtr, readEnd, utf8)
-      }
-
       // Transcode middle
       while readIdx < readEnd {
-        if readIdx + stride < readEnd &&
-           ((utf8.baseAddress.unsafelyUnwrapped + readIdx).withMemoryRebound(
-              to: UInt.self, capacity: 1
-           ) {
-          $0.pointee & wordASCIIMask == 0
-        }) {
-          transcodeOneASCIIWord(&readIdx, &writePtr, utf8)
-        } else {
-          for _ in readIdx ..< Swift.min(readIdx + stride, readEnd) {
-            transcodeOneAtATime(&readIdx, &writePtr, readEnd, utf8)
-          }
+        let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
+        buffer[writeIdx] = scalar.utf16[0]
+        readIdx &+= len
+        writeIdx &+= 1
+        if _slowPath(scalar.utf16.count == 2) {
+          buffer[writeIdx] = scalar.utf16[1]
+          writeIdx &+= 1
         }
       }
 
