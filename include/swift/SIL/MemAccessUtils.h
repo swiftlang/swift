@@ -260,6 +260,16 @@ enum class NestedAccessType { StopAtAccessBegin, IgnoreAccessBegin };
 /// previous.
 enum class AccessUseType { Exact, Inner, Overlapping };
 
+/// When walking from a value to its storage, casts may be encountered.  The
+/// cases describe variety of encountered casts, categorized by the kind of
+/// transformation that the casts perform.
+///
+/// The enum values are ordered.  Each successive cast kind is more
+/// transformative than the last.
+///
+/// TODO: Distinguish between LayoutEquivalent and LayoutCompatibile.
+enum class AccessStorageCast { Identity, Type };
+
 /// The physical representation used to identify access information and common
 /// API used by both AccessBase and AccessStorage.
 ///
@@ -896,6 +906,30 @@ struct AccessStorageWithBase {
 
   void print(raw_ostream &os) const;
   void dump() const;
+};
+
+/// Extends AccessStorageWithBase by adding information that was obtained while
+/// visiting from a particular address, to which an instance of this is
+/// relative.
+struct RelativeAccessStorageWithBase {
+
+  /// Identical to AccessStorageWithBase::compute but preserves information
+  /// specific to the walk from address;
+  static RelativeAccessStorageWithBase compute(SILValue address);
+
+  /// Identical to AccessStorageWithBase::computeInScope but preserves
+  /// information specific to the walk from address;
+  static RelativeAccessStorageWithBase computeInScope(SILValue address);
+
+  /// The address to which this RelativeAccessStorageWithBase is relative.
+  SILValue address;
+  /// The underlying access storage and base.
+  AccessStorageWithBase storageWithBase;
+  /// The most transformative cast that was seen between when walking from
+  /// address to storage.base;
+  Optional<AccessStorageCast> cast;
+
+  AccessStorage getStorage() const { return storageWithBase.storage; }
 };
 
 /// Return an AccessStorage value that identifies formally accessed storage
@@ -1637,8 +1671,9 @@ public:
   // Result visitBase(SILValue base, AccessStorage::Kind kind);
   // Result visitNonAccess(SILValue base);
   // Result visitPhi(SILPhiArgument *phi);
-  // Result visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper);
-  // Result visitAccessProjection(SingleValueInstruction *projectedAddr,
+  // Result visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper,
+  // AccessStorageCast cast); Result
+  // visitAccessProjection(SingleValueInstruction *projectedAddr,
   //                              Operand *sourceOper);
 
   Result visit(SILValue sourceAddr);
@@ -1650,8 +1685,12 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     if (auto *projOper = getAccessProjectionOperand(svi))
       return asImpl().visitAccessProjection(svi, projOper);
 
-    if (isAccessStorageCast(svi))
-      return asImpl().visitStorageCast(svi, &svi->getAllOperands()[0]);
+    if (isAccessStorageTypeCast(svi))
+      return asImpl().visitStorageCast(svi, &svi->getAllOperands()[0],
+                                       AccessStorageCast::Type);
+    if (isAccessStorageIdentityCast(svi))
+      return asImpl().visitStorageCast(svi, &svi->getAllOperands()[0],
+                                       AccessStorageCast::Identity);
   }
   switch (sourceAddr->getKind()) {
   default:
@@ -1826,7 +1865,8 @@ public:
     return SILValue();
   }
 
-  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper) {
+  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper,
+                            AccessStorageCast) {
     // The cloner does not currently know how to create compensating
     // end_borrows or fix mark_dependence operands.
     if (isa<BeginBorrowInst>(cast) || isa<MarkDependenceInst>(cast))
