@@ -441,9 +441,12 @@ public:
 
   std::string getClangModuleHash() const;
 
-  /// If we already imported a given decl, return the corresponding Swift decl.
-  /// Otherwise, return nullptr.
-  Decl *importDeclCached(const clang::NamedDecl *ClangDecl);
+  /// If we already imported a given decl successfully, return the corresponding
+  /// Swift decl as an Optional<Decl *>, but if we previously tried and failed
+  /// to import said decl then return nullptr.
+  /// Otherwise, if we have never encountered this decl previously then return
+  /// None.
+  Optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl);
 
   // Returns true if it is expected that the macro is ignored.
   bool shouldIgnoreMacro(StringRef Name, const clang::MacroInfo *Macro);
