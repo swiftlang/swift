@@ -642,7 +642,7 @@ extension String.UTF16View {
       if _slowPath(range.lowerBound.transcodedOffset != 0) {
         _internalInvariant(range.lowerBound.transcodedOffset == 1)
         let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
-        buffer[writeIdx] = scalar.utf16[1]
+        buffer[_unchecked: writeIdx] = scalar.utf16[1]
         readIdx &+= len
         writeIdx &+= 1
       }
@@ -650,11 +650,11 @@ extension String.UTF16View {
       // Transcode middle
       while readIdx < readEnd {
         let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
-        buffer[writeIdx] = scalar.utf16[0]
+        buffer[_unchecked: writeIdx] = scalar.utf16[0]
         readIdx &+= len
         writeIdx &+= 1
         if _slowPath(scalar.utf16.count == 2) {
-          buffer[writeIdx] = scalar.utf16[1]
+          buffer[_unchecked: writeIdx] = scalar.utf16[1]
           writeIdx &+= 1
         }
       }
@@ -665,7 +665,7 @@ extension String.UTF16View {
         let (scalar, _) = _decodeScalar(utf8, startingAt: readIdx)
         _internalInvariant(scalar.utf16.count == 2)
 
-        buffer[writeIdx] = scalar.utf16[0]
+        buffer[_unchecked: writeIdx] = scalar.utf16[0]
         writeIdx &+= 1
       }
       _internalInvariant(writeIdx <= writeEnd)
