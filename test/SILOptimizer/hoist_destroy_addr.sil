@@ -7,6 +7,8 @@ sil_stage canonical
 
 import Builtin
 
+typealias AnyObject = Builtin.AnyObject
+
 class X {
 }
 
@@ -390,7 +392,8 @@ entry(%addr : $*X, %instance : @owned $X):
 // CHECK-LABEL: sil [ossa] @hoist_upto_address_to_pointer_use : {{.*}} {
 // CHECK:         address_to_pointer
 // CHECK:         pointer_to_address
-// CHECK:         load [take]
+// CHECK:         load [copy]
+// CHECK:         destroy_addr
 // CHECK:         tuple
 // CHECK-LABEL: } // end sil function 'hoist_upto_address_to_pointer_use'
 sil [ossa] @hoist_upto_address_to_pointer_use : $@convention(thin) (@in X) -> (@owned X) {
@@ -794,4 +797,41 @@ entry(%instance : @owned $(X, I)):
     dealloc_stack %addr : $*(X, I)
     %retval = tuple (%copy : $(X, I), %i_2 : $I)
     return %retval : $((X, I), I)
+}
+
+// Don't fold a destroy_addr of underlying storage into the copy_addr of a
+// bitcast of that address.
+//
+// CHECK-LABEL: sil [ossa] @nofold_destroy_addr_original_into_copy_addr_cast : {{.*}} {
+// CHECK:         copy_addr {{%[^,]+}}
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nofold_destroy_addr_original_into_copy_addr_cast'
+sil [ossa] @nofold_destroy_addr_original_into_copy_addr_cast : $@convention(thin) <T> (@owned AnyObject) -> @out T {
+entry(%out : $*T, %instance : @owned $AnyObject):
+    %addr = alloc_stack $AnyObject
+    store %instance to [init] %addr : $*AnyObject
+    %cast_addr = unchecked_addr_cast %addr : $*AnyObject to $*T
+    copy_addr %cast_addr to [initialization] %out : $*T
+    destroy_addr %addr : $*AnyObject
+    dealloc_stack %addr : $*AnyObject
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Don't fold a destroy_addr of underlying storage into the load [copy] of a 
+// bitcast of that address.
+//
+// CHECK-LABEL: sil [ossa] @nofold_destroy_addr_original_into_load_cast : {{.*}} {
+// CHECK:         load [copy]
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nofold_destroy_addr_original_into_load_cast'
+sil [ossa] @nofold_destroy_addr_original_into_load_cast : $@convention(thin) (@owned AnyObject) -> @owned X {
+entry(%instance : @owned $AnyObject):
+    %addr = alloc_stack $AnyObject
+    store %instance to [init] %addr : $*AnyObject
+    %cast_addr = unchecked_addr_cast %addr : $*AnyObject to $*X
+    %cast = load [copy] %cast_addr : $*X
+    destroy_addr %addr : $*AnyObject
+    dealloc_stack %addr : $*AnyObject
+    return %cast : $X
 }

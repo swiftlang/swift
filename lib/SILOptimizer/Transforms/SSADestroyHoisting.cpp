@@ -786,8 +786,15 @@ bool HoistDestroys::checkFoldingBarrier(
   SILValue address;
   if (auto *load = dyn_cast<LoadInst>(instruction)) {
     auto loadee = load->getOperand();
-    auto accessPath = AccessPath::compute(loadee);
-    if (accessPath.getStorage().hasIdenticalStorage(storage)) {
+    auto relativeAccessStorage = RelativeAccessStorageWithBase::compute(loadee);
+    if (relativeAccessStorage.getStorage().hasIdenticalStorage(storage)) {
+      // If the access path from the loaded address to its root storage involves
+      // a (layout non-equivalent) typecast--a load [take] of the casted address
+      // would not be equivalent to a load [copy] followed by a destroy_addr of
+      // the corresponding uncast projection--the truncated portion might have
+      // refcounted components.
+      if (relativeAccessStorage.cast == AccessStorageCast::Type)
+        return true;
       if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
         address = loadee;
         loads.push_back(load);
@@ -798,8 +805,15 @@ bool HoistDestroys::checkFoldingBarrier(
     }
   } else if (auto *copy = dyn_cast<CopyAddrInst>(instruction)) {
     auto source = copy->getSrc();
-    auto accessPath = AccessPath::compute(source);
-    if (accessPath.getStorage().hasIdenticalStorage(storage)) {
+    auto relativeAccessStorage = RelativeAccessStorageWithBase::compute(source);
+    if (relativeAccessStorage.getStorage().hasIdenticalStorage(storage)) {
+      // If the access path from the copy_addr'd address to its root storage
+      // involves a (layout non-equivalent) typecast--a copy_addr [take] of the
+      // casted address would not be equivalent to a copy_addr followed by a
+      // destroy_addr of the corresponding uncast projection--the truncated
+      // portion might have refcounted components.
+      if (relativeAccessStorage.cast == AccessStorageCast::Type)
+        return true;
       address = source;
       copies.push_back(copy);
     }
