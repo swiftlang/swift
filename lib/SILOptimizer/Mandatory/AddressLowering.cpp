@@ -1239,7 +1239,7 @@ public:
     return storage.storageAddress;
   }
 
-  void initializeOperand(Operand *operand);
+  void initializeComposingUse(Operand *operand);
 
   SILValue recursivelyMaterializeStorage(ValueStorage &storage,
                                          bool intoPhiOperand);
@@ -1269,7 +1269,7 @@ protected:
 ///
 /// If the operand projects into its use, then the memory was already
 /// initialized when visiting the use.
-void AddressMaterialization::initializeOperand(Operand *operand) {
+void AddressMaterialization::initializeComposingUse(Operand *operand) {
   SILValue def = operand->get();
   if (def->getType().isAddressOnly(*pass.function)) {
     ValueStorage &storage = pass.valueStorageMap.getStorage(def);
@@ -2903,7 +2903,7 @@ protected:
   void visitEnumInst(EnumInst *enumInst) {
     if (enumInst->hasOperand()) {
       // Handle operands here because loadable operands must also be copied.
-      addrMat.initializeOperand(&enumInst->getOperandRef());
+      addrMat.initializeComposingUse(&enumInst->getOperandRef());
     }
     SILValue enumAddr = addrMat.materializeAddress(enumInst);
 
@@ -2916,7 +2916,7 @@ protected:
       InitExistentialValueInst *initExistentialValue) {
 
     // Initialize memory for the operand which may be opaque or loadable.
-    addrMat.initializeOperand(&initExistentialValue->getOperandRef());
+    addrMat.initializeComposingUse(&initExistentialValue->getOperandRef());
   }
 
   // Project an opaque value out of a box-type existential.
@@ -2948,7 +2948,7 @@ protected:
     // For each element, initialize the operand's memory. Some struct elements
     // may be loadable types.
     for (Operand &operand : structInst->getAllOperands())
-      addrMat.initializeOperand(&operand);
+      addrMat.initializeComposingUse(&operand);
   }
 
   // Define an opaque tuple.
@@ -2956,7 +2956,7 @@ protected:
     // For each element, initialize the operand's memory. Some tuple elements
     // may be loadable types.
     for (Operand &operand : tupleInst->getAllOperands())
-      addrMat.initializeOperand(&operand);
+      addrMat.initializeComposingUse(&operand);
   }
 };
 } // end anonymous namespace
