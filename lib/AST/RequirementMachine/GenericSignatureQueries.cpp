@@ -265,6 +265,9 @@ bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
     explicit Walker(const RequirementMachine &self) : Self(self) {}
 
     Action walkToTypePre(Type component) override {
+      if (!component->hasTypeParameter())
+        return Action::SkipChildren;
+
       if (!component->isTypeParameter())
         return Action::Continue;
 
@@ -305,6 +308,9 @@ Type RequirementMachine::getCanonicalTypeInContext(
     TypeArrayView<GenericTypeParamType> genericParams) const {
 
   return type.transformRec([&](Type t) -> Optional<Type> {
+    if (!t->hasTypeParameter())
+      return t;
+
     if (!t->isTypeParameter())
       return None;
 
