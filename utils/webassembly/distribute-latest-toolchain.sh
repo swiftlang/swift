@@ -193,8 +193,9 @@ if is_released $toolchain_name; then
   exit 0
 fi
 
-if [[ "$toolchain_name" != "$original_toolchain_name" ]]; then
-  for target in ${targets[@]}; do
+for target in ${targets[@]}; do
+  original_toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-$targets.tar.gz | head -n1))
+  if [[ "$toolchain_name" != "$original_toolchain_name" ]]; then
     tar xfz swift-wasm-$channel-SNAPSHOT-$target.tar.gz
     mv "$original_toolchain_name" "$toolchain_name"
     if [[ "$target" == macos_* ]]; then
@@ -208,8 +209,8 @@ if [[ "$toolchain_name" != "$original_toolchain_name" ]]; then
     fi
     tar cfz swift-wasm-$channel-SNAPSHOT-$target.tar.gz "$toolchain_name"
     rm -rf "$toolchain_name"
-  done
-fi
+  fi
+done
 
 release_packages=()
 
