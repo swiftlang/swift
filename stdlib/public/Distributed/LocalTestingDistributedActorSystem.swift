@@ -31,6 +31,7 @@ public struct LocalTestingActorAddress: Hashable, Sendable, Codable {
 }
 
 // TODO(distributed): not thread safe...
+@available(SwiftStdlib 5.7, *)
 public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = LocalTestingActorAddress
   public typealias InvocationEncoder = LocalTestingInvocationEncoder
