@@ -68,6 +68,7 @@ extension AsyncSequence {
 /// An asynchronous sequence that maps the given error-throwing closure over the
 /// asynchronous sequence’s elements.
 @available(SwiftStdlib 5.1, *)
+@frozen
 public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let base: Base
@@ -96,6 +97,7 @@ extension AsyncThrowingMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the map sequence.
+  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
