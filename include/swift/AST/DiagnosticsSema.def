@@ -1935,8 +1935,8 @@ WARNING(type_does_not_conform_swiftui_warning,none,
 
 ERROR(non_final_class_cannot_conform_to_self_same_type,none,
       "non-final class %0 cannot safely conform to protocol %1, "
-      "which requires that 'Self' is exactly equal to %2",
-      (Type, Type, Type))
+      "which requires that %2 %select{is exactly equal to|inherit from}3 %4",
+      (Type, Type, Type, unsigned, Type))
 
 ERROR(cannot_use_nil_with_this_type,none,
       "'nil' cannot be used in context expecting type %0", (Type))

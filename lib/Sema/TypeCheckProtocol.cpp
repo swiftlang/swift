@@ -4840,6 +4840,102 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
+/// FIXME: It feels like this could be part of findExistentialSelfReferences().
+static Optional<Requirement>
+hasInvariantSelfRequirement(const ProtocolDecl *proto,
+                            ArrayRef<Requirement> reqSig) {
+  auto selfTy = proto->getSelfInterfaceType();
+
+  auto containsInvariantSelf = [&](Type t) -> bool {
+    struct Walker : public TypeWalker {
+      Type SelfTy;
+      bool Found = false;
+
+      Walker(Type selfTy) : SelfTy(selfTy) {}
+
+      Action walkToTypePre(Type ty) override {
+        // Check for 'Self'.
+        if (ty->isEqual(SelfTy)) {
+          Found = true;
+          return Action::Stop;
+        }
+
+        // 'Self.A' is OK.
+        if (ty->is<DependentMemberType>())
+          return Action::SkipChildren;
+
+        return Action::Continue;
+      }
+    };
+
+    Walker walker(selfTy);
+    t.walk(walker);
+
+    return walker.Found;
+  };
+
+  for (auto req : reqSig) {
+    switch (req.getKind()) {
+    case RequirementKind::SameType:
+      if (req.getSecondType()->isTypeParameter()) {
+        if (req.getFirstType()->isEqual(selfTy))
+          return req;
+      } else {
+        if (containsInvariantSelf(req.getSecondType()))
+          return req;
+      }
+      continue;
+    case RequirementKind::Superclass:
+      if (containsInvariantSelf(req.getSecondType()))
+        return req;
+      continue;
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
+      continue;
+    }
+
+    llvm_unreachable("Bad requirement kind");
+  }
+
+  return None;
+}
+
+static void diagnoseInvariantSelfRequirement(
+    SourceLoc loc, Type adoptee, const ProtocolDecl *proto,
+    Requirement req, DiagnosticEngine &diags) {
+  Type firstType, secondType;
+  unsigned kind = 0;
+
+  switch (req.getKind()) {
+  case RequirementKind::SameType:
+  if (req.getSecondType()->isTypeParameter()) {
+      // eg, 'Self == Self.A.B'
+      firstType = req.getSecondType();
+      secondType = req.getFirstType();
+    } else {
+      // eg, 'Self.A.B == G<Self>'
+      firstType = req.getFirstType();
+      secondType = req.getSecondType();
+    }
+    kind = 0;
+    break;
+  case RequirementKind::Superclass:
+    // eg, 'Self.A.B : G<Self>'
+    firstType = req.getFirstType();
+    secondType = req.getSecondType();
+    kind = 1;
+    break;
+  case RequirementKind::Conformance:
+  case RequirementKind::Layout:
+    llvm_unreachable("Invalid requirement kind");
+  }
+
+  diags.diagnose(loc, diag::non_final_class_cannot_conform_to_self_same_type,
+                 adoptee, proto->getDeclaredInterfaceType(),
+                 firstType, kind, secondType)
+      .warnUntilSwiftVersion(6);
+}
+
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
   Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
@@ -4867,15 +4963,8 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   // instead of the concrete class type itself.
   if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {
     if (!classDecl->isSemanticallyFinal()) {
-      for (auto req : reqSig) {
-        if (req.getKind() == RequirementKind::SameType &&
-            req.getFirstType()->isEqual(proto->getSelfInterfaceType())) {
-          diags.diagnose(Loc, diag::non_final_class_cannot_conform_to_self_same_type,
-                         Adoptee, proto->getDeclaredInterfaceType(),
-                         req.getSecondType())
-              .warnUntilSwiftVersion(6);
-          break;
-        }
+      if (auto req = hasInvariantSelfRequirement(proto, reqSig)) {
+        diagnoseInvariantSelfRequirement(Loc, Adoptee, proto, *req, diags);
       }
     }
   }
