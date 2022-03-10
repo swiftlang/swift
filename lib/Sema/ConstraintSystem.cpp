@@ -6023,7 +6023,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
 /// Because opened archetypes are not part of the surface language, these
 /// constraints render the member inaccessible.
 static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
-    Type baseTy, const ValueDecl *member, const DeclContext *useDC) {
+    Type baseTy, const ValueDecl *member) {
   const auto sig =
       member->getInnermostDeclContext()->getGenericSignatureOfContext();
 
@@ -6060,7 +6060,7 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
       return Action::Stop;
     }
   } isDependentOnSelfWalker(member->getASTContext().getOpenedArchetypeSignature(
-      baseTy, useDC->getGenericSignatureOfContext()));
+      baseTy, GenericSignature()));
 
   for (const auto &req : sig.getRequirements()) {
     switch (req.getKind()) {
@@ -6121,8 +6121,7 @@ bool ConstraintSystem::isMemberAvailableOnExistential(
   }
 
   if (doesMemberHaveUnfulfillableConstraintsWithExistentialBase(baseTy,
-                                                                member,
-                                                                DC)) {
+                                                                member)) {
     return false;
   }
 
