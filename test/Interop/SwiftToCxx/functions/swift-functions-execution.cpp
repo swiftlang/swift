@@ -2,8 +2,8 @@
 
 // RUN: %target-swift-frontend %S/swift-functions.swift -typecheck -module-name Functions -emit-cxx-header-path %t/functions.h
 
-// RUN: %target-interop-clangxx -c %s -I %t -o %t/swift-functions-execution.o
-// RUN: %target-build-swift-link-cxx %S/swift-functions.swift -o %t/swift-functions-execution -Xlinker %t/swift-functions-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+// RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-functions-execution.o
+// RUN: %target-interop-build-swift %S/swift-functions.swift -o %t/swift-functions-execution -Xlinker %t/swift-functions-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
 
 // RUN: %target-codesign %t/swift-functions-execution
 // RUN: %target-run %t/swift-functions-execution | %FileCheck %s
