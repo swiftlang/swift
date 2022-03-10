@@ -107,6 +107,11 @@ public:
     return requirementID;
   }
 
+  void setRequirementID(Optional<unsigned> requirementID) {
+    assert(!getRequirementID().hasValue());
+    this->requirementID = requirementID;
+  }
+
   Optional<Symbol> isPropertyRule() const;
 
   const ProtocolDecl *isProtocolConformanceRule() const;
@@ -176,12 +181,9 @@ public:
     Permanent = true;
   }
 
-  void markExplicit(Optional<unsigned> requirementID) {
-    assert((!Explicit || requirementID.hasValue()) &&
-           "Rule is already explicit");
-    assert(!Permanent &&
+  void markExplicit() {
+    assert(!Explicit && !Permanent &&
            "Permanent and explicit are mutually exclusive");
-    this->requirementID = requirementID;
     Explicit = true;
   }
 

@@ -500,7 +500,8 @@ bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
                                     SmallVectorImpl<RequirementError> &errors) {
   bool added = addRule(std::move(lhs), std::move(rhs));
   if (added) {
-    Rules.back().markExplicit(requirementID);
+    Rules.back().markExplicit();
+    Rules.back().setRequirementID(requirementID);
   } else if (requirementID.hasValue()) {
     auto req = WrittenRequirements[requirementID.getValue()];
     errors.push_back(
@@ -742,12 +743,10 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
   for (unsigned ruleID : indices(getRules())) {
     auto &rule = getRules()[ruleID];
 
-    if (!rule.isExplicit() && !rule.isPermanent() && !rule.isRedundant() &&
+    if (!rule.getRequirementID().hasValue() &&
+        !rule.isPermanent() && !rule.isRedundant() &&
         isInMinimizationDomain(rule.getLHS().getRootProtocol()))
       impliedRequirements.insert(ruleID);
-
-    if (!rule.isExplicit())
-      continue;
 
     auto requirementID = rule.getRequirementID();
     if (!requirementID.hasValue())

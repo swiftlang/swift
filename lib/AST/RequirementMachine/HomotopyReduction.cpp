@@ -184,7 +184,7 @@ void RewriteSystem::propagateExplicitBits() {
       for (unsigned ruleID : rulesInEmptyContext) {
         auto &rule = getRule(ruleID);
         if (!rule.isPermanent() && !rule.isExplicit())
-          rule.markExplicit(None);
+          rule.markExplicit();
       }
     }
   }
@@ -220,7 +220,7 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
           replacement.dump(llvm::dbgs());
         }
 
-        replacement.markExplicit(requirementID);
+        replacement.setRequirementID(requirementID);
       }
     }
   }
