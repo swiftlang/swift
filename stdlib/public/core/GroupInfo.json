@@ -188,7 +188,6 @@
     "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift",
     "UnsafeBufferPointerSlice.swift",
-    "UnsafeBufferPointerProtocols.swift",
     "UnsafeRawBufferPointer.swift"
   ],
   "Protocols": [

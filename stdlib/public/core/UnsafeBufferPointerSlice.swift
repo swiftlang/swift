@@ -80,7 +80,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   @discardableResult
   @inlinable
   @_alwaysEmitIntoClient
-  func initializeMemory<T>(
+  public func initializeMemory<T>(
     as type: T.Type, repeating repeatedValue: T
   ) -> UnsafeMutableBufferPointer<T> {
     let buffer = Base(rebasing: self)
@@ -144,7 +144,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   @discardableResult
   @inlinable
   @_alwaysEmitIntoClient
-  func initializeMemory<C: Collection>(
+  public func initializeMemory<C: Collection>(
     as type: C.Element.Type,
     fromElements source: C
   ) -> UnsafeMutableBufferPointer<C.Element> {
@@ -178,7 +178,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   @discardableResult
   @inlinable
   @_alwaysEmitIntoClient
-  func moveInitializeMemory<T>(
+  public func moveInitializeMemory<T>(
     as type: T.Type,
     fromElements source: UnsafeMutableBufferPointer<T>
   ) -> UnsafeMutableBufferPointer<T> {
@@ -208,7 +208,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   @discardableResult
   @inlinable
   @_alwaysEmitIntoClient
-  func moveInitializeMemory<T>(
+  public func moveInitializeMemory<T>(
     as type: T.Type,
     fromElements source: Slice<UnsafeMutableBufferPointer<T>>
   ) -> UnsafeMutableBufferPointer<T> {
@@ -287,7 +287,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T, Result>(
     to type: T.Type, _ body: (UnsafeMutableBufferPointer<T>) throws -> Result
   ) rethrows -> Result {
     let buffer = Base(rebasing: self)
@@ -312,7 +312,9 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @inlinable
   @_alwaysEmitIntoClient
-  func assumingMemoryBound<T>(to type: T.Type) -> UnsafeMutableBufferPointer<T> {
+  public func assumingMemoryBound<T>(
+    to type: T.Type
+  ) -> UnsafeMutableBufferPointer<T> {
     let buffer = Base(rebasing: self)
     return buffer.assumingMemoryBound(to: T.self)
   }
@@ -391,7 +393,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T, Result>(
     to type: T.Type, _ body: (UnsafeBufferPointer<T>) throws -> Result
   ) rethrows -> Result {
     let buffer = Base(rebasing: self)
@@ -416,15 +418,15 @@ extension Slice where Base == UnsafeRawBufferPointer {
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @inlinable
   @_alwaysEmitIntoClient
-  func assumingMemoryBound<T>(to type: T.Type) -> UnsafeBufferPointer<T> {
+  public func assumingMemoryBound<T>(
+    to type: T.Type
+  ) -> UnsafeBufferPointer<T> {
     let buffer = Base(rebasing: self)
     return buffer.assumingMemoryBound(to: T.self)
   }
 }
 
-extension Slice: _BufferProtocol
-  where Base: _BufferProtocol & _RebasableCollection, Base.SubSequence == Self {
-
+extension Slice {
   /// Executes the given closure while temporarily binding the memory referenced
   /// by this buffer slice to the given type.
   ///
@@ -481,17 +483,16 @@ extension Slice: _BufferProtocol
   ///   - buffer: The buffer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
-  public func withMemoryRebound<T, Result>(
+  @_alwaysEmitIntoClient
+  public func withMemoryRebound<T, Result, Element>(
     to type: T.Type, _ body: (UnsafeBufferPointer<T>) throws -> Result
-  ) rethrows -> Result {
-    let buffer = Base(rebasing: self)
-    return try buffer.withMemoryRebound(to: T.self, body)
+  ) rethrows -> Result where Base == UnsafeBufferPointer<Element> {
+    let rebased = UnsafeBufferPointer<Element>(rebasing: self)
+    return try rebased.withMemoryRebound(to: T.self, body)
   }
 }
 
-extension Slice: _MutableBufferProtocol
-where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressProtocol,
-      Base.SubSequence == Self {
+extension Slice {
 
   /// Initializes every element in this buffer slice's memory to
   /// a copy of the given value.
@@ -502,7 +503,10 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   ///
   /// - Parameter repeatedValue: The value with which to initialize this
   ///   buffer slice's memory.
-  public func initialize(repeating repeatedValue: Base.Element) {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func initialize<Element>(repeating repeatedValue: Element)
+    where Base == UnsafeMutableBufferPointer<Element> {
     Base(rebasing: self).initialize(repeating: repeatedValue)
   }
 
@@ -527,9 +531,12 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   ///   buffer.
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
   ///   buffer, and an index to the next uninitialized element in the buffer.
+  @inlinable
+  @_alwaysEmitIntoClient
   public func initialize<S>(
     from source: S
-  ) -> (S.Iterator, Index) where S: Sequence, Base.Element == S.Element {
+  ) -> (S.Iterator, Index)
+    where S: Sequence, Base == UnsafeMutableBufferPointer<S.Element> {
     let buffer = Base(rebasing: self)
     let (iterator, index) = buffer.initialize(from: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
@@ -556,9 +563,12 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   /// - Returns: An index to the next uninitialized element in the buffer,
   ///   or `endIndex`.
   @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
   public func initialize<C>(
     fromElements source: C
-  ) -> Int where C : Collection, Base.Element == C.Element {
+  ) -> Index
+    where C : Collection, Base == UnsafeMutableBufferPointer<C.Element> {
     let buffer = Base(rebasing: self)
     let index = buffer.initialize(fromElements: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
@@ -574,7 +584,10 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   ///
   /// - Parameters:
   ///   - repeatedValue: The value used when updating this pointer's memory.
-  public func update(repeating repeatedValue: Base.Element) {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func update<Element>(repeating repeatedValue: Element)
+    where Base == UnsafeMutableBufferPointer<Element> {
     Base(rebasing: self).update(repeating: repeatedValue)
   }
 
@@ -587,9 +600,12 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   ///   the buffer's contents.
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
   ///   buffer, and the index one past the last updated element in the buffer.
-  public func update<S: Sequence>(
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func update<S>(
     from source: S
-  ) -> (unwritten: S.Iterator, updated: Index) where S.Element == Element {
+  ) -> (unwritten: S.Iterator, updated: Index)
+    where S: Sequence, Base == UnsafeMutableBufferPointer<S.Element> {
     let buffer = Base(rebasing: self)
     let (iterator, index) = buffer.update(from: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
@@ -606,9 +622,12 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   /// - Returns: An index one past the last updated element in the buffer,
   ///   or `endIndex`.
   @discardableResult
-  public func update<C: Collection>(
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func update<C>(
     fromElements source: C
-  ) -> Index where Base.Element == C.Element {
+  ) -> Index
+    where C: Collection, Base == UnsafeMutableBufferPointer<C.Element> {
     let buffer = Base(rebasing: self)
     let index = buffer.update(fromElements: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
@@ -631,9 +650,11 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   /// - Returns: An index to the next uninitialized element in the buffer,
   ///   or `endIndex`.
   @discardableResult
-  public func moveInitialize(
-    fromElements source: UnsafeMutableBufferPointer<Base.Element>
-  ) -> Index {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func moveInitialize<Element>(
+    fromElements source: UnsafeMutableBufferPointer<Element>
+  ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
     let buffer = Base(rebasing: self)
     let index = buffer.moveInitialize(fromElements: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
@@ -656,9 +677,11 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   /// - Returns: An index one past the last replaced element in the buffer,
   ///   or `endIndex`.
   @discardableResult
-  public func moveInitialize(
-    fromElements source: Slice<UnsafeMutableBufferPointer<Base.Element>>
-  ) -> Index {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func moveInitialize<Element>(
+    fromElements source: Slice<UnsafeMutableBufferPointer<Element>>
+  ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
     let buffer = Base(rebasing: self)
     let index = buffer.moveInitialize(fromElements: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
@@ -681,9 +704,11 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   /// - Returns: An index one past the last updated element in the buffer,
   ///   or `endIndex`.
   @discardableResult
-  public func moveUpdate(
-    fromElements source: UnsafeMutableBufferPointer<Base.Element>
-  ) -> Index {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func moveUpdate<Element>(
+    fromElements source: UnsafeMutableBufferPointer<Element>
+  ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
     let buffer = Base(rebasing: self)
     let index = buffer.moveUpdate(fromElements: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
@@ -706,9 +731,11 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   /// - Returns: An index one past the last updated element in the buffer,
   ///   or `endIndex`.
   @discardableResult
-  public func moveUpdate(
-    fromElements source: Slice<UnsafeMutableBufferPointer<Base.Element>>
-  ) -> Index {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func moveUpdate<Element>(
+    fromElements source: Slice<UnsafeMutableBufferPointer<Element>>
+  ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
     let buffer = Base(rebasing: self)
     let index = buffer.moveUpdate(fromElements: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
@@ -726,7 +753,10 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   /// - Returns: A raw buffer to the same range of memory as this buffer.
   ///   The range of memory is still bound to `Element`.
   @discardableResult
-  public func deinitialize() -> UnsafeMutableRawBufferPointer {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func deinitialize<Element>() -> UnsafeMutableRawBufferPointer
+    where Base == UnsafeMutableBufferPointer<Element> {
     Base(rebasing: self).deinitialize()
   }
 
@@ -739,7 +769,10 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   /// - Parameters:
   ///   - value: The value used to initialize the buffer element's memory.
   ///   - index: The index of the element to initialize
-  public func initializeElement(at index: Int, to value: Element) {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func initializeElement<Element>(at index: Int, to value: Element)
+    where Base == UnsafeMutableBufferPointer<Element> {
     assert(startIndex <= index && index < endIndex)
     base.baseAddress.unsafelyUnwrapped.advanced(by: index).initialize(to: value)
   }
@@ -754,7 +787,10 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   /// - Parameters:
   ///   - value: The value used to update the buffer element's memory.
   ///   - index: The index of the element to update
-  public func updateElement(at index: Index, to value: Element) {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func updateElement<Element>(at index: Index, to value: Element)
+    where Base == UnsafeMutableBufferPointer<Element> {
     assert(startIndex <= index && index < endIndex)
     base.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee = value
   }
@@ -769,7 +805,10 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   /// - Parameters:
   ///   - index: The index of the buffer element to retrieve and deinitialize.
   /// - Returns: The instance referenced by this index in this buffer.
-  public func moveElement(from index: Index) -> Element {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func moveElement<Element>(from index: Index) -> Element
+    where Base == UnsafeMutableBufferPointer<Element> {
     assert(startIndex <= index && index < endIndex)
     return base.baseAddress.unsafelyUnwrapped.advanced(by: index).move()
   }
@@ -782,7 +821,10 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   ///
   /// - Parameters:
   ///   - index: The index of the buffer element to deinitialize.
-  public func deinitializeElement(at index: Base.Index) {
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func deinitializeElement<Element>(at index: Base.Index)
+    where Base == UnsafeMutableBufferPointer<Element> {
     assert(startIndex <= index && index < endIndex)
     base.baseAddress.unsafelyUnwrapped.advanced(by: index).deinitialize(count: 1)
   }
@@ -843,16 +885,18 @@ where Base: _MutableBufferProtocol & _RebasableCollection & _MutableBaseAddressP
   ///   - buffer: The buffer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
-  public func withMemoryRebound<T, Result>(
+  @_alwaysEmitIntoClient
+  public func withMemoryRebound<T, Result, Element>(
     to type: T.Type, _ body: (UnsafeMutableBufferPointer<T>) throws -> Result
-  ) rethrows -> Result {
+  ) rethrows -> Result where Base == UnsafeMutableBufferPointer<Element>{
     try Base(rebasing: self).withMemoryRebound(to: T.self, body)
   }
 
   @inlinable
-  func withContiguousMutableStorageIfAvailable<R>(
+  @_alwaysEmitIntoClient
+  public func withContiguousMutableStorageIfAvailable<R, Element>(
     _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  ) rethrows -> R? where Base == UnsafeMutableBufferPointer<Element> {
     try base.withContiguousStorageIfAvailable { buffer in
       let start = base.baseAddress?.advanced(by: startIndex)
       var slice = UnsafeMutableBufferPointer(start: start, count: count)
