@@ -206,6 +206,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-supports-backtrace-reporting     ""                "whether to build stdlib assuming the runtime environment provides the backtrace(3) API, if not set defaults to true on all platforms except for Cygwin, Haiku and wasm"
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
     swift-stdlib-single-threaded-runtime          "0"               "whether to build stdlib as a single-threaded runtime only"
+    swift-stdlib-concurrency-tracing              ""                "whether to enable tracing signposts for concurrency; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
     swift-stdlib-has-commandline                  "1"               "whether to build stdlib with the CommandLine enum and support for argv/argc"
     swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
@@ -2207,6 +2208,13 @@ for host in "${ALL_HOSTS[@]}"; do
                         "${cmake_options[@]}"
                         -DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=TRUE
                         -DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}"
+                    )
+                fi
+
+                if [[ "${SWIFT_STDLIB_CONCURRENCY_TRACING}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_CONCURRENCY_TRACING:BOOL=$(true_false "${SWIFT_STDLIB_CONCURRENCY_TRACING}")
                     )
                 fi
 
