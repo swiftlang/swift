@@ -1231,7 +1231,7 @@ public:
       return storage.storageAddress;
 
     if (storage.isUseProjection) {
-      materializeUseProjectionStorage(storage, /*intoPhiOperand*/ false);
+      recursivelyMaterializeStorage(storage, /*intoPhiOperand*/ false);
     } else {
       assert(storage.isDefProjection);
       storage.storageAddress = materializeDefProjection(origValue);
@@ -1241,8 +1241,8 @@ public:
 
   void initializeOperand(Operand *operand);
 
-  SILValue materializeUseProjectionStorage(ValueStorage &storage,
-                                           bool intoPhiOperand);
+  SILValue recursivelyMaterializeStorage(ValueStorage &storage,
+                                         bool intoPhiOperand);
 
   SILValue materializeDefProjection(SILValue origValue);
 
@@ -1257,8 +1257,8 @@ protected:
 
   SILValue materializeComposingUser(SingleValueInstruction *user,
                                     bool intoPhiOperand) {
-    return materializeUseProjectionStorage(
-        pass.valueStorageMap.getStorage(user), intoPhiOperand);
+    return recursivelyMaterializeStorage(pass.valueStorageMap.getStorage(user),
+                                         intoPhiOperand);
   }
 };
 } // anonymous namespace
@@ -1290,19 +1290,26 @@ void AddressMaterialization::initializeOperand(Operand *operand) {
                          StoreOwnershipQualifier::Init);
 }
 
-// Recursively materialize the address for storage at the point that a use
-// projects into it via either a composing-use (struct, tuple, enum) or phi
-// projection. This only materializes the address that the operands project
-// into. It does not materialize the storage for the result. e.g. it
-// materializes init_enum_data_addr, not inject_enum_addr.
+// Recursively materialize the address for storage at the point that an operand
+// may project into it via either a composing-use (struct, tuple, enum) or phi
+// projection.
+//
+// Precondition: \p storage is not a def-projection.
 //
 // If \p intoPhiOperand is true, this materializes the address in the path that
-// reaches a phi operand, not the phi block itself.
+// reaches a phi operand, not the phi block itself. Do not map the storage onto
+// the materialized address.
 //
 // If \p intoPhiOperand is false, then the materialized address is guaranteed to
 // domaninate the composing user. Map the user onto this address to avoid
 // rematerialization.
-SILValue AddressMaterialization::materializeUseProjectionStorage(
+//
+// Note: This only materializes the address for the purpose of projection an
+// operand into the storage. It does not materialize the final address of
+// storage after materializing the result. In particular, it materializes
+// init_enum_data_addr, but not inject_enum_addr.
+//
+SILValue AddressMaterialization::recursivelyMaterializeStorage(
     ValueStorage &storage, bool intoPhiOperand = false) {
   // If this storage is already materialized, then simply return its
   // address. This not only avoids redundant projections, but is necessary for
@@ -1331,7 +1338,7 @@ SILValue AddressMaterialization::materializeUseProjectionStorage(
     return recordAddress(useStorage.storage.storageAddress);
   }
   if (storage.isPhiProjection()) {
-    return recordAddress(materializeUseProjectionStorage(
+    return recordAddress(recursivelyMaterializeStorage(
         pass.valueStorageMap.getProjectedStorage(storage).storage,
         /*intoPhiOperand*/ true));
   }
@@ -1566,8 +1573,8 @@ void PhiRewriter::materializeOperand(PhiOperand phiOper) {
 
   auto &phiStorage = pass.valueStorageMap.getStorage(phiOper.getValue());
   SILValue phiAddress =
-      addrMat.materializeUseProjectionStorage(phiStorage,
-                                              /*intoPhiOperand*/ true);
+      addrMat.recursivelyMaterializeStorage(phiStorage,
+                                            /*intoPhiOperand*/ true);
 
   if (!movePos.foundAntiDependenceCycle) {
     createPhiMove(builder, phiOperAddress, phiAddress);
