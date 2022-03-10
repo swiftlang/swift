@@ -3631,7 +3631,8 @@ std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash(Impl.Instance->getDiagnostics());
 }
 
-Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
+Optional<Decl *>
+ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
   return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion);
 }
 
