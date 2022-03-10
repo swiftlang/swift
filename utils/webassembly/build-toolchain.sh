@@ -5,8 +5,7 @@ SOURCE_PATH="$(cd "$(dirname "$0")/../../.." && pwd)"
 UTILS_PATH="$(cd "$(dirname "$0")" && pwd)"
 
 BUILD_SDK_PATH="$SOURCE_PATH/build-sdk"
-WASI_SDK_PATH="$BUILD_SDK_PATH/wasi-sdk"
-WASI_SYSROOT_PATH="$WASI_SDK_PATH/share/wasi-sysroot"
+WASI_SYSROOT_PATH="$BUILD_SDK_PATH/wasi-sysroot"
 
 case $(uname -s) in
   Darwin)
@@ -155,7 +154,7 @@ build_target_toolchain() {
 
 embed_wasi_sysroot() {
   # Merge wasi-sdk and the toolchain
-  cp -r "$WASI_SDK_PATH/share/wasi-sysroot" "$DIST_TOOLCHAIN_SDK/usr/share"
+  cp -r "$WASI_SYSROOT_PATH" "$DIST_TOOLCHAIN_SDK/usr/share"
 
   # Replace absolute sysroot path with relative path
   sed -i.bak -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" "$DIST_TOOLCHAIN_SDK/usr/lib/swift/wasi/wasm32/wasi.modulemap"

@@ -243,7 +243,7 @@ function(_add_target_variant_swift_compile_flags
   endif()
 
   if("${sdk}" STREQUAL "WASI")
-    list(APPEND result "-Xcc" "-D_WASI_EMULATED_MMAN")
+    list(APPEND result "-Xcc" "-D_WASI_EMULATED_MMAN" "-Xcc" "-D_WASI_EMULATED_SIGNAL" "-Xcc" "-D_WASI_EMULATED_PROCESS_CLOCKS")
   endif()
 
   if(NOT BUILD_STANDALONE)
