@@ -44,15 +44,19 @@ jobs:
 
           case "${{ github.event.inputs.channel }}" in
             "DEVELOPMENT")
+              export TARGETS_TO_DIST="amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 macos_x86_64 macos_arm64"
               ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm} DEVELOPMENT "${{ github.event.inputs.toolchain_name }}"
             ;;
             "5.3")
+              export TARGETS_TO_DIST="ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64"
               ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm-release/5.3} 5.3 "${{ github.event.inputs.toolchain_name }}"
             ;;
             "5.4")
+              export TARGETS_TO_DIST="ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64 macos_arm64"
               ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm-release/5.4} 5.4 "${{ github.event.inputs.toolchain_name }}"
             ;;
             "5.5")
+              export TARGETS_TO_DIST="ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64 macos_arm64"
               ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm-release/5.5} 5.5 "${{ github.event.inputs.toolchain_name }}"
             ;;
             *)
@@ -62,8 +66,7 @@ jobs:
           esac
 
         env:
-          TARGETS_TO_DIST: "amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 macos_x86_64 macos_arm64"
-          GITHUB_TOKEN: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
           DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
