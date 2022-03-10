@@ -182,7 +182,6 @@ cmake --build "%BuildRoot%\curl" --target install || (exit /b)
 copy /y "%SourceRoot%\swift\stdlib\public\Platform\ucrt.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" || (exit /b)
 copy /y "%SourceRoot%\swift\stdlib\public\Platform\winsdk.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" || (exit /b)
 copy /y "%SourceRoot%\swift\stdlib\public\Platform\vcruntime.modulemap" "%VCToolsInstallDir%\include\module.modulemap" || (exit /b)
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\vcruntime.apinotes" "%VCToolsInstallDir%\include\vcruntime.apinotes" || (exit /b)
 
 :: Build Toolchain
 cmake ^
