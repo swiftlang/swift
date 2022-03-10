@@ -65,23 +65,30 @@
 using namespace swift;
 using namespace rewriting;
 
-/// Recompute Useful, RulesInEmptyContext, ProjectionCount and DecomposeCount
-/// if needed.
+/// Recompute various cached values if needed.
 void RewriteLoop::recompute(const RewriteSystem &system) {
   if (!Dirty)
     return;
   Dirty = 0;
 
+  Useful = 0;
   ProjectionCount = 0;
   DecomposeCount = 0;
-  Useful = false;
+  HasConcreteTypeAliasRule = 0;
 
   RewritePathEvaluator evaluator(Basepoint);
   for (auto step : Path) {
     switch (step.Kind) {
-    case RewriteStep::Rule:
+    case RewriteStep::Rule: {
       Useful |= (!step.isInContext() && !evaluator.isInContext());
+
+      const auto &rule = system.getRule(step.getRuleID());
+      if (rule.isProtocolTypeAliasRule() &&
+          rule.getLHS().size() == 3)
+        HasConcreteTypeAliasRule = 1;
+
       break;
+    }
 
     case RewriteStep::LeftConcreteProjection:
       ++ProjectionCount;
@@ -128,6 +135,14 @@ unsigned RewriteLoop::getDecomposeCount(
     const RewriteSystem &system) const {
   const_cast<RewriteLoop *>(this)->recompute(system);
   return DecomposeCount;
+}
+
+/// Returns true if the loop contains at least one concrete protocol typealias rule,
+/// which have the form ([P].A.[concrete: C] => [P].A).
+bool RewriteLoop::hasConcreteTypeAliasRule(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return HasConcreteTypeAliasRule;
 }
 
 /// The number of Decompose steps, used by the elimination order to prioritize

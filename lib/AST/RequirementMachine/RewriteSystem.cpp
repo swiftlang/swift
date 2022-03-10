@@ -174,8 +174,13 @@ Optional<Identifier> Rule::isProtocolTypeAliasRule() const {
     //
     // We shouldn't have unresolved symbols on the right hand side;
     // they should have been simplified away.
-    if (RHS.containsUnresolvedSymbols())
-      return None;
+    if (RHS.containsUnresolvedSymbols()) {
+      if (RHS.size() != 2 ||
+          RHS[0] != LHS[0] ||
+          RHS[1].getKind() != Symbol::Kind::Name) {
+        return None;
+      }
+    }
   } else {
     // This is the case where the underlying type is concrete.
     assert(LHS.size() == 3);
