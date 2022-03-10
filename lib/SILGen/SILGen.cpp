@@ -466,6 +466,25 @@ SILGenModule::getCheckExpectedExecutor() {
                                     "_checkExpectedExecutor");
 }
 
+FuncDecl *
+SILGenModule::getResumeCheckedContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeCheckedContinuation,
+                                    "_resumeCheckedContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeCheckedThrowingContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeCheckedThrowingContinuation,
+                                    "_resumeCheckedThrowingContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeCheckedThrowingContinuationWithError() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeCheckedThrowingContinuationWithError,
+                                  "_resumeCheckedThrowingContinuationWithError");
+}
+
 FuncDecl *SILGenModule::getAsyncMainDrainQueue() {
   return lookupConcurrencyIntrinsic(getASTContext(), AsyncMainDrainQueue,
                                     "_asyncMainDrainQueue");

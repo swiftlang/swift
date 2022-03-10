@@ -130,6 +130,9 @@ public:
   llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuation;
   llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuationWithError;
   llvm::Optional<FuncDecl *> CheckExpectedExecutor;
+  llvm::Optional<FuncDecl*> ResumeCheckedContinuation;
+  llvm::Optional<FuncDecl*> ResumeCheckedThrowingContinuation;
+  llvm::Optional<FuncDecl*> ResumeCheckedThrowingContinuationWithError;
 
   llvm::Optional<FuncDecl *> AsyncMainDrainQueue;
   llvm::Optional<FuncDecl *> GetMainExecutor;
@@ -546,6 +549,12 @@ public:
   FuncDecl *getRunTaskForBridgedAsyncMethod();
   /// Retrieve the _Concurrency._checkExpectedExecutor intrinsic.
   FuncDecl *getCheckExpectedExecutor();
+  /// Retrieve the _Concurrency._resumeCheckedContinuation intrinsic.
+  FuncDecl *getResumeCheckedContinuation();
+  /// Retrieve the _Concurrency._resumeCheckedThrowingContinuation intrinsic.
+  FuncDecl *getResumeCheckedThrowingContinuation();
+  /// Retrieve the _Concurrency._resumeCheckedThrowingContinuationWithError intrinsic.
+  FuncDecl *getResumeCheckedThrowingContinuationWithError();
 
   /// Retrieve the _Concurrency._asyncMainDrainQueue intrinsic.
   FuncDecl *getAsyncMainDrainQueue();

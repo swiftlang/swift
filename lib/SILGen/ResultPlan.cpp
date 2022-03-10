@@ -753,7 +753,9 @@ public:
 
     // Wrap the Builtin.RawUnsafeContinuation in an
     // UnsafeContinuation<T, E>.
-    auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
+    auto continuationDecl =
+        true ? SGF.getASTContext().getCheckedContinuationDecl()
+             : SGF.getASTContext().getUnsafeContinuationDecl();
 
     auto errorTy = throws
       ? SGF.getASTContext().getErrorExistentialType()
@@ -869,7 +871,9 @@ public:
         SGF.B.setInsertionPoint(
             ++bridgedForeignError->getDefiningInstruction()->getIterator());
 
-        auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
+        auto continuationDecl =
+            true ? SGF.getASTContext().getCheckedContinuationDecl()
+                 : SGF.getASTContext().getUnsafeContinuationDecl();
 
         auto errorTy = SGF.getASTContext().getErrorExistentialType();
         auto continuationBGT =

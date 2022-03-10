@@ -309,8 +309,12 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
 
       SILBasicBlock *returnBB = nullptr;
       if (errorIndex) {
-        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
-        auto errorIntrinsic = getResumeUnsafeThrowingContinuationWithError();
+        resumeIntrinsic =
+          true ? getResumeCheckedThrowingContinuation()
+               : getResumeUnsafeThrowingContinuation();
+        auto errorIntrinsic =
+          true ? getResumeCheckedThrowingContinuationWithError()
+               : getResumeUnsafeThrowingContinuationWithError();
 
         auto errorArgument = params[*errorIndex];
         auto someErrorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
@@ -383,9 +387,13 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         SGF.B.createBranch(loc, returnBB);
         SGF.B.emitBlock(noneErrorBB);
       } else if (foreignError) {
-        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
+        resumeIntrinsic =
+          true ? getResumeCheckedThrowingContinuation()
+               : getResumeUnsafeThrowingContinuation();
       } else {
-        resumeIntrinsic = getResumeUnsafeContinuation();
+        resumeIntrinsic =
+          true ? getResumeCheckedContinuation()
+               : getResumeUnsafeContinuation();
       }
 
       auto loweredResumeTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
