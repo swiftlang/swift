@@ -1,4 +1,4 @@
-//===--- RequirementMachineRequests.cpp -----------------------------------===//
+//===--- RequirementMachineRequests.cpp - Request evaluator requests ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -29,268 +29,12 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Statistic.h"
-#include "RequirementLowering.h"
 #include <memory>
 #include <vector>
+#include "RequirementLowering.h"
 
 using namespace swift;
 using namespace rewriting;
-
-namespace {
-
-/// Represents a set of types related by same-type requirements, and an
-/// optional concrete type requirement.
-struct ConnectedComponent {
-  llvm::SmallVector<Type, 2> Members;
-  Type ConcreteType;
-
-  void buildRequirements(Type subjectType, std::vector<Requirement> &reqs);
-};
-
-/// Case 1: A set of rewrite rules of the form:
-///
-///   B => A
-///   C => A
-///   D => A
-///
-/// Become a series of same-type requirements
-///
-///   A == B, B == C, C == D
-///
-/// Case 2: A set of rewrite rules of the form:
-///
-///   A.[concrete: X] => A
-///   B => A
-///   C => A
-///   D => A
-///
-/// Become a series of same-type requirements
-///
-///   A == X, B == X, C == X, D == X
-void ConnectedComponent::buildRequirements(Type subjectType,
-                                           std::vector<Requirement> &reqs) {
-  std::sort(Members.begin(), Members.end(),
-            [](Type first, Type second) -> bool {
-              return compareDependentTypes(first, second) < 0;
-            });
-
-  if (!ConcreteType) {
-    for (auto constraintType : Members) {
-      reqs.emplace_back(RequirementKind::SameType,
-                        subjectType, constraintType);
-      subjectType = constraintType;
-    }
-  } else if (!ConcreteType->hasError()) {
-    // For compatibility with the old GenericSignatureBuilder, drop requirements
-    // containing ErrorTypes.
-    reqs.emplace_back(RequirementKind::SameType,
-                      subjectType, ConcreteType);
-
-    for (auto constraintType : Members) {
-      reqs.emplace_back(RequirementKind::SameType,
-                        constraintType, ConcreteType);
-    }
-  }
-}
-
-}  // end namespace
-
-/// Convert a list of non-permanent, non-redundant rewrite rules into a list of
-/// requirements sorted in canonical order. The \p genericParams are used to
-/// produce sugared types.
-std::vector<Requirement>
-RequirementMachine::buildRequirementsFromRules(
-    ArrayRef<unsigned> rules,
-    TypeArrayView<GenericTypeParamType> genericParams) const {
-  std::vector<Requirement> reqs;
-  llvm::SmallDenseMap<TypeBase *, ConnectedComponent> sameTypeReqs;
-
-  // Convert a rewrite rule into a requirement.
-  auto createRequirementFromRule = [&](const Rule &rule) {
-    if (auto prop = rule.isPropertyRule()) {
-      auto subjectType = Map.getTypeForTerm(rule.getRHS(), genericParams);
-
-      switch (prop->getKind()) {
-      case Symbol::Kind::Protocol:
-        reqs.emplace_back(RequirementKind::Conformance,
-                          subjectType,
-                          prop->getProtocol()->getDeclaredInterfaceType());
-        return;
-
-      case Symbol::Kind::Layout:
-        reqs.emplace_back(RequirementKind::Layout,
-                          subjectType,
-                          prop->getLayoutConstraint());
-        return;
-
-      case Symbol::Kind::Superclass: {
-        // Requirements containing unresolved name symbols originate from
-        // invalid code and should not appear in the generic signature.
-        for (auto term : prop->getSubstitutions()) {
-          if (term.containsUnresolvedSymbols())
-            return;
-        }
-
-        // Requirements containing error types originate from invalid code
-        // and should not appear in the generic signature.
-        if (prop->getConcreteType()->hasError())
-          return;
-
-        auto superclassType = Map.getTypeFromSubstitutionSchema(
-                                prop->getConcreteType(),
-                                prop->getSubstitutions(),
-                                genericParams, MutableTerm());
-
-        reqs.emplace_back(RequirementKind::Superclass,
-                          subjectType, superclassType);
-        return;
-      }
-
-      case Symbol::Kind::ConcreteType: {
-        // Requirements containing unresolved name symbols originate from
-        // invalid code and should not appear in the generic signature.
-        for (auto term : prop->getSubstitutions()) {
-          if (term.containsUnresolvedSymbols())
-            return;
-        }
-
-        // Requirements containing error types originate from invalid code
-        // and should not appear in the generic signature.
-        if (prop->getConcreteType()->hasError())
-          return;
-
-        auto concreteType = Map.getTypeFromSubstitutionSchema(
-                                prop->getConcreteType(),
-                                prop->getSubstitutions(),
-                                genericParams, MutableTerm());
-
-        auto &component = sameTypeReqs[subjectType.getPointer()];
-        assert(!component.ConcreteType);
-        component.ConcreteType = concreteType;
-        return;
-      }
-
-      case Symbol::Kind::ConcreteConformance:
-        // "Concrete conformance requirements" are not recorded in the generic
-        // signature.
-        return;
-
-      case Symbol::Kind::Name:
-      case Symbol::Kind::AssociatedType:
-      case Symbol::Kind::GenericParam:
-        break;
-      }
-
-      llvm_unreachable("Invalid symbol kind");
-    }
-
-    assert(rule.getLHS().back().getKind() != Symbol::Kind::Protocol);
-    auto constraintType = Map.getTypeForTerm(rule.getLHS(), genericParams);
-    auto subjectType = Map.getTypeForTerm(rule.getRHS(), genericParams);
-
-    sameTypeReqs[subjectType.getPointer()].Members.push_back(constraintType);
-  };
-
-  if (getDebugOptions().contains(DebugFlags::Minimization)) {
-    llvm::dbgs() << "\nMinimized rules:\n";
-  }
-
-  // Build the list of requirements, storing same-type requirements off
-  // to the side.
-  for (unsigned ruleID : rules) {
-    const auto &rule = System.getRule(ruleID);
-
-    if (getDebugOptions().contains(DebugFlags::Minimization)) {
-      llvm::dbgs() << "- " << rule << "\n";
-    }
-
-    createRequirementFromRule(rule);
-  }
-
-  // Now, convert each connected component into a series of same-type
-  // requirements.
-  for (auto &pair : sameTypeReqs) {
-    pair.second.buildRequirements(pair.first, reqs);
-  }
-
-  if (getDebugOptions().contains(DebugFlags::Minimization)) {
-    llvm::dbgs() << "Requirements:\n";
-    for (const auto &req : reqs) {
-      req.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-  }
-
-  // Finally, sort the requirements in canonical order.
-  llvm::array_pod_sort(reqs.begin(), reqs.end(),
-                       [](const Requirement *lhs, const Requirement *rhs) -> int {
-                         return lhs->compare(*rhs);
-                       });
-
-  return reqs;
-}
-
-/// Convert a list of protocol typealias rules to a list of name/underlying type
-/// pairs.
-std::vector<ProtocolTypeAlias>
-RequirementMachine::buildProtocolTypeAliasesFromRules(
-    ArrayRef<unsigned> rules,
-    TypeArrayView<GenericTypeParamType> genericParams) const {
-  std::vector<ProtocolTypeAlias> aliases;
-
-  if (getDebugOptions().contains(DebugFlags::Minimization)) {
-    llvm::dbgs() << "\nMinimized type aliases:\n";
-  }
-
-  for (unsigned ruleID : rules) {
-    const auto &rule = System.getRule(ruleID);
-    auto name = *rule.isProtocolTypeAliasRule();
-    Type underlyingType;
-
-    if (auto prop = rule.isPropertyRule()) {
-      assert(prop->getKind() == Symbol::Kind::ConcreteType);
-
-      // Requirements containing unresolved name symbols originate from
-      // invalid code and should not appear in the generic signature.
-      for (auto term : prop->getSubstitutions()) {
-        if (term.containsUnresolvedSymbols())
-          continue;
-      }
-
-      // Requirements containing error types originate from invalid code
-      // and should not appear in the generic signature.
-      if (prop->getConcreteType()->hasError())
-        continue;
-
-      underlyingType = Map.getTypeFromSubstitutionSchema(
-                           prop->getConcreteType(),
-                           prop->getSubstitutions(),
-                           genericParams, MutableTerm());
-    } else {
-      underlyingType = Map.getTypeForTerm(rule.getRHS(), genericParams);
-    }
-
-    aliases.emplace_back(name, underlyingType);
-
-    if (getDebugOptions().contains(DebugFlags::Minimization)) {
-      PrintOptions opts;
-      opts.ProtocolQualifiedDependentMemberTypes = true;
-
-      llvm::dbgs() << "- " << name << " == ";
-      underlyingType.print(llvm::dbgs(), opts);
-      llvm::dbgs() << "\n";
-    }
-  }
-
-  // Finally, sort the aliases in canonical order.
-  llvm::array_pod_sort(aliases.begin(), aliases.end(),
-                       [](const ProtocolTypeAlias *lhs,
-                          const ProtocolTypeAlias *rhs) -> int {
-                         return lhs->getName().compare(rhs->getName());
-                       });
-
-  return aliases;
-}
 
 /// Builds the requirement signatures for each protocol in this strongly
 /// connected component.
@@ -322,14 +66,16 @@ RequirementMachine::computeMinimalProtocolRequirements() {
     auto genericParams = proto->getGenericSignature().getGenericParams();
 
     const auto &entry = rules[proto];
-    auto reqs = ctx.AllocateCopy(
-            buildRequirementsFromRules(entry.Requirements,
-                                       genericParams));
-    auto aliases = ctx.AllocateCopy(
-            buildProtocolTypeAliasesFromRules(entry.TypeAliases,
-                                              genericParams));
 
-    result[proto] = RequirementSignature(reqs, aliases);
+    std::vector<Requirement> reqs;
+    std::vector<ProtocolTypeAlias> aliases;
+    buildRequirementsFromRules(entry.Requirements,
+                               entry.TypeAliases,
+                               genericParams,
+                               reqs, aliases);
+
+    result[proto] = RequirementSignature(ctx.AllocateCopy(reqs),
+                                         ctx.AllocateCopy(aliases));
   }
 
   return result;
@@ -448,7 +194,15 @@ RequirementMachine::computeMinimalGenericSignatureRequirements() {
   }
 
   auto rules = System.getMinimizedGenericSignatureRules();
-  return buildRequirementsFromRules(rules, getGenericParams());
+
+  std::vector<Requirement> reqs;
+  std::vector<ProtocolTypeAlias> aliases;
+
+  buildRequirementsFromRules(rules, ArrayRef<unsigned>(), getGenericParams(),
+                             reqs, aliases);
+  assert(aliases.empty());
+
+  return reqs;
 }
 
 GenericSignatureWithError

@@ -87,6 +87,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/PropertyMap.cpp
   RequirementMachine/PropertyRelations.cpp
   RequirementMachine/PropertyUnification.cpp
+  RequirementMachine/RequirementBuilder.cpp
   RequirementMachine/RequirementLowering.cpp
   RequirementMachine/RequirementMachine.cpp
   RequirementMachine/RequirementMachineRequests.cpp

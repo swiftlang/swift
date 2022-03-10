@@ -108,13 +108,12 @@ class RequirementMachine final {
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
-  std::vector<Requirement> buildRequirementsFromRules(
-    ArrayRef<unsigned> rules,
-    TypeArrayView<GenericTypeParamType> genericParams) const;
-
-  std::vector<ProtocolTypeAlias> buildProtocolTypeAliasesFromRules(
-    ArrayRef<unsigned> rules,
-    TypeArrayView<GenericTypeParamType> genericParams) const;
+  void buildRequirementsFromRules(
+    ArrayRef<unsigned> requirementRules,
+    ArrayRef<unsigned> typeAliasRules,
+    TypeArrayView<GenericTypeParamType> genericParams,
+    std::vector<Requirement> &reqs,
+    std::vector<ProtocolTypeAlias> &aliases) const;
 
   TypeArrayView<GenericTypeParamType> getGenericParams() const {
     return TypeArrayView<GenericTypeParamType>(
