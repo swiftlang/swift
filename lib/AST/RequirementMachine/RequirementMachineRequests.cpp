@@ -354,7 +354,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
   SmallVector<RequirementError, 4> errors;
 
-  auto status = machine->initWithProtocols(component, errors);
+  auto status = machine->initWithProtocols(component);
   if (status.first != CompletionResult::Success) {
     // All we can do at this point is diagnose and give each protocol an empty
     // requirement signature.
@@ -524,7 +524,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
       ctx.getRewriteContext()));
 
   auto status =
-      machine->initWithWrittenRequirements(genericParams, requirements, errors);
+      machine->initWithWrittenRequirements(genericParams, requirements);
   machine->checkCompletionResult(status.first);
 
   auto minimalRequirements =
@@ -652,7 +652,7 @@ InferredGenericSignatureRequestRQM::evaluate(
       ctx.getRewriteContext()));
 
   auto status =
-      machine->initWithWrittenRequirements(genericParams, requirements, errors);
+      machine->initWithWrittenRequirements(genericParams, requirements);
   if (status.first != CompletionResult::Success) {
     ctx.Diags.diagnose(loc,
                        diag::requirement_machine_completion_failed,

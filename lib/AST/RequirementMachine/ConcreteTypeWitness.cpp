@@ -581,7 +581,7 @@ void PropertyMap::inferConditionalRequirements(
         for (const auto &rule : builder.RequirementRules) {
           auto lhs = std::get<0>(rule);
           auto rhs = std::get<1>(rule);
-          System.addExplicitRule(lhs, rhs, /*requirementID=*/None, errors);
+          System.addExplicitRule(lhs, rhs, /*requirementID=*/None);
         }
       }
     }

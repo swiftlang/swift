@@ -302,8 +302,7 @@ public:
   void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
                   ArrayRef<StructuralRequirement> writtenRequirements,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-                  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules,
-                  SmallVectorImpl<RequirementError> &errors);
+                  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
     return Protos;
@@ -336,8 +335,7 @@ public:
   bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
 
   bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
-                       Optional<unsigned> requirementID,
-                       SmallVectorImpl<RequirementError> &errors);
+                       Optional<unsigned> requirementID);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 

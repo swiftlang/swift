@@ -279,8 +279,7 @@ void RewriteSystem::initialize(
     ArrayRef<StructuralRequirement> writtenRequirements,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
     std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>>
-        &&requirementRules,
-    SmallVectorImpl<RequirementError> &errors) {
+        &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
@@ -295,7 +294,7 @@ void RewriteSystem::initialize(
     auto lhs = std::get<0>(rule);
     auto rhs = std::get<1>(rule);
     auto requirementID = std::get<2>(rule);
-    addExplicitRule(lhs, rhs, requirementID, errors);
+    addExplicitRule(lhs, rhs, requirementID);
   }
 }
 
@@ -496,16 +495,11 @@ bool RewriteSystem::addPermanentRule(MutableTerm lhs, MutableTerm rhs) {
 
 /// Add a new rule, marking it explicit.
 bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
-                                    Optional<unsigned> requirementID,
-                                    SmallVectorImpl<RequirementError> &errors) {
+                                    Optional<unsigned> requirementID) {
   bool added = addRule(std::move(lhs), std::move(rhs));
   if (added) {
     Rules.back().markExplicit();
     Rules.back().setRequirementID(requirementID);
-  } else if (requirementID.hasValue()) {
-    auto req = WrittenRequirements[requirementID.getValue()];
-    errors.push_back(
-        RequirementError::forRedundantRequirement(req.req, req.loc));
   }
 
   return added;
@@ -784,12 +778,23 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
     return rule.isRedundant();
   };
 
-  for (auto pair : rulesPerRequirement) {
-    unsigned requirementID = pair.first;
-    auto ruleIDs = pair.second;
+  for (auto requirementID : indices(WrittenRequirements)) {
+    auto requirement = WrittenRequirements[requirementID];
+    auto pairIt = rulesPerRequirement.find(requirementID);
+
+    // If there are no rules for this structural requirement, then
+    // the requirement was never added to the rewrite system because
+    // it is trivially redundant.
+    if (pairIt == rulesPerRequirement.end()) {
+      errors.push_back(
+          RequirementError::forRedundantRequirement(requirement.req,
+                                                    requirement.loc));
+      continue;
+    }
 
     // If all rules derived from this structural requirement are redundant,
     // then the requirement is unnecessary in the source code.
+    auto ruleIDs = pairIt->second;
     if (llvm::all_of(ruleIDs, isRedundantRule)) {
       auto requirement = WrittenRequirements[requirementID];
       errors.push_back(
