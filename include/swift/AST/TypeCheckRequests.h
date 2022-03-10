@@ -1184,7 +1184,7 @@ public:
     bool isCached() const { return true; }
 };
 
-/// Obtain the 'distributed thunk' for the in passed function.
+/// Obtain the 'distributed thunk' for the passed-in function.
 ///
 /// The thunk is responsible for invoking 'remoteCall' when invoked on a remote
 /// 'distributed actor'.

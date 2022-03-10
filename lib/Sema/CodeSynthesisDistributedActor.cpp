@@ -33,18 +33,6 @@ using namespace swift;
 
 
 /******************************************************************************/
-/****************************** UTILS *****************************************/
-/******************************************************************************/
-
-static DeclName createDistributedFuncName(ASTContext &C, FuncDecl* func) {
-//  std::string localFuncNameString = "$dist_";
-  std::string localFuncNameString = "";
-  localFuncNameString.append(std::string(func->getBaseName().getIdentifier().str()));
-  auto thunkBaseName = DeclBaseName(C.getIdentifier(StringRef(localFuncNameString)));
-  return DeclName(C, thunkBaseName, func->getParameters());
-}
-
-/******************************************************************************/
 /************************ PROPERTY SYNTHESIS **********************************/
 /******************************************************************************/
 
@@ -106,7 +94,7 @@ static void forwardParameters(AbstractFunctionDecl *afd,
     forwardingParams.push_back(new (C) DeclRefExpr(
         ConcreteDeclRef(param), DeclNameLoc(), /*implicit=*/true,
         swift::AccessSemantics::Ordinary,
-        param->getInterfaceType()));
+        afd->mapTypeIntoContext(param->getInterfaceType())));
   }
 }
 
@@ -145,7 +133,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   assert(systemConfRef && "ActorSystem must conform to DistributedActorSystem");
 
   // === ActorSystem.InvocationEncoder
-  ProtocolDecl *DTIE = C.getDistributedTargetInvocationEncoderDecl();
   Type invocationEncoderTy =
       getDistributedActorSystemInvocationEncoderType(systemDecl);
   NominalTypeDecl *invocationEncoderDecl = invocationEncoderTy->getAnyNominal();
@@ -195,7 +182,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   auto *systemVar =
       new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
-                      C.getIdentifier("system"), thunk);
+                      C.Id_system, thunk);
   systemVar->setInterfaceType(systemProperty->getInterfaceType());
   systemVar->setImplicit();
   systemVar->setSynthesized();
@@ -212,7 +199,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   // --- invocationEncoder = system.makeInvocationEncoder()
   auto *invocationVar =
       new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var, sloc,
-                      C.getIdentifier("invocation"), thunk);
+                      C.Id_invocation, thunk);
   invocationVar->setInterfaceType(invocationEncoderTy);
   invocationVar->setImplicit();
   invocationVar->setSynthesized();
@@ -228,7 +215,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     auto *makeInvocationArgs = ArgumentList::createImplicit(C, {});
     auto makeInvocationCallExpr =
         CallExpr::createImplicit(C, makeInvocationExpr, makeInvocationArgs);
-    makeInvocationCallExpr->setType(DTIE->getInterfaceType());
     makeInvocationCallExpr->setThrows(false);
 
     auto invocationEncoderPB = PatternBindingDecl::createImplicit(
@@ -384,7 +370,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   // === Prepare the 'RemoteCallTarget'
   VarDecl *targetVar =
       new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
-                      C.getIdentifier("target"), thunk);
+                      C.Id_target, thunk);
 
   {
     // --- Mangle the thunk name
@@ -510,7 +496,7 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   assert(systemTy &&
          "Thunk synthesis must have concrete actor system type available");
 
-  DeclName thunkName = createDistributedFuncName(C, func);
+  DeclName thunkName = func->getName();
 
   // --- Prepare generic parameters
   GenericParamList *genericParamList = nullptr;
@@ -571,14 +557,14 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 /******************************************************************************/
 
 FuncDecl *GetDistributedThunkRequest::evaluate(
-    Evaluator &evaluator, AbstractFunctionDecl *afd) const {
-  if (!afd->isDistributed())
+    Evaluator &evaluator, AbstractFunctionDecl *distributedTarget) const {
+  if (!distributedTarget->isDistributed())
     return nullptr;
 
-  auto &C = afd->getASTContext();
-  auto DC = afd->getDeclContext();
+  auto &C = distributedTarget->getASTContext();
+  auto DC = distributedTarget->getDeclContext();
 
-  if (!getConcreteReplacementForProtocolActorSystemType(afd)) {
+  if (!getConcreteReplacementForProtocolActorSystemType(distributedTarget)) {
     // Don't synthesize thunks, unless there is a *concrete* ActorSystem.
     // TODO(distributed): we should be able to lift this eventually,
     // and allow resolving distributed actor protocols.
@@ -588,12 +574,12 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
   // Force type-checking the original function, so we can avoid synthesizing
   // the thunks (which would have many of the same errors, if they are caused
   // by a bad source function signature, e.g. missing conformances etc).
-  (void) TypeChecker::typeCheckDecl(afd);
-  if (afd->getDiags().hadAnyError()) {
+  (void) TypeChecker::typeCheckDecl(distributedTarget);
+  if (distributedTarget->getDiags().hadAnyError()) {
     return nullptr;
   }
 
-  if (auto func = dyn_cast<FuncDecl>(afd)) {
+  if (auto func = dyn_cast<FuncDecl>(distributedTarget)) {
     // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
     // we won't be emitting the offending decl after all.
     if (!C.getLoadedModule(C.Id_Distributed))

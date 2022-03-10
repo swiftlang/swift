@@ -1926,12 +1926,6 @@ namespace {
 
         if (auto conversion = dyn_cast<ImplicitConversionExpr>(expr))
           expr = conversion->getSubExpr();
-
-//        // Map opaque values.
-//        if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(expr)) {
-//          if (auto *value = getExistentialValue(opaqueValue))
-//            expr = value;
-//        }
       } while (prior != expr);
 
       if (auto call = dyn_cast<DotSyntaxCallExpr>(expr)) {
@@ -2867,7 +2861,6 @@ namespace {
 
       case ActorIsolationRestriction::CrossActorSelf:
       case ActorIsolationRestriction::ActorSelf:
-        valueRef.dump();
         llvm_unreachable("non-member reference into an actor");
 
       case ActorIsolationRestriction::GlobalActorUnsafe:
@@ -3110,10 +3103,6 @@ namespace {
     }
     }
 
-//    /// Determine whether the given reference is to a method on
-//    /// a remote distributed actor in the given context.
-//    bool isDistributedThunk(ConcreteDeclRef ref, Expr *context,
-//                            bool isInAsyncLetInitializer);
   };
 }
 
@@ -4862,10 +4851,7 @@ bool swift::isPotentiallyIsolatedActor(
   if (!var)
     return false;
 
-  if (var->getName().str().equals("__secretlyKnownToBeLocal")
-      ) {
-//      ||
-//      var->getAttrs().hasAttribute<KnownToBeLocalAttr>()) { /// FIXME(distributed): NOT QUITE, as this also would trim the implicit 'await', but we do still want it
+  if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
     // FIXME(distributed): we did a dynamic check and know that this actor is
     //   local, but we can't express that to the type system; the real
     //   implementation will have to mark 'self' as "known to be local" after

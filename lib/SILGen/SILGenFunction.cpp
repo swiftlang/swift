@@ -522,7 +522,6 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
 
   if (fd->isDistributedActorFactory()) {
-    // TODO(distributed): generalize as "emit body synthesized in SIL" marker
     // Synthesize the factory function body
     emitDistributedActorFactory(fd);
   } else {

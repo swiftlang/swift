@@ -93,7 +93,7 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
     return signature->getConcreteType(ActorSystemAssocType);
   }
 
-  llvm_unreachable("Unable to fetch ActorSystem type! Un");
+  llvm_unreachable("Unable to fetch ActorSystem type!");
 }
 
 Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
