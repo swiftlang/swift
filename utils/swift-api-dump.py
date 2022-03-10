@@ -334,8 +334,6 @@ def main():
     extra_args = ['-skip-imports']
     if args.enable_experimental_concurrency:
         extra_args = extra_args + ['-enable-experimental-concurrency']
-    if args.enable_experimental_distributed:
-        extra_args = extra_args + ['-enable-experimental-distributed']
     if args.enable_experimental_string_processing:
         extra_args = extra_args + ['-enable-experimental-string-processing']
     if args.swift_version:

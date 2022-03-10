@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-distributed -disable-availability-checking -parse-as-library %s | %FileCheck %s
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-swift-emit-silgen -disable-availability-checking -parse-as-library %s | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

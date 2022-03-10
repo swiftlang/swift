@@ -1,4 +1,4 @@
-// RUN:  %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking | %FileCheck %s --dump-input=always
+// RUN:  %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking | %FileCheck %s --dump-input=fail
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
