@@ -311,7 +311,8 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
       case Symbol::Kind::Superclass:
       case Symbol::Kind::ConcreteType:
       case Symbol::Kind::ConcreteConformance:
-        llvm_unreachable("Term has invalid root symbol");
+        llvm::errs() << "Invalid root symbol: " << MutableTerm(begin, end) << "\n";
+        abort();
       }
     }
 

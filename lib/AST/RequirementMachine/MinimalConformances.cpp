@@ -365,7 +365,8 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
     break;
   }
 
-  llvm_unreachable("Bad symbol kind");
+  llvm::errs() << "Bad symbol in " << lhs << "\n";
+  abort();
 }
 
 /// Collect conformance rules and parent paths, and record an initial

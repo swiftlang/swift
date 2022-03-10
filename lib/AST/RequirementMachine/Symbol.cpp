@@ -596,7 +596,8 @@ Symbol Symbol::withConcreteSubstitutions(
     break;
   }
 
-  llvm_unreachable("Bad symbol kind");
+  llvm::errs() << "Bad symbol kind: " << *this << "\n";
+  abort();
 }
 
 /// For a superclass or concrete type symbol
