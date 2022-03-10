@@ -50,14 +50,14 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
       throw LocalTestingDistributedActorSystemError(message: "Unable to locate id '\(id)' locally")
     }
     guard let actor = anyActor as? Act else {
-      throw LocalTestingDistributedActorSystemError(message: "Failed to resolve id '\(id)' as \(Act.Type)")
+      throw LocalTestingDistributedActorSystemError(message: "Failed to resolve id '\(id)' as \(Act.Type.self)")
     }
     return actor
   }
 
   public func assignID<Act>(_ actorType: Act.Type) -> ActorID
     where Act: DistributedActor {
-    let id = ActorAddress(parse: "\(self.idProvider.next())")
+    let id = self.idProvider.next()
     self.assignedIDs.insert(id)
     return id
   }
@@ -72,7 +72,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 
   public func resignID(_ id: ActorID) {
-    guard self.assignedIDs.contains(actor.id) else {
+    guard self.assignedIDs.contains(id) else {
       fatalError("Attempted to resign unknown id '\(id)'")
     }
     self.activeActors.removeValue(forKey: id)
