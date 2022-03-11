@@ -1204,6 +1204,18 @@ CanSILFunctionType getNativeSILFunctionType(
     Optional<SubstitutionMap> reqtSubs = None,
     ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
 
+/// Build the type of a function transformation thunk.
+CanSILFunctionType buildSILFunctionThunkType(
+    SILFunction *fn,
+    CanSILFunctionType &sourceType,
+    CanSILFunctionType &expectedType,
+    CanType &inputSubstType,
+    CanType &outputSubstType,
+    GenericEnvironment *&genericEnv,
+    SubstitutionMap &interfaceSubs,
+    CanType &dynamicSelfType,
+    bool withoutActuallyEscaping);
+
 } // namespace swift
 
 namespace llvm {

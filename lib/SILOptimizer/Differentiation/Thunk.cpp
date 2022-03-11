@@ -45,7 +45,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
   // If there's no opened existential, we just inherit the generic environment
   // from the parent function.
   if (openedExistential == nullptr) {
-    auto genericSig = fn->getLoweredFunctionType()->getSubstGenericSignature();
+    auto genericSig = fn->getLoweredFunctionType()->getInvocationGenericSignature();
     genericEnv = fn->getGenericEnvironment();
     interfaceSubs = fn->getForwardingSubstitutionMap();
     contextSubs = interfaceSubs;
@@ -58,7 +58,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
   GenericSignature baseGenericSig;
   int depth = 0;
   if (inheritGenericSig) {
-    baseGenericSig = fn->getLoweredFunctionType()->getSubstGenericSignature();
+    baseGenericSig = fn->getLoweredFunctionType()->getInvocationGenericSignature();
     if (baseGenericSig)
       depth = baseGenericSig.getGenericParams().back()->getDepth() + 1;
   }
