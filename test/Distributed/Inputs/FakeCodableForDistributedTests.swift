@@ -367,3 +367,88 @@ fileprivate struct StringsSingleValueEncoding: SingleValueEncodingContainer {
     try value.encode(to: stringsEncoding)
   }
 }
+
+public final class FakeDecoder: Decoder {
+  public var codingPath: [CodingKey] = []
+  public var userInfo: [CodingUserInfoKey: Any] = [:]
+
+  var string: String = ""
+
+  public func decode<T>(_ string: String, as type: T.Type) throws -> T where T: Decodable {
+    self.string = string
+    return try type.init(from: self)
+  }
+
+  public func container<Key>(
+    keyedBy type: Key.Type
+  ) throws -> KeyedDecodingContainer<Key> {
+    fatalError("\(#function) not implemented")
+  }
+
+  public func unkeyedContainer() throws -> UnkeyedDecodingContainer {
+    fatalError("\(#function) not implemented")
+  }
+
+  public func singleValueContainer() throws -> SingleValueDecodingContainer {
+    return FakeSingleValueDecodingContainer(string: self.string)
+  }
+}
+
+public final class FakeSingleValueDecodingContainer: SingleValueDecodingContainer {
+  public var codingPath: [CodingKey] { [] }
+
+  let string: String
+
+  init(string: String) {
+    self.string = string
+  }
+
+  public func decodeNil() -> Bool {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: Bool.Type) throws -> Bool {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: String.Type) throws -> String {
+    String(self.string.split(separator: ";").first!)
+  }
+  public func decode(_ type: Double.Type) throws -> Double {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: Float.Type) throws -> Float {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: Int.Type) throws -> Int {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: Int8.Type) throws -> Int8 {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: Int16.Type) throws -> Int16 {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: Int32.Type) throws -> Int32 {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: Int64.Type) throws -> Int64 {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: UInt.Type) throws -> UInt {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: UInt8.Type) throws -> UInt8 {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: UInt16.Type) throws -> UInt16 {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: UInt32.Type) throws -> UInt32 {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode(_ type: UInt64.Type) throws -> UInt64 {
+    fatalError("\(#function) not implemented")
+  }
+  public func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
+    fatalError("\(#function) not implemented")
+  }
+}

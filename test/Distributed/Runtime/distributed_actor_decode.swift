@@ -179,7 +179,7 @@ class TestEncoder: Encoder {
     }
   }
 
-  func encode<Act: DistributedActor>(_ actor: Act) throws -> String {
+  func encode<Act: DistributedActor>(_ actor: Act) throws -> String where Act.ID: Codable {
     try actor.encode(to: self)
     return self.data!
   }

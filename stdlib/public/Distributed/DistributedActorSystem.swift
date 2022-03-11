@@ -15,7 +15,7 @@ import _Concurrency
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedActorSystem: Sendable {
   /// The identity used by actors that communicate via this transport
-  associatedtype ActorID: Sendable & Hashable & Codable // TODO(distributed): make Codable conditional here
+  associatedtype ActorID: Sendable & Hashable
 
   associatedtype InvocationEncoder: DistributedTargetInvocationEncoder
   associatedtype InvocationDecoder: DistributedTargetInvocationDecoder
