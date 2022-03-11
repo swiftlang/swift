@@ -223,7 +223,7 @@ public:
 };
 } // end anonymous namespace
 
-void SILGenFunction::emitDistActorImplicitPropertyInits(
+void SILGenFunction::emitDistributedActorImplicitPropertyInits(
     ConstructorDecl *ctor, ManagedValue selfArg) {
   // Only designated initializers should perform this initialization.
   assert(ctor->isDesignatedInit());
