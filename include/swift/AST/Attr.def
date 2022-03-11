@@ -265,6 +265,10 @@ SIMPLE_DECL_ATTR(objcMembers, ObjCMembers,
   OnClass |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   34)
+CONTEXTUAL_SIMPLE_DECL_ATTR(_compilerInitialized, CompilerInitialized,
+  OnVar |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  35)
 CONTEXTUAL_SIMPLE_DECL_ATTR(__consuming, Consuming,
   OnFunc | OnAccessor |
   DeclModifier |

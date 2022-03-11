@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -verify %s -o /dev/null
 
 class SomeClass {}
 
@@ -52,4 +52,11 @@ func tuple_test() -> Int {
   }
   
   return t.1+t.0  // No diagnostic, everything is fully initialized.
+}
+
+class CheckCompilerInitAttr {
+  @_compilerInitialized let poster: Int
+  init() {
+    poster = 10 // expected-error {{illegal assignment to '@_compilerInitialized' storage}}
+  }
 }

@@ -537,6 +537,7 @@ namespace {
     void diagnoseRefElementAddr(RefElementAddrInst *REI);
     bool diagnoseMethodCall(const DIMemoryUse &Use,
                             bool SuperInitDone);
+    void diagnoseBadExplicitStore(SILInstruction *Inst);
     
     bool isBlockIsReachableFromEntry(const SILBasicBlock *BB);
   };
@@ -574,6 +575,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     case DIUseKind::InOutSelfArgument:
     case DIUseKind::PartialStore:
     case DIUseKind::SelfInit:
+    case DIUseKind::BadExplicitStore:
       break;
     }
 
@@ -775,6 +777,13 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   // the static analyzer.
   if (!TheMemory.isAnyInitSelf())
     diagnose(Module, TheMemory.getLoc(), diag::variable_defined_here, isLet);
+}
+
+void LifetimeChecker::diagnoseBadExplicitStore(SILInstruction *Inst) {
+  if (!shouldEmitError(Inst))
+    return;
+
+  diagnose(Module, Inst->getLoc(), diag::explicit_store_of_compilerinitialized);
 }
 
 /// Determines whether the given function is a constructor that belogs to a
@@ -1137,6 +1146,10 @@ void LifetimeChecker::doIt() {
       break;
     case DIUseKind::TypeOfSelf:
       handleTypeOfSelfUse(Use);
+      break;
+
+    case DIUseKind::BadExplicitStore:
+      diagnoseBadExplicitStore(Inst);
       break;
     }
   }

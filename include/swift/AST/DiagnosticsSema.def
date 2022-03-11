@@ -3203,6 +3203,17 @@ ERROR(escaping_non_function_parameter,none,
 ERROR(escaping_optional_type_argument, none,
       "closure is already escaping in optional type argument", ())
 
+// @_compilerInitialized attribute
+ERROR(incompatible_compilerinitialized_var,none,
+      "'@_compilerInitialized' attribute only applies to "
+      "let-bound stored properties without a default value", ())
+ERROR(protocol_compilerinitialized,none,
+      "'@_compilerInitialized' is not currently supported in protocols", ())
+ERROR(optional_compilerinitialized,none,
+      "'@_compilerInitialized' cannot be applied to an Optional let", ())
+ERROR(instancemember_compilerinitialized,none,
+      "'@_compilerInitialized' can only be applied to a non-static class or actor member", ())
+
 // @_nonEphemeral attribute
 ERROR(non_ephemeral_non_pointer_type,none,
       "@_nonEphemeral attribute only applies to pointer types", ())
