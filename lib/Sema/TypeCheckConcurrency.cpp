@@ -344,7 +344,9 @@ GlobalActorAttributeRequest::evaluate(
     if (auto var = dyn_cast<VarDecl>(storage)) {
 
       // ... but not if it's an async-context top-level global
-      if (var->isTopLevelGlobal() && var->getDeclContext()->isAsyncContext()) {
+      if (var->getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
+          var->isTopLevelGlobal() && (var->getDeclContext()->isAsyncContext()
+            || var->getASTContext().LangOpts.WarnConcurrency)) {
         var->diagnose(diag::global_actor_top_level_var)
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
@@ -3867,7 +3869,10 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
-    if (var->isTopLevelGlobal() && var->getDeclContext()->isAsyncContext()) {
+    if (var->getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
+        var->isTopLevelGlobal() &&
+        (var->getASTContext().LangOpts.WarnConcurrency ||
+         var->getDeclContext()->isAsyncContext())) {
       if (Type mainActor = var->getASTContext().getMainActorType())
         return inferredIsolation(
             ActorIsolation::forGlobalActor(mainActor,
