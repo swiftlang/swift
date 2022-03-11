@@ -671,8 +671,13 @@ namespace {
           paramImportKind = ImportTypeKind::CompletionHandlerResultParameter;
         }
 
+        auto paramQualType = *param;
+        if (paramQualType->isReferenceType() &&
+            paramQualType->getPointeeType().isConstQualified())
+          paramQualType = paramQualType->getPointeeType();
+
         auto swiftParamTy = Impl.importTypeIgnoreIUO(
-            *param, paramImportKind, AllowNSUIntegerAsInt, Bridging,
+            paramQualType, paramImportKind, AllowNSUIntegerAsInt, Bridging,
             OTK_Optional);
         if (!swiftParamTy)
           return Type();
