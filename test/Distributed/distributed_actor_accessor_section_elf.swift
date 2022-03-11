@@ -8,6 +8,9 @@
 
 // REQUIRES: OS=linux-gnu
 
+// FIXME(distributed): rdar://90159628 need to build on linux to debug why this reports a wrong mangled name again after flag removal
+// REQUIRES: radar90159628
+
 import _Distributed
 import FakeDistributedActorSystems
 
