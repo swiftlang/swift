@@ -532,9 +532,12 @@ extension String.UTF16View {
     let idx = _utf16AlignNativeIndex(idx)
 
     guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
-      // TODO: Generic _distance is still very slow. We should be able to
-      // skip over ASCII substrings quickly
-      return _distance(from: startIndex, to: idx)
+      return _guts.withFastUTF8 { utf8 in
+        let sliced = UnsafeBufferPointer(
+          rebasing: utf8[startIndex._encodedOffset ..< idx._encodedOffset]
+        )
+        return _utf16Length(UnsafeRawBufferPointer(sliced))
+      }
     }
 
     // Simple and common: endIndex aka `length`.
@@ -544,7 +547,13 @@ extension String.UTF16View {
     // Otherwise, find the nearest lower-bound breadcrumb and count from there
     let (crumb, crumbOffset) = breadcrumbsPtr.pointee.getBreadcrumb(
       forIndex: idx)
-    return crumbOffset + _distance(from: crumb, to: idx)
+    
+    return _guts.withFastUTF8 { utf8 in
+      let sliced = UnsafeBufferPointer(
+        rebasing: utf8[crumb._encodedOffset ..< idx._encodedOffset]
+      )
+      return crumbOffset + _utf16Length(UnsafeRawBufferPointer(sliced))
+    }
   }
 
   @usableFromInline

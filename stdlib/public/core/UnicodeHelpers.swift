@@ -123,6 +123,46 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
 }
 
 @inlinable @inline(__always)
+internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
+  guard rawBuffer.count > 0 else { return 0 }
+  _internalInvariant(!UTF8.isContinuation(rawBuffer.first.unsafelyUnwrapped))
+  _internalInvariant(
+       UTF8.isASCII(rawBuffer.last.unsafelyUnwrapped)
+    || UTF8.isContinuation(rawBuffer.last.unsafelyUnwrapped))
+  let wordASCIIMask = UInt(truncatingIfNeeded: 0x8080_8080_8080_8080 as UInt64)
+  var utf16Count = 0
+  var readIdx = 0
+
+  while readIdx + MemoryLayout<UInt>.stride < rawBuffer.count {
+    let maybeASCII = Builtin.loadRaw((rawBuffer.baseAddress._unsafelyUnwrappedUnchecked + readIdx)._rawValue) as UInt
+   //let maybeASCII = rawBuffer.load(fromByteOffset: readIdx, as: UInt.self)
+    if maybeASCII & wordASCIIMask == 0 {
+      utf16Count &+= MemoryLayout<UInt>.stride
+      readIdx &+= MemoryLayout<UInt>.stride
+    } else {
+      let endIdx = readIdx + MemoryLayout<UInt>.stride
+      while readIdx < endIdx {
+        let byte = rawBuffer.load(fromByteOffset: readIdx, as: UInt8.self)
+        let len = _utf8ScalarLength(byte)
+        let utf16Len = len == 4 ? 2 : 1
+        utf16Count &+= utf16Len
+        readIdx &+= len
+      }
+    }
+  }
+  
+  while readIdx < rawBuffer.count {
+    let byte = rawBuffer.load(fromByteOffset: readIdx, as: UInt8.self)
+    let len = _utf8ScalarLength(byte)
+    let utf16Len = len == 4 ? 2 : 1
+    utf16Count &+= utf16Len
+    readIdx &+= len
+  }
+  
+  return utf16Count
+}
+
+@inlinable @inline(__always)
 internal func _utf8ScalarLength(
   _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
   ) -> Int {
