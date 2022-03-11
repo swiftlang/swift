@@ -3533,6 +3533,21 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
       }
     }
 
+    // FIXME(backDeploy): support coroutines rdar://90111169
+    auto diagnoseCoroutineIfNecessary = [&](AccessorDecl *AD) {
+      if (AD->isCoroutine())
+        diagnose(Attr->getLocation(), diag::back_deploy_not_on_coroutine,
+                 Attr, AD->getDescriptiveKind());
+    };
+    if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+      ASD->visitEmittedAccessors([&](AccessorDecl *AD) {
+        diagnoseCoroutineIfNecessary(AD);
+      });
+    }
+    if (auto *AD = dyn_cast<AccessorDecl>(D)) {
+      diagnoseCoroutineIfNecessary(AD);
+    }
+
     auto AtLoc = Attr->AtLoc;
     auto Platform = Attr->Platform;
 

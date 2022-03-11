@@ -45,27 +45,23 @@ public struct TopLevelStruct {
   // CHECK: @_backDeploy(macOS 12.0)
   // FROMSOURCE: public var backDeployedPropertyWithAccessors: Swift.Int {
   // FROMSOURCE:   get { 45 }
-  // FROMSOURCE:   set(newValue) { print("set property") }
   // FROMSOURCE: }
   // FROMMODULE: public var backDeployedPropertyWithAccessors: Swift.Int
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
   public var backDeployedPropertyWithAccessors: Int {
     get { 45 }
-    set(newValue) { print("set property") }
   }
 
   // CHECK: @_backDeploy(macOS 12.0)
   // FROMSOURCE: public subscript(index: Swift.Int) -> Swift.Int {
   // FROMSOURCE:   get { 46 }
-  // FROMSOURCE:   set(newValue) { print("set subscript") }
   // FROMSOURCE: }
   // FROMMODULE: public subscript(index: Swift.Int) -> Swift.Int
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
   public subscript(index: Int) -> Int {
     get { 46 }
-    set(newValue) { print("set subscript") }
   }
 }
 
