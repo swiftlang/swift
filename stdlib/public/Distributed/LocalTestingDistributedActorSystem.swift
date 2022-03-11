@@ -12,7 +12,9 @@
 
 import Swift
 
-#if canImport(Glibc)
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
 import Glibc
 #elseif os(Windows)
 import WinSDK
@@ -196,19 +198,23 @@ public struct LocalTestingDistributedActorSystemError: DistributedActorSystemErr
 // === lock ----------------------------------------------------------------
 
 fileprivate class _Lock {
-  #if os(Windows)
+  #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+  private let underlying: UnsafeMutablePointer<os_unfair_lock>
+  #elseif os(Windows)
   private let underlying: UnsafeMutablePointer<SRWLOCK>
-  #elseif os(Cygwin) || os(FreeBSD) || os(OpenBSD)
-  private let underlying: UnsafeMutablePointer<pthread_mutex_t?>
   #elseif os(WASI)
   // pthread is currently not available on WASI
+  #elseif os(Cygwin) || os(FreeBSD) || os(OpenBSD)
+  private let underlying: UnsafeMutablePointer<pthread_mutex_t?>
   #else
   private let underlying: UnsafeMutablePointer<pthread_mutex_t>
   #endif
 
   deinit {
-    #if os(Windows)    
-    // Mutexes do not need to be explicitly destroyed
+    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+    // `os_unfair_lock`s do not need to be explicitly destroyed
+    #elseif os(Windows)    
+    // `SRWLOCK`s do not need to be explicitly destroyed
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
@@ -224,7 +230,9 @@ fileprivate class _Lock {
   }
 
   init() {
-    #if os(Windows)
+    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    #elseif os(Windows)
     self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
     InitializeSRWLock(self.underlying)
     #elseif os(WASI)
@@ -239,7 +247,9 @@ fileprivate class _Lock {
 
   @discardableResult
   func withLock<T>(_ body: () -> T) -> T {
-    #if os(Windows)
+    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+    os_unfair_lock_lock(self.underlying)
+    #elseif os(Windows)
     AcquireSRWLockExclusive(self.underlying)
     #elseif os(WASI)
     // WASI environment has only a single thread
@@ -250,7 +260,9 @@ fileprivate class _Lock {
     #endif
 
     defer {
-      #if os(Windows)
+      #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+      os_unfair_lock_unlock(self.underlying)    
+      #elseif os(Windows)
       ReleaseSRWLockExclusive(self.underlying)
       #elseif os(WASI)
       // WASI environment has only a single thread
