@@ -2338,6 +2338,7 @@ bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   // diagnostic.
   bool emittedSingleBBDiagnostic = false;
   for (auto *mvi : useState.markMoves) {
+    LLVM_DEBUG(llvm::dbgs() << "Performing single block analysis on: " << *mvi);
     emittedSingleBBDiagnostic |= performSingleBasicBlockAnalysis(address, mvi);
   }
 

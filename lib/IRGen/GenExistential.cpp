@@ -1445,7 +1445,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
     T = existential->getConstraintType()->getCanonicalType();
   }
   llvm::StructType *type;
-  if (isa<ProtocolType>(T))
+  if (isa<ProtocolType>(T) || isa<ParameterizedProtocolType>(T))
     type = IGM.createNominalType(T);
   else
     type = IGM.createNominalType(cast<ProtocolCompositionType>(T.getPointer()));

@@ -15,7 +15,7 @@ import _Concurrency
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedActorSystem: Sendable {
   /// The identity used by actors that communicate via this transport
-  associatedtype ActorID: Sendable & Hashable & Codable // TODO: make Codable conditional here
+  associatedtype ActorID: Sendable & Hashable & Codable // TODO(distributed): make Codable conditional here
 
   associatedtype InvocationEncoder: DistributedTargetInvocationEncoder
   associatedtype InvocationDecoder: DistributedTargetInvocationDecoder
@@ -106,7 +106,6 @@ public protocol DistributedActorSystem: Sendable {
   /// The returned `DistributedTargetInvocation` will be populated with all
   /// arguments, generic substitutions, and specific error and return types
   /// that are associated with this specific invocation.
-  @inlinable
   func makeInvocationEncoder() -> InvocationEncoder
 
 //  /// Invoked by the Swift runtime when making a remote call.
@@ -344,7 +343,7 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 // MARK: Support types
 /// A distributed 'target' can be a `distributed func` or `distributed` computed property.
 @available(SwiftStdlib 5.7, *)
-public struct RemoteCallTarget {
+public struct RemoteCallTarget { // TODO: ship this around always; make printing nice
   let _mangledName: String // TODO: StaticString would be better here; no arc, codesize of cleanups
 
   // Only intended to be created by the _Distributed library.
@@ -358,7 +357,7 @@ public struct RemoteCallTarget {
   }
 
   // <module>.Base.hello(hi:)
-  public var fullName: String {
+  public var fullName: String { // TODO: make description
     fatalError("NOT IMPLEMENTED YET: \(#function)")
   }
 }
@@ -412,7 +411,7 @@ public protocol DistributedTargetInvocationEncoder {
 //  ///
 //  /// Record the error type of the distributed method.
 //  /// This method will not be invoked if the target is not throwing.
-//  mutating func recordErrorType<E: Error>(_ type: E.Type) throws
+//  mutating func recordErrorType<E: Error>(_ type: E.Type) throws // TODO: make not adhoc
 
 //  /// Ad-hoc requirement
 //  ///

@@ -46,30 +46,29 @@ struct Unrelated {}
 
 //
 // If a class conforms to a protocol concretely, the resulting protocol
-// composition type should be equivalent to the class type.
-//
-// FIXME: Disabled for now.
+// composition type should be equivalent to the class type for redeclaration
+// checking purposes.
 //
 
-func alreadyConforms<T>(_: Base<T>) {} // expected-note {{'alreadyConforms' previously declared here}}
-func alreadyConforms<T>(_: Base<T> & P1) {} // FIXME e/xpected-error {{invalid redeclaration of 'alreadyConforms'}} expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms<T>(_: Base<T>) {} // expected-note 3 {{'alreadyConforms' previously declared here}}
+func alreadyConforms<T>(_: Base<T> & P1) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 func alreadyConforms<T>(_: Base<T> & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 func alreadyConforms<T>(_: Base<T> & P1 & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 
-func alreadyConformsMeta<T>(_: Base<T>.Type) {} // expected-note {{'alreadyConformsMeta' previously declared here}}
-func alreadyConformsMeta<T>(_: (Base<T> & P1).Type) {} // FIXME e/xpected-error {{invalid redeclaration of 'alreadyConformsMeta'}} expected-note {{'alreadyConformsMeta' previously declared here}}
-func alreadyConformsMeta<T>(_: (Base<T> & P1).Protocol) {} // FIXME e/xpected-error {{invalid redeclaration of 'alreadyConformsMeta'}} expected-note 3 {{'alreadyConformsMeta' previously declared here}}
+func alreadyConformsMeta<T>(_: Base<T>.Type) {} // expected-note 7 {{'alreadyConformsMeta' previously declared here}}
+func alreadyConformsMeta<T>(_: (Base<T> & P1).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (Base<T> & P1).Protocol) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
 func alreadyConformsMeta<T>(_: (any Base<T> & P1).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
 func alreadyConformsMeta<T>(_: (Base<T> & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
 func alreadyConformsMeta<T>(_: (Base<T> & P1 & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
 func alreadyConformsMeta<T>(_: (Base<T> & P1 & AnyObject).Protocol) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
 func alreadyConformsMeta<T>(_: (any Base<T> & P1 & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
 
-func alreadyConforms(_: P3) {} // e/xpected-note {{'alreadyConforms' previously declared here}}
-func alreadyConforms(_: P3 & AnyObject) {} // FIXME e/xpected-error {{invalid redeclaration of 'alreadyConforms'}}
+func alreadyConforms(_: P3) {} // expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms(_: P3 & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 
-func alreadyConformsMeta(_: P3.Type) {} // FIXME e/xpected-note {{'alreadyConformsMeta' previously declared here}}
-func alreadyConformsMeta(_: (P3 & AnyObject).Type) {} // FIXME ex/pected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta(_: P3.Type) {} // expected-note {{'alreadyConformsMeta' previously declared here}}
+func alreadyConformsMeta(_: (P3 & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
 
 // SE-0156 stipulates that a composition can contain multiple classes, as long
 // as they are all the same.

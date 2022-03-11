@@ -350,7 +350,7 @@ static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
   (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
 }
 
-// TODO: same ugly hack as Codable does...
+// TODO(distributed): same ugly hack as Codable does...
 static void installDistributedActorIfNecessary(NominalTypeDecl *NTD) {
   auto req =
     ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveDistributedActor};
@@ -2499,7 +2499,7 @@ public:
     }
 
     if (CD->isDistributedActor()) {
-      TypeChecker::checkDistributedActor(CD);
+      TypeChecker::checkDistributedActor(SF, CD);
     }
 
     // Force lowering of stored properties.
@@ -3051,7 +3051,7 @@ public:
     checkExplicitAvailability(ED);
 
     if (nominal->isDistributedActor())
-      TypeChecker::checkDistributedActor(dyn_cast<ClassDecl>(nominal));
+      TypeChecker::checkDistributedActor(SF, nominal);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

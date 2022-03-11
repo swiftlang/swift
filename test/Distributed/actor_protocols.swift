@@ -22,14 +22,16 @@ class C: Actor, UnsafeSendable {
 }
 
 struct S: Actor {
-  // expected-error@-1{{non-class type 'S' cannot conform to class protocol 'Actor'}}
+  // expected-error@-1{{non-class type 'S' cannot conform to class protocol 'AnyActor'}}
+  // expected-error@-2{{non-class type 'S' cannot conform to class protocol 'Actor'}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }
 }
 
 struct E: Actor {
-  // expected-error@-1{{non-class type 'E' cannot conform to class protocol 'Actor'}}
+  // expected-error@-1{{non-class type 'E' cannot conform to class protocol 'AnyActor'}}
+  // expected-error@-2{{non-class type 'E' cannot conform to class protocol 'Actor'}}
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }

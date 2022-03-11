@@ -2926,7 +2926,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                     /*topLevelFunction=*/true, isMethod,
                                     /*isInitializer=*/isa<ConstructorDecl>(afd),
                                     getNumCurryLevels())
-        ->getCanonicalType();
+        ->getMinimalCanonicalType(afd);
   }
 
   if (isa<AbstractStorageDecl>(this)) {
@@ -2942,7 +2942,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                                    /*topLevelFunction=*/true,
                                    /*isMethod=*/false,
                                    /*isInitializer=*/false, getNumCurryLevels())
-              ->getCanonicalType();
+              ->getMinimalCanonicalType(cast<SubscriptDecl>(this));
     }
 
     // We want to curry the default signature type with the 'self' type of the
@@ -2957,7 +2957,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
         /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
-    return mappedType->getCanonicalType();
+    return mappedType->getMinimalCanonicalType(getDeclContext());
   }
 
   // Note: If you add more cases to this function, you should update the
@@ -4085,9 +4085,9 @@ GenericParameterReferenceInfo swift::findGenericParameterReferences(
 }
 
 GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
-    Type baseTy, const DeclContext *useDC,
-    bool treatNonResultCovariantSelfAsInvariant) const {
+    Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const {
   assert(baseTy->isExistentialType());
+  assert(!baseTy->hasTypeParameter());
 
   // Types never refer to 'Self'.
   if (isa<TypeDecl>(this))
@@ -4099,9 +4099,12 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
   if (type->hasError())
     return GenericParameterReferenceInfo();
 
-  const auto sig =
-      getASTContext().getOpenedArchetypeSignature(baseTy,
-                                                  useDC->getGenericSignatureOfContext());
+  // Note: a non-null GenericSignature would violate the invariant that
+  // the protocol 'Self' type referenced from the requirement's interface
+  // type is the same as the existential 'Self' type.
+  auto sig = getASTContext().getOpenedArchetypeSignature(baseTy,
+      GenericSignature());
+
   auto genericParam = sig.getGenericParams().front();
   return findGenericParameterReferences(
       this, sig, genericParam, treatNonResultCovariantSelfAsInvariant, None);
@@ -5310,11 +5313,6 @@ bool ProtocolDecl::isMarkerProtocol() const {
   return getAttrs().hasAttribute<MarkerAttr>();
 }
 
-bool ProtocolDecl::inheritsFromDistributedActor() const {
-  auto &C = getASTContext();
-  return inheritsFrom(C.getDistributedActorDecl());
-}
-
 ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
@@ -6375,6 +6373,10 @@ bool VarDecl::isAsyncLet() const {
 
 bool VarDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
+}
+
+bool VarDecl::isKnownToBeLocal() const {
+  return getAttrs().hasAttribute<KnownToBeLocalAttr>();
 }
 
 bool VarDecl::isOrdinaryStoredProperty() const {
@@ -7996,7 +7998,6 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
   *selfDecl = new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                   getLoc(), ctx.Id_self, this);
   (*selfDecl)->setImplicit();
-
   return *selfDecl;
 }
 

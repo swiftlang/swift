@@ -281,7 +281,6 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
     
   case SILLinkage::HiddenExternal:
   case SILLinkage::PublicExternal:
-  case SILLinkage::SharedExternal:
     llvm_unreachable("should be definition linkage?");
   }
 

@@ -249,7 +249,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
            (forDefinition == ForDefinition_t::NotForDefinition &&
             (fnLinkage == linkageForDef ||
              (linkageForDef == SILLinkage::PublicNonABI &&
-              fnLinkage == SILLinkage::SharedExternal))));
+              fnLinkage == SILLinkage::Shared))));
     if (forDefinition) {
       // In all the cases where getConstantLinkage returns something
       // different for ForDefinition, it returns an available-externally

@@ -17,11 +17,16 @@ public class C {
 public class D {}
 
 @available(macOS 10.9, *)
-@_originallyDefinedIn(module: "original", _myProject 2.0) // expected-error {{expected at least one platform version in @_originallyDefinedIn}}
-// expected-error @-1 {{reference to undefined version '2.0' for availability macro '_myProject'}}
+@_originallyDefinedIn(module: "original", _myProject 2.0) // expected-error {{reference to undefined version '2.0' for availability macro '_myProject'}}
 public func macroVersionned() {}
 
 // Fallback to the default diagnostic when the macro is unknown.
 @available(macOS 10.9, *)
-@_originallyDefinedIn(module: "original", _unknownMacro) // expected-error {{expected at least one platform version in @_originallyDefinedIn}}
+@_originallyDefinedIn(module: "original", _unknownMacro) // expected-warning {{unknown platform '_unknownMacro' for attribute '@_originallyDefinedIn'}}
+// expected-error@-1 {{expected version number in '@_originallyDefinedIn' attribute}}
 public func macroUnknown() {}
+
+@available(macOS 10.9, *)
+@_originallyDefinedIn(module: "original", swift 5.1) // expected-warning {{unknown platform 'swift' for attribute '@_originallyDefinedIn'}}
+// expected-error@-1 {{expected at least one platform version in '@_originallyDefinedIn' attribute}}
+public func swiftVersionMacro() {}

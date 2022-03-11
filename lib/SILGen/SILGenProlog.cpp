@@ -316,7 +316,7 @@ struct ArgumentInitHelper {
     assert(type->isMaterializable());
 
     ++ArgNo;
-    if (PD->hasName()) {
+    if (PD->hasName() || PD->isIsolated()) {
       makeArgumentIntoBinding(type, &*f.begin(), PD);
       return;
     }

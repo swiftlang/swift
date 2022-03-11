@@ -1184,6 +1184,27 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Obtain the 'distributed thunk' for the passed-in function.
+///
+/// The thunk is responsible for invoking 'remoteCall' when invoked on a remote
+/// 'distributed actor'.
+class GetDistributedThunkRequest :
+    public SimpleRequest<GetDistributedThunkRequest,
+                         FuncDecl *(AbstractFunctionDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *distributedFunc) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Obtain the 'id' property of a 'distributed actor'.
 class GetDistributedActorIDPropertyRequest :
     public SimpleRequest<GetDistributedActorIDPropertyRequest,

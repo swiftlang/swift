@@ -34,7 +34,7 @@ extension ImportedClass {
   // CHECK-LABEL: sil hidden [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE16objcToDesignatedAByt_tcfC
   // CHECK: function_ref @$sSo13ImportedClassC39convenience_init_peer_delegation_importE16objcToDesignatedAByt_tcfcTD :
   // CHECK: end sil function '$sSo13ImportedClassC39convenience_init_peer_delegation_importE16objcToDesignatedAByt_tcfC'
-  // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE16objcToDesignatedAByt_tcfcTD
+  // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE16objcToDesignatedAByt_tcfcTD
   // CHECK: objc_method %0 : $ImportedClass, #ImportedClass.init!initializer.foreign
   // CHECK: end sil function '$sSo13ImportedClassC39convenience_init_peer_delegation_importE16objcToDesignatedAByt_tcfcTD'
   // CHECK-LABEL: sil hidden [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE16objcToDesignatedAByt_tcfc
@@ -49,7 +49,7 @@ extension ImportedClass {
   // CHECK-LABEL: sil hidden [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE17objcToConvenienceAByt_tcfC
   // CHECK: function_ref @$sSo13ImportedClassC39convenience_init_peer_delegation_importE17objcToConvenienceAByt_tcfcTD :
   // CHECK: end sil function '$sSo13ImportedClassC39convenience_init_peer_delegation_importE17objcToConvenienceAByt_tcfC'
-  // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE17objcToConvenienceAByt_tcfcTD
+  // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE17objcToConvenienceAByt_tcfcTD
   // CHECK: objc_method %0 : $ImportedClass, #ImportedClass.init!initializer.foreign
   // CHECK: end sil function '$sSo13ImportedClassC39convenience_init_peer_delegation_importE17objcToConvenienceAByt_tcfcTD'
   // CHECK-LABEL: sil hidden [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE17objcToConvenienceAByt_tcfc
@@ -65,7 +65,7 @@ extension ImportedClass {
   // CHECK-LABEL: sil hidden [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE24objcToConvenienceFactoryAByt_tcfC
   // CHECK: function_ref @$sSo13ImportedClassC39convenience_init_peer_delegation_importE24objcToConvenienceFactoryAByt_tcfcTD :
   // CHECK: end sil function '$sSo13ImportedClassC39convenience_init_peer_delegation_importE24objcToConvenienceFactoryAByt_tcfC'
-  // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE24objcToConvenienceFactoryAByt_tcfcTD
+  // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE24objcToConvenienceFactoryAByt_tcfcTD
   // CHECK: objc_method %0 : $ImportedClass, #ImportedClass.init!initializer.foreign
   // CHECK: end sil function '$sSo13ImportedClassC39convenience_init_peer_delegation_importE24objcToConvenienceFactoryAByt_tcfcTD'
   // CHECK-LABEL: sil hidden [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE24objcToConvenienceFactoryAByt_tcfc
@@ -81,7 +81,7 @@ extension ImportedClass {
   // CHECK-LABEL: sil hidden [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE19objcToNormalFactoryAByt_tcfC
   // CHECK: function_ref @$sSo13ImportedClassC39convenience_init_peer_delegation_importE19objcToNormalFactoryAByt_tcfcTD :
   // CHECK: end sil function '$sSo13ImportedClassC39convenience_init_peer_delegation_importE19objcToNormalFactoryAByt_tcfC'
-  // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE19objcToNormalFactoryAByt_tcfcTD
+  // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE19objcToNormalFactoryAByt_tcfcTD
   // CHECK: objc_method %0 : $ImportedClass, #ImportedClass.init!initializer.foreign
   // CHECK: end sil function '$sSo13ImportedClassC39convenience_init_peer_delegation_importE19objcToNormalFactoryAByt_tcfcTD'
   // CHECK-LABEL: sil hidden [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE19objcToNormalFactoryAByt_tcfc

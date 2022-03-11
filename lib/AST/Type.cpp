@@ -106,6 +106,8 @@ NominalTypeDecl *CanType::getAnyNominal() const {
 GenericTypeDecl *CanType::getAnyGeneric() const {
   if (auto existential = dyn_cast<ExistentialType>(*this))
     return existential->getConstraintType()->getAnyGeneric();
+  if (auto ppt = dyn_cast<ParameterizedProtocolType>(*this))
+    return ppt->getBaseType()->getDecl();
   if (auto Ty = dyn_cast<AnyGenericType>(*this))
     return Ty->getDecl();
   return nullptr;
@@ -380,6 +382,20 @@ bool CanType::isTypeErasedGenericClassTypeImpl(CanType type) {
   return false;
 }
 
+static bool archetypeConformsTo(ArchetypeType *archetype, KnownProtocolKind protocol) {
+  auto &ctx = archetype->getASTContext();
+  auto expectedProto = ctx.getProtocol(protocol);
+  if (!expectedProto)
+    return false;
+
+  for (auto proto : archetype->getConformsTo()) {
+    if (proto == expectedProto || proto->inheritsFrom(expectedProto))
+      return true;
+  }
+
+  return false;
+}
+
 bool TypeBase::isActorType() {
   // Nominal types: check whether the declaration is an actor.
   if (auto nominal = getAnyNominal())
@@ -387,16 +403,7 @@ bool TypeBase::isActorType() {
 
   // Archetypes check for conformance to Actor.
   if (auto archetype = getAs<ArchetypeType>()) {
-    auto actorProto = getASTContext().getProtocol(KnownProtocolKind::Actor);
-    if (!actorProto)
-      return false;
-
-    for (auto proto : archetype->getConformsTo()) {
-      if (proto == actorProto || proto->inheritsFrom(actorProto))
-        return true;
-    }
-
-    return false;
+    return archetypeConformsTo(archetype, KnownProtocolKind::Actor);
   }
 
   // Existential types: check for Actor protocol.
@@ -417,6 +424,40 @@ bool TypeBase::isActorType() {
     }
 
     return false;
+  }
+
+  return false;
+}
+
+bool TypeBase::isDistributedActor() {
+  // Nominal types: check whether the declaration is an actor.
+  if (auto *nominal = getAnyNominal()) {
+    if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+      return classDecl->isDistributedActor();
+
+    if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
+      return false;
+  }
+
+  // Archetypes check for conformance to DistributedActor.
+  if (auto archetype = getAs<ArchetypeType>()) {
+    return archetypeConformsTo(archetype, KnownProtocolKind::DistributedActor);
+  }
+
+  // Existential types: check for DistributedActor protocol conformance.
+  if (isExistentialType()) {
+    auto actorProto = getASTContext().getDistributedActorDecl();
+    if (!actorProto)
+      return false;
+
+    // TODO(distributed): Inheritance is not yet supported.
+
+    auto layout = getExistentialLayout();
+    return llvm::any_of(layout.getProtocols(),
+                        [&actorProto](ProtocolType *protocol) {
+                          return protocol->getDecl() == actorProto ||
+                                 protocol->isDistributedActor();
+                        });
   }
 
   return false;

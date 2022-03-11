@@ -1935,8 +1935,8 @@ WARNING(type_does_not_conform_swiftui_warning,none,
 
 ERROR(non_final_class_cannot_conform_to_self_same_type,none,
       "non-final class %0 cannot safely conform to protocol %1, "
-      "which requires that 'Self' is exactly equal to %2",
-      (Type, Type, Type))
+      "which requires that %2 %select{is exactly equal to|inherit from}3 %4",
+      (Type, Type, Type, unsigned, Type))
 
 ERROR(cannot_use_nil_with_this_type,none,
       "'nil' cannot be used in context expecting type %0", (Type))
@@ -4495,6 +4495,13 @@ ERROR(actor_inheritance,none,
 ERROR(actor_protocol_illegal_inheritance,none,
       "non-actor type %0 cannot conform to the 'Actor' protocol",
       (DeclName))
+ERROR(distributed_actor_conformance_missing_system_type,none,
+      "distributed actor %0 does not declare ActorSystem it can be used with.",
+      (DeclName))
+NOTE(note_distributed_actor_system_can_be_defined_using_defaultdistributedactorsystem,none,
+     "you can provide a module-wide default actor system by declaring:\n"
+     "typealias DefaultDistributedActorSystem = <#ConcreteActorSystem#>\n",
+     ())
 ERROR(distributed_actor_protocol_illegal_inheritance,none,
       "non-distributed actor type %0 cannot conform to the 'DistributedActor' protocol",
       (DeclName))
@@ -4594,6 +4601,9 @@ NOTE(note_distributed_actor_isolated_method,none,
      (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_isolated_method,none,
       "only 'distributed' instance methods can be called on a potentially remote distributed actor",
+      ())
+ERROR(distributed_local_cannot_be_used,none,
+      "'local' cannot be used in user-defined code currently",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",

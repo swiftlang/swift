@@ -173,13 +173,11 @@ protected:
 
   bool visitUnknownUse(Operand *use) override {
     auto *user = use->getUser();
-    // Recognize any leaf users not already recognized by UniqueAddressUses.
-    //
-    // Destroy hoisting considers address_to_pointer to be a leaf use because
-    // any potential pointer access is already considered to be a
-    // deinitializtion barrier.
-    if (isa<PointerToAddressInst>(user)) {
-      storageUsers.insert(use->getUser());
+    if (isa<BuiltinRawPointerType>(use->get()->getType().getASTType())) {
+      // Destroy hoisting considers address_to_pointer to be a leaf use because
+      // any potential pointer access is already considered to be a
+      // deinitializtion barrier.  Consequently, any instruction that uses a
+      // value produced by address_to_pointer isn't regarded as a storage use.
       return true;
     }
     LLVM_DEBUG(llvm::dbgs() << "Unknown user " << *user);

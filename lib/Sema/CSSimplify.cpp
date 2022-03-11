@@ -1348,7 +1348,8 @@ namespace {
 static Optional<
     std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
 shouldOpenExistentialCallArgument(
-    ValueDecl *callee, unsigned paramIdx, Type paramTy, Type argTy) {
+    ValueDecl *callee, unsigned paramIdx, Type paramTy, Type argTy,
+    Expr *argExpr, ConstraintSystem &cs) {
   if (!callee)
     return None;
 
@@ -1381,6 +1382,20 @@ shouldOpenExistentialCallArgument(
   // type inference won't be possible.
   if (!paramTy->hasTypeVariable())
     return None;
+
+  // An argument expression that explicitly coerces to an existential
+  // disables the implicit opening of the existential.
+  if (argExpr) {
+    if (auto argCoercion = dyn_cast<CoerceExpr>(
+            argExpr->getSemanticsProvidingExpr())) {
+      if (auto typeRepr = argCoercion->getCastTypeRepr()) {
+        if (auto toType = cs.getType(typeRepr)) {
+          if (toType->isAnyExistentialType())
+            return None;
+        }
+      }
+    }
+  }
 
   OpenedExistentialAdjustments adjustments;
 
@@ -1670,10 +1685,10 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       auto argTy = argument.getOldType();
 
       bool matchingAutoClosureResult = param.isAutoClosure();
+      auto *argExpr = getArgumentExpr(locator.getAnchor(), argIdx);
       if (param.isAutoClosure() && !isSynthesizedArgument(argument)) {
         auto &ctx = cs.getASTContext();
         auto *fnType = paramTy->castTo<FunctionType>();
-        auto *argExpr = getArgumentExpr(locator.getAnchor(), argIdx);
 
         // If this is a call to a function with a closure argument and the
         // parameter is an autoclosure, let's just increment the score here
@@ -1715,7 +1730,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       // If the argument is an existential type and the parameter is generic,
       // consider opening the existential type.
       if (auto existentialArg = shouldOpenExistentialCallArgument(
-              callee, paramIdx, paramTy, argTy)) {
+              callee, paramIdx, paramTy, argTy, argExpr, cs)) {
         // My kingdom for a decent "if let" in C++.
         TypeVariableType *openedTypeVar;
         Type existentialType;
@@ -3120,8 +3135,18 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
         return result;
     }
 
+    // Arguments of parameterized protocol types have to match on the nose.
+    if (auto ppt1 = type1->getAs<ParameterizedProtocolType>()) {
+      auto ppt2 = type2->castTo<ParameterizedProtocolType>();
+      return matchDeepTypeArguments(*this, subflags,
+                                    ppt1->getArgs(),
+                                    ppt2->getArgs(),
+                                    locator);
+    }
+
     return getTypeMatchSuccess();
   }
+
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
     auto nominal2 = type2->castTo<NominalType>();
@@ -3432,6 +3457,68 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
         break;
       }
+    }
+  }
+
+  auto constraintType1 = type1;
+  if (auto existential = constraintType1->getAs<ExistentialType>())
+    constraintType1 = existential->getConstraintType();
+
+  auto constraintType2 = type2;
+  if (auto existential = constraintType2->getAs<ExistentialType>())
+    constraintType2 = existential->getConstraintType();
+
+  auto ppt1 = constraintType1->getAs<ParameterizedProtocolType>();
+  auto ppt2 = constraintType2->getAs<ParameterizedProtocolType>();
+
+  // With two parameterized protocols, we've already made sure conformance
+  // constraints are satisified. Try to match the arguments!
+  if (ppt1 && ppt2) {
+    ArrayRef<Type> longerArgs = ppt1->getArgs();
+    ArrayRef<Type> shorterArgs = ppt2->getArgs();
+    // The more constrained of the two types had better be the first type -
+    // otherwise we're forgetting requirements.
+    if (longerArgs.size() < shorterArgs.size()) {
+      return getTypeMatchFailure(locator);
+    }
+
+    // Line up the the arguments of the parameterized protocol.
+    // FIXME: Extend the locator path to point to the argument
+    // inducing the requirement.
+    for (const auto &pair : llvm::zip_first(shorterArgs, longerArgs)) {
+      auto result = matchTypes(std::get<0>(pair), std::get<1>(pair),
+                               ConstraintKind::Bind,
+                               subflags, locator);
+      if (result.isFailure())
+        return result;
+    }
+  } else if (ppt1 && type2->isExistentialType()) {
+    // P<T, U, V, ...> converts to (P & Q & ...) trivially...
+    return getTypeMatchSuccess();
+  } else if (ppt2 && type1->isExistentialType()) {
+    // But (P & Q & ...) does not convert to P<T, U, V, ...>
+    return getTypeMatchFailure(locator);
+  } else if (ppt1 || ppt2) {
+    auto parameterized = constraintType1;
+    auto base = constraintType2;
+    if (ppt2)
+      std::swap(parameterized, base);
+
+    // One of the two is parameterized, and the other is a concrete type.
+    // Substitute the base into the requirements of the parameterized type and
+    // discharge the requirements of the parameterized protocol.
+    // FIXME: Extend the locator path to point to the argument
+    // inducing the requirement.
+    SmallVector<Requirement, 2> reqs;
+    parameterized->castTo<ParameterizedProtocolType>()
+                 ->getRequirements(base, reqs);
+    for (const auto &req : reqs) {
+      assert(req.getKind() == RequirementKind::SameType);
+      auto result = matchTypes(req.getFirstType(), req.getSecondType(),
+                               ConstraintKind::Bind,
+                               subflags, locator);
+      if (result.isFailure())
+        return result;
     }
   }
 
@@ -10113,18 +10200,8 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
   if (type2->isAnyExistentialType()) {
     // We have the existential side. Produce an opened archetype and bind
     // type1 to it.
-    bool isMetatype = false;
-    auto instanceTy = type2;
-    if (auto metaTy = type2->getAs<ExistentialMetatypeType>()) {
-      isMetatype = true;
-      instanceTy = metaTy->getExistentialInstanceType();
-    }
-    assert(instanceTy->isExistentialType());
-    Type openedTy =
-        OpenedArchetypeType::get(instanceTy->getCanonicalType(),
-                                 DC->getGenericSignatureOfContext());
-    if (isMetatype)
-      openedTy = MetatypeType::get(openedTy, getASTContext());
+    Type openedTy = openExistentialType(type2, getConstraintLocator(locator))
+        .first;
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
   }
   if (!type2->isTypeVariableOrMember())

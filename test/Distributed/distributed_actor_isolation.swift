@@ -45,7 +45,8 @@ distributed actor DistributedActor_1 {
   distributed static func distributedStatic() {} // expected-error{{'distributed' method cannot be 'static'}}
   distributed class func distributedClass() {}
   // expected-error@-1{{class methods are only allowed within classes; use 'static' to declare a static method}}
-  // expected-error@-2{{'distributed' method cannot be 'static'}} // TODO(distributed): should call out 'class' instead?
+  // expected-error@-2{{'distributed' method cannot be 'static'}}
+  // expected-error@-3{{class methods are only allowed within classes; use 'static' to declare a static method}}
 
   func hello() {} // expected-note{{distributed actor-isolated instance method 'hello()' declared here}}
   func helloAsync() async {} // expected-note{{distributed actor-isolated instance method 'helloAsync()' declared here}}

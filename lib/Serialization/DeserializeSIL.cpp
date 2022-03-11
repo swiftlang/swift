@@ -69,7 +69,6 @@ fromStableSILLinkage(unsigned value) {
   case SIL_LINKAGE_PRIVATE: return SILLinkage::Private;
   case SIL_LINKAGE_PUBLIC_EXTERNAL: return SILLinkage::PublicExternal;
   case SIL_LINKAGE_HIDDEN_EXTERNAL: return SILLinkage::HiddenExternal;
-  case SIL_LINKAGE_SHARED_EXTERNAL: return SILLinkage::SharedExternal;
   default: return None;
   }
 }
@@ -623,11 +622,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     // Don't override the transparency or linkage of a function with
     // an existing declaration, except if we deserialized a
     // PublicNonABI function, which has HiddenExternal when
-    // referenced as a declaration, and SharedExternal when it has
+    // referenced as a declaration, and Shared when it has
     // a deserialized body.
     if (isAvailableExternally(fn->getLinkage())) {
-      if (linkage == SILLinkage::PublicNonABI) {
-        fn->setLinkage(SILLinkage::SharedExternal);
+      if (linkage == SILLinkage::PublicNonABI || linkage == SILLinkage::Shared) {
+        fn->setLinkage(SILLinkage::Shared);
       } else if (hasPublicVisibility(linkage)) {
         // Cross-module-optimization can change the linkage to public. In this
         // case we need to update the linkage of the function (which is
@@ -884,6 +883,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
 
+  if (!MF->isSIB() && !SILMod.isSerialized()) {
+    assert((fn->isSerialized() || fn->empty()) &&
+           "deserialized function must have the IsSerialized flag set");
+  }
   return fn;
 }
 
@@ -3521,8 +3524,8 @@ llvm::Expected<SILWitnessTable *>
   unsigned IsDeclaration;
   unsigned Serialized;
   ProtocolConformanceID conformance;
-  WitnessTableLayout::readRecord(scratch, RawLinkage,
-                                 IsDeclaration, Serialized, conformance);
+  WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration,
+                                 Serialized, conformance);
 
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
@@ -3543,7 +3546,7 @@ llvm::Expected<SILWitnessTable *>
                                     theConformance);
 
   if (!existingWt)
-    existingWt = SILMod.lookUpWitnessTable(theConformance, false);
+    existingWt = SILMod.lookUpWitnessTable(theConformance);
   auto wT = existingWt;
 
   // If we have an existing witness table, verify that the conformance matches

@@ -96,7 +96,7 @@ void job_run_end(ExecutorRef *executor, job_run_info info);
 } // namespace concurrency
 } // namespace swift
 
-#if __has_include(<os/signpost.h>)
+#if SWIFT_STDLIB_CONCURRENCY_TRACING
 #include "TracingSignpost.h"
 #else
 #include "TracingStubs.h"
