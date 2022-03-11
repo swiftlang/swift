@@ -29,6 +29,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -5486,17 +5487,13 @@ void swift::diagnoseConformanceFailure(Type T,
       return;
 
     // If it is missing the ActorSystem type, suggest adding it:
-    // FIXME(distributed): use getDistributedActorSystemType(nominal); once merged
-    auto &C = nominal->getASTContext();
-    auto DA = C.getDistributedActorDecl();
-    Type selfType = nominal->getSelfInterfaceType();
-    auto conformance = nominal->getParentModule()->lookupConformance(selfType, DA);
-    auto systemTy = conformance.getTypeWitnessByName(selfType, C.Id_ActorSystem);
-
+    auto systemTy = getDistributedActorSystemType(/*actor=*/nominal);
     if (!systemTy || systemTy->hasError()) {
       diags.diagnose(ComplainLoc,
                      diag::distributed_actor_conformance_missing_system_type,
                      nominal->getName());
+      diags.diagnose(nominal->getStartLoc(),
+                     diag::note_distributed_actor_system_can_be_defined_using_defaultdistributedactorsystem);
       return;
     }
   }
