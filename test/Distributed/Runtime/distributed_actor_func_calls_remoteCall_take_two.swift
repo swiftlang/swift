@@ -14,12 +14,6 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
-// FIXME(distributed): rdar://90078069
-// UNSUPPORTED: linux
-
-// FIXME(distributed): optimized builds optimize too aggressively somewhere
-// REQUIRES: swift_test_mode_optimize_none
-
 import _Distributed
 import FakeDistributedActorSystems
 

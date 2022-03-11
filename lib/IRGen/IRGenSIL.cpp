@@ -2239,7 +2239,7 @@ void IRGenSILFunction::emitSILFunction() {
 
   // Emit distributed accessor, and mark the thunk as accessible
   // by name at runtime through it.
-  if (CurSILFn->isDistributed() && CurSILFn->isThunk()) {
+  if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
     IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
   }
