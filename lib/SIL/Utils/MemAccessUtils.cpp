@@ -2025,8 +2025,7 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
   case SILInstructionKind::StoreWeakInst:
   case SILInstructionKind::StoreUnownedInst:
     if (operIdx == CopyLikeInstruction::Dest) {
-      visitor.visitStore(use);
-      return true;
+      return visitor.visitStore(use);
     }
     break;
 

@@ -44,7 +44,6 @@ enum SILLinkageEncoding : uint8_t {
   SIL_LINKAGE_PRIVATE,
   SIL_LINKAGE_PUBLIC_EXTERNAL,
   SIL_LINKAGE_HIDDEN_EXTERNAL,
-  SIL_LINKAGE_SHARED_EXTERNAL,
 };
 using SILLinkageField = BCFixed<4>;
 
@@ -266,7 +265,7 @@ namespace sil_block {
   using SILFunctionLayout =
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
                      BCFixed<1>,  // transparent
-                     BCFixed<2>,  // serialized
+                     BCFixed<1>,  // serialized
                      BCFixed<2>,  // thunks: signature optimized/reabstraction
                      BCFixed<1>,  // without_actually_escaping
                      BCFixed<3>,  // specialPurpose

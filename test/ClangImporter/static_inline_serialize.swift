@@ -6,7 +6,7 @@
 // RUN: %target-swift-frontend -module-name test -O -emit-sil %s -I %t -enable-objc-interop | %FileCheck %s
 // RUN: %target-swift-frontend -module-name test -O -emit-ir %s -I %t -enable-objc-interop | %FileCheck --check-prefix=CHECK-IR %s
 
-// CHECK: sil shared_external [clang c_inline_func] @c_inline_func : $@convention(c) (Int32) -> Int32
+// CHECK: sil shared [clang c_inline_func] @c_inline_func : $@convention(c) (Int32) -> Int32
 
 // CHECK-IR-LABEL: define{{.*}} i32 @"$s4test6mytest1xs5Int32VAE_tF"(i32 %0)
 // CHECK-IR: = add {{.*}}, 27

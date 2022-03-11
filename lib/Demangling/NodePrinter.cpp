@@ -306,6 +306,7 @@ private:
     case Node::Kind::MetatypeRepresentation:
     case Node::Kind::Module:
     case Node::Kind::Tuple:
+    case Node::Kind::ParameterizedProtocol:
     case Node::Kind::Protocol:
     case Node::Kind::ProtocolSymbolicReference:
     case Node::Kind::ReturnType:
@@ -2024,7 +2025,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::DistributedThunk:
     if (!Options.ShortenThunk) {
-      Printer << "distributed thunk for ";
+      Printer << "distributed thunk ";
     }
     return nullptr;
   case Node::Kind::DistributedAccessor:
@@ -2268,6 +2269,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     } else {
       Printer << ".Type";
     }
+    return nullptr;
+  }
+  case Node::Kind::ParameterizedProtocol: {
+    printBoundGeneric(Node, depth);
     return nullptr;
   }
   case Node::Kind::ExistentialMetatype: {

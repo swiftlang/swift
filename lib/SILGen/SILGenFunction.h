@@ -2055,9 +2055,6 @@ public:
   /// corresponding SIL function for it.
   void emitDistributedActorFactory(FuncDecl *fd);
 
-  /// Generates a thunk from an actor function
-  void emitDistributedThunk(SILDeclRef thunk);
-
   /// Notify transport that actor has initialized successfully,
   /// and is ready to receive messages.
   void emitDistributedActorReady(

@@ -254,7 +254,7 @@ optimizeInst(SILInstruction *inst, SILOptFunctionBuilder &funcBuilder,
       return true;
 
     if (callee->isExternalDeclaration())
-      getModule()->loadFunction(callee);
+      getModule()->loadFunction(callee, SILModule::LinkingMode::LinkAll);
 
     if (callee->isExternalDeclaration())
       return true;

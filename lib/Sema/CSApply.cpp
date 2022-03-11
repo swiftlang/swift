@@ -378,10 +378,12 @@ namespace {
     ///
     /// \param expr The expression to be coerced.
     /// \param toType The type to which the expression will be coerced.
+    /// \param locator Locator describing where this existential conversion occurs.
     ///
     /// \return The coerced expression, whose type will be equivalent to
     /// \c toType.
-    Expr *coerceExistential(Expr *expr, Type toType);
+    Expr *coerceExistential(Expr *expr, Type toType,
+                            ConstraintLocatorBuilder locator);
 
     /// Coerce an expression of (possibly unchecked) optional
     /// type to have a different (possibly unchecked) optional type.
@@ -5275,51 +5277,6 @@ collectExistentialConformances(Type fromType, Type toType,
   return toType->getASTContext().AllocateCopy(conformances);
 }
 
-Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType) {
-  Type fromType = cs.getType(expr);
-  Type fromInstanceType = fromType;
-  Type toInstanceType = toType;
-
-  // Look through metatypes
-  while ((fromInstanceType->is<UnresolvedType>() ||
-          fromInstanceType->is<AnyMetatypeType>()) &&
-         toInstanceType->is<ExistentialMetatypeType>()) {
-    if (!fromInstanceType->is<UnresolvedType>())
-      fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
-    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getExistentialInstanceType();
-  }
-
-  ASTContext &ctx = cs.getASTContext();
-
-  auto conformances =
-    collectExistentialConformances(fromInstanceType, toInstanceType,
-                                   cs.DC->getParentModule());
-
-  // For existential-to-existential coercions, open the source existential.
-  if (fromType->isAnyExistentialType()) {
-    fromType = OpenedArchetypeType::getAny(fromType->getCanonicalType(),
-                                           cs.DC->getGenericSignatureOfContext());
-
-    auto *archetypeVal = cs.cacheType(
-        new (ctx) OpaqueValueExpr(expr->getSourceRange(), fromType));
-
-    auto *result = cs.cacheType(ErasureExpr::create(ctx, archetypeVal, toType,
-                                                    conformances));
-    return cs.cacheType(
-        new (ctx) OpenExistentialExpr(expr, archetypeVal, result,
-                                      cs.getType(result)));
-  }
-
-  // Load tuples with lvalue elements.
-  if (auto tupleType = fromType->getAs<TupleType>()) {
-    if (tupleType->hasLValueType()) {
-      expr = cs.coerceToRValue(expr);
-    }
-  }
-
-  return cs.cacheType(ErasureExpr::create(ctx, expr, toType, conformances));
-}
-
 /// Given that the given expression is an implicit conversion added
 /// to the target by coerceToType, find out how many OptionalEvaluationExprs
 /// it includes and the target.
@@ -6044,15 +6001,9 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
 
 static CollectionUpcastConversionExpr::ConversionPair
 buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
-                             Type srcCollectionType, Type destCollectionType,
+                             Type srcType, Type destType,
                              bool bridged, ConstraintLocatorBuilder locator,
                              unsigned typeArgIndex) {
-  // We don't need this stuff unless we've got generalized casts.
-  Type srcType = srcCollectionType->castTo<BoundGenericType>()
-                                  ->getGenericArgs()[typeArgIndex];
-  Type destType = destCollectionType->castTo<BoundGenericType>()
-                                    ->getGenericArgs()[typeArgIndex];
-
   // Build the conversion.
   auto &cs = rewriter.getConstraintSystem();
   ASTContext &ctx = cs.getASTContext();
@@ -6201,9 +6152,12 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
 
   ASTContext &ctx = cs.getASTContext();
   // Build the first value conversion.
+  auto fromArgs = cs.getType(expr)->castTo<BoundGenericType>()->getGenericArgs();
+  auto toArgs = toType->castTo<BoundGenericType>()->getGenericArgs();
   auto conv =
-    buildOpaqueElementConversion(*this, expr->getLoc(), cs.getType(expr),
-                                 toType, bridged, locator, 0);
+    buildOpaqueElementConversion(*this, expr->getLoc(),
+                                 fromArgs[0], toArgs[0],
+                                 bridged, locator, 0);
 
   // For single-parameter collections, form the upcast.
   if (ConstraintSystem::isArrayType(toType) ||
@@ -6217,8 +6171,9 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
 
   // Build the second value conversion.
   auto conv2 =
-    buildOpaqueElementConversion(*this, expr->getLoc(), cs.getType(expr),
-                                 toType, bridged, locator, 1);
+    buildOpaqueElementConversion(*this, expr->getLoc(),
+                                 fromArgs[1], toArgs[1],
+                                 bridged, locator, 1);
 
   return cs.cacheType(
            new (ctx) CollectionUpcastConversionExpr(expr, toType, conv, conv2));
@@ -6268,6 +6223,106 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
 
   // Bridging from an Objective-C class type to a Swift type.
   return forceBridgeFromObjectiveC(expr, toType);
+}
+
+Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
+                                      ConstraintLocatorBuilder locator) {
+  Type fromType = cs.getType(expr);
+  Type fromInstanceType = fromType;
+  Type toInstanceType = toType;
+
+  // Look through metatypes
+  while ((fromInstanceType->is<UnresolvedType>() ||
+          fromInstanceType->is<AnyMetatypeType>()) &&
+         toInstanceType->is<ExistentialMetatypeType>()) {
+    if (!fromInstanceType->is<UnresolvedType>())
+      fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
+    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getExistentialInstanceType();
+  }
+
+  ASTContext &ctx = cs.getASTContext();
+
+  auto conformances =
+    collectExistentialConformances(fromInstanceType, toInstanceType,
+                                   cs.DC->getParentModule());
+
+  // Use the requirements of any parameterized protocols to build out fake
+  // argument conversions that can be used to infer opaque types.
+  SmallVector<CollectionUpcastConversionExpr::ConversionPair, 4> argConversions;
+
+  auto fromConstraintType = fromInstanceType;
+  if (auto existential = fromConstraintType->getAs<ExistentialType>())
+    fromConstraintType = existential->getConstraintType();
+
+  auto toConstraintType = toInstanceType;
+  if (auto existential = toConstraintType->getAs<ExistentialType>())
+    toConstraintType = existential->getConstraintType();
+
+  auto fromPPT = fromConstraintType->getAs<ParameterizedProtocolType>();
+  auto toPPT = toConstraintType->getAs<ParameterizedProtocolType>();
+
+  if (fromPPT && toPPT) {
+    assert(fromPPT->getArgs().size() >= toPPT->getArgs().size());
+    for (unsigned i = 0; i < toPPT->getArgs().size(); ++i) {
+      auto firstTy = fromPPT->getArgs()[i];
+      auto secondTy = toPPT->getArgs()[i];
+      auto conv =
+        buildOpaqueElementConversion(*this, expr->getLoc(),
+                                     firstTy,
+                                     secondTy,
+                                     /*bridged*/ false,
+                                     locator, i);
+      argConversions.push_back(conv);
+    }
+  } else if ((fromPPT || toPPT) &&
+             !fromInstanceType->isExistentialType()) {
+    auto parameterized = fromConstraintType;
+    auto base = toConstraintType;
+    if (toPPT)
+      std::swap(parameterized, base);
+
+    SmallVector<Requirement, 4> reqs;
+    parameterized->castTo<ParameterizedProtocolType>()
+                 ->getRequirements(base, reqs);
+
+    for (unsigned i = 0; i < reqs.size(); ++i) {
+      const auto &req = reqs[i];
+      assert(req.getKind() == RequirementKind::SameType);
+      auto conv =
+        buildOpaqueElementConversion(*this, expr->getLoc(),
+                                     req.getFirstType(),
+                                     req.getSecondType(),
+                                     /*bridged*/ false,
+                                     locator, i);
+      argConversions.push_back(conv);
+    }
+  }
+
+  // For existential-to-existential coercions, open the source existential.
+  if (fromType->isAnyExistentialType()) {
+    fromType = OpenedArchetypeType::getAny(fromType->getCanonicalType(),
+                                           cs.DC->getGenericSignatureOfContext());
+
+    auto *archetypeVal = cs.cacheType(
+        new (ctx) OpaqueValueExpr(expr->getSourceRange(), fromType));
+
+    auto *result = cs.cacheType(ErasureExpr::create(ctx, archetypeVal, toType,
+                                                    conformances,
+                                                    argConversions));
+    return cs.cacheType(
+        new (ctx) OpenExistentialExpr(expr, archetypeVal, result,
+                                      cs.getType(result)));
+  }
+
+  // Load tuples with lvalue elements.
+  if (auto tupleType = fromType->getAs<TupleType>()) {
+    if (tupleType->hasLValueType()) {
+      expr = cs.coerceToRValue(expr);
+    }
+  }
+
+  return cs.cacheType(ErasureExpr::create(ctx, expr, toType,
+                                          conformances, argConversions));
 }
 
 Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
@@ -6359,7 +6414,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::Existential:
     case ConversionRestrictionKind::MetatypeToExistentialMetatype:
-      return coerceExistential(expr, toType);
+      return coerceExistential(expr, toType, locator);
 
     case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
       assert(ctx.LangOpts.EnableObjCInterop &&
@@ -6905,7 +6960,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::ProtocolComposition:
   case TypeKind::ParameterizedProtocol:
   case TypeKind::Protocol:
-    return coerceExistential(expr, toType);
+    return coerceExistential(expr, toType, locator);
 
   // Coercion to Optional<T>.
   case TypeKind::BoundGenericEnum: {
@@ -7509,8 +7564,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setArgs(args);
     cs.setType(apply, fnType->getResult());
 
-    // If this is a call to a distributed method thunk, let's mark the
-    // call as implicitly throwing.
+    // If this is a call to a distributed method thunk,
+    // let's mark the call as implicitly throwing.
     if (isDistributedThunk(callee, apply->getFn())) {
       auto *FD = cast<AbstractFunctionDecl>(callee.getDecl());
       if (!FD->hasThrows())

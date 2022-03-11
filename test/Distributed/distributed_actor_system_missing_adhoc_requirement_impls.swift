@@ -40,6 +40,61 @@ struct MissingRemoteCall: DistributedActorSystem {
   }
 }
 
+struct MissingRemoteCall_missing_makeInvocationEncoder: DistributedActorSystem {
+  // expected-error@-1{{type 'MissingRemoteCall_missing_makeInvocationEncoder' does not conform to protocol 'DistributedActorSystem'}}
+
+  typealias ActorID = ActorAddress
+  typealias InvocationDecoder = FakeInvocationDecoder
+  typealias InvocationEncoder = FakeInvocationEncoder
+  typealias SerializationRequirement = Codable
+
+  func resolve<Act>(id: ActorID, as actorType: Act.Type)
+    throws -> Act? where Act: DistributedActor {
+    return nil
+  }
+
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
+    where Act: DistributedActor {
+    ActorAddress(parse: "fake://123")
+  }
+
+  func actorReady<Act>(_ actor: Act)
+    where Act: DistributedActor,
+    Act.ID == ActorID {
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    fatalError("NOT IMPLEMENTED \(#function)")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+    fatalError("NOT IMPLEMENTED \(#function)")
+  }
+
+  func resignID(_ id: ActorID) {
+  }
+
+  // func makeInvocationEncoder() -> InvocationEncoder {} // MISSING
+}
+
 struct Error_wrongReturn: DistributedActorSystem {
   // expected-error@-1{{struct 'Error_wrongReturn' is missing witness for protocol requirement 'remoteCall'}}
   // expected-note@-2{{protocol 'Error_wrongReturn' requires function 'remoteCall' with signature:}}
@@ -499,7 +554,7 @@ struct FakeInvocationEncoder_missing_recordArgument2: DistributedTargetInvocatio
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument>(_ argument: Argument) throws {} // BAD
+  mutating func recordArgument<Argument: SomeProtocol>(_ argument: Argument) throws {} // BAD
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}

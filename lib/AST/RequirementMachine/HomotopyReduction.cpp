@@ -55,15 +55,18 @@
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include "RewriteContext.h"
 #include "RewriteSystem.h"
 
 using namespace swift;
 using namespace rewriting;
 
-/// Recompute RulesInEmptyContext and DecomposeCount if needed.
+/// Recompute Useful, RulesInEmptyContext, ProjectionCount and DecomposeCount
+/// if needed.
 void RewriteLoop::recompute(const RewriteSystem &system) {
   if (!Dirty)
     return;
@@ -109,6 +112,8 @@ void RewriteLoop::recompute(const RewriteSystem &system) {
     evaluator.apply(step, system);
   }
 
+  Useful = !rulesInEmptyContext.empty();
+
   RulesInEmptyContext.clear();
 
   // Collect all rules that we saw exactly once in empty context.
@@ -144,6 +149,14 @@ unsigned RewriteLoop::getDecomposeCount(
     const RewriteSystem &system) const {
   const_cast<RewriteLoop *>(this)->recompute(system);
   return DecomposeCount;
+}
+
+/// The number of Decompose steps, used by the elimination order to prioritize
+/// loops that are not concrete simplifications.
+bool RewriteLoop::isUseful(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return Useful;
 }
 
 /// If a rewrite loop contains an explicit rule in empty context, propagate the
@@ -418,16 +431,22 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     if (loop.isDeleted())
       continue;
 
-    bool foundAny = false;
-    for (unsigned ruleID : loop.findRulesAppearingOnceInEmptyContext(*this)) {
-      redundancyCandidates.emplace_back(loopID, ruleID);
-      foundAny = true;
+    // Delete loops that don't contain any rewrite rules in empty context,
+    // since such loops do not yield any elimination candidates.
+    if (!loop.isUseful(*this)) {
+      if (Debug.contains(DebugFlags::HomotopyReduction)) {
+        llvm::dbgs() << "** Deleting useless loop #" << loopID << ": ";
+        loop.dump(llvm::dbgs(), *this);
+        llvm::dbgs() << "\n";
+      }
+
+      loop.markDeleted();
+      continue;
     }
 
-    // Delete loops that don't contain any rewrite rules in empty context,
-    // since such loops do not give us useful information.
-    if (!foundAny)
-      loop.markDeleted();
+    for (unsigned ruleID : loop.findRulesAppearingOnceInEmptyContext(*this)) {
+      redundancyCandidates.emplace_back(loopID, ruleID);
+    }
   }
 
   Optional<std::pair<unsigned, unsigned>> found;
@@ -609,6 +628,10 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     if (!changed)
       continue;
 
+    if (Context.getASTContext().LangOpts.EnableRequirementMachineLoopNormalization) {
+      loop.computeNormalForm(*this);
+    }
+
     // The loop's path has changed, so we must invalidate the cached
     // result of findRulesAppearingOnceInEmptyContext().
     loop.markDirty();
@@ -658,6 +681,34 @@ void RewriteSystem::performHomotopyReduction(
   }
 }
 
+void RewriteSystem::normalizeRedundantRules() {
+  for (auto &pair : RedundantRules) {
+    pair.second.computeNormalForm(*this);
+  }
+
+  if (Debug.contains(DebugFlags::RedundantRules)) {
+    llvm::dbgs() << "\nRedundant rules:\n";
+    for (const auto &pair : RedundantRules) {
+      const auto &rule = getRule(pair.first);
+      llvm::dbgs() << "- ("
+                   << rule.getLHS() << " => "
+                   << rule.getRHS() << ") ::== ";
+
+      MutableTerm lhs(rule.getLHS());
+      pair.second.dump(llvm::dbgs(), lhs, *this);
+
+      llvm::dbgs() << "\n";
+
+      if (Debug.contains(DebugFlags::RedundantRulesDetail)) {
+        llvm::dbgs() << "\n";
+        pair.second.dumpLong(llvm::dbgs(), lhs, *this);
+
+        llvm::dbgs() << "\n\n";
+      }
+    }
+  }
+}
+
 /// Use the loops to delete redundant rewrite rules via a series of Tietze
 /// transformations, updating and simplifying existing loops as each rule
 /// is deleted.
@@ -676,6 +727,12 @@ void RewriteSystem::minimizeRewriteSystem() {
 
   propagateExplicitBits();
   processConflicts();
+
+  if (Context.getASTContext().LangOpts.EnableRequirementMachineLoopNormalization) {
+    for (auto &loop : Loops) {
+      loop.computeNormalForm(*this);
+    }
+  }
 
   // First pass:
   // - Eliminate all LHS-simplified non-conformance rules.
@@ -753,25 +810,7 @@ void RewriteSystem::minimizeRewriteSystem() {
   verifyRedundantConformances(redundantConformances);
   verifyMinimizedRules(redundantConformances);
 
-  if (Debug.contains(DebugFlags::RedundantRules)) {
-    llvm::dbgs() << "\nRedundant rules:\n";
-    for (const auto &pair : RedundantRules) {
-      const auto &rule = getRule(pair.first);
-      llvm::dbgs() << "- " << rule << " ::== ";
-
-      MutableTerm lhs(rule.getLHS());
-      pair.second.dump(llvm::dbgs(), lhs, *this);
-
-      llvm::dbgs() << "\n";
-
-      if (Debug.contains(DebugFlags::RedundantRulesDetail)) {
-        llvm::dbgs() << "\n";
-        pair.second.dumpLong(llvm::dbgs(), lhs, *this);
-
-        llvm::dbgs() << "\n\n";
-      }
-    }
-  }
+  normalizeRedundantRules();
 }
 
 /// In a conformance-valid rewrite system, any rule with unresolved symbols on

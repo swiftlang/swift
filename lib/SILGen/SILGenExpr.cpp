@@ -2801,7 +2801,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent,
       (expansion == ResilienceExpansion::Minimal
-       ? IsSerializable
+       ? IsSerialized
        : IsNotSerialized),
       ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
   if (!thunk->empty())
@@ -2960,7 +2960,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent,
       (expansion == ResilienceExpansion::Minimal
-       ? IsSerializable
+       ? IsSerialized
        : IsNotSerialized),
       ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
   if (!thunk->empty())
@@ -3148,7 +3148,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     equals = builder.getOrCreateSharedFunction(
         loc, name, signature, IsBare, IsNotTransparent,
         (expansion == ResilienceExpansion::Minimal
-         ? IsSerializable
+         ? IsSerialized
          : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
     if (!equals->empty()) {
@@ -3325,7 +3325,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     hash = builder.getOrCreateSharedFunction(
         loc, name, signature, IsBare, IsNotTransparent,
         (expansion == ResilienceExpansion::Minimal
-         ? IsSerializable
+         ? IsSerialized
          : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
     if (!hash->empty()) {

@@ -167,7 +167,7 @@ public:
       llvm::DenseMap<const SILBasicBlock *, std::string>;
 
   enum class LinkingMode : uint8_t {
-    /// Link functions with non-public linkage. Used by the mandatory pipeline.
+    /// Link functions with shared linkage. Used by the mandatory pipeline.
     LinkNormal,
 
     /// Link all functions. Used by the performance pipeine.
@@ -349,6 +349,8 @@ private:
   /// to ensure that the module is serialized only once.
   bool serialized;
 
+  bool parsedAsSerializedSIL;
+
   /// Set if we have registered a deserialization notification handler for
   /// lowering ownership in non transparent functions.
   /// This gets set in NonTransparent OwnershipModelEliminator pass.
@@ -454,6 +456,12 @@ public:
   /// Set a flag indicating that this module is serialized already.
   void setSerialized() { serialized = true; }
   bool isSerialized() const { return serialized; }
+
+  void setParsedAsSerializedSIL() {
+    serialized = true;
+    parsedAsSerializedSIL = true;
+  }
+  bool isParsedAsSerializedSIL() const { return parsedAsSerializedSIL; }
 
   void setBasicBlockName(const SILBasicBlock *block, StringRef name) {
 #ifndef NDEBUG
@@ -688,9 +696,20 @@ public:
   /// \return null if this module has no such function
   SILFunction *lookUpFunction(SILDeclRef fnRef);
 
-  /// Attempt to deserialize the SILFunction. Returns true if deserialization
-  /// succeeded, false otherwise.
-  bool loadFunction(SILFunction *F);
+  /// Attempt to deserialize function \p F and all functions which are referenced
+  /// from \p F (according to the \p LinkMode).
+  ///
+  /// Returns true if deserialization succeeded, false otherwise.
+  bool loadFunction(SILFunction *F, LinkingMode LinkMode);
+
+  /// Attempt to deserialize a function with \p name and all functions which are
+  /// referenced from that function (according to the \p LinkMode).
+  ///
+  /// If \p linkage is provided, the deserialized function is required to have
+  /// that linkage. Returns null, if this is not the case.
+  SILFunction *loadFunction(StringRef name,
+                            LinkingMode LinkMode,
+                            Optional<SILLinkage> linkage = None);
 
   /// Update the linkage of the SILFunction with the linkage of the serialized
   /// function.
@@ -699,19 +718,10 @@ public:
   /// AST, e.g. cross-module-optimization can change the SIL linkages.
   void updateFunctionLinkage(SILFunction *F);
 
-  /// Attempt to link the SILFunction. Returns true if linking succeeded, false
-  /// otherwise.
+  /// Attempt to deserialize function \p F and all required referenced functions.
   ///
-  /// \return false if the linking failed.
-  bool linkFunction(SILFunction *F,
-                    LinkingMode LinkMode = LinkingMode::LinkNormal);
-
-  /// Check if a given function exists in any of the modules with a
-  /// required linkage, i.e. it can be linked by linkFunction.
-  ///
-  /// \return null if this module has no such function. Otherwise
-  /// the declaration of a function.
-  SILFunction *findFunction(StringRef Name, SILLinkage Linkage);
+  /// Returns true if linking succeeded, false otherwise.
+  bool linkFunction(SILFunction *F, LinkingMode LinkMode);
 
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.
@@ -725,15 +735,15 @@ public:
   ///        table.
   /// \arg deserializeLazily If we cannot find the witness table should we
   ///                        attempt to lazily deserialize it.
-  SILWitnessTable *
-  lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily=true);
-  SILWitnessTable *
-  lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
+  SILWitnessTable *lookUpWitnessTable(const ProtocolConformance *C);
 
   /// Attempt to lookup \p Member in the witness table for \p C.
+  ///
+  /// Also, deserialize all referenced functions according to the \p linkgingMode.
   std::pair<SILFunction *, SILWitnessTable *>
   lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
-                               SILDeclRef Requirement);
+                               SILDeclRef Requirement,
+                               SILModule::LinkingMode linkingMode);
 
   /// Look up the SILDefaultWitnessTable representing the default witnesses
   /// of a resilient protocol, if any.

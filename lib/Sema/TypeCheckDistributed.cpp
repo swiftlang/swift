@@ -454,7 +454,7 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   assert(func->isDistributed());
 
   auto &C = func->getASTContext();
-  auto declContext = func->getDeclContext();
+  auto DC = func->getDeclContext();
   auto module = func->getParentModule();
 
   /// If no distributed module is available, then no reason to even try checks.
@@ -464,10 +464,10 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   // === All parameters and the result type must conform
   // SerializationRequirement
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationRequirements;
-  if (auto extension = dyn_cast<ExtensionDecl>(declContext)) {
+  if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
     serializationRequirements = extractDistributedSerializationRequirements(
         C, extension->getGenericRequirements());
-  } else if (auto actor = dyn_cast<ClassDecl>(declContext)) {
+  } else if (auto actor = dyn_cast<ClassDecl>(DC)) {
     auto systemProp = actor->getDistributedActorSystemProperty();
     serializationRequirements = getDistributedSerializationRequirementProtocols(
         systemProp->getInterfaceType()->getAnyNominal(),
@@ -585,8 +585,13 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
   return false;
 }
 
-void swift::checkDistributedActorProperties(const ClassDecl *decl) {
+void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
   auto &C = decl->getASTContext();
+
+  if (isa<ProtocolDecl>(decl)) {
+    // protocols don't matter for stored property checking
+    return;
+  }
 
   for (auto member : decl->getMembers()) {
     if (auto prop = dyn_cast<VarDecl>(member)) {
@@ -645,45 +650,58 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
 
 // ==== ------------------------------------------------------------------------
 
-void TypeChecker::checkDistributedActor(ClassDecl *decl) {
-  if (!decl)
+void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal) {
+  if (!nominal)
     return;
 
   // ==== Ensure the _Distributed module is available,
   // without it there's no reason to check the decl in more detail anyway.
-  if (!swift::ensureDistributedModuleLoaded(decl))
+  if (!swift::ensureDistributedModuleLoaded(nominal))
     return;
 
   // ==== Constructors
   // --- Get the default initializer
   // If applicable, this will create the default 'init(transport:)' initializer
-  (void)decl->getDefaultInitializer();
+  (void)nominal->getDefaultInitializer();
 
-  for (auto member : decl->getMembers()) {
+  for (auto member : nominal->getMembers()) {
     // --- Check all constructors
-    if (auto ctor = dyn_cast<ConstructorDecl>(member))
-      checkDistributedActorConstructor(decl, ctor);
+    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+        checkDistributedActorConstructor(classDecl, ctor);
+        continue;
+      }
+    }
+
+    // --- Ensure all thunks
+    if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (!func->isDistributed())
+        continue;
+
+      if (auto thunk = func->getDistributedThunk()) {
+        SF->DelayedFunctions.push_back(thunk);
+      }
+    }
   }
 
   // ==== Properties
-  checkDistributedActorProperties(decl);
+  checkDistributedActorProperties(nominal);
   // --- Synthesize the 'id' property here rather than via derived conformance
   //     because the 'DerivedConformanceDistributedActor' won't trigger for 'id'
   //     because it has a default impl via 'Identifiable' (ObjectIdentifier)
   //     which we do not want.
-  (void)decl->getDistributedActorIDProperty();
+  (void)nominal->getDistributedActorIDProperty();
 }
 
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 swift::getDistributedSerializationRequirementProtocols(
     NominalTypeDecl *nominal, ProtocolDecl *protocol) {
-  if (!protocol) {
+  if (!protocol || !nominal) {
     return {};
   }
 
-
   auto ty = getDistributedSerializationRequirementType(nominal, protocol);
-  if (ty->hasError()) {
+  if (!ty || ty->hasError()) {
     return {};
   }
 

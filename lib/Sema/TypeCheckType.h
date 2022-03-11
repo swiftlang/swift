@@ -282,12 +282,12 @@ public:
     case Context::Inherited:
     case Context::ExtensionBinding:
     case Context::GenericRequirement:
+    case Context::ExistentialConstraint:
       return true;
     case Context::None:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
     case Context::MetatypeBase:
-    case Context::ExistentialConstraint:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:

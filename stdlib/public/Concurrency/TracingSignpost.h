@@ -52,6 +52,7 @@
 #define SWIFT_LOG_ACTOR_STATE_CHANGED_NAME "actor_state_changed"
 #define SWIFT_LOG_ACTOR_JOB_QUEUE_NAME "actor_job_queue"
 #define SWIFT_LOG_TASK_LIFETIME_NAME "task_lifetime"
+#define SWIFT_LOG_TASK_FLAGS_CHANGED_NAME "task_flags_changed"
 #define SWIFT_LOG_TASK_STATUS_CHANGED_NAME "task_status_changed"
 #define SWIFT_LOG_TASK_WAIT_NAME "task_wait"
 #define SWIFT_LOG_JOB_ENQUEUE_GLOBAL_NAME "job_enqueue_global"
@@ -201,7 +202,7 @@ inline void task_status_changed(AsyncTask *task, uintptr_t flags) {
 inline void task_flags_changed(AsyncTask *task, uint32_t flags) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
-  os_signpost_event_emit(TaskLog, id, SWIFT_LOG_TASK_STATUS_CHANGED_NAME,
+  os_signpost_event_emit(TaskLog, id, SWIFT_LOG_TASK_FLAGS_CHANGED_NAME,
                          "task=%" PRIx64 " flags=0x%" PRIx32, task->getTaskId(),
                          flags);
 }

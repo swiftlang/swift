@@ -183,3 +183,14 @@ option(SWIFT_FREESTANDING_FLAVOR
 set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
     must specify the form of LTO by setting this to one of: 'full', 'thin'. This
     option only affects the standard library and runtime, not tools.")
+
+if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_STDLIB_CONCURRENCY_TRACING_default TRUE)
+else()
+  set(SWIFT_STDLIB_CONCURRENCY_TRACING_default FALSE)
+endif()
+
+option(SWIFT_STDLIB_CONCURRENCY_TRACING
+  "Enable concurrency tracing in the runtime; assumes the presence of os_log(3)
+   and the os_signpost(3) API."
+  "${SWIFT_STDLIB_CONCURRENCY_TRACING_default}")

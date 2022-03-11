@@ -433,8 +433,8 @@ bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
     if (!init)
       return false;
     auto initRef = SILDeclRef(init.getDecl(), SILDeclRef::Kind::Allocator);
-    auto initFn = AI->getModule().findFunction(initRef.mangle(),
-                                               SILLinkage::PublicExternal);
+    auto initFn = AI->getModule().loadFunction(initRef.mangle(),
+                                               SILModule::LinkingMode::LinkAll);
     if (!initFn)
       return false;
 

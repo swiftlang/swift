@@ -24,7 +24,7 @@ extension ClassWithBlockProperty : ProtocolWithBlockProperty {}
 // CHECK-NEXT: ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[FN]]([[SELF]])
 // CHECK-NEXT: yield [[ADDR]] : $*Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>
 
-// CHECK-LABEL: sil shared [serializable] [ossa] @$sSo22ClassWithBlockPropertyC5blockySSSgcSgvM :
+// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo22ClassWithBlockPropertyC5blockySSSgcSgvM :
 // CHECK-SAME:    $@yield_once @convention(method) (@guaranteed ClassWithBlockProperty) -> @yields @inout Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>
 
 //   Protocol witness for 'dependentBlock'
@@ -41,7 +41,7 @@ extension ClassWithBlockProperty : ProtocolWithBlockProperty {}
 // CHECK-NEXT: store [[OUT_FUNCTION]] to [init] [[TEMP]] :
 // CHECK-NEXT: yield [[TEMP]]
 
-// CHECK-LABEL: sil shared [serializable] [ossa] @$sSo22ClassWithBlockPropertyC09dependentC0ySSSgcSgvM :
+// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo22ClassWithBlockPropertyC09dependentC0ySSSgcSgvM :
 // CHECK-SAME:    $@yield_once @convention(method) (@guaranteed ClassWithBlockProperty) -> @yields @inout Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>
 
 // Make sure 'modify' implementations for 'dynamic' properties go through

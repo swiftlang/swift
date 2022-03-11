@@ -122,15 +122,16 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
-                       bool isDistributed,
+                       bool isDistributed, bool isKnownToBeLocal,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), isDistributed(isDistributed),
+    : loc(vd), kind(kind), isForeign(isForeign), 
+      isDistributed(isDistributed), isKnownToBeLocal(isKnownToBeLocal),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
       pointer(derivativeId) {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
-                       bool asDistributed)
+                       bool asDistributed, bool asDistributedKnownToBeLocal)
     : backDeploymentKind(SILDeclRef::BackDeploymentKind::None),
       defaultArgIndex(0),
       pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
@@ -171,6 +172,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
 
   isForeign = asForeign;
   isDistributed = asDistributed;
+  isKnownToBeLocal = asDistributedKnownToBeLocal;
 }
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
@@ -572,9 +574,6 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   if (auto closure = getAbstractClosureExpr()) {
     // Ask the AST if we're inside an @inlinable context.
     if (closure->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      if (isForeign)
-        return IsSerializable;
-
       return IsSerialized;
     }
 
@@ -638,7 +637,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // serializable.
   if (d->getDeclContext()->isLocalContext()) {
     if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
-      return IsSerializable;
+      return IsSerialized;
 
     return IsNotSerialized;
   }
@@ -650,7 +649,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // Enum element constructors are serializable if the enum is
   // @usableFromInline or public.
   if (isEnumElement())
-    return IsSerializable;
+    return IsSerialized;
 
   // 'read' and 'modify' accessors synthesized on-demand are serialized if
   // visible outside the module.
@@ -660,7 +659,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
       return IsSerialized;
 
   if (isForeignToNativeThunk())
-    return IsSerializable;
+    return IsSerialized;
 
   // The allocating entry point for designated initializers are serialized
   // if the class is @usableFromInline or public.
@@ -682,13 +681,13 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     // @objc thunks for top-level functions are serializable since they're
     // referenced from @convention(c) conversions inside inlinable
     // functions.
-    return IsSerializable;
+    return IsSerialized;
   }
 
   // Declarations imported from Clang modules are serialized if
   // referenced from an inlinable context.
   if (isClangImported())
-    return IsSerializable;
+    return IsSerialized;
 
   // Otherwise, ask the AST if we're inside an @inlinable context.
   if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)

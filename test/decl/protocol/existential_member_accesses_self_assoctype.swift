@@ -560,6 +560,8 @@ extension UnfulfillableGenericRequirements {
                               A: Sequence, A.Element: Sequence,
                               U.A == A.Element.Element {}
   func method7<U>(_: U) where U: UnfulfillableGenericRequirements & Class<Self> {}
+
+  func method8<U>(_: U) where U == Self.A {}
 }
 do {
   let exist: any UnfulfillableGenericRequirements
@@ -579,6 +581,19 @@ do {
   exist.method7(false)
   // expected-error@-1 {{instance method 'method7' requires that 'U' conform to 'UnfulfillableGenericRequirements'}}
   // expected-error@-2 {{member 'method7' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+
+  exist.method8(false)
+  // expected-error@-1 {{member 'method8' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+}
+
+// Make sure this also works in a generic context!
+struct G<X, Y, Z> {
+  func doIt() {
+    let exist: any UnfulfillableGenericRequirements
+
+    exist.method8(false)
+    // expected-error@-1 {{member 'method8' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+  }
 }
 protocol UnfulfillableGenericRequirementsDerived1: UnfulfillableGenericRequirements where A == Bool {}
 protocol UnfulfillableGenericRequirementsDerived2: UnfulfillableGenericRequirements where A == Class<Self> {}

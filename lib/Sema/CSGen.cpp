@@ -3733,11 +3733,9 @@ static bool generateInitPatternConstraints(
     return cs.generateWrappedPropertyTypeConstraints(
         wrappedVar, cs.getType(target.getAsExpr()), patternType);
 
-  if (!patternType->is<OpaqueTypeArchetypeType>()) {
-    // Add a conversion constraint between the types.
-    cs.addConstraint(ConstraintKind::Conversion, cs.getType(target.getAsExpr()),
-                     patternType, locator, /*isFavored*/true);
-  }
+  // Add a conversion constraint between the types.
+  cs.addConstraint(ConstraintKind::Conversion, cs.getType(target.getAsExpr()),
+                   patternType, locator, /*isFavored*/true);
 
   return false;
 }

@@ -2106,7 +2106,6 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
     return isDefinition ? RESULT(LinkOnceODR, Hidden, Default)
                         : RESULT(External, Hidden, Default);
 

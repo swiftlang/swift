@@ -541,8 +541,8 @@ SILFunction *ClosureCloner::constructClonedFunction(
   SILFunction *origF = fri->getReferencedFunction();
 
   IsSerialized_t isSerialized = IsNotSerialized;
-  if (f->isSerialized() && origF->isSerialized())
-    isSerialized = IsSerialized_t::IsSerializable;
+  if (f->isSerialized())
+    isSerialized = IsSerialized_t::IsSerialized;
 
   auto clonedName = getSpecializedName(origF, isSerialized, promotableIndices);
 

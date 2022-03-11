@@ -22,6 +22,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -1258,47 +1259,19 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
   return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
 }
 
-AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
-    NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
-  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
-  const NominalTypeDecl *system = actorOrSystem;
-  if (actorOrSystem->isDistributedActor()) {
-    auto var = actorOrSystem->getDistributedActorSystemProperty();
-    system = var->getInterfaceType()->getAnyNominal();
-  }
-
-  if (!system)
-    system = getProtocol(KnownProtocolKind::DistributedActorSystem);
-
-  auto mutableSystem = const_cast<NominalTypeDecl *>(system);
-  return evaluateOrDefault(
-      system->getASTContext().evaluator,
-      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem, /*isVoidReturn=*/isVoidReturn},
-      nullptr);
-}
-
 FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
-    NominalTypeDecl *actorOrSystem) const {
-  NominalTypeDecl *system = actorOrSystem;
-  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
-  if (actorOrSystem->isDistributedActor()) {
-    auto var = actorOrSystem->getDistributedActorSystemProperty();
-    system = var->getInterfaceType()->getAnyNominal();
-  }
+    AbstractFunctionDecl *thunk) const {
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
+  assert(systemTy && "No specific ActorSystem type found!");
 
-  for (auto result : system->lookupDirect(Id_makeInvocationEncoder)) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-    if (fd->getParameters()->size() != 0)
-      continue;
-    if (fd->hasAsync())
-      continue;
-    if (fd->hasThrows())
-      continue;
-    // TODO(distributed): more checks, return type etc
+  auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
+  assert(systemNominal && "No system nominal type found!");
 
-    return fd;
+  for (auto result : systemNominal->lookupDirect(Id_makeInvocationEncoder)) {
+    auto *func = dyn_cast<FuncDecl>(result);
+    if (func && func->isDistributedActorSystemMakeInvocationEncoder()) {
+      return func;
+    }
   }
 
   return nullptr;
@@ -1308,29 +1281,11 @@ FuncDecl *
 ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
   for (auto result : nominal->lookupDirect(Id_recordGenericSubstitution)) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-    if (fd->getParameters()->size() != 1)
-      continue;
-    if (fd->hasAsync())
-      continue;
-    if (!fd->hasThrows())
-      continue;
-    // TODO(distributed): more checks
-
-    auto genericParamList = fd->getGenericParams();
-
-    // A single generic parameter.
-    if (genericParamList->size() != 1)
-      continue;
-
-    // No requirements on the generic parameter
-    if (fd->getGenericRequirements().size() != 0)
-      continue;
-
-    if (fd->getResultInterfaceType()->isVoid())
-      return fd;
+    auto *func = dyn_cast<FuncDecl>(result);
+    if (func &&
+        func->isDistributedTargetInvocationEncoderRecordGenericSubstitution()) {
+      return func;
+    }
   }
 
   return nullptr;
@@ -4444,7 +4399,8 @@ CanTypeWrapper<OpenedArchetypeType>
 OpenedArchetypeType::get(CanType existential, GenericSignature parentSig,
                          Optional<UUID> knownID) {
   assert(existential->isExistentialType());
-  auto interfaceType = OpenedArchetypeType::getSelfInterfaceTypeFromContext(parentSig, existential->getASTContext());
+  auto interfaceType = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
+      parentSig, existential->getASTContext());
   return get(existential, interfaceType, parentSig, knownID);
 }
 
@@ -4510,7 +4466,8 @@ CanType OpenedArchetypeType::getAny(CanType existential, Type interfaceType,
 
 CanType OpenedArchetypeType::getAny(CanType existential,
                                     GenericSignature parentSig) {
-  auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(parentSig, existential->getASTContext());
+  auto interfaceTy = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
+      parentSig, existential->getASTContext());
   return getAny(existential, interfaceTy, parentSig);
 }
 
@@ -5201,7 +5158,8 @@ ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
     type = existential->getConstraintType();
 
   const CanType constraint = type->getCanonicalType();
-  assert(!constraint->hasTypeParameter() && "This only works with archetypes");
+  assert(parentSig || !constraint->hasTypeParameter() &&
+         "Interface type here requires a parent signature");
 
   // The opened archetype signature for a protocol type is identical
   // to the protocol's own canonical generic signature if there aren't any
@@ -5216,11 +5174,13 @@ ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
   // generic parameters. This ensures that we keep e.g. generic superclass
   // existentials contained in a well-formed generic context.
   auto canParentSig = parentSig.getCanonicalSignature();
-  auto found = getImpl().ExistentialSignatures.find({constraint, canParentSig.getPointer()});
+  auto key = std::make_pair(constraint, canParentSig.getPointer());
+  auto found = getImpl().ExistentialSignatures.find(key);
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
 
-  auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(canParentSig, type->getASTContext())
+  auto genericParam = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
+      canParentSig, type->getASTContext())
     ->castTo<GenericTypeParamType>();
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           constraint);
@@ -5231,7 +5191,7 @@ ASTContext::getOpenedArchetypeSignature(Type type, GenericSignature parentSig) {
   CanGenericSignature canGenericSig(genericSig);
 
   auto result = getImpl().ExistentialSignatures.insert(
-      std::make_pair(std::make_pair(constraint, canParentSig.getPointer()), canGenericSig));
+      std::make_pair(key, canGenericSig));
   assert(result.second);
   (void) result;
 
