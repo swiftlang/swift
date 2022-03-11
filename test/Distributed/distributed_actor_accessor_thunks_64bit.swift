@@ -6,6 +6,8 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+// REQUIRES: CPU=x86_64 || CPU=arm64
+
 // UNSUPPORTED: OS=windows-msvc
 
 import _Distributed
