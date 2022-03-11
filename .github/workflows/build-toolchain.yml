@@ -129,11 +129,12 @@ jobs:
           restore-keys: |
             ${{ matrix.target }}-sccache-v11-
 
-      - name: Clean stdlib build directory
+      - name: Clean build directory
         if: ${{ matrix.clean_build_dir }}
         run: |
           rm -rf ${{ github.workspace }}/target-build \
             ${{ github.workspace }}/host-build \
+            ${{ github.workspace }}/build-sdk \
             ${{ github.workspace }}/host-toolchain-sdk \
             ${{ github.workspace }}/dist-toolchain-sdk
 
