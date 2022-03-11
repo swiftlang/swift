@@ -55,7 +55,6 @@ extension AsyncSequence {
 /// An asynchronous sequence that maps the given closure over the asynchronous
 /// sequence’s elements.
 @available(SwiftStdlib 5.1, *)
-@frozen
 public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let base: Base
@@ -63,13 +62,17 @@ public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let transform: (Base.Element) async -> Transformed
 
-  @inlinable
+  @inlinable @inline(never)
   init(
-    _ base: Base, 
+    _ base: Base,
     transform: @escaping (Base.Element) async -> Transformed
   ) {
-    self.base = base
-    self.transform = transform
+    self = withUnsafeTemporaryAllocation(of: Self.self, capacity: 1) { buffer in
+      let raw = UnsafeMutableRawBufferPointer(buffer)
+      raw.baseAddress!.advanced(by: MemoryLayout<Self>.offset(of: \.base)!).assumingMemoryBound(to: Base.self).initialize(to: base)
+      raw.baseAddress!.advanced(by: MemoryLayout<Self>.offset(of: \.transform)!).assumingMemoryBound(to: ((Base.Element) async -> Transformed).self).initialize(to: transform)
+      return buffer.baseAddress!.pointee
+    }
   }
 }
 
@@ -84,7 +87,6 @@ extension AsyncMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the map sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -92,13 +94,17 @@ extension AsyncMapSequence: AsyncSequence {
     @usableFromInline
     let transform: (Base.Element) async -> Transformed
 
-    @inlinable
+    @inlinable @inline(never)
     init(
-      _ baseIterator: Base.AsyncIterator, 
+      _ baseIterator: Base.AsyncIterator,
       transform: @escaping (Base.Element) async -> Transformed
     ) {
-      self.baseIterator = baseIterator
-      self.transform = transform
+      self = withUnsafeTemporaryAllocation(of: Self.self, capacity: 1) { buffer in
+        let raw = UnsafeMutableRawBufferPointer(buffer)
+        raw.baseAddress!.advanced(by: MemoryLayout<Self>.offset(of: \.baseIterator)!).assumingMemoryBound(to: Base.AsyncIterator.self).initialize(to: baseIterator)
+        raw.baseAddress!.advanced(by: MemoryLayout<Self>.offset(of: \.transform)!).assumingMemoryBound(to: ((Base.Element) async -> Transformed).self).initialize(to: transform)
+        return buffer.baseAddress!.pointee
+      }
     }
 
     /// Produces the next element in the map sequence.

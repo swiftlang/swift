@@ -76,13 +76,17 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let transform: (Base.Element) async throws -> Transformed
 
-  @inlinable
+  @inlinable @inline(never)
   init(
-    _ base: Base, 
+    _ base: Base,
     transform: @escaping (Base.Element) async throws -> Transformed
   ) {
-    self.base = base
-    self.transform = transform
+    self = withUnsafeTemporaryAllocation(of: Self.self, capacity: 1) { buffer in
+      let raw = UnsafeMutableRawBufferPointer(buffer)
+      raw.baseAddress!.advanced(by: MemoryLayout<Self>.offset(of: \.base)!).assumingMemoryBound(to: Base.self).initialize(to: base)
+      raw.baseAddress!.advanced(by: MemoryLayout<Self>.offset(of: \.transform)!).assumingMemoryBound(to: ((Base.Element) async throws -> Transformed).self).initialize(to: transform)
+      return buffer.baseAddress!.pointee
+    }
   }
 }
 
@@ -97,7 +101,6 @@ extension AsyncThrowingMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the map sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -108,13 +111,17 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     @usableFromInline
     var finished = false
 
-    @inlinable
+    @inlinable @inline(never)
     init(
-      _ baseIterator: Base.AsyncIterator, 
+      _ baseIterator: Base.AsyncIterator,
       transform: @escaping (Base.Element) async throws -> Transformed
     ) {
-      self.baseIterator = baseIterator
-      self.transform = transform
+      self = withUnsafeTemporaryAllocation(of: Self.self, capacity: 1) { buffer in
+        let raw = UnsafeMutableRawBufferPointer(buffer)
+        raw.baseAddress!.advanced(by: MemoryLayout<Self>.offset(of: \.baseIterator)!).assumingMemoryBound(to: Base.AsyncIterator.self).initialize(to: baseIterator)
+        raw.baseAddress!.advanced(by: MemoryLayout<Self>.offset(of: \.transform)!).assumingMemoryBound(to: ((Base.Element) async throws -> Transformed).self).initialize(to: transform)
+        return buffer.baseAddress!.pointee
+      }
     }
 
     /// Produces the next element in the map sequence.
