@@ -242,7 +242,11 @@ Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
   auto archetype = cast<ArchetypeType>(type);
   if (isa<OpaqueTypeArchetypeType>(archetype->getRoot()))
     return Type();
-  
+
+  // Leave opened archetypes alone; they're handled contextually.
+  if (isa<OpenedArchetypeType>(archetype))
+    return Type(type);
+
   return archetype->getInterfaceType();
 }
 
