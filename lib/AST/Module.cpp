@@ -1349,10 +1349,10 @@ LookupConformanceInModuleRequest::evaluate(
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
+    } else {
+      // Was unable to infer the missing conformance.
+      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
     }
-
-    // Was unable to infer the missing conformance.
-    return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
   }
 
   assert(!conformances.empty());
