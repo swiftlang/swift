@@ -29,6 +29,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -5473,6 +5474,28 @@ void swift::diagnoseConformanceFailure(Type T,
   if (Proto->isSpecificProtocol(KnownProtocolKind::ExpressibleByNilLiteral)) {
     diags.diagnose(ComplainLoc, diag::cannot_use_nil_with_this_type, T);
     return;
+  }
+
+  // Special case: a distributed actor conformance often can fail because of
+  // a missing ActorSystem (or DefaultDistributedActorSystem) typealias.
+  // In this case, the "normal" errors are an avalanche of errors related to
+  // missing things in the actor that don't help users diagnose the root problem.
+  // Instead, we want to suggest adding the typealias.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
+    auto nominal = T->getNominalOrBoundGenericNominal();
+    if (!nominal)
+      return;
+
+    // If it is missing the ActorSystem type, suggest adding it:
+    auto systemTy = getDistributedActorSystemType(/*actor=*/nominal);
+    if (!systemTy || systemTy->hasError()) {
+      diags.diagnose(ComplainLoc,
+                     diag::distributed_actor_conformance_missing_system_type,
+                     nominal->getName());
+      diags.diagnose(nominal->getStartLoc(),
+                     diag::note_distributed_actor_system_can_be_defined_using_defaultdistributedactorsystem);
+      return;
+    }
   }
 
   // Special case: for enums with a raw type, explain that the failing
