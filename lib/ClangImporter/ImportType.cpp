@@ -2206,6 +2206,14 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
           findGenericTypeInGenericDecls(templateParamType, genericParams);
     } else {
       if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
+        // We don't support reference type to a dependent type, just bail.
+        if (refType->getPointeeType()->isDependentType()) {
+          addImportDiagnostic(
+              param, Diagnostic(diag::parameter_type_not_imported, param),
+              param->getSourceRange().getBegin());
+          return nullptr;
+        }
+
         paramTy = refType->getPointeeType();
         if (!paramTy.isConstQualified())
           isInOut = true;
