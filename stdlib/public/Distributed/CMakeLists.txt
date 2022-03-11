@@ -30,7 +30,7 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   LINK_LIBRARIES ${swift_distributed_link_libraries}
 
   C_COMPILE_FLAGS
-    -Dswift_Distributed_EXPORTS
+    -DswiftDistributed_EXPORTS
     -I${SWIFT_SOURCE_DIR}/stdlib/include
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
