@@ -266,6 +266,12 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
          "#  define SWIFT_EXTERN extern\n"
          "# endif\n"
          "#endif\n";
+  auto emitMacro = [&](StringRef name, StringRef value) {
+    out << "#if !defined(" << name << ")\n";
+    out << "# define " << name << " " << value << "\n";
+    out << "#endif\n";
+  };
+  emitMacro("SWIFT_CALL", "__attribute__((swiftcall))");
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
 }
@@ -373,25 +379,28 @@ static void writeImports(raw_ostream &out,
 }
 
 static void writePostImportPrologue(raw_ostream &os, ModuleDecl &M) {
-  os <<
-      "#pragma clang diagnostic ignored \"-Wproperty-attribute-mismatch\"\n"
-      "#pragma clang diagnostic ignored \"-Wduplicate-method-arg\"\n"
-      "#if __has_warning(\"-Wpragma-clang-attribute\")\n"
-      "# pragma clang diagnostic ignored \"-Wpragma-clang-attribute\"\n"
-      "#endif\n"
-      "#pragma clang diagnostic ignored \"-Wunknown-pragmas\"\n"
-      "#pragma clang diagnostic ignored \"-Wnullability\"\n"
-      "\n"
-      "#if __has_attribute(external_source_symbol)\n"
-      "# pragma push_macro(\"any\")\n"
-      "# undef any\n"
-      "# pragma clang attribute push("
+  os << "#pragma clang diagnostic ignored \"-Wproperty-attribute-mismatch\"\n"
+        "#pragma clang diagnostic ignored \"-Wduplicate-method-arg\"\n"
+        "#if __has_warning(\"-Wpragma-clang-attribute\")\n"
+        "# pragma clang diagnostic ignored \"-Wpragma-clang-attribute\"\n"
+        "#endif\n"
+        "#pragma clang diagnostic ignored \"-Wunknown-pragmas\"\n"
+        "#pragma clang diagnostic ignored \"-Wnullability\"\n"
+        "#pragma clang diagnostic ignored "
+        "\"-Wdollar-in-identifier-extension\"\n"
+        "\n"
+        "#if __has_attribute(external_source_symbol)\n"
+        "# pragma push_macro(\"any\")\n"
+        "# undef any\n"
+        "# pragma clang attribute push("
         "__attribute__((external_source_symbol(language=\"Swift\", "
-          "defined_in=\"" << M.getNameStr() << "\",generated_declaration))), "
+        "defined_in=\""
+     << M.getNameStr()
+     << "\",generated_declaration))), "
         "apply_to=any(function,enum,objc_interface,objc_category,"
-           "objc_protocol))\n"
-      "# pragma pop_macro(\"any\")\n"
-      "#endif\n\n";
+        "objc_protocol))\n"
+        "# pragma pop_macro(\"any\")\n"
+        "#endif\n\n";
 }
 
 static void writeEpilogue(raw_ostream &os) {
