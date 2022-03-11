@@ -10,6 +10,80 @@
 //
 //===----------------------------------------------------------------------===//
 
+module _visualc_intrinsics [system] [extern_c] {
+  explicit module arm {
+    requires armv7
+    header "armintr.h"
+
+    explicit module neon {
+      requires neon
+      header "arm_neon.h"
+    }
+  }
+
+  explicit module aarch64 {
+    requires aarch64
+    header "arm64intr.h"
+
+    explicit module neon {
+      requires neon
+      header "arm64_neon.h"
+    }
+  }
+
+  explicit module intel {
+    requires x86
+    export *
+
+    header "immintrin.h"
+
+    explicit module mmx {
+      header "mmintrin.h"
+    }
+
+    explicit module sse {
+      export mmx
+      header "xmmintrin.h"
+    }
+
+    explicit module sse2 {
+      export sse
+      header "emmintrin.h"
+    }
+
+    explicit module sse3 {
+      export sse2
+      header "pmmintrin.h"
+    }
+
+    explicit module ssse3 {
+      export sse3
+      header "tmmintrinh"
+    }
+
+    explicit module sse4_1 {
+      export ssse3
+      header "smmintrin.h"
+    }
+
+    explicit module sse4_2 {
+      export sse4_1
+      header "nmmintrin.h"
+    }
+
+    explicit module sse4a {
+      export sse3
+      header "ammintrin.h"
+    }
+
+    explicit module aes_pclmul {
+      header "wmmintrin.h"
+      export aes
+      export pclmul
+    }
+  }
+}
+
 module visualc [system] {
   module SAL {
     header "sal.h"
