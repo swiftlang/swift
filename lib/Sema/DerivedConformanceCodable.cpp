@@ -1552,13 +1552,14 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
   //
   //   @derived init(from decoder: Decoder) throws {
   //     let container = try decoder.container(keyedBy: CodingKeys.self)
-  //     if container.allKeys.count != 1 {
+  //     var allKeys = ArraySlice(container.allKeys)
+  //     guard let onlyKey = allKeys.popFirst(), allKeys.isEmpty else {
   //       let context = DecodingError.Context(
   //           codingPath: container.codingPath,
   //           debugDescription: "Invalid number of keys found, expected one.")
   //       throw DecodingError.typeMismatch(Foo.self, context)
   //     }
-  //     switch container.allKeys.first {
+  //     switch onlyKey {
   //     case .bar:
   //       let nestedContainer = try container.nestedContainer(
   //           keyedBy: BarCodingKeys.self, forKey: .bar)
@@ -1597,15 +1598,67 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
         initDecl->getParameters()->get(0), codingKeysEnum, statements,
         /*throws*/ true);
 
+    // generate: var allKeys = ArraySlice(container.allKeys);
+    auto *allKeysDecl =
+        new (C) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
+                        SourceLoc(), C.Id_allKeys, funcDC);
+    allKeysDecl->setImplicit();
+    allKeysDecl->setSynthesized();
+    {
+      auto *arraySliceRef =
+          new (C) DeclRefExpr(ConcreteDeclRef(C.getArraySliceDecl()),
+                              DeclNameLoc(), /*Implicit=*/true);
+      auto *containerAllKeys =
+          UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_allKeys);
+      auto *argList = ArgumentList::createImplicit(
+          C, {Argument::unlabeled(containerAllKeys)});
+      auto *init = CallExpr::createImplicit(C, arraySliceRef, argList);
+
+      auto *allKeysPattern = NamedPattern::createImplicit(C, allKeysDecl);
+      auto *allKeysBindingDecl = PatternBindingDecl::createImplicit(
+          C, StaticSpellingKind::None, allKeysPattern, init, funcDC);
+
+      statements.push_back(allKeysBindingDecl);
+      statements.push_back(allKeysDecl);
+    }
+
     // generate:
-    //
-    //  if container.allKeys.count != 1 {
+    //  guard let onlyKey = allKeys.popFirst(), allKeys.isEmpty else {
     //    let context = DecodingError.Context(
     //            codingPath: container.codingPath,
     //            debugDescription: "Invalid number of keys found, expected
     //            one.")
     //    throw DecodingError.typeMismatch(Foo.self, context)
     //  }
+    auto *theKeyDecl =
+        new (C) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Let,
+                        SourceLoc(), C.getIdentifier("onlyKey"), funcDC);
+    theKeyDecl->setImplicit();
+    theKeyDecl->setSynthesized();
+
+    SmallVector<StmtConditionElement, 2> guardElements;
+    {
+      auto *allKeysExpr =
+          new (C) DeclRefExpr(ConcreteDeclRef(allKeysDecl), DeclNameLoc(),
+                              /*Implicit=*/true);
+
+      // generate: let onlyKey = allKeys.popFirst;
+      auto *allKeysPopFisrtCallExpr = CallExpr::createImplicitEmpty(
+          C, UnresolvedDotExpr::createImplicit(C, allKeysExpr, C.Id_popFirst));
+
+      auto *theKeyPattern = BindingPattern::createImplicit(
+          C, /*isLet=*/true, NamedPattern::createImplicit(C, theKeyDecl));
+
+      guardElements.emplace_back(SourceLoc(), theKeyPattern,
+                                 allKeysPopFisrtCallExpr);
+
+      // generate: allKeys.isEmpty;
+      auto *allKeysIsEmptyExpr =
+          UnresolvedDotExpr::createImplicit(C, allKeysExpr, C.Id_isEmpty);
+
+      guardElements.emplace_back(allKeysIsEmptyExpr);
+    }
+
     auto *targetType = TypeExpr::createImplicit(
         funcDC->mapTypeIntoContext(targetEnum->getDeclaredInterfaceType()), C);
     auto *targetTypeExpr =
@@ -1615,44 +1668,21 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
         C, containerExpr, C.getDecodingErrorDecl(), C.Id_typeMismatch,
         targetTypeExpr, "Invalid number of keys found, expected one.");
 
-    // container.allKeys
-    auto *allKeysExpr =
-        UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_allKeys);
-
-    // container.allKeys.count
-    auto *keysCountExpr =
-        UnresolvedDotExpr::createImplicit(C, allKeysExpr, C.Id_count);
-
-    // container.allKeys.count == 1
-    auto *cmpFunc = C.getEqualIntDecl();
-    auto *fnType = cmpFunc->getInterfaceType()->castTo<FunctionType>();
-    auto *cmpFuncExpr = new (C)
-        DeclRefExpr(cmpFunc, DeclNameLoc(),
-                    /*implicit*/ true, AccessSemantics::Ordinary, fnType);
-    auto *oneExpr = IntegerLiteralExpr::createFromUnsigned(C, 1);
-
-    auto *cmpExpr = BinaryExpr::create(C, keysCountExpr, cmpFuncExpr, oneExpr,
-                                       /*implicit*/ true);
-    cmpExpr->setThrows(false);
-
     auto *guardBody = BraceStmt::create(C, SourceLoc(), {throwStmt},
                                         SourceLoc(), /* Implicit */ true);
 
-    auto *guardStmt = new (C)
-        GuardStmt(SourceLoc(), cmpExpr, guardBody, /* Implicit */ true, C);
+    auto *guardStmt =
+        new (C) GuardStmt(SourceLoc(), C.AllocateCopy(guardElements), guardBody,
+                          /* Implicit */ true);
 
     statements.push_back(guardStmt);
 
-    // generate: switch container.allKeys.first { }
-    auto *firstExpr =
-        UnresolvedDotExpr::createImplicit(C, allKeysExpr, C.Id_first);
-
-    // generate: switch container.allKeys.first.unsafelyUnwrapped { }
-    auto *unwrapped =
-        UnresolvedDotExpr::createImplicit(C, firstExpr, C.Id_unsafelyUnwrapped);
+    // generate: switch onlyKey { }
+    auto *theKeyExpr = new (C) DeclRefExpr(ConcreteDeclRef(theKeyDecl),
+                                           DeclNameLoc(), /*Implicit=*/true);
 
     auto switchStmt = createEnumSwitch(
-        C, funcDC, unwrapped, targetEnum, codingKeysEnum,
+        C, funcDC, theKeyExpr, targetEnum, codingKeysEnum,
         /*createSubpattern*/ false,
         [&](auto *elt, auto *codingKeyCase,
             auto payloadVars) -> std::tuple<EnumElementDecl *, BraceStmt *> {

@@ -18,10 +18,12 @@ enum Payload: Codable {
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: Payload.CodingKeys.self)
 
-    guard container.allKeys.count == 1 else {
+    var allKeys = ArraySlice(container.allKeys)
+
+    guard let onlyKey = allKeys.popFirst(), allKeys.isEmpty else {
       throw DecodingError.typeMismatch(Payload.self, DecodingError.Context.init(codingPath: container.codingPath, debugDescription: "Invalid number of keys found, expected one.", underlyingError: nil))
     }
-    switch container.allKeys.first.unsafelyUnwrapped {
+    switch onlyKey {
     case .plain:
 
       let nestedContainer = try container.nestedContainer(keyedBy: Payload.PlainCodingKeys.self, forKey: Payload.CodingKeys.plain)
