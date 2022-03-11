@@ -56,6 +56,11 @@ namespace irgen {
                              GenericSignature fnSig,
                              Explosion &out);
 
+  llvm::Value *emitFastClassCastIfPossible(IRGenFunction &IGF,
+                                           llvm::Value *instance,
+                                           CanType sourceFormalType,
+                                           CanType targetFormalType);
+
   /// Convert a class object to the given destination type,
   /// using a runtime-checked cast.
   llvm::Value *emitClassDowncast(IRGenFunction &IGF,

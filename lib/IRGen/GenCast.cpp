@@ -30,6 +30,7 @@
 #include "llvm/IR/Module.h"
 
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
@@ -1038,8 +1039,69 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     return;
   }
 
+  if (llvm::Value *fastResult = emitFastClassCastIfPossible(IGF, instance,
+                                        sourceFormalType, targetFormalType)) {
+    out.add(fastResult);
+    return;
+  }
+
   Explosion outRes;
   llvm::Value *result = emitClassDowncast(IGF, instance, targetFormalType,
                                           mode);
   out.add(result);
+}
+
+/// When casting a class instance to a final class, we can directly compare
+/// the isa-pointer with address of the metadata. This avoids a call to
+/// `swift_dynamicCastClass`.
+/// It also avoids a call to the metadata accessor of the class (which calls
+/// `swift_getInitializedObjCClass`). For comparing the metadata pointers it's
+/// not required that the metadata is fully initialized.
+llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
+                                                llvm::Value *instance,
+                                                CanType sourceFormalType,
+                                                CanType targetFormalType) {
+  if (!doesCastPreserveOwnershipForTypes(IGF.IGM.getSILModule(), sourceFormalType,
+                                         targetFormalType)) {
+    return nullptr;
+  }
+
+  // This does not include generic classes.
+  auto classTy = dyn_cast<ClassType>(targetFormalType);
+  if (!classTy)
+    return nullptr;
+
+  // TODO: we could use the ClassHierarchyAnalysis do also handle "effectively"
+  // final classes, e.g. not-subclassed internal classes in WMO.
+  // This would need some re-architecting of ClassHierarchyAnalysis to make it
+  // available in IRGen.
+  ClassDecl *toClass = classTy->getDecl();
+  if (!toClass->isFinal())
+    return nullptr;
+    
+  AncestryOptions forbidden = AncestryOptions(AncestryFlags::ObjC) |
+                              AncestryFlags::Resilient |
+                              AncestryFlags::ResilientOther |
+                              AncestryFlags::ClangImported |
+                              AncestryFlags::ObjCObjectModel;
+  if (toClass->checkAncestry() & forbidden)
+    return nullptr;
+
+  // Get the metadata pointer of the destination class type.
+  llvm::Value *destMetadata = IGF.IGM.getAddrOfTypeMetadata(targetFormalType);
+  llvm::Value *lhs = IGF.Builder.CreateBitCast(destMetadata, IGF.IGM.Int8PtrTy);
+    
+  // Load the isa pointer.
+  llvm::Value *objMetadata = emitHeapMetadataRefForHeapObject(IGF, instance,
+      targetFormalType, GenericSignature(), /*suppress cast*/ true);
+  llvm::Value *rhs = IGF.Builder.CreateBitCast(objMetadata, IGF.IGM.Int8PtrTy);
+  
+  // return isa_ptr == metadat_ptr ? instance : nullptr
+  llvm::Value *isEqual = IGF.Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ,
+                                              lhs, rhs);
+  auto *instanceTy = cast<llvm::PointerType>(instance->getType());
+  auto *nullPtr = llvm::ConstantPointerNull::get(instanceTy);
+  auto *select = IGF.Builder.CreateSelect(isEqual, instance, nullPtr);
+  llvm::Type *destTy = IGF.getTypeInfoForUnlowered(targetFormalType).getStorageType();
+  return IGF.Builder.CreateBitCast(select, destTy);
 }
