@@ -93,8 +93,12 @@ static bool isRequirement(Node::Kind kind) {
 
 void swift::Demangle::failAssert(const char *file, unsigned line,
                                  NodePointer node, const char *expr) {
-  fprintf(stderr, "%s:%u: assertion failed for Node %p: %s", file, line, node,
+  fprintf(stderr, "%s:%u: assertion failed for Node %p: %s\n", file, line, node,
           expr);
+  if (node) {
+    fprintf(stderr, "%s:%u: Node %p is:\n", file, line, node);
+    node->dump();
+  }
   abort();
 }
 
