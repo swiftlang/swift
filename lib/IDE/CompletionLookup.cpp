@@ -2634,22 +2634,6 @@ void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
       RequestedResultsTy::toplevelResults().withModuleQualifier(
           ModuleQualifier));
 
-  // Manually add any expected nominal types from imported modules so that
-  // they get their expected type relation. Don't include protocols, since
-  // they can't be initialized from the type name.
-  // FIXME: this does not include types that conform to an expected protocol.
-  // FIXME: this creates duplicate results.
-  for (auto T : expectedTypeContext.getPossibleTypes()) {
-    if (auto NT = T->getAs<NominalType>()) {
-      if (auto NTD = NT->getDecl()) {
-        if (!isa<ProtocolDecl>(NTD) && NTD->getModuleContext() != CurrModule) {
-          addNominalTypeRef(NT->getDecl(),
-                            DeclVisibilityKind::VisibleAtTopLevel, {});
-        }
-      }
-    }
-  }
-
   if (CompletionContext) {
     // FIXME: this is an awful simplification that says all and only enums can
     // use implicit member syntax (leading dot). Computing the accurate answer
