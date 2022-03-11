@@ -13,10 +13,12 @@
 #ifndef SWIFT_REWRITESYSTEM_H
 #define SWIFT_REWRITESYSTEM_H
 
+#include "swift/AST/Requirement.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PointerUnion.h"
 
 #include "Debug.h"
+#include "Diagnostics.h"
 #include "RewriteLoop.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -43,6 +45,11 @@ class RewriteSystem;
 class Rule final {
   Term LHS;
   Term RHS;
+
+  /// The written requirement ID, which can be used to index into the
+  /// \c WrittenRequirements array in the rewrite system to retrieve
+  /// the structural requirement.
+  Optional<unsigned> requirementID;
 
   /// A 'permanent' rule cannot be deleted by homotopy reduction. These
   /// do not correspond to generic requirements and are re-added when the
@@ -95,6 +102,15 @@ public:
 
   const Term &getLHS() const { return LHS; }
   const Term &getRHS() const { return RHS; }
+
+  Optional<unsigned> getRequirementID() const {
+    return requirementID;
+  }
+
+  void setRequirementID(Optional<unsigned> requirementID) {
+    assert(!getRequirementID().hasValue());
+    this->requirementID = requirementID;
+  }
 
   Optional<Symbol> isPropertyRule() const;
 
@@ -225,6 +241,9 @@ class RewriteSystem final {
   /// top-level generic signature and this array is empty.
   ArrayRef<const ProtocolDecl *> Protos;
 
+  /// The requirements written in source code.
+  std::vector<StructuralRequirement> WrittenRequirements;
+
   /// The rules added so far, including rules from our client, as well
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
@@ -281,8 +300,9 @@ public:
   DebugOptions getDebugOptions() const { return Debug; }
 
   void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
+                  ArrayRef<StructuralRequirement> writtenRequirements,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-                  std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
+                  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
     return Protos;
@@ -314,7 +334,8 @@ public:
 
   bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
 
-  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs);
+  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
+                       Optional<unsigned> requirementID);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
@@ -347,6 +368,14 @@ public:
   };
 
   void verifyRewriteRules(ValidityPolicy policy) const;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Diagnostics
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
 
 private:
   struct CriticalPair {
@@ -472,6 +501,8 @@ private:
   std::vector<std::pair<unsigned, unsigned>> ConflictingRules;
 
   void propagateExplicitBits();
+
+  void propagateRedundantRequirementIDs();
 
   void processConflicts();
 

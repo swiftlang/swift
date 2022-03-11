@@ -42,6 +42,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("redundant-rules", DebugFlags::RedundantRules)
       .Case("redundant-rules-detail", DebugFlags::RedundantRulesDetail)
       .Case("concrete-contraction", DebugFlags::ConcreteContraction)
+      .Case("propagate-requirement-ids", DebugFlags::PropagateRequirementIDs)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "

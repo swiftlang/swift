@@ -6,8 +6,8 @@ protocol Swappable1 {
   associatedtype A
   associatedtype B
   associatedtype Swapped : Swappable1
-    where Swapped.B == A,
-          Swapped.A == B, // FIXME: Diagnose redundancy
+    where Swapped.B == A, // expected-warning {{redundant same-type constraint 'Self.Swapped.B' == 'Self.A'}}
+          Swapped.A == B,
           Swapped.Swapped == Self
 }
 
