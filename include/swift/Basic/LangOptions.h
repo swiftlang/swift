@@ -344,7 +344,7 @@ namespace swift {
     bool EnableInferPublicSendable = false;
 
     /// Enable experimental 'distributed' actors and functions.
-    bool EnableExperimentalDistributed = false;
+    bool EnableExperimentalDistributed = true;
 
     /// Enable experimental 'move only' features.
     bool EnableExperimentalMoveOnly = false;
