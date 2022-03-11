@@ -1,15 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors-disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s --dump-input=always
+// RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s --dump-input=always
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 // REQUIRES: OS=linux-gnu
-
-// FIXME(distributed): rdar://90159628 need to build on linux to debug why this reports a wrong mangled name again after flag removal
-// REQUIRES: radar90159628
 
 import _Distributed
 import FakeDistributedActorSystems
