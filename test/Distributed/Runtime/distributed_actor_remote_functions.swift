@@ -11,6 +11,9 @@
 // FIXME(distributed): rdar://90078069
 // UNSUPPORTED: linux
 
+// FIXME(distributed): optimized builds optimize too aggressively somewhere
+// REQUIRES: swift_test_mode_optimize_none
+
 import _Distributed
 import _Concurrency
 
