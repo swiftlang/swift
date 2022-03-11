@@ -1,5 +1,6 @@
 
 add_swift_host_library(swiftPrintAsClang STATIC
+  CxxSynthesis.cpp
   DeclAndTypePrinter.cpp
   ModuleContentsWriter.cpp
   PrintAsClang.cpp)
