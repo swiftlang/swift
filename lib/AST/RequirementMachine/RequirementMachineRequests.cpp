@@ -72,6 +72,7 @@ RequirementMachine::computeMinimalProtocolRequirements() {
     buildRequirementsFromRules(entry.Requirements,
                                entry.TypeAliases,
                                genericParams,
+                               /*reconstituteSugar=*/true,
                                reqs, aliases);
 
     result[proto] = RequirementSignature(ctx.AllocateCopy(reqs),
@@ -180,7 +181,8 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
 /// Builds the top-level generic signature requirements for this rewrite system.
 std::vector<Requirement>
-RequirementMachine::computeMinimalGenericSignatureRequirements() {
+RequirementMachine::computeMinimalGenericSignatureRequirements(
+    bool reconstituteSugar) {
   assert(System.getProtocols().empty() &&
          "Not a top-level generic signature rewrite system");
   assert(!Params.empty() &&
@@ -199,7 +201,7 @@ RequirementMachine::computeMinimalGenericSignatureRequirements() {
   std::vector<ProtocolTypeAlias> aliases;
 
   buildRequirementsFromRules(rules, ArrayRef<unsigned>(), getGenericParams(),
-                             reqs, aliases);
+                             reconstituteSugar, reqs, aliases);
   assert(aliases.empty());
 
   return reqs;
@@ -281,8 +283,11 @@ AbstractGenericSignatureRequestRQM::evaluate(
       machine->initWithWrittenRequirements(genericParams, requirements);
   machine->checkCompletionResult(status.first);
 
+  // We pass reconstituteSugar=false to ensure that if the original
+  // requirements were canonical, the final signature remains canonical.
   auto minimalRequirements =
-    machine->computeMinimalGenericSignatureRequirements();
+    machine->computeMinimalGenericSignatureRequirements(
+        /*reconstituteSugar=*/false);
 
   auto result = GenericSignature::get(genericParams, minimalRequirements);
   bool hadError = machine->hadError();
@@ -423,7 +428,8 @@ InferredGenericSignatureRequestRQM::evaluate(
   }
 
   auto minimalRequirements =
-    machine->computeMinimalGenericSignatureRequirements();
+    machine->computeMinimalGenericSignatureRequirements(
+        /*reconstituteSugar=*/true);
 
   auto result = GenericSignature::get(genericParams, minimalRequirements);
   bool hadError = machine->hadError();

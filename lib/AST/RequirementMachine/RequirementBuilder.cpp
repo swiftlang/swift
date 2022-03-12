@@ -127,6 +127,7 @@ class RequirementBuilder {
   const RewriteSystem &System;
   const PropertyMap &Map;
   TypeArrayView<GenericTypeParamType> GenericParams;
+  bool ReconstituteSugar;
   bool Debug;
 
   // Temporary state populated by addRequirementRules() and
@@ -139,8 +140,11 @@ public:
   std::vector<ProtocolTypeAlias> Aliases;
 
   RequirementBuilder(const RewriteSystem &system, const PropertyMap &map,
-                     TypeArrayView<GenericTypeParamType> genericParams)
-    : System(system), Map(map), GenericParams(genericParams),
+                     TypeArrayView<GenericTypeParamType> genericParams,
+                     bool reconstituteSugar)
+    : System(system), Map(map),
+      GenericParams(genericParams),
+      ReconstituteSugar(reconstituteSugar),
       Debug(System.getDebugOptions().contains(DebugFlags::Minimization)) {}
 
   void addRequirementRules(ArrayRef<unsigned> rules);
@@ -186,10 +190,13 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
         if (prop->getConcreteType()->hasError())
           return;
 
-        auto superclassType = Map.getTypeFromSubstitutionSchema(
+        Type superclassType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 GenericParams, MutableTerm());
+
+        if (ReconstituteSugar)
+          superclassType = superclassType->reconstituteSugar(/*recursive=*/true);
 
         Reqs.emplace_back(RequirementKind::Superclass,
                           subjectType, superclassType);
@@ -209,10 +216,13 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
         if (prop->getConcreteType()->hasError())
           return;
 
-        auto concreteType = Map.getTypeFromSubstitutionSchema(
+        Type concreteType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 GenericParams, MutableTerm());
+
+        if (ReconstituteSugar)
+          concreteType = concreteType->reconstituteSugar(/*recursive=*/true);
 
         auto &component = Components[subjectType.getPointer()];
         assert(!component.ConcreteType);
@@ -281,10 +291,14 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
       if (prop->getConcreteType()->hasError())
         continue;
 
-      auto concreteType = Map.getTypeFromSubstitutionSchema(
+      Type concreteType = Map.getTypeFromSubstitutionSchema(
                                prop->getConcreteType(),
                                prop->getSubstitutions(),
                                GenericParams, MutableTerm());
+
+      if (ReconstituteSugar)
+        concreteType = concreteType->reconstituteSugar(/*recursive=*/true);
+
       auto &component = Components[subjectType.getPointer()];
       assert(!component.ConcreteType);
       Components[subjectType.getPointer()].ConcreteType = concreteType;
@@ -345,9 +359,10 @@ RequirementMachine::buildRequirementsFromRules(
     ArrayRef<unsigned> requirementRules,
     ArrayRef<unsigned> typeAliasRules,
     TypeArrayView<GenericTypeParamType> genericParams,
+    bool reconstituteSugar,
     std::vector<Requirement> &reqs,
     std::vector<ProtocolTypeAlias> &aliases) const {
-  RequirementBuilder builder(System, Map, genericParams);
+  RequirementBuilder builder(System, Map, genericParams, reconstituteSugar);
 
   builder.addRequirementRules(requirementRules);
   builder.addTypeAliasRules(typeAliasRules);

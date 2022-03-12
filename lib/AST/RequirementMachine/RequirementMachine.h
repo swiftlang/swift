@@ -112,6 +112,7 @@ class RequirementMachine final {
     ArrayRef<unsigned> requirementRules,
     ArrayRef<unsigned> typeAliasRules,
     TypeArrayView<GenericTypeParamType> genericParams,
+    bool reconstituteSugar,
     std::vector<Requirement> &reqs,
     std::vector<ProtocolTypeAlias> &aliases) const;
 
@@ -149,7 +150,8 @@ public:
   llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
   computeMinimalProtocolRequirements();
 
-  std::vector<Requirement> computeMinimalGenericSignatureRequirements();
+  std::vector<Requirement>
+  computeMinimalGenericSignatureRequirements(bool reconstituteSugar);
 
   std::string getRuleAsStringForDiagnostics(unsigned ruleID) const;
 
