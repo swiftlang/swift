@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify -requirement-machine-abstract-signatures=verify %s
 
 protocol P {
   func paul()
@@ -73,25 +73,23 @@ struct Test {
   let inferredOpaqueStructural2 = (bar(), bas()) // expected-error{{inferred type}}
 }
 
-let zingle = {() -> some P in 1 } // expected-error{{'some' types are only implemented}}
+let zingle = {() -> some P in 1 } // expected-error{{'some' types are only permitted}}
 
 
-// Support for structural opaque result types is hidden behind a compiler flag
-// until the proposal gets approved.
-func twoOpaqueTypes() -> (some P, some P) { return (1, 2) } // expected-error{{'opaque' types cannot be nested inside other types}}
-func asArrayElem() -> (some P)! { return [1] } // expected-error{{'opaque' types cannot be nested inside other types}}
+func twoOpaqueTypes() -> (some P, some P) { return (1, 2) }
+func asArrayElem() -> [some P] { return [1] }
 
 // Invalid positions
 
-typealias Foo = some P // expected-error{{'some' types are only implemented}}
+typealias Foo = some P // expected-error{{'some' types are only permitted}}
 
-func blibble(blobble: some P) {} // expected-error{{'some' types are only implemented}}
+func blibble(blobble: some P) {}
 func blib() -> P & some Q { return 1 } // expected-error{{'some' should appear at the beginning}}
 func blab() -> some P? { return 1 } // expected-error{{must specify only}} expected-note{{did you mean to write an optional of an 'opaque' type?}}
-func blorb<T: some P>(_: T) { } // expected-error{{'some' types are only implemented}}
-func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only implemented}} expected-error{{cannot convert}}
+func blorb<T: some P>(_: T) { } // expected-error{{'some' types are only permitted}}
+func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only permitted}} expected-error{{cannot convert}}
 
-protocol OP: some P {} // expected-error{{'some' types are only implemented}}
+protocol OP: some P {} // expected-error{{'some' types are only permitted}}
 
 func foo() -> some P {
   let x = (some P).self // expected-error*{{}}
@@ -272,15 +270,14 @@ func associatedTypeIdentity() {
 
   sameType(cr, c.r_out())
   sameType(dr, d.r_out())
-  sameType(cr, dr) // expected-error {{conflicting arguments to generic parameter 'T' ('(some R).S' (associated type of protocol 'R') vs. '(some R).S' (associated type of protocol 'R'))}}
+  sameType(cr, dr) // expected-error {{conflicting arguments to generic parameter 'T' ('(some R).S' (result type of 'candace') vs. '(some R).S' (result type of 'doug'))}}
   sameType(gary(candace()).r_out(), gary(candace()).r_out())
   sameType(gary(doug()).r_out(), gary(doug()).r_out())
   // TODO(diagnostics): This is not great but the problem comes from the way solver discovers and attempts bindings, if we could detect that
   // `(some R).S` from first reference to `gary()` in incosistent with the second one based on the parent type of `S` it would be much easier to diagnose.
   sameType(gary(doug()).r_out(), gary(candace()).r_out())
-  // expected-error@-1:3  {{conflicting arguments to generic parameter 'T' ('(some R).S' (associated type of protocol 'R') vs. '(some R).S' (associated type of protocol 'R'))}}
-  // expected-error@-2:12 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
-  // expected-error@-3:34 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
+  // expected-error@-1:12 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
+  // expected-error@-2:34 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
 }
 
 func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}
@@ -506,10 +503,11 @@ extension OpaqueProtocol {
 }
 
 func takesOpaqueProtocol(existential: OpaqueProtocol) {
-  // this is not allowed:
-  _ = existential.asSome // expected-error{{member 'asSome' cannot be used on value of protocol type 'OpaqueProtocol'; use a generic constraint instead}}
-  _ = existential.getAsSome() // expected-error{{member 'getAsSome' cannot be used on value of protocol type 'OpaqueProtocol'; use a generic constraint instead}}
-  _ = existential[0] // expected-error{{member 'subscript' cannot be used on value of protocol type 'OpaqueProtocol'; use a generic constraint instead}}
+  // These are okay because we erase to the opaque type bound
+  let a = existential.asSome
+  let _: Int = a // expected-error{{cannot convert value of type 'any OpaqueProtocol' to specified type 'Int'}}
+  _ = existential.getAsSome()
+  _ = existential[0]
 }
 
 func takesOpaqueProtocol<T : OpaqueProtocol>(generic: T) {

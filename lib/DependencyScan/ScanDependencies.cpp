@@ -47,6 +47,7 @@
 
 using namespace swift;
 using namespace swift::dependencies;
+using namespace swift::c_string_utils;
 using namespace llvm::yaml;
 
 namespace {
@@ -332,24 +333,37 @@ static void discoverCrosssImportOverlayDependencies(
                 allModules.end(), action);
 }
 
+namespace {
+std::string quote(StringRef unquoted) {
+  llvm::SmallString<128> buffer;
+  llvm::raw_svector_ostream os(buffer);
+  for (const auto ch : unquoted) {
+    if (ch == '\\')
+      os << '\\';
+    os << ch;
+  }
+  return buffer.str().str();
+}
+}
+
 /// Write a single JSON field.
 template <typename T>
 void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
                           const T &value, unsigned indentLevel,
-                          bool trailingComma);
+                          bool trailingComma, bool nested = false);
 
 /// Write a string value as JSON.
 void writeJSONValue(llvm::raw_ostream &out, StringRef value,
                     unsigned indentLevel) {
   out << "\"";
-  out << value;
+  out << quote(value);
   out << "\"";
 }
 
 void writeJSONValue(llvm::raw_ostream &out, swiftscan_string_ref_t value,
                     unsigned indentLevel) {
   out << "\"";
-  out << get_C_string(value);
+  out << quote(get_C_string(value));
   out << "\"";
 }
 
@@ -442,11 +456,31 @@ void writeJSONValue(llvm::raw_ostream &out, const std::vector<T> &values,
 template <typename T>
 void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
                           const T &value, unsigned indentLevel,
-                          bool trailingComma) {
+                          bool trailingComma, bool nested) {
   out.indent(indentLevel * 2);
   writeJSONValue(out, fieldName, indentLevel);
   out << ": ";
-  writeJSONValue(out, value, indentLevel);
+  auto updatedIndentLevel = indentLevel;
+  
+  if (nested) {
+    // This is a hack to "fix" a format for a value that should be a nested
+    // set of strings. Currently only capturedPCMArgs (clang) is expected to
+    // in the nested format, which supposedly only contains one set of strings.
+    // Adjust the indentation to account for the nested brackets.
+    updatedIndentLevel += 1;
+    out << "[\n";
+    out.indent(updatedIndentLevel * 2);
+  }
+
+  writeJSONValue(out, value, updatedIndentLevel);
+
+  if (nested) {
+    // If nested, add an extra closing brack with a correct indentation.
+    out << "\n";
+    out.indent(indentLevel * 2);
+    out << "]";
+  }
+
   if (trailingComma)
     out << ",";
   out << "\n";
@@ -595,7 +629,7 @@ static void writeJSON(llvm::raw_ostream &out,
           const auto &arg =
               get_C_string(swiftTextualDeps->command_line->strings[i]);
           out.indent(6 * 2);
-          out << "\"" << arg << "\"";
+          out << "\"" << quote(arg) << "\"";
           if (i != count - 1)
             out << ",";
           out << "\n";
@@ -610,7 +644,7 @@ static void writeJSON(llvm::raw_ostream &out,
           const auto &candidate = get_C_string(
               swiftTextualDeps->compiled_module_candidates->strings[i]);
           out.indent(6 * 2);
-          out << "\"" << candidate << "\"";
+          out << "\"" << quote(candidate) << "\"";
           if (i != count - 1)
             out << ",";
           out << "\n";
@@ -634,7 +668,7 @@ static void writeJSON(llvm::raw_ostream &out,
           const auto &arg =
               get_C_string(swiftTextualDeps->extra_pcm_args->strings[i]);
           out.indent(6 * 2);
-          out << "\"" << arg << "\"";
+          out << "\"" << quote(arg) << "\"";
           if (i != count - 1)
             out << ",";
           out << "\n";
@@ -720,7 +754,7 @@ static void writeJSON(llvm::raw_ostream &out,
 
       // Captured PCM arguments.
       writeJSONSingleField(out, "capturedPCMArgs", clangDeps->captured_pcm_args, 5,
-                           /*trailingComma=*/false);
+                           /*trailingComma=*/false, /*nested=*/true);
     }
 
     out.indent(4 * 2);
@@ -775,8 +809,8 @@ generateFullDependencyGraph(CompilerInstance &instance,
                                         module.first,
                                         {module.second, currentImportPathSet});
     if (!moduleDepsQuery) {
-      std::string err = "Module Dependency Cache missing module" + module.first;
-      llvm::report_fatal_error(err);
+      llvm::report_fatal_error(Twine("Module Dependency Cache missing module") +
+                               module.first);
     }
 
     auto moduleDeps = *moduleDepsQuery;
@@ -1073,7 +1107,8 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
-      if (pInstance->setup(subInvok)) {
+      std::string InstanceSetupError;
+      if (pInstance->setup(subInvok, InstanceSetupError)) {
         invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;

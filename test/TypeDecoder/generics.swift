@@ -19,7 +19,7 @@ protocol First {
 }
 
 protocol Second {
-  associatedtype Assoc : Second
+  associatedtype Assoc : Second where Assoc.Assoc.Assoc == Self
 }
 
 struct OuterFirst<A : First, B : First> {

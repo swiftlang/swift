@@ -21,7 +21,7 @@ var global: Int
 // FIXME: should this be allowed?
 @Maker
 var globalWithEmptyImplicitGetter: Int {}
-// expected-error@-1 {{computed property must have accessors specified}}
+// expected-error@-1 {{missing return in accessor expected to return 'Int'}}
 // expected-error@-3 {{result builder attribute 'Maker' can only be applied to a variable if it defines a getter}}
 
 @Maker

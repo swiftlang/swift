@@ -1115,8 +1115,9 @@ bb0(%0 : @unowned $C):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
 // CHECK:   [[BORROWED_ARG_COPY_COPY:%.*]] = begin_borrow [[ARG_COPY_COPY]]
+// CHECK:   [[LEXICAL_BORROW:%.*]] = begin_borrow [lexical] [[BORROWED_ARG_COPY_COPY]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
-// CHECK:   apply [[F]]([[BORROWED_ARG_COPY_COPY]])
+// CHECK:   apply [[F]]([[LEXICAL_BORROW]])
 // CHECK: } // end sil function 'test_guaranteed_closure_capture'
 sil [ossa] @test_guaranteed_closure_capture : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
@@ -1134,8 +1135,9 @@ bb0(%0 : @guaranteed $C):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
 // CHECK:   [[BORROWED_ARG_COPY_COPY:%.*]] = begin_borrow [[ARG_COPY_COPY]]
+// CHECK:   [[LEXICAL_BORROW:%.*]] = begin_borrow [lexical] [[BORROWED_ARG_COPY_COPY]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
-// CHECK:   apply [[F]]([[BORROWED_ARG_COPY_COPY]])
+// CHECK:   apply [[F]]([[LEXICAL_BORROW]])
 // CHECK: } // end sil function 'test_guaranteed_closure_capture2'
 sil [ossa] @test_guaranteed_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
@@ -1170,8 +1172,9 @@ bb0(%0 : @guaranteed $C):
 // CHECK:   [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
 // CHECK:   [[BORROWED_ARG_COPY_COPY:%.*]] = begin_borrow [[ARG_COPY_COPY]]
 // CHECK:   [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG_COPY]])
+// CHECK:   [[LEXICAL_BORROW:%.*]] = begin_borrow [lexical] [[BORROWED_ARG_COPY_COPY]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
-// CHECK:   apply [[F]]([[BORROWED_ARG_COPY_COPY]])
+// CHECK:   apply [[F]]([[LEXICAL_BORROW]])
 // CHECK:   return [[C]]
 // CHECK: } // end sil function 'test_guaranteed_closure'
 sil [ossa] @test_guaranteed_closure : $@convention(thin) (@guaranteed C) -> @owned @callee_guaranteed () -> () {

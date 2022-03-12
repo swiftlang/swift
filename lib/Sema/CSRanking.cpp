@@ -786,7 +786,7 @@ struct TypeBindingsToCompare {
     return !Type1WasLabeled && !Type2WasLabeled && Type1->isEqual(Type2);
   }
 };
-}; // end anonymous namespace
+} // end anonymous namespace
 
 /// Given the bound types of two constructor overloads, returns their parameter
 /// list types as tuples to compare for solution ranking, or \c None if they

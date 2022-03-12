@@ -178,8 +178,11 @@ int main(int argc, char **argv) {
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   CI.performSema();
 
   // If parsing produced an error, don't run any passes.

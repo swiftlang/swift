@@ -46,12 +46,6 @@ struct SwiftToSourceKitCompletionAdapter {
   static bool handleResult(SourceKit::CodeCompletionConsumer &consumer,
                            CodeCompletionResult *result,
                            bool annotatedDescription) {
-    llvm::SmallString<64> name;
-    {
-      llvm::raw_svector_ostream OSS(name);
-      ide::printCodeCompletionResultFilterName(*result, OSS);
-    }
-
     llvm::SmallString<64> description;
     {
       llvm::raw_svector_ostream OSS(description);
@@ -64,7 +58,7 @@ struct SwiftToSourceKitCompletionAdapter {
                                                 /*leadingPunctuation=*/false);
     }
 
-    Completion extended(*result, name, description);
+    Completion extended(*result, description);
     return handleResult(consumer, &extended, /*leadingPunctuation=*/false,
                         /*legacyLiteralToKeyword=*/true, annotatedDescription);
   }
@@ -74,8 +68,9 @@ struct SwiftToSourceKitCompletionAdapter {
                            bool legacyLiteralToKeyword,
                            bool annotatedDescription);
 
-  static void getResultAssociatedUSRs(ArrayRef<StringRef> AssocUSRs,
-                                      raw_ostream &OS);
+  static void
+  getResultAssociatedUSRs(ArrayRef<NullTerminatedStringRef> AssocUSRs,
+                          raw_ostream &OS);
 };
 
 } // anonymous namespace
@@ -97,6 +92,7 @@ static void swiftCodeCompleteImpl(
     unsigned Offset, ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const CodeCompletion::Options &opts,
+    SourceKitCancellationToken CancellationToken,
     llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback) {
   assert(Callback && "Must provide callback to receive results");
 
@@ -106,9 +102,10 @@ static void swiftCodeCompleteImpl(
   CompletionContext.setIncludeObjectLiterals(opts.includeObjectLiterals);
   CompletionContext.setAddInitsToTopLevel(opts.addInitsToTopLevel);
   CompletionContext.setCallPatternHeuristics(opts.callPatternHeuristics);
+  CompletionContext.setAddCallWithNoDefaultArgs(opts.addCallWithNoDefaultArgs);
 
   Lang.performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem,
+      UnresolvedInputFile, Offset, Args, FileSystem, CancellationToken,
       [&](CancellableResult<SwiftLangSupport::CompletionLikeOperationParams>
               ParamsResult) {
         ParamsResult.mapAsync<CodeCompleteResult>(
@@ -116,7 +113,8 @@ static void swiftCodeCompleteImpl(
               Lang.getCompletionInstance()->codeComplete(
                   CIParams.Invocation, Args, FileSystem,
                   CIParams.completionBuffer, Offset, CIParams.DiagC,
-                  CompletionContext, DeliverTransformed);
+                  CompletionContext, CIParams.CancellationFlag,
+                  DeliverTransformed);
             },
             Callback);
       });
@@ -141,12 +139,19 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
 
     bool hasRequiredType = Result->Info.completionContext->typeContextKind ==
                            TypeContextKind::Required;
-    if (CCOpts.sortByName)
-      CodeCompletionContext::sortCompletionResults(Result->Results);
+    ArrayRef<CodeCompletionResult *> Results = Result->ResultSink.Results;
+    // If the results are sorted by name, this stores the sorted results, which
+    // will be referenced by `Results`.
+    std::vector<CodeCompletionResult *> SortedResultsStorage;
+    if (CCOpts.sortByName) {
+      SortedResultsStorage =
+          CodeCompletionContext::sortCompletionResults(Results);
+      Results = SortedResultsStorage;
+    }
     // FIXME: this adhoc filtering should be configurable like it is in the
     // codeCompleteOpen path.
-    for (auto *Result : Result->Results) {
-      if (Result->getKind() == CodeCompletionResult::ResultKind::Literal) {
+    for (auto *Result : Results) {
+      if (Result->getKind() == CodeCompletionResultKind::Literal) {
         switch (Result->getLiteralKind()) {
         case CodeCompletionLiteralKind::NilLiteral:
         case CodeCompletionLiteralKind::BooleanLiteral:
@@ -155,7 +160,7 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
         case CodeCompletionLiteralKind::ColorLiteral:
           if (hasRequiredType &&
               Result->getExpectedTypeRelation() <
-                  CodeCompletionResult::ExpectedTypeRelation::Convertible)
+                  CodeCompletionResultTypeRelation::Convertible)
             continue;
           break;
         default:
@@ -185,7 +190,8 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
 void SwiftLangSupport::codeComplete(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     OptionsDictionary *options, SourceKit::CodeCompletionConsumer &SKConsumer,
-    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) {
+    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken) {
 
   CodeCompletion::Options CCOpts;
   if (options) {
@@ -206,22 +212,22 @@ void SwiftLangSupport::codeComplete(
 
   swiftCodeCompleteImpl(
       *this, UnresolvedInputFile, Offset, Args, fileSystem, CCOpts,
-      [&](CancellableResult<CodeCompleteResult> Result) {
+      CancellationToken, [&](CancellableResult<CodeCompleteResult> Result) {
         deliverCodeCompleteResults(SKConsumer, CCOpts, Result);
       });
 }
 
 static void getResultStructure(
-    CodeCompletion::SwiftResult *result, bool leadingPunctuation,
+    const CodeCompletion::SwiftResult &result, bool leadingPunctuation,
     CodeCompletionInfo::DescriptionStructure &structure,
     std::vector<CodeCompletionInfo::ParameterStructure> &parameters) {
-  auto *CCStr = result->getCompletionString();
+  auto *CCStr = result.getCompletionString();
   auto FirstTextChunk = CCStr->getFirstTextChunkIndex(leadingPunctuation);
 
   if (!FirstTextChunk.hasValue())
     return;
 
-  bool isOperator = result->isOperator();
+  bool isOperator = result.isOperator();
 
   auto chunks = CCStr->getChunks();
   using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
@@ -390,18 +396,16 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   CodeCompletionInfo Info;
   if (Result->hasCustomKind()) {
     Info.CustomKind = Result->getCustomKind();
-  } else if (Result->getKind() == CodeCompletionResult::ResultKind::Keyword) {
+  } else if (Result->getKind() == CodeCompletionResultKind::Keyword) {
     Info.Kind = KeywordUID;
-  } else if (Result->getKind() == CodeCompletionResult::ResultKind::Pattern) {
+  } else if (Result->getKind() == CodeCompletionResultKind::Pattern) {
     Info.Kind = PatternUID;
-  } else if (Result->getKind() ==
-             CodeCompletionResult::ResultKind::BuiltinOperator) {
+  } else if (Result->getKind() == CodeCompletionResultKind::BuiltinOperator) {
     Info.Kind = PatternUID; // FIXME: add a UID for operators
-  } else if (Result->getKind() ==
-             CodeCompletionResult::ResultKind::Declaration) {
+  } else if (Result->getKind() == CodeCompletionResultKind::Declaration) {
     Info.Kind = SwiftLangSupport::getUIDForCodeCompletionDeclKind(
         Result->getAssociatedDeclKind());
-  } else if (Result->getKind() == CodeCompletionResult::ResultKind::Literal) {
+  } else if (Result->getKind() == CodeCompletionResultKind::Literal) {
     auto literalKind = Result->getLiteralKind();
     if (legacyLiteralToKeyword &&
         (literalKind == CodeCompletionLiteralKind::BooleanLiteral ||
@@ -437,7 +441,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
 
       LogMessageOs << "Code completion result with empty description "
                       "was ignored: \n";
-      Result->printPrefix(LogMessageOs);
+      Result->getSwiftResult().printPrefix(LogMessageOs);
       Result->getCompletionString()->print(LogMessageOs);
 
       *Log << LogMessage;
@@ -469,7 +473,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   }
   unsigned USRsEnd = SS.size();
 
-  Info.Name = Result->getName();
+  Info.Name = Result->getFilterName();
   Info.Description = StringRef(SS.begin() + DescBegin, DescEnd - DescBegin);
   Info.SourceText = StringRef(SS.begin() + TextBegin, TextEnd - TextBegin);
   Info.TypeName = StringRef(SS.begin() + TypeBegin, TypeEnd - TypeBegin);
@@ -517,17 +521,17 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   static UIdent CCTypeRelIdentical("source.codecompletion.typerelation.identical");
 
   switch (Result->getExpectedTypeRelation()) {
-  case CodeCompletionResult::ExpectedTypeRelation::NotApplicable:
+  case CodeCompletionResultTypeRelation::NotApplicable:
     Info.TypeRelation = CCTypeRelNotApplicable; break;
-  case CodeCompletionResult::ExpectedTypeRelation::Unknown:
+  case CodeCompletionResultTypeRelation::Unknown:
     Info.TypeRelation = CCTypeRelUnknown; break;
-  case CodeCompletionResult::ExpectedTypeRelation::Unrelated:
+  case CodeCompletionResultTypeRelation::Unrelated:
     Info.TypeRelation = CCTypeRelUnrelated; break;
-  case CodeCompletionResult::ExpectedTypeRelation::Invalid:
+  case CodeCompletionResultTypeRelation::Invalid:
     Info.TypeRelation = CCTypeRelInvalid; break;
-  case CodeCompletionResult::ExpectedTypeRelation::Convertible:
+  case CodeCompletionResultTypeRelation::Convertible:
     Info.TypeRelation = CCTypeRelConvertible; break;
-  case CodeCompletionResult::ExpectedTypeRelation::Identical:
+  case CodeCompletionResultTypeRelation::Identical:
     Info.TypeRelation = CCTypeRelIdentical; break;
   }
 
@@ -544,7 +548,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   // Description structure.
   std::vector<CodeCompletionInfo::ParameterStructure> parameters;
   CodeCompletionInfo::DescriptionStructure structure;
-  getResultStructure(Result, leadingPunctuation, structure, parameters);
+  getResultStructure(*Result, leadingPunctuation, structure, parameters);
   Info.descriptionStructure = structure;
   if (!parameters.empty())
     Info.parametersStructure = parameters;
@@ -591,7 +595,7 @@ getCodeCompletionKeywordKindForUID(UIdent uid) {
 }
 
 void SwiftToSourceKitCompletionAdapter::getResultAssociatedUSRs(
-    ArrayRef<StringRef> AssocUSRs, raw_ostream &OS) {
+    ArrayRef<NullTerminatedStringRef> AssocUSRs, raw_ostream &OS) {
   bool First = true;
   for (auto USR : AssocUSRs) {
     if (!First)
@@ -839,9 +843,9 @@ static void translateFilterRules(ArrayRef<FilterRule> rawFilterRules,
   }
 }
 
-static bool checkInnerResult(CodeCompletionResult *result, bool &hasDot,
+static bool checkInnerResult(const CodeCompletionResult &result, bool &hasDot,
                              bool &hasQDot, bool &hasInit) {
-  auto chunks = result->getCompletionString()->getChunks();
+  auto chunks = result.getCompletionString()->getChunks();
   if (!chunks.empty() &&
       chunks[0].is(CodeCompletionString::Chunk::ChunkKind::Dot)) {
     hasDot = true;
@@ -852,9 +856,8 @@ static bool checkInnerResult(CodeCompletionResult *result, bool &hasDot,
              chunks[1].is(CodeCompletionString::Chunk::ChunkKind::Dot)) {
     hasQDot = true;
     return true;
-  } else if (result->getKind() ==
-                 CodeCompletion::SwiftResult::ResultKind::Declaration &&
-             result->getAssociatedDeclKind() ==
+  } else if (result.getKind() == CodeCompletionResultKind::Declaration &&
+             result.getAssociatedDeclKind() ==
                  CodeCompletionDeclKind::Constructor) {
     hasInit = true;
     return true;
@@ -870,25 +873,20 @@ filterInnerResults(ArrayRef<Result *> results, bool includeInner,
                    bool &hasDot, bool &hasQDot, bool &hasInit,
                    const CodeCompletion::FilterRules &rules) {
   std::vector<Result *> topResults;
-  for (auto *result : results) {
+  for (Result *result : results) {
     if (!includeInnerOperators && result->isOperator())
       continue;
 
-    llvm::SmallString<64> filterName;
-    {
-      llvm::raw_svector_ostream OSS(filterName);
-      ide::printCodeCompletionResultFilterName(*result, OSS);
-    }
     llvm::SmallString<64> description;
     {
       llvm::raw_svector_ostream OSS(description);
       ide::printCodeCompletionResultDescription(*result, OSS,
                                                 /*leadingPunctuation=*/false);
     }
-    if (rules.hideCompletion(result, filterName, description))
+    if (rules.hideCompletion(*result, result->getFilterName(), description))
       continue;
 
-    bool inner = checkInnerResult(result, hasDot, hasQDot, hasInit);
+    bool inner = checkInnerResult(*result, hasDot, hasQDot, hasInit);
 
     if (!inner ||
         (includeInner &&
@@ -903,24 +901,33 @@ static void transformAndForwardResults(
     CodeCompletion::SessionCacheRef session,
     const NameToPopularityMap *nameToPopularity,
     CodeCompletion::Options options, unsigned offset, StringRef filterText,
-    unsigned resultOffset, unsigned maxResults) {
+    unsigned resultOffset, unsigned maxResults,
+    SourceKitCancellationToken CancellationToken) {
 
   CodeCompletion::CompletionSink innerSink;
   Completion *exactMatch = nullptr;
   auto buildInnerResult = [&](ArrayRef<CodeCompletionString::Chunk> chunks) {
     auto *completionString =
         CodeCompletionString::create(innerSink.allocator, chunks);
-    CodeCompletion::SwiftResult paren(
-        CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
-        SemanticContextKind::CurrentNominal,
+    ContextFreeCodeCompletionResult *contextFreeResult =
+        ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
+            innerSink.swiftSink, CodeCompletionResultKind::BuiltinOperator,
+            completionString, CodeCompletionOperatorKind::None,
+            /*BriefDocComment=*/"", CodeCompletionResultType::notApplicable(),
+            ContextFreeNotRecommendedReason::None,
+            CodeCompletionDiagnosticSeverity::None,
+            /*DiagnosticMessage=*/"");
+    auto *paren = new (innerSink.allocator) CodeCompletion::SwiftResult(
+        *contextFreeResult, SemanticContextKind::CurrentNominal,
         CodeCompletionFlairBit::ExpressionSpecific,
-        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString,
-        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+        exactMatch ? exactMatch->getNumBytesToErase() : 0,
+        /*TypeContext=*/nullptr, /*DC=*/nullptr, /*USRTypeContext=*/nullptr,
+        ContextualNotRecommendedReason::None,
+        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
 
     SwiftCompletionInfo info;
-    std::vector<Completion *> extended =
-        extendCompletions(&paren, innerSink, info, nameToPopularity, options,
-                          exactMatch);
+    std::vector<Completion *> extended = extendCompletions(
+        paren, innerSink, info, nameToPopularity, options, exactMatch);
     assert(extended.size() == 1);
     return extended.front();
   };
@@ -987,7 +994,7 @@ static void transformAndForwardResults(
   organizer.groupAndSort(options);
 
   if ((options.addInnerResults || options.addInnerOperators) && exactMatch &&
-      exactMatch->getKind() == Completion::ResultKind::Declaration) {
+      exactMatch->getKind() == CodeCompletionResultKind::Declaration) {
     std::vector<Completion *> innerResults;
     bool hasDot = false;
     bool hasQDot = false;
@@ -1012,7 +1019,8 @@ static void transformAndForwardResults(
 
     swiftCodeCompleteImpl(
         lang, buffer.get(), str.size(), cargs, session->getFileSystem(),
-        options, [&](CancellableResult<CodeCompleteResult> Result) {
+        options, CancellationToken,
+        [&](CancellableResult<CodeCompleteResult> Result) {
           CallbackCalled = true;
           switch (Result.getKind()) {
           case CancellableResultKind::Success: {
@@ -1022,8 +1030,9 @@ static void transformAndForwardResults(
               return;
             }
             auto topResults = filterInnerResults(
-                Result->Results, options.addInnerResults,
-                options.addInnerOperators, hasDot, hasQDot, hasInit, rules);
+                ArrayRef<CodeCompletionResult *>(Result->ResultSink.Results),
+                options.addInnerResults, options.addInnerOperators, hasDot,
+                hasQDot, hasInit, rules);
             // FIXME: Clearing the flair (and semantic context) is a hack so
             // that they won't overwhelm other results that also match the
             // filter text.
@@ -1031,6 +1040,7 @@ static void transformAndForwardResults(
                 extendCompletions(topResults, innerSink, Result->Info,
                                   nameToPopularity, options, exactMatch,
                                   /*clearFlair=*/true);
+            innerSink.adoptSwiftSink(Result->ResultSink);
             break;
           }
           case CancellableResultKind::Failure:
@@ -1087,7 +1097,8 @@ void SwiftLangSupport::codeCompleteOpen(
     StringRef name, llvm::MemoryBuffer *inputBuf, unsigned offset,
     OptionsDictionary *options, ArrayRef<FilterRule> rawFilterRules,
     GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args,
-    Optional<VFSOptions> vfsOptions) {
+    Optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken) {
   StringRef filterText;
   unsigned resultOffset = 0;
   unsigned maxResults = 0;
@@ -1127,7 +1138,7 @@ void SwiftLangSupport::codeCompleteOpen(
   bool CodeCompleteDidFail = false;
   bool CallbackCalled = false;
   swiftCodeCompleteImpl(
-      *this, inputBuf, offset, args, fileSystem, CCOpts,
+      *this, inputBuf, offset, args, fileSystem, CCOpts, CancellationToken,
       [&](CancellableResult<CodeCompleteResult> Result) {
         CallbackCalled = true;
         switch (Result.getKind()) {
@@ -1138,8 +1149,10 @@ void SwiftLangSupport::codeCompleteOpen(
           mayUseImplicitMemberExpr = completionCtx.MayUseImplicitMemberExpr;
           consumer.setReusingASTContext(completionCtx.ReusingASTContext);
           consumer.setAnnotatedTypename(completionCtx.getAnnotateResult());
-          completions = extendCompletions(Result->Results, sink, Result->Info,
-                                          nameToPopularity, CCOpts);
+          completions =
+              extendCompletions(Result->ResultSink.Results, sink, Result->Info,
+                                nameToPopularity, CCOpts);
+          sink.adoptSwiftSink(Result->ResultSink);
           break;
         }
         case CancellableResultKind::Failure:
@@ -1189,7 +1202,8 @@ void SwiftLangSupport::codeCompleteOpen(
   }
 
   transformAndForwardResults(consumer, *this, session, nameToPopularity, CCOpts,
-                             offset, filterText, resultOffset, maxResults);
+                             offset, filterText, resultOffset, maxResults,
+                             CancellationToken);
 }
 
 void SwiftLangSupport::codeCompleteClose(
@@ -1205,6 +1219,7 @@ void SwiftLangSupport::codeCompleteClose(
 
 void SwiftLangSupport::codeCompleteUpdate(
     StringRef name, unsigned offset, OptionsDictionary *options,
+    SourceKitCancellationToken CancellationToken,
     GroupedCodeCompletionConsumer &consumer) {
   auto session = CCSessions.get(name, offset);
   if (!session) {
@@ -1234,7 +1249,8 @@ void SwiftLangSupport::codeCompleteUpdate(
   }
 
   transformAndForwardResults(consumer, *this, session, nameToPopularity, CCOpts,
-                             offset, filterText, resultOffset, maxResults);
+                             offset, filterText, resultOffset, maxResults,
+                             CancellationToken);
 }
 
 swift::ide::CodeCompletionCache &SwiftCompletionCache::getCache() {

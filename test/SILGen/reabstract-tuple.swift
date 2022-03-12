@@ -26,7 +26,7 @@ class Box<T> {
 // CHECK:   // function_ref Box.__allocating_init(_:)
 // CHECK:   [[INIT_F:%.*]] = function_ref @$s4main3BoxCyACyxGxcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
 // CHECK:   [[CALL:%.*]] = apply [[INIT_F]]<(Int, () -> ())>(%{{.*}}, %{{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
-// CHECK:   [[BORROW_CALL:%.*]] = begin_borrow [[CALL]] : $Box<(Int, () -> ())> 
+// CHECK:   [[BORROW_CALL:%.*]] = begin_borrow [lexical] [[CALL]] : $Box<(Int, () -> ())> 
 // CHECK:   [[REF:%.*]] = ref_element_addr [[BORROW_CALL]] : $Box<(Int, () -> ())>, #Box.value
 // CHECK:   [[TUPLEC:%.*]] = load [copy] [[REF]] : $*(Int, @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>)
 // CHECK:   ([[TUPLEC_0:%.*]], [[TUPLEC_1:%.*]]) = destructure_tuple [[TUPLEC]]

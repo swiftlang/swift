@@ -29,10 +29,11 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   if (!ctx.shouldPerform(ARCTransformKind::RedundantBorrowScopeElimPeephole))
     return false;
 
-  // Lexical borrow scopes must remain in order to ensure that value lifetimes
-  // are not observably shortened.
-  if (bbi->isLexical())
+  // Non-redundant, lexical borrow scopes must remain in order to ensure that
+  // value lifetimes are not observably shortened.
+  if (bbi->isLexical() && !isNestedLexicalBeginBorrow(bbi)) {
     return false;
+  }
 
   auto kind = bbi->getOperand().getOwnershipKind();
   SmallVector<EndBorrowInst *, 16> endBorrows;

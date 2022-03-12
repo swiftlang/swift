@@ -158,6 +158,7 @@ void SwiftLangSupport::getConformingMethodList(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     OptionsDictionary *optionsDict, ArrayRef<const char *> Args,
     ArrayRef<const char *> ExpectedTypeNames,
+    SourceKitCancellationToken CancellationToken,
     SourceKit::ConformingMethodListConsumer &SKConsumer,
     Optional<VFSOptions> vfsOptions) {
   std::string error;
@@ -175,13 +176,14 @@ void SwiftLangSupport::getConformingMethodList(
   }
 
   performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, fileSystem,
+      UnresolvedInputFile, Offset, Args, fileSystem, CancellationToken,
       [&](CancellableResult<CompletionLikeOperationParams> ParmsResult) {
         ParmsResult.mapAsync<ConformingMethodListResults>(
             [&](auto &Params, auto DeliverTransformed) {
               getCompletionInstance()->conformingMethodList(
                   Params.Invocation, Args, fileSystem, Params.completionBuffer,
-                  Offset, Params.DiagC, ExpectedTypeNames, DeliverTransformed);
+                  Offset, Params.DiagC, ExpectedTypeNames,
+                  Params.CancellationFlag, DeliverTransformed);
             },
             [&](auto Result) { deliverResults(SKConsumer, Result); });
       });

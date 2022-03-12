@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 /// CR and LF are common special cases in grapheme breaking logic
 private var _CR: UInt8 { return 0x0d }
 private var _LF: UInt8 { return 0x0a }
@@ -175,13 +177,56 @@ extension _StringGuts {
   }
 }
 
+extension Unicode.Scalar {
+  fileprivate var _isLinkingConsonant: Bool {
+    _swift_stdlib_isLinkingConsonant(value)
+  }
+
+  fileprivate var _isVirama: Bool {
+    switch value {
+    // Devanagari
+    case 0x94D:
+      return true
+    // Bengali
+    case 0x9CD:
+      return true
+    // Gujarati
+    case 0xACD:
+      return true
+    // Oriya
+    case 0xB4D:
+      return true
+    // Telugu
+    case 0xC4D:
+      return true
+    // Malayalam
+    case 0xD4D:
+      return true
+
+    default:
+      return false
+    }
+  }
+}
+
 internal struct _GraphemeBreakingState {
+  // When we're looking through an indic sequence, one of the requirements is
+  // that there is at LEAST 1 Virama present between two linking consonants.
+  // This value helps ensure that when we ultimately need to decide whether or
+  // not to break that we've at least seen 1 when walking.
+  var hasSeenVirama = false
+
   // When walking forwards in a string, we need to know whether or not we've
   // entered an emoji sequence to be able to eventually break after all of the
   // emoji's various extenders and zero width joiners. This bit allows us to
   // keep track of whether or not we're still in an emoji sequence when deciding
   // to break.
-  var isInEmojiSequence: Bool = false
+  var isInEmojiSequence = false
+
+  // Similar to emoji sequences, we need to know not to break an Indic grapheme
+  // sequence. This sequence is (potentially) composed of many scalars and isn't
+  // as trivial as comparing two grapheme properties.
+  var isInIndicSequence = false
 
   // When walking forward in a string, we need to not break on emoji flag
   // sequences. Emoji flag sequences are composed of 2 regional indicators, so
@@ -190,7 +235,7 @@ internal struct _GraphemeBreakingState {
   // is another regional indicator, we reach the same decision rule, but in this
   // case we actually need to break there's a boundary between emoji flag
   // sequences.
-  var shouldBreakRI: Bool = false
+  var shouldBreakRI = false
 }
 
 extension _StringGuts {
@@ -288,8 +333,12 @@ extension _StringGuts {
     // continue treating the current grapheme cluster as an emoji sequence.
     var enterEmojiSequence = false
 
+    // Very similar to emoji sequences, but for Indic grapheme sequences.
+    var enterIndicSequence = false
+
     defer {
       state.isInEmojiSequence = enterEmojiSequence
+      state.isInIndicSequence = enterIndicSequence
     }
 
     switch (x, y) {
@@ -338,6 +387,26 @@ extension _StringGuts {
         enterEmojiSequence = true
       }
 
+      // If we're currently in an indic sequence (or if our lhs is a linking
+      // consonant), then this check and everything underneath ensures that
+      // we continue being in one and may check if this extend is a Virama.
+      if state.isInIndicSequence || scalar1._isLinkingConsonant {
+        if y == .extend {
+          let extendNormData = Unicode._NormData(scalar2, fastUpperbound: 0x300)
+
+          // If our extend's CCC is 0, then this rule does not apply.
+          guard extendNormData.ccc != 0 else {
+            return false
+          }
+        }
+
+        enterIndicSequence = true
+
+        if scalar2._isVirama {
+          state.hasSeenVirama = true
+        }
+      }
+
       return false
 
     // GB9a
@@ -370,6 +439,32 @@ extension _StringGuts {
 
     // GB999
     default:
+      // GB9c
+      if state.isInIndicSequence, state.hasSeenVirama, scalar2._isLinkingConsonant {
+        state.hasSeenVirama = false
+        return false
+      }
+
+      // Handle GB9c when walking backwards.
+      if isBackwards {
+        switch (x, scalar2._isLinkingConsonant) {
+        case (.extend, true):
+          let extendNormData = Unicode._NormData(scalar1, fastUpperbound: 0x300)
+
+          guard extendNormData.ccc != 0 else {
+            return true
+          }
+
+          return !checkIfInIndicSequence(index)
+
+        case (.zwj, true):
+          return !checkIfInIndicSequence(index)
+
+        default:
+          return true
+        }
+      }
+
       return true
     }
   }
@@ -417,9 +512,7 @@ extension _StringGuts {
   //                | = We found our starting .extendedPictographic letting us
   //                    know that we are in an emoji sequence so our initial
   //                    break question is answered as NO.
-  internal func checkIfInEmojiSequence(
-    _ index: Int
-  ) -> Bool {
+  internal func checkIfInEmojiSequence(_ index: Int) -> Bool {
     var emojiIdx = String.Index(_encodedOffset: index)
 
     guard emojiIdx != startIndex else {
@@ -447,7 +540,91 @@ extension _StringGuts {
 
     return false
   }
-  
+
+  // When walking backwards, it's impossible to know whether we break when we
+  // see our first ((.extend|.zwj), .linkingConsonant) without walking
+  // further backwards. This walks the string backwards enough until we figure
+  // out whether or not to break this indic sequence. For example:
+  //
+  // Scalar view #1:
+  //
+  //     [.virama, .extend, .linkingConsonant]
+  //                       ^
+  //                       | = To be able to know whether or not to break these
+  //                           two, we need to walk backwards to determine if
+  //                           this is a legitimate indic sequence.
+  //      ^
+  //      | = The scalar sequence ends without a starting linking consonant,
+  //          so this is in fact not an indic sequence, so we can break the two.
+  //
+  // Scalar view #2:
+  //
+  //     [.linkingConsonant, .virama, .extend, .linkingConsonant]
+  //                                          ^
+  //                                          | = Same as above
+  //                            ^
+  //                            | = This is a virama, so we at least have seen
+  //                                1 to be able to return true if we see a
+  //                                linking consonant later.
+  //         ^
+  //         | = Is a linking consonant and we've seen a virama, so this is a
+  //             legitimate indic sequence, so do NOT break the initial question.
+  internal func checkIfInIndicSequence(_ index: Int) -> Bool {
+    var indicIdx = String.Index(_encodedOffset: index)
+
+    guard indicIdx != startIndex else {
+      return false
+    }
+
+    let scalars = String.UnicodeScalarView(self)
+    scalars.formIndex(before: &indicIdx)
+
+    var hasSeenVirama = false
+
+    // Check if the first extend was the Virama.
+    let scalar = scalars[indicIdx]
+
+    if scalar._isVirama {
+      hasSeenVirama = true
+    }
+
+    while indicIdx != startIndex {
+      scalars.formIndex(before: &indicIdx)
+      let scalar = scalars[indicIdx]
+
+      let gbp = Unicode._GraphemeBreakProperty(from: scalar)
+
+      switch (gbp, scalar._isLinkingConsonant) {
+      case (.extend, false):
+        let extendNormData = Unicode._NormData(scalar, fastUpperbound: 0x300)
+
+        guard extendNormData.ccc != 0 else {
+          return false
+        }
+
+        if scalar._isVirama {
+          hasSeenVirama = true
+        }
+
+      case (.zwj, false):
+        continue
+
+      // LinkingConsonant
+      case (_, true):
+        guard hasSeenVirama else {
+          return false
+        }
+
+        return true
+
+      default:
+        return false
+      }
+    }
+
+    return false
+  }
+
   // When walking backwards, it's impossible to know whether we break when we
   // see our first (.regionalIndicator, .regionalIndicator) without walking
   // further backwards. This walks the string backwards enough until we figure

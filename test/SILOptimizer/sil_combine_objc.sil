@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
-// REQUIRES: objc_interop
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // See https://bugs.swift.org/browse/SR-5065, rdar://32511494
 // XFAIL: *

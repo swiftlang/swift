@@ -1090,7 +1090,7 @@ extension Array: RangeReplaceableCollection {
   @inline(never)
   @inlinable // @specializable
   internal mutating func _copyToNewBuffer(oldCount: Int) {
-    let newCount = oldCount + 1
+    let newCount = oldCount &+ 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
       countForNewBuffer: oldCount, minNewCapacity: newCount)
     _buffer._arrayOutOfPlaceUpdate(&newBuffer, oldCount, 0)
@@ -1101,7 +1101,7 @@ extension Array: RangeReplaceableCollection {
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.beginCOWMutation()) {
       _createNewBuffer(bufferIsUnique: false,
-                       minimumCapacity: count + 1,
+                       minimumCapacity: count &+ 1,
                        growForAppend: true)
     }
   }
@@ -1121,9 +1121,9 @@ extension Array: RangeReplaceableCollection {
     let capacity = _buffer.mutableCapacity
     _internalInvariant(capacity == 0 || _buffer.isMutableAndUniquelyReferenced())
 
-    if _slowPath(oldCount + 1 > capacity) {
+    if _slowPath(oldCount &+ 1 > capacity) {
       _createNewBuffer(bufferIsUnique: capacity > 0,
-                       minimumCapacity: oldCount + 1,
+                       minimumCapacity: oldCount &+ 1,
                        growForAppend: true)
     }
   }
@@ -1135,9 +1135,9 @@ extension Array: RangeReplaceableCollection {
     newElement: __owned Element
   ) {
     _internalInvariant(_buffer.isMutableAndUniquelyReferenced())
-    _internalInvariant(_buffer.mutableCapacity >= _buffer.mutableCount + 1)
+    _internalInvariant(_buffer.mutableCapacity >= _buffer.mutableCount &+ 1)
 
-    _buffer.mutableCount = oldCount + 1
+    _buffer.mutableCount = oldCount &+ 1
     (_buffer.mutableFirstElementAddress + oldCount).initialize(to: newElement)
   }
 

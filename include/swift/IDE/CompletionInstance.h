@@ -15,8 +15,12 @@
 
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CancellableResult.h"
-#include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionContext.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/IDE/CodeCompletionResultSink.h"
 #include "swift/IDE/ConformingMethodList.h"
+#include "swift/IDE/ImportDepth.h"
+#include "swift/IDE/SwiftCompletionInfo.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -53,8 +57,9 @@ struct CompletionInstanceResult {
 
 /// The results returned from \c CompletionInstance::codeComplete.
 struct CodeCompleteResult {
-  MutableArrayRef<CodeCompletionResult *> Results;
+  CodeCompletionResultSink &ResultSink;
   SwiftCompletionInfo &Info;
+  ImportDepth ImportDep;
 };
 
 /// The results returned from \c CompletionInstance::typeContextInfo.
@@ -106,6 +111,7 @@ class CompletionInstance {
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
           Callback);
 
@@ -119,6 +125,7 @@ class CompletionInstance {
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
           Callback);
 
@@ -129,6 +136,14 @@ class CompletionInstance {
   /// In case of failure or cancellation, the callback receives the
   /// corresponding failed or cancelled result.
   ///
+  /// If \p CancellationFlag is not \c nullptr, code completion can be cancelled
+  /// by setting the flag to \c true.
+  /// IMPORTANT: If \p CancellationFlag is not \c nullptr, then completion might
+  /// be cancelled in the secon pass that's invoked inside \p Callback.
+  /// Therefore, \p Callback MUST check whether completion was cancelled before
+  /// interpreting the results, since invalid results may be returned in case
+  /// of cancellation.
+  ///
   /// NOTE: \p Args is only used for checking the equaity of the invocation.
   /// Since this function assumes that it is already normalized, exact the same
   /// arguments including their order is considered as the same invocation.
@@ -137,6 +152,7 @@ class CompletionInstance {
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
           Callback);
 
@@ -155,6 +171,7 @@ public:
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC, ide::CodeCompletionContext &CompletionContext,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback);
 
   void typeContextInfo(
@@ -162,6 +179,7 @@ public:
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<TypeContextInfoResult>)>
           Callback);
 
@@ -170,6 +188,7 @@ public:
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC, ArrayRef<const char *> ExpectedTypeNames,
+      std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<ConformingMethodListResults>)>
           Callback);
 };

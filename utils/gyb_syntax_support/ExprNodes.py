@@ -538,6 +538,13 @@ EXPR_NODES = [
                    is_optional=True),
          ]),
 
+    # e.g '(a|c)*', the contents of the literal is opaque to the C++ Swift
+    # parser though.
+    Node('RegexLiteralExpr', kind='Expr',
+         children=[
+             Child('Regex', kind='RegexLiteralToken'),
+         ]),
+
     # e.g. "\a.b[2].a"
     Node('KeyPathExpr', kind='Expr',
          children=[

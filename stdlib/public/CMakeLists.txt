@@ -79,15 +79,21 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
 
+  set(swift_demangling_cflags)
+
   # The old mangling support is only needed on platforms with ObjC.
   if(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
     list(APPEND swiftDemanglingSources
       "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
       "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
       )
-    set(swift_demangling_cflags -DSWIFT_SUPPORT_OLD_MANGLING=1)
+    list(APPEND swift_demangling_cflags -DSWIFT_SUPPORT_OLD_MANGLING=1)
   else()
-    set(swift_demangling_cflags -DSWIFT_SUPPORT_OLD_MANGLING=0)
+    list(APPEND swift_demangling_cflags -DSWIFT_SUPPORT_OLD_MANGLING=0)
+  endif()
+
+  if(SWIFT_STDLIB_HAS_TYPE_PRINTING)
+    list(APPEND swift_demangling_cflags -DSWIFT_STDLIB_HAS_TYPE_PRINTING)
   endif()
 
   add_swift_target_library(swiftDemangling OBJECT_LIBRARY

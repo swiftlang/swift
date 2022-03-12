@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name access_marker_mandatory -parse-as-library -Xllvm -sil-full-demangle -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -module-name access_marker_mandatory -parse-as-library -Xllvm -sil-full-demangle -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
 
 public struct S {
   var i: Int

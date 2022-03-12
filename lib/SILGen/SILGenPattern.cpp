@@ -1378,7 +1378,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     return emitBoolDispatch(rowsToSpecialize, arg, handler, failure);
   }
   llvm_unreachable("bad pattern kind");
-};
+}
 
 /// Given that we've broken down a source value into this subobject,
 /// and that we were supposed to use the given consumption rules on
@@ -3007,6 +3007,10 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
     // If we don't have a multi-pattern 'catch', we can emit the
     // body inline. Emit the statement here and bail early.
     if (clause->getCaseLabelItems().size() == 1) {
+      // Debug values for catch clause variables must be nested within a scope for
+      // the catch block to avoid name conflicts.
+      DebugScope scope(*this, CleanupLocation(clause));
+
       // If we have case body vars, set them up to point at the matching var
       // decls.
       if (clause->hasCaseBodyVariables()) {
@@ -3027,6 +3031,11 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
             // Ok, we found a match. Update the VarLocs for the case block.
             auto v = VarLocs[vd];
             VarLocs[expected] = v;
+
+            // Emit a debug description of the incoming arg, nested within the scope
+            // for the pattern match.
+            SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
+            B.emitDebugDescription(vd, v.value, dbgVar);
           }
         }
       }

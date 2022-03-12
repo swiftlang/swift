@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Mutex, ConditionVariable, Read/Write lock, and Scoped lock implementations
-// using Windows Slim Reader/Writer Locks and Conditional Variables.
+// Mutex and Read/Write lock implementations using Windows Slim
+// Reader/Writer Locks and Conditional Variables.
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,37 +24,14 @@
 
 namespace swift {
 
-typedef CONDITION_VARIABLE ConditionHandle;
-typedef SRWLOCK ConditionMutexHandle;
 typedef SRWLOCK MutexHandle;
 typedef SRWLOCK ReadWriteLockHandle;
 
-#define SWIFT_CONDITION_SUPPORTS_CONSTEXPR 1
 #define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 1
 #define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 1
 
-struct ConditionPlatformHelper {
-  static constexpr ConditionHandle staticInit() {
-    return CONDITION_VARIABLE_INIT;
-  };
-  static void init(ConditionHandle &condition) {
-    InitializeConditionVariable(&condition);
-  }
-  static void destroy(ConditionHandle &condition) {}
-  static void notifyOne(ConditionHandle &condition) {
-    WakeConditionVariable(&condition);
-  }
-  static void notifyAll(ConditionHandle &condition) {
-    WakeAllConditionVariable(&condition);
-  }
-  static void wait(ConditionHandle &condition, MutexHandle &mutex);
-};
-
 struct MutexPlatformHelper {
   static constexpr MutexHandle staticInit() { return SRWLOCK_INIT; }
-  static constexpr ConditionMutexHandle conditionStaticInit() {
-    return SRWLOCK_INIT;
-  }
   static void init(MutexHandle &mutex, bool checked = false) {
     InitializeSRWLock(&mutex);
   }

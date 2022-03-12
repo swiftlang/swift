@@ -59,7 +59,12 @@ func emitDecomp(
   _ data: [(UInt32, [UInt32])],
   into result: inout String
 ) {
-  emitMph(mph, name: "_swift_stdlib_nfd_decomp", into: &result)
+  emitMph(
+    mph,
+    name: "_swift_stdlib_nfd_decomp",
+    defineLabel: "NFD_DECOMP",
+    into: &result
+  )
   
   // Fixup the decomposed scalars first for fully decompositions.
   
@@ -179,23 +184,4 @@ func emitDecompIndices(
   }
   
   result += "\n};\n\n"
-}
-
-func emitDecompAccessor(_ mph: Mph, into result: inout String) {
-  result += """
-  SWIFT_RUNTIME_STDLIB_INTERNAL
-  const __swift_uint8_t * const _swift_stdlib_nfd_decompositions = _swift_stdlib_nfd_decomp;
-  
-  SWIFT_RUNTIME_STDLIB_INTERNAL
-  __swift_uint32_t _swift_stdlib_getDecompositionEntry(__swift_uint32_t scalar) {
-    __swift_intptr_t decompIdx = _swift_stdlib_getMphIdx(scalar, \(mph.bitArrays.count),
-                                                    _swift_stdlib_nfd_decomp_keys,
-                                                    _swift_stdlib_nfd_decomp_ranks,
-                                                    _swift_stdlib_nfd_decomp_sizes);
-  
-    return _swift_stdlib_nfd_decomp_indices[decompIdx];
-  }
-  
-  
-  """
 }

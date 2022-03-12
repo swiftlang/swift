@@ -15,7 +15,8 @@
 
 #include "CodeCompletion.h"
 #include "SourceKit/Core/LangSupport.h"
-#include "swift/IDE/CodeCompletion.h"
+//#include "swift/IDE/CodeCompletionContext.h"
+#include "swift/IDE/SwiftCompletionInfo.h"
 #include "llvm/ADT/StringMap.h"
 
 namespace swift {
@@ -45,6 +46,7 @@ struct Options {
   bool fuzzyMatching = true;
   bool annotatedDescription = false;
   bool includeObjectLiterals = true;
+  bool addCallWithNoDefaultArgs = true;
   unsigned minFuzzyLength = 2;
   unsigned showTopNonLiteralResults = 3;
 

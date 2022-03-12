@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
 
 struct MyType<TyA, TyB> { // expected-note {{generic type 'MyType' declared here}}
   // expected-note @-1 {{arguments to generic parameter 'TyB' ('S' and 'Int') are expected to be equal}}
@@ -131,6 +131,11 @@ func f(a : MyTypeWithHashable<Int, Int>) {
 class GenericClass<T> {
   typealias TA<U> = MyType<T, U>
   typealias TAI<U> = MyType<Int, U>
+
+  func testNestedUnbound(t: T) {
+    typealias Nested<X, Y> = MyType<X, Y>
+    _ = Nested(a: t, b: t)
+  }
 
   func testCapture<S>(s: S, t: T) -> TA<S> {
     return TA<S>(a: t, b: s)

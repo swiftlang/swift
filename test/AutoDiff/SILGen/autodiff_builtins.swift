@@ -101,8 +101,7 @@ func test_context_builtins() {
 // CHECK-LABEL: sil{{.*}}@test_context_builtins
 // CHECK: bb0:
 // CHECK:   [[CTX:%.*]] = builtin "autoDiffCreateLinearMapContext"({{%.*}} : $Builtin.Word) : $Builtin.NativeObject
-// CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [[CTX]] : $Builtin.NativeObject
+// CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [lexical] [[CTX]] : $Builtin.NativeObject
 // CHECK:   [[BUF:%.*]] = builtin "autoDiffProjectTopLevelSubcontext"([[BORROWED_CTX]] : $Builtin.NativeObject) : $Builtin.RawPointer
-// CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [[CTX]] : $Builtin.NativeObject
 // CHECK:   [[BUF:%.*]] = builtin "autoDiffAllocateSubcontext"([[BORROWED_CTX]] : $Builtin.NativeObject, {{.*}} : $Builtin.Word) : $Builtin.RawPointer
 // CHECK:   destroy_value [[CTX]]

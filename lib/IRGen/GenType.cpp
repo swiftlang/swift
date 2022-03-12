@@ -1117,16 +1117,16 @@ namespace {
   class OpaqueStorageTypeInfo final :
     public ScalarTypeInfo<OpaqueStorageTypeInfo, LoadableTypeInfo>
   {
-    llvm::IntegerType *ScalarType;
+    std::vector<llvm::IntegerType *> ScalarTypes;
   public:
     OpaqueStorageTypeInfo(llvm::ArrayType *storage,
-                          llvm::IntegerType *scalarType,
+                          std::vector<llvm::IntegerType *> &&scalarTypes,
                           Size size,
                           SpareBitVector &&spareBits,
                           Alignment align)
       : ScalarTypeInfo(storage, size, std::move(spareBits), align, IsPOD,
                        IsFixedSize),
-        ScalarType(scalarType)
+        ScalarTypes(std::move(scalarTypes))
     {}
     
     llvm::ArrayType *getStorageType() const {
@@ -1139,7 +1139,7 @@ namespace {
     }
 
     unsigned getExplosionSize() const override {
-      return 1;
+      return ScalarTypes.size();
     }
     
     void loadAsCopy(IRGenFunction &IGF, Address addr,
@@ -1149,8 +1149,18 @@ namespace {
     
     void loadAsTake(IRGenFunction &IGF, Address addr,
                     Explosion &explosion) const override {
-      addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
-      explosion.add(IGF.Builder.CreateLoad(addr));
+      auto index = ScalarTypes.size();
+      for (auto scalarTy : ScalarTypes) {
+        addr = IGF.Builder.CreateElementBitCast(addr, scalarTy);
+        explosion.add(IGF.Builder.CreateLoad(addr));
+        --index;
+        // Advance to next scalar chunk.
+        if (index > 0) {
+          addr = IGF.Builder.CreateElementBitCast(addr, IGF.IGM.Int8Ty);
+          auto currentScalarTypeSize = Size(scalarTy->getIntegerBitWidth()/8);
+          addr = IGF.Builder.CreateConstByteArrayGEP(addr, currentScalarTypeSize);
+        }
+      }
     }
 
     void assign(IRGenFunction &IGF, Explosion &explosion, Address addr,
@@ -1160,13 +1170,26 @@ namespace {
 
     void initialize(IRGenFunction &IGF, Explosion &explosion, Address addr,
                     bool isOutlined) const override {
-      addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
-      IGF.Builder.CreateStore(explosion.claimNext(), addr);
+      auto index = ScalarTypes.size();
+      for (auto scalarTy : ScalarTypes) {
+        addr = IGF.Builder.CreateElementBitCast(addr, scalarTy);
+        IGF.Builder.CreateStore(explosion.claimNext(), addr);
+        --index;
+        // Advance to next scalar chunk.
+        if (index > 0) {
+          addr = IGF.Builder.CreateElementBitCast(addr, IGF.IGM.Int8Ty);
+          auto currentScalarTypeSize = Size(scalarTy->getIntegerBitWidth()/8);
+          addr = IGF.Builder.CreateConstByteArrayGEP(addr, currentScalarTypeSize);
+        }
+      }
     }
     
     void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
                    Explosion &targetExplosion) const override {
-      targetExplosion.add(sourceExplosion.claimNext());
+      for (auto scalarTy : ScalarTypes) {
+        (void)scalarTy;
+        targetExplosion.add(sourceExplosion.claimNext());
+      }
     }
     
     void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
@@ -1176,11 +1199,17 @@ namespace {
 
     void consume(IRGenFunction &IGF, Explosion &explosion,
                  Atomicity atomicity) const override {
-      explosion.claimNext();
+      for (auto scalarTy: ScalarTypes) {
+        (void)scalarTy;
+        (void)explosion.claimNext();
+      }
     }
     
     void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const override {
-      explosion.claimNext();
+      for (auto scalarTy: ScalarTypes) {
+        (void)scalarTy;
+        (void)explosion.claimNext();
+      }
     }
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
@@ -1189,7 +1218,9 @@ namespace {
     }
     
     void getSchema(ExplosionSchema &schema) const override {
-      schema.add(ExplosionSchema::Element::forScalar(ScalarType));
+      for (auto scalarTy: ScalarTypes) {
+        schema.add(ExplosionSchema::Element::forScalar(scalarTy));
+      }
     }
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -1202,14 +1233,20 @@ namespace {
                              EnumPayload &payload,
                              Explosion &source,
                              unsigned offset) const override {
-      payload.insertValue(IGF, source.claimNext(), offset);
+      for (auto scalarTy: ScalarTypes) {
+        payload.insertValue(IGF, source.claimNext(), offset);
+        offset += scalarTy->getIntegerBitWidth();
+      }
     }
     
     void unpackFromEnumPayload(IRGenFunction &IGF,
                                const EnumPayload &payload,
                                Explosion &target,
                                unsigned offset) const override {
-      target.add(payload.extractValue(IGF, ScalarType, offset));
+      for (auto scalarTy : ScalarTypes) {
+        target.add(payload.extractValue(IGF, scalarTy, offset));
+        offset += scalarTy->getIntegerBitWidth();
+      }
     }
   };
 
@@ -1563,6 +1600,7 @@ IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   case ReferenceCounting::Block:
   case ReferenceCounting::Error:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
     llvm_unreachable("not implemented");
   }
 
@@ -1946,10 +1984,28 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size, Alignment align) {
   // Use an [N x i8] array for storage, but load and store as a single iNNN
   // scalar.
   auto storageType = llvm::ArrayType::get(IGM.Int8Ty, size.getValue());
-  auto intType = llvm::IntegerType::get(IGM.getLLVMContext(),
-                                        size.getValueInBits());
+
+  // Create chunks of MAX_INT_BITS integer scalar types if neccessary.
+  std::vector<llvm::IntegerType*> scalarTypes;
+  Size chunkSize = size;
+  auto maxChunkSize = Size(llvm::IntegerType::MAX_INT_BITS/8);
+  while (chunkSize) {
+    if (chunkSize > maxChunkSize) {
+      auto intType = llvm::IntegerType::get(IGM.getLLVMContext(),
+                                            maxChunkSize.getValueInBits());
+      scalarTypes.push_back(intType);
+      chunkSize -= maxChunkSize;
+      continue;
+    }
+    auto intType = llvm::IntegerType::get(IGM.getLLVMContext(),
+                                          chunkSize.getValueInBits());
+    scalarTypes.push_back(intType);
+    chunkSize = Size(0);
+  }
+
   // There are no spare bits in an opaque storage type.
-  auto type = new OpaqueStorageTypeInfo(storageType, intType, size,
+  auto type = new OpaqueStorageTypeInfo(storageType, std::move(scalarTypes),
+                    size,
                     SpareBitVector::getConstant(size.getValueInBits(), false),
                     align);
   
@@ -2102,7 +2158,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
@@ -2127,6 +2182,10 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
+  case TypeKind::ParameterizedProtocol:
+    return convertParameterizedProtocolType(cast<ParameterizedProtocolType>(ty));
+  case TypeKind::Existential:
+    return convertExistentialType(cast<ExistentialType>(ty));
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     llvm_unreachable("can't convert dependent type");
@@ -2140,6 +2199,9 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertBoxType(cast<SILBoxType>(ty));
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
+  case TypeKind::Pack:
+  case TypeKind::PackExpansion:
+    llvm_unreachable("Unimplemented!");
   }
   }
   llvm_unreachable("bad type kind");

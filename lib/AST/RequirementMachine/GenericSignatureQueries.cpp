@@ -38,22 +38,22 @@ RequirementMachine::getLocalRequirements(
   verify(term);
 
   GenericSignature::LocalRequirements result;
-  result.anchor = Context.getTypeForTerm(term, genericParams);
+  result.anchor = Map.getTypeForTerm(term, genericParams);
 
   auto *props = Map.lookUpProperties(term);
   if (!props)
     return result;
 
   if (props->isConcreteType()) {
-    result.concreteType = props->getConcreteType({}, term, Context);
+    result.concreteType = props->getConcreteType({}, term, Map);
     return result;
   }
 
   if (props->hasSuperclassBound()) {
-    result.superclass = props->getSuperclassBound({}, term, Context);
+    result.superclass = props->getSuperclassBound({}, term, Map);
   }
 
-  for (const auto *proto : props->getConformsToExcludingSuperclassConformances())
+  for (const auto *proto : props->getConformsTo())
     result.protos.push_back(const_cast<ProtocolDecl *>(proto));
 
   result.layout = props->getLayoutConstraint();
@@ -152,7 +152,7 @@ getSuperclassBound(Type depType,
   if (!props->hasSuperclassBound())
     return Type();
 
-  return props->getSuperclassBound(genericParams, term, Context);
+  return props->getSuperclassBound(genericParams, term, Map);
 }
 
 bool RequirementMachine::isConcreteType(Type depType) const {
@@ -183,7 +183,7 @@ getConcreteType(Type depType,
   if (!props->isConcreteType())
     return Type();
 
-  return props->getConcreteType(genericParams, term, Context);
+  return props->getConcreteType(genericParams, term, Map);
 }
 
 bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
@@ -227,12 +227,10 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
 
       auto conformsTo = props->getConformsTo();
 
-      for (const auto *proto : symbol.getProtocols()) {
-        // T.[P:A] is valid iff T conforms to P.
-        if (std::find(conformsTo.begin(), conformsTo.end(), proto)
-              == conformsTo.end())
-          return prefix;
-      }
+      // T.[P:A] is valid iff T conforms to P.
+      if (std::find(conformsTo.begin(), conformsTo.end(), symbol.getProtocol())
+            == conformsTo.end())
+        return prefix;
 
       break;
     }
@@ -240,6 +238,7 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
     case Symbol::Kind::Layout:
     case Symbol::Kind::Superclass:
     case Symbol::Kind::ConcreteType:
+    case Symbol::Kind::ConcreteConformance:
       llvm_unreachable("Property symbol cannot appear in a type term");
     }
 
@@ -259,26 +258,38 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
 /// concrete type).
 bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
   // Look for non-canonical type parameters.
-  return !type.findIf([&](Type component) -> bool {
-    if (!component->isTypeParameter())
-      return false;
+  class Walker : public TypeWalker {
+    const RequirementMachine &Self;
 
-    auto term = Context.getMutableTermForType(component->getCanonicalType(),
-                                              /*proto=*/nullptr);
+  public:
+    explicit Walker(const RequirementMachine &self) : Self(self) {}
 
-    System.simplify(term);
-    verify(term);
+    Action walkToTypePre(Type component) override {
+      if (!component->isTypeParameter())
+        return Action::Continue;
 
-    auto *props = Map.lookUpProperties(term);
-    if (!props)
-      return false;
+      auto term = Self.Context.getMutableTermForType(
+          component->getCanonicalType(),
+          /*proto=*/nullptr);
 
-    if (props->isConcreteType())
-      return true;
+      Self.System.simplify(term);
+      Self.verify(term);
 
-    auto anchor = Context.getTypeForTerm(term, {});
-    return CanType(anchor) != CanType(component);
-  });
+      auto anchor = Self.Map.getTypeForTerm(term, {});
+      if (CanType(anchor) != CanType(component))
+        return Action::Stop;
+
+      auto *props = Self.Map.lookUpProperties(term);
+      if (props && props->isConcreteType())
+        return Action::Stop;
+
+      // The parent of a canonical type parameter might be non-canonical
+      // because it is concrete.
+      return Action::SkipChildren;
+    }
+  };
+
+  return !type.walk(Walker(*this));
 }
 
 /// Unlike most other queries, the input type can be any type, not just a
@@ -340,7 +351,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
       if (props) {
         if (props->isConcreteType()) {
           auto concreteType = props->getConcreteType(genericParams,
-                                                     prefix, Context);
+                                                     prefix, Map);
           if (!concreteType->hasTypeParameter())
             return concreteType;
 
@@ -355,7 +366,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
         if (props->hasSuperclassBound() &&
             prefix.size() != term.size()) {
           auto superclass = props->getSuperclassBound(genericParams,
-                                                      prefix, Context);
+                                                      prefix, Map);
           if (!superclass->hasTypeParameter())
             return superclass;
 
@@ -364,7 +375,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
         }
       }
 
-      return Context.getTypeForTerm(prefix, genericParams);
+      return Map.getTypeForTerm(prefix, genericParams);
     }();
 
     // If T is already valid, the longest valid prefix U of T is T itself, and
@@ -389,7 +400,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
 
     // Compute the type of the unresolved suffix term V, rooted in the
     // generic parameter τ_0_0.
-    auto origType = Context.getRelativeTypeForTerm(term, prefix);
+    auto origType = Map.getRelativeTypeForTerm(term, prefix);
 
     // Substitute τ_0_0 in the above relative type with the concrete type
     // for U.
@@ -416,6 +427,19 @@ Type RequirementMachine::getCanonicalTypeInContext(
     // FIXME: Recursion guard is needed here
     return getCanonicalTypeInContext(substType, genericParams);
   });
+}
+
+/// Determine if the given type parameter is valid with respect to this
+/// requirement machine's generic signature.
+bool RequirementMachine::isValidTypeInContext(Type type) const {
+  assert(type->isTypeParameter());
+
+  auto term = Context.getMutableTermForType(type->getCanonicalType(),
+                                            /*proto=*/nullptr);
+  System.simplify(term);
+
+  auto prefix = getLongestValidPrefix(term);
+  return (prefix == term);
 }
 
 /// Retrieve the conformance access path used to extract the conformance of
@@ -536,7 +560,8 @@ RequirementMachine::getConformanceAccessPath(Type type,
       // A copy of the current path, populated as needed.
       SmallVector<ConformanceAccessPath::Entry, 4> entries;
 
-      for (const auto &req : lastProto->getRequirementSignature()) {
+      auto reqs = lastProto->getRequirementSignature().getRequirements();
+      for (const auto &req : reqs) {
         // We only care about conformance requirements.
         if (req.getKind() != RequirementKind::Conformance)
           continue;
@@ -662,4 +687,86 @@ RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
   }
 
   return nullptr;
+}
+
+void RequirementMachine::verify(const MutableTerm &term) const {
+#ifndef NDEBUG
+  // If the term is in the generic parameter domain, ensure we have a valid
+  // generic parameter.
+  if (term.begin()->getKind() == Symbol::Kind::GenericParam) {
+    auto *genericParam = term.begin()->getGenericParam();
+    TypeArrayView<GenericTypeParamType> genericParams = getGenericParams();
+    auto found = std::find(genericParams.begin(),
+                           genericParams.end(),
+                           genericParam);
+    if (found == genericParams.end()) {
+      llvm::errs() << "Bad generic parameter in " << term << "\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
+
+  MutableTerm erased;
+
+  // First, "erase" resolved associated types from the term, and try
+  // to simplify it again.
+  for (auto symbol : term) {
+    if (erased.empty()) {
+      switch (symbol.getKind()) {
+      case Symbol::Kind::Protocol:
+      case Symbol::Kind::GenericParam:
+        erased.add(symbol);
+        continue;
+
+      case Symbol::Kind::AssociatedType:
+        erased.add(Symbol::forProtocol(symbol.getProtocol(), Context));
+        break;
+
+      case Symbol::Kind::Name:
+      case Symbol::Kind::Layout:
+      case Symbol::Kind::Superclass:
+      case Symbol::Kind::ConcreteType:
+      case Symbol::Kind::ConcreteConformance:
+        llvm::errs() << "Bad initial symbol in " << term << "\n";
+        abort();
+        break;
+      }
+    }
+
+    switch (symbol.getKind()) {
+    case Symbol::Kind::Name:
+      assert(!erased.empty());
+      erased.add(symbol);
+      break;
+
+    case Symbol::Kind::AssociatedType:
+      erased.add(Symbol::forName(symbol.getName(), Context));
+      break;
+
+    case Symbol::Kind::Protocol:
+    case Symbol::Kind::GenericParam:
+    case Symbol::Kind::Layout:
+    case Symbol::Kind::Superclass:
+    case Symbol::Kind::ConcreteType:
+    case Symbol::Kind::ConcreteConformance:
+      llvm::errs() << "Bad interior symbol " << symbol << " in " << term << "\n";
+      abort();
+      break;
+    }
+  }
+
+  MutableTerm simplified = erased;
+  System.simplify(simplified);
+
+  // We should end up with the same term.
+  if (simplified != term) {
+    llvm::errs() << "Term verification failed\n";
+    llvm::errs() << "Initial term:    " << term << "\n";
+    llvm::errs() << "Erased term:     " << erased << "\n";
+    llvm::errs() << "Simplified term: " << simplified << "\n";
+    llvm::errs() << "\n";
+    dump(llvm::errs());
+    abort();
+  }
+#endif
 }

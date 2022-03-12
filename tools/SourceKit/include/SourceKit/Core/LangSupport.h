@@ -732,6 +732,11 @@ public:
   virtual void cancelled() = 0;
 };
 
+struct CompilationResult {
+  unsigned int ResultStatus;
+  llvm::ArrayRef<DiagnosticEntryInfo> Diagnostics;
+};
+
 class LangSupport {
   virtual void anchor();
 
@@ -749,24 +754,27 @@ public:
                            IndexingConsumer &Consumer,
                            ArrayRef<const char *> Args) = 0;
 
-  virtual void
-  codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
-               OptionsDictionary *options,
-               CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
-               Optional<VFSOptions> vfsOptions) = 0;
+  virtual void codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+                            OptionsDictionary *options,
+                            CodeCompletionConsumer &Consumer,
+                            ArrayRef<const char *> Args,
+                            Optional<VFSOptions> vfsOptions,
+                            SourceKitCancellationToken CancellationToken) = 0;
 
-  virtual void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
-                                unsigned offset, OptionsDictionary *options,
-                                ArrayRef<FilterRule> filterRules,
-                                GroupedCodeCompletionConsumer &consumer,
-                                ArrayRef<const char *> args,
-                                Optional<VFSOptions> vfsOptions) = 0;
+  virtual void
+  codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
+                   unsigned offset, OptionsDictionary *options,
+                   ArrayRef<FilterRule> filterRules,
+                   GroupedCodeCompletionConsumer &consumer,
+                   ArrayRef<const char *> args, Optional<VFSOptions> vfsOptions,
+                   SourceKitCancellationToken CancellationToken) = 0;
 
   virtual void codeCompleteClose(StringRef name, unsigned offset,
                                  GroupedCodeCompletionConsumer &consumer) = 0;
 
   virtual void codeCompleteUpdate(StringRef name, unsigned offset,
                                   OptionsDictionary *options,
+                                  SourceKitCancellationToken CancellationToken,
                                   GroupedCodeCompletionConsumer &consumer) = 0;
 
   virtual void codeCompleteCacheOnDisk(StringRef path) = 0;
@@ -923,20 +931,26 @@ public:
                           ArrayRef<const char *> Args,
                           DocInfoConsumer &Consumer) = 0;
 
-  virtual void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf,
-                                        unsigned Offset,
-                                        OptionsDictionary *options,
-                                        ArrayRef<const char *> Args,
-                                        TypeContextInfoConsumer &Consumer,
-                                        Optional<VFSOptions> vfsOptions) = 0;
+  virtual void getExpressionContextInfo(
+      llvm::MemoryBuffer *inputBuf, unsigned Offset, OptionsDictionary *options,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      TypeContextInfoConsumer &Consumer, Optional<VFSOptions> vfsOptions) = 0;
 
-  virtual void getConformingMethodList(llvm::MemoryBuffer *inputBuf,
-                                       unsigned Offset,
-                                       OptionsDictionary *options,
-                                       ArrayRef<const char *> Args,
-                                       ArrayRef<const char *> ExpectedTypes,
-                                       ConformingMethodListConsumer &Consumer,
-                                       Optional<VFSOptions> vfsOptions) = 0;
+  virtual void getConformingMethodList(
+      llvm::MemoryBuffer *inputBuf, unsigned Offset, OptionsDictionary *options,
+      ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedTypes,
+      SourceKitCancellationToken CancellationToken,
+      ConformingMethodListConsumer &Consumer,
+      Optional<VFSOptions> vfsOptions) = 0;
+
+  virtual void
+  performCompile(StringRef Name, ArrayRef<const char *> Args,
+                 Optional<VFSOptions> vfsOptions,
+                 SourceKitCancellationToken CancellationToken,
+                 std::function<void(const RequestResult<CompilationResult> &)>
+                     Receiver) = 0;
+
+  virtual void closeCompile(StringRef Name) = 0;
 
   virtual void getStatistics(StatisticsReceiver) = 0;
 };

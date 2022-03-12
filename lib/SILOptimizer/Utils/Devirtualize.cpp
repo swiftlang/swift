@@ -1073,7 +1073,7 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
 
   std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
-      wmi->getConformance(), wmi->getMember());
+      wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
 
   if (!f)
     return false;
@@ -1094,7 +1094,48 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
     return false;
   }
 
-  return true;
+  // FIXME: devirtualizeWitnessMethod below does not support cases with
+  // covariant 'Self' nested inside a collection type,
+  // like '[Self]' or '[* : Self]'.
+  const Type interfaceTy = wmi->getMember()
+                               .getDecl()
+                               ->getInterfaceType()
+                               // Skip the 'self' parameter.
+                               ->castTo<AnyFunctionType>()
+                               ->getResult();
+
+  if (!interfaceTy->hasTypeParameter())
+    return true;
+
+  class HasSelfNestedInsideCollection final : public TypeWalker {
+    unsigned CollectionDepth;
+
+  public:
+    Action walkToTypePre(Type T) override {
+      if (!T->hasTypeParameter())
+        return Action::SkipChildren;
+
+      if (auto *GP = T->getAs<GenericTypeParamType>()) {
+        // Only 'Self' will have zero depth in the type of a requirement.
+        if (GP->getDepth() == 0 && CollectionDepth)
+          return Action::Stop;
+      }
+
+      if (T->isArray() || T->isDictionary())
+        ++CollectionDepth;
+
+      return Action::Continue;
+    }
+
+    Action walkToTypePost(Type T) override {
+      if (T->isArray() || T->isDictionary())
+        --CollectionDepth;
+
+      return Action::Continue;
+    }
+  };
+
+  return !interfaceTy.walk(HasSelfNestedInsideCollection());
 }
 
 /// In the cases where we can statically determine the function that
@@ -1112,7 +1153,7 @@ swift::tryDevirtualizeWitnessMethod(ApplySite applySite,
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
 
   std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
-      wmi->getConformance(), wmi->getMember());
+      wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
 
   return devirtualizeWitnessMethod(applySite, f, wmi->getConformance(), ore);
 }

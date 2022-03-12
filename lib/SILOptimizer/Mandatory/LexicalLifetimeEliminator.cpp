@@ -30,7 +30,7 @@ class LexicalLifetimeEliminatorPass : public SILFunctionTransform {
     // run this pass since we want lexical lifetimes to exist later in the
     // pipeline.
     if (fn->getModule().getOptions().LexicalLifetimes ==
-        LexicalLifetimesOption::ExperimentalLate)
+        LexicalLifetimesOption::On)
       return;
 
     bool madeChange = false;

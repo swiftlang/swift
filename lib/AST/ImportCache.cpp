@@ -309,7 +309,7 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
   auto result = allocateArray(ctx, accessPaths);
   ShadowCache[key] = result;
   return result;
-};
+}
 
 ArrayRef<ImportedModule>
 swift::namelookup::getAllImports(const DeclContext *dc) {

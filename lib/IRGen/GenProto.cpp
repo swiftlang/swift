@@ -31,6 +31,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
@@ -672,6 +673,7 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
       emitDynamicTypeOfHeapObject(IGF, instanceRef,
                                   MetatypeRepresentation::Thick,
                                   instanceType,
+                                  Fn.getGenericSignature(),
                                   /*allow artificial subclasses*/ true);
     IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                           MetadataState::Complete);
@@ -735,6 +737,7 @@ void BindPolymorphicParameter::emit(Explosion &nativeParam, unsigned paramIndex)
     emitDynamicTypeOfHeapObject(IGF, instanceRef,
                                 MetatypeRepresentation::Thick,
                                 instanceType,
+                                SubstFnType->getInvocationGenericSignature(),
                                 /* allow artificial subclasses */ true);
   IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                         MetadataState::Complete);
@@ -943,7 +946,7 @@ static bool isDependentConformance(
 
   // Check whether any of the conformances are dependent.
   auto proto = conformance->getProtocol();
-  for (const auto &req : proto->getRequirementSignature()) {
+  for (const auto &req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 
@@ -1492,6 +1495,15 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
                                                       GenericSignature sig,
                                                       bool inProtocolContext) {
   // FIXME: If we can directly reference constant type metadata, do so.
+  
+  if (type->isForeignReferenceType()) {
+    type->getASTContext().Diags.diagnose(
+        type->lookThroughAllOptionalTypes()
+            ->getClassOrBoundGenericClass()
+            ->getLoc(),
+        diag::foreign_reference_types_unsupported.ID, {});
+    exit(1);
+  }
 
   // Form a reference to the mangled name for this type.
   assert(!type->hasArchetype() && "type cannot contain archetypes");
@@ -1968,8 +1980,11 @@ namespace {
                 Description.requiresSpecialization);
       // Instantiation function
       B.addRelativeAddressOrNull(Description.instantiationFn);
+
       // Private data
-      {
+      if (IGM.IRGen.Opts.NoPreallocatedInstantiationCaches) {
+        B.addInt32(0);
+      } else {
         auto privateDataTy =
           llvm::ArrayType::get(IGM.Int8PtrTy,
                                swift::NumGenericMetadataPrivateDataWords);
@@ -2311,6 +2326,7 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
 
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::CXXMethod:
     // May be polymorphic at the SIL level, but no type metadata is actually
     // passed.
     return false;
@@ -2883,7 +2899,7 @@ static void save(const NecessaryBindings &bindings, IRGenFunction &IGF,
           return transform(requirement, metadata);
         }
       });
-};
+}
 
 void NecessaryBindings::save(IRGenFunction &IGF, Address buffer,
                              Explosion &source) const {
@@ -3638,10 +3654,8 @@ IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
                                      /*varargs*/ false);
   }
 
-  auto attrs = llvm::AttributeList::get(getLLVMContext(),
-                                       llvm::AttributeList::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
-
+  auto attrs = llvm::AttributeList().addFnAttribute(getLLVMContext(),
+                                                    llvm::Attribute::NoUnwind);
   return Signature(fnType, attrs, SwiftCC);
 }
 
@@ -3720,6 +3734,11 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
                                                false)
                           .getIntValue());
         });
+
+        // Need to pad the structure after generic parameters
+        // up to four bytes because generic requirements that
+        // follow expect that alignment.
+        fields.addAlignmentPadding(Alignment(4));
 
         // Generic requirements
         irgen::addGenericRequirements(*this, fields, signature,

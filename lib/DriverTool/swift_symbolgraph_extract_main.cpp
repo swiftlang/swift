@@ -23,6 +23,7 @@
 #include "swift/Option/Options.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -182,8 +183,9 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
             .Default(AccessLevel::Public);
   }
 
-  if (CI.setup(Invocation)) {
-    llvm::outs() << "Failed to setup compiler instance\n";
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::outs() << InstanceSetupError << '\n';
     return EXIT_FAILURE;
   }
 

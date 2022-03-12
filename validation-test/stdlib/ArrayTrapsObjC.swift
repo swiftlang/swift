@@ -4,6 +4,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// Temporarily disable for backdeployment (rdar://89821303)
+// UNSUPPORTED: use_os_stdlib
+
 import StdlibUnittest
 import Foundation
 
@@ -124,6 +127,9 @@ class ViolateInoutSafetySwitchToObjcBuffer {
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()
     for i in 0..<A.count {
+      // Note: the compiler is sometimes able to eliminate this
+      // `_checkSubscript` call when optimizations are enabled, skipping the
+      // exclusivity check contained within.
       let t = A._checkSubscript(
         i, wasNativeTypeChecked: isNativeTypeChecked)
       _ = A._getElement(
@@ -141,11 +147,11 @@ class ViolateInoutSafetySwitchToObjcBuffer {
 
 ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
   .skip(.custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+    { !_isDebugAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -O or -Ounchecked"))
   .crashOutputMatches(
-    !_isDebugAssertConfiguration() ? ""
-    : hasBackdeployedConcurrencyRuntime() ? "inout rules were violated"
+    hasBackdeployedConcurrencyRuntime()
+    ? "inout rules were violated"
     : "Fatal access conflict detected."
   )
   .code {
@@ -170,6 +176,9 @@ class ViolateInoutSafetyNeedElementTypeCheck {
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()
     for i in 0..<A.count {
+      // Note: the compiler is sometimes able to eliminate this
+      // `_checkSubscript` call when optimizations are enabled, skipping the
+      // exclusivity check contained within.
       let t = A._checkSubscript(
         i, wasNativeTypeChecked: isNativeTypeChecked)
       _ = A._getElement(
@@ -187,11 +196,11 @@ class ViolateInoutSafetyNeedElementTypeCheck {
 
 ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
   .skip(.custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+    { !_isDebugAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -O or -Ounchecked"))
   .crashOutputMatches(
-    !_isDebugAssertConfiguration() ? ""
-    : hasBackdeployedConcurrencyRuntime() ? "inout rules were violated"
+    hasBackdeployedConcurrencyRuntime()
+    ? "inout rules were violated"
     : "Fatal access conflict detected."
   )
   .code {

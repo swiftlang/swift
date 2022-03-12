@@ -78,28 +78,6 @@ TypeChecker::gatherGenericParamBindingsText(
   return result.str().str();
 }
 
-// An alias to avoid repeating the `SmallVector`'s size parameter.
-using CollectedOpaqueReprs = SmallVector<OpaqueReturnTypeRepr *, 2>;
-
-/// Walk `repr` recursively, collecting any `OpaqueReturnTypeRepr`s.
-static CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *repr) {
-  class Walker : public ASTWalker {
-    CollectedOpaqueReprs &Reprs;
-
-  public:
-    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
-
-    bool walkToTypeReprPre(TypeRepr *repr) override {
-      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
-        Reprs.push_back(opaqueRepr);
-      return true;
-    }
-  };
-
-  CollectedOpaqueReprs reprs;
-  repr->walk(Walker(reprs));
-  return reprs;
-}
 
 //
 // Generic functions
@@ -114,14 +92,6 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   assert(repr && "Declaration does not have an opaque result type");
   auto *dc = originatingDecl->getInnermostDeclContext();
   auto &ctx = dc->getASTContext();
-
-  // Support for structural opaque result types is hidden behind a compiler flag
-  // until the proposal gets approved.
-  if (!ctx.LangOpts.EnableExperimentalStructuralOpaqueTypes &&
-      !isa<OpaqueReturnTypeRepr>(repr)) {
-    ctx.Diags.diagnose(repr->getLoc(), diag::structural_opaque_types_are_experimental);
-    return nullptr;
-  }
 
   // Protocol requirements can't have opaque return types.
   //
@@ -186,93 +156,104 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
           ? outerGenericSignature.getGenericParams().back()->getDepth() + 1
           : 0;
 
-  SmallVector<GenericTypeParamType *, 2> genericParamTypes;
-  SmallVector<Requirement, 2> requirements;
-
-  auto opaqueReprs = collectOpaqueReturnTypeReprs(repr);
-  if (opaqueReprs.size() > 1) {
-    ctx.Diags.diagnose(repr->getLoc(), diag::more_than_one_opaque_type, repr);
-    return nullptr;
-  }
-
-  // TODO [OPAQUE SUPPORT]: right now we only allow one structural 'some' type,
-  // but *very* soon we will allow more than one such type.
-  for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
-    auto *currentRepr = opaqueReprs[i];
-
-    // Usually, we resolve the opaque constraint and bail if it isn't a class or
-    // existential type (see below). However, in this case we know we will fail,
-    // so we can bail early and provide a better diagnostic.
-    if (auto *optionalRepr =
-            dyn_cast<OptionalTypeRepr>(currentRepr->getConstraint())) {
-      std::string buf;
-      llvm::raw_string_ostream stream(buf);
-      stream << "(some " << optionalRepr->getBase() << ")?";
-
-      ctx.Diags.diagnose(currentRepr->getLoc(),
-                         diag::opaque_type_invalid_constraint);
-      ctx.Diags
-          .diagnose(currentRepr->getLoc(), diag::opaque_of_optional_rewrite)
-          .fixItReplaceChars(currentRepr->getStartLoc(),
-                             currentRepr->getEndLoc(), stream.str());
-      return nullptr;
-    }
-
-    auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
-                                                opaqueSignatureDepth, i, ctx);
-    genericParamTypes.push_back(paramType);
-
-    // Try to resolve the constraint repr in the parent decl context. It should
-    // be some kind of existential type. Pass along the error type if resolving
-    // the repr failed.
-    auto constraintType = TypeResolution::forInterface(
-                              dc, TypeResolverContext::GenericRequirement,
-                              // Unbound generics and placeholders are
-                              // meaningless in opaque types.
-                              /*unboundTyOpener*/ nullptr,
-                              /*placeholderHandler*/ nullptr)
-                              .resolveType(currentRepr->getConstraint());
-
-    if (constraintType->hasError())
-      return nullptr;
-
-    // Error out if the constraint type isn't a class or existential type.
-    if (!constraintType->getClassOrBoundGenericClass() &&
-        !constraintType->isExistentialType()) {
-      ctx.Diags.diagnose(currentRepr->getLoc(),
-                         diag::opaque_type_invalid_constraint);
-      return nullptr;
-    }
-
-    if (constraintType->hasArchetype())
-      constraintType = constraintType->mapTypeOutOfContext();
-
-    if (constraintType->getClassOrBoundGenericClass()) {
-      requirements.push_back(
-          Requirement(RequirementKind::Superclass, paramType, constraintType));
-    } else {
-      // In this case, the constraint type is an existential
-      requirements.push_back(
-          Requirement(RequirementKind::Conformance, paramType, constraintType));
-    }
-  }
-
-  auto interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
-                                                  genericParamTypes,
-                                                  std::move(requirements));
-
-  // Create the OpaqueTypeDecl for the result type.
-  // It has the same parent context and generic environment as the originating
-  // decl.
+  // Determine the context of the opaque type declaration we'll be creating.
   auto parentDC = originatingDecl->getDeclContext();
   auto originatingGenericContext = originatingDecl->getAsGenericContext();
-  GenericParamList *genericParams = originatingGenericContext
-    ? originatingGenericContext->getGenericParams()
-    : nullptr;
+  GenericParamList *genericParams;
+  GenericSignature interfaceSignature;
+  CollectedOpaqueReprs opaqueReprs;
+  if (auto namedOpaque = dyn_cast<NamedOpaqueReturnTypeRepr>(repr)) {
+    // Produce the generic signature for the opaque type.
+    genericParams = namedOpaque->getGenericParams();
+    genericParams->setDepth(opaqueSignatureDepth);
 
-  auto opaqueDecl = new (ctx)
-      OpaqueTypeDecl(originatingDecl, genericParams, parentDC,
-                     interfaceSignature, opaqueReprs[0], genericParamTypes[0]);
+    InferredGenericSignatureRequest request{
+        originatingDC->getParentModule(),
+        outerGenericSignature.getPointer(),
+        genericParams,
+        WhereClauseOwner(originatingDC, genericParams),
+        /*addedRequirements=*/{},
+        /*inferenceSources=*/{},
+        /*allowConcreteGenericParams=*/false};
+
+    interfaceSignature = evaluateOrDefault(
+        ctx.evaluator, request, GenericSignatureWithError())
+          .getPointer();
+    if (!interfaceSignature) {
+      // Already produced an error.
+      return nullptr;
+    }
+  } else {
+    opaqueReprs = repr->collectOpaqueReturnTypeReprs();
+    SmallVector<GenericTypeParamType *, 2> genericParamTypes;
+    SmallVector<Requirement, 2> requirements;
+    for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
+      auto *currentRepr = opaqueReprs[i];
+
+      // Usually, we resolve the opaque constraint and bail if it isn't a class
+      // or existential type (see below). However, in this case we know we will
+      // fail, so we can bail early and provide a better diagnostic.
+      if (auto *optionalRepr =
+              dyn_cast<OptionalTypeRepr>(currentRepr->getConstraint())) {
+        std::string buf;
+        llvm::raw_string_ostream stream(buf);
+        stream << "(some " << optionalRepr->getBase() << ")?";
+
+        ctx.Diags.diagnose(currentRepr->getLoc(),
+                           diag::opaque_type_invalid_constraint);
+        ctx.Diags
+            .diagnose(currentRepr->getLoc(), diag::opaque_of_optional_rewrite)
+            .fixItReplaceChars(currentRepr->getStartLoc(),
+                               currentRepr->getEndLoc(), stream.str());
+        return nullptr;
+      }
+
+      auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
+                                                  opaqueSignatureDepth, i, ctx);
+      genericParamTypes.push_back(paramType);
+
+      // Try to resolve the constraint repr in the parent decl context. It
+      // should be some kind of existential type. Pass along the error type if
+      // resolving the repr failed.
+      auto constraintType = TypeResolution::forInterface(
+                                dc, TypeResolverContext::GenericRequirement,
+                                // Unbound generics and placeholders are
+                                // meaningless in opaque types.
+                                /*unboundTyOpener*/ nullptr,
+                                /*placeholderHandler*/ nullptr)
+                                .resolveType(currentRepr->getConstraint());
+
+      if (constraintType->hasError())
+        return nullptr;
+
+      RequirementKind kind;
+      if (constraintType->isConstraintType())
+        kind = RequirementKind::Conformance;
+      else if (constraintType->getClassOrBoundGenericClass())
+        kind = RequirementKind::Superclass;
+      else {
+        // Error out if the constraint type isn't a class or existential type.
+        ctx.Diags.diagnose(currentRepr->getLoc(),
+                           diag::opaque_type_invalid_constraint);
+        return nullptr;
+      }
+
+      assert(!constraintType->hasArchetype());
+      requirements.emplace_back(kind, paramType, constraintType);
+    }
+
+    interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
+                                               genericParamTypes,
+                                               std::move(requirements));
+    genericParams = originatingGenericContext
+        ? originatingGenericContext->getGenericParams()
+        : nullptr;
+  }
+
+  // Create the OpaqueTypeDecl for the result type.
+  auto opaqueDecl = OpaqueTypeDecl::get(
+      originatingDecl, genericParams, parentDC, interfaceSignature,
+      opaqueReprs);
   opaqueDecl->copyFormalAccessFrom(originatingDecl);
   if (auto originatingSig = originatingDC->getGenericSignatureOfContext()) {
     opaqueDecl->setGenericSignature(originatingSig);
@@ -285,6 +266,28 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                    /*unboundTyOpener*/ nullptr,
                                    /*placeholderHandler*/ nullptr)
           .resolveType(repr);
+
+  // Opaque types cannot be used in parameter position.
+  Type desugared = interfaceType->getDesugaredType();
+  bool hasError = desugared.findIf([&](Type type) -> bool {
+    if (auto *fnType = type->getAs<FunctionType>()) {
+      for (auto param : fnType->getParams()) {
+        if (!param.getPlainType()->hasOpaqueArchetype())
+          continue;
+
+        ctx.Diags.diagnose(repr->getLoc(),
+                           diag::opaque_type_in_parameter,
+                           false, interfaceType);
+        return true;
+      }
+    }
+
+    return false;
+  });
+
+  if (hasError)
+    return nullptr;
+
   auto metatype = MetatypeType::get(interfaceType);
   opaqueDecl->setInterfaceType(metatype);
   return opaqueDecl;
@@ -504,7 +507,6 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
       // Produce an error that this generic parameter cannot be bound.
       paramDecl->diagnose(diag::unreferenced_generic_parameter,
                           paramDecl->getNameStr());
-      decl->setInvalid();
     }
   }
 }
@@ -527,6 +529,18 @@ static Type formExtensionInterfaceType(
   if (type->is<ProtocolCompositionType>())
     type = type->getCanonicalType();
 
+  // A parameterized protocol type is not a nominal. Unwrap it to get
+  // the underlying nominal, and record a same-type requirement for
+  // the primary associated type.
+  if (auto *paramProtoTy = type->getAs<ParameterizedProtocolType>()) {
+    auto *protoTy = paramProtoTy->getBaseType();
+    type = protoTy;
+
+    paramProtoTy->getRequirements(
+        protoTy->getDecl()->getSelfInterfaceType(),
+        sameTypeReqs);
+  }
+
   Type parentType = type->getNominalParent();
   GenericTypeDecl *genericDecl = type->getAnyGeneric();
 
@@ -545,8 +559,8 @@ static Type formExtensionInterfaceType(
   auto nominal = dyn_cast<NominalTypeDecl>(genericDecl);
   auto typealias = dyn_cast<TypeAliasDecl>(genericDecl);
   if (!nominal) {
-    Type underlyingType = typealias->getUnderlyingType();
-    nominal = underlyingType->getNominalOrBoundGenericNominal();
+    type = typealias->getUnderlyingType();
+    nominal = type->getNominalOrBoundGenericNominal();
   }
 
   // Form the result.
@@ -624,10 +638,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       llvm::errs() << "\n";
       PD->printContext(llvm::errs());
       llvm::errs() << "Generic signature: ";
-      sig->print(llvm::errs());
+      PrintOptions Opts;
+      Opts.ProtocolQualifiedDependentMemberTypes = true;
+      sig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
       llvm::errs() << "Canonical generic signature: ";
-      sig.getCanonicalSignature()->print(llvm::errs());
+      sig.getCanonicalSignature()->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
     return sig;
@@ -728,7 +744,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
           return nullptr;
         }
       }();
-      if (resultTypeRepr && !isa<OpaqueReturnTypeRepr>(resultTypeRepr)) {
+      if (resultTypeRepr && !resultTypeRepr->hasOpaque()) {
         const auto resultType =
             resolution.withOptions(TypeResolverContext::FunctionResult)
                 .resolveType(resultTypeRepr);
@@ -785,10 +801,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       GC->printContext(llvm::errs());
     }
     llvm::errs() << "Generic signature: ";
-    sig->print(llvm::errs());
+    PrintOptions Opts;
+    Opts.ProtocolQualifiedDependentMemberTypes = true;
+    sig->print(llvm::errs(), Opts);
     llvm::errs() << "\n";
     llvm::errs() << "Canonical generic signature: ";
-    sig.getCanonicalSignature()->print(llvm::errs());
+    sig.getCanonicalSignature()->print(llvm::errs(), Opts);
     llvm::errs() << "\n";
   }
 
@@ -800,7 +818,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 ///
 
 RequirementCheckResult TypeChecker::checkGenericArguments(
-    DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
+    ModuleDecl *module, SourceLoc loc, SourceLoc noteLoc, Type owner,
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
@@ -815,7 +833,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   SmallVector<RequirementSet, 8> pendingReqs;
   pendingReqs.push_back({requirements, {}});
 
-  auto *module = dc->getParentModule();
   ASTContext &ctx = module->getASTContext();
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
@@ -824,14 +841,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       auto req = rawReq;
       if (current.Parents.empty()) {
         auto substed = rawReq.subst(
-            [&](SubstitutableType *type) -> Type {
-              auto substType = substitutions(type);
-              if (substType->hasTypeParameter())
-                return dc->mapTypeIntoContext(substType);
-              return substType;
-            },
-            LookUpConformanceInModule(module),
-            options);
+            substitutions, LookUpConformanceInModule(module), options);
         if (!substed) {
           // Another requirement will fail later; just continue.
           valid = false;
@@ -956,8 +966,16 @@ RequirementRequest::evaluate(Evaluator &evaluator,
                              WhereClauseOwner owner,
                              unsigned index,
                              TypeResolutionStage stage) const {
+  auto &reqRepr = getRequirement();
+
   // Figure out the type resolution.
-  auto options = TypeResolutionOptions(TypeResolverContext::GenericRequirement);
+  TypeResolverContext context;
+  if (reqRepr.getKind() == RequirementReprKind::SameType) {
+    context = TypeResolverContext::SameTypeRequirement;
+  } else {
+    context = TypeResolverContext::GenericRequirement;
+  }
+  auto options = TypeResolutionOptions(context);
   if (owner.dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
   Optional<TypeResolution> resolution;
@@ -973,12 +991,8 @@ RequirementRequest::evaluate(Evaluator &evaluator,
                                               /*unboundTyOpener*/ nullptr,
                                               /*placeholderHandler*/ nullptr);
     break;
-
-  case TypeResolutionStage::Contextual:
-    llvm_unreachable("No clients care about this. Use mapTypeIntoContext()");
   }
 
-  auto &reqRepr = getRequirement();
   switch (reqRepr.getKind()) {
   case RequirementReprKind::TypeConstraint: {
     Type subject = resolution->resolveType(reqRepr.getSubjectRepr());

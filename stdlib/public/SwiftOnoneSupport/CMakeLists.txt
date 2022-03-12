@@ -10,7 +10,7 @@ set(swiftOnoneSupport_common_options
   SWIFT_COMPILE_FLAGS "-parse-stdlib" "-Xllvm" "-sil-inline-generics=false" "-Xfrontend" "-validate-tbd-against-ir=none" "-Xfrontend" "-check-onone-completeness" "-Xfrontend" "-disable-access-control" "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND ${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND ${BOOTSTRAPPING_MODE} STREQUAL "BOOTSTRAPPING")
 
   set(swiftOnoneSupport_common_bootstrapping_options
     SHARED
@@ -27,16 +27,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND ${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTST
     FILE_DEPENDS swiftCore-bootstrapping0
     BOOTSTRAPPING 0)
 
-  add_dependencies(bootstrapping0-corelib swiftSwiftOnoneSupport-bootstrapping0)
-
   # Bootstrapping - stage 1
 
   add_swift_target_library_single(swiftSwiftOnoneSupport-bootstrapping1 swiftSwiftOnoneSupport
     ${swiftOnoneSupport_common_bootstrapping_options}
     FILE_DEPENDS swiftCore-bootstrapping1
     BOOTSTRAPPING 1)
-
-  add_dependencies(bootstrapping1-corelib swiftSwiftOnoneSupport-bootstrapping1)
 
 endif()
 

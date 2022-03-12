@@ -12,7 +12,7 @@ class Blah<T: P> {
 
 // Mangled name of the anonymous descriptor
 // CHECK-NOT: private constant [84 x i8] c"$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV\00"
-// CHECK-MANGLED: [[INNER_MANGLED:@[0-9]+]] = private constant [84 x i8] c"$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV\00"
+// CHECK-MANGLED: [[INNER_MANGLED:@.str.[0-9]+]] = private constant [84 x i8] c"$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV\00"
 
 // Anonymous descriptor
 // CHECK: @"$s29anonymous_context_descriptors4BlahC5Inner33{{.*}}MXX" =

@@ -42,13 +42,17 @@ class FunctionArgApplyInfo;
 class FailureDiagnostic {
   const Solution &S;
   ConstraintLocator *Locator;
+  bool isWarning;
 
 public:
-  FailureDiagnostic(const Solution &solution, ConstraintLocator *locator)
-      : S(solution), Locator(locator) {}
+  FailureDiagnostic(const Solution &solution, ConstraintLocator *locator,
+                    bool isWarning = false)
+      : S(solution), Locator(locator), isWarning(isWarning) {}
 
-  FailureDiagnostic(const Solution &solution, ASTNode anchor)
-      : FailureDiagnostic(solution, solution.getConstraintLocator(anchor)) {}
+  FailureDiagnostic(const Solution &solution, ASTNode anchor,
+                    bool isWarning = false)
+      : FailureDiagnostic(solution, solution.getConstraintLocator(anchor),
+                          isWarning) { }
 
   virtual ~FailureDiagnostic();
 
@@ -329,7 +333,7 @@ private:
   /// Retrieve generic signature where this parameter originates from.
   GenericSignature getSignature(ConstraintLocator *locator);
 
-  void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
+  void maybeEmitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
 
   /// If this is a failure in conditional requirement, retrieve
   /// conformance information.
@@ -601,7 +605,7 @@ class ContextualFailure : public FailureDiagnostic {
 
 public:
   ContextualFailure(const Solution &solution, Type lhs, Type rhs,
-                    ConstraintLocator *locator)
+                    ConstraintLocator *locator, bool isWarning = false)
       : ContextualFailure(
             solution,
             locator->isForContextualType()
@@ -609,12 +613,13 @@ public:
                       .getPurpose()
                 : solution.getConstraintSystem().getContextualTypePurpose(
                       locator->getAnchor()),
-            lhs, rhs, locator) {}
+            lhs, rhs, locator, isWarning) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
-                    Type lhs, Type rhs, ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), CTP(purpose), RawFromType(lhs),
-        RawToType(rhs) {
+                    Type lhs, Type rhs, ConstraintLocator *locator,
+                    bool isWarning = false)
+      : FailureDiagnostic(solution, locator, isWarning), CTP(purpose),
+        RawFromType(lhs), RawToType(rhs) {
     assert(lhs && "Expected a valid 'from' type");
     assert(rhs && "Expected a valid 'to' type");
   }
@@ -753,8 +758,9 @@ public:
 
   AttributedFuncToTypeConversionFailure(const Solution &solution, Type fromType,
                                         Type toType, ConstraintLocator *locator,
-                                        AttributeKind attributeKind)
-      : ContextualFailure(solution, fromType, toType, locator),
+                                        AttributeKind attributeKind,
+                                        bool isWarning = false)
+      : ContextualFailure(solution, fromType, toType, locator, isWarning),
         attributeKind(attributeKind) {}
 
   bool diagnoseAsError() override;
@@ -777,8 +783,9 @@ private:
 class DroppedGlobalActorFunctionAttr final : public ContextualFailure {
 public:
   DroppedGlobalActorFunctionAttr(const Solution &solution, Type fromType,
-                                 Type toType, ConstraintLocator *locator)
-      : ContextualFailure(solution, fromType, toType, locator) {}
+                                 Type toType, ConstraintLocator *locator,
+                                 bool isWarning)
+    : ContextualFailure(solution, fromType, toType, locator, isWarning) { }
 
   bool diagnoseAsError() override;
 };
@@ -1753,6 +1760,14 @@ public:
   bool diagnoseAsError() override;
 };
 
+class NotCompileTimeConstFailure final : public FailureDiagnostic {
+public:
+  NotCompileTimeConstFailure(const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a contextual mismatch between expected collection element type
 /// and the one provided (e.g. source of the assignment or argument to a call)
 /// e.g.:
@@ -1934,8 +1949,9 @@ class ArgumentMismatchFailure : public ContextualFailure {
 
 public:
   ArgumentMismatchFailure(const Solution &solution, Type argType,
-                          Type paramType, ConstraintLocator *locator)
-      : ContextualFailure(solution, argType, paramType, locator),
+                          Type paramType, ConstraintLocator *locator,
+                          bool warning = false)
+      : ContextualFailure(solution, argType, paramType, locator, warning),
         Info(*getFunctionArgApplyInfo(getLocator())) {}
 
   bool diagnoseAsError() override;
@@ -2104,16 +2120,15 @@ public:
 /// ```
 class NonEphemeralConversionFailure final : public ArgumentMismatchFailure {
   ConversionRestrictionKind ConversionKind;
-  bool DowngradeToWarning;
 
 public:
   NonEphemeralConversionFailure(const Solution &solution,
                                 ConstraintLocator *locator, Type fromType,
                                 Type toType,
                                 ConversionRestrictionKind conversionKind,
-                                bool downgradeToWarning)
-      : ArgumentMismatchFailure(solution, fromType, toType, locator),
-        ConversionKind(conversionKind), DowngradeToWarning(downgradeToWarning) {
+                                bool warning)
+      : ArgumentMismatchFailure(solution, fromType, toType, locator, warning),
+        ConversionKind(conversionKind) {
   }
 
   bool diagnoseAsError() override;
@@ -2646,6 +2661,28 @@ public:
   SwiftToCPointerConversionInInvalidContext(const Solution &solution,
                                             ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where the type of default expression doesn't
+/// match expected type of the argument i.e. generic parameter type
+/// was inferred from result:
+///
+/// \code
+/// func test<T>(_: T = 42) -> T { ... }
+///
+/// let _: String = test() // conflict between `String` and `Int`.
+/// \endcode
+class DefaultExprTypeMismatch final : public ContextualFailure {
+public:
+  DefaultExprTypeMismatch(const Solution &solution, Type argType,
+                          Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(solution, argType, paramType, locator) {}
+
+  SourceLoc getLoc() const override {
+    return constraints::getLoc(getLocator()->getAnchor());
+  }
 
   bool diagnoseAsError() override;
 };

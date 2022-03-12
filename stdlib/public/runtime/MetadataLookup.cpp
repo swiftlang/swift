@@ -263,6 +263,7 @@ _registerTypeMetadataRecords(TypeMetadataPrivateState &T,
 }
 
 void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
+    const void *baseAddress,
     const void *records, uintptr_t recordsSize) {
   assert(recordsSize % sizeof(TypeMetadataRecord) == 0
          && "weird-sized type metadata section?!");
@@ -282,10 +283,12 @@ void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
                                recordsBegin, recordsEnd);
 }
 
-void swift::addImageTypeMetadataRecordBlockCallback(const void *records,
+void swift::addImageTypeMetadataRecordBlockCallback(const void *baseAddress,
+                                                    const void *records,
                                                     uintptr_t recordsSize) {
   TypeMetadataRecords.get();
-  addImageTypeMetadataRecordBlockCallbackUnsafe(records, recordsSize);
+  addImageTypeMetadataRecordBlockCallbackUnsafe(baseAddress,
+                                                records, recordsSize);
 }
 
 void
@@ -429,7 +432,9 @@ ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
     result.ImportInfo->collect</*asserting*/true>(component);
   }
 
+#ifndef NDEBUG
   assert(stage != AfterName && "no components?");
+#endif
 
   // Record the full identity.
   result.FullIdentity =
@@ -832,7 +837,8 @@ _registerProtocols(ProtocolMetadataPrivateState &C,
   C.SectionsToScan.push_back(ProtocolSection{begin, end});
 }
 
-void swift::addImageProtocolsBlockCallbackUnsafe(const void *protocols,
+void swift::addImageProtocolsBlockCallbackUnsafe(const void *baseAddress,
+                                                 const void *protocols,
                                                  uintptr_t protocolsSize) {
   assert(protocolsSize % sizeof(ProtocolRecord) == 0 &&
          "protocols section not a multiple of ProtocolRecord");
@@ -849,10 +855,11 @@ void swift::addImageProtocolsBlockCallbackUnsafe(const void *protocols,
                      recordsBegin, recordsEnd);
 }
 
-void swift::addImageProtocolsBlockCallback(const void *protocols,
+void swift::addImageProtocolsBlockCallback(const void *baseAddress,
+                                           const void *protocols,
                                            uintptr_t protocolsSize) {
   Protocols.get();
-  addImageProtocolsBlockCallbackUnsafe(protocols, protocolsSize);
+  addImageProtocolsBlockCallbackUnsafe(baseAddress, protocols, protocolsSize);
 }
 
 void swift::swift_registerProtocols(const ProtocolRecord *begin,
@@ -1307,8 +1314,10 @@ public:
   using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
 
-  BuiltType decodeMangledType(NodePointer node) {
-    return Demangle::decodeMangledType(*this, node).getType();
+  BuiltType decodeMangledType(NodePointer node,
+                              bool forRequirement = true) {
+    return Demangle::decodeMangledType(*this, node, forRequirement)
+        .getType();
   }
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
@@ -1452,6 +1461,9 @@ public:
 #define BUILTIN_TYPE(Symbol, _) \
     if (mangledName.equals(#Symbol)) \
       return &METADATA_SYM(Symbol).base;
+#if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
+#endif
 #include "swift/Runtime/BuiltinTypes.def"
     return BuiltType();
   }
@@ -1476,7 +1488,8 @@ public:
 
   TypeLookupErrorOr<BuiltType>
   createProtocolCompositionType(llvm::ArrayRef<BuiltProtocolDecl> protocols,
-                                BuiltType superclass, bool isClassBound) const {
+                                BuiltType superclass, bool isClassBound,
+                                bool forRequirement = true) const {
     // Determine whether we have a class bound.
     ProtocolClassConstraint classConstraint = ProtocolClassConstraint::Any;
     if (isClassBound || superclass) {
@@ -1492,6 +1505,13 @@ public:
 
     return swift_getExistentialTypeMetadata(classConstraint, superclass,
                                             protocols.size(), protocols.data());
+  }
+
+  TypeLookupErrorOr<BuiltType>
+  createParameterizedProtocolType(BuiltType base,
+                                  llvm::ArrayRef<BuiltType> args) const {
+    // FIXME: Runtime plumbing.
+    return BuiltType();
   }
 
   TypeLookupErrorOr<BuiltType> createDynamicSelfType(BuiltType selfType) const {
@@ -1891,6 +1911,233 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
                                     {}, {}).getType().getMetadata();
 }
 
+// ==== Function metadata functions ----------------------------------------------
+
+static llvm::Optional<llvm::StringRef>
+cstrToStringRef(const char *typeNameStart, size_t typeNameLength) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  for (char c : typeName) {
+    if (c >= '\x01' && c <= '\x1F')
+      return llvm::None;
+  }
+  return typeName;
+}
+
+/// Given mangling for a method, extract its function type in demangled
+/// representation.
+static NodePointer extractFunctionTypeFromMethod(Demangler &demangler,
+                                                 const char *typeNameStart,
+                                                 size_t typeNameLength) {
+  llvm::Optional<llvm::StringRef> typeName =
+      cstrToStringRef(typeNameStart, typeNameLength);
+  if (!typeName)
+    return nullptr;
+
+  auto node = demangler.demangleSymbol(*typeName);
+  if (!node)
+    return nullptr;
+
+  node = node->findByKind(Node::Kind::Function, /*maxDepth=*/2);
+  if (!node)
+    return nullptr;
+
+  node = node->findByKind(Node::Kind::Type, /*maxDepth=*/2);
+  if (!node)
+    return nullptr;
+
+  // If this is a generic function, it requires special handling.
+  if (auto genericType =
+          node->findByKind(Node::Kind::DependentGenericType, /*maxDepth=*/1)) {
+    node = genericType->findByKind(Node::Kind::Type, /*maxDepth=*/1);
+    return node->findByKind(Node::Kind::FunctionType, /*maxDepth=*/1);
+  }
+
+  auto funcType = node->getFirstChild();
+  assert(funcType->getKind() == Node::Kind::FunctionType);
+  return funcType;
+}
+
+/// For a single unlabeled parameter this function returns whole
+/// `ArgumentTuple`, for everything else a `Tuple` element inside it.
+static NodePointer getParameterList(NodePointer funcType) {
+  assert(funcType->getKind() == Node::Kind::FunctionType);
+
+  auto parameterContainer =
+      funcType->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/1);
+  assert(parameterContainer->getNumChildren() > 0);
+
+  // This is a type that convers entire parameter list.
+  auto parameterList = parameterContainer->getFirstChild();
+  assert(parameterList->getKind() == Node::Kind::Type);
+
+  auto parameters = parameterList->getFirstChild();
+  if (parameters->getKind() == Node::Kind::Tuple)
+    return parameters;
+
+  return parameterContainer;
+}
+
+static const Metadata *decodeType(TypeDecoder<DecodedMetadataBuilder> &decoder,
+                                  NodePointer type) {
+  assert(type->getKind() == Node::Kind::Type);
+
+  auto builtTypeOrError = decoder.decodeMangledType(type);
+
+  if (builtTypeOrError.isError()) {
+    auto err = builtTypeOrError.getError();
+    char *errStr = err->copyErrorString();
+    err->freeErrorString(errStr);
+    return nullptr;
+  }
+
+  return builtTypeOrError.getType();
+}
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+unsigned swift_func_getParameterCount(const char *typeNameStart,
+                                      size_t typeNameLength) {
+  StackAllocatedDemangler<1024> demangler;
+
+  auto funcType =
+      extractFunctionTypeFromMethod(demangler, typeNameStart, typeNameLength);
+  if (!funcType)
+    return -1;
+
+  auto parameterList = getParameterList(funcType);
+  return parameterList->getNumChildren();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+const Metadata *_Nullable
+swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
+                             GenericEnvironmentDescriptor *genericEnv,
+                             const void * const *genericArguments) {
+  StackAllocatedDemangler<1024> demangler;
+
+  auto *funcType =
+      extractFunctionTypeFromMethod(demangler, typeNameStart, typeNameLength);
+  if (!funcType)
+    return nullptr;
+
+  auto resultType = funcType->getLastChild();
+  if (!resultType)
+    return nullptr;
+
+  assert(resultType->getKind() == Node::Kind::ReturnType);
+
+  SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
+
+  DecodedMetadataBuilder builder(
+      demangler,
+      /*substGenericParam=*/
+      [&substFn](unsigned depth, unsigned index) {
+        return substFn.getMetadata(depth, index);
+      },
+      /*SubstDependentWitnessTableFn=*/
+      [&substFn](const Metadata *type, unsigned index) {
+        return substFn.getWitnessTable(type, index);
+      });
+
+  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
+
+  return decodeType(decoder, resultType->getFirstChild());
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+unsigned
+swift_func_getParameterTypeInfo(
+    const char *typeNameStart, size_t typeNameLength,
+    GenericEnvironmentDescriptor *genericEnv,
+    const void * const *genericArguments,
+    Metadata const **types, unsigned typesLength) {
+  if (typesLength < 0) return -1;
+
+  StackAllocatedDemangler<1024> demangler;
+
+  auto *funcType =
+      extractFunctionTypeFromMethod(demangler, typeNameStart, typeNameLength);
+  if (!funcType)
+    return -1;
+
+  auto parameterList = getParameterList(funcType);
+
+  // Only successfully return if the expected parameter count is the same
+  // as space prepared for it in the buffer.
+  if (!(parameterList && parameterList->getNumChildren() == typesLength))
+    return -2;
+
+  SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
+
+  DecodedMetadataBuilder builder(
+      demangler,
+      /*substGenericParam=*/
+      [&substFn](unsigned depth, unsigned index) {
+        return substFn.getMetadata(depth, index);
+      },
+      /*SubstDependentWitnessTableFn=*/
+      [&substFn](const Metadata *type, unsigned index) {
+        return substFn.getWitnessTable(type, index);
+      });
+  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
+
+  // for each parameter (TupleElement), store it into the provided buffer
+  for (unsigned index = 0; index != typesLength; ++index) {
+    auto *parameter = parameterList->getChild(index);
+
+    if (parameter->getKind() == Node::Kind::TupleElement) {
+      assert(parameter->getNumChildren() == 1);
+      parameter = parameter->getFirstChild();
+    }
+
+    assert(parameter->getKind() == Node::Kind::Type);
+
+    auto type = decodeType(decoder, parameter);
+    if (!type)
+      return -3; // Failed to decode a type.
+
+    types[index] = type;
+  } // end foreach parameter
+
+  return typesLength;
+}
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+BufferAndSize
+swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
+                                   const void *const *genericArguments) {
+  assert(genericEnv);
+  assert(genericArguments);
+
+  llvm::SmallVector<const void *, 4> witnessTables;
+  SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
+
+  auto error = _checkGenericRequirements(
+      genericEnv->getGenericRequirements(), witnessTables,
+      [&substFn](unsigned depth, unsigned index) {
+        return substFn.getMetadata(depth, index);
+      },
+      [&substFn](const Metadata *type, unsigned index) {
+        return substFn.getWitnessTable(type, index);
+      });
+
+  if (error) {
+    return {/*ptr=*/nullptr, -1};
+  }
+
+  if (witnessTables.empty())
+    return {/*ptr=*/nullptr, 0};
+
+  void **tables = (void **)malloc(witnessTables.size() * sizeof(void *));
+  for (unsigned i = 0, n = witnessTables.size(); i != n; ++i)
+    tables[i] = const_cast<void *>(witnessTables[i]);
+
+  return {tables, static_cast<intptr_t>(witnessTables.size())};
+}
+
+// ==== End of Function metadata functions ---------------------------------------
+
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 MetadataResponse
 swift_getOpaqueTypeMetadata(MetadataRequest request,
@@ -1957,12 +2204,9 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
       MetadataState::Complete, demangler, node,
       nullptr,
       /* no substitutions */
-      [&](unsigned depth, unsigned index) {
-        return nullptr;
-      },
-      [&](const Metadata *type, unsigned index) {
-        return nullptr;
-      }).getType().getMetadata();
+      [&](unsigned depth, unsigned index) { return nullptr; },
+      [&](const Metadata *type, unsigned index) { return nullptr; }
+    ).getType().getMetadata();
   } else {
     metadata = swift_stdlib_getTypeByMangledNameUntrusted(typeStr.data(),
                                                           typeStr.size());
@@ -2052,7 +2296,7 @@ buildEnvironmentPath(
   unsigned totalKeyParamCount = 0;
   auto genericParams = environment->getGenericParameters();
   for (unsigned numLocalParams : environment->getGenericParameterCounts()) {
-    // Adkjust totalParamCount so we have the # of local parameters.
+    // Adjust totalParamCount so we have the # of local parameters.
     numLocalParams -= totalParamCount;
 
     // Get the local generic parameters.
@@ -2339,7 +2583,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
         reinterpret_cast<void **>(&chainRoot->implementationFunction),
         reinterpret_cast<void *const *>(&previous->implementationFunction),
         replacedFunctionKey->getExtraDiscriminator(),
-        !replacedFunctionKey->isAsync());
+        !replacedFunctionKey->isAsync(), /*allowNull*/ false);
   }
 
   // First populate the current replacement's chain entry.
@@ -2350,7 +2594,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&currentEntry->implementationFunction),
       reinterpret_cast<void *const *>(&chainRoot->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync());
+      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
 
   currentEntry->next = chainRoot->next;
 
@@ -2386,7 +2630,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
       reinterpret_cast<void **>(&previous->implementationFunction),
       reinterpret_cast<void *const *>(&thisEntry->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync());
+      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
 }
 
 /// An automatic dymamic replacement entry.
@@ -2475,6 +2719,7 @@ public:
 } // anonymous namespace
 
 void swift::addImageDynamicReplacementBlockCallback(
+    const void *baseAddress,
     const void *replacements, uintptr_t replacementsSize,
     const void *replacementsSome, uintptr_t replacementsSomeSize) {
 

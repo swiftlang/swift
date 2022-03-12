@@ -11,6 +11,9 @@
 
 // REQUIRES: executable_test
 
+// Freestanding/minimal runtime does not support printing type names at runtime.
+// UNSUPPORTED: freestanding
+
 import StdlibUnittest
 
 let TypeNameTests = TestSuite("TypeName")

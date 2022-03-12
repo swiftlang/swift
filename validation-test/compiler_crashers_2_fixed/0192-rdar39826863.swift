@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s
+// RUN: %target-swift-frontend -emit-ir %s -requirement-machine-protocol-signatures=on
 
 protocol Tuple {
   associatedtype Head

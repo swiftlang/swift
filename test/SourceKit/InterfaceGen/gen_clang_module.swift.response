@@ -4281,9 +4281,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.name: "rawValue",
             key.offset: 269,
             key.length: 18,
-            key.typename: "UInt32",
-            key.nameoffset: 0,
-            key.namelength: 0
+            key.typename: "UInt32"
           }
         ]
       },
@@ -4414,9 +4412,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.name: "rawValue",
             key.offset: 499,
             key.length: 18,
-            key.typename: "UInt32",
-            key.nameoffset: 0,
-            key.namelength: 0
+            key.typename: "UInt32"
           }
         ]
       },
@@ -4564,9 +4560,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.name: "rawValue",
             key.offset: 739,
             key.length: 18,
-            key.typename: "UInt32",
-            key.nameoffset: 0,
-            key.namelength: 0
+            key.typename: "UInt32"
           }
         ]
       },
@@ -4691,8 +4685,6 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.enumcase,
         key.offset: 1020,
         key.length: 26,
-        key.nameoffset: 0,
-        key.namelength: 0,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
@@ -4716,8 +4708,6 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.enumcase,
         key.offset: 1052,
         key.length: 20,
-        key.nameoffset: 0,
-        key.namelength: 0,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
@@ -4741,8 +4731,6 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.enumcase,
         key.offset: 1103,
         key.length: 26,
-        key.nameoffset: 0,
-        key.namelength: 0,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
@@ -5281,9 +5269,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.name: "a",
         key.offset: 2135,
         key.length: 10,
-        key.typename: "Int32",
-        key.nameoffset: 0,
-        key.namelength: 0
+        key.typename: "Int32"
       }
     ]
   },
@@ -5308,9 +5294,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.var.parameter,
         key.offset: 2192,
         key.length: 8,
-        key.typename: "Int32",
-        key.nameoffset: 0,
-        key.namelength: 0
+        key.typename: "Int32"
       }
     ]
   },
@@ -5336,36 +5320,28 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.name: "a",
         key.offset: 2232,
         key.length: 10,
-        key.typename: "Int32",
-        key.nameoffset: 0,
-        key.namelength: 0
+        key.typename: "Int32"
       },
       {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "b",
         key.offset: 2244,
         key.length: 10,
-        key.typename: "Float",
-        key.nameoffset: 0,
-        key.namelength: 0
+        key.typename: "Float"
       },
       {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "c",
         key.offset: 2256,
         key.length: 11,
-        key.typename: "Double",
-        key.nameoffset: 0,
-        key.namelength: 0
+        key.typename: "Double"
       },
       {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "d",
         key.offset: 2269,
         key.length: 33,
-        key.typename: "UnsafeMutablePointer<Int32>!",
-        key.nameoffset: 0,
-        key.namelength: 0
+        key.typename: "UnsafeMutablePointer<Int32>!"
       }
     ]
   },
@@ -5390,9 +5366,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.name: "blk",
         key.offset: 2390,
         key.length: 26,
-        key.typename: "((Float) -> Int32)!",
-        key.nameoffset: 0,
-        key.namelength: 0
+        key.typename: "((Float) -> Int32)!"
       }
     ]
   },
@@ -5417,9 +5391,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.name: "fptr",
         key.offset: 2458,
         key.length: 42,
-        key.typename: "(@convention(c) (Float) -> Int32)!",
-        key.nameoffset: 0,
-        key.namelength: 0
+        key.typename: "(@convention(c) (Float) -> Int32)!"
       }
     ]
   },
@@ -5571,9 +5543,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.name: "a",
         key.offset: 3132,
         key.length: 10,
-        key.typename: "Int32",
-        key.nameoffset: 0,
-        key.namelength: 0
+        key.typename: "Int32"
       }
     ]
   },
@@ -5765,9 +5735,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.name: "anObject",
             key.offset: 3877,
             key.length: 16,
-            key.typename: "Any!",
-            key.nameoffset: 0,
-            key.namelength: 0
+            key.typename: "Any!"
           }
         ]
       },
@@ -5985,9 +5953,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.name: "a",
             key.offset: 4426,
             key.length: 10,
-            key.typename: "Int32",
-            key.nameoffset: 0,
-            key.namelength: 0
+            key.typename: "Int32"
           }
         ]
       },
@@ -6012,9 +5978,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
             key.name: "a",
             key.offset: 4470,
             key.length: 10,
-            key.typename: "Int32",
-            key.nameoffset: 0,
-            key.namelength: 0
+            key.typename: "Int32"
           },
           {
             key.kind: source.lang.swift.decl.var.parameter,
@@ -7022,8 +6986,6 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.enumcase,
         key.offset: 6777,
         key.length: 22,
-        key.nameoffset: 0,
-        key.namelength: 0,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
@@ -7047,8 +7009,6 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.kind: source.lang.swift.decl.enumcase,
         key.offset: 6859,
         key.length: 19,
-        key.nameoffset: 0,
-        key.namelength: 0,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,

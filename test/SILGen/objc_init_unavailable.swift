@@ -10,10 +10,10 @@ public func callUnavailableInit(name: String) -> ClassWithUnavailableInit {
 // CHECK: function_ref @$sSo24ClassWithUnavailableInitC8bundleIDABSgSSSg_tcfC : $@convention(method) (@owned Optional<String>, @thick ClassWithUnavailableInit.Type) -> @owned Optional<ClassWithUnavailableInit>
 // CHECK: return
 
-// CHECK-LABEL: sil shared [serializable] [ossa] @$sSo24ClassWithUnavailableInitC8bundleIDABSgSSSg_tcfC : $@convention(method) (@owned Optional<String>, @thick ClassWithUnavailableInit.Type) -> @owned Optional<ClassWithUnavailableInit> {
+// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo24ClassWithUnavailableInitC8bundleIDABSgSSSg_tcfC : $@convention(method) (@owned Optional<String>, @thick ClassWithUnavailableInit.Type) -> @owned Optional<ClassWithUnavailableInit> {
 // CHECK: function_ref @$sSo24ClassWithUnavailableInitC8bundleIDABSgSSSg_tcfcTO : $@convention(method) (@owned Optional<String>, @owned ClassWithUnavailableInit) -> @owned Optional<ClassWithUnavailableInit>
 // CHECK: return
 
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo24ClassWithUnavailableInitC8bundleIDABSgSSSg_tcfcTO : $@convention(method) (@owned Optional<String>, @owned ClassWithUnavailableInit) -> @owned Optional<ClassWithUnavailableInit> {
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo24ClassWithUnavailableInitC8bundleIDABSgSSSg_tcfcTO : $@convention(method) (@owned Optional<String>, @owned ClassWithUnavailableInit) -> @owned Optional<ClassWithUnavailableInit> {
 // CHECK: objc_method %1 : $ClassWithUnavailableInit, #ClassWithUnavailableInit.init!initializer.foreign : (ClassWithUnavailableInit.Type) -> (String?) -> ClassWithUnavailableInit?, $@convention(objc_method) (Optional<NSString>, @owned ClassWithUnavailableInit) -> @owned Optional<ClassWithUnavailableInit>
 // CHECK: return

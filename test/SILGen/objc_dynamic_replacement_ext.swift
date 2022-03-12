@@ -79,3 +79,11 @@ extension Generic {
 // CHECK-NOT: sil {{.*}} @$s10SomeModule7GenericC28objc_dynamic_replacement_extE02__F2_ySivsTo : $@convention(objc_method) <ItemType> (Int, Generic<ItemType>) -> ()
 // CHECK-DAG: sil [dynamic_replacement_for "$s10SomeModule7GenericC1ySivs"] [ossa] @$s10SomeModule7GenericC28objc_dynamic_replacement_extE02__F2_ySivs : $@convention(method) <ItemType> (Int, @guaranteed Generic<ItemType>) -> ()
 }
+
+// IMPORT-DAG: sil [dynamically_replacable] [ossa] @$s10SomeModule9MyGenericC4doItyyF
+// IMPORT-DAG: sil [thunk] [ossa] @$s10SomeModule9MyGenericC4doItyyFTo
+// CHECK-NOT: s10SomeModule9MyGenericC28objc_dynamic_replacement_extE02__G6__doItyyFTo
+// CHECK-DAG: sil hidden [dynamic_replacement_for "$s10SomeModule9MyGenericC4doItyyF"] [ossa] @$s10SomeModule9MyGenericC28objc_dynamic_replacement_extE02__G6__doItyyF : $@convention(method) <Item>
+extension MyGeneric {
+    @_dynamicReplacement(for: doIt()) func __replacement__doIt() {}
+}

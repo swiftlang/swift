@@ -24,7 +24,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(__APPLE__) && __has_include(<TargetConditionals.h>)
 #include <TargetConditionals.h>
 #endif
 
@@ -56,6 +56,13 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   bool isStrong() const { return Data == 0; }
+};
+
+/// A struct to return pointer and its size back to Swift
+/// as `(UnsafePointer<UInt8>, Int)`.
+struct BufferAndSize {
+  const void *buffer;
+  intptr_t length; // negative length means error.
 };
 
 /// Type information consists of metadata and its ownership info,
@@ -487,19 +494,21 @@ public:
     return c;
 #endif
   }
-  
-  template<> inline const ClassMetadata *
-  Metadata::getClassObject() const {
+
+  template <>
+  inline const ClassMetadata *Metadata::getClassObject() const {
     switch (getKind()) {
     case MetadataKind::Class: {
       // Native Swift class metadata is also the class object.
       return static_cast<const ClassMetadata *>(this);
     }
+#if SWIFT_OBJC_INTEROP
     case MetadataKind::ObjCClassWrapper: {
       // Objective-C class objects are referenced by their Swift metadata wrapper.
       auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(this);
       return wrapper->Class;
     }
+#endif
     // Other kinds of types don't have class objects.
     default:
       return nullptr;

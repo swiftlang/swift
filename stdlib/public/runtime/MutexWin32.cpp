@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Mutex, ConditionVariable, Read/Write lock, and Scoped lock implementations
-// using Windows Slim Reader/Writer Locks and Conditional Variables.
+// Mutex, Read/Write lock, and Scoped lock implementations
+// using Windows Slim Reader/Writer Locks.
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,14 +28,4 @@
 
 using namespace swift;
 
-void ConditionPlatformHelper::wait(CONDITION_VARIABLE &condition,
-                                   SRWLOCK &mutex) {
-  BOOL result = SleepConditionVariableSRW(&condition, &mutex, INFINITE, 0);
-  if (!result) {
-    DWORD errorcode = GetLastError();
-    SWIFT_FATAL_ERROR(/* flags = */ 0,
-                      "'SleepConditionVariableSRW()' failed with error code %d\n",
-                      errorcode);
-  }
-}
 #endif

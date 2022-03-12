@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-copy-propagation  -Xfrontend -disable-availability-checking %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-copy-propagation -Xfrontend -enable-lexical-lifetimes=false  -Xfrontend -disable-availability-checking %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

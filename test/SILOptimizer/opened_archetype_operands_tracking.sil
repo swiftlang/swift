@@ -215,7 +215,7 @@ sil hidden_external @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 // CHECK: function_ref @use 
 // CHECK-NOT: function_ref
 // CHECK: strong_release{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
-// CHECK: dealloc_ref{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
+// CHECK: dealloc_stack_ref{{.*}}C08045E0-2779-11E7-970E-A45E60E99281
 // CHECK: end sil function 'bar' 
 sil @bar : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):

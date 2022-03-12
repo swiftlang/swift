@@ -202,21 +202,22 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
+    return cast<SingleValueInstruction>(value)->getOperand(0);
+
   case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UncheckedAddrCastInst:
     // DO NOT use LOADABLE_REF_STORAGE because unchecked references don't have
     // retain/release instructions that trigger the 'default' case.
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   case ValueKind::RefTo##Name##Inst:                                           \
   case ValueKind::Name##ToRefInst:
 #include "swift/AST/ReferenceStorage.def"
-    return cast<SingleValueInstruction>(value)->getOperand(0);
-
-  case ValueKind::UncheckedAddrCastInst: {
-    auto *uac = cast<UncheckedAddrCastInst>(value);
-    SILValue op = uac->getOperand();
+  {
+    auto *svi = cast<SingleValueInstruction>(value);
+    SILValue op = svi->getOperand(0);
     SILType srcTy = op->getType().getObjectType();
     SILType destTy = value->getType().getObjectType();
-    SILFunction *f = uac->getFunction();
+    SILFunction *f = svi->getFunction();
     // If the source and destination of the cast don't agree on being a pointer,
     // we bail. Otherwise we would miss important edges in the connection graph:
     // e.g. loads of non-pointers are ignored, while it could be an escape of
@@ -2143,6 +2144,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
   switch (I->getKind()) {
     case SILInstructionKind::AllocStackInst:
     case SILInstructionKind::AllocRefInst:
+    case SILInstructionKind::AllocRefDynamicInst:
     case SILInstructionKind::AllocBoxInst:
       ConGraph->getNode(cast<SingleValueInstruction>(I));
       return;
@@ -2162,6 +2164,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::InitExistentialMetatypeInst:
     case SILInstructionKind::OpenExistentialMetatypeInst:
     case SILInstructionKind::ExistentialMetatypeInst:
+    case SILInstructionKind::DeallocStackRefInst:
     case SILInstructionKind::DeallocRefInst:
     case SILInstructionKind::SetDeallocatingInst:
     case SILInstructionKind::FixLifetimeInst:
@@ -2850,7 +2853,7 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
 // graph path exists from the referenced object to a global-escaping or
 // argument-escaping node.
 //
-// TODO: This API is inneffective for release hoisting, because the release
+// TODO: This API is ineffective for release hoisting, because the release
 // itself is often the only place that an object's contents may escape. We can't
 // currently determine that since the contents cannot escape prior to \p
 // releasePtr, then livePtr cannot possible point to the same memory!

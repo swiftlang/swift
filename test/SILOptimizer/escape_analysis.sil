@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -escapes-dump -escapes-internal-verify -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -parse-serialized-sil %s -escapes-dump -escapes-internal-verify -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -1421,7 +1421,7 @@ sil @check_non_escaping_implicit_destructor_invocation_via_strong_release : $@co
 bb0:
   %0 = alloc_ref [stack] $X
   strong_release %0 : $X
-  dealloc_ref [stack] %0 : $X
+  dealloc_stack_ref %0 : $X
   %3 = tuple ()
   return %3 : $()
 }
@@ -1438,7 +1438,7 @@ sil @check_non_escaping_implicit_destructor_invocation_via_release_value : $@con
 bb0:
   %0 = alloc_ref [stack] $X
   release_value %0 : $X
-  dealloc_ref [stack] %0 : $X
+  dealloc_stack_ref %0 : $X
   %3 = tuple ()
   return %3 : $()
 }
@@ -1455,7 +1455,7 @@ sil @check_escaping_implicit_destructor_invocation_via_strong_release : $@conven
 bb0:
   %0 = alloc_ref [stack] $Z
   strong_release %0 : $Z
-  dealloc_ref [stack] %0 : $Z
+  dealloc_stack_ref %0 : $Z
   %3 = tuple ()
   return %3 : $()
 }
@@ -1472,7 +1472,7 @@ sil @check_escaping_implicit_destructor_invocation_via_release_value : $@convent
 bb0:
   %0 = alloc_ref [stack] $Z
   release_value %0 : $Z
-  dealloc_ref [stack] %0 : $Z
+  dealloc_stack_ref %0 : $Z
   %3 = tuple ()
   return %3 : $()
 }

@@ -18,117 +18,123 @@ import Swift
   import Darwin.C.tgmath
 #elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
+#elseif os(WASI)
+  import WASILibc
 #elseif os(Windows)
   import CRT
 #else
 #error("Unsupported platform")
 #endif
 
-@usableFromInline
+%for T in ['T', 'Double']: # Prevents name collisions with system math library
+%  generic_signature = '<T: FloatingPoint & Differentiable>' if T == 'T' else ''
+%  constraint = 'where T == T.TangentVector' if T == 'T' else ''
+@inlinable
 @derivative(of: fma)
-func _jvpFma<T: FloatingPoint & Differentiable> (
-  _ x: T,
-  _ y: T,
-  _ z: T
-) -> (value: T, differential: (T, T, T) -> T) where T == T.TangentVector {
+func _jvpFma${generic_signature} (
+  _ x: ${T},
+  _ y: ${T},
+  _ z: ${T}
+) -> (value: ${T}, differential: (${T}, ${T}, ${T}) -> ${T}) ${constraint} {
   return (fma(x, y, z), { (dx, dy, dz) in dx * y + dy * x + dz })
 }
 
-@usableFromInline
+@inlinable
 @derivative(of: fma)
-func _vjpFma<T: FloatingPoint & Differentiable> (
-  _ x: T,
-  _ y: T,
-  _ z: T
-) -> (value: T, pullback: (T) -> (T, T, T)) where T == T.TangentVector {
+func _vjpFma${generic_signature} (
+  _ x: ${T},
+  _ y: ${T},
+  _ z: ${T}
+) -> (value: ${T}, pullback: (${T}) -> (${T}, ${T}, ${T})) ${constraint} {
   return (fma(x, y, z), { v in (v * y, v * x, v) })
 }
 
-@usableFromInline
+@inlinable
 @derivative(of: remainder)
-func _jvpRemainder<T: FloatingPoint & Differentiable> (
-  _ x: T,
-  _ y: T
-) -> (value: T, differential: (T, T) -> T) where T == T.TangentVector {
+func _jvpRemainder${generic_signature} (
+  _ x: ${T},
+  _ y: ${T}
+) -> (value: ${T}, differential: (${T}, ${T}) -> ${T}) ${constraint} {
   fatalError("""
     Unimplemented JVP for 'remainder(_:)'. \
     https://bugs.swift.org/browse/TF-1108 tracks this issue
     """)
 }
 
-@usableFromInline
+@inlinable
 @derivative(of: remainder)
-func _vjpRemainder<T: FloatingPoint & Differentiable> (
-  _ x: T,
-  _ y: T
-) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
+func _vjpRemainder${generic_signature} (
+  _ x: ${T},
+  _ y: ${T}
+) -> (value: ${T}, pullback: (${T}) -> (${T}, ${T})) ${constraint} {
   return (remainder(x, y), { v in (v, -v * ((x / y).rounded(.toNearestOrEven))) })
 }
 
-@usableFromInline
+@inlinable
 @derivative(of: fmod)
-func _jvpFmod<T: FloatingPoint & Differentiable> (
-  _ x: T,
-  _ y: T
-) -> (value: T, differential: (T, T) -> T) where T == T.TangentVector {
+func _jvpFmod${generic_signature} (
+  _ x: ${T},
+  _ y: ${T}
+) -> (value: ${T}, differential: (${T}, ${T}) -> ${T}) ${constraint} {
   fatalError("""
     Unimplemented JVP for 'fmod(_:)'. \
     https://bugs.swift.org/browse/TF-1108 tracks this issue
     """)
 }
 
-@usableFromInline
+@inlinable
 @derivative(of: fmod)
-func _vjpFmod<T: FloatingPoint & Differentiable> (
-  _ x: T,
-  _ y: T
-) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
+func _vjpFmod${generic_signature} (
+  _ x: ${T},
+  _ y: ${T}
+) -> (value: ${T}, pullback: (${T}) -> (${T}, ${T})) ${constraint} {
   return (fmod(x, y), { v in (v, -v * ((x / y).rounded(.towardZero))) })
 }
 
-%for derivative_kind in ['jvp', 'vjp']:
-%  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
-@usableFromInline
+%  for derivative_kind in ['jvp', 'vjp']:
+%    linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
+@inlinable
 @derivative(of: sqrt)
-func _${derivative_kind}Sqrt<T: FloatingPoint & Differentiable> (
-  _ x: T
-) -> (value: T, ${linear_map_kind}: (T) -> T) where T == T.TangentVector {
+func _${derivative_kind}Sqrt${generic_signature} (
+  _ x: ${T}
+) -> (value: ${T}, ${linear_map_kind}: (${T}) -> ${T}) ${constraint} {
   let value = sqrt(x)
   return (value, { v in v / (2 * value) })
 }
 
-@usableFromInline
+@inlinable
 @derivative(of: ceil)
-func _${derivative_kind}Ceil<T: FloatingPoint & Differentiable> (
-  _ x: T
-) -> (value: T, ${linear_map_kind}: (T) -> T) where T == T.TangentVector {
+func _${derivative_kind}Ceil${generic_signature} (
+  _ x: ${T}
+) -> (value: ${T}, ${linear_map_kind}: (${T}) -> ${T}) ${constraint} {
   return (ceil(x), { v in 0 })
 }
 
-@usableFromInline
+@inlinable
 @derivative(of: floor)
-func _${derivative_kind}Floor<T: FloatingPoint & Differentiable> (
-  _ x: T
-) -> (value: T, ${linear_map_kind}: (T) -> T) where T == T.TangentVector {
+func _${derivative_kind}Floor${generic_signature} (
+  _ x: ${T}
+) -> (value: ${T}, ${linear_map_kind}: (${T}) -> ${T}) ${constraint} {
   return (floor(x), { v in 0 })
 }
 
-@usableFromInline
+@inlinable
 @derivative(of: round)
-func _${derivative_kind}Round<T: FloatingPoint & Differentiable> (
-  _ x: T
-) -> (value: T, ${linear_map_kind}: (T) -> T) where T == T.TangentVector {
+func _${derivative_kind}Round${generic_signature} (
+  _ x: ${T}
+) -> (value: ${T}, ${linear_map_kind}: (${T}) -> ${T}) ${constraint} {
   return (round(x), { v in 0 })
 }
 
-@usableFromInline
+@inlinable
 @derivative(of: trunc)
-func _${derivative_kind}Trunc<T: FloatingPoint & Differentiable> (
-  _ x: T
-) -> (value: T, ${linear_map_kind}: (T) -> T) where T == T.TangentVector {
+func _${derivative_kind}Trunc${generic_signature} (
+  _ x: ${T}
+) -> (value: ${T}, ${linear_map_kind}: (${T}) -> ${T}) ${constraint} {
   return (trunc(x), { v in 0 })
 }
-%end # for derivative_kind in ['jvp', 'vjp']:
+%  end # for derivative_kind in ['jvp', 'vjp']:
+%end # for T in ['T', 'Double']:
 
 // Unary functions
 %for derivative_kind in ['jvp', 'vjp']:
@@ -274,7 +280,7 @@ func _${derivative_kind}Erfc(_ x: ${T}) -> (value: ${T}, ${linear_map_kind}: (${
 %end # for derivative_kind in ['jvp', 'vjp']:
 
 // Binary functions
-%for T in ['Float', 'Float80']:
+%for T in ['Float', 'Double', 'Float80']:
 %  if T == 'Float80':
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %  end
@@ -298,4 +304,4 @@ func _jvpPow(_ x: ${T}, _ y: ${T}) -> (value: ${T}, differential: (${T}, ${T}) -
 %  if T == 'Float80':
 #endif
 %  end # if T == 'Float80':
-%end # for T in ['Float', 'Float80']:
+%end # for T in ['Float', 'Double', 'Float80']:

@@ -14,7 +14,8 @@ func transform(_ i: Int) -> Double {
 // CHECK-LABEL: sil hidden [ossa] @$s17reabstract_lvalue0A13FunctionInOutyyF : $@convention(thin) () -> ()
 func reabstractFunctionInOut() {
   // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_guaranteed (Int) -> Double }
-  // CHECK: [[PB:%.*]] = project_box [[BOX]]
+  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+  // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
   // CHECK: [[ARG:%.*]] = function_ref @$s17reabstract_lvalue9transformySdSiF
   // CHECK: [[THICK_ARG:%.*]] = thin_to_thick_function [[ARG]]
   // CHECK: store [[THICK_ARG:%.*]] to [init] [[PB]]
@@ -35,8 +36,8 @@ func reabstractFunctionInOut() {
   consumeGenericInOut(&minimallyAbstracted)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSiSdIegyd_SiSdIegnr_TR : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> Double) -> @out Double
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSiSdIegnr_SiSdIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed Int) -> @out Double) -> Double
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiSdIegyd_SiSdIegnr_TR : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> Double) -> @out Double
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiSdIegnr_SiSdIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed Int) -> @out Double) -> Double
 
 // CHECK-LABEL: sil hidden [ossa] @$s17reabstract_lvalue0A13MetatypeInOutyyF : $@convention(thin) () -> ()
 func reabstractMetatypeInOut() {

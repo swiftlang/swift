@@ -748,14 +748,6 @@ public:
       Context.LangOpts.ParseForSyntaxTreeOnly;
   }
 
-  /// Returns true to indicate that experimental 'distributed actor' syntax
-  /// should be parsed if the parser is only a syntax tree or if the user has
-  /// passed the `-enable-experimental-distributed' flag to the frontend.
-  bool shouldParseExperimentalDistributed() const {
-    return Context.LangOpts.EnableExperimentalDistributed ||
-      Context.LangOpts.ParseForSyntaxTreeOnly;
-  }
-
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -1109,20 +1101,23 @@ public:
   ParserStatus parseTypeAttributeList(ParamDecl::Specifier &Specifier,
                                       SourceLoc &SpecifierLoc,
                                       SourceLoc &IsolatedLoc,
+                                      SourceLoc &ConstLoc,
                                       TypeAttributes &Attributes) {
     if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
         (Tok.is(tok::identifier) &&
          (Tok.getRawText().equals("__shared") ||
           Tok.getRawText().equals("__owned") ||
-          Tok.isContextualKeyword("isolated"))))
+          Tok.isContextualKeyword("isolated") ||
+          Tok.isContextualKeyword("_const"))))
       return parseTypeAttributeListPresent(
-          Specifier, SpecifierLoc, IsolatedLoc, Attributes);
+          Specifier, SpecifierLoc, IsolatedLoc, ConstLoc, Attributes);
     return makeParserSuccess();
   }
 
   ParserStatus parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                              SourceLoc &SpecifierLoc,
                                              SourceLoc &IsolatedLoc,
+                                             SourceLoc &ConstLoc,
                                              TypeAttributes &Attributes);
 
   bool parseConventionAttributeInternal(bool justChecking,
@@ -1166,10 +1161,9 @@ public:
   struct ParsedAccessors;
   ParserStatus parseGetSet(ParseDeclOptions Flags,
                            GenericParamList *GenericParams,
-                           ParameterList *Indices,
+                           ParameterList *Indices, TypeRepr *ResultType,
                            ParsedAccessors &accessors,
-                           AbstractStorageDecl *storage,
-                           SourceLoc StaticLoc);
+                           AbstractStorageDecl *storage, SourceLoc StaticLoc);
   ParserResult<VarDecl> parseDeclVarGetSet(PatternBindingEntry &entry,
                                            ParseDeclOptions Flags,
                                            SourceLoc StaticLoc,
@@ -1192,9 +1186,14 @@ public:
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes,
                                        bool HasFuncKeyword = true);
-  BraceStmt *parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
+  BodyAndFingerprint
+  parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
-  BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
+  BodyAndFingerprint
+  parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
+
+  ParserStatus parsePrimaryAssociatedTypes(
+      SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
@@ -1300,7 +1299,8 @@ public:
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
                                  ParamDecl::Specifier Specifier,
                                  SourceLoc SpecifierLoc,
-                                 SourceLoc IsolatedLoc);
+                                 SourceLoc IsolatedLoc,
+                                 SourceLoc ConstLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1361,6 +1361,9 @@ public:
 
     /// The location of the 'isolated' keyword, if present.
     SourceLoc IsolatedLoc;
+
+    /// The location of the '_const' keyword, if present.
+    SourceLoc CompileConstLoc;
 
     /// The type following the ':'.
     TypeRepr *Type = nullptr;
@@ -1572,6 +1575,7 @@ public:
   ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprStringLiteral();
+  ParserResult<Expr> parseExprRegexLiteral();
 
   StringRef copyAndStripUnderscores(StringRef text);
 
@@ -1837,6 +1841,16 @@ public:
                     bool &DiscardAttribute, SourceRange &attrRange,
                     SourceLoc AtLoc, SourceLoc Loc,
                     llvm::function_ref<void(AvailableAttr *)> addAttribute);
+
+  using PlatformAndVersion = std::pair<PlatformKind, llvm::VersionTuple>;
+
+  /// Parse a platform and version tuple (e.g. "macOS 12.0") and append it to the
+  /// given vector. Wildcards ('*') parse successfully but are ignored. Assumes
+  /// that the tuples are part of a comma separated list ending with a trailing
+  /// ')'.
+  ParserStatus parsePlatformVersionInList(StringRef AttrName,
+      llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions);
+
   //===--------------------------------------------------------------------===//
   // Code completion second pass.
 

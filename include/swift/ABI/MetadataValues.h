@@ -2014,12 +2014,12 @@ enum class JobKind : size_t {
 enum class JobPriority : size_t {
   // This is modelled off of Dispatch.QoS, and the values are directly
   // stolen from there.
-  UserInteractive = 0x21,
-  UserInitiated   = 0x19,
-  Default         = 0x15,
-  Utility         = 0x11,
-  Background      = 0x09,
-  Unspecified     = 0x00,
+  UserInteractive = 0x21, /* UI */
+  UserInitiated   = 0x19, /* IN */
+  Default         = 0x15, /* DEF */
+  Utility         = 0x11, /* UT */
+  Background      = 0x09, /* BG */
+  Unspecified     = 0x00, /* UN */
 };
 
 /// A tri-valued comparator which orders higher priorities first.
@@ -2028,12 +2028,18 @@ inline int descendingPriorityOrder(JobPriority lhs,
   return (lhs == rhs ? 0 : lhs > rhs ? -1 : 1);
 }
 
+inline JobPriority withUserInteractivePriorityDowngrade(JobPriority priority) {
+  return (priority == JobPriority::UserInteractive) ? JobPriority::UserInitiated
+                                                    : priority;
+}
+
 /// Flags for task creation.
 class TaskCreateFlags : public FlagSet<size_t> {
 public:
   enum {
-    Priority       = 0,
-    Priority_width = 8,
+    // Priority that user specified while creating the task
+    RequestedPriority = 0,
+    RequestedPriority_width = 8,
 
     Task_IsChildTask                              = 8,
     // bit 9 is unused
@@ -2046,8 +2052,9 @@ public:
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
   constexpr TaskCreateFlags() {}
 
-  FLAGSET_DEFINE_FIELD_ACCESSORS(Priority, Priority_width, JobPriority,
-                                 getPriority, setPriority)
+  FLAGSET_DEFINE_FIELD_ACCESSORS(RequestedPriority, RequestedPriority_width,
+                                 JobPriority, getRequestedPriority,
+                                 setRequestedPriority)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsChildTask,
                                 isChildTask,
                                 setIsChildTask)
@@ -2194,57 +2201,6 @@ public:
                                  getKind, setKind)
 };
 
-/// Kinds of async context.
-enum class AsyncContextKind {
-  /// An ordinary asynchronous function.
-  Ordinary         = 0,
-
-  /// A context which can yield to its caller.
-  Yielding         = 1,
-
-  /// A continuation context.
-  Continuation     = 2,
-
-  // Other kinds are reserved for interesting special
-  // intermediate contexts.
-
-  // Kinds >= 192 are private to the implementation.
-  First_Reserved = 192
-};
-
-/// Flags for async contexts.
-class AsyncContextFlags : public FlagSet<uint32_t> {
-public:
-  enum {
-    Kind                = 0,
-    Kind_width          = 8,
-
-    CanThrow            = 8,
-
-    // Kind-specific flags should grow down from 31.
-
-    Continuation_IsExecutorSwitchForced = 31,
-  };
-
-  explicit AsyncContextFlags(uint32_t bits) : FlagSet(bits) {}
-  constexpr AsyncContextFlags() {}
-  AsyncContextFlags(AsyncContextKind kind) {
-    setKind(kind);
-  }
-
-  /// The kind of context this represents.
-  FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, AsyncContextKind,
-                                 getKind, setKind)
-
-  /// Whether this context is permitted to throw.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow, canThrow, setCanThrow)
-
-  /// See AsyncContinuationFlags::isExecutorSwitchForced.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Continuation_IsExecutorSwitchForced,
-                                continuation_isExecutorSwitchForced,
-                                continuation_setIsExecutorSwitchForced)
-};
-
 /// Flags passed to swift_continuation_init.
 class AsyncContinuationFlags : public FlagSet<size_t> {
 public:
@@ -2310,6 +2266,21 @@ enum class ContinuationStatus : size_t {
 
   /// The continuation has already been resumed, but not yet awaited.
   Resumed = 2
+};
+
+/// Flags that go in a TargetAccessibleFunction structure.
+class AccessibleFunctionFlags : public FlagSet<uint32_t> {
+public:
+  enum {
+    /// Whether this is a "distributed" actor function.
+    Distributed = 0,
+  };
+
+  explicit AccessibleFunctionFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr AccessibleFunctionFlags() {}
+
+  /// Whether the this is a "distributed" actor function.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed, isDistributed, setDistributed)
 };
 
 } // end namespace swift

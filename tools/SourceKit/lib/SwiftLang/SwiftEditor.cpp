@@ -28,11 +28,11 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Indenting.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -245,14 +245,18 @@ SwiftEditorDocumentFileMap::getByUnresolvedName(StringRef FilePath) {
 }
 
 SwiftEditorDocumentRef
-SwiftEditorDocumentFileMap::findByPath(StringRef FilePath) {
+SwiftEditorDocumentFileMap::findByPath(StringRef FilePath, bool IsRealpath) {
   SwiftEditorDocumentRef EditorDoc;
 
-  std::string ResolvedPath = SwiftLangSupport::resolvePathSymlinks(FilePath);
+  std::string Scratch;
+  if (!IsRealpath) {
+    Scratch = SwiftLangSupport::resolvePathSymlinks(FilePath);
+    FilePath = Scratch;
+  }
   Queue.dispatchSync([&]{
     for (auto &Entry : Docs) {
       if (Entry.getKey() == FilePath ||
-          Entry.getValue().ResolvedPath == ResolvedPath) {
+          Entry.getValue().ResolvedPath == FilePath) {
         EditorDoc = Entry.getValue().DocRef;
         break;
       }
@@ -608,7 +612,12 @@ struct SwiftSemanticToken {
     return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, getIsRef());
   }
 };
+#if !defined(_MSC_VER)
 static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
+// FIXME: MSVC doesn't pack bitfields with different underlying types.
+// Giving up to check this in MSVC for now, becasue static_assert is only for
+// keeping low memory usage.
+#endif
 
 class SwiftDocumentSemanticInfo :
     public ThreadSafeRefCountedBase<SwiftDocumentSemanticInfo> {
@@ -650,7 +659,7 @@ public:
   void setCompilerArgs(ArrayRef<const char *> Args) {
     if (auto ASTMgr = this->ASTMgr.lock()) {
       InvokRef =
-          ASTMgr->getInvocation(Args, Filename, CompilerArgsError);
+          ASTMgr->getTypecheckInvocation(Args, Filename, CompilerArgsError);
     }
   }
 
@@ -973,7 +982,7 @@ public:
 
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
-    auto Kind = CodeCompletionResult::getCodeCompletionDeclKind(D);
+    auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
     bool IsSystem = D->getModuleContext()->isSystemModule();
     SemaToks.emplace_back(Kind, ByteOffset, Length, IsRef, IsSystem);
   }
@@ -2011,8 +2020,8 @@ void SwiftEditorDocument::resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
     Args.push_back("-");
     std::string Error;
     // Ignore possible error(s)
-    Lang.getASTManager()->
-      initCompilerInvocation(CompInv, Args, StringRef(), Error);
+    Lang.getASTManager()->initCompilerInvocation(
+        CompInv, Args, FrontendOptions::ActionType::Parse, StringRef(), Error);
   }
   CompInv.getLangOptions().BuildSyntaxTree = BuildSyntaxTree;
   CompInv.setMainFileSyntaxParsingCache(SyntaxCache);

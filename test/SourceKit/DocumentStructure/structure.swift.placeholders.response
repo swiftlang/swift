@@ -41,8 +41,6 @@
           key.kind: source.lang.swift.stmt.foreach,
           key.offset: 59,
           key.length: 28,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.elements: [
             {
               key.kind: source.lang.swift.structure.elem.id,
@@ -68,8 +66,6 @@
               key.kind: source.lang.swift.stmt.brace,
               key.offset: 85,
               key.length: 2,
-              key.nameoffset: 0,
-              key.namelength: 0,
               key.bodyoffset: 86,
               key.bodylength: 0
             }
@@ -90,8 +86,6 @@
       key.kind: source.lang.swift.expr.array,
       key.offset: 239,
       key.length: 22,
-      key.nameoffset: 0,
-      key.namelength: 0,
       key.bodyoffset: 240,
       key.bodylength: 20,
       key.elements: [

@@ -200,7 +200,7 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   SubLocationMap subLocationMap;
   if (!analyzeLocationUsesRecursively(loc, currentLocIdx, collectedVals,
                                       subLocationMap)) {
-    locations.set_size(currentLocIdx);
+    locations.truncate(currentLocIdx);
     for (SILValue V : collectedVals) {
       addr2LocIdx.erase(V);
     }
@@ -365,6 +365,11 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::SwitchEnumAddrInst:
       case SILInstructionKind::WitnessMethodInst:
         break;
+      case SILInstructionKind::MarkUnresolvedMoveAddrInst:
+        // We do not want the memory lifetime verifier to verify move_addr inst
+        // since the MarkUnresolvedMoveAddrChecker will validate that its uses
+        // are correct.
+        return false;
       default:
         return false;
     }

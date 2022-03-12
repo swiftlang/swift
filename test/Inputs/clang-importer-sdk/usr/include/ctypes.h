@@ -196,6 +196,11 @@ STDLIB_TYPEDEF(unsigned int, UInt);
 void noreturnFunction() __attribute__((noreturn));
 void couldReturnFunction() __attribute__((noreturn));
 
+// Struct with an __attribute((swift_name)) field.
+struct Rdar86069786 {
+    double c_name __attribute__((swift_name("swiftName")));
+};
+
 
 //===---
 // Function pointers
@@ -318,5 +323,14 @@ void nullableArrayParameters(const char x[_Nullable], void * const _Nullable y[_
 typedef double real_t __attribute__((availability(swift,unavailable,message="use double")));
 
 extern real_t realSin(real_t value);
+
+struct PartialImport {
+  int a;
+  int b;
+  int _Complex c;
+  int _Complex d;
+};
+
+struct PartialImport partialImport = {1, 2, 3, 4};
 
 #endif

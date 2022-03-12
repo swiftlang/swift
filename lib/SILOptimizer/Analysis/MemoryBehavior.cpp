@@ -171,6 +171,7 @@ public:
   MemBehavior visitLoadInst(LoadInst *LI);
   MemBehavior visitStoreInst(StoreInst *SI);
   MemBehavior visitCopyAddrInst(CopyAddrInst *CAI);
+  MemBehavior visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *MAI);
   MemBehavior visitApplyInst(ApplyInst *AI);
   MemBehavior visitTryApplyInst(TryApplyInst *AI);
   MemBehavior visitBeginApplyInst(BeginApplyInst *AI);
@@ -301,6 +302,25 @@ MemBehavior MemoryBehaviorVisitor::visitCopyAddrInst(CopyAddrInst *CAI) {
   return MemBehavior::None;
 }
 
+MemBehavior MemoryBehaviorVisitor::visitMarkUnresolvedMoveAddrInst(
+    MarkUnresolvedMoveAddrInst *MAI) {
+  bool mayWrite = mayAlias(MAI->getDest());
+  bool mayRead = mayAlias(MAI->getSrc());
+
+  if (mayRead) {
+    if (mayWrite)
+      return MemBehavior::MayReadWrite;
+
+    // mark_unresolved_move_addr doesn't semantically perform a take of src.
+    return MemBehavior::MayRead;
+  }
+
+  if (mayWrite)
+    return MemBehavior::MayWrite;
+
+  return MemBehavior::None;
+}
+
 MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
   // If our callee is not a builtin, be conservative and return may have side
   // effects.
@@ -368,6 +388,7 @@ static bool hasEscapingUses(SILValue address, int &numChecks) {
       case SILInstructionKind::LoadInst:
       case SILInstructionKind::StoreInst:
       case SILInstructionKind::CopyAddrInst:
+      case SILInstructionKind::MarkUnresolvedMoveAddrInst:
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
       case SILInstructionKind::EndAccessInst:
@@ -566,6 +587,17 @@ static SILValue getBeginScopeInst(SILValue V) {
   if (BorrowedValue borrowedObj = getSingleBorrowIntroducingValue(object)) {
     return borrowedObj.value;
   }
+  if (!object->getFunction()->hasOwnership()) {
+    // In non-OSSA, do a quick check if the object is a guaranteed function
+    // argument.
+    // Note that in OSSA, getSingleBorrowIntroducingValue will detect a
+    // guaranteed argument.
+    SILValue root = findOwnershipReferenceAggregate(object);
+    if (auto *funcArg = dyn_cast<SILFunctionArgument>(root)) {
+      if (funcArg->getArgumentConvention().isGuaranteedConvention())
+        return funcArg;
+    }
+  }
   return SILValue();
 }
 
@@ -591,7 +623,7 @@ void AliasAnalysis::computeImmutableScope(SingleValueInstruction *beginScopeInst
       addEndScopeInst(endAccess);
     }
   } else {
-    visitTransitiveEndBorrows(BorrowedValue(beginScopeInst), addEndScopeInst);
+    visitTransitiveEndBorrows(beginScopeInst, addEndScopeInst);
   }
 
   // Second step: walk up the control flow until the beginScopeInst and add

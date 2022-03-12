@@ -17,7 +17,7 @@
 // CHECK-NEXT:     var rawValue: [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:     typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:   }
-// CHECK-NEXT:   @frozen enum PublicClosedEnum : [[ENUM_UNDERLYING_TYPE]] {
+// CHECK-NEXT:   @frozen enum PublicClosedEnum : [[ENUM_UNDERLYING_TYPE]], @unchecked Sendable {
 // CHECK-NEXT:     init?(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     var rawValue: [[ENUM_UNDERLYING_TYPE]] { get }
 // CHECK-NEXT:     typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
@@ -25,7 +25,7 @@
 // CHECK-NEXT:     @available(swift, obsoleted: 3, renamed: "value1")
 // CHECK-NEXT:     static var Value1: PublicPrivate.PublicClosedEnum { get }
 // CHECK-NEXT:   }
-// CHECK-NEXT:   enum PublicOpenEnum : [[ENUM_UNDERLYING_TYPE]] {
+// CHECK-NEXT:   enum PublicOpenEnum : [[ENUM_UNDERLYING_TYPE]], @unchecked Sendable {
 // CHECK-NEXT:     init?(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     var rawValue: [[ENUM_UNDERLYING_TYPE]] { get }
 // CHECK-NEXT:     typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
@@ -33,7 +33,7 @@
 // CHECK-NEXT:     @available(swift, obsoleted: 3, renamed: "value1")
 // CHECK-NEXT:     static var Value1: PublicPrivate.PublicOpenEnum { get }
 // CHECK-NEXT:   }
-// CHECK-NEXT:   struct PublicFlagEnum : OptionSet {
+// CHECK-NEXT:   struct PublicFlagEnum : OptionSet, @unchecked Sendable {
 // CHECK-NEXT:     init(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     let rawValue: [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:     typealias RawValue = [[ENUM_UNDERLYING_TYPE]]

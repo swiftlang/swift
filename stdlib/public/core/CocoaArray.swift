@@ -131,20 +131,22 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<AnyObject>
   ) -> UnsafeMutablePointer<AnyObject> {
-    let nsSubRange = SwiftShims._SwiftNSRange(
-      location: bounds.lowerBound,
-      length: bounds.upperBound - bounds.lowerBound)
+    return withExtendedLifetime(buffer) {
+      let nsSubRange = SwiftShims._SwiftNSRange(
+        location: bounds.lowerBound,
+        length: bounds.upperBound - bounds.lowerBound)
 
-    // Copies the references out of the NSArray without retaining them
-    core.getObjects(target, range: nsSubRange)
+      // Copies the references out of the NSArray without retaining them
+      core.getObjects(target, range: nsSubRange)
 
-    // Make another pass to retain the copied objects
-    var result = target
-    for _ in bounds {
-      result.initialize(to: result.pointee)
-      result += 1
+      // Make another pass to retain the copied objects
+      var result = target
+      for _ in bounds {
+        result.initialize(to: result.pointee)
+        result += 1
+      }
+      return result
     }
-    return result
   }
 
   @_alwaysEmitIntoClient
@@ -154,7 +156,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     guard buffer.count > 0 else { return (makeIterator(), 0) }
     let start = buffer.baseAddress!
     let c = Swift.min(self.count, buffer.count)
-    let end = _copyContents(subRange: 0 ..< c, initializing: start)
+    _ = _copyContents(subRange: 0 ..< c, initializing: start)
     return (IndexingIterator(_elements: self, _position: c), c)
   }
 }

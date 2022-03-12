@@ -1,0 +1,188 @@
+{
+  key.offset: 0,
+  key.length: 318,
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.substructure: [
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "simple.paramNoLabel",
+      key.offset: 0,
+      key.length: 22,
+      key.nameoffset: 0,
+      key.namelength: 19,
+      key.bodyoffset: 20,
+      key.bodylength: 1,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.offset: 20,
+          key.length: 1,
+          key.bodyoffset: 20,
+          key.bodylength: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "simple.paramsNoLabels",
+      key.offset: 23,
+      key.length: 27,
+      key.nameoffset: 23,
+      key.namelength: 21,
+      key.bodyoffset: 45,
+      key.bodylength: 4,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.offset: 45,
+          key.length: 1,
+          key.bodyoffset: 45,
+          key.bodylength: 1
+        },
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.offset: 48,
+          key.length: 1,
+          key.bodyoffset: 48,
+          key.bodylength: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "simple.paramWithLabel",
+      key.offset: 51,
+      key.length: 31,
+      key.nameoffset: 51,
+      key.namelength: 21,
+      key.bodyoffset: 73,
+      key.bodylength: 8,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "label",
+          key.offset: 73,
+          key.length: 8,
+          key.nameoffset: 73,
+          key.namelength: 5,
+          key.bodyoffset: 80,
+          key.bodylength: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "simple.paramsWithLabel",
+      key.offset: 83,
+      key.length: 44,
+      key.nameoffset: 83,
+      key.namelength: 22,
+      key.bodyoffset: 106,
+      key.bodylength: 20,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "label1",
+          key.offset: 106,
+          key.length: 9,
+          key.nameoffset: 106,
+          key.namelength: 6,
+          key.bodyoffset: 114,
+          key.bodylength: 1
+        },
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "label2",
+          key.offset: 117,
+          key.length: 9,
+          key.nameoffset: 117,
+          key.namelength: 6,
+          key.bodyoffset: 125,
+          key.bodylength: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "subscriptNoLabel[b].paramNoLabel",
+      key.offset: 129,
+      key.length: 35,
+      key.nameoffset: 129,
+      key.namelength: 32,
+      key.bodyoffset: 162,
+      key.bodylength: 1,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.call,
+          key.name: "subscriptNoLabel",
+          key.offset: 129,
+          key.length: 19,
+          key.nameoffset: 129,
+          key.namelength: 16,
+          key.bodyoffset: 146,
+          key.bodylength: 1,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.expr.argument,
+              key.offset: 146,
+              key.length: 1,
+              key.bodyoffset: 146,
+              key.bodylength: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.offset: 162,
+          key.length: 1,
+          key.bodyoffset: 162,
+          key.bodylength: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "subscriptWithLabel[label: b].paramWithLabel",
+      key.offset: 165,
+      key.length: 53,
+      key.nameoffset: 165,
+      key.namelength: 43,
+      key.bodyoffset: 209,
+      key.bodylength: 8,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.call,
+          key.name: "subscriptWithLabel",
+          key.offset: 165,
+          key.length: 28,
+          key.nameoffset: 165,
+          key.namelength: 18,
+          key.bodyoffset: 184,
+          key.bodylength: 8,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.expr.argument,
+              key.name: "label",
+              key.offset: 184,
+              key.length: 8,
+              key.nameoffset: 184,
+              key.namelength: 5,
+              key.bodyoffset: 191,
+              key.bodylength: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "label",
+          key.offset: 209,
+          key.length: 8,
+          key.nameoffset: 209,
+          key.namelength: 5,
+          key.bodyoffset: 216,
+          key.bodylength: 1
+        }
+      ]
+    }
+  ]
+}

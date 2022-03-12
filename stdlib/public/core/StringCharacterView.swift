@@ -21,15 +21,7 @@
 import SwiftShims
 
 extension String: BidirectionalCollection {
-  /// A type that represents the number of steps between two `String.Index`
-  /// values, where one value is reachable from the other.
-  ///
-  /// In Swift, *reachability* refers to the ability to produce one value from
-  /// the other through zero or more applications of `index(after:)`.
-  public typealias IndexDistance = Int
-
   public typealias SubSequence = Substring
-
   public typealias Element = Character
 
   /// The position of the first character in a nonempty string.
@@ -76,10 +68,16 @@ extension String: BidirectionalCollection {
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
+    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+
+    // Note: bounds checking in `index(before:)` is tricky as scalar aligning an
+    // index may need to access storage, but it may also move it closer towards
+    // the `startIndex`. Therefore, we must check against the `endIndex` before
+    // aligning, but we need to delay the `i > startIndex` check until after.
+    _precondition(i <= endIndex, "String index is out of bounds")
+    let i = _guts.scalarAlign(i)
     _precondition(i > startIndex, "String index is out of bounds")
 
-    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
-    let i = _guts.scalarAlign(i)
     let stride = _characterStride(endingAt: i)
     let priorOffset = i._encodedOffset &- stride
     return Index(
@@ -95,22 +93,22 @@ extension String: BidirectionalCollection {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
-  ///
-  /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
+  ///   - distance: The distance to offset `i`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
+  /// - Complexity: O(*n*), where *n* is the absolute value of `distance`.
   @inlinable @inline(__always)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _index(i, offsetBy: n)
+    return _index(i, offsetBy: distance)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -135,27 +133,28 @@ extension String: BidirectionalCollection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
-  ///     limit that is greater than `i` has no effect.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
   ///
-  /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
+  /// - Complexity: O(*n*), where *n* is the absolute value of `distance`.
   @inlinable @inline(__always)
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _index(i, offsetBy: n, limitedBy: limit)
+    return _index(i, offsetBy: distance, limitedBy: limit)
   }
 
   /// Returns the distance between two indices.
@@ -168,7 +167,7 @@ extension String: BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the resulting distance.
   @inlinable @inline(__always)
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
     return _distance(from: _guts.scalarAlign(start), to: _guts.scalarAlign(end))
   }

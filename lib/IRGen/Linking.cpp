@@ -80,14 +80,16 @@ bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
 
 UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
     : UniversalLinkageInfo(IGM.Triple, IGM.IRGen.hasMultipleIGMs(),
-                           IGM.IRGen.Opts.ForcePublicLinkage) {}
+                           IGM.IRGen.Opts.ForcePublicLinkage,
+                           IGM.IRGen.Opts.InternalizeSymbols) {}
 
 UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
                                            bool hasMultipleIGMs,
-                                           bool forcePublicDecls)
+                                           bool forcePublicDecls,
+                                           bool isStaticLibrary)
     : IsELFObject(triple.isOSBinFormatELF()),
-      UseDLLStorage(useDllStorage(triple)), HasMultipleIGMs(hasMultipleIGMs),
-      ForcePublicDecls(forcePublicDecls) {}
+      UseDLLStorage(useDllStorage(triple)), Internalize(isStaticLibrary),
+      HasMultipleIGMs(hasMultipleIGMs), ForcePublicDecls(forcePublicDecls) {}
 
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
@@ -469,7 +471,8 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::DispatchThunkAsyncFunctionPointer:
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
-  case Kind::PartialApplyForwarderAsyncFunctionPointer: {
+  case Kind::PartialApplyForwarderAsyncFunctionPointer:
+  case Kind::DistributedAccessorAsyncPointer: {
     std::string Result(getUnderlyingEntityForAsyncFunctionPointer()
         .mangleAsString());
     Result.append("Tu");
@@ -492,10 +495,23 @@ std::string LinkEntity::mangleAsString() const {
     Result.append("Tu");
     return Result;
   }
-  case Kind::PartialApplyForwarder:
+  case Kind::PartialApplyForwarder: {
     std::string Result;
     Result = std::string(static_cast<llvm::Function *>(Pointer)->getName());
     return Result;
+  }
+
+  case Kind::DistributedAccessor: {
+    std::string Result(getSILFunction()->getName());
+    Result.append("TF");
+    return Result;
+  }
+
+  case Kind::AccessibleFunctionRecord: {
+    std::string Result(getSILFunction()->getName());
+    Result.append("HF");
+    return Result;
+  }
   }
   llvm_unreachable("bad entity kind!");
 }
@@ -790,11 +806,14 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
+  case Kind::DistributedAccessorAsyncPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
         .getLinkage(forDefinition);
   case Kind::KnownAsyncFunctionPointer:
     return SILLinkage::PublicExternal;
   case Kind::PartialApplyForwarder:
+  case Kind::DistributedAccessor:
+  case Kind::AccessibleFunctionRecord:
     return SILLinkage::Private;
   }
   llvm_unreachable("bad link entity kind");
@@ -821,6 +840,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
+  case Kind::DistributedAccessorAsyncPointer:
   case Kind::MethodDescriptor:
   case Kind::MethodDescriptorDerivative:
   case Kind::MethodDescriptorInitializer:
@@ -885,6 +905,8 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
   case Kind::PartialApplyForwarder:
   case Kind::KnownAsyncFunctionPointer:
+  case Kind::DistributedAccessor:
+  case Kind::AccessibleFunctionRecord:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -1005,11 +1027,14 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
+  case Kind::DistributedAccessorAsyncPointer:
   case Kind::AsyncFunctionPointerAST:
   case Kind::KnownAsyncFunctionPointer:
     return IGM.AsyncFunctionPointerTy;
   case Kind::PartialApplyForwarder:
     return IGM.FunctionPtrTy;
+  case Kind::AccessibleFunctionRecord:
+    return IGM.AccessibleFunctionRecordTy;
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -1040,12 +1065,14 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::MethodDescriptorAllocator:
   case Kind::OpaqueTypeDescriptor:
   case Kind::OpaqueTypeDescriptorRecord:
+  case Kind::AccessibleFunctionRecord:
     return Alignment(4);
   case Kind::AsyncFunctionPointer:
   case Kind::DispatchThunkAsyncFunctionPointer:
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
+  case Kind::DistributedAccessorAsyncPointer:
   case Kind::KnownAsyncFunctionPointer:
   case Kind::ObjCClassRef:
   case Kind::ObjCClass:
@@ -1092,7 +1119,8 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     return false;
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::DynamicallyReplaceableFunctionVariable:
-  case Kind::SILFunction: {
+  case Kind::SILFunction:
+  case Kind::DistributedAccessor: {
     return getSILFunction()->isWeakImported();
   }
 
@@ -1193,6 +1221,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ReflectionFieldDescriptor:
   case Kind::CoroutineContinuationPrototype:
   case Kind::DifferentiabilityWitness:
+  case Kind::AccessibleFunctionRecord:
     return false;
 
   case Kind::AsyncFunctionPointer:
@@ -1200,6 +1229,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
+  case Kind::DistributedAccessorAsyncPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
         .isWeakImported(module);
   case Kind::KnownAsyncFunctionPointer:
@@ -1328,8 +1358,15 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
+  case Kind::DistributedAccessorAsyncPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
         .getDeclContextForEmission();
+
+  case Kind::DistributedAccessor:
+  case Kind::AccessibleFunctionRecord: {
+    auto *funcDC = getSILFunction()->getDeclContext();
+    return funcDC->getParentModule();
+  }
   }
   llvm_unreachable("invalid decl kind");
 }

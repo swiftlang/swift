@@ -1092,11 +1092,11 @@ shouldBePartiallySpecialized(Type Replacement,
   llvm::SmallSetVector<ArchetypeType *, 2> UsedArchetypes;
   Replacement.visit([&](Type Ty) {
     if (auto Archetype = Ty->getAs<ArchetypeType>()) {
-      if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype->getRoot())) {
+      if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype)) {
         UsedArchetypes.insert(Primary);
       }
 
-      if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype->getRoot())) {
+      if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
         UsedArchetypes.insert(Seq);
       }
     }
@@ -1322,11 +1322,11 @@ void FunctionSignaturePartialSpecializer::collectUsedCallerArchetypes(
     // Add used generic parameters/archetypes.
     Replacement.visit([&](Type Ty) {
       if (auto Archetype = Ty->getAs<ArchetypeType>()) {
-        if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype->getRoot())) {
+        if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype)) {
           UsedCallerArchetypes.insert(Primary);
         }
 
-        if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype->getRoot())) {
+        if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
           UsedCallerArchetypes.insert(Seq);
         }
       }
@@ -1862,7 +1862,18 @@ GenericFuncSpecializer::GenericFuncSpecializer(
 
 /// Return an existing specialization if one exists.
 SILFunction *GenericFuncSpecializer::lookupSpecialization() {
-  if (SILFunction *SpecializedF = M.lookUpFunction(ClonedName)) {
+  SILFunction *SpecializedF = M.lookUpFunction(ClonedName);
+  if (!SpecializedF) {
+    // In case the specialized function is already serialized in an imported
+    // module, we need to take that. This can happen in case of cross-module-
+    // optimization.
+    // Otherwise we could end up that another de-serialized function from the
+    // same module would reference the new (non-external) specialization we
+    // would create here.
+    SpecializedF = M.loadFunction(ClonedName, SILModule::LinkingMode::LinkAll,
+                                  SILLinkage::Shared);
+  }
+  if (SpecializedF) {
     if (ReInfo.getSpecializedType() != SpecializedF->getLoweredFunctionType()) {
       llvm::dbgs() << "Looking for a function: " << ClonedName << "\n"
                    << "Expected type: " << ReInfo.getSpecializedType() << "\n"
@@ -2201,7 +2212,8 @@ protected:
 SILFunction *ReabstractionThunkGenerator::createThunk() {
   SILFunction *Thunk = FunctionBuilder.getOrCreateSharedFunction(
       Loc, ThunkName, ReInfo.getSubstitutedType(), IsBare, IsTransparent,
-      ReInfo.isSerialized(), ProfileCounter(), IsThunk, IsNotDynamic);
+      ReInfo.isSerialized(), ProfileCounter(), IsThunk, IsNotDynamic,
+      IsNotDistributed);
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
@@ -2230,8 +2242,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
       Arguments.push_back(NewArg);
     }
     FullApplySite ApplySite = createReabstractionThunkApply(Builder);
-    SILValue ReturnValue = ApplySite.getSingleDirectResult();
-    assert(ReturnValue && "getSingleDirectResult out of sync with ApplySite?!");
+    SILValue ReturnValue = ApplySite.getPseudoResult();
+    assert(ReturnValue && "getPseudoResult out of sync with ApplySite?!");
     Builder.createReturn(Loc, ReturnValue);
 
     return Thunk;
@@ -2243,8 +2255,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
 
   FullApplySite ApplySite = createReabstractionThunkApply(Builder);
 
-  SILValue ReturnValue = ApplySite.getSingleDirectResult();
-  assert(ReturnValue && "getSingleDirectResult out of sync with ApplySite?!");
+  SILValue ReturnValue = ApplySite.getPseudoResult();
+  assert(ReturnValue && "getPseudoResult out of sync with ApplySite?!");
 
   if (ReturnValueAddr) {
     // Need to store the direct results to the original indirect address.
@@ -2394,10 +2406,10 @@ static bool createPrespecialized(StringRef UnspecializedName,
   SILFunction *UnspecFunc = M.lookUpFunction(UnspecializedName);
   if (UnspecFunc) {
     if (!UnspecFunc->isDefinition())
-      M.loadFunction(UnspecFunc);
+      M.loadFunction(UnspecFunc, SILModule::LinkingMode::LinkAll);
   } else {
-    UnspecFunc = M.getSILLoader()->lookupSILFunction(UnspecializedName,
-                                                     /*declarationOnly*/ false);
+    UnspecFunc = M.loadFunction(UnspecializedName,
+                                SILModule::LinkingMode::LinkAll);
   }
 
   if (!UnspecFunc || !UnspecFunc->isDefinition())
@@ -2469,6 +2481,8 @@ lookupOrCreatePrespecialization(SILOptFunctionBuilder &funcBuilder,
       GenericCloner::createDeclaration(funcBuilder, origF, reInfo, clonedName);
   declaration->setLinkage(SILLinkage::PublicExternal);
 
+  ScopeCloner scopeCloner(*declaration);
+
   return declaration;
 }
 
@@ -2496,7 +2510,20 @@ usePrespecialized(SILOptFunctionBuilder &funcBuilder, ApplySite apply,
     auto specializationAvail = SA->getAvailability();
     auto &ctxt = funcBuilder.getModule().getSwiftModule()->getASTContext();
     auto deploymentAvail = AvailabilityContext::forDeploymentTarget(ctxt);
-    auto currentFnAvailability = apply.getFunction()->getAvailabilityForLinkage();
+    auto currentFn = apply.getFunction();
+    auto isInlinableCtxt = (currentFn->getResilienceExpansion()
+                             == ResilienceExpansion::Minimal);
+    auto currentFnAvailability = currentFn->getAvailabilityForLinkage();
+
+    // If we are in an inlineable function we can't use the specialization except
+    // the inlinable function itself has availability we can use.
+    if (currentFnAvailability.isAlwaysAvailable() && isInlinableCtxt) {
+      continue;
+    }
+    else if (isInlinableCtxt) {
+      deploymentAvail = currentFnAvailability;
+    }
+
     if (!currentFnAvailability.isAlwaysAvailable() &&
         !deploymentAvail.isContainedIn(currentFnAvailability))
       deploymentAvail = currentFnAvailability;
@@ -2594,8 +2621,8 @@ void swift::trySpecializeApplyOfGeneric(
   // cloning the callee. Otherwise, strip it off so that we can optimize
   // the body more.
   IsSerialized_t Serialized = IsNotSerialized;
-  if (F->isSerialized() && RefF->isSerialized())
-    Serialized = IsSerializable;
+  if (F->isSerialized())
+    Serialized = IsSerialized;
 
   // If it is OnoneSupport consider all specializations as non-serialized
   // as we do not SIL serialize their bodies.
@@ -2701,6 +2728,17 @@ void swift::trySpecializeApplyOfGeneric(
                             << "Specialized function type: "
                             << SpecializedF->getLoweredFunctionType() << "\n");
     NewFunctions.push_back(SpecializedF);
+  }
+  if (F->isSerialized() && !SpecializedF->hasValidLinkageForFragileInline()) {
+    // If the specialized function already exists as a "IsNotSerialized" function,
+    // but now it's called from a "IsSerialized" function, we need to mark it as
+    // IsSerialized.
+    SpecializedF->setSerialized(IsSerialized);
+    assert(SpecializedF->hasValidLinkageForFragileInline());
+    
+    // ... including all referenced shared functions.
+    FuncBuilder.getModule().linkFunction(SpecializedF,
+                                         SILModule::LinkingMode::LinkAll);
   }
 
   ORE.emit([&]() {
@@ -2844,9 +2882,10 @@ static SILFunction *lookupExistingSpecialization(SILModule &M,
   // TODO: Cache optimized specializations and perform lookup here?
   // Only check that this function exists, but don't read
   // its body. It can save some compile-time.
-  if (isKnownPrespecialization(FunctionName))
-    return M.findFunction(FunctionName, SILLinkage::PublicExternal);
-
+  if (isKnownPrespecialization(FunctionName)){
+    return M.loadFunction(FunctionName, SILModule::LinkingMode::LinkAll,
+                          SILLinkage::PublicExternal);
+  }
   return nullptr;
 }
 

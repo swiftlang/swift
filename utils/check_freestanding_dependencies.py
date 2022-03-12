@@ -30,34 +30,26 @@ args = parser.parse_args()
 # intended to depend on as few platform symbols/APIs as possible.
 #
 ################################################################################
-icu_dependencies = [
-    "_u_charAge", "_u_charName", "_u_getIntPropertyValue", "_u_getNumericValue",
-    "_u_hasBinaryProperty", "_u_strToLower", "_u_strToTitle", "_u_strToUpper",
-    "_ubrk_close", "_ubrk_following", "_ubrk_open", "_ubrk_preceding",
-    "_ubrk_setText", "_ubrk_setUText", "_unorm2_getNFCInstance",
-    "_unorm2_hasBoundaryBefore", "_unorm2_normalize",
-    "_unorm2_spanQuickCheckYes", "_utext_openUChars", "_utext_openUTF8",
-]
 cxx_dependencies = [
     "___cxa_guard_acquire", "___cxa_guard_release",
 ]
 math_dependencies = [
     "_ceill", "_cos", "_cosf", "_cosl", "_exp", "_exp2", "_exp2f", "_exp2l",
-    "_expf", "_expl", "_fma", "_fmaf", "_fmal", "_fmod", "_fmodf", "_fmodl",
-    "_log", "_log10", "_log10f", "_log10l", "_log2", "_log2f", "_log2l",
-    "_logf", "_logl", "_nearbyintl", "_remainder", "_remainderf", "_remainderl",
-    "_rintl", "_roundl", "_sin", "_sinf", "_sinl", "_truncl",
+    "_expf", "_expl", "_floorl", "_fma", "_fmaf", "_fmal", "_fmod", "_fmodf",
+    "_fmodl", "_log", "_log10", "_log10f", "_log10l", "_log2", "_log2f",
+    "_log2l", "_logf", "_logl", "_nearbyintl", "_remainder", "_remainderf",
+    "_remainderl", "_rintl", "_roundl", "_sin", "_sinf", "_sinl", "_truncl",
 ]
 common_expected_dependencies = [
     "___bzero", "___divti3", "___error", "___stderrp", "___stdoutp",
     "___truncsfhf2", "___udivti3", "_abort", "_arc4random_buf",
-    "_calloc", "_close", "_flockfile", "_floorl", "_fprintf",
+    "_calloc", "_close", "_fflush", "_flockfile", "_fprintf",
     "_fputc", "_fputs", "_free", "_funlockfile", "_fwrite", "_malloc",
     "_malloc_size", "_memchr", "_memcmp", "_memcpy", "_memmove", "_memset",
     "_posix_memalign", "_putc", "_read", "_realloc", "_snprintf", "_strchr",
-    "_strcmp", "_strdup", "_strlen", "_strncmp", "_strtod_l", "_strtof_l",
-    "_strtol", "_strtold_l", "_vsnprintf", "_write",
-] + icu_dependencies + cxx_dependencies + math_dependencies
+    "_strcmp", "_strdup", "_strlen", "_strncmp", "_strtod", "_strtof",
+    "_strtol", "_strtold", "_vprintf", "_vsnprintf", "_write",
+] + cxx_dependencies + math_dependencies
 vendor_apple_specific_dependencies = [
     "___stack_chk_fail", "___stack_chk_guard",
     "_getsectiondata", "__dyld_register_func_for_add_image",

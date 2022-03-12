@@ -14,6 +14,7 @@ add_swift_host_library(swiftAST STATIC
   AccessNotes.cpp
   AccessRequests.cpp
   ArgumentList.cpp
+  ASTBridging.cpp
   ASTContext.cpp
   ASTDemangler.cpp
   ASTDumper.cpp
@@ -43,6 +44,7 @@ add_swift_host_library(swiftAST STATIC
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
   DiagnosticList.cpp
+  DistributedDecl.cpp
   DocComment.cpp
   Effects.cpp
   Evaluator.cpp
@@ -74,11 +76,16 @@ add_swift_host_library(swiftAST STATIC
   ProtocolConformance.cpp
   RawComment.cpp
   RequirementEnvironment.cpp
-  RequirementMachine/GeneratingConformances.cpp
+  RequirementMachine/ConcreteContraction.cpp
+  RequirementMachine/ConcreteTypeWitness.cpp
   RequirementMachine/GenericSignatureQueries.cpp
   RequirementMachine/HomotopyReduction.cpp
+  RequirementMachine/InterfaceType.cpp
   RequirementMachine/KnuthBendix.cpp
+  RequirementMachine/MinimalConformances.cpp
+  RequirementMachine/NormalizeRewritePath.cpp
   RequirementMachine/PropertyMap.cpp
+  RequirementMachine/PropertyRelations.cpp
   RequirementMachine/PropertyUnification.cpp
   RequirementMachine/RequirementLowering.cpp
   RequirementMachine/RequirementMachine.cpp
@@ -86,8 +93,11 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/RewriteContext.cpp
   RequirementMachine/RewriteLoop.cpp
   RequirementMachine/RewriteSystem.cpp
+  RequirementMachine/SimplifySubstitutions.cpp
   RequirementMachine/Symbol.cpp
   RequirementMachine/Term.cpp
+  RequirementMachine/TypeDifference.cpp
+  SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp
   SubstitutionMap.cpp

@@ -108,6 +108,8 @@ tests.test("${Self}/success") {
   % end
 }
 
+#if !os(WASI)
+// Trap tests aren't available on WASI.
 tests.test("${Self}/radixTooLow") {
   ${Self}("0", radix: 2)
   expectCrashLater()
@@ -120,6 +122,7 @@ tests.test("${Self}/radixTooHigh") {
   expectCrashLater()
   let y = ${Self}("0", radix: maxRadix + 1)
 }
+#endif
 
 % end
 

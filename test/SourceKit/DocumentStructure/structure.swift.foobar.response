@@ -70,8 +70,6 @@
               key.kind: source.lang.swift.stmt.if,
               key.offset: 105,
               key.length: 19,
-              key.nameoffset: 0,
-              key.namelength: 0,
               key.elements: [
                 {
                   key.kind: source.lang.swift.structure.elem.condition_expr,
@@ -84,8 +82,6 @@
                   key.kind: source.lang.swift.stmt.brace,
                   key.offset: 113,
                   key.length: 11,
-                  key.nameoffset: 0,
-                  key.namelength: 0,
                   key.bodyoffset: 114,
                   key.bodylength: 9
                 }
@@ -311,8 +307,6 @@
               key.kind: source.lang.swift.stmt.if,
               key.offset: 529,
               key.length: 63,
-              key.nameoffset: 0,
-              key.namelength: 0,
               key.elements: [
                 {
                   key.kind: source.lang.swift.structure.elem.condition_expr,
@@ -325,8 +319,6 @@
                   key.kind: source.lang.swift.stmt.brace,
                   key.offset: 539,
                   key.length: 53,
-                  key.nameoffset: 0,
-                  key.namelength: 0,
                   key.bodyoffset: 540,
                   key.bodylength: 51,
                   key.substructure: [
@@ -344,8 +336,6 @@
                           key.kind: source.lang.swift.expr.argument,
                           key.offset: 564,
                           key.length: 1,
-                          key.nameoffset: 0,
-                          key.namelength: 0,
                           key.bodyoffset: 564,
                           key.bodylength: 1
                         },
@@ -403,9 +393,7 @@
     {
       key.kind: source.lang.swift.syntaxtype.comment.mark,
       key.offset: 666,
-      key.length: 16,
-      key.nameoffset: 0,
-      key.namelength: 0
+      key.length: 16
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -421,9 +409,7 @@
         {
           key.kind: source.lang.swift.syntaxtype.comment.mark,
           key.offset: 711,
-          key.length: 16,
-          key.nameoffset: 0,
-          key.namelength: 0
+          key.length: 16
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -449,16 +435,12 @@
             {
               key.kind: source.lang.swift.syntaxtype.comment.mark,
               key.offset: 774,
-              key.length: 12,
-              key.nameoffset: 0,
-              key.namelength: 0
+              key.length: 12
             },
             {
               key.kind: source.lang.swift.stmt.if,
               key.offset: 795,
               key.length: 70,
-              key.nameoffset: 0,
-              key.namelength: 0,
               key.elements: [
                 {
                   key.kind: source.lang.swift.structure.elem.condition_expr,
@@ -471,17 +453,13 @@
                   key.kind: source.lang.swift.stmt.brace,
                   key.offset: 805,
                   key.length: 60,
-                  key.nameoffset: 0,
-                  key.namelength: 0,
                   key.bodyoffset: 806,
                   key.bodylength: 58,
                   key.substructure: [
                     {
                       key.kind: source.lang.swift.syntaxtype.comment.mark,
                       key.offset: 822,
-                      key.length: 12,
-                      key.nameoffset: 0,
-                      key.namelength: 0
+                      key.length: 12
                     }
                   ]
                 }
@@ -515,8 +493,6 @@
           key.kind: source.lang.swift.stmt.if,
           key.offset: 921,
           key.length: 74,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.elements: [
             {
               key.kind: source.lang.swift.structure.elem.condition_expr,
@@ -529,17 +505,13 @@
               key.kind: source.lang.swift.stmt.brace,
               key.offset: 931,
               key.length: 64,
-              key.nameoffset: 0,
-              key.namelength: 0,
               key.bodyoffset: 932,
               key.bodylength: 62,
               key.substructure: [
                 {
                   key.kind: source.lang.swift.syntaxtype.comment.mark,
                   key.offset: 960,
-                  key.length: 29,
-                  key.nameoffset: 0,
-                  key.namelength: 0
+                  key.length: 29
                 }
               ]
             }
@@ -582,8 +554,6 @@
       key.kind: source.lang.swift.stmt.foreach,
       key.offset: 1114,
       key.length: 17,
-      key.nameoffset: 0,
-      key.namelength: 0,
       key.elements: [
         {
           key.kind: source.lang.swift.structure.elem.id,
@@ -609,8 +579,6 @@
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1129,
           key.length: 2,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.bodyoffset: 1130,
           key.bodylength: 0
         }
@@ -620,8 +588,6 @@
       key.kind: source.lang.swift.stmt.foreach,
       key.offset: 1132,
       key.length: 37,
-      key.nameoffset: 0,
-      key.namelength: 0,
       key.elements: [
         {
           key.kind: source.lang.swift.structure.elem.id,
@@ -642,8 +608,6 @@
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1167,
           key.length: 2,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.bodyoffset: 1168,
           key.bodylength: 0
         }
@@ -653,8 +617,6 @@
       key.kind: source.lang.swift.stmt.while,
       key.offset: 1170,
       key.length: 36,
-      key.nameoffset: 0,
-      key.namelength: 0,
       key.elements: [
         {
           key.kind: source.lang.swift.structure.elem.condition_expr,
@@ -683,8 +645,6 @@
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1204,
           key.length: 2,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.bodyoffset: 1205,
           key.bodylength: 0
         }
@@ -694,8 +654,6 @@
       key.kind: source.lang.swift.stmt.repeatwhile,
       key.offset: 1207,
       key.length: 22,
-      key.nameoffset: 0,
-      key.namelength: 0,
       key.elements: [
         {
           key.kind: source.lang.swift.structure.elem.expr,
@@ -708,8 +666,6 @@
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1214,
           key.length: 2,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.bodyoffset: 1215,
           key.bodylength: 0
         }
@@ -719,8 +675,6 @@
       key.kind: source.lang.swift.stmt.if,
       key.offset: 1230,
       key.length: 33,
-      key.nameoffset: 0,
-      key.namelength: 0,
       key.elements: [
         {
           key.kind: source.lang.swift.structure.elem.condition_expr,
@@ -749,8 +703,6 @@
           key.kind: source.lang.swift.stmt.brace,
           key.offset: 1261,
           key.length: 2,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.bodyoffset: 1262,
           key.bodylength: 0
         }
@@ -760,8 +712,6 @@
       key.kind: source.lang.swift.stmt.switch,
       key.offset: 1264,
       key.length: 67,
-      key.nameoffset: 0,
-      key.namelength: 0,
       key.elements: [
         {
           key.kind: source.lang.swift.structure.elem.expr,
@@ -774,8 +724,6 @@
           key.kind: source.lang.swift.stmt.case,
           key.offset: 1277,
           key.length: 14,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.elements: [
             {
               key.kind: source.lang.swift.structure.elem.pattern,
@@ -788,8 +736,6 @@
           key.kind: source.lang.swift.stmt.case,
           key.offset: 1294,
           key.length: 17,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.elements: [
             {
               key.kind: source.lang.swift.structure.elem.pattern,
@@ -807,8 +753,6 @@
           key.kind: source.lang.swift.stmt.case,
           key.offset: 1314,
           key.length: 15,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.elements: [
             {
               key.kind: source.lang.swift.structure.elem.pattern,
@@ -832,8 +776,6 @@
       key.kind: source.lang.swift.expr.array,
       key.offset: 1347,
       key.length: 9,
-      key.nameoffset: 0,
-      key.namelength: 0,
       key.bodyoffset: 1348,
       key.bodylength: 7,
       key.elements: [
@@ -867,8 +809,6 @@
       key.kind: source.lang.swift.expr.dictionary,
       key.offset: 1370,
       key.length: 15,
-      key.nameoffset: 0,
-      key.namelength: 0,
       key.bodyoffset: 1371,
       key.bodylength: 13,
       key.elements: [
@@ -1102,8 +1042,6 @@
           key.kind: source.lang.swift.expr.argument,
           key.offset: 1787,
           key.length: 2,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.bodyoffset: 1787,
           key.bodylength: 2,
           key.substructure: [
@@ -1111,8 +1049,6 @@
               key.kind: source.lang.swift.expr.closure,
               key.offset: 1787,
               key.length: 2,
-              key.nameoffset: 0,
-              key.namelength: 0,
               key.bodyoffset: 1788,
               key.bodylength: 0,
               key.substructure: [
@@ -1120,8 +1056,6 @@
                   key.kind: source.lang.swift.stmt.brace,
                   key.offset: 1787,
                   key.length: 2,
-                  key.nameoffset: 0,
-                  key.namelength: 0,
                   key.bodyoffset: 1788,
                   key.bodylength: 0
                 }
@@ -1222,8 +1156,6 @@
           key.kind: source.lang.swift.decl.enumcase,
           key.offset: 2006,
           key.length: 18,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.enumelement,
@@ -1264,8 +1196,6 @@
           key.kind: source.lang.swift.decl.enumcase,
           key.offset: 2050,
           key.length: 12,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.enumelement,
@@ -1370,9 +1300,7 @@
               key.name: "ident",
               key.offset: 2204,
               key.length: 15,
-              key.typename: "String",
-              key.nameoffset: 0,
-              key.namelength: 0
+              key.typename: "String"
             },
             {
               key.kind: source.lang.swift.expr.call,
@@ -1424,18 +1352,14 @@
               key.name: "lhs",
               key.offset: 2287,
               key.length: 13,
-              key.typename: "Chain<A>",
-              key.nameoffset: 0,
-              key.namelength: 0
+              key.typename: "Chain<A>"
             },
             {
               key.kind: source.lang.swift.decl.var.parameter,
               key.name: "rhs",
               key.offset: 2302,
               key.length: 13,
-              key.typename: "Chain<A>",
-              key.nameoffset: 0,
-              key.namelength: 0
+              key.typename: "Chain<A>"
             },
             {
               key.kind: source.lang.swift.expr.call,
@@ -1649,8 +1573,6 @@
           key.kind: source.lang.swift.expr.argument,
           key.offset: 2675,
           key.length: 8,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.bodyoffset: 2675,
           key.bodylength: 8
         }
@@ -1805,7 +1727,7 @@
       key.filepath: "-foobar",
       key.severity: source.diagnostic.severity.error,
       key.id: "destructor_decl_outside_class",
-      key.description: "deinitializers may only be declared within a class",
+      key.description: "deinitializers may only be declared within a class or actor",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     }
   ]

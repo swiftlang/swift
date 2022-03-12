@@ -30,34 +30,34 @@ var globalInt: Int { return 17 }
 
 public struct HasWrappers {
   @Wrapper
-  // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref | rel: 0
+  // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref,RelCont | rel: 1
   public var x: Int = globalInt
   // CHECK-NOT: [[@LINE-1]]:23 | variable/Swift | globalInt
-  // CHECK: [[@LINE-4]]:4 | constructor/Swift | init(initialValue:) | [[WrapperInit_USR]] | Ref,Call,Impl | rel: 0
+  // CHECK: [[@LINE-4]]:4 | constructor/Swift | init(initialValue:) | [[WrapperInit_USR]] | Ref,Call,Impl,RelCont | rel: 1
   // CHECK: [[@LINE-3]]:14 | instance-property/Swift | x | [[x_USR:.*]] | Def,RelChild | rel: 1
-  // CHECK: [[@LINE-4]]:23 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read | rel: 0
+  // CHECK: [[@LINE-4]]:23 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read,RelCont | rel: 1
 
   @Wrapper(body: { globalInt })
-  // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref | rel: 0
-  // CHECK: [[@LINE-2]]:20 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read | rel: 0
-  // CHECK: [[@LINE-3]]:4 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR]] | Ref,Call | rel: 0
+  // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref,RelCont | rel: 1
+  // CHECK: [[@LINE-2]]:20 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read,RelCont | rel: 1
+  // CHECK: [[@LINE-3]]:4 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR]] | Ref,Call,RelCont | rel: 1
   public var y: Int
   // CHECK: [[@LINE-1]]:14 | instance-property/Swift | y | [[y_USR:.*]] | Def,RelChild | rel: 1
   // CHECK-NOT: [[@LINE-6]]:20 | variable/Swift | globalInt
 
   @Wrapper(body: {
-  // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref | rel: 0
+  // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref,RelCont | rel: 1
     struct Inner {
       @Wrapper
-      // CHECK: [[@LINE-1]]:8 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref | rel: 0
-      // CHECK: [[@LINE-2]]:8 | constructor/Swift | init(initialValue:) | [[WrapperInit_USR]] | Ref,Call,Impl | rel: 0
+      // CHECK: [[@LINE-1]]:8 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref,RelCont | rel: 1
+      // CHECK: [[@LINE-2]]:8 | constructor/Swift | init(initialValue:) | [[WrapperInit_USR]] | Ref,Call,Impl,RelCont | rel: 1
       var x: Int = globalInt
-      // CHECK: [[@LINE-1]]:20 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read | rel: 0
+      // CHECK: [[@LINE-1]]:20 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read,RelCont | rel: 1
     }
     return Inner().x + globalInt
-    // CHECK: [[@LINE-1]]:24 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read | rel: 0
+    // CHECK: [[@LINE-1]]:24 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read,RelCont | rel: 1
   })
-  // CHECK: [[@LINE-12]]:4 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR]] | Ref,Call | rel: 0
+  // CHECK: [[@LINE-12]]:4 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR]] | Ref,Call,RelCont | rel: 1
   public var z: Int
   // CHECK: [[@LINE-1]]:14 | instance-property/Swift | z | [[z_USR:.*]] | Def,RelChild | rel: 1
 

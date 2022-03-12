@@ -128,6 +128,7 @@ static void deliverResults(SourceKit::TypeContextInfoConsumer &SKConsumer,
 void SwiftLangSupport::getExpressionContextInfo(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     OptionsDictionary *optionsDict, ArrayRef<const char *> Args,
+    SourceKitCancellationToken CancellationToken,
     SourceKit::TypeContextInfoConsumer &SKConsumer,
     Optional<VFSOptions> vfsOptions) {
   std::string error;
@@ -145,14 +146,14 @@ void SwiftLangSupport::getExpressionContextInfo(
   }
 
   performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, fileSystem,
+      UnresolvedInputFile, Offset, Args, fileSystem, CancellationToken,
       [&](CancellableResult<CompletionLikeOperationParams> ParamsResult) {
         ParamsResult.mapAsync<TypeContextInfoResult>(
             [&](auto &CIParams, auto DeliverTransformed) {
               getCompletionInstance()->typeContextInfo(
                   CIParams.Invocation, Args, fileSystem,
                   CIParams.completionBuffer, Offset, CIParams.DiagC,
-                  DeliverTransformed);
+                  CIParams.CancellationFlag, DeliverTransformed);
             },
             [&](auto Result) { deliverResults(SKConsumer, Result); });
       });

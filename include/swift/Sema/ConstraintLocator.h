@@ -85,6 +85,9 @@ enum ContextualTypePurpose : uint8_t {
   CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
                                ///< former 'wrappedValue' type
 
+  CTP_ExprPattern,      ///< `~=` operator application associated with expression
+                        /// pattern.
+
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 
@@ -641,6 +644,32 @@ public:
   }
 };
 
+class LocatorPathElt::PackType : public StoredPointerElement<TypeBase> {
+public:
+  PackType(Type type)
+      : StoredPointerElement(PathElementKind::PackType, type.getPointer()) {
+    assert(type->getDesugaredType()->is<swift::PackType>());
+  }
+
+  Type getType() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::PackType;
+  }
+};
+
+class LocatorPathElt::PackElement final : public StoredIntegerElement<1> {
+public:
+  PackElement(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::PackElement, index) {}
+
+  unsigned getIndex() const { return getValue<0>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PackElement;
+  }
+};
+
 class LocatorPathElt::KeyPathComponent final : public StoredIntegerElement<1> {
 public:
   KeyPathComponent(unsigned index)
@@ -757,6 +786,10 @@ public:
 
   GenericTypeParamType *getType() const {
     return getStoredPointer();
+  }
+    
+  bool isTypeSequence() const {
+    return getType()->isTypeSequence();
   }
 
   static bool classof(const LocatorPathElt *elt) {
@@ -1006,7 +1039,7 @@ public:
     if (auto *repr = node.dyn_cast<TypeRepr *>())
       return repr;
 
-    if (auto *cond = node.dyn_cast<StmtCondition *>())
+    if (auto *cond = node.dyn_cast<StmtConditionElement *>())
       return cond;
 
     if (auto *caseItem = node.dyn_cast<CaseLabelItem *>())

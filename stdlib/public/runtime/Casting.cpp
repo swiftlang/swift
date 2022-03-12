@@ -17,6 +17,7 @@
 
 #include "swift/Runtime/Casting.h"
 #include "../SwiftShims/RuntimeShims.h"
+#include "../SwiftShims/GlobalObjects.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
@@ -76,6 +77,8 @@ extern "C" const void *swift_dynamicCastObjCProtocolConditional(
                          Protocol * const *protocols);
 #endif
 
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+
 // Build a user-comprehensible name for a type.
 static void _buildNameForMetadata(const Metadata *type,
                                   bool qualified,
@@ -124,6 +127,13 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
+#else // SWIFT_STDLIB_HAS_TYPE_PRINTING
+
+std::string swift::nameForMetadata(const Metadata *type, bool qualified) {
+  return "<<< type printer not available >>>";
+}
+
+#endif // SWIFT_STDLIB_HAS_TYPE_PRINTING
 
 /// Used as part of cache key for `TypeNameCache`.
 enum class TypeNameKind {
@@ -1400,6 +1410,14 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 bool _swift_isClassOrObjCExistentialType(const Metadata *value,
                                                     const Metadata *T) {
   return swift_isClassOrObjCExistentialTypeImpl(T);
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+void _swift_setClassMetadata(const HeapMetadata *newClassMetadata,
+                             HeapObject* onObject,
+                             const Metadata *T) {
+  assert(T == newClassMetadata);
+  onObject->metadata = newClassMetadata;
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL

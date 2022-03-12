@@ -667,6 +667,51 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
 }
 
 bool
+ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *decl) const {
+  // ObjC protocols do not require `any`.
+  if (decl->isObjC())
+    return false;
+
+  for (auto member : decl->getMembers()) {
+    // Existential types require `any` if the protocol has an associated type.
+    if (isa<AssociatedTypeDecl>(member))
+      return true;
+
+    // For value members, look at their type signatures.
+    if (auto valueMember = dyn_cast<ValueDecl>(member)) {
+      const auto info = valueMember->findExistentialSelfReferences(
+          decl->getDeclaredInterfaceType(),
+          /*treatNonResultCovariantSelfAsInvariant=*/false);
+      if (info.selfRef > TypePosition::Covariant || info.assocTypeRef) {
+        return true;
+      }
+    }
+  }
+
+  // Check whether any of the inherited protocols require `any`.
+  for (auto proto : decl->getInheritedProtocols()) {
+    if (proto->existentialRequiresAny())
+      return true;
+  }
+
+  return false;
+}
+
+ArrayRef<AssociatedTypeDecl *>
+PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *decl) const {
+  SmallVector<AssociatedTypeDecl *, 2> assocTypes;
+
+  for (auto *assocType : decl->getAssociatedTypeMembers()) {
+    if (assocType->isPrimary())
+      assocTypes.push_back(assocType);
+  }
+
+  return decl->getASTContext().AllocateCopy(assocTypes);
+}
+
+bool
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (isa<ClassDecl>(decl))
     return decl->getAttrs().hasAttribute<FinalAttr>();
@@ -1055,6 +1100,14 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   if (!rawTy) {
     return std::make_tuple<>();
   }
+  
+  // Avoid computing raw values for enum cases in swiftinterface files since raw
+  // values are intentionally omitted from them (unless the enum is @objc).
+  // Without bailing here, incorrect raw values can be automatically generated
+  // and incorrect diagnostics may be omitted for some decls.
+  SourceFile *Parent = ED->getDeclContext()->getParentSourceFile();
+  if (Parent && Parent->Kind == SourceFileKind::Interface && !ED->isObjC())
+    return std::make_tuple<>();
 
   if (!computeAutomaticEnumValueKind(ED)) {
     return std::make_tuple<>();
@@ -1558,7 +1611,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   return requirementInfo.isContainedIn(witnessInfo);
 }
 
-// Returns 'nullptr' if this is the setter's 'newValue' parameter;
+// Returns 'nullptr' if this is the 'newValue' or 'oldValue' parameter;
 // otherwise, returns the corresponding parameter of the subscript
 // declaration.
 static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
@@ -1570,11 +1623,9 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   switch (accessor->getAccessorKind()) {
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
-      return nullptr;
-
   case AccessorKind::Set:
     if (param == accessorParams->get(0)) {
-      // This is the 'newValue' parameter.
+      // This is the 'newValue' or 'oldValue' parameter.
       return nullptr;
     }
 
@@ -1871,6 +1922,14 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
     }
 
     if (isProtocol) {
+      // FIXME: Source compatibility hack for Swift 5. The compiler
+      // accepts member operators on protocols with existential
+      // type arguments. We should consider banning this in Swift 6.
+      if (auto existential = paramType->getAs<ExistentialType>()) {
+        if (selfNominal == existential->getConstraintType()->getAnyNominal())
+          return true;
+      }
+
       // For a protocol, is it the 'Self' type parameter?
       if (auto genericParam = paramType->getAs<GenericTypeParamType>())
         if (genericParam->isEqual(DC->getSelfInterfaceType()))
@@ -2002,15 +2061,9 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   assert(typeRepr != nullptr && "Should call setSpecifier() on "
          "synthesized parameter declarations");
 
-  auto *nestedRepr = typeRepr;
-
   // Look through parens here; other than parens, specifiers
   // must appear at the top level of a parameter type.
-  while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
-    if (!tupleRepr->isParenType())
-      break;
-    nestedRepr = tupleRepr->getElementType(0);
-  }
+  auto *nestedRepr = typeRepr->getWithoutParens();
 
   if (auto isolated = dyn_cast<IsolatedTypeRepr>(nestedRepr))
     nestedRepr = isolated->getBase();
@@ -2082,7 +2135,14 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (decl->isVariadic()) {
-    Ty = VariadicSequenceType::get(Ty);
+    // Handle the monovariadic/polyvariadic interface type split.
+    if (Ty->hasTypeSequence()) {
+      // Polyvariadic types (T...) for <T...> resolve to pack expansions.
+      Ty = PackExpansionType::get(Ty);
+    } else {
+      // Monovariadic types (T...) for <T> resolve to [T].
+      Ty = VariadicSequenceType::get(Ty);
+    }
     if (!ctx.getArrayDecl()) {
       ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
                          diag::sugar_type_not_found, 0);
@@ -2560,11 +2620,6 @@ static ArrayRef<Decl *> evaluateMembersRequest(
         (void) var->getPropertyWrapperInitializerInfo();
       }
     }
-
-    // For a distributed function, add the remote function.
-    if (auto *func = dyn_cast<FuncDecl>(member)) {
-      (void) func->getDistributedActorRemoteFuncDecl();
-    }
   }
 
   SortedDeclList synthesizedMembers;
@@ -2730,15 +2785,24 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   }
 
   // Cannot extend function types, tuple types, etc.
-  if (!extendedType->getAnyNominal()) {
+  if (!extendedType->getAnyNominal() &&
+      !extendedType->is<ParameterizedProtocolType>()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
          .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
-  // Cannot extend a bound generic type, unless it's referenced via a
-  // non-generic typealias type.
-  if (extendedType->isSpecialized() &&
+  // Cannot extend types who contain placeholders.
+  if (extendedType->hasPlaceholder()) {
+    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
+      .highlight(extendedRepr->getSourceRange());
+    return error();
+  }
+
+  // By default, the user cannot extend a bound generic type, unless it's
+  // referenced via a non-generic typealias type.
+  if (!ext->getASTContext().LangOpts.EnableExperimentalBoundGenericExtensions &&
+      extendedType->isSpecialized() &&
       !isNonGenericTypeAliasType(extendedType)) {
     diags.diagnose(ext->getLoc(), diag::extension_specialization,
                    extendedType->getAnyNominal()->getName())

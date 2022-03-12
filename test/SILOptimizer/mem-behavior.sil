@@ -618,6 +618,19 @@ bb0(%0 : @guaranteed $X):
   return %3 : $Int32
 }
 
+// CHECK-LABEL: @testNonOSSAImmutableRefWithGuaranteedParam
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %4 = apply %3() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %1 = ref_element_addr [immutable] %0 : $X, #X.a
+// CHECK-NEXT:   r=1,w=0
+sil @testNonOSSAImmutableRefWithGuaranteedParam : $@convention(thin) (@guaranteed X) -> Int32 {
+bb0(%0 : $X):
+  %1 = ref_element_addr [immutable] %0 : $X, #X.a
+  %3 = load %1 : $*Int32
+  %5 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %6 = apply %5() : $@convention(thin) () -> ()
+  return %3 : $Int32
+}
 // CHECK-LABEL: @testImmutableRefWithBorrow
 // CHECK:      PAIR #1.
 // CHECK-NEXT:     %5 = apply %4() : $@convention(thin) () -> ()

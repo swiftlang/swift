@@ -60,7 +60,8 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateFunction(
       constant.getDecl(), name, SILLinkage::Shared, constantTy, IsBare,
-      IsTransparent, IsSerializable, IsNotDynamic, ProfileCounter(), IsThunk);
+      IsTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
+      ProfileCounter(), IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -108,6 +109,12 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
 void SILGenModule::emitDistributedThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(thunk.isDistributedThunk() && "distributed thunks only");
+  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
+}
+
+void SILGenModule::emitBackDeploymentThunk(SILDeclRef thunk) {
+  // Thunks are always emitted by need, so don't need delayed emission.
+  assert(thunk.isBackDeploymentThunk() && "back deployment thunks only");
   emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
@@ -254,10 +261,11 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateSharedFunction(loc, name, implTy,
-                                           IsBare, IsTransparent, IsSerializable,
+                                           IsBare, IsTransparent, IsSerialized,
                                            ProfileCounter(),
                                            IsThunk,
-                                           IsNotDynamic);
+                                           IsNotDynamic,
+                                           IsNotDistributed);
   
   if (F->empty()) {
     // Emit the implementation.
@@ -506,17 +514,17 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   
   // The thunk that converts an actor-constrained, non-async function to an
   // async function is not serializable if the actor's visibility precludes it.
-  auto serializable = IsSerializable;
+  auto serializable = IsSerialized;
   if (fromGlobalActorBound) {
     auto globalActorLinkage = getTypeLinkage(fromGlobalActorBound);
     serializable = globalActorLinkage >= FormalLinkage::PublicNonUnique
-      ? IsSerializable : IsNotSerialized;
+      ? IsSerialized : IsNotSerialized;
   }
 
   SILGenFunctionBuilder builder(*this);
   return builder.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, serializable,
-      ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed);
 }
 
 SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
@@ -538,7 +546,7 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
   auto *thunk = builder.getOrCreateFunction(
       derivativeFnDecl, name, SILLinkage::Private, constantTy, IsBare,
       IsTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
-      ProfileCounter(), IsThunk);
+      IsNotDistributed, ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
 

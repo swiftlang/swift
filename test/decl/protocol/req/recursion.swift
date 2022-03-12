@@ -10,6 +10,7 @@ extension SomeProtocol where T == Optional<T> { } // expected-error{{same-type c
 
 class X<T> where T == X { // expected-error{{same-type constraint 'T' == 'X<T>' is recursive}}
 // expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
+// expected-error@-2 3{{generic class 'X' has self-referential generic requirements}}
     var type: T { return Swift.type(of: self) } // expected-error{{cannot convert return expression of type 'X<T>.Type' to return type 'T'}}
 }
 
@@ -44,8 +45,7 @@ public protocol P {
 }
 
 public struct S<A: P> where A.T == S<A> {
-// expected-error@-1 {{generic struct 'S' has self-referential generic requirements}}
-// expected-note@-2 {{while resolving type 'S<A>'}}
+// expected-error@-1 3{{generic struct 'S' has self-referential generic requirements}}
   func f(a: A.T) {
     g(a: id(t: a)) // `a` has error type which is diagnosed as circular reference
     _ = A.T.self
@@ -70,8 +70,7 @@ protocol PI {
 }
 
 struct SI<A: PI> : I where A : I, A.T == SI<A> {
-// expected-error@-1 {{generic struct 'SI' has self-referential generic requirements}}
-// expected-note@-2 {{while resolving type 'SI<A>'}}
+// expected-error@-1 3{{generic struct 'SI' has self-referential generic requirements}}
   func ggg<T : I>(t: T.Type) -> T {
     return T()
   }
@@ -98,7 +97,9 @@ struct S5<A: PI> : I where A : I, A.T == S4<A> { }
 
 // Used to hit ArchetypeBuilder assertions
 struct SU<A: P> where A.T == SU {
+// expected-error@-1 3{{generic struct 'SU' has self-referential generic requirements}}
 }
 
 struct SIU<A: PI> : I where A : I, A.T == SIU {
+// expected-error@-1 3{{generic struct 'SIU' has self-referential generic requirements}}
 }

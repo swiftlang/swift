@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
+#include "TypeCheckRegex.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -213,7 +214,7 @@ namespace {
       }
 
       if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
-        LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
+        LTI.binaryExprs.push_back(binaryExpr);
       }  
       
       if (auto favoredType = CS.getFavoredType(expr)) {
@@ -836,6 +837,9 @@ namespace {
           ty = ty->getInOutObjectType();
           flags = flags.withInOut(true);
         }
+        if (arg.isConst()) {
+          flags = flags.withCompileTimeConst(true);
+        }
         result.emplace_back(ty, arg.getLabel(), flags);
       }
     }
@@ -1254,6 +1258,32 @@ namespace {
       return witnessType;
     }
 
+    Type visitRegexLiteralExpr(RegexLiteralExpr *E) {
+      auto &ctx = CS.getASTContext();
+      auto *regexDecl = ctx.getRegexDecl();
+      if (!regexDecl) {
+        ctx.Diags.diagnose(E->getLoc(),
+                           diag::string_processing_lib_missing,
+                           ctx.Id_Regex.str());
+        return Type();
+      }
+      SmallVector<TupleTypeElt, 4> matchElements {ctx.getSubstringType()};
+      if (decodeRegexCaptureTypes(ctx,
+                                  E->getSerializedCaptureStructure(),
+                                  /*atomType*/ ctx.getSubstringType(),
+                                  matchElements)) {
+        ctx.Diags.diagnose(E->getLoc(),
+                           diag::regex_capture_types_failed_to_decode);
+        return Type();
+      }
+      if (matchElements.size() == 1)
+        return BoundGenericStructType::get(
+            regexDecl, Type(), matchElements.front().getType());
+      // Form a tuple.
+      auto matchType = TupleType::get(matchElements, ctx);
+      return BoundGenericStructType::get(regexDecl, Type(), {matchType});
+    }
+
     Type visitDeclRefExpr(DeclRefExpr *E) {
       auto locator = CS.getConstraintLocator(E);
 
@@ -1321,15 +1351,13 @@ namespace {
       // Introduce type variables for unbound generics.
       const auto genericOpener = OpenUnboundGenericType(CS, locator);
       const auto placeholderHandler = HandlePlaceholderType(CS, locator);
-      const auto result = TypeResolution::forContextual(CS.DC, resCtx,
-                                                        genericOpener,
-                                                        placeholderHandler)
-              .resolveType(repr);
+      const auto result = TypeResolution::resolveContextualType(
+          repr, CS.DC, resCtx, genericOpener, placeholderHandler);
       if (result->hasError()) {
         return Type();
       }
       // Diagnose top-level usages of placeholder types.
-      if (isa<TopLevelCodeDecl>(CS.DC) && isa<PlaceholderTypeRepr>(repr)) {
+      if (isa<PlaceholderTypeRepr>(repr->getWithoutParens())) {
         CS.getASTContext().Diags.diagnose(repr->getLoc(),
                                           diag::placeholder_type_not_allowed);
       }
@@ -1581,11 +1609,12 @@ namespace {
           if (specializations.size() > typeVars.size()) {
             de.diagnose(expr->getSubExpr()->getLoc(),
                         diag::type_parameter_count_mismatch,
-                        bgt->getDecl()->getName(),
-                        typeVars.size(), specializations.size(),
-                        false)
-              .highlight(SourceRange(expr->getLAngleLoc(),
-                                     expr->getRAngleLoc()));
+                        bgt->getDecl()->getName(), typeVars.size(),
+                        specializations.size(),
+                        /*too many arguments*/ false,
+                        /*type sequence?*/ false)
+                .highlight(
+                    SourceRange(expr->getLAngleLoc(), expr->getRAngleLoc()));
             de.diagnose(bgt->getDecl(), diag::kind_declname_declared_here,
                         DescriptiveDeclKind::GenericType,
                         bgt->getDecl()->getName());
@@ -1597,13 +1626,12 @@ namespace {
           auto *const locator = CS.getConstraintLocator(expr);
           const auto options =
               TypeResolutionOptions(TypeResolverContext::InExpression);
-          for (size_t i = 0, size = specializations.size(); i < size; ++i) {
-            const auto resolution = TypeResolution::forContextual(
-                CS.DC, options,
+          for (size_t i = 0, e = specializations.size(); i < e; ++i) {
+            const auto result = TypeResolution::resolveContextualType(
+                specializations[i], CS.DC, options,
                 // Introduce type variables for unbound generics.
                 OpenUnboundGenericType(CS, locator),
                 HandlePlaceholderType(CS, locator));
-            const auto result = resolution.resolveType(specializations[i]);
             if (result->hasError())
               return Type();
 
@@ -1697,6 +1725,18 @@ namespace {
       return TupleType::get(elements, CS.getASTContext());
     }
 
+    Type visitPackExpr(PackExpr *expr) {
+      // The type of a pack expression is simply a pack of the types of
+      // its subexpressions.
+      SmallVector<Type, 4> elements;
+      elements.reserve(expr->getNumElements());
+      for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
+        elements.emplace_back(CS.getType(expr->getElement(i)));
+      }
+
+      return PackType::get(CS.getASTContext(), elements);
+    }
+
     Type visitSubscriptExpr(SubscriptExpr *expr) {
       ValueDecl *decl = nullptr;
       if (expr->hasDecl()) {
@@ -1733,16 +1773,12 @@ namespace {
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
       auto joinElementTypes = [&](Optional<Type> elementType) {
-        auto openedElementType = elementType.map([&](Type type) {
-          return CS.openOpaqueType(type, contextualPurpose, locator);
-        });
-
         const auto elements = expr->getElements();
         unsigned index = 0;
 
         using Iterator = decltype(elements)::iterator;
         CS.addJoinConstraint<Iterator>(
-            locator, elements.begin(), elements.end(), openedElementType,
+            locator, elements.begin(), elements.end(), elementType,
             [&](const auto it) {
               auto *locator = CS.getConstraintLocator(
                   expr, LocatorPathElt::TupleElement(index++));
@@ -1755,6 +1791,8 @@ namespace {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        contextualType = CS.openOpaqueType(
+            contextualType, contextualPurpose, locator);
         Optional<Type> arrayElementType =
             ConstraintSystem::isArrayType(contextualType);
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
@@ -1868,8 +1906,6 @@ namespace {
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
         auto openedType =
             CS.openOpaqueType(contextualType, contextualPurpose, locator);
-        openedType = CS.replaceInferableTypesWithTypeVars(
-            openedType, CS.getConstraintLocator(expr));
         auto dictionaryKeyValue =
             ConstraintSystem::isDictionaryType(openedType);
         Type contextualDictionaryKeyType;
@@ -2744,7 +2780,7 @@ namespace {
 
       CS.addConstraint(ConstraintKind::ApplicableFunction,
                        FunctionType::get(params, resultType, extInfo),
-                       CS.getType(expr->getFn()),
+                       CS.getType(fnExpr),
         CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
       // If we ended up resolving the result type variable to a concrete type,
@@ -3697,11 +3733,9 @@ static bool generateInitPatternConstraints(
     return cs.generateWrappedPropertyTypeConstraints(
         wrappedVar, cs.getType(target.getAsExpr()), patternType);
 
-  if (!patternType->is<OpaqueTypeArchetypeType>()) {
-    // Add a conversion constraint between the types.
-    cs.addConstraint(ConstraintKind::Conversion, cs.getType(target.getAsExpr()),
-                     patternType, locator, /*isFavored*/true);
-  }
+  // Add a conversion constraint between the types.
+  cs.addConstraint(ConstraintKind::Conversion, cs.getType(target.getAsExpr()),
+                   patternType, locator, /*isFavored*/true);
 
   return false;
 }
@@ -4215,9 +4249,9 @@ struct ResolvedMemberResult::Implementation {
   Optional<unsigned> BestIdx;
 };
 
-ResolvedMemberResult::ResolvedMemberResult(): Impl(new Implementation()) {};
+ResolvedMemberResult::ResolvedMemberResult(): Impl(new Implementation()) {}
 
-ResolvedMemberResult::~ResolvedMemberResult() { delete Impl; };
+ResolvedMemberResult::~ResolvedMemberResult() { delete Impl; }
 
 ResolvedMemberResult::operator bool() const {
   return !Impl->AllDecls.empty();

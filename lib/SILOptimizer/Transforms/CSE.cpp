@@ -815,8 +815,8 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
   if (!VI) return false;
 
   llvm::SmallSetVector<SILInstruction *, 16> Candidates;
-  auto OldOpenedArchetype = Inst->getOpenedArchetype();
-  auto NewOpenedArchetype = VI->getOpenedArchetype();
+  const auto OldOpenedArchetype = Inst->getDefinedOpenedArchetype();
+  const auto NewOpenedArchetype = VI->getDefinedOpenedArchetype();
 
   // Collect all candidates that may contain opened archetypes
   // that need to be replaced.

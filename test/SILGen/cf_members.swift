@@ -4,15 +4,16 @@ import ImportAsMember
 
 func makeMetatype() -> Struct1.Type { return Struct1.self }
 
-// CHECK-LABEL: sil [ossa] @$s10cf_members17importAsUnaryInityyF
+// CHECK-LABEL: sil [ossa] @$s10cf_members17importAsUnaryInityyF :
 public func importAsUnaryInit() {
   // CHECK: function_ref @CCPowerSupplyCreateDangerous : $@convention(c) () -> @owned CCPowerSupply
   var a = CCPowerSupply(dangerous: ())
   let f: (()) -> CCPowerSupply = CCPowerSupply.init(dangerous:)
   a = f(())
 }
+// CHECK: } // end sil function '$s10cf_members17importAsUnaryInityyF'
 
-// CHECK-LABEL: sil [ossa] @$s10cf_members3foo{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil [ossa] @$s10cf_members3foo{{[_0-9a-zA-Z]*}}F :
 public func foo(_ x: Double) {
 // CHECK: bb0([[X:%.*]] : $Double):
   // CHECK: [[GLOBALVAR:%.*]] = global_addr @IAMStruct1GlobalVar
@@ -67,13 +68,12 @@ public func foo(_ x: Double) {
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu0_ : $@convention(thin) (Struct1) -> @owned @callee_guaranteed (Double) -> Struct1
   // CHECK: [[C:%.*]] = apply [[THUNK]]([[ZVAL]])
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [lexical] [[C]]
   // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
   // CHECK: [[BORROWED_C2:%.*]] = begin_borrow [[C_COPY]]
   let c: (Double) -> Struct1 = z.translate(radians:)
   // CHECK: apply [[BORROWED_C2]]([[X]])
   // CHECK: destroy_value [[C_COPY]]
-  // CHECK: end_borrow [[BORROWED_C]]
   z = c(x)
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu2_ : $@convention(thin) (Struct1) -> @owned @callee_guaranteed (Double) -> Struct1
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
@@ -102,13 +102,12 @@ public func foo(_ x: Double) {
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu4_ : $@convention(thin) (Struct1) -> @owned @callee_guaranteed (Double) -> Struct1
   // CHECK: [[F:%.*]] = apply [[THUNK]]([[ZVAL]])
-  // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
+  // CHECK: [[BORROWED_F:%.*]] = begin_borrow [lexical] [[F]]
   // CHECK: [[F_COPY:%.*]] = copy_value [[BORROWED_F]]
   // CHECK: [[BORROWED_F2:%.*]] = begin_borrow [[F_COPY]]
   let f = z.scale
   // CHECK: apply [[BORROWED_F2]]([[X]])
   // CHECK: destroy_value [[F_COPY]]
-  // CHECK: end_borrow [[BORROWED_F]]
   z = f(x)
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu6_ : $@convention(thin) (Struct1) -> @owned @callee_guaranteed (Double) -> Struct1
   // CHECK: thin_to_thick_function [[THUNK]]
@@ -158,13 +157,12 @@ public func foo(_ x: Double) {
   // CHECK: [[SELF:%.*]] = metatype
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFs5Int32VycSo10IAMStruct1Vmcfu8_ : $@convention(thin) (@thin Struct1.Type) -> @owned @callee_guaranteed () -> Int32
   // CHECK: [[I:%.*]] = apply [[THUNK]]([[SELF]])
-  // CHECK: [[BORROWED_I:%.*]] = begin_borrow [[I]]
+  // CHECK: [[BORROWED_I:%.*]] = begin_borrow [lexical] [[I]]
   // CHECK: [[I_COPY:%.*]] = copy_value [[BORROWED_I]]
   // CHECK: [[BORROWED_I2:%.*]] = begin_borrow [[I_COPY]]
   let i = Struct1.staticMethod
   // CHECK: apply [[BORROWED_I2]]()
   // CHECK: destroy_value [[I_COPY]]
-  // CHECK: end_borrow [[BORROWED_I]]
   y = i()
 
   // TODO: Support @convention(c) references that only capture thin metatype

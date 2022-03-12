@@ -1,7 +1,7 @@
-// RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil %s -o /dev/null -Xfrontend -verify
+// RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil %s -o /dev/null -Xfrontend -verify -Xfrontend -enable-lexical-borrow-scopes=false
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swiftc_driver -wmo -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil -save-optimization-record=yaml  -save-optimization-record-path %t/note.yaml %s -o /dev/null && %FileCheck --input-file=%t/note.yaml %s
+// RUN: %target-swiftc_driver -wmo -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil -save-optimization-record=yaml  -save-optimization-record-path %t/note.yaml -Xfrontend -enable-lexical-borrow-scopes=false %s -o /dev/null && %FileCheck --input-file=%t/note.yaml %s
 
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
 

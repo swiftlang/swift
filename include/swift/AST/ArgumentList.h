@@ -83,6 +83,9 @@ public:
   /// Whether the argument is \c inout, denoted with the '&' prefix.
   bool isInOut() const;
 
+  /// Whether the argument is a compile-time constant value.
+  bool isConst() const;
+
   bool operator==(const Argument &other) {
     return LabelLoc == other.LabelLoc && Label == other.Label &&
            ArgExpr == other.ArgExpr;
@@ -246,11 +249,13 @@ public:
   static ArgumentList *
   createImplicit(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
                  SourceLoc rParenLoc,
+                 Optional<unsigned> firstTrailingClosureIndex = None,
                  AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a set of \p args.
   static ArgumentList *
   createImplicit(ASTContext &ctx, ArrayRef<Argument> args,
+                 Optional<unsigned> firstTrailingClosureIndex = None,
                  AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a single labeled argument

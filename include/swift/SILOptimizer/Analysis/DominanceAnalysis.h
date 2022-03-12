@@ -36,6 +36,10 @@ public:
   DominanceAnalysis(const DominanceAnalysis &) = delete;
   DominanceAnalysis &operator=(const DominanceAnalysis &) = delete;
 
+  static SILAnalysisKind getAnalysisKind() {
+    return SILAnalysisKind::Dominance;
+  }
+
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == SILAnalysisKind::Dominance;
   }
@@ -64,6 +68,10 @@ public:
 
   PostDominanceAnalysis(const PostDominanceAnalysis &) = delete;
   PostDominanceAnalysis &operator=(const PostDominanceAnalysis &) = delete;
+
+  static SILAnalysisKind getAnalysisKind() {
+    return SILAnalysisKind::PostDominance;
+  }
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == SILAnalysisKind::PostDominance;

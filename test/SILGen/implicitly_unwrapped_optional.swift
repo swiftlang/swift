@@ -8,7 +8,8 @@ func foo(f f: (() -> ())!) {
 // CHECK: sil hidden [ossa] @{{.*}}foo{{.*}} : $@convention(thin) (@guaranteed Optional<@callee_guaranteed () -> ()>) -> () {
 // CHECK: bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed () -> ()>):
 // CHECK:   [[F:%.*]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
-// CHECK:   [[PF:%.*]] = project_box [[F]]
+// CHECK:   [[F_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[F]]
+// CHECK:   [[PF:%.*]] = project_box [[F_LIFETIME]]
 // CHECK:   [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK:   store [[T0_COPY]] to [init] [[PF]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PF]] : $*Optional<@callee_guaranteed () -> ()>
@@ -26,6 +27,7 @@ func foo(f f: (() -> ())!) {
 // CHECK:   end_borrow [[B]]
 // CHECK:   br bb2
 // CHECK: bb2(
+// CHECK:   end_borrow [[F_LIFETIME]]
 // CHECK:   destroy_value [[F]]
 // CHECK:   return
 // CHECK: bb3:

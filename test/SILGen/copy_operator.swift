@@ -1,6 +1,6 @@
-// RUN: %target-swift-emit-silgen -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-experimental-move-only | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-experimental-move-only | %FileCheck -check-prefix=CHECK-SIL %s
-// RUN: %target-swift-emit-sil -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -enable-experimental-move-only | %FileCheck -check-prefix=CHECK-SIL-OPT %s
+// RUN: %target-swift-emit-silgen -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-experimental-move-only | %FileCheck %s
+// RUN: %target-swift-emit-sil -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-experimental-move-only | %FileCheck -check-prefix=CHECK-SIL %s
+// RUN: %target-swift-emit-sil -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -enable-experimental-move-only | %FileCheck -check-prefix=CHECK-SIL-OPT %s
 
 import Swift
 

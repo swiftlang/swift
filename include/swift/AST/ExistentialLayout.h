@@ -37,6 +37,7 @@ struct ExistentialLayout {
 
   ExistentialLayout(ProtocolType *type);
   ExistentialLayout(ProtocolCompositionType *type);
+  ExistentialLayout(ParameterizedProtocolType *type);
 
   /// The explicit superclass constraint, if any.
   Type explicitSuperclass;
@@ -108,6 +109,10 @@ private:
 
   /// Zero or more protocol constraints from a ProtocolCompositionType
   ArrayRef<Type> protocols;
+
+  /// Zero or more primary associated type requirements from a
+  /// ParameterizedProtocolType
+  ArrayRef<Type> sameTypeRequirements;
 };
 
 }

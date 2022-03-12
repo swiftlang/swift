@@ -85,10 +85,13 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
   // providing failure status instead of just returning the original string like
   // swift demangle.
 #if defined(_WIN32)
-  static StaticMutex mutex;
-
   char szUndName[1024];
-  DWORD dwResult = mutex.withLock([&syminfo, &szUndName]() {
+  DWORD dwResult;
+  dwResult = _swift_withWin32DbgHelpLibrary([&] (bool isInitialized) -> DWORD {
+    if (!isInitialized) {
+      return 0;
+    }
+
     DWORD dwFlags = UNDNAME_COMPLETE;
 #if !defined(_WIN64)
     dwFlags |= UNDNAME_32_BIT_DECODE;
@@ -98,7 +101,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
                                 sizeof(szUndName), dwFlags);
   });
 
-  if (dwResult == TRUE) {
+  if (dwResult) {
     symbolName += szUndName;
     return true;
   }
@@ -265,11 +268,13 @@ struct crashreporter_annotations_t gCRAnnotations
 __attribute__((__section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
     CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
 }
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
 // Report a message to any forthcoming crash log.
 static void
 reportOnCrash(uint32_t flags, const char *message)
 {
+#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
   // We must use an "unsafe" mutex in this pathway since the normal "safe"
   // mutex calls fatalError when an error is detected and fatalError ends up
   // calling us. In other words we could get infinite recursion if the
@@ -290,17 +295,10 @@ reportOnCrash(uint32_t flags, const char *message)
   CRSetCrashLogMessage(newMessage);
 
   crashlogLock.unlock();
-}
-
 #else
-
-static void
-reportOnCrash(uint32_t flags, const char *message)
-{
   // empty
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 }
-
-#endif
 
 // Report a message to system console and stderr.
 static void
@@ -454,4 +452,11 @@ void swift::swift_abortDynamicReplacementDisabling() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
                     "Fatal error: trying to disable a dynamic replacement "
                     "that is already disabled");
+}
+
+/// Halt due to trying to use unicode data on platforms that don't have it.
+void swift::swift_abortDisabledUnicodeSupport() {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "Unicode normalization data is disabled on this platform");
+
 }

@@ -71,6 +71,15 @@ ERROR(class_subscript_not_in_class,none,
       "class subscripts are only allowed within classes; "
       "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 subscript", (bool))
 
+ERROR(require_static_for_const,none,
+      "'static' is required for _const variable declaration", ())
+
+ERROR(require_let_for_const,none,
+      "let is required for a _const variable declaration", ())
+
+ERROR(require_const_initializer_for_const,none,
+      "_const let should be initialized with a compile-time literal", ())
+
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
       "expected '{' in body of function declaration", ())

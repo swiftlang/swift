@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -9,9 +9,6 @@
 
 // Crash expectations can't be implemented on WASI/WebAssembly.
 // UNSUPPORTED: OS=wasi
-
-// Disabled until test hang can be looked at.
-// UNSUPPORTED: OS=windows-msvc
 
 // UNSUPPORTED: use_os_stdlib
 

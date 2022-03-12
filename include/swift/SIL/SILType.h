@@ -46,8 +46,8 @@ namespace swift {
 /// It checks only the type itself, but does not try to
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
-/// \returns The found archetype or empty type otherwise.
-CanArchetypeType getOpenedArchetypeOf(CanType Ty);
+/// \returns The found opened archetype or empty type otherwise.
+CanOpenedArchetypeType getOpenedArchetypeOf(CanType Ty);
 
 /// How an existential type container is represented.
 enum class ExistentialRepresentation {
@@ -231,12 +231,26 @@ public:
   EnumDecl *getEnumOrBoundGenericEnum() const {
     return getASTType().getEnumOrBoundGenericEnum();
   }
+  
+  /// Returns true if this type is an enum or contains an enum.
+  bool isOrHasEnum() const {
+    return getASTType().findIf([](Type ty) {
+      return ty->getEnumOrBoundGenericEnum() != nullptr;
+    });
+  }
+
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
     return getASTType().getNominalOrBoundGenericNominal();
   }
-  
+
+  /// If this type maps to a Swift class, check if that class is a foreign
+  /// reference type.
+  bool isForeignReferenceType() const {
+    return getASTType().isForeignReferenceType();
+  }
+
   /// True if the type is an address type.
   bool isAddress() const { return getCategory() == SILValueCategory::Address; }
 

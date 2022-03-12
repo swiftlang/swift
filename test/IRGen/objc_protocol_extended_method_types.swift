@@ -29,7 +29,7 @@ import Foundation
 // CHECK-JIT-DAG: [[TY_ID:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
 // CHECK-JIT-DAG: [[TY_INT_INT:@.*]] = private unnamed_addr constant [11 x i8] c"q24@0:8q16\00"
 
-// CHECK-LABEL: @_PROTOCOL_METHOD_TYPES__TtP35objc_protocol_extended_method_types1P_ = internal constant [16 x i8*] [
+// CHECK-LABEL: @_PROTOCOL_METHOD_TYPES__TtP35objc_protocol_extended_method_types1P_ = weak hidden constant [16 x i8*] [
 // -- required instance methods:
 //   -- requiredInstanceMethod
 // CHECK:         i8* getelementptr inbounds ([31 x i8], [31 x i8]* [[NSNUMBER]], i64 0, i64 0),
@@ -99,7 +99,7 @@ print(P.self)
 // CHECK-JIT: br label %[[FINISH_LABEL:[^ ]+]]
 
 // CHECK-JIT: [[NEW_PROTOCOL_LABEL]]:
-// CHECK-JIT: [[NEW_PROTOCOL:%.+]] = call %swift.protocol* @objc_allocateProtocol(i8* getelementptr inbounds ([45 x i8], [45 x i8]* @2, i64 0, i64 0))
+// CHECK-JIT: [[NEW_PROTOCOL:%.+]] = call %swift.protocol* @objc_allocateProtocol(i8* getelementptr inbounds ([45 x i8], [45 x i8]* @{{.*}}, i64 0, i64 0))
 // -- requiredInstanceMethod:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(requiredInstanceMethod:)", i64 0, i64 0))
 // CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})

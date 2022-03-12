@@ -94,15 +94,15 @@ public struct S5 : P {
 // CHECK-NEXT:    public func withBase()
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: extension S6 where T : Middle<U> {
+// CHECK-LABEL: extension S6 where T : print_synthesized_extensions_superclass.Middle<U> {
 // CHECK-NEXT:    public func withMiddleAbstract()
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: extension S6 where T : Middle<Int> {
+// CHECK-LABEL: extension S6 where T : print_synthesized_extensions_superclass.Middle<Int> {
 // CHECK-NEXT:    public func withMiddleConcrete()
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: extension S6 where T : Most {
+// CHECK-LABEL: extension S6 where T : print_synthesized_extensions_superclass.Most {
 // CHECK-NEXT:    public func withMost()
 // CHECK-NEXT:  }
 
@@ -113,11 +113,11 @@ public struct S6<T, U> : P where T : Base {}
 // CHECK-NEXT:    public func withMiddleAbstract()
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: extension S7 where T : Middle<Int> {
+// CHECK-LABEL: extension S7 where T : print_synthesized_extensions_superclass.Middle<Int> {
 // CHECK-NEXT:    public func withMiddleConcrete()
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: extension S7 where T : Most {
+// CHECK-LABEL: extension S7 where T : print_synthesized_extensions_superclass.Most {
 // CHECK-NEXT:    public func withMost()
 // CHECK-NEXT:  }
 

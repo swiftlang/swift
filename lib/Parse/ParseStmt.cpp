@@ -948,13 +948,19 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
     // Change the DeclContext for any variables declared in the defer to be within
     // the defer closure.
     ParseFunctionBody cc(*this, tempDecl);
-    
+    llvm::SaveAndRestore<Optional<StableHasher>> T(
+        CurrentTokenHash, StableHasher::defaultHasher());
+
     ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::expected_lbrace_after_defer);
     if (Body.isNull())
       return nullptr;
     Status |= Body;
-    tempDecl->setBodyParsed(Body.get());
+
+    // Clone the current hasher and extract a Fingerprint.
+    StableHasher currentHash{*CurrentTokenHash};
+    Fingerprint fp(std::move(currentHash));
+    tempDecl->setBodyParsed(Body.get(), fp);
   }
   
   SourceLoc loc = tempDecl->getBodySourceRange().Start;

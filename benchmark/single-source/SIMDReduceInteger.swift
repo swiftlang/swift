@@ -85,7 +85,7 @@ let int32Data: UnsafeBufferPointer<Int32> = {
   let untyped = UnsafeMutableRawBufferPointer.allocate(
     byteCount: MemoryLayout<Int32>.size * count, alignment: 16
   )
-  // Intialize the memory as Int32 and fill with random values.
+  // Initialize the memory as Int32 and fill with random values.
   let typed = untyped.initializeMemory(as: Int32.self, repeating: 0)
   var g = SplitMix64(seed: 0)
   for i in 0 ..< typed.count {
@@ -172,7 +172,7 @@ let int8Data: UnsafeBufferPointer<Int8> = {
   let untyped = UnsafeMutableRawBufferPointer.allocate(
     byteCount: MemoryLayout<Int8>.size * count, alignment: 16
   )
-  // Intialize the memory as Int8 and fill with random values.
+  // Initialize the memory as Int8 and fill with random values.
   let typed = untyped.initializeMemory(as: Int8.self, repeating: 0)
   var g = SplitMix64(seed: 0)
   for i in 0 ..< typed.count {

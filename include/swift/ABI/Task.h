@@ -222,9 +222,9 @@ public:
     void *Storage[14];
 
     /// Initialize this storage during the creation of a task.
-    void initialize(AsyncTask *task);
-    void initializeWithSlab(AsyncTask *task,
-                            void *slab, size_t slabCapacity);
+    void initialize(JobPriority basePri);
+    void initializeWithSlab(JobPriority basePri, void *slab,
+                            size_t slabCapacity);
 
     /// React to the completion of the enclosing task's execution.
     void complete(AsyncTask *task);
@@ -250,7 +250,7 @@ public:
     : Job(flags, run, metadata, captureCurrentVoucher),
       ResumeContext(initialContext) {
     assert(flags.isAsyncTask());
-    Id = getNextTaskId();
+    setTaskId();
   }
 
   /// Create a task with "immortal" reference counts.
@@ -265,10 +265,21 @@ public:
     : Job(flags, run, metadata, immortal, captureCurrentVoucher),
       ResumeContext(initialContext) {
     assert(flags.isAsyncTask());
-    Id = getNextTaskId();
+    setTaskId();
   }
 
   ~AsyncTask();
+
+  /// Set the task's ID field to the next task ID.
+  void setTaskId();
+  uint64_t getTaskId();
+
+  /// Get the task's resume function, for logging purposes only. This will
+  /// attempt to see through the various adapters that are sometimes used, and
+  /// failing that will return ResumeTask. The returned function pointer may
+  /// have a different signature than ResumeTask, and it's only for identifying
+  /// code associated with the task.
+  const void *getResumeFunctionForLogging();
 
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
@@ -279,6 +290,22 @@ public:
     return ResumeTask(ResumeContext); // 'return' forces tail call
   }
 
+  /// A task can have the following states:
+  ///   * suspended: In this state, a task is considered not runnable
+  ///   * enqueued: In this state, a task is considered runnable
+  ///   * running on a thread
+  ///   * completed
+  ///
+  /// The following state transitions are possible:
+  ///       suspended -> enqueued
+  ///       suspended -> running
+  ///       enqueued -> running
+  ///       running -> suspended
+  ///       running -> completed
+  ///       running -> enqueued
+  ///
+  /// The 4 methods below are how a task switches from one state to another.
+
   /// Flag that this task is now running.  This can update
   /// the priority stored in the job flags if the priority has been
   /// escalated.
@@ -286,16 +313,13 @@ public:
   /// Generally this should be done immediately after updating
   /// ActiveTask.
   void flagAsRunning();
-  void flagAsRunning_slow();
 
-  /// Flag that this task is now suspended.  This can update the
-  /// priority stored in the job flags if the priority hsa been
-  /// escalated.  Generally this should be done immediately after
-  /// clearing ActiveTask and immediately before enqueuing the task
-  /// somewhere.  TODO: record where the task is enqueued if
-  /// possible.
+  /// Flag that this task is now suspended.
   void flagAsSuspended();
-  void flagAsSuspended_slow();
+
+  /// Flag that the task is to be enqueued on the provided executor and actually
+  /// enqueue it
+  void flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor);
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.
@@ -566,14 +590,6 @@ private:
     return reinterpret_cast<AsyncTask *&>(
         SchedulerPrivate[NextWaitingTaskIndex]);
   }
-
-  /// Get the next non-zero Task ID.
-  uint32_t getNextTaskId() {
-    static std::atomic<uint32_t> Id(1);
-    uint32_t Next = Id.fetch_add(1, std::memory_order_relaxed);
-    if (Next == 0) Next = Id.fetch_add(1, std::memory_order_relaxed);
-    return Next;
-  }
 };
 
 // The compiler will eventually assume these.
@@ -615,19 +631,9 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_resume
     ResumeParent;
 
-  /// Flags describing this context.
-  ///
-  /// Note that this field is only 32 bits; any alignment padding
-  /// following this on 64-bit platforms can be freely used by the
-  /// function.  If the function is a yielding function, that padding
-  /// is of course interrupted by the YieldToParent field.
-  AsyncContextFlags Flags;
-
-  AsyncContext(AsyncContextFlags flags,
-               TaskContinuationFunction *resumeParent,
+  AsyncContext(TaskContinuationFunction *resumeParent,
                AsyncContext *parent)
-    : Parent(parent), ResumeParent(resumeParent),
-      Flags(flags) {}
+    : Parent(parent), ResumeParent(resumeParent) {}
 
   AsyncContext(const AsyncContext &) = delete;
   AsyncContext &operator=(const AsyncContext &) = delete;
@@ -651,36 +657,58 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_yield
     YieldToParent;
 
-  YieldingAsyncContext(AsyncContextFlags flags,
-                       TaskContinuationFunction *resumeParent,
+  YieldingAsyncContext(TaskContinuationFunction *resumeParent,
                        TaskContinuationFunction *yieldToParent,
                        AsyncContext *parent)
-    : AsyncContext(flags, resumeParent, parent),
+    : AsyncContext(resumeParent, parent),
       YieldToParent(yieldToParent) {}
-
-  static bool classof(const AsyncContext *context) {
-    return context->Flags.getKind() == AsyncContextKind::Yielding;
-  }
 };
 
 /// An async context that can be resumed as a continuation.
 class ContinuationAsyncContext : public AsyncContext {
 public:
+  class FlagsType : public FlagSet<size_t> {
+  public:
+    enum {
+      CanThrow = 0,
+      IsExecutorSwitchForced = 1,
+    };
+
+    explicit FlagsType(size_t bits) : FlagSet(bits) {}
+    constexpr FlagsType() {}
+
+    /// Whether this is a throwing continuation.
+    FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow,
+                                  canThrow,
+                                  setCanThrow)
+
+    /// See AsyncContinuationFlags::isExecutorSwitchForced().
+    FLAGSET_DEFINE_FLAG_ACCESSORS(IsExecutorSwitchForced,
+                                  isExecutorSwitchForced,
+                                  setIsExecutorSwitchForced)
+  };
+
+  /// Flags for the continuation.  Not public ABI.
+  FlagsType Flags;
+
   /// An atomic object used to ensure that a continuation is not
   /// scheduled immediately during a resume if it hasn't yet been
-  /// awaited by the function which set it up.
+  /// awaited by the function which set it up.  Not public ABI.
   std::atomic<ContinuationStatus> AwaitSynchronization;
 
   /// The error result value of the continuation.
   /// This should be null-initialized when setting up the continuation.
   /// Throwing resumers must overwrite this with a non-null value.
+  /// Public ABI.
   SwiftError *ErrorResult;
 
   /// A pointer to the normal result value of the continuation.
   /// Normal resumers must initialize this before resuming.
+  /// Public ABI.
   OpaqueValue *NormalResult;
 
   /// The executor that should be resumed to.
+  /// Public ABI.
   ExecutorRef ResumeToExecutor;
 
   void setErrorResult(SwiftError *error) {
@@ -688,11 +716,7 @@ public:
   }
 
   bool isExecutorSwitchForced() const {
-    return Flags.continuation_isExecutorSwitchForced();
-  }
-
-  static bool classof(const AsyncContext *context) {
-    return context->Flags.getKind() == AsyncContextKind::Continuation;
+    return Flags.isExecutorSwitchForced();
   }
 };
 

@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/DataTypes.h"
+#include <cstdint>
 
 #ifndef SWIFT_LAYOUT_CONSTRAINTKIND_H
 #define SWIFT_LAYOUT_CONSTRAINTKIND_H

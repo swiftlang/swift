@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
 
 protocol MyFormattedPrintable {
   func myFormat() -> String
@@ -230,9 +230,7 @@ class Top {}
 class Bottom<T : Bottom<Top>> {}
 // expected-error@-1 {{'Bottom' requires that 'Top' inherit from 'Bottom<Top>'}}
 // expected-note@-2 {{requirement specified as 'T' : 'Bottom<Top>' [with T = Top]}}
-// expected-error@-3 {{generic class 'Bottom' has self-referential generic requirements}}
-// expected-note@-4 {{while resolving type 'Bottom<Top>'}}
-// expected-note@-5 {{through reference here}}
+// expected-error@-3 *{{generic class 'Bottom' has self-referential generic requirements}}
 
 // Invalid inheritance clause
 
@@ -245,3 +243,15 @@ struct UnsolvableInheritance2<T : U.A, U : T.A> {}
 
 enum X7<T> where X7.X : G { case X } // expected-error{{enum case 'X' is not a member type of 'X7<T>'}}
 // expected-error@-1{{cannot find type 'G' in scope}}
+
+// Test that contextual type resolution for generic metatypes is consistent
+// under a same-type constraint.
+protocol MetatypeTypeResolutionProto {}
+struct X8<T> {
+  static var property1: T.Type { T.self }
+  static func method1() -> T.Type { T.self }
+}
+extension X8 where T == MetatypeTypeResolutionProto {
+  static var property2: T.Type { property1 } // ok, still .Protocol
+  static func method2() -> T.Type { method1() } // ok, still .Protocol
+}

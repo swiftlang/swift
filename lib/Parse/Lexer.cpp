@@ -20,6 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/ExperimentalRegexBridging.h"
 #include "swift/Syntax/Trivia.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
@@ -30,21 +31,21 @@
 // FIXME: Figure out if this can be migrated to LLVM.
 #include "clang/Basic/CharInfo.h"
 
-// Regex parser delivered via libSwift
-#include "swift/Parse/ExperimentalRegexBridging.h"
-static ParseRegexStrawperson parseRegexStrawperson = nullptr;
-void Parser_registerParseRegexStrawperson(ParseRegexStrawperson fn) {
-  parseRegexStrawperson = fn;
-}
-
 #include <limits>
+
+// Regex lexing delivered via libSwift.
+#include "swift/Parse/ExperimentalRegexBridging.h"
+static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
+void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
+  regexLiteralLexingFn = fn;
+}
 
 using namespace swift;
 using namespace swift::syntax;
 
-// clang::isIdentifierHead and clang::isIdentifierBody are deliberately not in
-// this list as a reminder that they are using C rules for identifiers.
-// (Admittedly these are the same as Swift's right now.)
+// clang::isAsciiIdentifierStart and clang::isAsciiIdentifierContinue are
+// deliberately not in this list as a reminder that they are using C rules for
+// identifiers. (Admittedly these are the same as Swift's right now.)
 using clang::isAlphanumeric;
 using clang::isDigit;
 using clang::isHexDigit;
@@ -521,7 +522,7 @@ void Lexer::skipSlashStarComment() {
 
 static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
   if (c < 0x80)
-    return clang::isIdentifierBody(c, /*dollar*/true);
+    return clang::isAsciiIdentifierContinue(c, /*dollar*/true);
   
   // N1518: Recommendations for extended identifier characters for C and C++
   // Proposed Annex X.1: Ranges of characters allowed
@@ -679,10 +680,10 @@ void Lexer::lexHash() {
 
   // Scan for [a-zA-Z]+ to see what we match.
   const char *tmpPtr = CurPtr;
-  if (clang::isIdentifierHead(*tmpPtr)) {
+  if (clang::isAsciiIdentifierStart(*tmpPtr)) {
     do {
       ++tmpPtr;
-    } while (clang::isIdentifierBody(*tmpPtr));
+    } while (clang::isAsciiIdentifierContinue(*tmpPtr));
   }
 
   // Map the character sequence onto
@@ -1795,9 +1796,6 @@ static void validateMultilineIndents(const Token &Str,
 
 /// Emit diagnostics for single-quote string and suggest replacement
 /// with double-quoted equivalent.
-///
-/// Or, if we're in experimental regex mode, we will emit a custom
-/// error message instead, determined by the Swift library.
 void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
                                              const char *TokEnd) {
   assert(*TokStart == '\'' && TokEnd[-1] == '\'');
@@ -1806,15 +1804,6 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
 
   auto startLoc = Lexer::getSourceLoc(TokStart);
   auto endLoc = Lexer::getSourceLoc(TokEnd);
-
-  if (LangOpts.EnableExperimentalStringProcessing) {
-    if (parseRegexStrawperson) {
-      auto copy = std::string(TokStart, TokEnd-TokStart);
-      auto msg = parseRegexStrawperson(copy.c_str());
-      assert(msg != nullptr);
-      Diags->diagnose(startLoc, diag::lex_experimental_regex_strawperson, msg);
-    }
-  }
 
   SmallString<32> replacement;
   replacement.push_back('"');
@@ -1969,6 +1958,44 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
   }
 }
 
+bool Lexer::tryLexRegexLiteral(const char *TokStart) {
+  // We need to have experimental string processing enabled, and have the
+  // parsing logic for regex literals available.
+  if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
+    return false;
+
+  // Ask libswift to try and lex a regex literal.
+  // - Ptr will not be advanced if this is not for a regex literal.
+  // - ErrStr will be set if there is any error to emit.
+  // - CompletelyErroneous will be set if there was an error that cannot be
+  //   recovered from.
+  auto *Ptr = TokStart;
+  const char *ErrStr = nullptr;
+  bool CompletelyErroneous = regexLiteralLexingFn(&Ptr, BufferEnd, &ErrStr);
+  if (ErrStr)
+    diagnose(TokStart, diag::regex_literal_parsing_error, ErrStr);
+
+  // If we didn't make any lexing progress, this isn't a regex literal and we
+  // should fallback to lexing as something else.
+  if (Ptr == TokStart)
+    return false;
+
+  // Update to point to where we ended regex lexing.
+  assert(Ptr > TokStart && Ptr <= BufferEnd);
+  CurPtr = Ptr;
+
+  // If the lexing was completely erroneous, form an unknown token.
+  if (CompletelyErroneous) {
+    assert(ErrStr);
+    formToken(tok::unknown, TokStart);
+    return true;
+  }
+
+  // Otherwise, we either had a successful lex, or something that was
+  // recoverable.
+  formToken(tok::regex_literal, TokStart);
+  return true;
+}
 
 /// lexEscapedIdentifier:
 ///   identifier ::= '`' identifier '`'
@@ -2441,8 +2468,16 @@ void Lexer::lexImpl() {
   case '\\': return formToken(tok::backslash, TokStart);
 
   case '#':
+    // Try lex a raw string literal.
     if (unsigned CustomDelimiterLen = advanceIfCustomDelimiter(CurPtr, Diags))
       return lexStringLiteral(CustomDelimiterLen);
+
+    // If we have experimental string processing enabled, try lex a regex
+    // literal.
+    if (tryLexRegexLiteral(TokStart))
+      return;
+
+    // Otherwise try lex a magic pound literal.
     return lexHash();
 
       // Operator characters.
@@ -2462,10 +2497,10 @@ void Lexer::lexImpl() {
     return lexOperatorIdentifier();
   case '%':
     // Lex %[0-9a-zA-Z_]+ as a local SIL value
-    if (InSILBody && clang::isIdentifierBody(CurPtr[0])) {
+    if (InSILBody && clang::isAsciiIdentifierContinue(CurPtr[0])) {
       do {
         ++CurPtr;
-      } while (clang::isIdentifierBody(CurPtr[0]));
+      } while (clang::isAsciiIdentifierContinue(CurPtr[0]));
       
       return formToken(tok::sil_local_name, TokStart);
     }
@@ -2495,13 +2530,20 @@ void Lexer::lexImpl() {
   case '&': case '|':  case '^': case '~': case '.':
     return lexOperatorIdentifier();
 
+  case 'r':
+    // If we have experimental string processing enabled, try lex a regex
+    // literal.
+    if (tryLexRegexLiteral(TokStart))
+      return;
+    LLVM_FALLTHROUGH;
+
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
   case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
   case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U':
   case 'V': case 'W': case 'X': case 'Y': case 'Z':
   case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
   case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
-  case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
+  case 'o': case 'p': case 'q': /*r above*/ case 's': case 't': case 'u':
   case 'v': case 'w': case 'x': case 'y': case 'z':
   case '_':
     return lexIdentifier();
@@ -2513,8 +2555,8 @@ void Lexer::lexImpl() {
   case '5': case '6': case '7': case '8': case '9':
     return lexNumber();
 
-  case '"':
   case '\'':
+  case '"':
     return lexStringLiteral();
       
   case '`':

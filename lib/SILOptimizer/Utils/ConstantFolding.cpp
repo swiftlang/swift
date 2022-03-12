@@ -1408,6 +1408,11 @@ static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
 }
 
 static bool isApplyOfKnownAvailability(SILInstruction &I) {
+  // Inlinable functions can be deserialized in other modules which can be
+  // compiled with a different deployment target.
+  if (I.getFunction()->getResilienceExpansion() != ResilienceExpansion::Maximal)
+    return false;
+
   auto apply = FullApplySite::isa(&I);
   if (!apply)
     return false;
@@ -1818,6 +1823,7 @@ ConstantFolder::processWorkList() {
     }
 
     // Go through all users of the constant and try to fold them.
+
     for (auto Result : I->getResults()) {
       for (auto *Use : Result->getUses()) {
         SILInstruction *User = Use->getUser();

@@ -590,6 +590,10 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           .diagnose(Loc, diag::cannot_find_in_scope, Name,
                     Name.isOperator())
           .highlight(UDRE->getSourceRange());
+      if (!Context.LangOpts.DisableExperimentalClangImporterDiagnostics) {
+        Context.getClangModuleLoader()->diagnoseTopLevelValue(
+            Name.getFullName());
+      }
     };
 
     if (!isConfused) {
@@ -599,7 +603,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
           if (typeContext->getSelfClassDecl())
             SelfType = DynamicSelfType::get(SelfType, Context);
-          SelfType = DC->mapTypeIntoContext(SelfType);
           return new (Context)
               TypeExpr(new (Context) FixedTypeRepr(SelfType, Loc));
         }
@@ -664,7 +667,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (UDRE->isImplicit()) {
       return TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), D, LookupDC,
-          LookupDC->mapTypeIntoContext(D->getInterfaceType()));
+          // It might happen that LookupDC is null if this is checking
+          // synthesized code, in that case, don't map the type into context,
+          // but return as is -- the synthesis should ensure the type is correct.
+          LookupDC ? LookupDC->mapTypeIntoContext(D->getInterfaceType())
+                   : D->getInterfaceType());
     } else {
       return TypeExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
     }
@@ -750,10 +757,27 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                            /*Implicit=*/true);
     }
 
+    auto isInClosureContext = [&](ValueDecl *decl) -> bool {
+      auto *DC = decl->getDeclContext();
+      do {
+        if (dyn_cast<ClosureExpr>(DC))
+          return true;
+      } while ((DC = DC->getParent()));
+
+      return false;
+    };
+
     llvm::SmallVector<ValueDecl *, 4> outerAlternatives;
     (void)findNonMembers(Lookup.outerResults(), UDRE->getRefKind(),
                          /*breakOnMember=*/false, outerAlternatives,
-                         /*isValid=*/[](ValueDecl *choice) -> bool {
+                         /*isValid=*/[&](ValueDecl *choice) -> bool {
+                           // Values that are defined in a closure
+                           // that hasn't been type-checked yet,
+                           // cannot be outer candidates.
+                           if (isInClosureContext(choice)) {
+                             return choice->hasInterfaceType() &&
+                                    !choice->isInvalid();
+                           }
                            return !choice->isInvalid();
                          });
 
@@ -1505,10 +1529,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // Fold 'T.U' into a nested type.
   if (auto *ITR = dyn_cast<IdentTypeRepr>(InnerTypeRepr)) {
     // Resolve the TypeRepr to get the base type for the lookup.
-    const auto options =
-        TypeResolutionOptions(TypeResolverContext::InExpression);
-    const auto resolution = TypeResolution::forContextual(
-        DC, options,
+    const auto BaseTy = TypeResolution::resolveContextualType(
+        InnerTypeRepr, DC, TypeResolverContext::InExpression,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -1517,7 +1539,6 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get);
-    const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy->mayHaveMembers()) {
       // See if there is a member type with this name.
@@ -2060,8 +2081,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         TypeResolutionOptions(TypeResolverContext::InExpression) |
         TypeResolutionFlags::SilenceErrors;
 
-    const auto resolution = TypeResolution::forContextual(
-        DC, options,
+    const auto result = TypeResolution::resolveContextualType(
+        typeExpr->getTypeRepr(), DC, options,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -2070,13 +2091,13 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get);
-    const auto result = resolution.resolveType(typeExpr->getTypeRepr());
+
     if (result->hasError())
       return nullptr;
     castTy = result;
   }
 
-  if (!castTy || !castTy->getAnyNominal())
+  if (!castTy->getAnyNominal())
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
@@ -2091,6 +2112,40 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
                                           call->getSourceRange(),
                                           typeExpr->getTypeRepr())
              : nullptr;
+}
+
+bool ConstraintSystem::preCheckTarget(SolutionApplicationTarget &target,
+                                      bool replaceInvalidRefsWithErrors,
+                                      bool leaveClosureBodiesUnchecked) {
+  auto *DC = target.getDeclContext();
+
+  bool hadErrors = false;
+
+  if (auto *expr = target.getAsExpr()) {
+    hadErrors |= preCheckExpression(expr, DC, replaceInvalidRefsWithErrors,
+                                    leaveClosureBodiesUnchecked);
+    // Even if the pre-check fails, expression still has to be re-set.
+    target.setExpr(expr);
+  }
+
+  if (target.isForEachStmt()) {
+    auto &info = target.getForEachStmtInfo();
+
+    if (info.whereExpr)
+      hadErrors |= preCheckExpression(info.whereExpr, DC,
+                                      /*replaceInvalidRefsWithErrors=*/true,
+                                      /*leaveClosureBodiesUnchecked=*/false);
+
+    // Update sequence and where expressions to pre-checked versions.
+    if (!hadErrors) {
+      info.stmt->setSequence(target.getAsExpr());
+
+      if (info.whereExpr)
+        info.stmt->setWhere(info.whereExpr);
+    }
+  }
+
+  return hadErrors;
 }
 
 /// Pre-check the expression, validating any types that occur in the

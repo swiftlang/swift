@@ -295,7 +295,7 @@ struct ModuleRebuildInfo {
                 StringRef prebuiltCacheDir, SourceLoc loc,
                 DiagArgs &&...diagArgs) {
     diags.diagnose(loc, std::forward<DiagArgs>(diagArgs)...);
-    auto SDKVer = getSDKBuildVersion(ctx.SearchPathOpts.SDKPath);
+    auto SDKVer = getSDKBuildVersion(ctx.SearchPathOpts.getSDKPath());
     llvm::SmallString<64> buffer = prebuiltCacheDir;
     llvm::sys::path::append(buffer, "SystemVersion.plist");
     auto PBMVer = getSDKBuildVersionFromPlist(buffer.str());
@@ -382,7 +382,7 @@ class ModuleInterfaceLoaderImpl {
     if (!dep.isSDKRelative())
       return dep.getPath();
 
-    path::native(ctx.SearchPathOpts.SDKPath, scratch);
+    path::native(ctx.SearchPathOpts.getSDKPath(), scratch);
     llvm::sys::path::append(scratch, dep.getPath());
     return StringRef(scratch.data(), scratch.size());
   }
@@ -562,7 +562,7 @@ class ModuleInterfaceLoaderImpl {
   }
 
   bool canInterfaceHavePrebuiltModule() {
-    StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
+    StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
     if (!sdkPath.empty() &&
         hasPrefix(path::begin(interfacePath), path::end(interfacePath),
                   path::begin(sdkPath), path::end(sdkPath))) {
@@ -607,7 +607,7 @@ class ModuleInterfaceLoaderImpl {
   Optional<StringRef>
   computeFallbackPrebuiltModulePath(llvm::SmallString<256> &scratch) {
     namespace path = llvm::sys::path;
-    StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
+    StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
 
     // Check if this is a public interface file from the SDK.
     if (sdkPath.empty() ||
@@ -1296,17 +1296,19 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   GenericArgs.push_back(ArgSaver.save(genericSubInvocation.getLangOptions()
     .EffectiveLanguageVersion.asAPINotesVersionString()));
 
-  genericSubInvocation.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
-  genericSubInvocation.setFrameworkSearchPaths(SearchPathOpts.FrameworkSearchPaths);
-  if (!SearchPathOpts.SDKPath.empty()) {
+  genericSubInvocation.setImportSearchPaths(
+      SearchPathOpts.getImportSearchPaths());
+  genericSubInvocation.setFrameworkSearchPaths(
+      SearchPathOpts.getFrameworkSearchPaths());
+  if (!SearchPathOpts.getSDKPath().empty()) {
     // Add -sdk arguments to the module building commands.
     // Module building commands need this because dependencies sometimes use
     // sdk-relative paths (prebuilt modules for example). Without -sdk, the command
     // will not be able to local these dependencies, leading to unnecessary
     // building from textual interfaces.
     GenericArgs.push_back("-sdk");
-    GenericArgs.push_back(ArgSaver.save(SearchPathOpts.SDKPath));
-    genericSubInvocation.setSDKPath(SearchPathOpts.SDKPath);
+    GenericArgs.push_back(ArgSaver.save(SearchPathOpts.getSDKPath()));
+    genericSubInvocation.setSDKPath(SearchPathOpts.getSDKPath().str());
   }
 
   genericSubInvocation.getFrontendOptions().InputMode
@@ -1339,6 +1341,16 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.getLangOptions().DisableAvailabilityChecking = true;
     GenericArgs.push_back("-disable-availability-checking");
   }
+
+  // Pass-down the obfuscators so we can get the serialized search paths properly.
+  genericSubInvocation.setSerializedPathObfuscator(
+    SearchPathOpts.DeserializedPathRecoverer);
+  SearchPathOpts.DeserializedPathRecoverer
+    .forEachPair([&](StringRef lhs, StringRef rhs) {
+      GenericArgs.push_back("-serialized-path-obfuscate");
+      std::string pair = (llvm::Twine(lhs) + "=" + rhs).str();
+      GenericArgs.push_back(ArgSaver.save(pair));
+  });
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
@@ -1642,6 +1654,13 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
   SmallVector<const char *, 64> SubArgs;
+
+  // If the interface was emitted by a compiler that didn't print
+  // `-target-min-inlining-version` into it, default to using the version from
+  // the target triple, emulating previous behavior.
+  SubArgs.push_back("-target-min-inlining-version");
+  SubArgs.push_back("target");
+
   std::string CompilerVersion;
   // Extract compiler arguments from the interface file and use them to configure
   // the compiler invocation.
@@ -1682,9 +1701,11 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
 
   ForwardingDiagnosticConsumer FDC(*Diags);
   subInstance.addDiagnosticConsumer(&FDC);
-  if (subInstance.setup(subInvocation)) {
+  std::string InstanceSetupError;
+  if (subInstance.setup(subInvocation, InstanceSetupError)) {
     return std::make_error_code(std::errc::not_supported);
   }
+
   info.BuildArguments = BuildArgs;
   info.Hash = CacheHash;
   auto target = *(std::find(BuildArgs.rbegin(), BuildArgs.rend(), "-target") - 1);
@@ -1824,9 +1845,17 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
   return std::make_error_code(std::errc::not_supported);
 }
 
-bool ExplicitSwiftModuleLoader::canImportModule(
-    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
-  StringRef moduleName = mID.Item.str();
+bool ExplicitSwiftModuleLoader::canImportModule(ImportPath::Module path,
+                                                llvm::VersionTuple version,
+                                                bool underlyingVersion) {
+  // FIXME: Swift submodules?
+  ImportPath::Element mID = path.front();
+  // Look up the module with the real name (physical name on disk);
+  // in case `-module-alias` is used, the name appearing in source files
+  // and the real module name are different. For example, '-module-alias Foo=Bar'
+  // maps Foo appearing in source files, e.g. 'import Foo', to the real module
+  // name Bar (on-disk name), which should be searched for loading.
+  StringRef moduleName = Ctx.getRealModuleName(mID.Item).str();
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no provided explicit module matches the name, then it cannot be imported.
   if (it == Impl.ExplicitModuleMap.end()) {

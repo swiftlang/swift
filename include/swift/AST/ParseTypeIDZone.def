@@ -20,7 +20,7 @@ SWIFT_REQUEST(Parse, CodeCompletionSecondPassRequest,
 SWIFT_REQUEST(Parse, ParseMembersRequest,
               FingerprintAndMembers(IterableDeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(Parse, ParseAbstractFunctionBodyRequest,
-              BraceStmt *(AbstractFunctionDecl *), SeparatelyCached,
+              BodyAndFingerprint(AbstractFunctionDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(Parse, ParseSourceFileRequest,
               SourceFileParsingResult(SourceFile *), SeparatelyCached,

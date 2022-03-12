@@ -381,8 +381,8 @@ protected:
     setNumEntries(other.getNumEntries());
     setNumTombstones(other.getNumTombstones());
 
-    if (is_trivially_copyable<KeyT>::value &&
-        is_trivially_copyable<ValueT>::value)
+    if (std::is_trivially_copyable<KeyT>::value &&
+        std::is_trivially_copyable<ValueT>::value)
       memcpy(reinterpret_cast<void *>(getBuckets()), other.getBuckets(),
              getNumBuckets() * sizeof(BucketT));
     else
@@ -667,7 +667,7 @@ class DenseMap : public DenseMapBase<DenseMap<KeyT, ValueT, KeyInfoT, BucketT>,
   unsigned NumBuckets;
 
 public:
-  /// Create a DenseMap wth an optional \p InitialReserve that guarantee that
+  /// Create a DenseMap with an optional \p InitialReserve that guarantee that
   /// this number of elements can be inserted in the map without grow()
   explicit DenseMap(unsigned InitialReserve = 0) { init(InitialReserve); }
 
@@ -864,6 +864,9 @@ public:
     this->insert(I, E);
   }
 
+  SmallDenseMap(std::initializer_list<typename BaseT::value_type> Vals)
+      : SmallDenseMap(Vals.begin(), Vals.end()) {}
+
   ~SmallDenseMap() {
     this->destroyAll();
     deallocateBuckets();
@@ -894,7 +897,7 @@ public:
           std::swap(*LHSB, *RHSB);
           continue;
         }
-        // Swap separately and handle any assymetry.
+        // Swap separately and handle any asymmetry.
         std::swap(LHSB->getFirst(), RHSB->getFirst());
         if (hasLHSValue) {
           ::new (&RHSB->getSecond()) ValueT(std::move(LHSB->getSecond()));
@@ -982,7 +985,7 @@ public:
     if (Small) {
       // First move the inline buckets into a temporary storage.
       AlignedCharArrayUnion<BucketT[InlineBuckets]> TmpStorage;
-      BucketT *TmpBegin = reinterpret_cast<BucketT *>(TmpStorage.buffer);
+      BucketT *TmpBegin = reinterpret_cast<BucketT *>(&TmpStorage);
       BucketT *TmpEnd = TmpBegin;
 
       // Loop over the buckets, moving non-empty, non-tombstones into the
@@ -1072,8 +1075,8 @@ private:
     assert(Small);
     // Note that this cast does not violate aliasing rules as we assert that
     // the memory's dynamic type is the small, inline bucket buffer, and the
-    // 'storage.buffer' static type is 'char *'.
-    return reinterpret_cast<const BucketT *>(storage.buffer);
+    // 'storage' is a POD containing a char buffer.
+    return reinterpret_cast<const BucketT *>(&storage);
   }
 
   BucketT *getInlineBuckets() {
@@ -1084,7 +1087,7 @@ private:
   const LargeRep *getLargeRep() const {
     assert(!Small);
     // Note, same rule about aliasing as with getInlineBuckets.
-    return reinterpret_cast<const LargeRep *>(storage.buffer);
+    return reinterpret_cast<const LargeRep *>(&storage);
   }
 
   LargeRep *getLargeRep() {
@@ -1130,8 +1133,6 @@ class DenseMapIterator {
   friend class DenseMapIterator<KeyT, ValueT, KeyInfoT, Bucket, true>;
   friend class DenseMapIterator<KeyT, ValueT, KeyInfoT, Bucket, false>;
 
-  using ConstIterator = DenseMapIterator<KeyT, ValueT, KeyInfoT, Bucket, true>;
-
 public:
   using difference_type = ptrdiff_t;
   using value_type =
@@ -1171,11 +1172,14 @@ public:
     return Ptr;
   }
 
-  bool operator==(const ConstIterator &RHS) const {
-    return Ptr == RHS.Ptr;
+  friend bool operator==(const DenseMapIterator &LHS,
+                         const DenseMapIterator &RHS) {
+    return LHS.Ptr == RHS.Ptr;
   }
-  bool operator!=(const ConstIterator &RHS) const {
-    return Ptr != RHS.Ptr;
+
+  friend bool operator!=(const DenseMapIterator &LHS,
+                         const DenseMapIterator &RHS) {
+    return !(LHS == RHS);
   }
 
   inline DenseMapIterator& operator++() {  // Preincrement

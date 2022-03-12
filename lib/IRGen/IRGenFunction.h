@@ -295,6 +295,10 @@ public:
 
   void emitTSanInoutAccessCall(llvm::Value *address);
 
+  llvm::Value *emitTargetOSVersionAtLeastCall(llvm::Value *major,
+                                              llvm::Value *minor,
+                                              llvm::Value *patch);
+
   llvm::Value *emitProjectBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
   llvm::Value *emitAllocEmptyBoxCall();

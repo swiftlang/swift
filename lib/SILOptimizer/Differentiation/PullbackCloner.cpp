@@ -1051,7 +1051,7 @@ public:
         // Note: All user-called initializations go through the calls to the
         // initializer, and synthesized initializers only have one level of
         // struct formation which will not result into any aggregate adjoint
-        // valeus.
+        // values.
         llvm_unreachable(
             "Aggregate adjoint values should not occur for `struct` "
             "instructions");
@@ -2085,35 +2085,36 @@ bool PullbackCloner::Implementation::run() {
 
   // Collect differentiation parameter adjoints.
   // Do a first pass to collect non-inout values.
-  unsigned pullbackInoutArgumentIndex = 0;
   for (auto i : getConfig().parameterIndices->getIndices()) {
-    auto isParameterInout = conv.getParameters()[i].isIndirectMutating();
-    if (!isParameterInout) {
-      addRetElt(i);
-    }
+    if (!conv.getParameters()[i].isIndirectMutating()) {
+       addRetElt(i);
+     }
   }
 
-  // Do a second pass for all inout parameters.
-  for (auto i : getConfig().parameterIndices->getIndices()) {
-    // Skip non-inout parameters.
-    auto isParameterInout = conv.getParameters()[i].isIndirectMutating();
-    if (!isParameterInout)
-      continue;
+  // Do a second pass for all inout parameters, however this is only necessary
+  // for functions with multiple basic blocks.  For functions with a single
+  // basic block adjoint accumulation for those parameters is already done by
+  // per-instruction visitors.
+  if (getOriginal().size() > 1) {
+    const auto &pullbackConv = pullback.getConventions();
+    SmallVector<SILArgument *, 1> pullbackInOutArgs;
+    for (auto pullbackArg : enumerate(pullback.getArgumentsWithoutIndirectResults())) {
+      if (pullbackConv.getParameters()[pullbackArg.index()].isIndirectMutating())
+        pullbackInOutArgs.push_back(pullbackArg.value());
+    }
 
-    // Skip `inout` parameters for functions with a single basic block:
-    // adjoint accumulation for those parameters is already done by
-    // per-instruction visitors.
-    if (getOriginal().size() == 1)
-      continue;
+    unsigned pullbackInoutArgumentIdx = 0;
+    for (auto i : getConfig().parameterIndices->getIndices()) {
+      // Skip non-inout parameters.
+      if (!conv.getParameters()[i].isIndirectMutating())
+        continue;
 
-    // For functions with multiple basic blocks, accumulation is needed
-    // for `inout` parameters because pullback basic blocks have different
-    // adjoint buffers.
-    auto pullbackInoutArgument =
-        getPullback()
-            .getArgumentsWithoutIndirectResults()[pullbackInoutArgumentIndex++];
-    pullbackIndirectResults.push_back(pullbackInoutArgument);
-    addRetElt(i);
+      // For functions with multiple basic blocks, accumulation is needed
+      // for `inout` parameters because pullback basic blocks have different
+      // adjoint buffers.
+      pullbackIndirectResults.push_back(pullbackInOutArgs[pullbackInoutArgumentIdx++]);
+      addRetElt(i);
+    }
   }
 
   // Copy them to adjoint indirect results.

@@ -23,6 +23,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -239,8 +240,12 @@ static bool needsForeignMetadataCompletionFunction(IRGenModule &IGM,
 
 template <class Flags>
 static Flags getMethodDescriptorFlags(ValueDecl *fn) {
-  if (isa<ConstructorDecl>(fn))
-    return Flags(Flags::Kind::Init); // 'init' is considered static
+  if (isa<ConstructorDecl>(fn)) {
+    auto flags = Flags(Flags::Kind::Init); // 'init' is considered static
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(fn))
+      flags = flags.withIsAsync(afd->hasAsync());
+    return flags;
+  }
 
   auto kind = [&] {
     auto accessor = dyn_cast<AccessorDecl>(fn);
@@ -791,9 +796,10 @@ namespace {
     }
 
     void addRequirementSignature() {
+      auto requirements = Proto->getRequirementSignature().getRequirements();
       auto metadata =
         irgen::addGenericRequirements(IGM, B, Proto->getGenericSignature(),
-                                      Proto->getRequirementSignature());
+                                      requirements);
 
       B.fillPlaceholderWithInt(*NumRequirementsInSignature, IGM.Int32Ty,
                                metadata.NumRequirements);
@@ -1164,7 +1170,14 @@ namespace {
         // declaration's name as the ABI name.
       } else if (auto clangDecl =
                             Mangle::ASTMangler::getClangDeclForMangling(Type)) {
-        abiName = clangDecl->getName();
+        // Class template specializations need to use their mangled name so
+        // that each specialization gets its own metadata. A class template
+        // specialization's Swift name will always be the mangled name, so just
+        // use that.
+        if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
+          abiName = Type->getName().str();
+        else
+          abiName = clangDecl->getName();
 
         // Typedefs and compatibility aliases that have been promoted to
         // their own nominal types need to be marked specially.
@@ -1266,7 +1279,7 @@ namespace {
     }
 
     void addMetadataInstantiationCache() {
-      if (!HasMetadata) {
+      if (!HasMetadata || IGM.getOptions().NoPreallocatedInstantiationCaches) {
         B.addInt32(0);
         return;
       }
@@ -1487,11 +1500,12 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata) {
+      if (IGM.IRGen.Opts.ReflectionMetadata !=
+          ReflectionMetadataMode::Runtime) {
         B.addInt32(0);
         return;
       }
-    
+
       IGM.IRGen.noteUseOfFieldDescriptor(getType());
 
       B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
@@ -1565,7 +1579,8 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata) {
+      if (IGM.IRGen.Opts.ReflectionMetadata !=
+          ReflectionMetadataMode::Runtime) {
         B.addInt32(0);
         return;
       }
@@ -1624,7 +1639,8 @@ namespace {
         VTable(IGM.getSILModule().lookUpVTable(getType())),
         Resilient(IGM.hasResilientMetadata(Type, ResilienceExpansion::Minimal)) {
 
-      if (getType()->isForeign()) return;
+      if (getType()->isForeign() || Type->isForeignReferenceType())
+        return;
 
       MetadataLayout = &IGM.getClassMetadataLayout(Type);
 
@@ -1654,6 +1670,7 @@ namespace {
     }
 
     void layout() {
+      assert(!getType()->isForeignReferenceType());
       super::layout();
       addVTable();
       addOverrideTable();
@@ -1720,7 +1737,8 @@ namespace {
     void addReflectionFieldDescriptor() {
       // Classes are always reflectable, unless reflection is disabled or this
       // is a foreign class.
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata ||
+      if ((IGM.IRGen.Opts.ReflectionMetadata !=
+           ReflectionMetadataMode::Runtime) ||
           getType()->isForeign()) {
         B.addInt32(0);
         return;
@@ -1998,6 +2016,15 @@ namespace {
     using super = ContextDescriptorBuilderBase;
 
     OpaqueTypeDecl *O;
+
+    /// Whether the given requirement is a conformance requirement that
+    /// requires a witness table in the opaque type descriptor.
+    ///
+    /// When it does, returns the protocol.
+    ProtocolDecl *requiresWitnessTable(const Requirement &req) const {
+      return opaqueTypeRequiresWitnessTable(O, req);
+    }
+
   public:
     
     OpaqueTypeDescriptorBuilder(IRGenModule &IGM, OpaqueTypeDecl *O)
@@ -2012,29 +2039,28 @@ namespace {
     
     void addUnderlyingTypeAndConformances() {
       auto sig = O->getOpaqueInterfaceGenericSignature();
-      auto underlyingType = Type(O->getUnderlyingInterfaceType())
-        .subst(*O->getUnderlyingTypeSubstitutions())
-        ->getCanonicalType(sig);
-
       auto contextSig = O->getGenericSignature().getCanonicalSignature();
+      auto subs = *O->getUnderlyingTypeSubstitutions();
 
-      B.addRelativeAddress(IGM.getTypeRef(underlyingType, contextSig,
-                                          MangledTypeRefRole::Metadata).first);
-      
-      auto opaqueType = O->getDeclaredInterfaceType()
-                         ->castTo<OpaqueTypeArchetypeType>();
-      
-      for (auto proto : opaqueType->getConformsTo()) {
-        auto conformance = ProtocolConformanceRef(proto);
-        auto underlyingConformance = conformance
-          .subst(O->getUnderlyingInterfaceType(),
-                 *O->getUnderlyingTypeSubstitutions());
+      // Add the underlying types for each generic parameter.
+      for (auto genericParam : O->getOpaqueGenericParams()) {
+        auto underlyingType = Type(genericParam).subst(subs)->getCanonicalType(sig);
+        B.addRelativeAddress(
+            IGM.getTypeRef(underlyingType, contextSig,
+            MangledTypeRefRole::Metadata).first);
+      }
 
-        // Skip protocols without Witness tables, e.g. @objc protocols.
-        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
-                underlyingConformance.getRequirement()))
+      // Add witness tables for each of the conformance requirements.
+      for (const auto &req : sig.getRequirements()) {
+        auto proto = requiresWitnessTable(req);
+        if (!proto)
           continue;
 
+        auto underlyingDependentType = req.getFirstType()->getCanonicalType();
+        auto underlyingType = underlyingDependentType.subst(subs)
+            ->getCanonicalType();
+        auto underlyingConformance =
+            subs.lookupConformance(underlyingDependentType, proto);
         auto witnessTableRef = IGM.emitWitnessTableRefString(
                                           underlyingType, underlyingConformance,
                                           contextSig,
@@ -2054,7 +2080,6 @@ namespace {
         return true;
         
       case SILLinkage::Shared:
-      case SILLinkage::SharedExternal:
       case SILLinkage::PublicNonABI:
         return false;
       }
@@ -2110,14 +2135,44 @@ namespace {
     }
     
     uint16_t getKindSpecificFlags() {
-      // Store the size of the type and conformances vector in the flags.
-      auto opaqueType = O->getDeclaredInterfaceType()
-        ->castTo<OpaqueTypeArchetypeType>();
+      // Store the number of types and witness tables in the flags.
+      unsigned numWitnessTables = llvm::count_if(
+          O->getOpaqueInterfaceGenericSignature().getRequirements(),
+          [&](const Requirement &req) {
+            return requiresWitnessTable(req) != nullptr;
+          });
 
-      return 1 + opaqueType->getConformsTo().size();
+      return O->getOpaqueGenericParams().size() + numWitnessTables;
     }
   };
 } // end anonymous namespace
+
+ProtocolDecl *irgen::opaqueTypeRequiresWitnessTable(
+    OpaqueTypeDecl *opaque, const Requirement &req) {
+  // We only care about conformance requirements.
+  if (req.getKind() != RequirementKind::Conformance)
+    return nullptr;
+
+  // The protocol must require a witness table.
+  auto proto = req.getProtocolDecl();
+  if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
+    return nullptr;
+
+  // The type itself must be anchored on one of the generic parameters of
+  // the opaque type (not an outer context).
+  Type subject = req.getFirstType();
+  while (auto depMember = subject->getAs<DependentMemberType>()) {
+    subject = depMember->getBase();
+  }
+
+  if (auto genericParam = subject->getAs<GenericTypeParamType>()) {
+    unsigned opaqueDepth = opaque->getOpaqueGenericParams().front()->getDepth();
+    if (genericParam->getDepth() == opaqueDepth)
+      return proto;
+  }
+
+  return nullptr;
+}
 
 static void eraseExistingTypeContextDescriptor(IRGenModule &IGM,
                                                NominalTypeDecl *type) {
@@ -2528,6 +2583,8 @@ namespace {
 
     /// Emit the instantiation cache variable for the template.
     void emitInstantiationCache() {
+      if (IGM.IRGen.Opts.NoPreallocatedInstantiationCaches) return;
+      
       auto cache = cast<llvm::GlobalVariable>(
         IGM.getAddrOfTypeMetadataInstantiationCache(Target, ForDefinition));
       auto init =
@@ -2830,6 +2887,13 @@ static void createNonGenericMetadataAccessFunction(IRGenModule &IGM,
 /// Emit the base-offset variable for the class.
 static void emitClassMetadataBaseOffset(IRGenModule &IGM,
                                         ClassDecl *classDecl) {
+  if (classDecl->isForeignReferenceType()) {
+    classDecl->getASTContext().Diags.diagnose(
+        classDecl->getLoc(), diag::foreign_reference_types_unsupported.ID,
+        {});
+    exit(1);
+  }
+
   // Otherwise, we know the offset at compile time, even if our
   // clients do not, so just emit a constant.
   auto &layout = IGM.getClassMetadataLayout(classDecl);
@@ -4980,10 +5044,8 @@ namespace {
         auto candidate = IGF.IGM.getAddrOfTypeMetadata(type);
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetForeignTypeMetadataFn(),
                                            {request.get(IGF), candidate});
-        call->addAttribute(llvm::AttributeList::FunctionIndex,
-                           llvm::Attribute::NoUnwind);
-        call->addAttribute(llvm::AttributeList::FunctionIndex,
-                           llvm::Attribute::ReadNone);
+        call->addFnAttr(llvm::Attribute::NoUnwind);
+        call->addFnAttr(llvm::Attribute::ReadNone);
 
         return MetadataResponse::handle(IGF, request, call);
       });
@@ -5030,6 +5092,8 @@ namespace {
 
     void emitInitializeMetadata(IRGenFunction &IGF, llvm::Value *metadata,
                                 MetadataDependencyCollector *collector) {
+      assert(!getTargetType()->isForeignReferenceType());
+      
       if (!Target->hasSuperclass()) {
         assert(IGM.getOptions().LazyInitializeClassMetadata &&
                "should have superclass if not lazy initializing class metadata");
@@ -5053,6 +5117,8 @@ namespace {
     // Visitor methods.
 
     void addValueWitnessTable() {
+      assert(!getTargetType()->isForeignReferenceType());
+
       // The runtime will fill in the default VWT during allocation for the
       // foreign class metadata.
       //
@@ -5081,6 +5147,7 @@ namespace {
     }
 
     void addMetadataFlags() {
+      assert(!getTargetType()->isForeignReferenceType());
       B.addInt(IGM.MetadataKindTy, (unsigned) MetadataKind::ForeignClass);
     }
 
@@ -5173,6 +5240,8 @@ bool irgen::requiresForeignTypeMetadata(CanType type) {
 
 bool irgen::requiresForeignTypeMetadata(NominalTypeDecl *decl) {
   if (auto *clas = dyn_cast<ClassDecl>(decl)) {
+    assert(!clas->isForeignReferenceType());
+    
     switch (clas->getForeignClassKind()) {
     case ClassDecl::ForeignKind::Normal:
     case ClassDecl::ForeignKind::RuntimeOnly:
@@ -5196,7 +5265,8 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
   init.setPacked(true);
 
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-    assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType);
+    assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType ||
+           classDecl->isForeignReferenceType());
 
     ForeignClassMetadataBuilder builder(IGM, classDecl, init);
     builder.layout();
@@ -5251,6 +5321,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Hashable:
   case KnownProtocolKind::CaseIterable:
   case KnownProtocolKind::Comparable:
+  case KnownProtocolKind::SIMD:
   case KnownProtocolKind::SIMDScalar:
   case KnownProtocolKind::BinaryInteger:
   case KnownProtocolKind::ObjectiveCBridgeable:
@@ -5288,9 +5359,11 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::Actor:
-  case KnownProtocolKind::ActorTransport:
   case KnownProtocolKind::DistributedActor:
-  case KnownProtocolKind::ActorIdentity:
+  case KnownProtocolKind::DistributedActorSystem:
+  case KnownProtocolKind::DistributedTargetInvocationEncoder:
+  case KnownProtocolKind::DistributedTargetInvocationDecoder:
+  case KnownProtocolKind::DistributedTargetInvocationResultHandler:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:

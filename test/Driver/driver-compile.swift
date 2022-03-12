@@ -65,7 +65,7 @@
 
 // swift-frontend cannot be copied to another location with bootstrapping because
 // it will not find the libswiftCore library with its relative RPATH.
-// UNSUPPORTED: libswift_bootstrapping
+// UNSUPPORTED: bootstrapping_mode
 
 // CHECK: bin{{/|\\\\}}swift
 // CHECK: Driver{{/|\\\\}}driver-compile.swift

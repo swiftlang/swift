@@ -53,7 +53,8 @@ protocol GenericCollection : Collection {
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach13trivialStructyySaySiGF : $@convention(thin) (@guaranteed Array<Int>) -> () {
 // CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<Int>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<Int>> }, var, name "$x$generator"
-// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
+// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
+// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:
@@ -65,6 +66,7 @@ protocol GenericCollection : Collection {
 // CHECK:   br [[LOOP_DEST]]
 //
 // CHECK: [[NONE_BB]]:
+// CHECK:   end_borrow [[ITERATOR_LIFETIME]]
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -105,7 +107,8 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach26trivialStructContinueBreakyySaySiGF : $@convention(thin) (@guaranteed Array<Int>) -> () {
 // CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<Int>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<Int>> }, var, name "$x$generator"
-// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
+// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
+// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<Int>
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = witness_method $Array<Int>, #Sequence.makeIterator : <Self where Self : Sequence> (__owned Self) -> () -> Self.Iterator : $@convention(witness_method: Sequence) <τ_0_0 where τ_0_0 : Sequence> (@in τ_0_0) -> @out τ_0_0.Iterator
@@ -145,6 +148,7 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   br [[CONT_BLOCK]]
 //
 // CHECK: [[CONT_BLOCK]]
+// CHECK:   end_borrow [[ITERATOR_LIFETIME]]
 // CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<Int>> }
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -205,7 +209,8 @@ func existentialBreak(_ xx: [P]) {
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach24existentialContinueBreakyySayAA1P_pGF : $@convention(thin) (@guaranteed Array<P>) -> () {
 // CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<P>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<P>> }, var, name "$x$generator"
-// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
+// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
+// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<P>
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = witness_method $Array<P>, #Sequence.makeIterator : <Self where Self : Sequence> (__owned Self) -> () -> Self.Iterator : $@convention(witness_method: Sequence) <τ_0_0 where τ_0_0 : Sequence> (@in τ_0_0) -> @out τ_0_0.Iterator
@@ -220,7 +225,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<P>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[T0:%.*]] = alloc_stack $P, let, name "x"
+// CHECK:   [[T0:%.*]] = alloc_stack [lexical] $P, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<P>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [initialization] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
@@ -254,6 +259,7 @@ func existentialBreak(_ xx: [P]) {
 //
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
+// CHECK:   end_borrow [[ITERATOR_LIFETIME]]
 // CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<P>> }
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -365,7 +371,8 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach26genericStructContinueBreakyySayAA07GenericC0VyxGGlF : $@convention(thin) <T> (@guaranteed Array<GenericStruct<T>>) -> () {
 // CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<GenericStruct<T>>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box $<τ_0_0> { var IndexingIterator<Array<GenericStruct<τ_0_0>>> } <T>, var, name "$x$generator"
-// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
+// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
+// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<GenericStruct<T>>
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = witness_method $Array<GenericStruct<T>>, #Sequence.makeIterator : <Self where Self : Sequence> (__owned Self) -> () -> Self.Iterator : $@convention(witness_method: Sequence) <τ_0_0 where τ_0_0 : Sequence> (@in τ_0_0) -> @out τ_0_0.Iterator
@@ -380,7 +387,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[T0:%.*]] = alloc_stack $GenericStruct<T>, let, name "x"
+// CHECK:   [[T0:%.*]] = alloc_stack [lexical] $GenericStruct<T>, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [initialization] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
@@ -414,6 +421,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 //
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
+// CHECK:   end_borrow [[ITERATOR_LIFETIME]]
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -473,7 +481,8 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach30genericCollectionContinueBreakyyxSlRzlF : $@convention(thin) <T where T : Collection> (@in_guaranteed T) -> () {
 // CHECK: bb0([[COLLECTION:%.*]] : $*T):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : Collection> { var τ_0_0.Iterator } <T>, var, name "$x$generator"
-// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
+// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
+// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = witness_method $T, #Sequence.makeIterator :
 // CHECK:   apply [[MAKE_ITERATOR_FUNC]]<T>([[PROJECT_ITERATOR_BOX]], [[COLLECTION_COPY:%.*]])
 // CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<T.Element>
@@ -486,7 +495,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<T.Element>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[T0:%.*]] = alloc_stack $T.Element, let, name "x"
+// CHECK:   [[T0:%.*]] = alloc_stack [lexical] $T.Element, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<T.Element>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [initialization] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
@@ -520,6 +529,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 //
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
+// CHECK:   end_borrow [[ITERATOR_LIFETIME]]
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -624,7 +634,7 @@ func injectForEachElementIntoOptional(_ xs: [Int]) {
 // CHECK: copy_addr [take] [[NEXT_RESULT:%.*]] to [initialization] [[NEXT_RESULT_COPY:%.*]] : $*Optional<T>
 // CHECK: switch_enum_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
 // CHECK: [[BB_SOME]]:
-// CHECK: [[X_BINDING:%.*]] = alloc_stack $Optional<T>, let, name "x"
+// CHECK: [[X_BINDING:%.*]] = alloc_stack [lexical] $Optional<T>, let, name "x"
 // CHECK: [[ADDR:%.*]] = unchecked_take_enum_data_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK: [[X_ADDR:%.*]] = init_enum_data_addr [[X_BINDING]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK: copy_addr [take] [[ADDR]] to [initialization] [[X_ADDR]] : $*T

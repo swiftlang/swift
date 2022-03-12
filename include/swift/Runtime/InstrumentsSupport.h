@@ -60,6 +60,6 @@ size_t _swift_indexToSize(size_t idx);
 SWIFT_RUNTIME_EXPORT
 void _swift_zone_init(void);
 
-};
+}
 
 #endif

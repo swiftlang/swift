@@ -43,6 +43,10 @@ public:
   iterator begin() const { return vector.begin(); }
   iterator end() const { return vector.end(); }
 
+  llvm::iterator_range<iterator> getRange() const {
+    return llvm::make_range(begin(), end());
+  }
+
   bool empty() const { return vector.empty(); }
 
   bool contains(SILBasicBlock *block) const { return set.contains(block); }

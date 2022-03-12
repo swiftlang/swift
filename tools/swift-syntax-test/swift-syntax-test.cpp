@@ -595,8 +595,9 @@ int parseFile(
   PrintingDiagnosticConsumer DiagConsumer(DiagOS);
   CompilerInstance Instance;
   Instance.addDiagnosticConsumer(&DiagConsumer);
-  if (Instance.setup(Invocation)) {
-    llvm::errs() << "Unable to set up compiler instance";
+  std::string InstanceSetupError;
+  if (Instance.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return EXIT_FAILURE;
   }
 

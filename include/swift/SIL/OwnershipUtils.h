@@ -31,6 +31,7 @@ class SILModule;
 class SILValue;
 class DeadEndBlocks;
 class PrunedLiveness;
+struct BorrowedValue;
 
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v);
@@ -78,8 +79,7 @@ inline bool isForwardingConsume(SILValue value) {
 }
 
 /// Find leaf "use points" of \p guaranteedValue that determine its lifetime
-/// requirement. If \p usePoints is nullptr, then the simply returns true if no
-/// PointerEscape use was found.
+/// requirement. Return true if no PointerEscape use was found.
 ///
 /// Precondition: \p guaranteedValue is not a BorrowedValue.
 ///
@@ -102,6 +102,12 @@ inline bool isForwardingConsume(SILValue value) {
 /// on borrow-introducing values.
 bool findInnerTransitiveGuaranteedUses(
     SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints = nullptr);
+
+/// Find all uses in the extended lifetime (i.e. including copies) of a simple
+/// (i.e. not reborrowed) borrow scope and its transitive uses.
+bool findExtendedUsesOfSimpleBorrowedValue(
+    BorrowedValue borrowedValue,
+    SmallVectorImpl<Operand *> *usePoints = nullptr);
 
 /// Find leaf "use points" of a guaranteed value within its enclosing borrow
 /// scope (without looking through reborrows). To find the use points of the
@@ -162,6 +168,14 @@ bool findExtendedTransitiveGuaranteedUses(
   SILValue guaranteedValue,
   SmallVectorImpl<Operand *> &usePoints);
 
+/// Find non-transitive uses of a simple (i.e. without looking through
+/// reborrows) value.
+///
+/// The scope-ending use of borrows of the value are included.  If a borrow of
+/// the value is reborrowed, returns false.
+bool findUsesOfSimpleValue(SILValue value,
+                           SmallVectorImpl<Operand *> *usePoints = nullptr);
+
 /// An operand that forwards ownership to one or more results.
 class ForwardingOperand {
   Operand *use = nullptr;
@@ -173,6 +187,11 @@ public:
     // We use a force unwrap since a ForwardingOperand should always have an
     // ownership constraint.
     return use->getOwnershipConstraint();
+  }
+
+  bool isDirectlyForwarding() const {
+    auto &mixin = *OwnershipForwardingMixin::get(use->getUser());
+    return mixin.isDirectlyForwarding();
   }
 
   ValueOwnershipKind getForwardingOwnershipKind() const;
@@ -556,8 +575,11 @@ struct BorrowedValue {
   /// This ignores reborrows. The assumption is that, since \p uses are
   /// dominated by this local scope, checking the extended borrow scope should
   /// not be necessary to determine they are within the scope.
+  ///
+  /// \p deadEndBlocks is optional during transition. It will be completely
+  /// removed in an upcoming commit.
   bool areUsesWithinLocalScope(ArrayRef<Operand *> uses,
-                               DeadEndBlocks &deadEndBlocks) const;
+                               DeadEndBlocks *deadEndBlocks) const;
 
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments. \p
@@ -1193,8 +1215,16 @@ void findTransitiveReborrowBaseValuePairs(
 /// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
 /// its reborrows.
 void visitTransitiveEndBorrows(
-    BorrowedValue beginBorrow,
+    SILValue value,
     function_ref<void(EndBorrowInst *)> visitEndBorrow);
+
+/// Whether the specified lexical begin_borrow instruction is nested.
+///
+/// A begin_borrow [lexical] is nested if the borrowed value's lifetime is
+/// guaranteed by another lexical scope.  That happens if:
+/// - the value is a guaranteed argument to the function
+/// - the value is itself a begin_borrow [lexical]
+bool isNestedLexicalBeginBorrow(BeginBorrowInst *bbi);
 
 } // namespace swift
 

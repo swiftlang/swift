@@ -148,7 +148,7 @@ struct StructContainingBridgeObject {
 
   // CHECK-LABEL: sil hidden [ossa] @$ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
   // CHECK: bb0([[ARG:%.*]] : @owned $AnyObject,
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [lexical] [[ARG]]
   // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   [[CASTED_ARG:%.*]] = unchecked_ref_cast [[COPIED_ARG]] : $AnyObject to $Builtin.BridgeObject
   // CHECK:   assign [[CASTED_ARG]] to
@@ -170,7 +170,7 @@ struct ReabstractionThunkTest : Protocol {
 // result.
 extension FakeDictionary {
   // CHECK-LABEL: sil hidden [ossa] @$ss14FakeDictionaryV20makeSureToCopyTuplesyyF : $@convention(method) <Key, Value> (FakeDictionary<Key, Value>) -> () {
-  // CHECK:   [[X:%.*]] = alloc_stack $(Key, Value), let, name "x"
+  // CHECK:   [[X:%.*]] = alloc_stack [lexical] $(Key, Value), let, name "x"
   // CHECK:   [[INDUCTION_VAR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<(Key, Value)>, #Optional.some!enumelt
   // CHECK:   [[INDUCTION_VAR_0:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 0
   // CHECK:   [[INDUCTION_VAR_1:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 1

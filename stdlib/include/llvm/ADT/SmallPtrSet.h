@@ -269,7 +269,7 @@ public:
   explicit SmallPtrSetIterator(const void *const *BP, const void *const *E)
       : SmallPtrSetIteratorImpl(BP, E) {}
 
-  // Most methods provided by baseclass.
+  // Most methods are provided by the base class.
 
   const PtrTy operator*() const {
     assert(Bucket < End);
@@ -346,15 +346,27 @@ public:
     return std::make_pair(makeIterator(p.first), p.second);
   }
 
+  /// Insert the given pointer with an iterator hint that is ignored. This is
+  /// identical to calling insert(Ptr), but allows SmallPtrSet to be used by
+  /// std::insert_iterator and std::inserter().
+  iterator insert(iterator, PtrType Ptr) {
+    return insert(Ptr).first;
+  }
+
   /// erase - If the set contains the specified pointer, remove it and return
   /// true, otherwise return false.
   bool erase(PtrType Ptr) {
     return erase_imp(PtrTraits::getAsVoidPointer(Ptr));
   }
   /// count - Return 1 if the specified pointer is in the set, 0 otherwise.
-  size_type count(ConstPtrType Ptr) const { return find(Ptr) != end() ? 1 : 0; }
+  size_type count(ConstPtrType Ptr) const {
+    return find_imp(ConstPtrTraits::getAsVoidPointer(Ptr)) != EndPointer();
+  }
   iterator find(ConstPtrType Ptr) const {
     return makeIterator(find_imp(ConstPtrTraits::getAsVoidPointer(Ptr)));
+  }
+  bool contains(ConstPtrType Ptr) const {
+    return find_imp(ConstPtrTraits::getAsVoidPointer(Ptr)) != EndPointer();
   }
 
   template <typename IterT>

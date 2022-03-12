@@ -132,10 +132,10 @@ private:
 
 /// The input type for a record member lookup request.
 struct ClangRecordMemberLookupDescriptor final {
-  StructDecl *recordDecl;
+  NominalTypeDecl *recordDecl;
   DeclName name;
 
-  ClangRecordMemberLookupDescriptor(StructDecl *recordDecl, DeclName name)
+  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
       : recordDecl(recordDecl), name(name) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }

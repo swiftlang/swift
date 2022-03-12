@@ -78,6 +78,34 @@ getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
   }
 }
 
+VarDecl *CaptureInfo::getIsolatedParamCapture() const {
+  if (!hasLocalCaptures())
+    return nullptr;
+
+  for (const auto &capture : getCaptures()) {
+    if (!capture.getDecl()->isLocalCapture())
+      continue;
+
+    if (capture.isDynamicSelfMetadata())
+      continue;
+
+    // If we captured an isolated parameter, return it.
+    if (auto param = dyn_cast_or_null<ParamDecl>(capture.getDecl())) {
+      // If we have captured an isolated parameter, return it.
+      if (param->isIsolated())
+        return param;
+    }
+
+    // If we captured 'self', check whether it is (still) isolated.
+    if (auto var = dyn_cast_or_null<VarDecl>(capture.getDecl())) {
+      if (var->isSelfParamCapture() && var->isSelfParamCaptureIsolated())
+        return var;
+    }
+  }
+
+  return nullptr;
+}
+
 LLVM_ATTRIBUTE_USED void CaptureInfo::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';

@@ -127,3 +127,13 @@ module TemplateTypeParameterNotInSignature {
   header "template-type-parameter-not-in-signature.h"
   requires cplusplus
 }
+
+module DefineReferencedInline {
+  header "define-referenced-inline.h"
+  requires cplusplus
+}
+
+module DependentTypes {
+  header "dependent-types.h"
+  requires cplusplus
+}

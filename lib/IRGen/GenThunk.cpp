@@ -118,9 +118,7 @@ IRGenThunk::IRGenThunk(IRGenFunction &IGF, SILDeclRef declRef)
 
   if (isAsync) {
     asyncLayout.emplace(irgen::getAsyncContextLayout(
-        IGF.IGM, origTy, substTy, subMap, /*suppress generics*/ false,
-        FunctionPointer::Kind(
-            FunctionPointer::BasicKind::AsyncFunctionPointer)));
+        IGF.IGM, origTy, substTy, subMap));
   }
 }
 
@@ -164,8 +162,6 @@ void IRGenThunk::prepareArguments() {
 
   // Chop off the async context parameters.
   if (isAsync) {
-    // FIXME: Once we remove async task and executor this should be one not
-    // three.
     unsigned numAsyncContextParams =
         (unsigned)AsyncFunctionArgumentIndex::Context + 1;
     (void)original.claim(numAsyncContextParams);
@@ -235,8 +231,11 @@ Callee IRGenThunk::lookupMethod() {
   if (selfTy.is<MetatypeType>()) {
     metadata = selfValue;
   } else {
+    auto &Types = IGF.IGM.getSILModule().Types;
+    auto *env = Types.getConstantGenericEnvironment(declRef);
+    auto sig = env ? env->getGenericSignature() : GenericSignature();
     metadata = emitHeapMetadataRefForHeapObject(IGF, selfValue, selfTy,
-                                                /*suppress cast*/ true);
+                                                sig, /*suppress cast*/ true);
   }
 
   // Find the method we're interested in.
@@ -253,7 +252,8 @@ void IRGenThunk::emit() {
 
   if (isAsync) {
     auto asyncContextIdx = Signature::forAsyncEntry(
-                               IGF.IGM, origTy, /*useSpecialConvention*/ false)
+                               IGF.IGM, origTy,
+                               FunctionPointerKind::defaultAsync())
                                .getAsyncContextIndex();
 
     auto entity = LinkEntity::forDispatchThunk(declRef);
@@ -386,7 +386,6 @@ llvm::Constant *IRGenModule::defineAsyncFunctionPointer(LinkEntity entity,
   auto asyncEntity = LinkEntity::forAsyncFunctionPointer(entity);
   auto *var = cast<llvm::GlobalVariable>(
       getAddrOfLLVMVariable(asyncEntity, init, DebugTypeInfo()));
-  setTrueConstGlobal(var);
   return var;
 }
 

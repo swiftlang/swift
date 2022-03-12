@@ -16,8 +16,8 @@
 
 #include "TaskPrivate.h"
 
-// Thread Sanitizer is not supported on Windows.
-#if defined(_WIN32)
+// Thread Sanitizer is not supported on Windows or WASI.
+#if defined(_WIN32) || defined(__wasi__) || !__has_include(<dlfcn.h>)
 void swift::_swift_tsan_acquire(void *addr) {}
 void swift::_swift_tsan_release(void *addr) {}
 #else

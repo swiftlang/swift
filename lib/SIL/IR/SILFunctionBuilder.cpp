@@ -13,7 +13,9 @@
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 
 using namespace swift;
@@ -21,7 +23,8 @@ using namespace swift;
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
     SILLocation loc, StringRef name, SILLinkage linkage, CanSILFunctionType type, IsBare_t isBareSILFunction,
     IsTransparent_t isTransparent, IsSerialized_t isSerialized,
-    IsDynamicallyReplaceable_t isDynamic, ProfileCounter entryCount,
+    IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
+    ProfileCounter entryCount,
     IsThunk_t isThunk, SubclassScope subclassScope) {
   assert(!type->isNoEscape() && "Function decls always have escaping types.");
   if (auto fn = mod.lookUpFunction(name)) {
@@ -33,8 +36,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
   auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
                                 isBareSILFunction, isTransparent, isSerialized,
-                                entryCount, isDynamic, IsNotExactSelfClass,
-                                isThunk, subclassScope);
+                                entryCount, isDynamic, isDistributed,
+                                IsNotExactSelfClass, isThunk, subclassScope);
   fn->setDebugScope(new (mod) SILDebugScope(loc, fn));
   return fn;
 }
@@ -94,6 +97,56 @@ void SILFunctionBuilder::addFunctionAttributes(
       F->addSpecializeAttr(SILSpecializeAttr::create(
           M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
           spiGroupIdent, attributedFuncDecl->getModuleContext(), availability));
+    }
+  }
+
+  llvm::SmallVector<const EffectsAttr *, 8> customEffects;
+  if (constant) {
+    for (auto *attr : Attrs.getAttributes<EffectsAttr>()) {
+      auto *effectsAttr = cast<EffectsAttr>(attr);
+      if (effectsAttr->getKind() == EffectsKind::Custom) {
+        customEffects.push_back(effectsAttr);
+      } else {
+        if (F->getEffectsKind() != EffectsKind::Unspecified &&
+            F->getEffectsKind() != effectsAttr->getKind()) {
+          mod.getASTContext().Diags.diagnose(effectsAttr->getLocation(),
+              diag::warning_in_effects_attribute, "mismatching function effects");
+        } else {
+          F->setEffectsKind(effectsAttr->getKind());
+        }
+      }
+    }
+  }
+
+  if (!customEffects.empty()) {
+    llvm::SmallVector<StringRef, 8> paramNames;
+    auto *fnDecl = cast<AbstractFunctionDecl>(constant.getDecl());
+    if (ParameterList *paramList = fnDecl->getParameters()) {
+      for (ParamDecl *pd : *paramList) {
+        // Give up on tuples. Their elements are added as individual
+        // argumenst. It destroys the 1-1 relation ship between parameters
+        // and arguments.
+        if (isa<TupleType>(CanType(pd->getType())))
+          break;
+        // First try the "local" parameter name. If there is none, use the
+        // API name. E.g. `foo(apiName localName: Type) {}`
+        StringRef name = pd->getName().str();
+        if (name.empty())
+          name = pd->getArgumentName().str();
+        if (!name.empty())
+          paramNames.push_back(name);
+      }
+    }
+    for (const EffectsAttr *effectsAttr : llvm::reverse(customEffects)) {
+      auto error = F->parseEffects(effectsAttr->getCustomString(),
+                            /*fromSIL*/ false, /*isDerived*/ false, paramNames);
+      if (error.first) {
+        SourceLoc loc = effectsAttr->getCustomStringLocation();
+        if (loc.isValid())
+          loc = loc.getAdvancedLoc(error.second);
+        mod.getASTContext().Diags.diagnose(loc,
+                    diag::warning_in_effects_attribute, StringRef(error.first));
+      }
     }
   }
 
@@ -196,7 +249,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
            (forDefinition == ForDefinition_t::NotForDefinition &&
             (fnLinkage == linkageForDef ||
              (linkageForDef == SILLinkage::PublicNonABI &&
-              fnLinkage == SILLinkage::SharedExternal))));
+              fnLinkage == SILLinkage::Shared))));
     if (forDefinition) {
       // In all the cases where getConstantLinkage returns something
       // different for ForDefinition, it returns an available-externally
@@ -212,10 +265,6 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       constant.isTransparent() ? IsTransparent : IsNotTransparent;
   IsSerialized_t IsSer = constant.isSerialized();
 
-  EffectsKind EK = constant.hasEffectsAttribute()
-                       ? constant.getEffectsAttribute()
-                       : EffectsKind::Unspecified;
-
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())
     inlineStrategy = NoInline;
@@ -229,11 +278,17 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     IsTrans = IsNotTransparent;
   }
 
+  IsDistributed_t IsDistributed = IsDistributed_t::IsNotDistributed;
+  // Mark both distributed thunks and methods as distributed.
+  if (constant.hasFuncDecl() && constant.getFuncDecl()->isDistributed()) {
+    IsDistributed = IsDistributed_t::IsDistributed;
+  }
+
   auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
                                 IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
-                                IsNotExactSelfClass,
+                                IsDistributed, IsNotExactSelfClass,
                                 IsNotThunk, constant.getSubclassScope(),
-                                inlineStrategy, EK);
+                                inlineStrategy);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
   if (constant.isGlobal())
@@ -280,10 +335,10 @@ SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
     SILLocation loc, StringRef name, CanSILFunctionType type,
     IsBare_t isBareSILFunction, IsTransparent_t isTransparent,
     IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
-    IsDynamicallyReplaceable_t isDynamic) {
+    IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared, type,
                              isBareSILFunction, isTransparent, isSerialized,
-                             isDynamic, entryCount, isThunk,
+                             isDynamic, isDistributed, entryCount, isThunk,
                              SubclassScope::NotApplicable);
 }
 
@@ -292,12 +347,13 @@ SILFunction *SILFunctionBuilder::createFunction(
     GenericEnvironment *genericEnv, Optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
     IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
-    ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope,
+    IsDistributed_t isDistributed, ProfileCounter entryCount,
+    IsThunk_t isThunk, SubclassScope subclassScope,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
     const SILDebugScope *DebugScope) {
   return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
                              isBareSILFunction, isTrans, isSerialized,
-                             entryCount, isDynamic, IsNotExactSelfClass,
-                             isThunk, subclassScope,
+                             entryCount, isDynamic, isDistributed,
+                             IsNotExactSelfClass, isThunk, subclassScope,
                              inlineStrategy, EK, InsertBefore, DebugScope);
 }

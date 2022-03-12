@@ -227,6 +227,11 @@ void SelectEnforcement::analyzeUsesOfBox(SingleValueInstruction *source) {
   for (auto use : source->getUses()) {
     auto user = use->getUser();
 
+    if (auto BBI = dyn_cast<BeginBorrowInst>(user)) {
+      analyzeUsesOfBox(BBI);
+      continue;
+    }
+
     if (auto MUI = dyn_cast<MarkUninitializedInst>(user)) {
       analyzeUsesOfBox(MUI);
       continue;
@@ -238,10 +243,9 @@ void SelectEnforcement::analyzeUsesOfBox(SingleValueInstruction *source) {
     }
       
     // Ignore certain other uses that do not capture the value.
-    if (isa<StrongRetainInst>(user) ||
-        isa<StrongReleaseInst>(user) ||
-        isa<DestroyValueInst>(user) ||
-        isa<DeallocBoxInst>(user))
+    if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user) ||
+        isa<DestroyValueInst>(user) || isa<DeallocBoxInst>(user) ||
+        isa<EndBorrowInst>(user))
       continue;
 
     // Treat everything else as an escape.
@@ -667,6 +671,8 @@ void AccessEnforcementSelection::processFunction(SILFunction *F) {
 SourceAccess
 AccessEnforcementSelection::getAccessKindForBox(ProjectBoxInst *projection) {
   SILValue source = projection->getOperand();
+  if (auto *BBI = dyn_cast<BeginBorrowInst>(source))
+    source = BBI->getOperand();
   if (auto *MUI = dyn_cast<MarkUninitializedInst>(source))
     source = MUI->getOperand();
 

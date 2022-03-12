@@ -12,6 +12,8 @@
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
+// Enable with rdar://85526879
+// UNSUPPORTED: CPU=arm64e
 
 // rdar://82123254
 // UNSUPPORTED: use_os_stdlib

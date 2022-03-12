@@ -234,9 +234,9 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  auto genericParam = new (ctx) GenericTypeParamDecl(
+  auto genericParam = GenericTypeParamDecl::create(
       &M->getMainFile(FileUnitKind::Builtin), ident, SourceLoc(),
-      /*type sequence*/ false, 0, index);
+      /*type sequence*/ false, 0, index, /*opaque type=*/false, nullptr);
   return genericParam;
 }
 
@@ -859,6 +859,12 @@ static ValueDecl *getMoveOperation(ASTContext &ctx, Identifier id) {
 static ValueDecl *getCopyOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
                             _parameters(_typeparam(0)), _typeparam(0));
+}
+
+static ValueDecl *getAssumeAlignment(ASTContext &ctx, Identifier id) {
+  // This is always "(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer"
+  return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer, _word),
+                            _rawPointer);
 }
 
 static ValueDecl *getTransferArrayOperation(ASTContext &ctx, Identifier id) {
@@ -1578,6 +1584,12 @@ static ValueDecl *getBuildDefaultActorExecutorRef(ASTContext &ctx,
                             _executor);
 }
 
+static ValueDecl *getTargetOSVersionAtLeast(ASTContext &Context,
+                                            Identifier Id) {
+  auto int32Type = BuiltinIntegerType::get(32, Context);
+  return getBuiltinFunction(Id, {int32Type, int32Type, int32Type}, int32Type);
+}
+
 static ValueDecl *getBuildOrdinarySerialExecutorRef(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
@@ -1822,17 +1834,14 @@ static ValueDecl *getUnreachableOperation(ASTContext &Context,
 static ValueDecl *getOnceOperation(ASTContext &Context,
                                    Identifier Id,
                                    bool withContext) {
-  // (RawPointer, @convention(c) ([Context]) -> ()[, Context]) -> ()
+  // (RawPointer, @convention(c) (Context) -> ()[, Context]) -> ()
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
   SmallVector<AnyFunctionType::Param, 1> CFuncParams;
-  swift::CanType ContextTy;
-  if (withContext) {
-    ContextTy = Context.TheRawPointerType;
-    auto ContextArg = FunctionType::Param(ContextTy);
-    CFuncParams.push_back(ContextArg);
-  }
+  swift::CanType ContextTy = Context.TheRawPointerType;
+  auto ContextArg = FunctionType::Param(ContextTy);
+  CFuncParams.push_back(ContextArg);
   auto Rep = FunctionTypeRepresentation::CFunctionPointer;
   auto ClangType = Context.getClangFunctionType(CFuncParams, VoidTy, Rep);
   auto Thin =
@@ -2196,18 +2205,17 @@ getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
       return false;
     ArgElts.push_back(ArgTy);
   }
-  
+
   // Translate LLVM function attributes to Swift function attributes.
   IntrinsicInfo II;
   II.ID = ID;
   auto attrs = II.getOrCreateAttributes(Context);
-  if (attrs.hasAttribute(llvm::AttributeList::FunctionIndex,
-                         llvm::Attribute::NoReturn)) {
+  if (attrs.hasFnAttr(llvm::Attribute::NoReturn)) {
     ResultTy = Context.getNeverType();
     if (!ResultTy)
       return false;
   }
-  
+
   return true;
 }
 
@@ -2546,6 +2554,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       return nullptr;
     return getCopyOperation(Context, Id);
 
+  case BuiltinValueKind::AssumeAlignment:
+    if (!Types.empty())
+      return nullptr;
+    return getAssumeAlignment(Context, Id);
+
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
 #define BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(id, name, attrs, overload)  \
@@ -2824,6 +2837,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateAsyncTaskInGroup:
     return getCreateAsyncTaskInGroup(Context, Id);
+
+  case BuiltinValueKind::TargetOSVersionAtLeast:
+    return getTargetOSVersionAtLeast(Context, Id);
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);

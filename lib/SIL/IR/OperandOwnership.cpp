@@ -20,8 +20,9 @@
 using namespace swift;
 
 /// Return true if all OperandOwnership invariants hold.
-bool swift::checkOperandOwnershipInvariants(const Operand *operand) {
-  OperandOwnership opOwnership = operand->getOperandOwnership();
+bool swift::checkOperandOwnershipInvariants(const Operand *operand,
+                                            SILModuleConventions *silConv) {
+  OperandOwnership opOwnership = operand->getOperandOwnership(silConv);
   if (opOwnership == OperandOwnership::Borrow) {
     // Must be a valid BorrowingOperand.
     return bool(BorrowingOperand(const_cast<Operand *>(operand)));
@@ -38,6 +39,9 @@ namespace {
 class OperandOwnershipClassifier
   : public SILInstructionVisitor<OperandOwnershipClassifier, OperandOwnership> {
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
+  // Allow module conventions to be overriden while lowering between canonical
+  // and lowered SIL stages.
+  SILModuleConventions silConv;
 
   const Operand &op;
 
@@ -49,8 +53,8 @@ public:
   /// should be the subobject and Value should be the parent object. An example
   /// of where one would want to do this is in the case of value projections
   /// like struct_extract.
-  OperandOwnershipClassifier(SILModule &mod, const Operand &op)
-      : mod(mod), op(op) {}
+  OperandOwnershipClassifier(SILModuleConventions silConv, const Operand &op)
+      : mod(silConv.getModule()), silConv(silConv), op(op) {}
 
   SILValue getValue() const { return op.get(); }
 
@@ -143,6 +147,7 @@ OPERAND_OWNERSHIP(TrivialUse, CheckedCastAddrBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondFail)
 OPERAND_OWNERSHIP(TrivialUse, CopyAddr)
+OPERAND_OWNERSHIP(TrivialUse, MarkUnresolvedMoveAddr)
 OPERAND_OWNERSHIP(TrivialUse, DeallocStack)
 OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
 OPERAND_OWNERSHIP(TrivialUse, DestroyAddr)
@@ -182,6 +187,10 @@ OPERAND_OWNERSHIP(TrivialUse, UncheckedAddrCast)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedRefCastAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedTakeEnumDataAddr)
 OPERAND_OWNERSHIP(TrivialUse, UnconditionalCheckedCastAddr)
+
+// The dealloc_stack_ref operand needs to have NonUse ownership because
+// this use comes after the last consuming use (which is usually a dealloc_ref).
+OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
 
 // Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
@@ -322,6 +331,7 @@ FORWARDING_OWNERSHIP(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP(InitExistentialRef)
 FORWARDING_OWNERSHIP(DifferentiableFunction)
 FORWARDING_OWNERSHIP(LinearFunction)
+FORWARDING_OWNERSHIP(MarkMustCheck)
 #undef FORWARDING_OWNERSHIP
 
 // Arbitrary value casts are forwarding instructions that are also allowed to
@@ -468,9 +478,17 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
   if (getValue()->getType().isAddress()) {
     return OperandOwnership::TrivialUse;
   }
-  SILArgumentConvention argConv = apply.isCalleeOperand(op)
-    ? SILArgumentConvention(apply.getSubstCalleeType()->getCalleeConvention())
-    : apply.getArgumentConvention(op);
+  auto calleeTy = apply.getSubstCalleeType();
+  SILArgumentConvention argConv = [&]() {
+    if (apply.isCalleeOperand(op)) {
+      return SILArgumentConvention(calleeTy->getCalleeConvention());
+    } else {
+      unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg()
+                              + apply.getAppliedArgIndex(op);
+      return silConv.getFunctionConventions(calleeTy).getSILArgumentConvention(
+          calleeArgIdx);
+    }
+  }();
 
   auto argOwnership = getFunctionArgOwnership(
     argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
@@ -647,6 +665,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssignCopyArrayNoAlias)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssignCopyArrayFrontToBack)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssignCopyArrayBackToFront)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssignTakeArray)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssumeAlignment)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssumeNonNegative)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssumeTrue)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AtomicLoad)
@@ -776,6 +795,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Swift3ImplicitObjCEntrypoint)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntInstrprofIncrement)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Move)
 BUILTIN_OPERAND_OWNERSHIP(UnownedInstantaneousUse, Copy)
@@ -853,9 +873,8 @@ BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedRemoteActor)
 
-// FIXME: Why do these reqiuire a borrowed value at all?
-BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffAllocateSubcontext)
-BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffProjectTopLevelSubcontext)
+BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffAllocateSubcontext)
+BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffProjectTopLevelSubcontext)
 
 // FIXME: ConvertTaskToJob is documented as taking NativePointer. It's operand's
 // ownership should be 'TrivialUse'.
@@ -897,8 +916,9 @@ OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-OperandOwnership Operand::getOperandOwnership() const {
-  // A type-dependent operant is a NonUse (as opposed to say an
+OperandOwnership
+Operand::getOperandOwnership(SILModuleConventions *silConv) const {
+  // A type-dependent operand is a NonUse (as opposed to say an
   // InstantaneousUse) because it does not require liveness.
   if (isTypeDependent())
     return OperandOwnership::NonUse;
@@ -918,7 +938,8 @@ OperandOwnership Operand::getOperandOwnership() const {
       return OperandOwnership(OperandOwnership::InstantaneousUse);
     }
   }
-
-  OperandOwnershipClassifier classifier(getUser()->getModule(), *this);
+  SILModuleConventions overrideConv =
+      silConv ? *silConv : SILModuleConventions(getUser()->getModule());
+  OperandOwnershipClassifier classifier(overrideConv, *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }

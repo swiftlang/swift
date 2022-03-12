@@ -23,7 +23,7 @@ import resilient_objc_class
 // -- parent
 // CHECK-SAME: @"$s31class_update_callback_with_stubMXM"
 // -- name
-// CHECK-SAME: @1
+// CHECK-SAME: @.str.1
 // -- access function
 // CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCMa"
 // -- field descriptor

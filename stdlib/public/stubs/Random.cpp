@@ -22,24 +22,28 @@
 #include <Windows.h>
 #include <Bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
-#else
+#elif !defined(__APPLE__)
+
 #include <errno.h>
 #include <fcntl.h>
-#endif
 
 #if __has_include(<sys/random.h>)
 #include <sys/random.h>
 #endif
+#if __has_include(<sys/stat.h>)
 #include <sys/stat.h>
+#endif
 #if __has_include(<sys/syscall.h>)
 #include <sys/syscall.h>
+#endif
+
 #endif
 
 #include <stdlib.h>
 
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
-#include "../SwiftShims/Random.h"
+#include "SwiftShims/Random.h"
 
 #include <algorithm> // required for std::min
 

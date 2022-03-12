@@ -1464,9 +1464,10 @@ public:
     if (auto gp = handleTypeParameterInAbstractionPattern(pattern, t))
       return gp;
     
-    assert(!pattern.getType()->hasTypeParameter()
+    assert(pattern.getType()->isExistentialType() ||
+           (!pattern.getType()->hasTypeParameter()
            && !pattern.getType()->hasArchetype()
-           && !pattern.getType()->hasOpaqueArchetype());
+           && !pattern.getType()->hasOpaqueArchetype()));
     return pattern.getType();
   }
   
@@ -1649,8 +1650,8 @@ public:
       newGPMapping.insert({gp, newParamTy});
       auto substGPTy = Type(gp).subst(substGPMap)->castTo<GenericTypeParamType>();
       substRequirements.push_back(Requirement(RequirementKind::SameType,
-                                              substGPTy,
-                                              newParamTy));
+                                              newParamTy,
+                                              substGPTy));
       assert(!substReplacementTypes[substGPTy->getIndex()]);
       substReplacementTypes[substGPTy->getIndex()] = substParamTy;
     }
@@ -1695,7 +1696,15 @@ public:
     return handleGenericNominalType(pattern.getType(), bgt,
                                     pattern.getGenericSignatureOrNull());
   }
-  
+
+  CanType visitPackType(PackType *pack, AbstractionPattern pattern) {
+    llvm_unreachable("Unimplemented!");
+  }
+
+  CanType visitPackExpansionType(PackExpansionType *pack, AbstractionPattern pattern) {
+    llvm_unreachable("Unimplemented!");
+  }
+
   CanType visitTupleType(TupleType *tuple, AbstractionPattern pattern) {
     if (auto gp = handleTypeParameterInAbstractionPattern(pattern, tuple))
       return gp;

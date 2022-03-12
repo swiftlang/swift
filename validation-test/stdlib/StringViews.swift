@@ -9,6 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+// rdar://84233775
+// REQUIRES: rdar84233775
+
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 

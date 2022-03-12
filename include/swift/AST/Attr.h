@@ -168,8 +168,9 @@ protected:
     );
 
     SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute,
-                          NumKnownProtocolKindBits,
-      kind : NumKnownProtocolKindBits
+                          NumKnownProtocolKindBits+1,
+      kind : NumKnownProtocolKindBits,
+      isUnchecked : 1
     );
   } Bits;
 
@@ -288,6 +289,9 @@ public:
 
     /// Whether this attribute is only valid when distributed is enabled.
     DistributedOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
+
+    /// Whether this attribute is valid on additional decls in ClangImporter.
+    OnAnyClangDecl = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 18),
   };
 
   LLVM_READNONE
@@ -487,7 +491,7 @@ public:
       Name(Name) {}
 
   SILGenNameAttr(StringRef Name, bool Implicit)
-    : SILGenNameAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+    : SILGenNameAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The symbol name.
   const StringRef Name;
@@ -505,7 +509,7 @@ public:
       Name(Name) {}
 
   CDeclAttr(StringRef Name, bool Implicit)
-    : CDeclAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+    : CDeclAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The symbol name.
   const StringRef Name;
@@ -524,7 +528,7 @@ public:
   Value(Value) {}
 
   SemanticsAttr(StringRef Value, bool Implicit)
-  : SemanticsAttr(Value, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+  : SemanticsAttr(Value, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The semantics tag value.
   const StringRef Value;
@@ -628,14 +632,16 @@ public:
                    const llvm::VersionTuple &Obsoleted,
                    SourceRange ObsoletedRange,
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
-                   bool Implicit)
+                   bool Implicit,
+                   bool IsSPI)
     : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
       Message(Message), Rename(Rename), RenameDecl(RenameDecl),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
       PlatformAgnostic(PlatformAgnostic),
-      Platform(Platform)
+      Platform(Platform),
+      IsSPI(IsSPI)
   {}
 
 #undef INIT_VER_TUPLE
@@ -680,6 +686,9 @@ public:
 
   /// The platform of the availability.
   const PlatformKind Platform;
+
+  /// Whether this is available as SPI.
+  const bool IsSPI;
 
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;
@@ -908,6 +917,25 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ObjC;
+  }
+};
+
+class MainTypeAttr final : public DeclAttribute {
+public:
+  MainTypeAttr(bool isImplicit)
+      : DeclAttribute(DAK_MainType, SourceLoc(), SourceLoc(), isImplicit) {}
+
+  MainTypeAttr(SourceLoc AtLoc, SourceLoc NameLoc)
+      : DeclAttribute(DAK_MainType, AtLoc,
+                      SourceRange(AtLoc.isValid() ? AtLoc : NameLoc, NameLoc),
+                      /*Implicit=*/false) {}
+
+  MainTypeAttr(SourceLoc NameLoc)
+      : DeclAttribute(DAK_MainType, SourceLoc(), SourceRange(NameLoc, NameLoc),
+                      /*Implicit=*/false) {}
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_MainType;
   }
 };
 
@@ -1176,16 +1204,64 @@ public:
   }
 };
 
+/// Represents the exclusivity attribute.
+class ExclusivityAttr : public DeclAttribute {
+public:
+  enum Mode {
+    Checked,
+    Unchecked
+  };
+
+private:
+  Mode mode;
+
+public:
+  ExclusivityAttr(SourceLoc atLoc, SourceRange range, Mode mode)
+     : DeclAttribute(DAK_Exclusivity, atLoc, range, /*Implicit=*/false),
+       mode(mode) {}
+
+  ExclusivityAttr(Mode mode)
+    : ExclusivityAttr(SourceLoc(), SourceRange(), mode) {}
+
+  Mode getMode() const { return mode; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Exclusivity;
+  }
+};
+
 /// Represents the side effects attribute.
 class EffectsAttr : public DeclAttribute {
+  StringRef customString;
+  SourceLoc customStringLoc;
+
 public:
   EffectsAttr(SourceLoc atLoc, SourceRange range, EffectsKind kind)
       : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false) {
     Bits.EffectsAttr.kind = unsigned(kind);
   }
 
+  EffectsAttr(SourceLoc atLoc, SourceRange range, StringRef customString,
+              SourceLoc customStringLoc)
+      : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false),
+        customString(customString), customStringLoc(customStringLoc) {
+    Bits.EffectsAttr.kind = unsigned(EffectsKind::Custom);
+  }
+
   EffectsAttr(EffectsKind kind)
   : EffectsAttr(SourceLoc(), SourceRange(), kind) {}
+
+  EffectsAttr(StringRef customString)
+  : EffectsAttr(SourceLoc(), SourceRange(), customString, SourceLoc()) {}
+
+  StringRef getCustomString() const {
+    assert(getKind() == EffectsKind::Custom);
+    return customString;
+  }
+  
+  SourceLoc getCustomStringLocation() const {
+    return customStringLoc;
+  }
 
   EffectsKind getKind() const { return EffectsKind(Bits.EffectsAttr.kind); }
   static bool classof(const DeclAttribute *DA) {
@@ -1276,17 +1352,23 @@ class SynthesizedProtocolAttr : public DeclAttribute {
 
 public:
   SynthesizedProtocolAttr(KnownProtocolKind protocolKind,
-                          LazyConformanceLoader *Loader)
+                          LazyConformanceLoader *Loader,
+                          bool isUnchecked)
     : DeclAttribute(DAK_SynthesizedProtocol, SourceLoc(), SourceRange(),
                     /*Implicit=*/true), Loader(Loader)
   {
     Bits.SynthesizedProtocolAttr.kind = unsigned(protocolKind);
+    Bits.SynthesizedProtocolAttr.isUnchecked = unsigned(isUnchecked);
   }
 
   /// Retrieve the known protocol kind naming the protocol to be
   /// synthesized.
   KnownProtocolKind getProtocolKind() const {
     return KnownProtocolKind(Bits.SynthesizedProtocolAttr.kind);
+  }
+
+  bool isUnchecked() const {
+    return bool(Bits.SynthesizedProtocolAttr.isUnchecked);
   }
 
   /// Retrieve the lazy loader that will be used to populate the
@@ -2075,6 +2157,50 @@ public:
   }
 };
 
+/// The @_unavailableFromAsync attribute, used to make function declarations
+/// unavailable from async contexts.
+class UnavailableFromAsyncAttr : public DeclAttribute {
+public:
+  UnavailableFromAsyncAttr(StringRef Message, SourceLoc AtLoc,
+                           SourceRange Range, bool Implicit)
+      : DeclAttribute(DAK_UnavailableFromAsync, AtLoc, Range, Implicit),
+        Message(Message) {}
+  UnavailableFromAsyncAttr(StringRef Message, bool Implicit)
+      : UnavailableFromAsyncAttr(Message, SourceLoc(), SourceRange(),
+                                 Implicit) {}
+  const StringRef Message;
+
+  bool hasMessage() const { return !Message.empty(); }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_UnavailableFromAsync;
+  }
+};
+
+/// The @_backDeploy(...) attribute, used to make function declarations available
+/// for back deployment to older OSes via emission into the client binary.
+class BackDeployAttr: public DeclAttribute {
+public:
+  BackDeployAttr(SourceLoc AtLoc, SourceRange Range,
+                 PlatformKind Platform,
+                 const llvm::VersionTuple Version,
+                 bool Implicit)
+    : DeclAttribute(DAK_BackDeploy, AtLoc, Range, Implicit),
+      Platform(Platform),
+      Version(Version) {}
+
+  /// The platform the symbol is available for back deployment on.
+  const PlatformKind Platform;
+
+  /// The earliest platform version that may use the back deployed implementation.
+  const llvm::VersionTuple Version;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_BackDeploy;
+  }
+};
+
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -2215,6 +2341,15 @@ public:
       if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
         return Attr;
     return nullptr;
+  }
+
+  /// Returns the "winning" \c NonSendableAttr or \c SendableAttr in this
+  /// attribute list, or \c nullptr if there are none.
+  const DeclAttribute *getEffectiveSendableAttr() const;
+
+  DeclAttribute *getEffectiveSendableAttr() {
+    return const_cast<DeclAttribute *>(
+         const_cast<const DeclAttributes *>(this)->getEffectiveSendableAttr());
   }
 
 private:

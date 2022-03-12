@@ -3,6 +3,7 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_1 | %FileCheck %s -check-prefix=DEFAULT_ARGS_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_2 | %FileCheck %s -check-prefix=DEFAULT_ARGS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-complete-add-call-with-no-default-args=false -code-completion-token=DEFAULT_ARGS_2 | %FileCheck %s --check-prefix=ONLY_DEFAULTS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_3 | %FileCheck %s -check-prefix=DEFAULT_ARGS_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_4 | %FileCheck %s -check-prefix=DEFAULT_ARGS_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_5 | %FileCheck %s -check-prefix=DEFAULT_ARGS_5
@@ -80,6 +81,10 @@ func testDefaultArgs2() {
 // DEFAULT_ARGS_2-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ({#(a): Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_2-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_2: End completions
+
+// ONLY_DEFAULTS: Begin completions
+// ONLY_DEFAULTS-NEXT: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
+// ONLY_DEFAULTS: End completions
 
 func testDefaultArgs3() {
   freeFuncWithDefaultArgs3#^DEFAULT_ARGS_3^#

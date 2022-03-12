@@ -24,6 +24,7 @@
 #ifndef SWIFT_BASIC_PATHREMAPPER_H
 #define SWIFT_BASIC_PATHREMAPPER_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 
@@ -34,7 +35,7 @@ namespace swift {
 
 class PathRemapper {
   SmallVector<std::pair<std::string, std::string>, 2> PathMappings;
-
+  friend class PathObfuscator;
 public:
   /// Adds a mapping such that any paths starting with `FromPrefix` have that
   /// portion replaced with `ToPrefix`.
@@ -55,6 +56,26 @@ public:
         return (Twine(Mapping.second) +
                 Path.substr(Mapping.first.size())).str();
     return Path.str();
+  }
+};
+
+class PathObfuscator {
+  PathRemapper obfuscator, recoverer;
+public:
+  void addMapping(StringRef FromPrefix, StringRef ToPrefix) {
+    obfuscator.addMapping(FromPrefix, ToPrefix);
+    recoverer.addMapping(ToPrefix, FromPrefix);
+  }
+  std::string obfuscate(StringRef Path) const {
+    return obfuscator.remapPath(Path);
+  }
+  std::string recover(StringRef Path) const {
+    return recoverer.remapPath(Path);
+  }
+  void forEachPair(llvm::function_ref<void(StringRef, StringRef)> op) const {
+    for (auto pair: obfuscator.PathMappings) {
+      op(pair.first, pair.second);
+    }
   }
 };
 

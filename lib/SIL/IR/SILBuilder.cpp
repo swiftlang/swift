@@ -285,6 +285,10 @@ SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
     if (isa<DeallocStackInst>(Inst))
       continue;
 
+    // end_borrow insts also don't affect take-ability
+    if (isa<EndBorrowInst>(Inst))
+      continue;
+
     // An end_access of the same address may be able to be rewritten as a
     // [deinit] access.
     if (auto endAccess = dyn_cast<EndAccessInst>(Inst)) {
@@ -568,24 +572,25 @@ void SILBuilder::emitDestructureValueOperation(
 
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
-                                             bool poisonRefs) {
+                                             bool poisonRefs,
+                                             bool operandWasMoved) {
   llvm::SmallString<4> Name;
   // Debug location overrides cannot apply to debug value instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
   return insert(DebugValueInst::create(
       getSILDebugLocation(Loc), src, getModule(),
-      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs));
+      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs, operandWasMoved));
 }
 
-DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc,
-                                                 SILValue src,
-                                                 SILDebugVariable Var) {
+DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc, SILValue src,
+                                                 SILDebugVariable Var,
+                                                 bool wasMoved) {
   llvm::SmallString<4> Name;
   // Debug location overrides cannot apply to debug addr instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
-  return insert(
-      DebugValueInst::createAddr(getSILDebugLocation(Loc), src, getModule(),
-                                 *substituteAnonymousArgs(Name, Var, Loc)));
+  return insert(DebugValueInst::createAddr(
+      getSILDebugLocation(Loc), src, getModule(),
+      *substituteAnonymousArgs(Name, Var, Loc), wasMoved));
 }
 
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,

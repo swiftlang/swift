@@ -50,8 +50,8 @@ using namespace swift;
 // Check to make sure the runtime is being built with a compiler that
 // supports the Swift calling convention.
 //
-// If the Swift calling convention is not in use, functions such as 
-// swift_allocBox and swift_makeBoxUnique that rely on their return value 
+// If the Swift calling convention is not in use, functions such as
+// swift_allocBox and swift_makeBoxUnique that rely on their return value
 // being passed in a register to be compatible with Swift may miscompile on
 // some platforms and silently fail.
 #if !__has_attribute(swiftcall)
@@ -186,11 +186,11 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
   if (object->refCounts.getCount() != 0)
     swift::fatalError(/* flags = */ 0,
                       "Fatal error: Stack object escaped\n");
-  
+
   if (object->refCounts.getUnownedCount() != 1)
     swift::fatalError(/* flags = */ 0,
                       "Fatal error: Unowned reference to stack object\n");
-  
+
   if (object->refCounts.getWeakCount() != 0)
     swift::fatalError(/* flags = */ 0,
                       "Fatal error: Weak reference to stack object\n");
@@ -477,10 +477,10 @@ void swift::swift_unownedRelease(HeapObject *object) {
   // Only class objects can be unowned-retained and unowned-released.
   assert(object->metadata->isClassObject());
   assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
-  
+
   if (object->refCounts.decrementUnownedShouldFree(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-    
+
     swift_slowDealloc(object, classMetadata->getInstanceSize(),
                       classMetadata->getInstanceAlignMask());
   }
@@ -537,7 +537,7 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n) {
   // Only class objects can be unowned-retained and unowned-released.
   assert(object->metadata->isClassObject());
   assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
-  
+
   if (object->refCounts.decrementUnownedShouldFree(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
     swift_slowDealloc(object, classMetadata->getInstanceSize(),

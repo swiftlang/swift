@@ -230,6 +230,14 @@ public:
   static void tryDiagnoseFailedComparableDerivation(DeclContext *DC,
                                                     NominalTypeDecl *nominal);
 
+  /// Diagnose problems, if any, preventing automatic derivation of
+  /// DistributedActor requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void tryDiagnoseFailedDistributedActorDerivation(DeclContext *DC,
+                                                    NominalTypeDecl *nominal);
+
   /// Determine if an Equatable requirement can be derived for a type.
   ///
   /// This is implemented for enums without associated values or all-Equatable

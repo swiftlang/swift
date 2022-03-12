@@ -17,7 +17,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/InitializeLibSwift.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
@@ -97,8 +97,7 @@ extern int swift_api_extract_main(ArrayRef<const char *> Args,
 /// \returns True if running as a subcommand.
 static bool shouldRunAsSubcommand(StringRef ExecName,
                                   SmallString<256> &SubcommandName,
-                                  const ArrayRef<const char *> Args,
-                                  bool &isRepl) {
+                                  const ArrayRef<const char *> Args) {
   assert(!Args.empty());
 
   // If we are not run as 'swift', don't do anything special. This doesn't work
@@ -125,7 +124,6 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   // If the subcommand is the "built-in" 'repl', then use the
   // normal driver.
   if (Subcommand == "repl") {
-    isRepl = true;
     return false;
   }
 
@@ -184,14 +182,18 @@ static bool appendSwiftDriverName(SmallString<256> &buffer) {
 }
 
 static int run_driver(StringRef ExecName,
-                       const ArrayRef<const char *> argv) {
+                       ArrayRef<const char *> argv,
+                       const ArrayRef<const char *> originalArgv) {
   // This is done here and not done in FrontendTool.cpp, because
-  // FrontendTool.cpp is linked to tools, which don't use libswift.
-  initializeLibSwift();
+  // FrontendTool.cpp is linked to tools, which don't use swift modules.
+  initializeSwiftModules();
+
+  bool isRepl = false;
 
   // Handle integrated tools.
   if (argv.size() > 1) {
     StringRef FirstArg(argv[1]);
+
     if (FirstArg == "-frontend") {
       return performFrontend(llvm::makeArrayRef(argv.data()+2,
                                                 argv.data()+argv.size()),
@@ -210,6 +212,11 @@ static int run_driver(StringRef ExecName,
       return performFrontend(llvm::makeArrayRef(argv.data()+1,
                                                 argv.data()+argv.size()),
                              argv[0], (void *)(intptr_t)getExecutablePath);
+    }
+
+    if (FirstArg == "repl") {
+      isRepl = true;
+      argv = argv.drop_front();
     }
   }
 
@@ -244,7 +251,14 @@ static int run_driver(StringRef ExecName,
       subCommandArgs.push_back(NewDriverPath.c_str());
 
       // Push on the source program arguments
-      subCommandArgs.insert(subCommandArgs.end(), argv.begin() + 1, argv.end());
+      if (isRepl) {
+        subCommandArgs.push_back("-repl");
+        subCommandArgs.insert(subCommandArgs.end(),
+                              originalArgv.begin() + 2, originalArgv.end());
+      } else {
+        subCommandArgs.insert(subCommandArgs.end(),
+                              originalArgv.begin() + 1, originalArgv.end());
+      }
 
       // Execute the subcommand.
       subCommandArgs.push_back(nullptr);
@@ -359,8 +373,7 @@ int swift::mainEntry(int argc_, const char **argv_) {
   // Check if this invocation should execute a subcommand.
   StringRef ExecName = llvm::sys::path::stem(argv[0]);
   SmallString<256> SubcommandName;
-  bool isRepl = false;
-  if (shouldRunAsSubcommand(ExecName, SubcommandName, argv, isRepl)) {
+  if (shouldRunAsSubcommand(ExecName, SubcommandName, argv)) {
     // Preserve argv for the stack trace.
     SmallVector<const char *, 256> subCommandArgs(argv.begin(), argv.end());
     subCommandArgs.erase(&subCommandArgs[1]);
@@ -393,12 +406,6 @@ int swift::mainEntry(int argc_, const char **argv_) {
     return 2;
   }
 
-  if (isRepl) {
-    // Preserve argv for the stack trace.
-    SmallVector<const char *, 256> replArgs(argv.begin(), argv.end());
-    replArgs.erase(&replArgs[1]);
-    return run_driver(ExecName, replArgs);
-  } else {
-    return run_driver(ExecName, argv);
-  }
+  ArrayRef<const char *> originalArgv(argv_, &argv_[argc_]);
+  return run_driver(ExecName, argv, originalArgv);
 }

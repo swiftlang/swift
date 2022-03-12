@@ -56,6 +56,7 @@
 #endif
 
 using namespace swift;
+using namespace hashable_support;
 
 #if SWIFT_HAS_ISA_MASKING
 OBJC_EXPORT __attribute__((__weak_import__))
@@ -660,13 +661,12 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
   auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
 
 #if SWIFT_OBJC_INTEROP
-  void *objc_ret = nullptr;
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_retain_n(static_cast<HeapObject *>(objectRef), n);
     return object;
   }
   for (int i = 0;i < n; ++i)
-    objc_ret = objc_retain(static_cast<id>(objectRef));
+    objc_retain(static_cast<id>(objectRef));
   return object;
 #else
   swift_retain_n(static_cast<HeapObject *>(objectRef), n);
@@ -701,13 +701,12 @@ void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n) {
   auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
 
 #if SWIFT_OBJC_INTEROP
-  void *objc_ret = nullptr;
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
     return object;
   }
   for (int i = 0;i < n; ++i)
-    objc_ret = objc_retain(static_cast<id>(objectRef));
+    objc_retain(static_cast<id>(objectRef));
   return object;
 #else
   swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
@@ -1598,6 +1597,24 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
 const Metadata *swift::getNSObjectMetadata() {
   return SWIFT_LAZY_CONSTANT(
       swift_getObjCClassMetadata((const ClassMetadata *)[NSObject class]));
+}
+
+const Metadata *swift::getNSStringMetadata() {
+  return SWIFT_LAZY_CONSTANT(swift_getObjCClassMetadata(
+    (const ClassMetadata *)objc_lookUpClass("NSString")
+  ));
+}
+
+const HashableWitnessTable *
+swift::hashable_support::getNSStringHashableConformance() {
+  return SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<const HashableWitnessTable *>(
+      swift_conformsToProtocol(
+        getNSStringMetadata(),
+        &HashableProtocolDescriptor
+      )
+    )
+  );
 }
 
 #endif

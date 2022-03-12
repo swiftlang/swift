@@ -51,6 +51,8 @@ namespace {
     /// Class metatypes have non-trivial representation due to the
     /// possibility of subclassing.
     bool visitClassType(CanClassType type) {
+      if (type->isForeignReferenceType())
+        return true;
       return false;
     }
     bool visitBoundGenericClassType(CanBoundGenericClassType type) {
@@ -577,6 +579,11 @@ namespace {
                                        IsTypeExpansionSensitive_t isSensitive) {
       return visitExistentialType(type, origType, isSensitive);
     }
+    RetTy visitParameterizedProtocolType(CanParameterizedProtocolType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
+      return visitExistentialType(type, origType, isSensitive);
+    }
 
     // Enums depend on their enumerators.
     RetTy visitEnumType(CanEnumType type, AbstractionPattern origType,
@@ -602,6 +609,16 @@ namespace {
                                       IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().visitAnyStructType(type, origType, type->getDecl(),
                                          isSensitive);
+    }
+
+    RetTy visitPackType(CanPackType type, AbstractionPattern origType,
+                        IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("");
+    }
+
+    RetTy visitPackExpansionType(CanPackExpansionType type, AbstractionPattern origType,
+                                 IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("");
     }
 
     // Tuples depend on their elements.
@@ -1651,6 +1668,10 @@ namespace {
     TypeLowering *handleReference(CanType type,
                                   RecursiveProperties properties) {
       auto silType = SILType::getPrimitiveObjectType(type);
+      if (type.isForeignReferenceType())
+        return new (TC) TrivialTypeLowering(
+            silType, RecursiveProperties::forTrivial(), Expansion);
+
       return new (TC) ReferenceTypeLowering(silType, properties, Expansion);
     }
 
@@ -1669,6 +1690,15 @@ namespace {
       }
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC) OpaqueValueTypeLowering(silType, properties, Expansion);
+    }
+    
+    TypeLowering *handleInfinite(CanType type,
+                                 RecursiveProperties properties) {
+      // Infinite types cannot actually be instantiated, so treat them as
+      // opaque for code generation purposes.
+      properties.setAddressOnly();
+      properties.setInfinite();
+      return handleAddressOnly(type, properties);
     }
 
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -1700,6 +1730,18 @@ namespace {
       auto silType = SILType::getPrimitiveAddressType(type);
       return new (TC)
           UnsafeValueBufferTypeLowering(silType, Expansion, isSensitive);
+    }
+
+    TypeLowering *visitPackType(CanPackType packType,
+                                AbstractionPattern origType,
+                                IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("");
+    }
+
+    TypeLowering *visitPackExpansionType(CanPackExpansionType packType,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("");
     }
 
     TypeLowering *visitTupleType(CanTupleType tupleType,
@@ -1751,6 +1793,12 @@ namespace {
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
+      // Bail out if the struct layout relies on itself.
+      TypeConverter::LowerAggregateTypeRAII loweringStruct(TC, structType);
+      if (loweringStruct.IsInfinite) {
+        return handleInfinite(structType, properties);
+      }
+
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
 
@@ -1792,6 +1840,12 @@ namespace {
       RecursiveProperties properties;
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+
+      // Bail out if the enum layout relies on itself.
+      TypeConverter::LowerAggregateTypeRAII loweringEnum(TC, enumType);
+      if (loweringEnum.IsInfinite) {
+        return handleInfinite(enumType, properties);
+      }
 
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
@@ -2201,6 +2255,15 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
                                              MetatypeRepresentation::Thick);
     }
 
+    CanType visitPackType(CanPackType substPackType) {
+      llvm_unreachable("");
+    }
+
+
+    CanType visitPackExpansionType(CanPackExpansionType substPackType) {
+      llvm_unreachable("");
+    }
+
     // Lower tuple element types.
     CanType visitTupleType(CanTupleType substTupleType) {
       return computeLoweredTupleType(TC, forExpansion, origType,
@@ -2393,8 +2456,16 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      TypeConverter &TC,
                                                      SILDeclRef c) {
   auto *vd = c.getDecl();
-  auto resultTy = getParameterAt(vd,
-                                 c.defaultArgIndex)->getInterfaceType();
+  auto *pd = getParameterAt(vd, c.defaultArgIndex);
+
+  Type resultTy;
+
+  if (auto type = pd->getTypeOfDefaultExpr()) {
+    resultTy = type->mapTypeOutOfContext();
+  } else {
+    resultTy = pd->getInterfaceType();
+  }
+
   assert(resultTy && "Didn't find default argument?");
 
   // The result type might be written in terms of type parameters
@@ -3369,6 +3440,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
         ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
+
+  // Asynchronous functions require a thunk if they differ in whether they
+  // have an error result.
+  if (fnTy1->hasErrorResult() != fnTy2->hasErrorResult() &&
+      (fnTy1->isAsync() || fnTy2->isAsync()))
+    return ABIDifference::NeedsThunk;
 
   for (unsigned i = 0, e = fnTy1->getParameters().size(); i < e; ++i) {
     auto param1 = fnTy1->getParameters()[i], param2 = fnTy2->getParameters()[i];

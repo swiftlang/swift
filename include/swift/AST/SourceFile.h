@@ -84,13 +84,14 @@ private:
   /// This is \c None until it is filled in by the import resolution phase.
   Optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
 
+  /// Which imports have made use of @preconcurrency.
+  llvm::SmallDenseSet<AttributedImport<ImportedModule>>
+      PreconcurrencyImportsUsed;
+
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
   /// same module.
   mutable Identifier PrivateDiscriminator;
-
-  /// A synthesized file corresponding to this file, created on-demand.
-  SynthesizedFileUnit *SynthesizedFile = nullptr;
 
   /// The root TypeRefinementContext for this SourceFile.
   ///
@@ -287,6 +288,10 @@ public:
 
   ~SourceFile();
 
+  bool hasImports() const {
+    return Imports.hasValue();
+  }
+
   /// Retrieve an immutable view of the source file's imports.
   ArrayRef<AttributedImport<ImportedModule>> getImports() const {
     return *Imports;
@@ -295,6 +300,14 @@ public:
   /// Set the imports for this source file. This gets called by import
   /// resolution.
   void setImports(ArrayRef<AttributedImport<ImportedModule>> imports);
+
+  /// Whether the given import has used @preconcurrency.
+  bool hasImportUsedPreconcurrency(
+      AttributedImport<ImportedModule> import) const;
+
+  /// Note that the given import has used @preconcurrency/
+  void setImportUsedPreconcurrency(
+      AttributedImport<ImportedModule> import);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.
@@ -408,11 +421,6 @@ public:
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
   Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
-
-  /// Returns the synthesized file for this source file, if it exists.
-  SynthesizedFileUnit *getSynthesizedFile() const { return SynthesizedFile; };
-
-  SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   virtual bool walk(ASTWalker &walker) override;
 
@@ -573,6 +581,9 @@ public:
   }
 
   ArrayRef<OpaqueTypeDecl *> getOpaqueReturnTypeDecls();
+
+  /// Returns true if the source file contains concurrency in the top-level
+  bool isAsyncTopLevelSourceFile() const;
 
 private:
 

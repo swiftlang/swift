@@ -783,7 +783,12 @@ public:
                               Type());
     }
 
-    auto declKindForType = [](Type type) {
+    auto declKindForType = [](Type type) -> DescriptiveDeclKind {
+      // If this is an existential type, use the decl kind of
+      // its constraint type.
+      if (auto existential = type->getAs<ExistentialType>())
+        type = existential->getConstraintType();
+
       if (isa<TypeAliasType>(type.getPointer()))
         return DescriptiveDeclKind::TypeAlias;
       else if (auto nominal = type->getAnyNominal())
@@ -1540,7 +1545,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
     }
     // Implementation-only imported, cannot be reexported.
     return DisallowedOriginKind::ImplementationOnly;
-  } else if (decl->isSPI() && !where.isSPI()) {
+  } else if ((decl->isSPI() || decl->isAvailableAsSPI()) && !where.isSPI()) {
     // SPI can only be exported in SPI.
     return where.getDeclContext()->getParentModule() == M ?
       DisallowedOriginKind::SPILocal :
@@ -1548,7 +1553,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
   }
 
   return DisallowedOriginKind::None;
-};
+}
 
 namespace {
 

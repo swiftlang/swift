@@ -58,10 +58,6 @@ namespace {
 /// The optimization can also handle def-use chains between end_cow_mutation and
 /// begin_cow_mutation which involve phi-arguments.
 ///
-/// An additional peephole optimization is performed: if the begin_cow_mutation
-/// is the only use of the end_cow_mutation, the whole pair of instructions
-/// is eliminated.
-///
 class COWOptsPass : public SILFunctionTransform {
 public:
   COWOptsPass() {}
@@ -86,18 +82,19 @@ void COWOptsPass::run() {
   if (!F->shouldOptimize())
     return;
 
-  LLVM_DEBUG(llvm::dbgs() << "*** RedundantPhiElimination on function: "
+  LLVM_DEBUG(llvm::dbgs() << "*** COW optimization on function: "
                           << F->getName() << " ***\n");
 
   AA = PM->getAnalysis<AliasAnalysis>(F);
 
   bool changed = false;
   for (SILBasicBlock &block : *F) {
-    auto iter = block.begin();
-    while (iter != block.end()) {
-      SILInstruction *inst = &*iter++;
-      if (auto *beginCOW = dyn_cast<BeginCOWMutationInst>(inst))
-        changed |= optimizeBeginCOW(beginCOW);
+  
+    for (SILInstruction &inst : block) {
+      if (auto *beginCOW = dyn_cast<BeginCOWMutationInst>(&inst)) {
+        if (optimizeBeginCOW(beginCOW))
+          changed = true;
+      }
     }
   }
 
@@ -212,20 +209,6 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
                                     BCM->getUniquenessResult()->getType(), 1);
   BCM->getUniquenessResult()->replaceAllUsesWith(IL);
   
-  // Try the peephole optimization: remove an end_cow_mutation/begin_cow_mutation
-  // pair completely if the begin_cow_mutation is the only use of
-  // end_cow_mutation.
-  if (auto *singleEndCOW = dyn_cast<EndCOWMutationInst>(BCM->getOperand())) {
-    assert(endCOWMutationInsts.size() == 1 &&
-           *endCOWMutationInsts.begin() == singleEndCOW);
-    if (singleEndCOW->hasOneUse()) {
-      BCM->getBufferResult()->replaceAllUsesWith(singleEndCOW->getOperand());
-      BCM->eraseFromParent();
-      singleEndCOW->eraseFromParent();
-      return true;
-    }
-  }
-
   for (EndCOWMutationInst *ECM : endCOWMutationInsts) {
     // This is important for other optimizations: The code is now relying on
     // the buffer to be unique.

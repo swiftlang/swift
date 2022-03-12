@@ -1,0 +1,24 @@
+module POD {
+  header "pod.h"
+  requires cplusplus
+}
+
+module MoveOnly {
+  header "move-only.h"
+  requires cplusplus
+}
+
+module Singleton {
+  header "singleton.h"
+  requires cplusplus
+}
+
+module Nullable {
+  header "nullable.h"
+  requires cplusplus
+}
+
+module WitnessTable {
+  header "witness-table.h"
+  requires cplusplus
+}

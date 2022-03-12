@@ -16,11 +16,8 @@
 /// deleted, which in turn allows canonicalization of the outer owned values
 /// (via CanonicalizeOSSALifetime).
 ///
-/// This does not shrink borrow scopes; it does not rewrite end_borrows.
-///
-/// TODO: A separate utility to shrink borrow scopes should eventually run
-/// before this utility. It should hoist end_borrow up to the latest "destroy
-/// barrier" whenever the scope does not contain a PointerEscape.
+/// This does not shrink borrow scopes; it does not rewrite end_borrows.  For
+/// that, see ShrinkBorrowScope.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -149,6 +146,18 @@ protected:
 
   bool consolidateBorrowScope();
 };
+
+bool shrinkBorrowScope(
+    BeginBorrowInst const &bbi, InstructionDeleter &deleter,
+    SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts);
+
+MoveValueInst *foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
+                                                 DominanceInfo &dominanceTree,
+                                                 InstructionDeleter &deleter);
+
+bool hoistDestroysOfOwnedLexicalValue(SILValue const value,
+                                      SILFunction &function,
+                                      InstructionDeleter &deleter);
 
 } // namespace swift
 

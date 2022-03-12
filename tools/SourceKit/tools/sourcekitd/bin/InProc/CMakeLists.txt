@@ -55,9 +55,9 @@ target_link_libraries(sourcekitdInProc PRIVATE
 # that is in the same directory as the swift library directory.
 if (SOURCEKITD_BUILD_STATIC_INPROC)
   add_sourcekit_library(sourcekitdInProc_Static
+    ${sourcekitdInProc_args}
     HEADERS
       ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
-    ${sourcekitdInProc_args}
   )
   target_link_libraries(sourcekitdInProc_Static PRIVATE
     SourceKitSwiftLang

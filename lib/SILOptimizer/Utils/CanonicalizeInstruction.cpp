@@ -36,6 +36,10 @@ using namespace swift;
 // Tracing within the implementation can also be activiated by the pass.
 #define DEBUG_TYPE pass.debugType
 
+llvm::cl::opt<bool> EnableLoadSplittingDebugInfo(
+    "sil-load-splitting-debug-info", llvm::cl::init(false),
+    llvm::cl::desc("Create debug fragments at -O for partial loads"));
+
 // Vtable anchor.
 CanonicalizeInstruction::~CanonicalizeInstruction() {}
 
@@ -243,6 +247,9 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   //   }
   // }
   //
+  // Also, avoid degrading debug info unless it is necessary for exclusivity
+  // diagnostics.
+  //
   // TODO: This logic subtly anticipates SILGen behavior. In the future, change
   // SILGen to avoid emitting the full load and never delete loads in Raw SIL.
   if (projections.empty() && loadInst->getModule().getStage() == SILStage::Raw)
@@ -294,6 +301,19 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     }
     pass.notifyNewInstruction(**lastNewLoad);
 
+    // FIXME: This drops debug info at -Onone load-splitting is required at
+    // -Onone for exclusivity diagnostics. Fix this by
+    // 
+    // 1. At -Onone, preserve the original load when pass.preserveDebugInfo is
+    // true, but moving it out of its current access scope and into an "unknown"
+    // access scope, which won't be enforced as an exclusivity violation.
+    //
+    // 2. At -O, create "debug fragments" recover as much debug info as possible
+    // by creating debug_value fragments for each new partial load. Currently
+    // disabled because of LLVM back-end crashes.
+    if (!pass.preserveDebugInfo && EnableLoadSplittingDebugInfo) {
+      createDebugFragments(*loadInst, proj, lastNewLoad->getLoadInst());
+    }
     if (loadOwnership) {
       if (*loadOwnership == LoadOwnershipQualifier::Copy) {
         // Destroy the loaded value wherever the aggregate load was destroyed.
@@ -301,7 +321,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
                LoadOwnershipQualifier::Copy);
         for (SILInstruction *destroy : lifetimeEndingInsts) {
           auto *newInst = SILBuilderWithScope(destroy).createDestroyValue(
-              destroy->getLoc(), **lastNewLoad);
+              destroy->getLoc(), lastNewLoad->getLoadInst());
           pass.notifyNewInstruction(newInst);
         }
       }
@@ -324,6 +344,14 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   for (auto *destroy : lifetimeEndingInsts)
     nextII = killInstruction(destroy, nextII, pass);
 
+  // FIXME: remove this temporary hack to advance the iterator beyond
+  // debug_value. A soon-to-be merged commit migrates CanonicalizeInstruction to
+  // use InstructionDeleter.
+  while (nextII != loadInst->getParent()->end()
+         && nextII->isDebugInstruction()) {
+    ++nextII;
+  }
+  deleteAllDebugUses(*loadInst, pass.getCallbacks());
   return killInstAndIncidentalUses(*loadInst, nextII, pass);
 }
 
@@ -414,18 +442,29 @@ broadenSingleElementStores(StoreInst *storeInst,
 /// copy. The only way to guarantee the lifetime of a variable is to use a
 /// borrow scope--copy/destroy is insufficient by itself.
 ///
+/// FIXME: This removes debug_value instructions aggressively as part of
+/// SILGenCleanup. Instead, debug_values should be canonicalized before copy
+/// elimination so that we never see the pattern:
+///   %b = begin_borrow
+///   %c = copy %b
+///   end_borrow %b
+///   debug_value %c
+///
 /// FIXME: Technically this should be guarded by a compiler flag like
-/// -enable-copy-propagation until SILGen protects scoped variables by borrow
-/// scopes.
+/// -enable-copy-propagation until SILGen protects scoped variables by
+/// borrow scopes.
 static SILBasicBlock::iterator
 eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
   auto next = std::next(cvi->getIterator());
 
   // Eliminate copies that only have destroy_value uses.
   SmallVector<DestroyValueInst *, 8> destroys;
-  for (auto *use : getNonDebugUses(cvi)) {
+  for (Operand *use : cvi->getUses()) {
     if (auto *dvi = dyn_cast<DestroyValueInst>(use->getUser())) {
       destroys.push_back(dvi);
+      continue;
+    }
+    if (!pass.preserveDebugInfo && isa<DebugValueInst>(use->getUser())) {
       continue;
     }
     return next;
@@ -434,9 +473,7 @@ eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
   while (!destroys.empty()) {
     next = killInstruction(destroys.pop_back_val(), next, pass);
   }
-
-  next = killInstAndIncidentalUses(cvi, next, pass);
-  return next;
+  return killInstAndIncidentalUses(cvi, next, pass);
 }
 
 /// Unlike dead copy elimination, dead borrows can be safely removed because the
@@ -445,9 +482,13 @@ static SILBasicBlock::iterator
 eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
   auto next = std::next(bbi->getIterator());
 
-  // Never eliminate lexical borrow scopes.  They must be kept to ensure that
-  // value lifetimes aren't observably shortened.
-  if (bbi->isLexical())
+  // Lexical borrow scopes can only be eliminated under certain circumstances:
+  // (1) They can never be eliminated if the module is in the raw stage, because
+  //     they may be needed for diagnostic.
+  // (2) They can never be eliminated if there is no enclosing lexical scope
+  //     which guarantees the lifetime of the value.
+  if (bbi->isLexical() && (bbi->getModule().getStage() == SILStage::Raw ||
+                           !isNestedLexicalBeginBorrow(bbi)))
     return next;
 
   // We know that our borrow is completely within the lifetime of its base value
@@ -520,7 +561,6 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   if (auto li = LoadOperation(inst)) {
     return splitAggregateLoad(li, *this);
   }
-
   if (auto *storeInst = dyn_cast<StoreInst>(inst)) {
     return broadenSingleElementStores(storeInst, *this);
   }
@@ -534,8 +574,11 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   // If we have ownership and are not in raw SIL, eliminate unneeded forwarding
   // insts. We don't do this in raw SIL as not to disturb the codegen read by
   // diagnostics.
+  //
+  // TODO: fix tryEliminateUnneededForwardingInst to handle debug uses.
   auto *fn = inst->getFunction();
-  if (fn->hasOwnership() && fn->getModule().getStage() != SILStage::Raw) {
+  if (!preserveDebugInfo && fn->hasOwnership()
+      && fn->getModule().getStage() != SILStage::Raw) {
     if (OwnershipForwardingMixin::isa(inst))
       if (auto newNext = tryEliminateUnneededForwardingInst(inst, *this))
         return *newNext;

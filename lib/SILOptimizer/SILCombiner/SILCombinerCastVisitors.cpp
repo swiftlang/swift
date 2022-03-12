@@ -218,6 +218,95 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *uci) {
   return nullptr;
 }
 
+// Optimize Builtin.assumeAlignment -> pointer_to_address
+//
+// Case #1. Literal zero = natural alignment
+//    %1 = integer_literal $Builtin.Int64, 0
+//    %2 = builtin "assumeAlignment"
+//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
+//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*Int
+//
+//    Erases the `pointer_to_address` `[align=]` attribute:
+//
+// Case #2. Literal nonzero = forced alignment.
+//
+//    %1 = integer_literal $Builtin.Int64, 16
+//    %2 = builtin "assumeAlignment"
+//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
+//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*Int
+//
+//    Promotes the `pointer_to_address` `[align=]` attribute to a higher value.
+//
+// Case #3. Folded dynamic alignment
+//
+//    %1 = builtin "alignof"<T>(%0 : $@thin T.Type) : $Builtin.Word
+//    %2 = builtin "assumeAlignment"
+//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
+//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*T
+//
+//    Erases the `pointer_to_address` `[align=]` attribute.
+SILInstruction *
+SILCombiner::optimizeAlignment(PointerToAddressInst *ptrAdrInst) {
+  if (!ptrAdrInst->alignment())
+    return nullptr;
+
+  llvm::Align oldAlign = ptrAdrInst->alignment().valueOrOne();
+
+  // TODO: stripCasts(ptrAdrInst->getOperand()) can be used to find the Builtin,
+  // but then the Builtin could not be trivially removed. Ideally,
+  // Builtin.assume will be the immediate operand so it can be removed in the
+  // common case.
+  BuiltinInst *assumeAlign = dyn_cast<BuiltinInst>(ptrAdrInst->getOperand());
+  if (!assumeAlign
+      || assumeAlign->getBuiltinKind() != BuiltinValueKind::AssumeAlignment) {
+    return nullptr;
+  }
+  SILValue ptrSrc = assumeAlign->getArguments()[0];
+  SILValue alignOper = assumeAlign->getArguments()[1];
+
+  if (auto *integerInst = dyn_cast<IntegerLiteralInst>(alignOper)) {
+    llvm::MaybeAlign newAlign(integerInst->getValue().getLimitedValue());
+    if (newAlign && newAlign.valueOrOne() <= oldAlign)
+      return nullptr;
+
+    // Case #1: the pointer is assumed naturally aligned
+    //
+    // Or Case #2: the pointer is assumed to have non-zero alignment greater
+    // than it current alignment.
+    //
+    // In either case, rewrite the address alignment with the assumed alignment,
+    // and bypass the Builtin.assumeAlign.
+    return Builder.createPointerToAddress(
+        ptrAdrInst->getLoc(), ptrSrc, ptrAdrInst->getType(),
+        ptrAdrInst->isStrict(), ptrAdrInst->isInvariant(), newAlign);
+  }
+  // Handle possible 32-bit sign-extension.
+  SILValue extendedAlignment;
+  if (match(alignOper,
+            m_ApplyInst(BuiltinValueKind::SExtOrBitCast,
+                        m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
+                                    m_SILValue(extendedAlignment))))) {
+    alignOper = extendedAlignment;
+  }
+  MetatypeInst *metatype;
+  if (match(alignOper,
+            m_ApplyInst(BuiltinValueKind::Alignof, m_MetatypeInst(metatype)))) {
+    SILType instanceType = ptrAdrInst->getFunction()->getLoweredType(
+        metatype->getType().castTo<MetatypeType>().getInstanceType());
+
+    if (instanceType.getAddressType() != ptrAdrInst->getType())
+      return nullptr;
+
+    // Case #3: the alignOf type matches the address type. Convert to a
+    // naturally aligned pointer by erasing alignment and bypassing the
+    // Builtin.assumeAlign.
+    return Builder.createPointerToAddress(
+        ptrAdrInst->getLoc(), ptrSrc, ptrAdrInst->getType(),
+        ptrAdrInst->isStrict(), ptrAdrInst->isInvariant());
+  }
+  return nullptr;
+}
+
 SILInstruction *
 SILCombiner::
 visitPointerToAddressInst(PointerToAddressInst *PTAI) {
@@ -374,7 +463,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
     }
   }
 
-  return nullptr;
+  return optimizeAlignment(PTAI);
 }
 
 SILInstruction *

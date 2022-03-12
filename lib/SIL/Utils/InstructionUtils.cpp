@@ -62,18 +62,6 @@ SILValue swift::getUnderlyingObject(SILValue v) {
   }
 }
 
-SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue v) {
-  while (true) {
-    SILValue v2 = stripCastsWithoutMarkDependence(v);
-    v2 = stripAddressProjections(v2);
-    v2 = stripIndexingInsts(v2);
-    v2 = lookThroughOwnershipInsts(v2);
-    if (v2 == v)
-      return v2;
-    v = v2;
-  }
-}
-
 /// Return the underlying SILValue after stripping off identity SILArguments if
 /// we belong to a BB with one predecessor.
 SILValue swift::stripSinglePredecessorArgs(SILValue V) {
@@ -437,6 +425,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::MarkMustCheckInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
@@ -473,6 +462,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::SwitchValueInst:
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:
@@ -643,6 +633,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
     return RuntimeEffect::MetaData;
   }
+  // Equialent to a copy_addr [init]
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
+    return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
+  }
+
   case SILInstructionKind::StoreInst:
     switch (cast<StoreInst>(inst)->getOwnershipQualifier()) {
       case StoreOwnershipQualifier::Unqualified:
@@ -672,8 +667,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       if (auto selfType = instTy->getAs<DynamicSelfType>())
         instTy = selfType->getSelfType();
       auto *cl = instTy->getClassOrBoundGenericClass();
-      if ((cl && (cl->usesObjCObjectModel() || cl->isForeign())) ||
-          instTy->isAnyObject())
+      bool isForeign = cl && (cl->getObjectModel() == ReferenceCounting::ObjC ||
+                              cl->isForeign());
+      if (isForeign || instTy->isAnyObject())
         return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
       return RuntimeEffect::MetaData;
     }
@@ -690,7 +686,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData;
     case ExistentialRepresentation::Class: {
       auto *cl = opType.getClassOrBoundGenericClass();
-      if ((cl && cl->usesObjCObjectModel()) || opType.isAnyObject())
+      bool usesObjCModel = cl->getObjectModel() == ReferenceCounting::ObjC;
+      if ((cl && usesObjCModel) || opType.isAnyObject())
         return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
       return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
     }
@@ -780,6 +777,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       rt |= RuntimeEffect::MetaData;
       break;
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::Closure:

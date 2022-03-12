@@ -253,8 +253,7 @@ class DeadFunctionAndGlobalElimination {
 
   /// Marks a witness table as alive if it is not alive yet.
   void ensureAliveConformance(const ProtocolConformance *C) {
-    SILWitnessTable *WT = Module->lookUpWitnessTable(C,
-                                                 /*deserializeLazily*/ false);
+    SILWitnessTable *WT = Module->lookUpWitnessTable(C);
     if (!WT || isAlive(WT))
       return;
     makeAlive(WT);
@@ -312,9 +311,7 @@ class DeadFunctionAndGlobalElimination {
     mi->methodIsCalled = true;
     for (FuncImpl &FImpl : mi->implementingFunctions) {
       if (auto Conf = FImpl.Impl.dyn_cast<RootProtocolConformance *>()) {
-        SILWitnessTable *WT =
-            Module->lookUpWitnessTable(Conf,
-                                       /*deserializeLazily*/ false);
+        SILWitnessTable *WT = Module->lookUpWitnessTable(Conf);
         if (!WT || isAlive(WT))
           makeAlive(FImpl.F);
       } else {

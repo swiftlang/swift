@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-experimental-lexical-lifetimes %s -mem2reg
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg
 
 // Make sure we are not crashing on blocks that are not dominated by the entry block.
 

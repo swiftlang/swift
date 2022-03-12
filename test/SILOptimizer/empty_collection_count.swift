@@ -13,7 +13,7 @@
 // CHECK: return [[I]]
 public func testArray() -> Int {
   let d = Array<Int>()
-  return d.count
+  return d.count + d.capacity
 }
 
 // CHECK-LABEL: sil @{{.*}}testDictionary

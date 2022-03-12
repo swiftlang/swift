@@ -168,7 +168,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(ImportPath::Element named,
+  virtual bool canImportModule(ImportPath::Module named,
                                llvm::VersionTuple version,
                                bool underlyingVersion) override;
 
@@ -287,7 +287,7 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 public:
   virtual ~MemoryBufferSerializedModuleLoader();
 
-  bool canImportModule(ImportPath::Element named, llvm::VersionTuple version,
+  bool canImportModule(ImportPath::Module named, llvm::VersionTuple version,
                        bool underlyingVersion) override;
   ModuleDecl *
   loadModule(SourceLoc importLoc,
@@ -433,7 +433,7 @@ public:
   virtual void
   getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &results) const override;
 
-  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
+  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const override;
 
   virtual void
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
@@ -464,6 +464,9 @@ public:
 
   virtual void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)>) const override;
+
+  virtual void collectSerializedSearchPath(
+      llvm::function_ref<void(StringRef)> callback) const override;
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST;

@@ -13,9 +13,13 @@ import _Concurrency
 // CHECK-CANONICAL: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 @MainActor public func onMainActor() { }
 
+// CHECK-CANONICAL-LABEL: sil [ossa] @$s4test17onMainActorUnsafeyyF
+// CHECK-CANONICAL: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+@preconcurrency @MainActor public func onMainActorUnsafe() { }
+
 func takeClosure(_ fn: @escaping () -> Int) { }
 
-@_predatesConcurrency func takeUnsafeMainActorClosure(_ fn: @MainActor @escaping () -> Int) { }
+@preconcurrency func takeUnsafeMainActorClosure(_ fn: @MainActor @escaping () -> Int) { }
 
 public actor MyActor {
   var counter = 0
@@ -41,5 +45,20 @@ public actor MyActor {
       onMainActor()
       return 5
     }
+  }
+
+  // CHECK-CANONICAL-LABEL: sil private [ossa] @$s4test7MyActorC0A13LocalFunctionyyF5localL_SiyF : $@convention(thin) (@guaranteed MyActor) -> Int
+  // CHECK-CANONICAL: [[CAPTURE:%.*]] = copy_value %0 : $MyActor
+  // CHECK-CANONICAL-NEXT: [[BORROWED_CAPTURE:%.*]] = begin_borrow [[CAPTURE]] : $MyActor
+  // CHECK-CANONICAL-NEXT: [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>([[BORROWED_CAPTURE]] : $MyActor) : $Builtin.Executor
+  // CHECK-CANONICAL-NEXT: [[EXECUTOR_DEP:%.*]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on [[BORROWED_CAPTURE]] : $MyActor
+  // CHECK-CANONICAL: [[CHECK_FN:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+  // CHECK-CANONICAL-NEXT: apply [[CHECK_FN]]({{.*}}, [[EXECUTOR_DEP]])
+  public func testLocalFunction() {
+    func local() -> Int {
+      return counter
+    }
+
+    print(local())
   }
 }

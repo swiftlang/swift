@@ -56,17 +56,6 @@ Type InheritedTypeRequest::evaluate(
                                      /*unboundTyOpener*/ nullptr,
                                      /*placeholderHandler*/ nullptr);
     break;
-
-  case TypeResolutionStage::Contextual: {
-    // Compute the contextual type by mapping the interface type into context.
-    auto result =
-      evaluator(InheritedTypeRequest{decl, index,
-                                     TypeResolutionStage::Interface});
-    if (!result)
-      return Type();
-
-    return dc->mapTypeIntoContext(*result);
-  }
   }
 
   const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
@@ -153,8 +142,8 @@ Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
     auto &inheritedType = *inheritedTypeResult;
     if (!inheritedType) continue;
 
-    // Skip existential types.
-    if (inheritedType->isExistentialType()) continue;
+    // Skip protocol conformances.
+    if (inheritedType->isConstraintType()) continue;
 
     // We found a raw type; return it.
     return inheritedType;

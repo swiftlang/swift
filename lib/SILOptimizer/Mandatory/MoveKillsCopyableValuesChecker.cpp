@@ -20,11 +20,16 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 
 using namespace swift;
@@ -80,12 +85,11 @@ struct CheckerLivenessInfo {
 } // end anonymous namespace
 
 bool CheckerLivenessInfo::compute() {
-  bool foundEscapes = false;
-
   LLVM_DEBUG(llvm::dbgs() << "LivenessVisitor Begin!\n");
   while (SILValue value = defUseWorklist.pop()) {
     LLVM_DEBUG(llvm::dbgs() << "New Value: " << value);
     SWIFT_DEFER { LLVM_DEBUG(llvm::dbgs() << "Finished Value: " << value); };
+
     for (Operand *use : value->getUses()) {
       auto *user = use->getUser();
       LLVM_DEBUG(llvm::dbgs() << "    User: " << *user);
@@ -108,7 +112,8 @@ bool CheckerLivenessInfo::compute() {
       // escape. Is it legal to canonicalize ForwardingUnowned?
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
-        foundEscapes = true;
+        // This is an escape but it is up to the user to handle this, move
+        // checking stops here.
         break;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
@@ -127,8 +132,16 @@ bool CheckerLivenessInfo::compute() {
         consumingUse.insert(use);
         break;
       case OperandOwnership::Borrow: {
-        bool failed = !liveness.updateForBorrowingOperand(use);
-        assert(!failed && "Shouldn't see reborrows this early in the pipeline");
+        if (auto *bbi = dyn_cast<BeginBorrowInst>(user)) {
+          // Only add borrows to liveness if the borrow isn't lexical. If it is
+          // a lexical borrow, we have created an entirely new source level
+          // binding that should be tracked separately.
+          if (!bbi->isLexical()) {
+            bool failed = !liveness.updateForBorrowingOperand(use);
+            if (failed)
+              return false;
+          }
+        }
         break;
       }
       case OperandOwnership::ForwardingBorrow:
@@ -170,8 +183,8 @@ bool CheckerLivenessInfo::compute() {
     }
   }
 
-  // We succeeded if we did not find any escapes.
-  return !foundEscapes;
+  // We succeeded if we reached this point since we handled all uses.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -183,9 +196,19 @@ namespace {
 struct MoveKillsCopyableValuesChecker {
   SILFunction *fn;
   CheckerLivenessInfo livenessInfo;
-  SmallSetVector<MoveValueInst *, 1> movesWithinLivenessBoundary;
+  DominanceInfo *dominanceToUpdate;
+  SILLoopInfo *loopInfoToUpdate;
 
-  MoveKillsCopyableValuesChecker(SILFunction *fn) : fn(fn) {}
+  MoveKillsCopyableValuesChecker(SILFunction *fn)
+      : fn(fn), livenessInfo(), dominanceToUpdate(nullptr),
+        loopInfoToUpdate(nullptr) {}
+
+  void setDominanceToUpdate(DominanceInfo *newDFI) {
+    dominanceToUpdate = newDFI;
+  }
+
+  void setLoopInfoToUpdate(SILLoopInfo *newLFI) { loopInfoToUpdate = newLFI; }
+
   bool check();
 
   void emitDiagnosticForMove(SILValue borrowedValue,
@@ -328,8 +351,7 @@ bool MoveKillsCopyableValuesChecker::check() {
   SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
-    if (arg->getOwnershipKind() == OwnershipKind::Guaranteed ||
-        arg->getOwnershipKind() == OwnershipKind::Owned)
+    if (arg->getOwnershipKind() == OwnershipKind::Owned)
       valuesToCheck.insert(arg);
   }
 
@@ -349,38 +371,36 @@ bool MoveKillsCopyableValuesChecker::check() {
   LLVM_DEBUG(llvm::dbgs() << "Visiting Function: " << fn->getName() << "\n");
   auto valuesToProcess =
       llvm::makeArrayRef(valuesToCheck.begin(), valuesToCheck.end());
+  auto &mod = fn->getModule();
 
+  // If we do not emit any diagnostics, we need to put in a break after each dbg
+  // info carrying inst for a lexical value that we find a move on. This ensures
+  // that we avoid a behavior today in SelectionDAG that causes dbg info addr to
+  // be always sunk to the end of a block.
+  //
+  // TODO: We should add llvm.dbg.addr support for fastisel and also teach
+  // CodeGen how to handle llvm.dbg.addr better.
+  bool emittedDiagnostic = false;
   while (!valuesToProcess.empty()) {
     auto lexicalValue = valuesToProcess.front();
     valuesToProcess = valuesToProcess.drop_front(1);
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *lexicalValue);
 
-    // Before we do anything, see if we can find a name for our value. We do
-    // this early since we need this for all of our diagnostics below.
-    StringRef varName = "unknown";
-    if (auto *use = getSingleDebugUse(lexicalValue)) {
-      DebugVarCarryingInst debugVar(use->getUser());
-      if (auto varInfo = debugVar.getVarInfo()) {
-        varName = varInfo->Name;
-      } else {
-        if (auto *decl = debugVar.getDecl()) {
-          varName = decl->getBaseName().userFacingName();
-        }
-      }
-    }
-
     // Then compute liveness.
     SWIFT_DEFER { livenessInfo.clear(); };
     livenessInfo.initDef(lexicalValue);
-    // We do not care if we find an escape. We just want to make sure that any
-    // non-escaping users obey our property. If the user does something unsafe
-    // that is on them to manage.
-    bool foundEscape = livenessInfo.compute();
-    (void)foundEscape;
+
+    // We only fail to optimize if for some reason we hit reborrows. This is
+    // temporary since we really should just ban reborrows in Raw SIL.
+    bool canOptimize = livenessInfo.compute();
+    if (!canOptimize)
+      continue;
 
     // Then look at all of our found consuming uses. See if any of these are
     // _move that are within the boundary.
-    SWIFT_DEFER { movesWithinLivenessBoundary.clear(); };
+    bool foundMove = false;
+    auto dbgVarInst = DebugVarCarryingInst::getFromValue(lexicalValue);
+    StringRef varName = DebugVarCarryingInst::getName(dbgVarInst);
     for (auto *use : livenessInfo.consumingUse) {
       if (auto *mvi = dyn_cast<MoveValueInst>(use->getUser())) {
         // Only emit diagnostics if our move value allows us to.
@@ -395,21 +415,47 @@ bool MoveKillsCopyableValuesChecker::check() {
         LLVM_DEBUG(llvm::dbgs() << "Move Value: " << *mvi);
         if (livenessInfo.liveness.isWithinBoundary(mvi)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
-          movesWithinLivenessBoundary.insert(mvi);
+          emitDiagnosticForMove(lexicalValue, varName, mvi);
+          emittedDiagnostic = true;
         } else {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: No!\n");
+          if (auto varInfo = dbgVarInst.getVarInfo()) {
+            auto *next = mvi->getNextInstruction();
+            SILBuilderWithScope builder(next);
+            // We need to make sure any undefs we put in are the same loc/debug
+            // scope as our original so that the backend treats them as
+            // referring to the same "debug entity".
+            builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
+            builder.createDebugValue(
+                dbgVarInst->getLoc(),
+                SILUndef::get(mvi->getOperand()->getType(), mod), *varInfo,
+                false /*poison*/, true /*moved*/);
+          }
         }
+        foundMove = true;
       }
     }
 
-    // Ok, we found all of our moves that violate the boundary condition, lets
-    // emit diagnostics for each of them.
-    for (auto *mvi : movesWithinLivenessBoundary) {
-      emitDiagnosticForMove(lexicalValue, varName, mvi);
+    // If we found a move, mark our debug var inst as having a moved value. This
+    // ensures we emit llvm.dbg.addr instead of llvm.dbg.declare in IRGen.
+    if (foundMove) {
+      dbgVarInst.markAsMoved();
     }
   }
 
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+//                        Unsupported Use Case Errors
+//===----------------------------------------------------------------------===//
+
+static void emitUnsupportedUseCaseError(MoveValueInst *mvi) {
+  auto &astContext = mvi->getModule().getASTContext();
+  auto diag = diag::
+    sil_movekillscopyablevalue_move_applied_to_unsupported_move;
+  diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+  mvi->setAllowsDiagnostics(false);
 }
 
 //===----------------------------------------------------------------------===//
@@ -421,12 +467,6 @@ namespace {
 class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
-    auto &astContext = fn->getASTContext();
-
-    // If we do not have experimental move only enabled, do not emit
-    // diagnostics.
-    if (!astContext.LangOpts.EnableExperimentalMoveOnly)
-      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
@@ -437,8 +477,20 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
 
     MoveKillsCopyableValuesChecker checker(getFunction());
 
-    if (MoveKillsCopyableValuesChecker(getFunction()).check()) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    // If we already had dominance or loop info generated, update them when
+    // splitting blocks.
+    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+    if (dominanceAnalysis->hasFunctionInfo(fn))
+      checker.setDominanceToUpdate(dominanceAnalysis->get(fn));
+    auto *loopAnalysis = getAnalysis<SILLoopAnalysis>();
+    if (loopAnalysis->hasFunctionInfo(fn))
+      checker.setLoopInfoToUpdate(loopAnalysis->get(fn));
+
+    if (checker.check()) {
+      AnalysisPreserver preserveDominance(dominanceAnalysis);
+      AnalysisPreserver preserveLoop(loopAnalysis);
+      invalidateAnalysis(
+          SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
 
     // Now search through our function one last time and any move_value
@@ -453,9 +505,7 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
       for (auto &inst : block) {
         if (auto *mvi = dyn_cast<MoveValueInst>(&inst)) {
           if (mvi->getAllowDiagnostics()) {
-            auto diag = diag::
-                sil_movekillscopyablevalue_move_applied_to_unsupported_move;
-            diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+            emitUnsupportedUseCaseError(mvi);
           }
         }
       }

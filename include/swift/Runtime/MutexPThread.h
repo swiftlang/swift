@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Mutex, ConditionVariable, Read/Write lock, and Scoped lock implementations
+// Mutex, Read/Write lock, and Scoped lock implementations
 // using PThreads.
 //
 //===----------------------------------------------------------------------===//
@@ -27,8 +27,6 @@
 
 namespace swift {
 
-typedef pthread_cond_t ConditionHandle;
-typedef pthread_mutex_t ConditionMutexHandle;
 typedef pthread_rwlock_t ReadWriteLockHandle;
 
 #if HAS_OS_UNFAIR_LOCK
@@ -42,50 +40,18 @@ typedef pthread_mutex_t MutexHandle;
 // constexpr for static allocation versions. The way they define things
 // results in a reinterpret_cast which violates constexpr.
 // WASI currently doesn't support threading/locking at all.
-#define SWIFT_CONDITION_SUPPORTS_CONSTEXPR 0
 #define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 0
 #define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 0
 #else
-#define SWIFT_CONDITION_SUPPORTS_CONSTEXPR 1
 #define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 1
 #define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 1
 #endif
-
-/// PThread low-level implementation that supports ConditionVariable
-/// found in Mutex.h
-///
-/// See ConditionVariable
-struct ConditionPlatformHelper {
-#if SWIFT_CONDITION_SUPPORTS_CONSTEXPR
-  static constexpr
-#else
-  static
-#endif
-      ConditionHandle
-      staticInit() {
-    return PTHREAD_COND_INITIALIZER;
-  };
-  static void init(ConditionHandle &condition);
-  static void destroy(ConditionHandle &condition);
-  static void notifyOne(ConditionHandle &condition);
-  static void notifyAll(ConditionHandle &condition);
-  static void wait(ConditionHandle &condition, ConditionMutexHandle &mutex);
-};
 
 /// PThread low-level implementation that supports Mutex
 /// found in Mutex.h
 ///
 /// See Mutex
 struct MutexPlatformHelper {
-#if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
-  static constexpr
-#else
-  static
-#endif
-      ConditionMutexHandle
-      conditionStaticInit() {
-    return PTHREAD_MUTEX_INITIALIZER;
-  };
 #if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
   static constexpr
 #else
@@ -99,14 +65,6 @@ struct MutexPlatformHelper {
     return PTHREAD_MUTEX_INITIALIZER;
 #endif  
   }
-  static void init(ConditionMutexHandle &mutex, bool checked = false);
-  static void destroy(ConditionMutexHandle &mutex);
-  static void lock(ConditionMutexHandle &mutex);
-  static void unlock(ConditionMutexHandle &mutex);
-  static bool try_lock(ConditionMutexHandle &mutex);
-
-  // The ConditionMutexHandle versions handle everything on-Apple platforms.
-#if HAS_OS_UNFAIR_LOCK
 
   static void init(MutexHandle &mutex, bool checked = false);
   static void destroy(MutexHandle &mutex);
@@ -114,19 +72,47 @@ struct MutexPlatformHelper {
   static void unlock(MutexHandle &mutex);
   static bool try_lock(MutexHandle &mutex);
 
+#if HAS_OS_UNFAIR_LOCK
   // os_unfair_lock always checks for errors, so just call through.
-  static void unsafeLock(MutexHandle &mutex) { lock(mutex); }
-  static void unsafeUnlock(MutexHandle &mutex) { unlock(mutex); }
-#endif
-
-  // The unsafe versions don't do error checking.
-  static void unsafeLock(ConditionMutexHandle &mutex) {
+  static void unsafeLock(MutexHandle &mutex) {
+    lock(mutex);
+  }
+  static void unsafeUnlock(MutexHandle &mutex) {
+    unlock(mutex);
+  }
+#else
+  // Skip error checking for the unsafe versions.
+  static void unsafeLock(MutexHandle &mutex) {
     (void)pthread_mutex_lock(&mutex);
   }
-  static void unsafeUnlock(ConditionMutexHandle &mutex) {
+  static void unsafeUnlock(MutexHandle &mutex) {
     (void)pthread_mutex_unlock(&mutex);
   }
+#endif
 };
+
+#if HAS_OS_UNFAIR_LOCK
+
+inline void MutexPlatformHelper::init(os_unfair_lock &lock, bool checked) {
+  (void)checked; // Unfair locks are always checked.
+  lock = OS_UNFAIR_LOCK_INIT;
+}
+
+inline void MutexPlatformHelper::destroy(os_unfair_lock &lock) {}
+
+inline void MutexPlatformHelper::lock(os_unfair_lock &lock) {
+  os_unfair_lock_lock(&lock);
+}
+
+inline void MutexPlatformHelper::unlock(os_unfair_lock &lock) {
+  os_unfair_lock_unlock(&lock);
+}
+
+inline bool MutexPlatformHelper::try_lock(os_unfair_lock &lock) {
+  return os_unfair_lock_trylock(&lock);
+}
+
+#endif
 
 /// PThread low-level implementation that supports ReadWriteLock
 /// found in Mutex.h

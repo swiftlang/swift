@@ -26,8 +26,6 @@ namespace swift {
 /// nothing left to strip.
 SILValue getUnderlyingObject(SILValue V);
 
-SILValue getUnderlyingObjectStopAtMarkDependence(SILValue V);
-
 SILValue stripSinglePredecessorArgs(SILValue V);
 
 /// Return the underlying SILValue after stripping off all casts from the

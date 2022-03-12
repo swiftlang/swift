@@ -7,6 +7,8 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar85913190
+
 import Foundation
 
 let str = "abcdefg\u{A758}hijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz\u{A759}"

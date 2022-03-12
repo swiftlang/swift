@@ -7,7 +7,16 @@ import Swift
 // Declarations //
 //////////////////
 
+typealias AnyObject = Builtin.AnyObject
+
 class Klass {}
+
+class X {}
+
+struct S {
+    var v1: AnyObject
+    var v2: AnyObject
+}
 
 struct SmallCodesizeStruct {
   var cls1 : Klass
@@ -38,6 +47,10 @@ struct NonTrivialStruct {
 public enum FakeOptional<T> {
   case some(T)
   case none
+}
+
+struct UInt8 {
+  var _value : Builtin.Int8
 }
 
 sil [ossa] @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
@@ -1021,7 +1034,8 @@ enum KlassOptional {
 sil @return_optional_or_error : $@convention(thin) () -> (@owned KlassOptional, @error Error)
 
 // CHECK-LABEL: sil [ossa] @test_deadphi4 :
-// CHECK-NOT: alloc_stack
+// mem2reg cannot optimize an enum location which spans over multiple blocks.
+// CHECK:         alloc_stack
 // CHECK-LABEL: } // end sil function 'test_deadphi4'
 sil [ossa] @test_deadphi4 : $@convention(thin) (@owned KlassOptional) -> () {
 bb0(%0 : @owned $KlassOptional):
@@ -1113,3 +1127,102 @@ bb9:
   return %res : $()
 }
 
+// Test that a load [take] of an unchecked_addr_cast doesn't get promoted.
+//
+// CHECK-LABEL: sil [ossa] @load_take_unchecked_addr_cast : {{.*}} {
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'load_take_unchecked_addr_cast'
+sil [ossa] @load_take_unchecked_addr_cast : $@convention(thin) (@guaranteed AnyObject) -> () {
+entry(%instance : @guaranteed $AnyObject):
+  %copy = copy_value %instance : $AnyObject
+  %storage = alloc_stack $AnyObject
+  store %copy to [init] %storage : $*AnyObject
+  %cast_addr = unchecked_addr_cast %storage : $*AnyObject to $*Klass
+  %value = load [take] %cast_addr : $*Klass
+  dealloc_stack %storage : $*AnyObject
+  destroy_value %value : $Klass    
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Don't bail if the original address is destroyed even if we see a cast.
+//
+// CHECK-LABEL: sil [ossa] @destroy_original_storage : {{.*}} {
+// CHECK:         destroy_value
+// CHECK-LABEL: } // end sil function 'destroy_original_storage'
+sil [ossa] @destroy_original_storage : $@convention(thin) (@guaranteed AnyObject) -> () {
+entry(%instance : @guaranteed $AnyObject):
+  %copy = copy_value %instance : $AnyObject
+  %storage = alloc_stack $AnyObject
+  store %copy to [init] %storage : $*AnyObject
+  %cast_addr = unchecked_addr_cast %storage : $*AnyObject to $*Klass
+  %value = load [copy] %cast_addr : $*Klass
+  destroy_addr %storage : $*AnyObject
+  dealloc_stack %storage : $*AnyObject
+  destroy_value %value : $Klass    
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Bail if the address produced by an unchecked_addr_cast is destroyed.
+//
+// CHECK-LABEL: sil [ossa] @destroy_addr_unchecked_addr_cast : {{.*}} {
+// CHECK:         unchecked_addr_cast
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'destroy_addr_unchecked_addr_cast'
+sil [ossa] @destroy_addr_unchecked_addr_cast : $@convention(thin) (@guaranteed AnyObject) -> () {
+entry(%instance : @guaranteed $AnyObject):
+  %copy = copy_value %instance : $AnyObject
+  %storage = alloc_stack $AnyObject
+  store %copy to [init] %storage : $*AnyObject
+  %cast_addr = unchecked_addr_cast %storage : $*AnyObject to $*Klass
+  %value = load [copy] %cast_addr : $*Klass
+  destroy_addr %cast_addr : $*Klass
+  dealloc_stack %storage : $*AnyObject
+  destroy_value %value : $Klass    
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Bail if there's a load [take] of one of multiple non-trivial fields.
+//
+// CHECK-LABEL: sil [ossa] @load_take_one_of_two_nontrivial_struct_fields : {{.*}} {
+// CHECK:         load [take]
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'load_take_one_of_two_nontrivial_struct_fields'
+sil [ossa] @load_take_one_of_two_nontrivial_struct_fields : $@convention(thin) (@guaranteed S) -> () {
+entry(%instance : @guaranteed $S):
+  %copy = copy_value %instance : $S
+  %storage = alloc_stack $S
+  store %copy to [init] %storage : $*S
+  %v1_addr = struct_element_addr %storage : $*S, #S.v1
+  %cast_addr = unchecked_addr_cast %v1_addr : $*AnyObject to $*Klass
+  %value = load [take] %cast_addr : $*Klass
+  %v2_addr = struct_element_addr %storage : $*S, #S.v2
+  destroy_addr %v2_addr : $*AnyObject
+  //destroy_addr %storage : $*S
+  dealloc_stack %storage : $*S
+  destroy_value %value : $Klass    
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Don't bail if we happen to see an unchecked_addr_cast but then load [take]
+// the original address.
+//
+// CHECK-LABEL: sil [ossa] @load_take_original_despite_cast : {{.*}} {
+// CHECK:         unchecked_bitwise_cast
+// CHECK:         destroy_value
+// CHECK-LABEL: } // end sil function 'load_take_original_despite_cast'
+sil [ossa] @load_take_original_despite_cast : $@convention(thin) (@owned AnyObject) -> () {
+entry(%instance : @owned $AnyObject):
+  %74 = alloc_stack $AnyObject
+  store %instance to [init] %74 : $*AnyObject
+  %76 = unchecked_addr_cast %74 : $*AnyObject to $*UInt8
+  %77 = load [trivial] %76 : $*UInt8
+  %79 = load [take] %74 : $*AnyObject
+  destroy_value %79 : $AnyObject
+  dealloc_stack %74 : $*AnyObject
+  %82 = tuple ()
+  return %82 : $()
+}

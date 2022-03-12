@@ -520,10 +520,14 @@ public:
     // These are marked as ref-qualified (the &) to make sure they can't be
     // called on temporaries, since the temporary would be destroyed before the
     // return value can be used, making it invalid.
-    const ElemTy *begin() & { return Start; }
-    const ElemTy *end() & { return Start + Count; }
+    const ElemTy *begin() const& { return Start; }
+    const ElemTy *end() const& { return Start + Count; }
+    const ElemTy& operator [](size_t index) const& {
+      assert(index < count() && "out-of-bounds access to snapshot element");
+      return Start[index];
+    }
 
-    size_t count() { return Count; }
+    size_t count() const { return Count; }
   };
 
   // This type cannot be safely copied or moved.
@@ -548,7 +552,7 @@ public:
       auto newCapacity = std::max((size_t)16, count * 2);
       auto *newStorage = Storage::allocate(newCapacity);
       if (storage) {
-        std::copy(storage->data(), storage->data() + count, newStorage->data());
+        std::uninitialized_copy_n(storage->data(), count, newStorage->data());
         newStorage->Count.store(count, std::memory_order_release);
         ConcurrentFreeListNode::add(&FreeList, storage);
       }
@@ -622,10 +626,7 @@ using llvm::hash_value;
 /// outstanding readers, but this won't destroy the static mutex it uses.
 template <class ElemTy, class MutexTy = StaticMutex>
 struct ConcurrentReadableHashMap {
-  // We use memcpy and don't call destructors. Make sure the elements will put
-  // up with this.
-  static_assert(std::is_trivially_copyable<ElemTy>::value,
-                "Elements must be trivially copyable.");
+  // We don't call destructors. Make sure the elements will put up with this.
   static_assert(std::is_trivially_destructible<ElemTy>::value,
                 "Elements must not have destructors (they won't be called).");
 
@@ -815,7 +816,7 @@ private:
   /// the first element of a variable-length array, whose size is determined by
   /// the allocation.
   struct ElementStorage {
-    uint32_t Capacity;
+    uintptr_t Capacity : 32;
     ElemTy Elem;
 
     static ElementStorage *allocate(size_t capacity) {
@@ -884,8 +885,13 @@ private:
     auto *newElements = ElementStorage::allocate(newCapacity);
 
     if (elements) {
-      memcpy(newElements->data(), elements->data(),
-             elementCount * sizeof(ElemTy));
+      if (std::is_trivially_copyable<ElemTy>::value) {
+        memcpy(newElements->data(), elements->data(),
+               elementCount * sizeof(ElemTy));
+      } else {
+        std::uninitialized_copy_n(elements->data(), elementCount,
+                                  newElements->data());
+      }
       ConcurrentFreeListNode::add(&FreeList, elements);
     }
 

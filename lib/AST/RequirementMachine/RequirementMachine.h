@@ -14,6 +14,7 @@
 #define SWIFT_REQUIREMENTMACHINE_H
 
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/RequirementSignature.h"
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
 
@@ -32,9 +33,11 @@ class ASTContext;
 class AssociatedTypeDecl;
 class CanType;
 class GenericTypeParamType;
+class InferredGenericSignatureRequestRQM;
 class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
+class RequirementSignatureRequestRQM;
 class Type;
 class UnifiedStatsReporter;
 
@@ -46,11 +49,12 @@ class RewriteContext;
 class RequirementMachine final {
   friend class swift::ASTContext;
   friend class swift::rewriting::RewriteContext;
+  friend class swift::RequirementSignatureRequestRQM;
   friend class swift::AbstractGenericSignatureRequestRQM;
+  friend class swift::InferredGenericSignatureRequestRQM;
 
   CanGenericSignature Sig;
   SmallVector<Type, 2> Params;
-  ArrayRef<const ProtocolDecl *> Protos;
 
   RewriteContext &Context;
   RewriteSystem System;
@@ -58,8 +62,11 @@ class RequirementMachine final {
 
   bool Dump = false;
   bool Complete = false;
-  unsigned RequirementMachineStepLimit;
-  unsigned RequirementMachineDepthLimit;
+
+  /// Parameters to prevent runaway completion and property map construction.
+  unsigned MaxRuleCount;
+  unsigned MaxRuleLength;
+  unsigned MaxConcreteNesting;
 
   UnifiedStatsReporter *Stats;
 
@@ -81,19 +88,31 @@ class RequirementMachine final {
   RequirementMachine &operator=(const RequirementMachine &) = delete;
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
-  void initWithGenericSignature(CanGenericSignature sig);
-  void initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
-  void initWithAbstractRequirements(
+  void checkCompletionResult(CompletionResult result) const;
+
+  std::pair<CompletionResult, unsigned>
+  initWithGenericSignature(CanGenericSignature sig);
+
+  std::pair<CompletionResult, unsigned>
+  initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
+
+  std::pair<CompletionResult, unsigned>
+  initWithWrittenRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
-      ArrayRef<Requirement> requirements);
+      ArrayRef<StructuralRequirement> requirements);
 
   bool isComplete() const;
 
-  void computeCompletion(RewriteSystem::ValidityPolicy policy);
+  std::pair<CompletionResult, unsigned>
+  computeCompletion(RewriteSystem::ValidityPolicy policy);
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
   std::vector<Requirement> buildRequirementsFromRules(
+    ArrayRef<unsigned> rules,
+    TypeArrayView<GenericTypeParamType> genericParams) const;
+
+  std::vector<ProtocolTypeAlias> buildProtocolTypeAliasesFromRules(
     ArrayRef<unsigned> rules,
     TypeArrayView<GenericTypeParamType> genericParams) const;
 
@@ -123,14 +142,19 @@ public:
   bool isCanonicalTypeInContext(Type type) const;
   Type getCanonicalTypeInContext(Type type,
                       TypeArrayView<GenericTypeParamType> genericParams) const;
+  bool isValidTypeInContext(Type type) const;
   ConformanceAccessPath getConformanceAccessPath(Type type,
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
-  llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>>
+  llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
   computeMinimalProtocolRequirements();
 
   std::vector<Requirement> computeMinimalGenericSignatureRequirements();
+
+  std::string getRuleAsStringForDiagnostics(unsigned ruleID) const;
+
+  bool hadError() const;
 
   void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;

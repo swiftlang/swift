@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -disable-copy-propagation %s -emit-sil -emit-verbose-sil -g -o - | %FileCheck --check-prefixes=CHECK-SIL,CHECK-NCP %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-copy-propagation %s -emit-sil -emit-verbose-sil -g -o - | %FileCheck --check-prefixes=CHECK-SIL,CHECK-CP %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -emit-sil -emit-verbose-sil -g -o - | %FileCheck --check-prefixes=CHECK-SIL %s
 import StdlibUnittest
 
 class Obj {}
@@ -18,10 +17,9 @@ func testDoStmt() throws -> Void {
     let obj = Obj()
     _blackHole(obj)
     // The poison debug_value takes the location of the original decl.
-    // CHECK-CP:  debug_value [poison] %{{.*}} : $Obj{{.*}} line:[[@LINE-3]]:9:in_prologue
     try foo(100)
     // CHECK-SIL: bb{{.*}}(%{{[0-9]+}} : $()):
-    // CHECK-NCP-NEXT: strong_release {{.*}}: $Obj{{.*}} line:[[@LINE+1]]:3:cleanup
+    // CHECK-SIL-NEXT: strong_release {{.*}}: $Obj{{.*}} line:[[@LINE+1]]:3:cleanup
   }
   // CHECK-SIL-NEXT:     = tuple ()
   // CHECK-SIL-NEXT:   return                        {{.*}} line:[[@LINE+1]]

@@ -33,8 +33,8 @@ namespace {
 /// Promotes heap allocated objects to the stack.
 ///
 /// It handles alloc_ref instructions of native swift classes: if promoted,
-/// the [stack] attribute is set in the alloc_ref and a dealloc_ref [stack] is
-/// inserted at the end of the object's lifetime.
+/// the [stack] attribute is set in the alloc_ref and a dealloc_stack_ref
+/// is inserted at the end of the object's lifetime.
 class StackPromotion : public SILFunctionTransform {
 
 public:
@@ -49,15 +49,12 @@ private:
                       DeadEndBlocks &DEBlocks);
 
   /// Tries to promote the allocation \p ARI.
-  bool tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
+  bool tryPromoteAlloc(AllocRefInstBase *ARI, EscapeAnalysis *EA,
                        DeadEndBlocks &DEBlocks);
 };
 
 void StackPromotion::run() {
   SILFunction *F = getFunction();
-  // FIXME: We should be able to support ownership.
-  if (F->hasOwnership())
-    return;
 
   LLVM_DEBUG(llvm::dbgs() << "** StackPromotion in " << F->getName() << " **\n");
 
@@ -87,7 +84,14 @@ bool StackPromotion::promoteInBlock(SILBasicBlock *BB, EscapeAnalysis *EA,
     // The allocation instruction may be moved, so increment Iter prior to
     // doing the optimization.
     SILInstruction *I = &*Iter++;
-    if (auto *ARI = dyn_cast<AllocRefInst>(I)) {
+    if (auto *ARI = dyn_cast<AllocRefInstBase>(I)) {
+
+      // We can only stack promote alloc_ref_dynamic instructions whose size and
+      // deinit is known to be equivalent to the base type.
+      auto *ARD = dyn_cast<AllocRefDynamicInst>(I);
+      if (ARD && !ARD->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType())
+        return false;
+
       // Don't stack promote any allocation inside a code region which ends up
       // in a no-return block. Such allocations may missing their final release.
       // We would insert the deallocation too early, which may result in a
@@ -101,7 +105,7 @@ bool StackPromotion::promoteInBlock(SILBasicBlock *BB, EscapeAnalysis *EA,
   return Changed;
 }
 
-bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
+bool StackPromotion::tryPromoteAlloc(AllocRefInstBase *ARI, EscapeAnalysis *EA,
                                      DeadEndBlocks &DEBlocks) {
   if (ARI->isObjC() || ARI->canAllocOnStack())
     return false;
@@ -144,10 +148,10 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
   // We set the [stack] attribute in the alloc_ref.
   ARI->setStackAllocatable();
 
-  /// And create dealloc_ref [stack] at the end of the object's lifetime.
+  /// And create dealloc_stack_ref at the end of the object's lifetime.
   for (SILInstruction *FrontierInst : Frontier) {
     SILBuilder B(FrontierInst);
-    B.createDeallocRef(ARI->getLoc(), ARI, true);
+    B.createDeallocStackRef(ARI->getLoc(), ARI);
   }
   return true;
 }

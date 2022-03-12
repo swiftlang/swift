@@ -208,15 +208,15 @@ protocol ProtocolWithClassInits : ClassWithInits<Int> {}
 
 func useProtocolWithClassInits1() {
   _ = ProtocolWithClassInits(notRequiredInit: ())
-  // expected-error@-1 {{protocol type 'ProtocolWithClassInits' cannot be instantiated}}
+  // expected-error@-1 {{type 'any ProtocolWithClassInits' cannot be instantiated}}
 
   _ = ProtocolWithClassInits(requiredInit: ())
-  // expected-error@-1 {{protocol type 'ProtocolWithClassInits' cannot be instantiated}}
+  // expected-error@-1 {{type 'any ProtocolWithClassInits' cannot be instantiated}}
 }
 
 func useProtocolWithClassInits2(_ t: ProtocolWithClassInits.Type) {
   _ = t.init(notRequiredInit: ())
-  // expected-error@-1 {{constructing an object of class type 'ProtocolWithClassInits' with a metatype value must use a 'required' initializer}}
+  // expected-error@-1 {{constructing an object of class type 'any ProtocolWithClassInits' with a metatype value must use a 'required' initializer}}
 
   let _: ProtocolWithClassInits = t.init(requiredInit: ())
 }
@@ -237,15 +237,15 @@ protocol ProtocolRefinesClassInits : ProtocolWithClassInits {}
 
 func useProtocolRefinesClassInits1() {
   _ = ProtocolRefinesClassInits(notRequiredInit: ())
-  // expected-error@-1 {{protocol type 'ProtocolRefinesClassInits' cannot be instantiated}}
+  // expected-error@-1 {{type 'any ProtocolRefinesClassInits' cannot be instantiated}}
 
   _ = ProtocolRefinesClassInits(requiredInit: ())
-  // expected-error@-1 {{protocol type 'ProtocolRefinesClassInits' cannot be instantiated}}
+  // expected-error@-1 {{type 'any ProtocolRefinesClassInits' cannot be instantiated}}
 }
 
 func useProtocolRefinesClassInits2(_ t: ProtocolRefinesClassInits.Type) {
   _ = t.init(notRequiredInit: ())
-  // expected-error@-1 {{constructing an object of class type 'ProtocolRefinesClassInits' with a metatype value must use a 'required' initializer}}
+  // expected-error@-1 {{constructing an object of class type 'any ProtocolRefinesClassInits' with a metatype value must use a 'required' initializer}}
 
   let _: ProtocolRefinesClassInits = t.init(requiredInit: ())
 }

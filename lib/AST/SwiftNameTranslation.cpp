@@ -64,7 +64,7 @@ getErrorDomainStringForObjC(const EnumDecl *ED) {
   for (const NominalTypeDecl * D = ED;
        D != nullptr;
        D = D->getDeclContext()->getSelfNominalTypeDecl()) {
-    // We don't currently PrintAsObjC any types whose parents are private or
+    // We don't currently PrintAsClang any types whose parents are private or
     // fileprivate.
     assert(D->getFormalAccess() >= AccessLevel::Internal &&
             "We don't currently append private discriminators");
@@ -146,6 +146,23 @@ isVisibleToObjC(const ValueDecl *VD, AccessLevel minRequiredAccess,
       // Check if we're overriding an initializer that is visible to obj-c
       if (auto parent = ctor->getOverriddenDecl())
         return isVisibleToObjC(parent, minRequiredAccess, false);
+    }
+  }
+  return false;
+}
+
+bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
+                                            AccessLevel minRequiredAccess,
+                                            bool checkParent) {
+  if (VD->isObjC())
+    return false;
+  if (VD->getFormalAccess() >= minRequiredAccess) {
+    return true;
+  } else if (checkParent) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(VD)) {
+      // Check if we're overriding an initializer that is visible to obj-c
+      if (auto parent = ctor->getOverriddenDecl())
+        return isVisibleToCxx(parent, minRequiredAccess, false);
     }
   }
   return false;

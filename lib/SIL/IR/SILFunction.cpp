@@ -14,7 +14,7 @@
 
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILBridging.h"
+#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -26,6 +26,7 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/BridgingUtils.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -86,6 +87,7 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
                     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
                     IsSerialized_t isSerialized, ProfileCounter entryCount,
                     IsDynamicallyReplaceable_t isDynamic,
+                    IsDistributed_t isDistributed,
                     IsExactSelfClass_t isExactSelfClass,
                     IsThunk_t isThunk,
                     SubclassScope classSubclassScope, Inline_t inlineStrategy,
@@ -108,14 +110,15 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
     // deleted. And afterwards the same specialization is created again.
     fn->init(linkage, name, loweredType, genericEnv, loc, isBareSILFunction,
              isTrans, isSerialized, entryCount, isThunk, classSubclassScope,
-             inlineStrategy, E, debugScope, isDynamic, isExactSelfClass);
+             inlineStrategy, E, debugScope, isDynamic, isExactSelfClass,
+             isDistributed);
     assert(fn->empty());
   } else {
     fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
                                 isBareSILFunction, isTrans, isSerialized,
                                 entryCount, isThunk, classSubclassScope,
                                 inlineStrategy, E, debugScope,
-                                isDynamic, isExactSelfClass);
+                                isDynamic, isExactSelfClass, isDistributed);
   }
   if (entry) entry->setValue(fn);
 
@@ -127,7 +130,13 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
   return fn;
 }
 
-SwiftMetatype SILFunction::registeredMetatype;
+static SwiftMetatype functionMetatype;
+static FunctionRegisterFn initFunction = nullptr;
+static FunctionRegisterFn destroyFunction = nullptr;
+static FunctionWriteFn writeFunction = nullptr;
+static FunctionParseFn parseFunction = nullptr;
+static FunctionCopyEffectsFn copyEffectsFunction = nullptr;
+static FunctionGetEffectFlagsFn getEffectFlagsFunction = nullptr;
 
 SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          CanSILFunctionType LoweredType,
@@ -139,16 +148,19 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          Inline_t inlineStrategy, EffectsKind E,
                          const SILDebugScope *DebugScope,
                          IsDynamicallyReplaceable_t isDynamic,
-                         IsExactSelfClass_t isExactSelfClass)
-    : SwiftObjectHeader(registeredMetatype),
+                         IsExactSelfClass_t isExactSelfClass,
+                         IsDistributed_t isDistributed)
+    : SwiftObjectHeader(functionMetatype),
       Module(Module), Availability(AvailabilityContext::alwaysAvailable())  {
   init(Linkage, Name, LoweredType, genericEnv, Loc, isBareSILFunction, isTrans,
        isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy,
-       E, DebugScope, isDynamic, isExactSelfClass);
+       E, DebugScope, isDynamic, isExactSelfClass, isDistributed);
   
   // Set our BB list to have this function as its parent. This enables us to
   // splice efficiently basic blocks in between functions.
   BlockList.Parent = this;
+  if (initFunction)
+    initFunction({this}, &libswiftSpecificData, sizeof(libswiftSpecificData));
 }
 
 void SILFunction::init(SILLinkage Linkage, StringRef Name,
@@ -161,7 +173,8 @@ void SILFunction::init(SILLinkage Linkage, StringRef Name,
                          Inline_t inlineStrategy, EffectsKind E,
                          const SILDebugScope *DebugScope,
                          IsDynamicallyReplaceable_t isDynamic,
-                         IsExactSelfClass_t isExactSelfClass) {
+                         IsExactSelfClass_t isExactSelfClass,
+                         IsDistributed_t isDistributed) {
   this->Name = Name;
   this->LoweredType = LoweredType;
   this->GenericEnv = genericEnv;
@@ -180,6 +193,7 @@ void SILFunction::init(SILLinkage Linkage, StringRef Name,
   this->IsWeakImported = false;
   this->IsDynamicReplaceable = isDynamic;
   this->ExactSelfClass = isExactSelfClass;
+  this->IsDistributed = isDistributed;
   this->Inlined = false;
   this->Zombie = false;
   this->HasOwnership = true,
@@ -218,6 +232,9 @@ SILFunction::~SILFunction() {
          "Not all BasicBlockBitfields deleted at function destruction");
   if (currentBitfieldID > MaxBitfieldID)
     MaxBitfieldID = currentBitfieldID;
+
+  if (destroyFunction)
+    destroyFunction({this}, &libswiftSpecificData, sizeof(libswiftSpecificData));
 }
 
 void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
@@ -240,6 +257,10 @@ const SILFunction *SILFunction::getOriginOfSpecialization() const {
     p = p->getSpecializationInfo()->getParent();
   }
   return p;
+}
+
+GenericSignature SILFunction::getGenericSignature() const {
+  return GenericEnv ? GenericEnv->getGenericSignature() : GenericSignature();
 }
 
 void SILFunction::numberValues(llvm::DenseMap<const SILNode*, unsigned> &
@@ -274,6 +295,10 @@ OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
     return OptimizationMode(OptMode);
 
   return getModule().getOptions().OptMode;
+}
+
+bool SILFunction::preserveDebugInfo() const {
+  return getEffectiveOptimizationMode() <= OptimizationMode::NoOptimization;
 }
 
 bool SILFunction::shouldOptimize() const {
@@ -678,6 +703,9 @@ SILFunction::isPossiblyUsedExternally() const {
   if (ReplacedFunction)
     return true;
 
+  if (isDistributed() && isThunk())
+    return true;
+
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
@@ -772,5 +800,70 @@ void SILFunction::forEachSpecializeAttrTargetFunction(
     if (auto *f = attr->getTargetFunction()) {
       action(f);
     }
+  }
+}
+
+void Function_register(SwiftMetatype metatype,
+            FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
+            FunctionWriteFn writeFn, FunctionParseFn parseFn,
+            FunctionCopyEffectsFn copyEffectsFn,
+            FunctionGetEffectFlagsFn getEffectFlagsFn) {
+  functionMetatype = metatype;
+  initFunction = initFn;
+  destroyFunction = destroyFn;
+  writeFunction = writeFn;
+  parseFunction = parseFn;
+  copyEffectsFunction = copyEffectsFn;
+  getEffectFlagsFunction = getEffectFlagsFn;
+}
+
+std::pair<const char *, int> SILFunction::
+parseEffects(StringRef attrs, bool fromSIL, bool isDerived,
+             ArrayRef<StringRef> paramNames) {
+  if (parseFunction) {
+    static_assert(sizeof(BridgedStringRef) == sizeof(StringRef),
+                  "relying on StringRef layout compatibility");
+    BridgedParsingError error =
+      parseFunction({this}, getBridgedStringRef(attrs), (SwiftInt)fromSIL,
+                (SwiftInt) isDerived,
+                {(const unsigned char *)paramNames.data(), paramNames.size()});
+    return {(const char *)error.message, (int)error.position};
+  }
+  return {nullptr, 0};
+}
+
+void SILFunction::writeEffect(llvm::raw_ostream &OS, int effectIdx) const {
+  if (writeFunction) {
+    writeFunction({const_cast<SILFunction *>(this)}, {&OS}, effectIdx);
+  }
+}
+
+void SILFunction::copyEffects(SILFunction *from) {
+  if (copyEffectsFunction) {
+    copyEffectsFunction({this}, {from});
+  }
+}
+
+bool SILFunction::hasArgumentEffects() const {
+  if (getEffectFlagsFunction) {
+    return getEffectFlagsFunction({const_cast<SILFunction *>(this)}, 0) != 0;
+  }
+  return false;
+}
+
+void SILFunction::
+visitArgEffects(std::function<void(int, bool, ArgEffectKind)> c) const {
+  if (!getEffectFlagsFunction)
+    return;
+    
+  int idx = 0;
+  BridgedFunction bridgedFn = {const_cast<SILFunction *>(this)};
+  while (int flags = getEffectFlagsFunction(bridgedFn, idx)) {
+    ArgEffectKind kind = ArgEffectKind::Unknown;
+    if (flags & EffectsFlagEscape)
+      kind = ArgEffectKind::Escape;
+
+    c(idx, (flags & EffectsFlagDerived) != 0, kind);
+    idx++;
   }
 }

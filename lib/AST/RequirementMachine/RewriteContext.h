@@ -52,10 +52,6 @@ class RewriteContext final {
   llvm::DenseMap<const ProtocolDecl *,
                  llvm::TinyPtrVector<const ProtocolDecl *>> AllInherited;
 
-  /// Cached support of sets of protocols, which is the number of elements in
-  /// the transitive closure of the set under protocol inheritance.
-  llvm::DenseMap<ArrayRef<const ProtocolDecl *>, unsigned> Support;
-
   /// Cache for associated type declarations.
   llvm::DenseMap<Symbol, AssociatedTypeDecl *> AssocTypes;
 
@@ -94,7 +90,7 @@ class RewriteContext final {
     ArrayRef<const ProtocolDecl *> Protos;
 
     /// Each connected component has a lazily-created requirement machine.
-    RequirementMachine *Machine = nullptr;
+    bool InProgress = false;
   };
 
   /// The protocol dependency graph.
@@ -116,8 +112,8 @@ class RewriteContext final {
   RewriteContext &operator=(const RewriteContext &) = delete;
   RewriteContext &operator=(RewriteContext &&) = delete;
 
-  void getRequirementMachineRec(const ProtocolDecl *proto,
-                                SmallVectorImpl<const ProtocolDecl *> &stack);
+  void getProtocolComponentRec(const ProtocolDecl *proto,
+                               SmallVectorImpl<const ProtocolDecl *> &stack);
 
 public:
   /// Statistics.
@@ -130,54 +126,66 @@ public:
   Histogram RuleTrieRootHistogram;
   Histogram PropertyTrieHistogram;
   Histogram PropertyTrieRootHistogram;
+  Histogram ConformanceRulesHistogram;
+  Histogram MinimalConformancesHistogram;
 
   explicit RewriteContext(ASTContext &ctx);
 
   DebugOptions getDebugOptions() const { return Debug; }
 
+  ASTContext &getASTContext() const { return Context; }
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Reduction order on protocols.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
   const llvm::TinyPtrVector<const ProtocolDecl *> &
   getInheritedProtocols(const ProtocolDecl *proto);
 
-  unsigned getProtocolSupport(const ProtocolDecl *proto);
-
-  unsigned getProtocolSupport(ArrayRef<const ProtocolDecl *> protos);
-
   int compareProtocols(const ProtocolDecl *lhs,
                        const ProtocolDecl *rhs);
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Type to term conversion. The opposite direction is implemented in
+  /// PropertyMap because it depends on the current rewrite system.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  static unsigned getGenericParamIndex(Type type);
 
   Term getTermForType(CanType paramType, const ProtocolDecl *proto);
 
   MutableTerm getMutableTermForType(CanType paramType,
                                     const ProtocolDecl *proto);
 
-  ASTContext &getASTContext() const { return Context; }
-
-  Type getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
-
-  Type getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
-
-  Type getRelativeTypeForTerm(
-                      const MutableTerm &term, const MutableTerm &prefix) const;
-
   MutableTerm getRelativeTermForType(CanType typeWitness,
                                      ArrayRef<Term> substitutions);
 
-  Type getTypeFromSubstitutionSchema(
-                      Type schema,
-                      ArrayRef<Term> substitutions,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const MutableTerm &prefix) const;
+  CanType getSubstitutionSchemaFromType(CanType concreteType,
+                                        const ProtocolDecl *proto,
+                                        SmallVectorImpl<Term> &result);
+
+  CanType getRelativeSubstitutionSchemaFromType(CanType concreteType,
+                                                ArrayRef<Term> substitutions,
+                                                SmallVectorImpl<Term> &result);
 
   AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol);
 
-  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs);
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Construction of requirement machines for connected components in the
+  /// protocol dependency graph.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
 
   RequirementMachine *getRequirementMachine(CanGenericSignature sig);
   bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);
 
-  RequirementMachine *getRequirementMachine(const ProtocolDecl *proto);
+  ArrayRef<const ProtocolDecl *> getProtocolComponent(const ProtocolDecl *proto);
+  bool isRecursivelyConstructingRequirementMachine(const ProtocolDecl *proto);
 
   ~RewriteContext();
 };

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(%import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(%import-libdispatch -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

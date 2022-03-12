@@ -29,6 +29,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -126,11 +127,14 @@ DeclAttrKind DeclAttribute::getAttrKindFromString(StringRef Str) {
 #define DECL_ATTR(X, CLASS, ...) .Case(#X, DAK_##CLASS)
 #define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DAK_##CLASS)
 #include "swift/AST/Attr.def"
+  .Case(SPI_AVAILABLE_ATTRNAME, DAK_Available)
   .Default(DAK_Count);
 }
 
 /// Returns true if this attribute can appear on the specified decl.
 bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
+  if ((getOptions(DK) & OnAnyClangDecl) && D->hasClangNode())
+    return true;
   return canAttributeAppearOnDeclKind(DK, D->getKind());
 }
 
@@ -354,7 +358,7 @@ DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
 
 void DeclAttributes::dump(const Decl *D) const {
   StreamPrinter P(llvm::errs());
-  PrintOptions PO = PrintOptions::printEverything();
+  PrintOptions PO = PrintOptions::printDeclarations();
   print(P, PO, D);
 }
 
@@ -366,6 +370,9 @@ LLVM_READONLY
 static bool isShortAvailable(const DeclAttribute *DA) {
   auto *AvailAttr = dyn_cast<AvailableAttr>(DA);
   if (!AvailAttr)
+    return false;
+
+  if (AvailAttr->IsSPI)
     return false;
 
   if (!AvailAttr->Introduced.hasValue())
@@ -683,20 +690,21 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector attributes;
   AttributeVector modifiers;
 
-  CustomAttr *FuncBuilderAttr = nullptr;
-  if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
-    FuncBuilderAttr = VD->getAttachedResultBuilder();
-  }
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Always print result builder attribute.
-    bool isResultBuilderAttr = DA == FuncBuilderAttr;
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&
-        !isResultBuilderAttr &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
     if (Options.excludeAttrKind(DA->getKind()))
+      continue;
+
+    // If this attribute is only allowed because this is a Clang decl, don't
+    // print it.
+    if (D && D->hasClangNode()
+        && !DeclAttribute::canAttributeAppearOnDeclKind(
+                               DA->getKind(), D->getKind()))
       continue;
 
     // Be careful not to coalesce `@available(swift 5)` with other short
@@ -842,6 +850,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
   case DAK_Custom: {
+
+    auto attr = cast<CustomAttr>(this);
+    if (auto type = attr->getType()) {
+      // Print custom attributes only if the attribute decl is accessible.
+      // FIXME: rdar://85477478 They should be rejected.
+      if (auto attrDecl = type->getNominalOrBoundGenericNominal()) {
+        if (attrDecl->getFormalAccess() < Options.AccessFilter) {
+          return false;
+        }
+      }
+    }
+
     if (!Options.IsForSwiftInterface)
       break;
     // For Swift interface, we should print result builder attributes
@@ -874,8 +894,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_ReferenceOwnership:
   case DAK_Effects:
   case DAK_Optimize:
+  case DAK_Exclusivity:
   case DAK_NonSendable:
-    if (DeclAttribute::isDeclModifier(getKind())) {
+    if (getKind() == DAK_Effects &&
+        cast<EffectsAttr>(this)->getKind() == EffectsKind::Custom) {
+      Printer.printAttrName("@_effects");
+      Printer << "(" << cast<EffectsAttr>(this)->getCustomString() << ")";
+    } else if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName(), Options);
     } else if (Options.IsForSwiftInterface && getKind() == DAK_ResultBuilder) {
       // Use @_functionBuilder in Swift interfaces to maintain backward
@@ -885,6 +910,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
     return true;
+
+  case DAK_MainType: {
+    // Don't print into SIL. Necessary bits have already been generated.
+    if (Options.PrintForSIL)
+      return false;
+    Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
+    return true;
+  }
 
   case DAK_SetterAccess:
     Printer.printKeyword(getAttrName(), Options, "(set)");
@@ -940,9 +973,23 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_Available: {
-    Printer.printAttrName("@available");
-    Printer << "(";
     auto Attr = cast<AvailableAttr>(this);
+    if (!Options.PrintSPIs && Attr->IsSPI) {
+      assert(Attr->hasPlatform());
+      assert(Attr->Introduced.hasValue());
+      Printer.printAttrName("@available");
+      Printer << "(";
+      Printer << Attr->platformString();
+      Printer << ", unavailable)";
+      break;
+    }
+    if (Attr->IsSPI) {
+      std::string atSPI = (llvm::Twine("@") + SPI_AVAILABLE_ATTRNAME).str();
+      Printer.printAttrName(atSPI);
+    } else {
+      Printer.printAttrName("@available");
+    }
+    Printer << "(";
     printAvailableAttr(Attr, Printer, Options);
     Printer << ")";
     break;
@@ -1155,6 +1202,27 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_UnavailableFromAsync: {
+    Printer.printAttrName("@_unavailableFromAsync");
+    const UnavailableFromAsyncAttr *attr = cast<UnavailableFromAsyncAttr>(this);
+    if (attr->hasMessage()) {
+      Printer << "(message: \"";
+      Printer << attr->Message;
+      Printer << "\")";
+    }
+    break;
+  }
+
+  case DAK_BackDeploy: {
+    Printer.printAttrName("@_backDeploy");
+    Printer << "(";
+    auto Attr = cast<BackDeployAttr>(this);
+    Printer << platformString(Attr->Platform) << " " <<
+      Attr->Version.getAsString();
+    Printer << ")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1221,6 +1289,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_ObjC:
   case DAK_ObjCRuntimeName:
     return "objc";
+  case DAK_MainType:
+    return "main";
   case DAK_DynamicReplacement:
     return "_dynamicReplacement";
   case DAK_TypeEraser:
@@ -1259,6 +1329,15 @@ StringRef DeclAttribute::getAttrName() const {
       llvm_unreachable("Invalid optimization kind");
     }
   }
+  case DAK_Exclusivity: {
+    switch (cast<ExclusivityAttr>(this)->getMode()) {
+    case ExclusivityAttr::Checked:
+      return "exclusivity(checked)";
+    case ExclusivityAttr::Unchecked:
+      return "exclusivity(unchecked)";
+    }
+    llvm_unreachable("Invalid optimization kind");
+  }
   case DAK_Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
@@ -1271,6 +1350,8 @@ StringRef DeclAttribute::getAttrName() const {
         return "_effects(readwrite)";
       case EffectsKind::Unspecified:
         return "_effects(unspecified)";
+      case EffectsKind::Custom:
+        return "_effects";
     }
   case DAK_AccessControl:
   case DAK_SetterAccess: {
@@ -1308,6 +1389,10 @@ StringRef DeclAttribute::getAttrName() const {
     return "transpose";
   case DAK_TypeSequence:
     return "_typeSequence";
+  case DAK_UnavailableFromAsync:
+    return "_unavailableFromAsync";
+  case DAK_BackDeploy:
+    return "_backDeploy";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1533,7 +1618,7 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
     NoVersion, SourceRange(),
     NoVersion, SourceRange(),
     Obsoleted, SourceRange(),
-    Kind, /* isImplicit */ false);
+    Kind, /* isImplicit */ false, /*SPI*/false);
 }
 
 AvailableAttr *AvailableAttr::createForAlternative(
@@ -1544,7 +1629,7 @@ AvailableAttr *AvailableAttr::createForAlternative(
     NoVersion, SourceRange(),
     NoVersion, SourceRange(),
     NoVersion, SourceRange(),
-    PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true);
+    PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true, /*SPI*/false);
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
@@ -1562,7 +1647,8 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
                                Obsoleted ? *Obsoleted : llvm::VersionTuple(),
                                implicit ? SourceRange() : ObsoletedRange,
                                PlatformAgnostic,
-                               implicit);
+                               implicit,
+                               IsSPI);
 }
 
 Optional<OriginallyDefinedInAttr::ActiveVersion>
@@ -2100,6 +2186,23 @@ TypeSequenceAttr *TypeSequenceAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                            SourceRange range) {
   void *mem = Ctx.Allocate(sizeof(TypeSequenceAttr), alignof(TypeSequenceAttr));
   return new (mem) TypeSequenceAttr(atLoc, range);
+}
+
+const DeclAttribute *
+DeclAttributes::getEffectiveSendableAttr() const {
+  const NonSendableAttr *assumedAttr = nullptr;
+
+  for (auto attr : getAttributes<NonSendableAttr>()) {
+    if (attr->Specificity == NonSendableKind::Specific)
+      return attr;
+    if (!assumedAttr)
+      assumedAttr = attr;
+  }
+
+  if (auto sendableAttr = getAttribute<SendableAttr>())
+    return sendableAttr;
+
+  return assumedAttr;
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

@@ -143,6 +143,7 @@ Globals
     global ::= opaque-type 'Ho'          // opaque type descriptor runtime record
   #endif
   global ::= protocol-conformance 'Hc'   // protocol conformance runtime record
+  global ::= global 'HF'                 // accessible function runtime record
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
 
@@ -218,9 +219,12 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
   global ::= global 'TE'                 // distributed actor thunk
+  global ::= global 'TF'                 // distributed method accessor
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
   global ::= global 'Tu'                 // async function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
+  global ::= global 'Twb'                // back deployment thunk
+  global ::= global 'TwB'                // back deployment fallback function
   global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
   global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
   global ::= type 'TC'                   // continuation prototype (not actually used for real symbols)
@@ -589,8 +593,8 @@ Types
   FUNCTION-KIND ::= 'B'                      // objc block function type
   FUNCTION-KIND ::= 'zB' C-TYPE              // objc block type with non-canonical C type
   FUNCTION-KIND ::= 'L'                      // objc block function type with canonical C type (escaping) (DWARF only; otherwise use 'B' or 'zB' C-TYPE)
-  FUNCTION-KIND ::= 'C'                      // C function pointer type
-  FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer type with with non-canonical C type
+  FUNCTION-KIND ::= 'C'                      // C function pointer / C++ method type
+  FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
 
@@ -619,7 +623,7 @@ Types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
-  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'Yi'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, actor 'isolated', and variadic specifier
+  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'Yi'? 'd'? 'Yt'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, actor 'isolated', variadic specifier, and compile-time constant
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
@@ -631,6 +635,7 @@ Types
   type ::= protocol-list 'p'                 // existential type
   type ::= protocol-list superclass 'Xc'     // existential type with superclass
   type ::= protocol-list 'Xl'                // existential type with AnyObject
+  type ::= protocol-list 'y' (type* '_')* type* retroactive-conformance* 'Xp'   // parameterized protocol type
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
@@ -735,15 +740,17 @@ implementation details of a function type.
 ::
 
   #if SWIFT_VERSION >= 5.1
-    type ::= 'Qr'                         // opaque result type (of current decl)
+    type ::= 'Qr'                         // opaque result type (of current decl, used for the first opaque type parameter only)
+    type ::= 'QR' INDEX                   // same as above, for subsequent opaque type parameters, INDEX is the ordinal -1
     type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
 
     opaque-type-decl-name ::= entity 'QO' // opaque result type of specified decl
   #endif
 
   #if SWIFT_VERSION >= 5.4
-    type ::= 'Qu'                         // opaque result type (of current decl)
+    type ::= 'Qu'                         // opaque result type (of current decl, first param)
                                           // used for ObjC class runtime name purposes.
+    type ::= 'QU' INDEX
   #endif
 
 Opaque return types have a special short representation in the mangling of
@@ -1135,6 +1142,7 @@ Some kinds need arguments, which precede ``Tf``.
   CONST-PROP ::= 'i' NATURAL_ZERO            // 64-bit-integer
   CONST-PROP ::= 'd' NATURAL_ZERO            // float-as-64-bit-integer
   CONST-PROP ::= 's' ENCODING                // string literal. Consumes one identifier argument.
+  CONST-PROP ::= 'k'                         // keypath. Consumes one identifier - the SHA1 of the keypath and two types (root and value).
 
   ENCODING ::= 'b'                           // utf8
   ENCODING ::= 'w'                           // utf16

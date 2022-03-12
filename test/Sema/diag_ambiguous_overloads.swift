@@ -132,13 +132,15 @@ func SR12689(_ u: UnsafeBufferPointer<UInt16>) {}
 let array : [UInt16] = [1, 2]
 
 array.withUnsafeBufferPointer {
-  _ = SR12689(UnsafeRawPointer($0).bindMemory(to: UInt16.self, capacity: 1)) // expected-error {{cannot convert value of type 'UnsafePointer<UInt16>' to expected argument type 'UnsafeBufferPointer<UInt16>'}}
-  // expected-error@-1 {{cannot convert value of type 'UnsafeBufferPointer<UInt16>' to expected argument type 'UnsafeMutableRawPointer'}}
-}
+  SR12689(UnsafeRawPointer($0).bindMemory(to: UInt16.self, capacity: 1)) // expected-error {{cannot convert value of type 'UnsafePointer<UInt16>' to expected argument type 'UnsafeBufferPointer<UInt16>'}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
+  // expected-note@-2 {{candidate expects value of type 'UnsafeRawPointer' for parameter #1}}
+  // expected-note@-3 {{candidate expects value of type 'UnsafeMutableRawPointer' for parameter #1}}
 
-array.withUnsafeBufferPointer {
-  _ = UnsafeRawPointer($0) as UnsafeBufferPointer<UInt16> // expected-error {{cannot convert value of type 'UnsafeRawPointer' to type 'UnsafeBufferPointer<UInt16>' in coercion}}
-  // expected-error@-1 {{cannot convert value of type 'UnsafeBufferPointer<UInt16>' to expected argument type 'UnsafeMutableRawPointer'}}
+  UnsafeRawPointer($0) as UnsafeBufferPointer<UInt16> // expected-error {{cannot convert value of type 'UnsafeRawPointer' to type 'UnsafeBufferPointer<UInt16>' in coercion}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
+  // expected-note@-2 {{found candidate with type '(UnsafeRawPointer) -> UnsafeRawPointer'}}
+  // expected-note@-3 {{found candidate with type '(UnsafeMutableRawPointer) -> UnsafeRawPointer'}}
 }
 
 func SR12689_1(_ u: Int) -> String { "" } // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}

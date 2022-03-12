@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -O | %FileCheck %s
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -emit-sil %s -O | %FileCheck %s
 
 
 @_optimize(none)

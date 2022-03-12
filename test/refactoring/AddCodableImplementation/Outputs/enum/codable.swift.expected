@@ -1,0 +1,67 @@
+
+enum Payload: Codable {
+  case plain(String)
+  case pair(key: String, value: String)
+
+  enum CodingKeys: CodingKey {
+    case plain
+    case pair
+  }
+  enum PlainCodingKeys: CodingKey {
+    case _0
+  }
+  enum PairCodingKeys: CodingKey {
+    case key
+    case value
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: Payload.CodingKeys.self)
+
+    var allKeys = ArraySlice(container.allKeys)
+
+    guard let onlyKey = allKeys.popFirst(), allKeys.isEmpty else {
+      throw DecodingError.typeMismatch(Payload.self, DecodingError.Context.init(codingPath: container.codingPath, debugDescription: "Invalid number of keys found, expected one.", underlyingError: nil))
+    }
+    switch onlyKey {
+    case .plain:
+
+      let nestedContainer = try container.nestedContainer(keyedBy: Payload.PlainCodingKeys.self, forKey: Payload.CodingKeys.plain)
+
+      self = Payload.plain(try nestedContainer.decode(String.self, forKey: Payload.PlainCodingKeys._0))
+      case .pair:
+
+      let nestedContainer = try container.nestedContainer(keyedBy: Payload.PairCodingKeys.self, forKey: Payload.CodingKeys.pair)
+
+      self = Payload.pair(key: try nestedContainer.decode(String.self, forKey: Payload.PairCodingKeys.key), value: try nestedContainer.decode(String.self, forKey: Payload.PairCodingKeys.value))
+    }
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: Payload.CodingKeys.self)
+
+    switch self {
+    case .plain(let a0):
+
+      var nestedContainer = container.nestedContainer(keyedBy: Payload.PlainCodingKeys.self, forKey: Payload.CodingKeys.plain)
+
+      try nestedContainer.encode(a0, forKey: Payload.PlainCodingKeys._0)
+      case .pair(let key, let value):
+
+      var nestedContainer = container.nestedContainer(keyedBy: Payload.PairCodingKeys.self, forKey: Payload.CodingKeys.pair)
+
+      try nestedContainer.encode(key, forKey: Payload.PairCodingKeys.key)
+      try nestedContainer.encode(value, forKey: Payload.PairCodingKeys.value)
+    }
+  }
+}
+
+enum Payload_D: Decodable {
+  case plain(String)
+  case pair(key: String, value: String)
+}
+
+enum Payload_E: Encodable {
+  case plain(String)
+  case pair(key: String, value: String)
+}

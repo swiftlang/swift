@@ -54,7 +54,13 @@ func getCompExclusions(from data: String) -> [ClosedRange<UInt32>] {
 }
 
 func emitComp(_ mph: Mph, _ data: [(UInt32, [UInt32])], into result: inout String) {
-  emitMph(mph, name: "_swift_stdlib_nfc_comp", into: &result)
+  emitMph(
+    mph,
+    name: "_swift_stdlib_nfc_comp",
+    defineLabel: "NFC_COMP",
+    into: &result
+  )
+  
   emitCompComps(mph, data, into: &result)
 }
 
@@ -137,69 +143,4 @@ func emitCompComps(
   }
   
   result += "\n};\n\n"
-}
-
-func emitCompAccessor(_ mph: Mph, into result: inout String) {
-  result += """
-  SWIFT_RUNTIME_STDLIB_INTERNAL
-  __swift_uint32_t _swift_stdlib_getComposition(__swift_uint32_t x,
-                                              __swift_uint32_t y) {
-    __swift_intptr_t compIdx = _swift_stdlib_getMphIdx(y, \(mph.bitArrays.count),
-                                                    _swift_stdlib_nfc_comp_keys,
-                                                    _swift_stdlib_nfc_comp_ranks,
-                                                    _swift_stdlib_nfc_comp_sizes);
-    auto array = _swift_stdlib_nfc_comp_indices[compIdx];
-  
-    // Ensure that the first element in this array is equal to our y scalar.
-    auto realY = (array[0] << 11) >> 11;
-  
-    if (y != realY) {
-      return std::numeric_limits<__swift_uint32_t>::max();
-    }
-  
-    auto count = array[0] >> 21;
-  
-    auto lowerBoundIndex = 1;
-    auto endIndex = count;
-    auto upperBoundIndex = endIndex - 1;
-  
-    while (upperBoundIndex >= lowerBoundIndex) {
-      auto index = lowerBoundIndex + (upperBoundIndex - lowerBoundIndex) / 2;
-    
-      auto entry = array[index];
-    
-      // Shift the range count out of the scalar.
-      auto lowerBoundScalar = (entry << 15) >> 15;
-    
-      bool isNegative = entry >> 31;
-      auto rangeCount = (entry << 1) >> 18;
-    
-      if (isNegative) {
-        rangeCount = -rangeCount;
-      }
-    
-      auto composed = lowerBoundScalar + rangeCount;
-    
-      if (x == lowerBoundScalar) {
-        return composed;
-      }
-    
-      if (x > lowerBoundScalar) {
-        lowerBoundIndex = index + 1;
-        continue;
-      }
-    
-      if (x < lowerBoundScalar) {
-        upperBoundIndex = index - 1;
-        continue;
-      }
-    }
-  
-    // If we made it out here, then our scalar was not found in the composition
-    // array.
-    // Return the max here to indicate that we couldn't find one.
-    return std::numeric_limits<__swift_uint32_t>::max();
-  }
-  
-  """
 }

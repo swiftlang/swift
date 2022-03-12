@@ -70,19 +70,21 @@ void checkPropertyWrapperActorIsolation(VarDecl *wrappedVar, Expr *expr);
 ClosureActorIsolation
 determineClosureActorIsolation(AbstractClosureExpr *closure);
 
-/// Describes the kind of operation that introduced the concurrent refernece.
-enum class ConcurrentReferenceKind {
-  /// A synchronous operation that was "promoted" to an asynchronous call
-  /// because it was out of the actor's domain.
-  SynchronousAsAsyncCall,
-  /// A cross-actor reference.
+/// States the reason for checking the Sendability of a given declaration.
+enum class SendableCheckReason {
+  /// A reference to an actor from outside that actor.
   CrossActor,
-  /// A local capture referenced from concurrent code.
-  LocalCapture,
-  /// Concurrent function
-  ConcurrentFunction,
-  /// Nonisolated declaration.
-  Nonisolated,
+
+  /// A synchronous operation that was "promoted" to an asynchronous one
+  /// because it was out of the actor's domain.
+  SynchronousAsAsync,
+
+  /// A protocol conformance where the witness/requirement have different
+  /// actor isolation.
+  Conformance,
+
+  /// The declaration is being exposed to Objective-C.
+  ObjC,
 };
 
 /// The isolation restriction in effect for a given declaration that is
@@ -197,6 +199,8 @@ public:
   }
 
   /// Determine the isolation rules for a given declaration.
+  /// The isolation restriction represents the isolation requirement of the
+  /// using context.
   ///
   /// \param fromExpression Indicates that the reference is coming from an
   /// expression.
@@ -211,9 +215,12 @@ public:
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
 
-/// Determine whether the given context uses concurrency features, such
-/// as async functions or actors.
-bool contextUsesConcurrencyFeatures(const DeclContext *dc);
+/// Determine whether the given context requires strict concurrency checking,
+/// e.g., because it uses concurrency features directly or because it's in
+/// code where strict checking has been enabled.
+bool contextRequiresStrictConcurrencyChecking(
+    const DeclContext *dc,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
 
 /// Diagnose the presence of any non-sendable types when referencing a
 /// given declaration from a particular declaration context.
@@ -227,8 +234,7 @@ bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 /// domain, including the substitutions so that (e.g.) we can consider the
 /// specific types at the use site.
 ///
-/// \param module The module from which the reference occurs. This is
-/// used to perform lookup of conformances to the \c Sendable protocol.
+/// \param fromDC The context from which the reference occurs.
 ///
 /// \param loc The location at which the reference occurs, which will be
 /// used when emitting diagnostics.
@@ -238,16 +244,69 @@ bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 ///
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonSendableTypesInReference(
-    ConcreteDeclRef declRef, ModuleDecl *module, SourceLoc loc,
-    ConcurrentReferenceKind refKind);
+    ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
+    SendableCheckReason refKind);
 
 /// Produce a diagnostic for a missing conformance to Sendable.
 void diagnoseMissingSendableConformance(
-    SourceLoc loc, Type type, ModuleDecl *module);
+    SourceLoc loc, Type type, const DeclContext *fromDC);
 
 /// If the given nominal type is public and does not explicitly
 /// state whether it conforms to Sendable, provide a diagnostic.
 void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
+
+/// How the Sendable check should be performed.
+enum class SendableCheck {
+  /// Sendable conformance was explicitly stated and should be
+  /// fully checked.
+  Explicit,
+
+  /// Sendable conformance was implied by a protocol that inherits from
+  /// Sendable and also predates concurrency.
+  ImpliedByStandardProtocol,
+
+  /// Implicit conformance to Sendable.
+  Implicit,
+
+  /// Implicit conformance to Sendable that would be externally-visible, i.e.,
+  /// for a public @_frozen type.
+  ImplicitForExternallyVisible,
+};
+
+/// Whether this sendable check is implicit.
+static inline bool isImplicitSendableCheck(SendableCheck check) {
+  switch (check) {
+  case SendableCheck::Explicit:
+  case SendableCheck::ImpliedByStandardProtocol:
+    return false;
+
+  case SendableCheck::Implicit:
+  case SendableCheck::ImplicitForExternallyVisible:
+    return true;
+  }
+}
+
+/// Describes the context in which a \c Sendable check occurs.
+struct SendableCheckContext {
+  const DeclContext * const fromDC;
+  const Optional<SendableCheck> conformanceCheck;
+
+  SendableCheckContext(
+      const DeclContext * fromDC,
+      Optional<SendableCheck> conformanceCheck = None
+  ) : fromDC(fromDC), conformanceCheck(conformanceCheck) { }
+
+  /// Determine the default diagnostic behavior for a missing/unavailable
+  /// Sendable conformance in this context.
+  DiagnosticBehavior defaultDiagnosticBehavior() const;
+
+  /// Determine the diagnostic behavior when referencing the given nominal
+  /// type in this context.
+  DiagnosticBehavior diagnosticBehavior(NominalTypeDecl *nominal) const;
+
+  /// Whether we are in an explicit conformance to Sendable.
+  bool isExplicitSendableConformance() const;
+};
 
 /// Diagnose any non-Sendable types that occur within the given type, using
 /// the given diagnostic.
@@ -258,9 +317,8 @@ void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
 ///
 /// \returns \c true if any diagnostics were produced, \c false otherwise.
 bool diagnoseNonSendableTypes(
-    Type type, ModuleDecl *module, SourceLoc loc,
-    llvm::function_ref<
-      std::pair<DiagnosticBehavior, bool>(Type, DiagnosticBehavior)> diagnose);
+    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose);
 
 namespace detail {
   template<typename T>
@@ -268,37 +326,28 @@ namespace detail {
     typedef T type;
   };
 }
+
 /// Diagnose any non-Sendable types that occur within the given type, using
 /// the given diagnostic.
 ///
 /// \returns \c true if any errors were produced, \c false otherwise.
 template<typename ...DiagArgs>
 bool diagnoseNonSendableTypes(
-    Type type, ModuleDecl *module, SourceLoc loc, Diag<Type, DiagArgs...> diag,
+    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    Diag<Type, DiagArgs...> diag,
     typename detail::Identity<DiagArgs>::type ...diagArgs) {
-  ASTContext &ctx = module->getASTContext();
+  ASTContext &ctx = fromContext.fromDC->getASTContext();
   return diagnoseNonSendableTypes(
-      type, module, loc, [&](Type specificType, DiagnosticBehavior behavior) {
-    ctx.Diags.diagnose(loc, diag, type, diagArgs...)
-      .limitBehavior(behavior);
-    return std::pair<DiagnosticBehavior, bool>(
-        behavior, behavior == DiagnosticBehavior::Unspecified);
+      type, fromContext, loc, [&](Type specificType,
+      DiagnosticBehavior behavior) {
+    if (behavior != DiagnosticBehavior::Ignore) {
+      ctx.Diags.diagnose(loc, diag, type, diagArgs...)
+        .limitBehavior(behavior);
+    }
+
+    return false;
   });
 }
-
-/// How the concurrent value check should be performed.
-enum class SendableCheck {
-  /// Sendable conformance was explicitly stated and should be
-  /// fully checked.
-  Explicit,
-
-  /// Sendable conformance was implied by one of the standard library
-  /// protocols that added Sendable after-the-fact.
-  ImpliedByStandardProtocol,
-
-  /// Implicit conformance to Sendable.
-  Implicit,
-};
 
 /// Given a set of custom attributes, pick out the global actor attributes
 /// and perform any necessary resolution and diagnostics, returning the
@@ -311,13 +360,9 @@ checkGlobalActorAttributes(
 Type getExplicitGlobalActor(ClosureExpr *closure);
 
 /// Adjust the type of the variable for concurrency.
-Type adjustVarTypeForConcurrency(Type type, VarDecl *var, DeclContext *dc);
-
-/// Adjust the function type of a function / subscript / enum case for
-/// concurrency.
-AnyFunctionType *adjustFunctionTypeForConcurrency(
-    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue);
+Type adjustVarTypeForConcurrency(
+    Type type, VarDecl *var, DeclContext *dc,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
 
 /// Adjust the given function type to account for concurrency-specific
 /// attributes whose affect on the type might differ based on context.
@@ -325,8 +370,9 @@ AnyFunctionType *adjustFunctionTypeForConcurrency(
 /// `@_unsafeSendable` and `@_unsafeMainActor` as well as a global actor
 /// on the declaration itself.
 AnyFunctionType *adjustFunctionTypeForConcurrency(
-    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue);
+    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
 
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.

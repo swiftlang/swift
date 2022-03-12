@@ -882,3 +882,40 @@ func test_weak_optionality_stays_the_same() {
     }
   }
 }
+
+enum WrapperEnum<Wrapped> where Wrapped: RawRepresentable {
+case known(Wrapped)
+
+  static func ~= (lhs: Wrapped, rhs: WrapperEnum<Wrapped>) -> Bool where Wrapped: Equatable {
+    switch rhs {
+    case .known(let wrapped):
+      return wrapped == lhs
+    }
+  }
+}
+
+func test_custom_tilde_equals_operator_matching() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ t: T) -> T { t }
+    static func buildEither<T>(first: T) -> T { first }
+    static func buildEither<T>(second: T) -> T { second }
+  }
+
+  enum TildeTest : String {
+  case test = "test"
+  }
+
+  struct S {}
+
+  struct MyView {
+    var entry: WrapperEnum<TildeTest>
+
+    @Builder var body: S {
+      switch entry {
+      case .test: S() // Ok although `.test` comes from `TildeTest` instead of `WrapperEnum`
+      case .known(_): S() // Ok - `.known` comes directly from `WrapperEnum`
+      }
+    }
+  }
+}

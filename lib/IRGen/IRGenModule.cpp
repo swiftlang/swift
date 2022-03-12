@@ -81,14 +81,14 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
                                   ArrayRef<llvm::Type*>(types.begin(),
                                                         types.size()),
                                   name, packed);
-};
+}
 
 /// A helper for creating pointer-to-struct types.
 static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
                                                   StringRef name,
                                   std::initializer_list<llvm::Type*> types) {
   return createStructType(IGM, name, types)->getPointerTo(DefaultAS);
-};
+}
 
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                  llvm::LLVMContext &LLVMContext,
@@ -103,6 +103,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
+  CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
@@ -113,7 +114,6 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     break;
   case IRGenDebugInfoLevel::ASTTypes:
   case IRGenDebugInfoLevel::DwarfTypes:
-    CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
@@ -131,6 +131,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     // This actually contains the debug flags for codeview.
     CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
     break;
+  }
+  if (!Opts.TrapFuncName.empty()) {
+    CGO.TrapFuncName = Opts.TrapFuncName;
   }
 
   auto &HSI = Importer->getClangPreprocessor()
@@ -600,6 +603,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
 
+  AccessibleFunctionRecordTy =
+      createStructType(*this, "swift.accessible_function",
+                       {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
+                        RelativeAddressTy, Int32Ty});
+
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = llvm::StructType::create(getLLVMContext(), "swift.context");
@@ -654,9 +662,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
 
   SwiftContextTy->setBody({
-    SwiftContextPtrTy,    // Parent
-    TaskContinuationFunctionPtrTy, // ResumeParent,
-    SizeTy,               // Flags
+    SwiftContextPtrTy,             // Parent
+    TaskContinuationFunctionPtrTy, // ResumeParent
   });
 
   AsyncTaskAndContextTy = createStructType(
@@ -666,6 +673,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ContinuationAsyncContextTy = createStructType(
       *this, "swift.continuation_context",
       {SwiftContextTy,       // AsyncContext header
+       SizeTy,               // flags
        SizeTy,               // await synchronization
        ErrorPtrTy,           // error result pointer
        OpaquePtrTy,          // normal result address
@@ -943,8 +951,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
       else
         buildFnAttr.addAttribute(Attr);
     }
-    fn->addAttributes(llvm::AttributeList::FunctionIndex, buildFnAttr);
-    fn->addAttributes(llvm::AttributeList::ReturnIndex, buildRetAttr);
+    fn->addFnAttrs(buildFnAttr);
+    fn->addRetAttrs(buildRetAttr);
     fn->addParamAttrs(0, buildFirstParamAttr);
   }
 
@@ -995,13 +1003,13 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #include "swift/Runtime/RuntimeFunctions.def"
 
 std::pair<llvm::GlobalVariable *, llvm::Constant *>
-IRGenModule::createStringConstant(StringRef Str,
-  bool willBeRelativelyAddressed, StringRef sectionName) {
+IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
+                                  StringRef sectionName, StringRef name) {
   // If not, create it.  This implicitly adds a trailing null.
   auto init = llvm::ConstantDataArray::getString(getLLVMContext(), Str);
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::PrivateLinkage,
-                                         init);
+                                         init, name);
   // FIXME: ld64 crashes resolving relative references to coalesceable symbols.
   // rdar://problem/22674524
   // If we intend to relatively address this string, don't mark it with
@@ -1144,7 +1152,7 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  if (auto *wt = SIL.lookUpWitnessTable(Conf, /*deserializeLazily=*/false)) {
+  if (auto *wt = SIL.lookUpWitnessTable(Conf)) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
         LazilyEmittedWitnessTables.insert(wt).second) {
@@ -1182,14 +1190,10 @@ void IRGenerator::addBackDeployedObjCActorInitialization(ClassDecl *ClassDecl) {
 
 llvm::AttributeList IRGenModule::getAllocAttrs() {
   if (AllocAttrs.isEmpty()) {
+    AllocAttrs = llvm::AttributeList().addRetAttribute(
+        getLLVMContext(), llvm::Attribute::NoAlias);
     AllocAttrs =
-        llvm::AttributeList::get(getLLVMContext(),
-                                 llvm::AttributeList::ReturnIndex,
-                                 llvm::Attribute::NoAlias);
-    AllocAttrs =
-        AllocAttrs.addAttribute(getLLVMContext(),
-                                llvm::AttributeList::FunctionIndex,
-                                llvm::Attribute::NoUnwind);
+        AllocAttrs.addFnAttribute(getLLVMContext(), llvm::Attribute::NoUnwind);
   }
   return AllocAttrs;
 }
@@ -1206,7 +1210,7 @@ void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
 void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
   llvm::AttrBuilder b;
   setHasNoFramePointer(b);
-  F->addAttributes(llvm::AttributeList::FunctionIndex, b);
+  F->addFnAttrs(b);
 }
 
 /// Construct initial function attributes from options.
@@ -1230,8 +1234,7 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
   llvm::AttrBuilder b;
   constructInitialFnAttributes(b);
-  return llvm::AttributeList::get(getLLVMContext(),
-                                  llvm::AttributeList::FunctionIndex, b);
+  return llvm::AttributeList().addFnAttributes(getLLVMContext(), b);
 }
 
 llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {
@@ -1247,7 +1250,7 @@ llvm::Constant *IRGenModule::getOpaquePtr(llvm::Constant *ptr) {
 }
 
 static void appendEncodedName(raw_ostream &os, StringRef name) {
-  if (clang::isValidIdentifier(name)) {
+  if (clang::isValidAsciiIdentifier(name)) {
     os << "_" << name;
   } else {
     for (auto c : name)
@@ -1574,7 +1577,9 @@ static llvm::GlobalObject *createForceImportThunk(IRGenModule &IGM) {
                                llvm::GlobalValue::LinkOnceODRLinkage, buf,
                                &IGM.Module);
     ForceImportThunk->setAttributes(IGM.constructInitialAttributes());
-    ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
+    ApplyIRLinkage(IGM.IRGen.Opts.InternalizeSymbols
+                      ? IRLinkage::Internal
+                      : IRLinkage::ExternalExport).to(ForceImportThunk);
     if (IGM.Triple.supportsCOMDAT())
       if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))
         GO->setComdat(IGM.Module.getOrInsertComdat(ForceImportThunk->getName()));
@@ -1686,6 +1691,7 @@ bool IRGenModule::finalize() {
   emitSwiftAsyncExtendedFrameInfoWeakRef();
   emitAutolinkInfo();
   emitGlobalLists();
+  emitUsedConditionals();
   if (DebugInfo)
     DebugInfo->finalize();
   cleanupClangCodeGenMetadata();
@@ -1739,7 +1745,7 @@ bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
-      (Triple.isOSDarwin() ||
+      (Triple.isOSDarwin() || Triple.isOSWindows() ||
        (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
   if (canPrespecializeTarget && isStandardLibrary()) {
     return IRGen.Opts.PrespecializeGenericMetadata;

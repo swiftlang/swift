@@ -29,91 +29,27 @@ bool swift::isValueAddressOrTrivial(SILValue v) {
          v.getOwnershipKind() == OwnershipKind::None;
 }
 
-// These operations forward both owned and guaranteed ownership.
-static bool isOwnershipForwardingInstructionKind(SILInstructionKind kind) {
-  switch (kind) {
-  case SILInstructionKind::TupleInst:
-  case SILInstructionKind::StructInst:
-  case SILInstructionKind::EnumInst:
-  case SILInstructionKind::DifferentiableFunctionInst:
-  case SILInstructionKind::LinearFunctionInst:
-  case SILInstructionKind::OpenExistentialRefInst:
-  case SILInstructionKind::UpcastInst:
-  case SILInstructionKind::UncheckedValueCastInst:
-  case SILInstructionKind::UncheckedRefCastInst:
-  case SILInstructionKind::ConvertFunctionInst:
-  case SILInstructionKind::RefToBridgeObjectInst:
-  case SILInstructionKind::BridgeObjectToRefInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst:
-  case SILInstructionKind::UncheckedEnumDataInst:
-  case SILInstructionKind::SelectEnumInst:
-  case SILInstructionKind::SwitchEnumInst:
-  case SILInstructionKind::CheckedCastBranchInst:
-  case SILInstructionKind::DestructureStructInst:
-  case SILInstructionKind::DestructureTupleInst:
-  case SILInstructionKind::MarkDependenceInst:
-  case SILInstructionKind::InitExistentialRefInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
-// These operations forward guaranteed ownership, but don't necessarily forward
-// owned values.
-static bool isGuaranteedForwardingInstructionKind(SILInstructionKind kind) {
-  switch (kind) {
-  case SILInstructionKind::TupleExtractInst:
-  case SILInstructionKind::StructExtractInst:
-  case SILInstructionKind::DifferentiableFunctionExtractInst:
-  case SILInstructionKind::LinearFunctionExtractInst:
-  case SILInstructionKind::OpenExistentialValueInst:
-  case SILInstructionKind::OpenExistentialBoxValueInst:
-    return true;
-  default:
-    return isOwnershipForwardingInstructionKind(kind);
-  }
-}
-
 bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
   // If we have an argument from a transforming terminator, we can forward
   // guaranteed.
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *ti = arg->getSingleTerminator())
-      if (ti->isTransformationTerminator()) {
-        assert(OwnershipForwardingMixin::isa(ti));
-        return true;
-      }
+      if (ti->isTransformationTerminator())
+        return OwnershipForwardingMixin::get(ti)->isDirectlyForwarding();
 
-  auto *inst = value->getDefiningInstruction();
-  if (!inst)
-    return false;
+  if (auto *inst = value->getDefiningInstruction())
+    if (auto *mixin = OwnershipForwardingMixin::get(inst))
+      return mixin->isDirectlyForwarding() &&
+             !isa<OwnedFirstArgForwardingSingleValueInst>(inst);
 
-  bool result = isGuaranteedForwardingInstructionKind(inst->getKind());
-  if (result) {
-    assert(!isa<OwnedFirstArgForwardingSingleValueInst>(inst));
-    assert(OwnershipForwardingMixin::isa(inst));
-  }
-  return result;
+  return false;
 }
 
 bool swift::canOpcodeForwardGuaranteedValues(Operand *use) {
-  auto *user = use->getUser();
-  bool result = isOwnershipForwardingInstructionKind(user->getKind());
-  if (result) {
-    assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(user));
-    assert(OwnershipForwardingMixin::isa(user));
-  }
-  return result;
-}
-
-static bool isOwnedForwardingValueKind(SILInstructionKind kind) {
-  switch (kind) {
-  case SILInstructionKind::MarkUninitializedInst:
-    return true;
-  default:
-    return isOwnershipForwardingInstructionKind(kind);
-  }
+  if (auto *mixin = OwnershipForwardingMixin::get(use->getUser()))
+    return mixin->isDirectlyForwarding() &&
+           !isa<OwnedFirstArgForwardingSingleValueInst>(use->getUser());
+  return false;
 }
 
 bool swift::canOpcodeForwardOwnedValues(SILValue value) {
@@ -121,29 +57,23 @@ bool swift::canOpcodeForwardOwnedValues(SILValue value) {
   // terminator, we are fine.
   if (auto *arg = dyn_cast<SILPhiArgument>(value))
     if (auto *predTerm = arg->getSingleTerminator())
-      if (predTerm->isTransformationTerminator()) {
-        assert(OwnershipForwardingMixin::isa(predTerm));
-        return true;
-      }
-  auto *inst = value->getDefiningInstruction();
-  if (!inst)
-    return false;
+      if (predTerm->isTransformationTerminator())
+        return OwnershipForwardingMixin::get(predTerm)->isDirectlyForwarding();
 
-  bool result = isOwnedForwardingValueKind(inst->getKind());
-  if (result) {
-    assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(inst));
-    assert(OwnershipForwardingMixin::isa(inst));
-  }
-  return result;
+  if (auto *inst = value->getDefiningInstruction())
+    if (auto *mixin = OwnershipForwardingMixin::get(inst))
+      return mixin->isDirectlyForwarding() &&
+             !isa<GuaranteedFirstArgForwardingSingleValueInst>(inst);
+
+  return false;
 }
 
 bool swift::canOpcodeForwardOwnedValues(Operand *use) {
   auto *user = use->getUser();
-  bool result = isOwnershipForwardingInstructionKind(user->getKind());
-  if (result) {
-    assert(OwnershipForwardingMixin::isa(user));
-  }
-  return result;
+  if (auto *mixin = OwnershipForwardingMixin::get(user))
+    return mixin->isDirectlyForwarding() &&
+           !isa<GuaranteedFirstArgForwardingSingleValueInst>(user);
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -160,8 +90,13 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 // Skip over nested borrow scopes. Their scope-ending instructions are their use
 // points. Transitively find all nested scope-ending instructions by looking
 // through nested reborrows. Nested reborrows are not use points.
+//
+// FIXME: handle inner reborrows, which aren't dominated by
+// guaranteedValue. Audit all users to handle reborrows.
 bool swift::findInnerTransitiveGuaranteedUses(
-    SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints) {
+  SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints) {
+
+  bool foundPointerEscape = false;
 
   auto leafUse = [&](Operand *use) {
     if (usePoints && use->getOperandOwnership() != OperandOwnership::NonUse) {
@@ -197,7 +132,9 @@ bool swift::findInnerTransitiveGuaranteedUses(
 
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
-      return false;
+      leafUse(use);
+      foundPointerEscape = true;
+      break;
 
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
@@ -213,17 +150,18 @@ bool swift::findInnerTransitiveGuaranteedUses(
       break;
 
     case OperandOwnership::InteriorPointer:
-      return false;
-
 #if 0 // FIXME!!! Enable in a following commit that fixes RAUW
-      // If our base guaranteed value does not have any consuming uses (consider
-      // function arguments), we need to be sure to include interior pointer
-      // operands since we may not get a use from a end_scope instruction.
+      // If our base guaranteed value does not have any consuming uses
+      // (consider function arguments), we need to be sure to include interior
+      // pointer operands since we may not get a use from a end_scope
+      // instruction.
       if (InteriorPointerOperand(use).findTransitiveUses(usePoints)
           != AddressUseKind::NonEscaping) {
-        return false;
+        foundPointerEscape = true;
       }
 #endif
+      leafUse(use);
+      foundPointerEscape = true;
       break;
 
     case OperandOwnership::ForwardingBorrow: {
@@ -248,12 +186,153 @@ bool swift::findInnerTransitiveGuaranteedUses(
       break;
     }
     case OperandOwnership::Borrow:
-      BorrowingOperand(use).visitExtendedScopeEndingUses([&](Operand *endUse) {
-        leafUse(endUse);
-        return true;
-      });
+      // FIXME: Use visitExtendedScopeEndingUses and audit all clients to handle
+      // reborrows.
+      //
+      // FIXME: visit[Extended]ScopeEndingUses can't return false here once dead
+      // borrows are disallowed.
+      if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *endUse) {
+            if (endUse->getOperandOwnership() == OperandOwnership::Reborrow) {
+              foundPointerEscape = true;
+            }
+            leafUse(endUse);
+            return true;
+          })) {
+        // Special case for dead borrows. This is dangerous because clients
+        // don't expect a begin_borrow to be in the use list.
+        leafUse(use);
+      }
       break;
     }
+  }
+  return !foundPointerEscape;
+}
+
+/// Find all uses in the extended lifetime (i.e. including copies) of a simple
+/// (i.e. not reborrowed) borrow scope and its transitive uses.
+bool swift::findExtendedUsesOfSimpleBorrowedValue(
+    BorrowedValue borrowedValue, SmallVectorImpl<Operand *> *usePoints) {
+
+  auto recordUse = [&](Operand *use) {
+    if (usePoints && use->getOperandOwnership() != OperandOwnership::NonUse) {
+      usePoints->push_back(use);
+    }
+  };
+
+  // Push the value's immediate uses.
+  //
+  // TODO: The worklist can be a simple vector without any a membership check if
+  // destructures are changed to be represented as reborrows. Currently a
+  // destructure forwards multiple results! This means that the worklist could
+  // grow exponentially without the membership check. It's fine to do this
+  // membership check locally in this function (within a borrow scope) because
+  // it isn't needed for the immediate uses, only the transitive uses.
+  GraphNodeWorklist<Operand *, 8> worklist;
+  auto addUsesToWorklist = [&worklist](SILValue value) {
+    for (Operand *use : value->getUses()) {
+      if (use->getOperandOwnership() != OperandOwnership::NonUse)
+        worklist.insert(use);
+    }
+  };
+
+  addUsesToWorklist(borrowedValue.value);
+
+  // --- Transitively follow forwarded uses and look for escapes.
+
+  // usePoints grows in this loop.
+  while (Operand *use = worklist.pop()) {
+    if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
+      addUsesToWorklist(cvi);
+    }
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::NonUse:
+      break;
+
+    case OperandOwnership::TrivialUse:
+    case OperandOwnership::ForwardingConsume:
+    case OperandOwnership::DestroyingConsume:
+      recordUse(use);
+      break;
+
+    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::PointerEscape:
+      return false;
+
+    case OperandOwnership::InstantaneousUse:
+    case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::BitwiseEscape:
+    // Reborrow only happens when this is called on a value that creates a
+    // borrow scope.
+    case OperandOwnership::Reborrow:
+    // EndBorrow either happens when this is called on a value that creates a
+    // borrow scope, or when it is pushed as a use when processing a nested
+    // borrow.
+    case OperandOwnership::EndBorrow:
+      recordUse(use);
+      break;
+
+    case OperandOwnership::InteriorPointer:
+      if (InteriorPointerOperandKind::get(use) ==
+          InteriorPointerOperandKind::Invalid)
+        return false;
+      // If our base guaranteed value does not have any consuming uses (consider
+      // function arguments), we need to be sure to include interior pointer
+      // operands since we may not get a use from a end_scope instruction.
+      if (InteriorPointerOperand(use).findTransitiveUses(usePoints) !=
+          AddressUseKind::NonEscaping) {
+        return false;
+      }
+      recordUse(use);
+      break;
+
+    case OperandOwnership::ForwardingBorrow: {
+      ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
+        // Do not include transitive uses with 'none' ownership
+        if (result.getOwnershipKind() == OwnershipKind::None)
+          return true;
+        for (auto *resultUse : result->getUses()) {
+          if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
+            worklist.insert(resultUse);
+          }
+        }
+        return true;
+      });
+      recordUse(use);
+      break;
+    }
+    case OperandOwnership::Borrow:
+      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
+      // borrows are disallowed.
+      if (!BorrowingOperand(use).visitExtendedScopeEndingUses(
+            [&](Operand *endUse) {
+              recordUse(endUse);
+              return true;
+            })) {
+        // Special case for dead borrows. This is dangerous because clients
+        // don't expect a begin_borrow to be in the use list.
+        recordUse(use);
+      }
+      break;
+    }
+  }
+  return true;
+}
+
+bool swift::findUsesOfSimpleValue(SILValue value,
+                                  SmallVectorImpl<Operand *> *usePoints) {
+  for (auto *use : value->getUses()) {
+    if (use->getOperandOwnership() == OperandOwnership::Borrow) {
+      if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *end) {
+            if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+              return false;
+            }
+            usePoints->push_back(end);
+            return true;
+          })) {
+        return false;
+      }
+    }
+    usePoints->push_back(use);
   }
   return true;
 }
@@ -400,21 +479,29 @@ bool BorrowingOperand::visitScopeEndingUses(
   switch (kind) {
   case BorrowingOperandKind::Invalid:
     llvm_unreachable("Using invalid case");
-  case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::BeginBorrow: {
+    bool deadBorrow = true;
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
+        deadBorrow = false;
         if (!func(use))
           return false;
       }
     }
-    return true;
+    // FIXME: special case for dead borrows. This is dangerous because clients
+    // only expect visitScopeEndingUses to return false if the visitor returned
+    // false.
+    return !deadBorrow;
+  }
   case BorrowingOperandKind::BeginApply: {
+    bool deadApply = true;
     auto *user = cast<BeginApplyInst>(op->getUser());
     for (auto *use : user->getTokenResult()->getUses()) {
+      deadApply = false;
       if (!func(use))
         return false;
     }
-    return true;
+    return !deadApply;
   }
   // These are instantaneous borrow scopes so there aren't any special end
   // scope instructions.
@@ -423,12 +510,16 @@ bool BorrowingOperand::visitScopeEndingUses(
   case BorrowingOperandKind::Yield:
     return true;
   case BorrowingOperandKind::Branch: {
+    bool deadBranch = true;
     auto *br = cast<BranchInst>(op->getUser());
-    for (auto *use : br->getArgForOperand(op)->getUses())
-      if (use->isLifetimeEnding())
+    for (auto *use : br->getArgForOperand(op)->getUses()) {
+      if (use->isLifetimeEnding()) {
+        deadBranch = false;
         if (!func(use))
           return false;
-    return true;
+      }
+    }
+    return !deadBranch;
   }
   }
   llvm_unreachable("Covered switch isn't covered");
@@ -495,10 +586,15 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
 void BorrowingOperand::getImplicitUses(
     SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *errorFunction) const {
-  visitScopeEndingUses([&](Operand *op) {
-    foundUses.push_back(op);
+  // FIXME: this visitScopeEndingUses should never return false once dead
+  // borrows are disallowed.
+  if (!visitScopeEndingUses([&](Operand *endOp) {
+    foundUses.push_back(endOp);
     return true;
-  });
+  })) {
+    // Special-case for dead borrows.
+    foundUses.push_back(op);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -600,7 +696,7 @@ void BorrowedValue::computeLiveness(PrunedLiveness &liveness) const {
 }
 
 bool BorrowedValue::areUsesWithinLocalScope(
-    ArrayRef<Operand *> uses, DeadEndBlocks &deadEndBlocks) const {
+    ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   // First make sure that we actually have a local scope. If we have a non-local
   // scope, then we have something (like a SILFunctionArgument) where a larger
   // semantic construct (in the case of SILFunctionArgument, the function
@@ -771,17 +867,18 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
     }
     // First, eliminate "end point uses" that we just need to check liveness at
     // and do not need to check transitive uses of.
-    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) || isIncidentalUse(user)
-        || isa<StoreInst>(user) || isa<DestroyAddrInst>(user)
-        || isa<AssignInst>(user) || isa<YieldInst>(user)
-        || isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user)
-        || isa<EndApplyInst>(user) || isa<LoadWeakInst>(user)
-        || isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user)
-        || isa<BeginUnpairedAccessInst>(user)
-        || isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user)
-        || isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user)
-        || isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)
-        || isa<IsUniqueInst>(user)) {
+    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
+        isa<MarkUnresolvedMoveAddrInst>(user) || isIncidentalUse(user) ||
+        isa<StoreInst>(user) || isa<DestroyAddrInst>(user) ||
+        isa<AssignInst>(user) || isa<YieldInst>(user) ||
+        isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user) ||
+        isa<EndApplyInst>(user) || isa<LoadWeakInst>(user) ||
+        isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user) ||
+        isa<BeginUnpairedAccessInst>(user) ||
+        isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
+        isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
+        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
+        isa<IsUniqueInst>(user)) {
       leafUse(op);
       continue;
     }
@@ -878,14 +975,14 @@ bool AddressOwnership::areUsesWithinLifetime(
   SILValue root = base.getOwnershipReferenceRoot();
   BorrowedValue borrow(root);
   if (borrow)
-    return borrow.areUsesWithinLocalScope(uses, deadEndBlocks);
+    return borrow.areUsesWithinLocalScope(uses, &deadEndBlocks);
 
   // --- A reference no borrow scope. Currently happens for project_box.
 
   // Compute the reference value's liveness.
   PrunedLiveness liveness;
   liveness.computeSSALiveness(root);
-  return liveness.areUsesWithinBoundary(uses, deadEndBlocks);
+  return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
 }
 
 //===----------------------------------------------------------------------===//
@@ -971,7 +1068,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     // instruction
     if (isForwardingBorrow(value)) {
       if (auto *i = value->getDefiningInstruction()) {
-        llvm::copy(i->getOperandValues(true /*skip type dependent ops*/),
+        llvm::copy(i->getNonTypeDependentOperandValues(),
                    std::back_inserter(worklist));
         continue;
       }
@@ -980,7 +1077,8 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
       // predecessor terminator.
       auto *arg = cast<SILPhiArgument>(value);
       auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst && termInst->isTransformationTerminator() &&
+             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
       assert(termInst->getNumOperands() == 1 &&
              "Transforming terminators should always have a single operand");
       worklist.push_back(termInst->getAllOperands()[0].get());
@@ -1015,7 +1113,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
     // instruction
     if (isForwardingBorrow(currentValue)) {
       if (auto *i = currentValue->getDefiningInstruction()) {
-        auto instOps = i->getOperandValues(true /*ignore type dependent ops*/);
+        auto instOps = i->getNonTypeDependentOperandValues();
         // If we have multiple incoming values, return .None. We can't handle
         // this.
         auto begin = instOps.begin();
@@ -1031,7 +1129,8 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
       // predecessor terminator.
       auto *arg = cast<SILPhiArgument>(currentValue);
       auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst && termInst->isTransformationTerminator() &&
+             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
       assert(termInst->getNumOperands() == 1 &&
              "Transformation terminators should only have single operands");
       currentValue = termInst->getAllOperands()[0].get();
@@ -1074,7 +1173,7 @@ bool swift::getAllOwnedValueIntroducers(
     // instruction
     if (isForwardingConsume(value)) {
       if (auto *i = value->getDefiningInstruction()) {
-        llvm::copy(i->getOperandValues(true /*skip type dependent ops*/),
+        llvm::copy(i->getNonTypeDependentOperandValues(),
                    std::back_inserter(worklist));
         continue;
       }
@@ -1083,7 +1182,8 @@ bool swift::getAllOwnedValueIntroducers(
       // predecessor terminator.
       auto *arg = cast<SILPhiArgument>(value);
       auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst && termInst->isTransformationTerminator() &&
+             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
       assert(termInst->getNumOperands() == 1 &&
              "Transforming terminators should always have a single operand");
       worklist.push_back(termInst->getAllOperands()[0].get());
@@ -1114,7 +1214,7 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
     // instruction
     if (isForwardingConsume(currentValue)) {
       if (auto *i = currentValue->getDefiningInstruction()) {
-        auto instOps = i->getOperandValues(true /*ignore type dependent ops*/);
+        auto instOps = i->getNonTypeDependentOperandValues();
         // If we have multiple incoming values, return .None. We can't handle
         // this.
         auto begin = instOps.begin();
@@ -1127,10 +1227,11 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
       }
 
       // Otherwise, we should have a block argument that is defined by a single
-      // predecessor terminator.
+      // predecessor terminator and is directly forwarding.
       auto *arg = cast<SILPhiArgument>(currentValue);
       auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst && termInst->isTransformationTerminator() &&
+             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
       assert(termInst->getNumOperands()
              - termInst->getNumTypeDependentOperands() == 1 &&
              "Transformation terminators should only have single operands");
@@ -1435,10 +1536,10 @@ void swift::findTransitiveReborrowBaseValuePairs(
 }
 
 void swift::visitTransitiveEndBorrows(
-    BorrowedValue beginBorrow,
+    SILValue value,
     function_ref<void(EndBorrowInst *)> visitEndBorrow) {
   GraphNodeWorklist<SILValue, 4> worklist;
-  worklist.insert(beginBorrow.value);
+  worklist.insert(value);
 
   while (!worklist.empty()) {
     auto val = worklist.pop();
@@ -1454,4 +1555,22 @@ void swift::visitTransitiveEndBorrows(
       }
     }
   }
+}
+
+/// Whether the specified lexical begin_borrow instruction is nested.
+///
+/// A begin_borrow [lexical] is nested if the borrowed value's lifetime is
+/// guaranteed by another lexical scope.  That happens if:
+/// - the value is a guaranteed argument to the function
+/// - the value is itself a begin_borrow [lexical]
+bool swift::isNestedLexicalBeginBorrow(BeginBorrowInst *bbi) {
+  assert(bbi->isLexical());
+  auto value = bbi->getOperand();
+  if (auto *outerBBI = dyn_cast<BeginBorrowInst>(value)) {
+    return outerBBI->isLexical();
+  }
+  if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {
+    return arg->getOwnershipKind() == OwnershipKind::Guaranteed;
+  }
+  return false;
 }

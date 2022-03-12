@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -20,47 +23,12 @@ distributed actor Capybara {
   }
 }
 
-
-// ==== Fake Transport ---------------------------------------------------------
-@available(SwiftStdlib 5.6, *)
-struct ActorAddress: ActorIdentity {
-  let address: String
-  init(parse address: String) {
-    self.address = address
-  }
-}
-
-@available(SwiftStdlib 5.6, *)
-struct FakeTransport: ActorTransport {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError("not implemented:\(#function)")
-  }
-
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
-  throws -> Act? where Act: DistributedActor {
-    return nil
-  }
-
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
-          where Act: DistributedActor {
-    let id = ActorAddress(parse: "xxx")
-    return .init(id)
-  }
-
-  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
-  }
-
-  func resignIdentity(_ id: AnyActorIdentity) {
-  }
-}
-
-@available(SwiftStdlib 5.5, *)
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test() async throws {
-  let transport = FakeTransport()
+  let system = DefaultDistributedActorSystem()
 
-  let local = Capybara(transport: transport)
+  let local = Capybara(system: system)
   // await local.eat() // SHOULD ERROR
   let valueWhenLocal: String? = await local.whenLocal { __secretlyKnownToBeLocal in
     __secretlyKnownToBeLocal.eat()
@@ -69,7 +37,7 @@ func test() async throws {
   // CHECK: valueWhenLocal: watermelon
   print("valueWhenLocal: \(valueWhenLocal ?? "nil")")
 
-  let remote = try Capybara.resolve(local.id, using: transport)
+  let remote = try Capybara.resolve(id: local.id, using: system)
   let valueWhenRemote: String? = await remote.whenLocal { __secretlyKnownToBeLocal in
     __secretlyKnownToBeLocal.eat()
   }
@@ -78,7 +46,6 @@ func test() async throws {
   print("valueWhenRemote: \(valueWhenRemote ?? "nil")")
 }
 
-@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     try! await test()

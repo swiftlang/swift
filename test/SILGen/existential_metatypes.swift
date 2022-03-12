@@ -24,7 +24,7 @@ struct S: P {
 func existentialMetatype(_ x: P) {
   // CHECK: [[TYPE1:%.*]] = existential_metatype $@thick P.Type, [[X]]
   let type1 = type(of: x)
-  // CHECK: [[INSTANCE1:%.*]] = alloc_stack $P
+  // CHECK: [[INSTANCE1:%.*]] = alloc_stack [lexical] $P
   // CHECK: [[OPEN_TYPE1:%.*]] = open_existential_metatype [[TYPE1]]
   // CHECK: [[INIT:%.*]] = witness_method {{.*}} #P.init!allocator
   // CHECK: [[INSTANCE1_VALUE:%.*]] = init_existential_addr [[INSTANCE1]] : $*P
@@ -34,7 +34,7 @@ func existentialMetatype(_ x: P) {
   // CHECK: [[S:%.*]] = metatype $@thick S.Type
   // CHECK: [[TYPE2:%.*]] = init_existential_metatype [[S]] : $@thick S.Type, $@thick P.Type
   let type2: P.Type = S.self
-  // CHECK: [[INSTANCE2:%.*]] = alloc_stack $P
+  // CHECK: [[INSTANCE2:%.*]] = alloc_stack [lexical] $P
   // CHECK: [[OPEN_TYPE2:%.*]] = open_existential_metatype [[TYPE2]]
   // CHECK: [[STATIC_METHOD:%.*]] = witness_method {{.*}} #P.staticMethod
   // CHECK: [[INSTANCE2_VALUE:%.*]] = init_existential_addr [[INSTANCE2]] : $*P
@@ -65,7 +65,8 @@ func existentialMetatypeUpcast2(_ x: (P & Q).Type) -> P.Type {
 // CHECK-LABEL: sil hidden [ossa] @$s21existential_metatypes0A19MetatypeVarPropertyAA5ValueVyF : $@convention(thin) () -> Value
 func existentialMetatypeVarProperty() -> Value {
   // CHECK:      [[BOX:%.*]] = alloc_box ${ var @thick P.Type }
-  // CHECK:      [[ADDR:%.*]] = project_box [[BOX]] : ${ var @thick P.Type }, 0
+  // CHECK:      [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+  // CHECK:      [[ADDR:%.*]] = project_box [[BOX_LIFETIME]] : ${ var @thick P.Type }, 0
   // CHECK:      [[T0:%.*]] = metatype $@thick S.Type
   // CHECK:      [[T1:%.*]] = init_existential_metatype [[T0]]
   // CHECK:      store [[T1]] to [trivial] [[ADDR]] :

@@ -27,7 +27,7 @@ public protocol Decoder {
 // CHECK:  try_apply [[WT]]<@opened("{{.*}}") Decoder>([[OPENED]]) : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error), normal bb2, error bb1
 //
 // CHECK:bb{{.*}}([[RET1:%.*]] : @owned $UnkeyedDecodingContainer):
-// CHECK:  [[BORROW2:%.*]] = begin_borrow [[RET1]] : $UnkeyedDecodingContainer
+// CHECK:  [[BORROW2:%.*]] = begin_borrow [lexical] [[RET1]] : $UnkeyedDecodingContainer
 // CHECK:  [[OPENED2:%.*]] = open_existential_value [[BORROW2]] : $UnkeyedDecodingContainer to $@opened("{{.*}}") UnkeyedDecodingContainer
 // CHECK:  [[WT2:%.*]] = witness_method $@opened("{{.*}}") UnkeyedDecodingContainer, #UnkeyedDecodingContainer.isAtEnd!getter : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened("{{.*}}") UnkeyedDecodingContainer : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK:  [[RET2:%.*]] = apply [[WT2]]<@opened("{{.*}}") UnkeyedDecodingContainer>([[OPENED2]]) : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
@@ -178,7 +178,7 @@ public struct Int : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
 // CHECK:   %5 = apply %4(%0, %1, %3) : $@convention(method) (FloatingPointSign, FloatingPointSign, @thin FloatingPointSign.Type) -> Bool // user: %6
 // CHECK:   return %5 : $Bool
 // CHECK-LABEL: } // end sil function '$ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW'
-public enum FloatingPointSign: Int64 {
+public enum FloatingPointSign {
   /// The sign for a positive value.
   case plus
 
@@ -213,7 +213,7 @@ public protocol Error {}
 // Test open_existential_box_value in a conversion context.
 // ---
 // CHECK-OSX-LABEL: sil [ossa] @$ss3foo1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
-// CHECK-OSX: [[BORROW:%.*]] = begin_borrow %{{.*}} : $Error
+// CHECK-OSX: [[BORROW:%.*]] = begin_borrow [lexical] %{{.*}} : $Error
 // CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened
 // CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened

@@ -1267,6 +1267,6 @@ bb0:
   %5 = load %4 : $*Int32
   set_deallocating %1 : $AX
   dealloc_ref %1 : $AX
-  dealloc_ref [stack] %1 : $AX
+  dealloc_stack_ref %1 : $AX
   return %5 : $Int32
 }

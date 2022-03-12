@@ -468,8 +468,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
                              : DynamicCastFeasibility::WillFail;
     }
 
-    if (targetMetatype.isAnyExistentialType() &&
-        (isa<ProtocolType>(target) || isa<ProtocolCompositionType>(target))) {
+    if (targetMetatype.isAnyExistentialType() && target->isExistentialType()) {
       auto Feasibility =
           classifyDynamicCastToProtocol(M, source, target, isWholeModuleOpts);
       // Cast from existential metatype to existential metatype may still

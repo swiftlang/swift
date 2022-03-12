@@ -25,7 +25,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/SyntaxModel.h"
@@ -273,7 +272,8 @@ configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
-      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache) {
+      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache),
+      CompileManager(RuntimeResourcePath, DiagnosticDocumentationPath) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
@@ -286,6 +286,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
       RuntimeResourcePath, DiagnosticDocumentationPath);
 
   CompletionInst = std::make_shared<CompletionInstance>();
+
   configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
 
   // By default, just use the in-memory cache.
@@ -388,6 +389,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     switch (Kind) {
     case CodeCompletionDeclKind::Module: return KindRefModule;
     case CodeCompletionDeclKind::Class: return KindRefClass;
+    case CodeCompletionDeclKind::Actor: return KindRefActor;
     case CodeCompletionDeclKind::Struct: return KindRefStruct;
     case CodeCompletionDeclKind::Enum: return KindRefEnum;
     case CodeCompletionDeclKind::EnumElement: return KindRefEnumElement;
@@ -415,6 +417,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
   switch (Kind) {
   case CodeCompletionDeclKind::Module: return KindDeclModule;
   case CodeCompletionDeclKind::Class: return KindDeclClass;
+  case CodeCompletionDeclKind::Actor: return KindDeclActor;
   case CodeCompletionDeclKind::Struct: return KindDeclStruct;
   case CodeCompletionDeclKind::Enum: return KindDeclEnum;
   case CodeCompletionDeclKind::EnumElement: return KindDeclEnumElement;
@@ -718,9 +721,12 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
   case SymbolKind::Module:
     return KindRefModule;
 
+  case SymbolKind::CommentTag:
+    return KindCommentTag;
+
   default:
     // TODO: reconsider whether having a default case is a good idea.
-    return UIdent();
+    llvm_unreachable("unhandled symbol kind Swift doesn't use");
   }
 
 #undef SIMPLE_CASE
@@ -999,6 +1005,7 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    SourceKitCancellationToken CancellationToken,
     llvm::function_ref<void(CancellableResult<CompletionLikeOperationParams>)>
         PerformOperation) {
   assert(FileSystem);
@@ -1042,8 +1049,8 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   CompilerInvocation Invocation;
   std::string CompilerInvocationError;
   bool CreatingInvocationFailed = getASTManager()->initCompilerInvocation(
-      Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
-      CompilerInvocationError);
+      Invocation, Args, FrontendOptions::ActionType::Typecheck, Diags,
+      newBuffer->getBufferIdentifier(), FileSystem, CompilerInvocationError);
   if (CreatingInvocationFailed) {
     PerformOperation(CancellableResult<CompletionLikeOperationParams>::failure(
         CompilerInvocationError));
@@ -1058,8 +1065,13 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   // Pin completion instance.
   auto CompletionInst = getCompletionInstance();
 
-  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(),
-                                          &CIDiags};
+  auto CancellationFlag = std::make_shared<std::atomic<bool>>(false);
+  ReqTracker->setCancellationHandler(CancellationToken, [CancellationFlag] {
+    CancellationFlag->store(true, std::memory_order_relaxed);
+  });
+
+  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(), &CIDiags,
+                                          CancellationFlag};
   PerformOperation(
       CancellableResult<CompletionLikeOperationParams>::success(Params));
 }

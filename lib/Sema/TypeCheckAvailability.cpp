@@ -181,7 +181,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
   auto runningOSVersion =
       (Ctx.LangOpts.DisableAvailabilityChecking
        ? AvailabilityContext::alwaysAvailable()
-       : TypeChecker::overApproximateAvailabilityAtLocation(D->getEndLoc(), DC));
+       : TypeChecker::overApproximateAvailabilityAtLocation(D->getLoc(), DC));
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
@@ -288,6 +288,27 @@ static bool hasActiveAvailableAttribute(Decl *D,
   return getActiveAvailableAttribute(D, AC);
 }
 
+static bool bodyIsResilienceBoundary(Decl *D) {
+  // The declaration contains code...
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
+    // And it has a location so we can check it...
+    if (!afd->isImplicit() && afd->getBodySourceRange().isValid()) {
+      // And the code is within our resilience domain, so it should be
+      // compiled with the minimum deployment target, not the minimum inlining
+      // target.
+      return afd->getResilienceExpansion() != ResilienceExpansion::Minimal;
+    }
+  }
+
+  return false;
+}
+
+static bool computeContainedByDeploymentTarget(TypeRefinementContext *TRC,
+                                               ASTContext &ctx) {
+  return TRC->getAvailabilityInfo()
+                  .isContainedIn(AvailabilityContext::forDeploymentTarget(ctx));
+}
+
 namespace {
 
 /// A class to walk the AST to build the type refinement context hierarchy.
@@ -302,6 +323,8 @@ class TypeRefinementContextBuilder : private ASTWalker {
     /// indicating that custom logic elsewhere will handle removing
     /// the context when needed.
     ParentTy ScopeNode;
+
+    bool ContainedByDeploymentTarget;
   };
 
   std::vector<ContextInfo> ContextStack;
@@ -318,10 +341,24 @@ class TypeRefinementContextBuilder : private ASTWalker {
     return ContextStack.back().TRC;
   }
 
+  bool isCurrentTRCContainedByDeploymentTarget() {
+    return ContextStack.back().ContainedByDeploymentTarget;
+  }
+
   void pushContext(TypeRefinementContext *TRC, ParentTy PopAfterNode) {
     ContextInfo Info;
     Info.TRC = TRC;
     Info.ScopeNode = PopAfterNode;
+
+    if (!ContextStack.empty() && isCurrentTRCContainedByDeploymentTarget()) {
+      assert(computeContainedByDeploymentTarget(TRC, Context) &&
+             "incorrectly skipping computeContainedByDeploymentTarget()");
+      Info.ContainedByDeploymentTarget = true;
+    } else {
+      Info.ContainedByDeploymentTarget =
+          computeContainedByDeploymentTarget(TRC, Context);
+    }
+
     ContextStack.push_back(Info);
   }
 
@@ -355,38 +392,70 @@ public:
 
 private:
   bool walkToDeclPre(Decl *D) override {
-    TypeRefinementContext *DeclTRC = getNewContextForWalkOfDecl(D);
+    // Adds in a parent TRC for decls which are syntatically nested but are not
+    // represented that way in the AST. (Particularly, AbstractStorageDecl
+    // parents for AccessorDecl children.)
+    if (auto ParentTRC = getEffectiveParentContextForDecl(D)) {
+      pushContext(ParentTRC, D);
+    }
 
-    if (DeclTRC) {
+    // Adds in a TRC that covers the entire declaration.
+    if (auto DeclTRC = getNewContextForSignatureOfDecl(D)) {
       pushContext(DeclTRC, D);
+    }
+
+    // Adds in a TRC that covers only the body of the declaration.
+    if (auto BodyTRC = getNewContextForBodyOfDecl(D)) {
+      pushContext(BodyTRC, D);
     }
 
     return true;
   }
 
   bool walkToDeclPost(Decl *D) override {
-    if (ContextStack.back().ScopeNode.getAsDecl() == D) {
+    // As seen above, we could have up to three TRCs in the stack for a single
+    // declaration.
+    while (ContextStack.back().ScopeNode.getAsDecl() == D) {
       ContextStack.pop_back();
     }
     return true;
   }
 
-  /// Returns a new context to be introduced for the declaration, or nullptr
-  /// if no new context should be introduced.
-  TypeRefinementContext *getNewContextForWalkOfDecl(Decl *D) {
+  TypeRefinementContext *getEffectiveParentContextForDecl(Decl *D) {
     if (auto accessor = dyn_cast<AccessorDecl>(D)) {
       // Use TRC of the storage rather the current TRC when walking this
       // function.
+      // FIXME: Can we assert that we won't process storage later that should
+      //        have been returned now?
       auto it = StorageContexts.find(accessor->getStorage());
       if (it != StorageContexts.end()) {
         return it->second;
       }
     }
-    
+    return nullptr;
+  }
+
+  /// If necessary, records a TRC so it can be returned by subsequent calls to
+  /// `getEffectiveParentContextForDecl()`.
+  void recordEffectiveParentContext(Decl *D, TypeRefinementContext *NewTRC) {
+    // Record the TRC for this storage declaration so that
+    // when we process the accessor, we can use this TRC as the
+    // parent in `getEffectiveParentContextForDecl()`.
+    if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
+      if (StorageDecl->hasParsedAccessors()) {
+        // FIXME: Can we assert that we've never queried for this storage?
+        StorageContexts[StorageDecl] = NewTRC;
+      }
+    }
+  }
+
+  /// Returns a new context to be introduced for the declaration, or nullptr
+  /// if no new context should be introduced.
+  TypeRefinementContext *getNewContextForSignatureOfDecl(Decl *D) {
     if (declarationIntroducesNewContext(D)) {
       return buildDeclarationRefinementContext(D);
     }
-    
+
     return nullptr;
   }
 
@@ -399,7 +468,7 @@ private:
     // probably to gin up a source range for the declaration when synthesizing
     // it.
     assert(D->getSourceRange().isValid());
-    
+
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
@@ -408,48 +477,67 @@ private:
     AvailabilityContext DeclInfo = ExplicitDeclInfo;
     DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
 
-    TypeRefinementContext *NewTRC =
-        TypeRefinementContext::createForDecl(Context, D, getCurrentTRC(),
-                                             DeclInfo,
-                                             ExplicitDeclInfo,
-                                             refinementSourceRangeForDecl(D));
-    
-    // Record the TRC for this storage declaration so that
-    // when we process the accessor, we can use this TRC as the
-    // parent.
-    if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      if (StorageDecl->hasParsedAccessors()) {
-        StorageContexts[StorageDecl] = NewTRC;
-      }
-    }
-    
+    // If the entire declaration is surrounded by a resilience boundary, it is
+    // also constrained by the deployment target.
+    if (signatureIsResilienceBoundary(D))
+      DeclInfo.intersectWith(AvailabilityContext::forDeploymentTarget(Context));
+
+    SourceRange Range = refinementSourceRangeForDecl(D);
+    TypeRefinementContext *NewTRC;
+    if (hasActiveAvailableAttribute(D, Context))
+      NewTRC = TypeRefinementContext::createForDecl(Context, D, getCurrentTRC(),
+                                                    DeclInfo, ExplicitDeclInfo,
+                                                    Range);
+    else
+      NewTRC =
+          TypeRefinementContext::createForResilienceBoundary(Context, D,
+                                                             getCurrentTRC(),
+                                                             DeclInfo, Range);
+
+    // Possibly use this as an effective parent context later.
+    recordEffectiveParentContext(D, NewTRC);
+
     return NewTRC;
   }
-  
+
   /// Returns true if the declaration should introduce a new refinement context.
   bool declarationIntroducesNewContext(Decl *D) {
     if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
       return false;
     }
-    
-    // No need to introduce a context if the declaration does not have an
-    // availability attribute.
-    if (!hasActiveAvailableAttribute(D, Context)) {
+
+    // Ignore implicit declarations. This mainly skips over the functions in
+    // `DeferStmt`s.
+    if (D->isImplicit()) {
       return false;
     }
-    
+
+    // No need to introduce a context if the declaration does not have an
+    // availability attribute and the signature is not a resilience boundary.
+    if (!hasActiveAvailableAttribute(D, Context) &&
+        !signatureIsResilienceBoundary(D)) {
+      return false;
+    }
+
     // Only introduce for an AbstractStorageDecl if it is not local.
     // We introduce for the non-local case because these may
     // have getters and setters (and these may be synthesized, so they might
     // not even exist yet).
     if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (storageDecl->getDeclContext()->isLocalContext()) {
-        // No need to
         return false;
       }
     }
-    
+
     return true;
+  }
+
+  /// A declaration's signature is a resilience boundary if the entire
+  /// declaration--not just the body--is not ABI-public and it's in a context
+  /// where ABI-public declarations would be available below the minimum
+  /// deployment target.
+  bool signatureIsResilienceBoundary(Decl *D) {
+    return !isCurrentTRCContainedByDeploymentTarget() && !::isExported(D);
   }
 
   /// Returns the source range which should be refined by declaration. This
@@ -460,6 +548,16 @@ private:
       // Use the declaration's availability for the context when checking
       // the bodies of its accessors.
 
+      Decl *locDecl = D;
+      // For a variable declaration (without accessors) we use the range of the
+      // containing pattern binding declaration to make sure that we include
+      // any type annotation in the type refinement context range.
+      if (auto varDecl = dyn_cast<VarDecl>(storageDecl)) {
+        auto *PBD = varDecl->getParentPatternBinding();
+        if (PBD)
+          locDecl = PBD;
+      }
+
       // HACK: For synthesized trivial accessors we may have not a valid
       // location for the end of the braces, so in that case we will fall back
       // to using the range for the storage declaration. The right fix here is
@@ -468,21 +566,54 @@ private:
       // locations.
       SourceLoc BracesEnd = storageDecl->getBracesRange().End;
       if (storageDecl->hasParsedAccessors() && BracesEnd.isValid()) {
-        return SourceRange(storageDecl->getStartLoc(),
+        return SourceRange(locDecl->getStartLoc(),
                            BracesEnd);
       }
       
-      // For a variable declaration (without accessors) we use the range of the
-      // containing pattern binding declaration to make sure that we include
-      // any type annotation in the type refinement context range.
-      if (auto varDecl = dyn_cast<VarDecl>(storageDecl)) {
-        auto *PBD = varDecl->getParentPatternBinding();
-        if (PBD)
-          return PBD->getSourceRange();
-      }
+      return locDecl->getSourceRange();
     }
     
     return D->getSourceRange();
+  }
+
+  TypeRefinementContext *getNewContextForBodyOfDecl(Decl *D) {
+    if (bodyIntroducesNewContext(D))
+      return buildBodyRefinementContext(D);
+
+    return nullptr;
+  }
+
+  bool bodyIntroducesNewContext(Decl *D) {
+    // Are we already effectively in a resilience boundary? If not, adding one
+    // wouldn't change availability.
+    if (isCurrentTRCContainedByDeploymentTarget())
+      return false;
+
+    // If we're in a function, is its body a resilience boundary?
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(D))
+      return bodyIsResilienceBoundary(afd);
+
+    // The only other case we care about is top-level code.
+    return isa<TopLevelCodeDecl>(D);
+  }
+
+  TypeRefinementContext *buildBodyRefinementContext(Decl *D) {
+    SourceRange range;
+    if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
+      range = tlcd->getSourceRange();
+    } else if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
+      range = afd->getBodySourceRange();
+    } else {
+      llvm_unreachable("unknown decl");
+    }
+
+    AvailabilityContext DeploymentTargetInfo =
+        AvailabilityContext::forDeploymentTarget(Context);
+    DeploymentTargetInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
+
+    return TypeRefinementContext::createForResilienceBoundary(
+                                           Context, D, getCurrentTRC(),
+                                           DeploymentTargetInfo, range);
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -902,8 +1033,8 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
   if (!RootTRC) {
     // The root type refinement context reflects the fact that all parts of
     // the source file are guaranteed to be executing on at least the minimum
-    // platform version.
-    auto MinPlatformReq = AvailabilityContext::forDeploymentTarget(Context);
+    // platform version for inlining.
+    auto MinPlatformReq = AvailabilityContext::forInliningTarget(Context);
     RootTRC = TypeRefinementContext::createRoot(&SF, MinPlatformReq);
     SF.setTypeRefinementContext(RootTRC);
   }
@@ -931,7 +1062,8 @@ void TypeChecker::buildTypeRefinementContextHierarchyDelayed(SourceFile &SF, Abs
 
   // Build the refinement context for the function body.
   ASTContext &Context = SF.getASTContext();
-  TypeRefinementContextBuilder Builder(RootTRC, Context);
+  auto LocalTRC = RootTRC->findMostRefinedSubContext(AFD->getLoc(), Context.SourceMgr);
+  TypeRefinementContextBuilder Builder(LocalTRC, Context);
   Builder.build(AFD);
 }
 
@@ -967,9 +1099,8 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // refined. For now, this is fine -- but if we ever synthesize #available(),
   // this will be a real problem.
 
-  // We can assume we are running on at least the minimum deployment target.
-  auto OverApproximateContext =
-    AvailabilityContext::forDeploymentTarget(Context);
+  // We can assume we are running on at least the minimum inlining target.
+  auto OverApproximateContext = AvailabilityContext::forInliningTarget(Context);
   auto isInvalidLoc = [SF](SourceLoc loc) {
     return SF ? loc.isInvalid() : true;
   };
@@ -1529,14 +1660,16 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     ASTContext &Context,
     InFlightDiagnostic &Err) {
   const TypeRefinementContext *TRC = nullptr;
-  AvailabilityContext RunningOSOverApprox =
-    TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
-                                                       ReferenceDC, &TRC);
-  VersionRange RunningRange = RunningOSOverApprox.getOSVersion();
+  (void)TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
+                                                           ReferenceDC, &TRC);
+  if (!TRC)
+    return false;
+  VersionRange RunningRange = TRC->getExplicitAvailabilityInfo().getOSVersion();
   if (RunningRange.hasLowerEndpoint() &&
       RequiredRange.hasLowerEndpoint() &&
-      AvailabilityContext(RequiredRange).isContainedIn(RunningOSOverApprox) &&
-      TRC && TRC->getReason() != TypeRefinementContext::Reason::Root) {
+      TRC->getReason() != TypeRefinementContext::Reason::Root &&
+      AvailabilityContext(RequiredRange).isContainedIn(
+                                 AvailabilityContext(RunningRange))) {
 
     // Only fix situations that are "nearby" versions, meaning
     // disagreement on a minor-or-less version for non-macOS,
@@ -1709,6 +1842,9 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
   ASTContext &ctx = ReferenceDC->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return;
+
+  if (!shouldCheckAvailability(ReferenceDC->getAsDecl()))
+    return;
   
   auto runningOS =
     TypeChecker::overApproximateAvailabilityAtLocation(
@@ -1779,6 +1915,25 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
+static DiagnosticBehavior
+behaviorLimitForExplicitUnavailability(
+    const RootProtocolConformance *rootConf,
+    const DeclContext *fromDC) {
+  auto protoDecl = rootConf->getProtocol();
+
+  // Soften errors about unavailable `Sendable` conformances depending on the
+  // concurrency checking mode.
+  if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    SendableCheckContext checkContext(fromDC);
+    if (auto nominal = rootConf->getType()->getAnyNominal())
+      return checkContext.diagnosticBehavior(nominal);
+
+    return checkContext.defaultDiagnosticBehavior();
+  }
+
+  return DiagnosticBehavior::Unspecified;
+}
+
 void TypeChecker::diagnosePotentialUnavailability(
     const RootProtocolConformance *rootConf,
     const ExtensionDecl *ext,
@@ -1795,11 +1950,13 @@ void TypeChecker::diagnosePotentialUnavailability(
     auto diagID = (ctx.LangOpts.EnableConformanceAvailabilityErrors
                    ? diag::conformance_availability_only_version_newer
                    : diag::conformance_availability_only_version_newer_warn);
+    auto behavior = behaviorLimitForExplicitUnavailability(rootConf, dc);
     auto err =
       ctx.Diags.diagnose(
                loc, diagID,
                type, proto, prettyPlatformString(targetPlatform(ctx.LangOpts)),
                reason.getRequiredOSVersionRange().getLowerEndpoint());
+    err.limitBehavior(behavior);
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(loc, dc,
@@ -2422,31 +2579,6 @@ bool swift::diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
   });
 }
 
-static DiagnosticBehavior
-behaviorLimitForExplicitUnavailability(const RootProtocolConformance *rootConf) {
-  auto protoDecl = rootConf->getProtocol();
-
-  // Soften errors about unavailable `Sendable` conformances depending on the
-  // concurrency checking mode
-  if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable) ||
-      protoDecl->isSpecificProtocol(KnownProtocolKind::UnsafeSendable)) {
-    // TODO: Base this on concurrency checking mode from ExportContext so it
-    //       detects when you're in concurrency code without -warn-concurrency.
-    auto &langOpts = protoDecl->getASTContext().LangOpts;
-    if (langOpts.isSwiftVersionAtLeast(6))
-      /* fall through */;
-    else if (!langOpts.WarnConcurrency)
-      // TODO: Needs more conditions--should only do this if we aren't in a
-      //       concurrent context, and either the import or the declaration is
-      //       @predatesConcurrency.
-      return DiagnosticBehavior::Ignore;
-    else
-      return DiagnosticBehavior::Warning;
-  }
-
-  return DiagnosticBehavior::Unspecified;
-}
-
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
@@ -2482,11 +2614,12 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
       // This was platform-specific; indicate the platform.
       platform = attr->prettyPlatformString();
       break;
-    } else {
-      // Downgrade unavailable Sendable conformances to warnings prior to
-      // Swift 6.
-      behavior = behaviorLimitForExplicitUnavailability(rootConf);
     }
+
+    // Downgrade unavailable Sendable conformance diagnostics where
+    // appropriate.
+    behavior = behaviorLimitForExplicitUnavailability(
+        rootConf, where.getDeclContext());
     LLVM_FALLTHROUGH;
 
   case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
@@ -2847,6 +2980,19 @@ public:
                                E->getLoc(), Where);
     }
 
+    if (AbstractClosureExpr *closure = dyn_cast<AbstractClosureExpr>(E)) {
+      if (shouldWalkIntoClosure(closure)) {
+        walkAbstractClosure(closure);
+        return skipChildren();
+      }
+    }
+    
+    if (auto EE = dyn_cast<ErasureExpr>(E)) {
+      for (ProtocolConformanceRef C : EE->getConformances()) {
+        diagnoseConformanceAvailability(E->getLoc(), C, Where);
+      }
+    }
+
     return visitChildren();
   }
 
@@ -2858,13 +3004,13 @@ public:
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+
     // We end up here when checking the output of the result builder transform,
     // which includes closures that are not "separately typechecked" and yet
     // contain statements and declarations. We need to walk them recursively,
     // since these availability for these statements is not diagnosed from
     // typeCheckStmt() as usual.
-    diagnoseStmtAvailability(S, Where.getDeclContext(),
-                             /*walkRecursively=*/true);
+    diagnoseStmtAvailability(S, Where.getDeclContext(), /*walkRecursively=*/true);
     return std::make_pair(false, S);
   }
 
@@ -2933,15 +3079,15 @@ private:
     // writeback. The AST should have this information.
     walkInContext(E, E->getBase(), MemberAccessContext::Getter);
 
-    ValueDecl *D = E->getMember().getDecl();
+    ConcreteDeclRef DR = E->getMember();
     // Diagnose for the member declaration itself.
-    if (diagnoseDeclAvailability(D, E->getNameLoc().getSourceRange(),
-                                 nullptr, Where))
+    if (diagnoseDeclRefAvailability(DR, E->getNameLoc().getSourceRange(),
+                                    getEnclosingApplyExpr(), None))
       return;
 
     // Diagnose for appropriate accessors, given the access context.
     auto *DC = Where.getDeclContext();
-    maybeDiagStorageAccess(D, E->getSourceRange(), DC);
+    maybeDiagStorageAccess(DR.getDecl(), E->getSourceRange(), DC);
   }
 
   /// Walk a keypath expression, checking all of its components for
@@ -2982,6 +3128,39 @@ private:
   void walkInOutExpr(InOutExpr *E) {
     walkInContext(E, E->getSubExpr(), MemberAccessContext::InOut);
   }
+
+  bool shouldWalkIntoClosure(AbstractClosureExpr *closure) const {
+    // Multi-statement closures are collected by ExprWalker::rewriteFunction
+    // and checked by ExprWalker::processDelayed in CSApply.cpp.
+    // Single-statement closures only have the attributes checked
+    // by TypeChecker::checkClosureAttributes in that rewriteFunction.
+    // Multi-statement closures will be checked explicitly later (as the decl
+    // context in the Where). Single-expression closures will not be
+    // revisited, and are not automatically set as the context of the 'where'.
+    // Don't double-check multi-statement closures, but do check
+    // single-statement closures, setting the closure as the decl context.
+    //
+    // Note about SE-0326: When a flag is enabled multi-statement closures
+    // are type-checked together with enclosing context, so walker behavior
+    // should match that of single-expression closures.
+    return closure->hasSingleExpressionBody() ||
+           Context.TypeCheckerOpts.EnableMultiStatementClosureInference;
+  }
+
+  /// Walk an abstract closure expression, checking for availability
+  void walkAbstractClosure(AbstractClosureExpr *closure) {
+    // Do the walk with the closure set as the decl context of the 'where'
+    auto where = ExportContext::forFunctionBody(closure, closure->getStartLoc());
+    if (where.isImplicit())
+      return;
+    ExprAvailabilityWalker walker(where);
+
+    // Manually dive into the body
+    closure->getBody()->walk(walker);
+
+    return;
+  }
+
 
   /// Walk the given expression in the member access context.
   void walkInContext(Expr *baseExpr, Expr *E,
@@ -3043,8 +3222,8 @@ private:
 
     Flags &= DeclAvailabilityFlag::ForInout;
     Flags |= DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
-    if (diagnoseDeclAvailability(D, ReferenceRange, /*call*/nullptr,
-                                 Where, Flags))
+    if (diagnoseDeclAvailability(D, ReferenceRange, /*call*/ nullptr, Where,
+                                 Flags))
       return;
   }
 };
@@ -3067,7 +3246,8 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
       return true;
   }
 
-  diagnoseDeclAvailability(D, R, call, Where, Flags);
+  if (diagnoseDeclAvailability(D, R, call, Where, Flags))
+      return true;
 
   if (R.isValid()) {
     if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
@@ -3077,6 +3257,58 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   }
 
   return false;
+}
+
+/// Diagnose uses of API annotated '@unavailableFromAsync' when used from
+/// asynchronous contexts.
+/// Returns true if a diagnostic was emitted, false otherwise.
+static bool
+diagnoseDeclUnavailableFromAsync(const ValueDecl *D, SourceRange R,
+                                 const Expr *call, const ExportContext &Where) {
+  // FIXME: I don't think this is right, but I don't understand the issue well
+  //        enough to fix it properly. If the decl context is an abstract
+  //        closure, we need it to have a type assigned to it before we can
+  //        determine whether it is an asynchronous context. It will crash
+  //        when we go to check without one. In TypeChecker::typeCheckExpression
+  //        (TypeCheckConstraints.cpp:403), we apply a solution before calling
+  //        `performSyntacticDiagnosticsForTarget`, which eventually calls
+  //        down to this function. Under most circumstances, the context that
+  //        we're in is typechecked at that point and has a type assigned.
+  //        When working with specific result builders, the solution applied
+  //        results in an expression with an unset type. In these cases, the
+  //        application makes its way into `ConstraintSystem::applySolution` for
+  //        closures (CSClosure.cpp:1356). The type is computed, but is
+  //        squirreled away in the constrain system to be applied once the
+  //        checks (including this one) approve of the decls within the decl
+  //        context before applying the type to the expression. It might be
+  //        possible to drive the constraint solver through the availability
+  //        checker and into us so that we can ask for it, but that feels wrong
+  //        too.
+  //        This behavior is demonstrated by the first use of the `tuplify`
+  //        function in `testExistingPatternsInCaseStatements` in
+  //        `test/Constraints/result_builder.swift`.
+  const AbstractClosureExpr *declCtxAsExpr =
+      dyn_cast<AbstractClosureExpr>(Where.getDeclContext());
+  if (declCtxAsExpr && !declCtxAsExpr->getType()) {
+    return false;
+  }
+
+  // If we are in a synchronous context, don't check it
+  if (!Where.getDeclContext()->isAsyncContext())
+    return false;
+  if (!D->getAttrs().hasAttribute<UnavailableFromAsyncAttr>())
+    return false;
+
+  ASTContext &ctx = Where.getDeclContext()->getASTContext();
+  const UnavailableFromAsyncAttr *attr =
+      D->getAttrs().getAttribute<UnavailableFromAsyncAttr>();
+  SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+  ctx.Diags
+      .diagnose(diagLoc, diag::async_unavailable_decl, D->getDescriptiveKind(),
+                D->getBaseName(), attr->hasMessage(), attr->Message)
+      .warnUntilSwiftVersion(6);
+  D->diagnose(diag::decl_declared_here, D->getName());
+  return true;
 }
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
@@ -3110,6 +3342,9 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   }
 
   if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
+    return true;
+
+  if (diagnoseDeclUnavailableFromAsync(D, R, call, Where))
     return true;
 
   // Make sure not to diagnose an accessor's deprecation if we already
@@ -3525,9 +3760,9 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 }
 
 static void diagnoseMissingConformance(
-    SourceLoc loc, Type type, ProtocolDecl *proto, ModuleDecl *module) {
+    SourceLoc loc, Type type, ProtocolDecl *proto, const DeclContext *fromDC) {
   assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
-  diagnoseMissingSendableConformance(loc, type, module);
+  diagnoseMissingSendableConformance(loc, type, fromDC);
 }
 
 bool
@@ -3545,15 +3780,13 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
   // Diagnose "missing" conformances where we needed a conformance but
   // didn't have one.
+  auto *DC = where.getDeclContext();
   if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
     if (builtinConformance->isMissing()) {
       diagnoseMissingConformance(loc, builtinConformance->getType(),
-                                 builtinConformance->getProtocol(),
-                                 where.getDeclContext()->getParentModule());
+                                 builtinConformance->getProtocol(), DC);
     }
   }
-
-  auto *DC = where.getDeclContext();
 
   auto maybeEmitAssociatedTypeNote = [&]() {
     if (!depTy && !replacementTy)

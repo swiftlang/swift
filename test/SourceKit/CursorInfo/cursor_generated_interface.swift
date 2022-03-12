@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/frameworks/LibA.framework/Modules/LibA.swiftmodule %t/mods %t/mods
-// RUN: split-file %s %t
+// RUN: split-file --leading-lines %s %t
 
 // RUN: %target-swift-frontend -module-name LibB -emit-module -emit-module-path %t/mods/LibB.swiftmodule -emit-module-source-info-path %t/mods/LibB.swiftsourceinfo %t/libB.swift
 // RUN: %target-swift-frontend -module-name LibC -emit-module -emit-module-path %t/mods/LibC.swiftmodule %t/libC.swift

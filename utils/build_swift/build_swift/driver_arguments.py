@@ -515,6 +515,14 @@ def create_argument_parser():
            help='the maximum number of parallel link jobs to use when '
                 'compiling swift tools.')
 
+    option('--swift-tools-ld64-lto-codegen-only-for-supporting-targets',
+           toggle_true,
+           default=False,
+           help='When building ThinLTO using ld64 on Darwin, controls whether '
+                'to opt out of LLVM IR optimizations when linking targets that '
+                'will get little benefit from it (e.g. tools for '
+                'bootstrapping or debugging Swift)')
+
     option('--dsymutil-jobs', store_int,
            default=defaults.DSYMUTIL_JOBS,
            metavar='COUNT',
@@ -544,9 +552,12 @@ def create_argument_parser():
            default=defaults.llvm_install_components(),
            help='A semi-colon split list of llvm components to install')
 
-    option('--libswift', store('libswift_mode'),
+    option('--bootstrapping', store('bootstrapping_mode'),
            choices=['off', 'hosttools', 'bootstrapping', 'bootstrapping-with-hostlibs'],
-           help='The libswift build mode. For details see libswift/README.md')
+           help='The bootstrapping build mode for swift compiler modules. '
+                'Available modes: `off`, `hosttools`, `bootstrapping`, '
+                '`bootstrapping-with-hostlibs`, `crosscompile`, and '
+                '`crosscompile-with-hostlibs`')
 
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
@@ -562,6 +573,17 @@ def create_argument_parser():
            default=[],
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
+
+    option('--cross-compile-deps-path', store_path,
+           help='The path to a directory that contains prebuilt cross-compiled '
+                'library dependencies of the corelibs and other Swift repos, '
+                'such as the libcurl dependency of FoundationNetworking')
+
+    option('--cross-compile-append-host-target-to-destdir', toggle_true,
+           default=True,
+           help="Append each cross-compilation host target's name as a subdirectory "
+                "for each cross-compiled toolchain's destdir, useful when building "
+                "multiple toolchains and can be disabled if only cross-compiling one.")
 
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
@@ -588,6 +610,9 @@ def create_argument_parser():
            help='Semicolon-separated list of architectures to configure Swift '
                 'module-only targets on Darwin platforms. These targets are '
                 'in addition to the full library targets.')
+
+    option('--swift-freestanding-is-darwin', toggle_true,
+           help='True if the freestanding platform is a Darwin one.')
 
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
@@ -975,6 +1000,14 @@ def create_argument_parser():
     option('--build-swift-stdlib-unittest-extra', toggle_true,
            help='Build optional StdlibUnittest components')
 
+    option('--build-swift-stdlib-static-print', toggle_true,
+           help='Build constant-folding print() support')
+
+    option('--build-swift-stdlib-unicode-data', toggle_true,
+           default=True,
+           help='Include Unicode data in the standard library.'
+                'Note: required for full String functionality')
+
     option(['-S', '--skip-build'], store_true,
            help='generate build directory only without building')
 
@@ -1023,6 +1056,12 @@ def create_argument_parser():
 
     option('--build-external-benchmarks', toggle_true,
            help='skip building Swift Benchmark Suite')
+
+    option('--build-swift-private-stdlib', toggle_true,
+           default=True,
+           help='build the private part of the Standard Library. '
+                'This can be useful to reduce build times when e.g. '
+                'tests do not need to run')
 
     # -------------------------------------------------------------------------
     in_group('Skip testing specified targets')
@@ -1159,16 +1198,6 @@ def create_argument_parser():
            help='The Android API level to target when building for Android. '
                 'Currently only 21 or above is supported')
 
-    option('--android-icu-uc', store_path,
-           help='Path to libicuuc.so')
-    option('--android-icu-uc-include', store_path,
-           help='Path to a directory containing headers for libicuuc')
-    option('--android-icu-i18n', store_path,
-           help='Path to libicui18n.so')
-    option('--android-icu-i18n-include', store_path,
-           help='Path to a directory containing headers libicui18n')
-    option('--android-icu-data', store_path,
-           help='Path to libicudata.so')
     option('--android-deploy-device-path', store_path,
            default=android.adb.commands.DEVICE_TEMP_DIR,
            help='Path on an Android device to which built Swift stdlib '

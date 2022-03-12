@@ -36,4 +36,4 @@ void _swift_async_stream_lock_unlock(MutexHandle &lock) {
   MutexPlatformHelper::unlock(lock);
 }
 
-};
+}

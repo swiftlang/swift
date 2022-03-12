@@ -1287,7 +1287,7 @@ bb5:
   br bb6
 
 bb6:
-  dealloc_ref [stack] %a : $Base
+  dealloc_stack_ref %a : $Base
   %r = tuple()
   return %r : $()
 }

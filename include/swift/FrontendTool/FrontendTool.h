@@ -78,6 +78,8 @@ int performFrontend(ArrayRef<const char *> args,
                     void *mainAddr,
                     FrontendObserver *observer = nullptr);
 
+bool performCompileStepsPostSema(CompilerInstance &Instance, int &ReturnValue,
+                                 FrontendObserver *observer);
 
 } // namespace swift
 

@@ -242,8 +242,8 @@ func testSetDowncastBridgedConditional(_ dict: Set<NSObject>)
 
 func promote<T>(_ x: T) -> T? { nil }
 
-// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast36testCollectionCompatibilityCoercionsyySaySiG_SayypGSgShySSGSDySSSiGtF
-func testCollectionCompatibilityCoercions(_ arr: [Int], _ optArr: [Any]?, _ set: Set<String>, _ dict: [String: Int]) {
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast36testCollectionCompatibilityCoercionsyySaySiG_SayypGSgShySSGSDySSSiGSitF
+func testCollectionCompatibilityCoercions(_ arr: [Int], _ optArr: [Any]?, _ set: Set<String>, _ dict: [String: Int], _ i: Int) {
   // Make sure we generate reasonable code for all of the below examples.
 
   // CHECK: [[CAST_FN:%.+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
@@ -297,4 +297,15 @@ func testCollectionCompatibilityCoercions(_ arr: [Int], _ optArr: [Any]?, _ set:
   // CHECK: [[CAST_FN:%.+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   // CHECK: apply [[CAST_FN]]<String, Int, Int, String>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   _ = promote(promote(promote(dict))) as [Int: String]
+
+  typealias Magic<T> = T
+
+  // These are currently not peepholed.
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: apply [[CAST_FN]]<Int, String>
+  [i].self as Magic as [String]
+
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: apply [[CAST_FN]]<Int, String>
+  (try [i]) as Magic as [String]
 }

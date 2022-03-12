@@ -1,4 +1,5 @@
 // -*- swift -*-
+
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 

@@ -33,6 +33,7 @@ namespace swift {
     const char *DocOutputPath = nullptr;
     const char *SourceInfoOutputPath = nullptr;
     std::string ABIDescriptorPath;
+    bool emptyABIDescriptor = false;
     llvm::VersionTuple UserModuleVersion;
     std::string SDKName;
 
@@ -44,6 +45,10 @@ namespace swift {
 
     /// Path prefixes that should be rewritten in debug info.
     PathRemapper DebuggingOptionsPrefixMap;
+
+    /// Obfuscate the serialized paths so we don't have the actual paths encoded
+    /// in the .swiftmodule file.
+    PathObfuscator PathObfuscator;
 
     /// Describes a single-file dependency for this module, along with the
     /// appropriate strategy for how to verify if it's up-to-date.
@@ -142,6 +147,7 @@ namespace swift {
     bool IsSIB = false;
     bool DisableCrossModuleIncrementalInfo = false;
     bool StaticLibrary = false;
+    bool HermeticSealAtLink = false;
     bool IsOSSA = false;
   };
 

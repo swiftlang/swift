@@ -714,6 +714,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     break;
     
   case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block:
     return nullptr;
@@ -726,7 +727,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
 
   // If CalleeFunction is a declaration, see if we can load it.
   if (CalleeFunction->empty())
-    AI.getModule().loadFunction(CalleeFunction);
+    AI.getModule().loadFunction(CalleeFunction, SILModule::LinkingMode::LinkNormal);
 
   // If we fail to load it, bail.
   if (CalleeFunction->empty())

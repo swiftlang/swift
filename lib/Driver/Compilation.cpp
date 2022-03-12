@@ -150,7 +150,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     EmitFineGrainedDependencyDotFileAfterEveryImport(
       EmitFineGrainedDependencyDotFileAfterEveryImport),
     EnableCrossModuleIncrementalBuild(EnableCrossModuleIncrementalBuild)
-    { };
+    { }
 // clang-format on
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,

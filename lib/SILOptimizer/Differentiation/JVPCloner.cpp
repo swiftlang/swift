@@ -1704,7 +1704,8 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       linkage, context.getASTContext().getIdentifier(diffName).str(), diffType,
       diffGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, jvp->isSerialized(),
-      original->isDynamicallyReplaceable());
+      original->isDynamicallyReplaceable(),
+      original->isDistributed());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));
 

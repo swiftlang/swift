@@ -18,14 +18,14 @@ public struct G<A: P1>: P2 {}
 public func callee<T: P1>(_: T.Type) {}
 
 // CHECK: rdar83687967.(file).caller11@
-// CHECK: Generic signature: <Child where Child : P3, Child.B == G<Child.A>>
+// CHECK: Generic signature: <Child where Child : P3, Child.[P3]B == G<Child.[P3]A>>
 public func caller11<Child: P3>(_: Child)
     where Child.B == G<Child.A> {
   callee(Child.A.self)
 }
 
 // CHECK: rdar83687967.(file).caller12@
-// CHECK: Generic signature: <Child where Child : P3, Child.B == G<Child.A>>
+// CHECK: Generic signature: <Child where Child : P3, Child.[P3]B == G<Child.[P3]A>>
 public func caller12<Child: P3>(_: Child)
     // expected-note@-1 {{conformance constraint 'Child.A' : 'P1' implied here}}
     where Child.B == G<Child.A>, Child.A : P1 {
@@ -37,14 +37,14 @@ public func caller12<Child: P3>(_: Child)
 }
 
 // CHECK: rdar83687967.(file).X1@
-// CHECK: Requirement signature: <Self where Self.Child : P3, Self.Child.B == G<Self.Child.A>>
+// CHECK: Requirement signature: <Self where Self.[X1]Child : P3, Self.[X1]Child.[P3]B == G<Self.[X1]Child.[P3]A>>
 public protocol X1 {
   associatedtype Child: P3
     where Child.B == G<Child.A>
 }
 
 // CHECK: rdar83687967.(file).X2@
-// CHECK: Requirement signature: <Self where Self.Child : P3, Self.Child.B == G<Self.Child.A>>
+// CHECK: Requirement signature: <Self where Self.[X2]Child : P3, Self.[X2]Child.[P3]B == G<Self.[X2]Child.[P3]A>>
 
 public protocol X2 {
   associatedtype Child: P3

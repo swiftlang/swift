@@ -325,7 +325,62 @@ struct DebugVarCarryingInst {
       llvm_unreachable("Not implemented");
     }
   }
+
+  void markAsMoved() {
+    switch (kind) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      cast<DebugValueInst>(inst)->markAsMoved();
+      break;
+    case Kind::AllocStack:
+      cast<AllocStackInst>(inst)->markAsMoved();
+      break;
+    case Kind::AllocBox:
+      llvm_unreachable("Not implemented");
+    }
+  }
+
+  /// If \p value is an alloc_stack, alloc_box use that. Otherwise, see if \p
+  /// value has a single debug user, return that. Otherwise return the invalid
+  /// DebugVarCarryingInst.
+  static DebugVarCarryingInst getFromValue(SILValue value);
+
+  /// Take in \p inst, a potentially invalid DebugVarCarryingInst, and returns a
+  /// name for it. If we have an invalid value or don't find var info or a decl,
+  /// return "unknown".
+  ///
+  /// The reason this isn't a method is that in all the other parts of
+  /// DebugVarCarryingInst, we use Invalid to signal early error.
+  static StringRef getName(DebugVarCarryingInst inst) {
+    if (!inst)
+      return "unknown";
+    StringRef varName = "unknown";
+    if (auto varInfo = inst.getVarInfo()) {
+      varName = varInfo->Name;
+    } else if (auto *decl = inst.getDecl()) {
+      varName = decl->getBaseName().userFacingName();
+    }
+    return varName;
+  }
 };
+
+inline DebugVarCarryingInst DebugVarCarryingInst::getFromValue(SILValue value) {
+  if (isa<AllocStackInst>(value) || isa<AllocBoxInst>(value))
+    return DebugVarCarryingInst(cast<SingleValueInstruction>(value));
+
+  if (auto *use = getSingleDebugUse(value))
+    return DebugVarCarryingInst(use->getUser());
+
+  return DebugVarCarryingInst();
+}
+
+/// Attempt to discover a StringRef varName for the value \p value. If we fail,
+/// we return the name "unknown".
+inline StringRef getDebugVarName(SILValue value) {
+  auto inst = DebugVarCarryingInst::getFromValue(value);
+  return DebugVarCarryingInst::getName(inst);
+}
 
 } // end namespace swift
 

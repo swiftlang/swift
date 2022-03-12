@@ -102,7 +102,8 @@ struct TestStructInit {
   // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfC : $@convention(method) (Wrapper<Int>, @owned String, @thin TestStructInit.Type) -> TestStructInit
   init(@Wrapper number: Int, @ImplementationDetail message: String) {
     // CHECK: debug_value %0 : $Wrapper<Int>, let, name "_number"
-    // CHECK: debug_value %1 : $String, let, name "message"
+    // CHECK: [[STR:%.*]] = begin_borrow [lexical] %1
+    // CHECK: debug_value [[STR]] : $String, let, name "message"
     // CHECK: alloc_stack $ImplementationDetail<String>
     // CHECK" function_ref @$s26property_wrapper_parameter20ImplementationDetailV12wrappedValueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin ImplementationDetail<τ_0_0>.Type) -> @out ImplementationDetail<τ_0_0>
 
@@ -134,7 +135,8 @@ class TestClassInit {
   // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfc : $@convention(method) (Wrapper<Int>, @owned String, @owned TestClassInit) -> @owned TestClassInit
   init(@Wrapper number: Int, @ImplementationDetail message: String) {
     // CHECK: debug_value %0 : $Wrapper<Int>, let, name "_number"
-    // CHECK: debug_value %1 : $String, let, name "message"
+    // CHECK: [[STR:%.*]] = begin_borrow [lexical] %1
+    // CHECK: debug_value [[STR]] : $String, let, name "message"
     // CHECK: alloc_stack $ImplementationDetail<String>
 
     _ = number

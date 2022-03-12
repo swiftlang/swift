@@ -209,13 +209,20 @@ public:
 /// [lattice]: http://mathworld.wolfram.com/Lattice.html
 class AvailabilityContext {
   VersionRange OSVersion;
+  llvm::Optional<bool> SPI;
 public:
   /// Creates a context that requires certain versions of the target OS.
-  explicit AvailabilityContext(VersionRange OSVersion) : OSVersion(OSVersion) {}
+  explicit AvailabilityContext(VersionRange OSVersion,
+                               llvm::Optional<bool> SPI = llvm::None)
+    : OSVersion(OSVersion), SPI(SPI) {}
 
   /// Creates a context that imposes the constraints of the ASTContext's
   /// deployment target.
   static AvailabilityContext forDeploymentTarget(ASTContext &Ctx);
+
+  /// Creates a context that imposes the constraints of the ASTContext's
+  /// inlining target (i.e. minimum inlining version).
+  static AvailabilityContext forInliningTarget(ASTContext &Ctx);
 
   /// Creates a context that imposes no constraints.
   ///
@@ -290,6 +297,10 @@ public:
   /// multiple `#available` checks.
   void unionWith(AvailabilityContext other) {
     OSVersion.unionWith(other.getOSVersion());
+  }
+
+  bool isAvailableAsSPI() const {
+    return SPI && *SPI;
   }
 };
 

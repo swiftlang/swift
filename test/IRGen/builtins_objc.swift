@@ -7,8 +7,8 @@ import Swift
 import Foundation
 import CoreGraphics
 
-// CHECK: [[INT32:@[0-9]+]] = {{.*}} c"i\00"
-// CHECK: [[OBJECT:@[0-9]+]] = {{.*}} c"@\00"
+// CHECK: [[INT32:@.str.[0-9]+]] = {{.*}} c"i\00"
+// CHECK: [[OBJECT:@.str.[0-9]+]] = {{.*}} c"@\00"
 
 @objc enum ObjCEnum: Int32 { case X }
 @objc class ObjCClass: NSObject {}
@@ -22,9 +22,9 @@ func getObjCTypeEncoding<T>(_: T) {
   use(Builtin.getObjCTypeEncoding(Int32.self))
   // CHECK: call swiftcc void @use({{.* i8]\*}} [[INT32]]
   use(Builtin.getObjCTypeEncoding(ObjCEnum.self))
-  // CHECK: call swiftcc void @use({{.* i8]\*}} [[CGRECT:@[0-9]+]],
+  // CHECK: call swiftcc void @use({{.* i8]\*}} [[CGRECT:@.str.[0-9]+]],
   use(Builtin.getObjCTypeEncoding(CGRect.self))
-  // CHECK: call swiftcc void @use({{.* i8]\*}} [[NSRANGE:@[0-9]+]],
+  // CHECK: call swiftcc void @use({{.* i8]\*}} [[NSRANGE:@.str.[0-9]+]],
   use(Builtin.getObjCTypeEncoding(NSRange.self))
   // CHECK: call swiftcc void @use({{.* i8]\*}} [[OBJECT]]
   use(Builtin.getObjCTypeEncoding(AnyObject.self))

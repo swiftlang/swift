@@ -13,6 +13,9 @@
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import StdlibUnittest
 
 // We build this code against a version of 'resil' where
@@ -37,7 +40,7 @@ enum test0_Node {
 
 DynamicMetadataCycleTests.test("cycle through enum")
   .crashOutputMatches("runtime error: unresolvable type metadata dependency cycle detected")
-  .crashOutputMatches("  main.test0_Node")
+  .crashOutputMatches("  Request for transitive completion of main.test0_Node")
   .crashOutputMatches("  depends on layout of resil.ResilientGenericStruct<main.test0_Node")
   .crashOutputMatches("  depends on layout of main.test0_Node")
   .code {

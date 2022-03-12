@@ -98,6 +98,16 @@ ValueBase::getDefiningInstructionResult() {
   return None;
 }
 
+bool ValueBase::isLexical() const {
+  if (auto *argument = dyn_cast<SILFunctionArgument>(this))
+    return argument->getOwnershipKind() == OwnershipKind::Owned;
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(this))
+    return bbi->isLexical();
+  if (auto *mvi = dyn_cast<MoveValueInst>(this))
+    return mvi->isLexical();
+  return false;
+}
+
 SILBasicBlock *SILNode::getParentBlock() const {
   if (auto *Inst = dyn_cast<SILInstruction>(this))
     return Inst->getParent();
@@ -308,8 +318,9 @@ SILFunction *Operand::getParentFunction() const {
   return self->getUser()->getFunction();
 }
 
-bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
-  auto operandOwnership = getOperandOwnership();
+bool Operand::canAcceptKind(ValueOwnershipKind kind,
+                            SILModuleConventions *silConv) const {
+  auto operandOwnership = getOperandOwnership(silConv);
   auto constraint = operandOwnership.getOwnershipConstraint();
   if (constraint.satisfiesConstraint(kind)) {
     // Constraints aren't precise enough to enforce Unowned value uses.
@@ -322,8 +333,8 @@ bool Operand::canAcceptKind(ValueOwnershipKind kind) const {
   return false;
 }
 
-bool Operand::satisfiesConstraints() const {
-  return canAcceptKind(get().getOwnershipKind());
+bool Operand::satisfiesConstraints(SILModuleConventions *silConv) const {
+  return canAcceptKind(get().getOwnershipKind(), silConv);
 }
 
 bool Operand::isLifetimeEnding() const {

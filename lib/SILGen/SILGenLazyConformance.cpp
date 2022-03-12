@@ -195,6 +195,11 @@ public:
     SGM.useConformancesFromType(CAI->getDest()->getType().getASTType());
   }
 
+  void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *MAI) {
+    SGM.useConformancesFromType(MAI->getSrc()->getType().getASTType());
+    SGM.useConformancesFromType(MAI->getDest()->getType().getASTType());
+  }
+
   void visitCopyValueInst(CopyValueInst *CVI) {
     SGM.useConformancesFromType(CVI->getOperand()->getType().getASTType());
   }
@@ -346,7 +351,7 @@ void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
       useConformancesFromType(superclass->getCanonicalType(genericSig));
 
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-    for (auto reqt : PD->getRequirementSignature()) {
+    for (auto reqt : PD->getRequirementSignature().getRequirements()) {
       if (reqt.getKind() != RequirementKind::Layout)
         useConformancesFromType(reqt.getSecondType()->getCanonicalType());
     }

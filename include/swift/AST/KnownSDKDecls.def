@@ -19,7 +19,6 @@
 #  define KNOWN_SDK_FUNC_DECL(Module, Name, Id)
 #endif
 
-KNOWN_SDK_FUNC_DECL(Distributed, MissingDistributedActorTransport, "_missingDistributedActorTransport")
 KNOWN_SDK_FUNC_DECL(Distributed, IsRemoteDistributedActor, "__isRemoteActor")
 
 #undef KNOWN_SDK_FUNC_DECL

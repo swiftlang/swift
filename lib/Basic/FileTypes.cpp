@@ -74,6 +74,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_RawSIL:
   case file_types::TY_LLVM_IR:
   case file_types::TY_ObjCHeader:
+  case file_types::TY_CXXHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_ImportedModules:
   case file_types::TY_TBD:
@@ -84,6 +85,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_JSONDependencies:
   case file_types::TY_JSONFeatures:
+  case file_types::TY_SwiftABIDescriptor:
     return true;
   case file_types::TY_Image:
   case file_types::TY_Object:
@@ -131,6 +133,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_ASTDump:
   case file_types::TY_RawSIL:
   case file_types::TY_ObjCHeader:
+  case file_types::TY_CXXHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_Image:
   case file_types::TY_dSYM:
@@ -157,6 +160,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_JSONDependencies:
   case file_types::TY_JSONFeatures:
   case file_types::TY_IndexUnitOutputPath:
+  case file_types::TY_SwiftABIDescriptor:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -180,6 +184,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_Object:
   case file_types::TY_Dependencies:
   case file_types::TY_ObjCHeader:
+  case file_types::TY_CXXHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_PCH:
   case file_types::TY_ImportedModules:
@@ -208,6 +213,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_JSONDependencies:
   case file_types::TY_JSONFeatures:
   case file_types::TY_IndexUnitOutputPath:
+  case file_types::TY_SwiftABIDescriptor:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");

@@ -97,7 +97,7 @@ OVERRIDE_TASK(task_create_common, AsyncTaskAndContext,
               (size_t taskCreateFlags,
                TaskOptionRecord *options,
                const Metadata *futureResultType,
-               FutureAsyncSignature::FunctionType *function,
+               TaskContinuationFunction *function,
                void *closureContext,
                size_t initialContextSize),
               (taskCreateFlags, options, futureResultType, function,
@@ -158,6 +158,10 @@ OVERRIDE_TASK(task_asyncMainDrainQueue, void,
 OVERRIDE_TASK(task_suspend, AsyncTask *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, ,)
+
+OVERRIDE_TASK(task_enqueueTaskOnExecutor, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (AsyncTask *task, ExecutorRef newExecutor), (task, newExecutor))
 
 OVERRIDE_TASK(continuation_init, AsyncTask *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -241,7 +245,7 @@ OVERRIDE_TASK_GROUP(taskGroup_initialize, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group, const Metadata *T), (group, T))
 
-OVERRIDE_TASK_GROUP(taskGroup_attachChild, void,
+OVERRIDE_TASK_STATUS(taskGroup_attachChild, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group, AsyncTask *child),
                     (group, child))
@@ -308,29 +312,9 @@ OVERRIDE_TASK_LOCAL(task_localsCopyTo, void,
                     (AsyncTask *target),
                     (target))
 
-OVERRIDE_TASK_STATUS(task_addStatusRecord, bool,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskStatusRecord *newRecord), (newRecord))
-
-OVERRIDE_TASK_STATUS(task_tryAddStatusRecord, bool,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskStatusRecord *newRecord), (newRecord))
-
-OVERRIDE_TASK_STATUS(task_removeStatusRecord, bool,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskStatusRecord *record), (record))
-
 OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, , )
-
-OVERRIDE_TASK_STATUS(task_attachChild, ChildTaskStatusRecord *,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (AsyncTask *child), (child))
-
-OVERRIDE_TASK_STATUS(task_detachChild, void,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (ChildTaskStatusRecord *record), (record))
 
 OVERRIDE_TASK_STATUS(task_cancel, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                      SWIFT_CC(swift), swift::, (AsyncTask *task), (task))

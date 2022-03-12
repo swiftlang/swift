@@ -173,7 +173,8 @@ public:
                 ModuleDecl *swiftModule, const TBDGenOptions &opts,
                 APIRecorder &recorder)
       : DataLayoutDescription(dataLayoutString),
-        UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false),
+        UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false,
+                          /*static=*/false),
         SwiftModule(swiftModule), Opts(opts), recorder(recorder),
         previousInstallNameMap(parsePreviousModuleInstallNameMap()) {}
 
@@ -212,6 +213,8 @@ public:
   void visitAbstractStorageDecl(AbstractStorageDecl *ASD);
 
   void visitVarDecl(VarDecl *VD);
+
+  void visitSubscriptDecl(SubscriptDecl *SD);
 
   void visitEnumDecl(EnumDecl *ED);
 

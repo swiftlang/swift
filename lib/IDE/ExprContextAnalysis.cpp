@@ -28,7 +28,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionResult.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/Attr.h"
@@ -308,7 +308,7 @@ void swift::ide::collectPossibleReturnTypesFromContext(
               const_cast<DeclContext *>(DC), /*diagnostics=*/false);
 
           if (!type->hasError()) {
-            candidates.push_back(type);
+            candidates.push_back(DC->mapTypeIntoContext(type));
             return;
           }
         }

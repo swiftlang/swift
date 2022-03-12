@@ -17,7 +17,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
   Missile.missilesLaunched = 0
   do {
     let sizeInBytes = 3 * MemoryLayout<Missile>.stride
-    var p1 = UnsafeMutableRawPointer.allocate(
+    let p1 = UnsafeMutableRawPointer.allocate(
       byteCount: sizeInBytes, alignment: MemoryLayout<Missile>.alignment)
     defer {
       p1.deallocate()
@@ -28,7 +28,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
     expectEqual(2, ptrM[1].number)
     expectEqual(2, ptrM[2].number)
 
-    var p2 = UnsafeMutableRawPointer.allocate(
+    let p2 = UnsafeMutableRawPointer.allocate(
       byteCount: sizeInBytes, alignment: MemoryLayout<Missile>.alignment)
     defer {
       p2.deallocate()
@@ -56,25 +56,25 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
 
 UnsafeMutableRawPointerExtraTestSuite.test("bindMemory") {
   let sizeInBytes = 3 * MemoryLayout<Int>.stride
-  var p1 = UnsafeMutableRawPointer.allocate(
+  let p1 = UnsafeMutableRawPointer.allocate(
     byteCount: sizeInBytes, alignment: MemoryLayout<Int>.alignment)
   defer {
     p1.deallocate()
   }
   let ptrI = p1.bindMemory(to: Int.self, capacity: 3)
   let bufI = UnsafeMutableBufferPointer(start: ptrI, count: 3)
-  bufI.initialize(from: 1...3)
+  _ = bufI.initialize(from: 1...3)
   let ptrU = p1.bindMemory(to: UInt.self, capacity: 3)
   expectEqual(1, ptrU[0])
   expectEqual(2, ptrU[1])
   expectEqual(3, ptrU[2])
   let ptrU2 = p1.assumingMemoryBound(to: UInt.self)
-  expectEqual(1, ptrU[0])
+  expectEqual(1, ptrU2[0])
 }
 
 UnsafeMutableRawPointerExtraTestSuite.test("load/store") {
   let sizeInBytes = 3 * MemoryLayout<Int>.stride
-  var p1 = UnsafeMutableRawPointer.allocate(
+  let p1 = UnsafeMutableRawPointer.allocate(
     byteCount: sizeInBytes, alignment: MemoryLayout<Int>.alignment)
   defer {
     p1.deallocate()
@@ -96,7 +96,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load/store") {
 
 UnsafeMutableRawPointerExtraTestSuite.test("copyMemory") {
   let sizeInBytes = 4 * MemoryLayout<Int>.stride
-  var rawPtr = UnsafeMutableRawPointer.allocate(
+  let rawPtr = UnsafeMutableRawPointer.allocate(
     byteCount: sizeInBytes, alignment: MemoryLayout<Int>.alignment)
   defer {
     rawPtr.deallocate()
@@ -200,6 +200,8 @@ func checkPtr(
   }
 }
 
+#if !os(WASI)
+// Trap tests aren't available on WASI.
 UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:") {
   let check = checkPtr(UnsafeMutableRawPointer.initializeMemory(as:from:count:))
   check(Check.Disjoint)
@@ -220,6 +222,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:.Righ
     check(Check.RightOverlap)
   }
 }
+#endif
 
 UnsafeMutableRawPointerExtraTestSuite.test("moveInitialize:from:") {
   let check =
@@ -227,6 +230,65 @@ UnsafeMutableRawPointerExtraTestSuite.test("moveInitialize:from:") {
   check(Check.LeftOverlap)
   check(Check.Disjoint)
   check(Check.RightOverlap)
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("withMemoryRebound") {
+  // test withMemoryRebound behaviour, post SE-0333.
+  let allocated = UnsafeMutableRawPointer.allocate(byteCount: 32,  alignment: 8)
+  defer { allocated.deallocate() }
+  allocated.withMemoryRebound(to: Int.self, capacity: 4) {
+    // Make sure the closure argument is a `UnsafeMutablePointer<Int>`
+    let ptrT: UnsafeMutablePointer<Int> = $0
+    // and that the pointee type is `Int`.
+    expectType(Int.self, &ptrT.pointee)
+  }
+  let nonmutable = UnsafeRawPointer(allocated)
+  nonmutable.withMemoryRebound(to: UInt.self, capacity: 4) {
+    // Make sure the closure argument is a `UnsafePointer<UInt>`
+    let ptrT: UnsafePointer<UInt> = $0
+    // and that the element type is `Int`.
+    let mutablePtrT = UnsafeMutablePointer(mutating: ptrT)
+    expectType(UInt.self, &mutablePtrT.pointee)
+  }
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("realignment-functions") {
+  var m = UnsafeMutableRawPointer(bitPattern: 1)!
+  expectEqual(m.alignedUp(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(m.alignedUp(for: Int32.self), .init(bitPattern: 4)!)
+  expectEqual(m.alignedUp(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(m.alignedUp(toMultipleOf: 16), .init(bitPattern: 16)!)
+
+  m = .init(bitPattern: 13)!
+  expectEqual(m.alignedDown(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(m.alignedDown(for: Int32.self), .init(bitPattern: 12)!)
+  expectEqual(m.alignedDown(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(m.alignedDown(toMultipleOf: 4), .init(bitPattern: 12)!)
+
+  var p = UnsafeRawPointer(bitPattern: 1)!
+  expectEqual(p.alignedUp(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(p.alignedUp(for: Int32.self), .init(bitPattern: 4)!)
+  expectEqual(p.alignedUp(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(p.alignedUp(toMultipleOf: 16), .init(bitPattern: 16)!)
+
+  p = .init(bitPattern: 13)!
+  expectEqual(p.alignedDown(for: Int64.self), .init(bitPattern: 8)!)
+  expectEqual(p.alignedDown(for: Int32.self), .init(bitPattern: 12)!)
+  expectEqual(p.alignedDown(toMultipleOf: 8), .init(bitPattern: 8)!)
+  expectEqual(p.alignedDown(toMultipleOf: 4), .init(bitPattern: 12)!)
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("pointer-comparisons") {
+  let a = UnsafeMutableRawPointer(bitPattern: 0x8000)!
+  let b = UnsafeRawPointer(bitPattern: 0x9000)!
+
+  expectTrue(a.assumingMemoryBound(to: Int.self) == UnsafeRawPointer(a))
+  expectTrue(b.assumingMemoryBound(to: UInt.self) >= b)
+  expectTrue(a <= a.assumingMemoryBound(to: Double.self))
+
+  expectTrue(a.assumingMemoryBound(to: Int.self) != b)
+  expectTrue(b.assumingMemoryBound(to: UInt.self) > UnsafeMutableRawPointer(a))
+  expectTrue(a < b.assumingMemoryBound(to: Double.self))
 }
 
 runAllTests()

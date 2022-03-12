@@ -812,7 +812,8 @@ static bool computeIncremental(const llvm::opt::InputArgList *ArgList,
 
   if (ShowIncrementalBuildDecisions) {
     llvm::outs() << "Incremental compilation has been disabled, because it "
-                 << ReasonToDisable;
+                 << ReasonToDisable
+                 << "\n";
   }
   return false;
 }
@@ -1157,7 +1158,8 @@ parseArgsUntil(const llvm::opt::OptTable& Opts,
     }
 
     unsigned Prev = Index;
-    Arg *A = Opts.ParseOneArg(*Args, Index, FlagsToInclude, FlagsToExclude);
+    Arg *A = Opts.ParseOneArg(*Args, Index, FlagsToInclude, FlagsToExclude)
+                 .release();
     assert(Index > Prev && "Parser failed to consume argument.");
 
     // Check for missing argument error.
@@ -1979,7 +1981,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
-        if (Ty == file_types::TY_ObjCHeader) {
+        if (Ty == file_types::TY_ObjCHeader ||
+            Ty == file_types::TY_CXXHeader) {
           auto *HeaderInput = C.createAction<InputAction>(*A, Ty);
           StringRef PersistentPCHDir;
           if (const Arg *A = Args.getLastArg(options::OPT_pch_output_dir)) {
@@ -2063,6 +2066,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_LLVM_BC:
       case file_types::TY_SerializedDiagnostics:
       case file_types::TY_ObjCHeader:
+      case file_types::TY_CXXHeader:
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:
       case file_types::TY_ExternalSwiftDeps:
@@ -2080,6 +2084,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftOverlayFile:
       case file_types::TY_JSONDependencies:
       case file_types::TY_JSONFeatures:
+      case file_types::TY_SwiftABIDescriptor:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,

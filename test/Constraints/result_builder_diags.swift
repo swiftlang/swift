@@ -78,7 +78,7 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   static func buildDo<T>(_ value: T) -> T { return value }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note {{in call to function 'tuplify(_:body:)'}}
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
   print(body(cond))
 }
 
@@ -309,13 +309,12 @@ struct MyTuplifiedStruct {
 
 func test_invalid_return_type_in_body() {
   tuplify(true) { _ -> (Void, Int) in
-    // If there is a `return` in the body result builder attribute is dropped, so nested `tuplify(false)`
-    // is correct (type-check is successful) with multi-statement closure inference enabled.
     tuplify(false) { condition in
       if condition {
-        return 42
+        return 42 // expected-error {{cannot use explicit 'return' statement in the body of result builder 'TupleBuilder'}}
+        // expected-note@-1 {{remove 'return' statements to apply the result builder}} {{9-16=}}
       } else {
-        1 // expected-warning {{integer literal is unused}}
+        1
       }
     }
 
@@ -443,9 +442,8 @@ func getSomeEnumOverloaded(_: Int) -> E2 { return .b(0, nil) }
 
 func testOverloadedSwitch() {
   tuplify(true) { c in
-    // FIXME: Bad source location.
-    switch getSomeEnumOverloaded(17) { // expected-error{{type 'E2' has no member 'a'; did you mean 'b'?}}
-    case .a:
+    switch getSomeEnumOverloaded(17) {
+    case .a: // expected-error{{type 'E2' has no member 'a'; did you mean 'b'?}}
       "a"
     default:
       "default"
@@ -483,7 +481,7 @@ struct TestConstraintGenerationErrors {
   func buildTupleClosure() {
     tuplify(true) { _ in
       let a = nothing // expected-error {{cannot find 'nothing' in scope}}
-      String(nothing) // expected-error {{cannot find 'nothing' in scope}}
+      String(nothing)
     }
   }
 }
@@ -524,7 +522,7 @@ enum E3 {
 }
 
 func testCaseMutabilityMismatches(e: E3) {
-   tuplify(true) { c in // expected-error {{generic parameter 'T' could not be inferred}}
+    tuplify(true) { c in
     "testSwitch"
     switch e {
     case .a(let x, var y),
@@ -776,12 +774,13 @@ func test_rdar65667992() {
     @Builder var body: S {
       switch entry { // expected-error {{type 'E' has no member 'unset'}}
       case .set(_, _): S()
-      case .unset(_): S()
+      case .unset(_): S() // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
       default: S()
       }
     }
   }
 }
+
 
 func test_weak_with_nonoptional_type() {
   class X {
@@ -814,5 +813,16 @@ func test_missing_member_in_optional_context() {
     if let method = test?.method() { // expected-error {{value of type 'Test' has no member 'method'}}
       1
     }
+  }
+}
+
+func test_redeclations() {
+  tuplify(true) { c in
+    let foo = 0 // expected-note {{'foo' previously declared here}}
+    let foo = foo // expected-error {{invalid redeclaration of 'foo'}}
+  }
+
+  tuplify(true) { c in
+    let (foo, foo) = (5, 6) // expected-error {{invalid redeclaration of 'foo'}} expected-note {{'foo' previously declared here}}
   }
 }

@@ -45,14 +45,6 @@ static inline void _swift_stdlib_free(void *_Nullable ptr) {
   free(ptr);
 }
 
-// <unistd.h>
-SWIFT_RUNTIME_STDLIB_SPI
-__swift_ssize_t _swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_SPI
-__swift_ssize_t _swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_close(int fd);
-
 // String handling <string.h>
 SWIFT_READONLY
 static inline __swift_size_t _swift_stdlib_strlen(const char *s) {
@@ -68,7 +60,7 @@ static inline __swift_size_t _swift_stdlib_strlen_unsigned(const unsigned char *
 SWIFT_READONLY
 static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
                                        __swift_size_t n) {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__ANDROID__) || defined(__OpenBSD__)
   extern int memcmp(const void * _Nullable, const void * _Nullable, __swift_size_t);
 #else
   extern int memcmp(const void *, const void *, __swift_size_t);
@@ -84,6 +76,19 @@ static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
 #else
 #define CONST_CAST(type, value) (type)value
 #endif
+
+#ifndef _VA_LIST
+typedef __builtin_va_list va_list;
+#define _VA_LIST
+#endif
+
+static inline int _swift_stdlib_vprintf(const char * __restrict fmt, va_list args) {
+    extern int vprintf(const char * __restrict, va_list);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+    return vprintf(fmt, args);
+#pragma clang diagnostic pop
+}
 
 // Non-standard extensions
 #if defined(__APPLE__)

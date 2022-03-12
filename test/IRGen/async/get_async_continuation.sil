@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -g -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %IRGenFileCheck %s
 // RUN: %target-swift-frontend  -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all
 
 // REQUIRES: concurrency
@@ -35,7 +35,7 @@ bb0:
 // CHECK-x86_64: store %swift.context* [[ctxt]], %swift.context** [[context_addr]]
 
 //   Initialize NormalResult.
-// CHECK: [[result_addr:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[cont_context]], i32 0, i32 3
+// CHECK: [[result_addr:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[cont_context]], i32 0, i32 4
 // CHECK: [[result_storage_as_opaque:%.*]] = bitcast i32* [[result_storage]] to %swift.opaque*
 // CHECK: store %swift.opaque* [[result_storage_as_opaque]], %swift.opaque** [[result_addr]]
 
@@ -59,7 +59,7 @@ bb0:
 
 //   Arrive at the await_async_continuation point.
 // CHECK: [[suspend:%.*]] = call { i8* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8s(i32 0, i8* [[resume_intrinsic]], i8* bitcast (i8* (i8*)* @__swift_async_resume_project_context to i8*), i8* bitcast (void (%swift.continuation_context*)* @__swift_continuation_await_point to i8*), %swift.continuation_context* [[cont_context]])
-// CHECK:   [[result_addr_addr:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[cont_context]], i32 0, i32 3
+// CHECK:   [[result_addr_addr:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[cont_context]], i32 0, i32 4
 // CHECK:   [[result_addr:%.*]] = load %swift.opaque*, %swift.opaque** [[result_addr_addr]]
 // CHECK:   [[typed_result_addr:%.*]] = bitcast %swift.opaque* [[result_addr]] to i32*
 // CHECK:   [[result_value:%.*]] = load i32, i32* [[typed_result_addr]]
@@ -72,10 +72,11 @@ bb0:
 // CHECK:      {{musttail call swifttailcc|tail call swiftcc}} void @swift_continuation_await(%swift.continuation_context* %0)
 // CHECK-NEXT: ret void
 
-// CHECK: define {{.*}} void @__swift_suspend_dispatch_1(i8* %0, %swift.context* %1)
+// CHECK: define {{.*}} void @async_continuation.0(i8* %0, %swift.context* %1){{.*}}!dbg ![[DBG:[0-9]+]]
 // CHECK-NOT: define
 // CHECK:  tail call swift{{(tail)?}}cc void %{{.*}}(%swift.context* swiftasync %1)
 // CHECK-NEXT:  ret void
+// CHECK: ![[DBG]] = distinct !DISubprogram(linkageName: "async_continuation"
 
 sil @async_continuation : $@async () -> () {
 entry:

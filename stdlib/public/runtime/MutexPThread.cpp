@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Mutex, ConditionVariable, Read/Write lock, and Scoped lock implementations
-// using PThreads.
+// Mutex and Read/Write lock implementations using pthreads.
+//
+// Darwin shares the pthreads implementation for read/write locks, but
+// uses inline implementations for os_unfair_lock.
 //
 //===----------------------------------------------------------------------===//
 
@@ -74,26 +76,7 @@ static const char *errorName(int errorcode) {
   }
 }
 
-void ConditionPlatformHelper::init(pthread_cond_t &condition) {
-  reportError(pthread_cond_init(&condition, nullptr));
-}
-
-void ConditionPlatformHelper::destroy(pthread_cond_t &condition) {
-  reportError(pthread_cond_destroy(&condition));
-}
-
-void ConditionPlatformHelper::notifyOne(pthread_cond_t &condition) {
-  reportError(pthread_cond_signal(&condition));
-}
-
-void ConditionPlatformHelper::notifyAll(pthread_cond_t &condition) {
-  reportError(pthread_cond_broadcast(&condition));
-}
-
-void ConditionPlatformHelper::wait(pthread_cond_t &condition,
-                                   pthread_mutex_t &mutex) {
-  reportError(pthread_cond_wait(&condition, &mutex));
-}
+#if !HAS_OS_UNFAIR_LOCK
 
 void MutexPlatformHelper::init(pthread_mutex_t &mutex, bool checked) {
   pthread_mutexattr_t attr;
@@ -119,27 +102,6 @@ void MutexPlatformHelper::unlock(pthread_mutex_t &mutex) {
 bool MutexPlatformHelper::try_lock(pthread_mutex_t &mutex) {
   returnTrueOrReportError(pthread_mutex_trylock(&mutex),
                           /* returnFalseOnEBUSY = */ true);
-}
-
-#if HAS_OS_UNFAIR_LOCK
-
-void MutexPlatformHelper::init(os_unfair_lock &lock, bool checked) {
-  (void)checked; // Unfair locks are always checked.
-  lock = OS_UNFAIR_LOCK_INIT;
-}
-
-void MutexPlatformHelper::destroy(os_unfair_lock &lock) {}
-
-void MutexPlatformHelper::lock(os_unfair_lock &lock) {
-  os_unfair_lock_lock(&lock);
-}
-
-void MutexPlatformHelper::unlock(os_unfair_lock &lock) {
-  os_unfair_lock_unlock(&lock);
-}
-
-bool MutexPlatformHelper::try_lock(os_unfair_lock &lock) {
-  return os_unfair_lock_trylock(&lock);
 }
 
 #endif

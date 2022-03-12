@@ -10,7 +10,6 @@
 #define LLVM_ADT_ITERATOR_H
 
 #include "llvm/ADT/iterator_range.h"
-#include <algorithm>
 #include <cstddef>
 #include <iterator>
 #include <type_traits>
@@ -65,9 +64,14 @@ namespace llvm {
 template <typename DerivedT, typename IteratorCategoryT, typename T,
           typename DifferenceTypeT = std::ptrdiff_t, typename PointerT = T *,
           typename ReferenceT = T &>
-class iterator_facade_base
-    : public std::iterator<IteratorCategoryT, T, DifferenceTypeT, PointerT,
-                           ReferenceT> {
+class iterator_facade_base {
+public:
+  using iterator_category = IteratorCategoryT;
+  using value_type = T;
+  using difference_type = DifferenceTypeT;
+  using pointer = PointerT;
+  using reference = ReferenceT;
+
 protected:
   enum {
     IsRandomAccess = std::is_base_of<std::random_access_iterator_tag,
@@ -143,28 +147,30 @@ public:
     return tmp;
   }
 
+#ifndef __cpp_impl_three_way_comparison
   bool operator!=(const DerivedT &RHS) const {
-    return !static_cast<const DerivedT *>(this)->operator==(RHS);
+    return !(static_cast<const DerivedT &>(*this) == RHS);
   }
+#endif
 
   bool operator>(const DerivedT &RHS) const {
     static_assert(
         IsRandomAccess,
         "Relational operators are only defined for random access iterators.");
-    return !static_cast<const DerivedT *>(this)->operator<(RHS) &&
-           !static_cast<const DerivedT *>(this)->operator==(RHS);
+    return !(static_cast<const DerivedT &>(*this) < RHS) &&
+           !(static_cast<const DerivedT &>(*this) == RHS);
   }
   bool operator<=(const DerivedT &RHS) const {
     static_assert(
         IsRandomAccess,
         "Relational operators are only defined for random access iterators.");
-    return !static_cast<const DerivedT *>(this)->operator>(RHS);
+    return !(static_cast<const DerivedT &>(*this) > RHS);
   }
   bool operator>=(const DerivedT &RHS) const {
     static_assert(
         IsRandomAccess,
         "Relational operators are only defined for random access iterators.");
-    return !static_cast<const DerivedT *>(this)->operator<(RHS);
+    return !(static_cast<const DerivedT &>(*this) < RHS);
   }
 
   PointerT operator->() { return &static_cast<DerivedT *>(this)->operator*(); }
@@ -261,12 +267,16 @@ public:
     return *static_cast<DerivedT *>(this);
   }
 
-  bool operator==(const DerivedT &RHS) const { return I == RHS.I; }
-  bool operator<(const DerivedT &RHS) const {
+  friend bool operator==(const iterator_adaptor_base &LHS,
+                         const iterator_adaptor_base &RHS) {
+    return LHS.I == RHS.I;
+  }
+  friend bool operator<(const iterator_adaptor_base &LHS,
+                        const iterator_adaptor_base &RHS) {
     static_assert(
         BaseT::IsRandomAccess,
         "Relational operators are only defined for random access iterators.");
-    return I < RHS.I;
+    return LHS.I < RHS.I;
   }
 
   ReferenceT operator*() const { return *I; }
@@ -340,34 +350,6 @@ template <typename WrappedIteratorT,
           typename T2 = std::add_pointer_t<T1>>
 using raw_pointer_iterator =
     pointer_iterator<pointee_iterator<WrappedIteratorT, T1>, T2>;
-
-// Wrapper iterator over iterator ItType, adding DataRef to the type of ItType,
-// to create NodeRef = std::pair<InnerTypeOfItType, DataRef>.
-template <typename ItType, typename NodeRef, typename DataRef>
-class WrappedPairNodeDataIterator
-    : public iterator_adaptor_base<
-          WrappedPairNodeDataIterator<ItType, NodeRef, DataRef>, ItType,
-          typename std::iterator_traits<ItType>::iterator_category, NodeRef,
-          std::ptrdiff_t, NodeRef *, NodeRef &> {
-  using BaseT = iterator_adaptor_base<
-      WrappedPairNodeDataIterator, ItType,
-      typename std::iterator_traits<ItType>::iterator_category, NodeRef,
-      std::ptrdiff_t, NodeRef *, NodeRef &>;
-
-  const DataRef DR;
-  mutable NodeRef NR;
-
-public:
-  WrappedPairNodeDataIterator(ItType Begin, const DataRef DR)
-      : BaseT(Begin), DR(DR) {
-    NR.first = DR;
-  }
-
-  NodeRef &operator*() const {
-    NR.second = *this->I;
-    return NR;
-  }
-};
 
 } // end namespace llvm
 }} // namespace swift::runtime

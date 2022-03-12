@@ -47,11 +47,11 @@ public class Concrete : Derived<Int> {
 // -- value witness table
 // CHECK-SAME: i8** {{@"\$sBoWV"|null}}
 // -- vtable entry for 'm1()'
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* {{@"\$s14generic_vtable4BaseC2m1yyF"|.* @"\$s14generic_vtable4BaseC2m1yyF.ptrauth"}}
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* {{@"\$s14generic_vtable4BaseC2m1yyF"|.* @"\$s14generic_vtable4BaseC2m1yyF.ptrauth[.0-9]*"}}
 // -- vtable entry for 'm2()'
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* {{@"\$s14generic_vtable4BaseC2m2yyF"|.* @"\$s14generic_vtable4BaseC2m2yyF.ptrauth"}}
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* {{@"\$s14generic_vtable4BaseC2m2yyF"|.* @"\$s14generic_vtable4BaseC2m2yyF.ptrauth[.0-9]*"}}
 // -- vtable entry for 'init()'
-// CHECK-SAME: %T14generic_vtable4BaseC* (%swift.type*)* {{@"\$s14generic_vtable4BaseCACycfC"|.* @"\$s14generic_vtable4BaseCACycfC.ptrauth"}}
+// CHECK-SAME: %T14generic_vtable4BaseC* (%swift.type*)* {{@"\$s14generic_vtable4BaseCACycfC"|.* @"\$s14generic_vtable4BaseCACycfC.ptrauth[.0-9]*"}}
 // --
 // CHECK-SAME: , align
 
@@ -132,15 +132,15 @@ public class Concrete : Derived<Int> {
 // -- nominal type descriptor
 // CHECK-SAME: @"$s14generic_vtable8ConcreteCMn{{(.ptrauth)?}}"
 // -- vtable entry for 'm1()'
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* {{@"\$s14generic_vtable4BaseC2m1yyF"|.* @"\$s14generic_vtable4BaseC2m1yyF.ptrauth.1"}}
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* {{@"\$s14generic_vtable4BaseC2m1yyF"|.* @"\$s14generic_vtable4BaseC2m1yyF.ptrauth[.0-9]*"}}
 // -- vtable entry for 'm2()'
-// CHECK-SAME: void (%T14generic_vtable7DerivedC*)* {{@"\$s14generic_vtable7DerivedC2m2yyF"|.* @"\$s14generic_vtable7DerivedC2m2yyF.ptrauth"}}
+// CHECK-SAME: void (%T14generic_vtable7DerivedC*)* {{@"\$s14generic_vtable7DerivedC2m2yyF"|.* @"\$s14generic_vtable7DerivedC2m2yyF.ptrauth[.0-9]*"}}
 // -- vtable entry for 'init()'
-// CHECK-SAME: %T14generic_vtable8ConcreteC* (%swift.type*)* {{@"\$s14generic_vtable8ConcreteCACycfC"|.* @"\$s14generic_vtable8ConcreteCACycfC.ptrauth"}}
+// CHECK-SAME: %T14generic_vtable8ConcreteC* (%swift.type*)* {{@"\$s14generic_vtable8ConcreteCACycfC"|.* @"\$s14generic_vtable8ConcreteCACycfC.ptrauth[.0-9]*"}}
 // -- vtable entry for 'm3()'
-// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* {{@"\$s14generic_vtable8ConcreteC2m3yyF"|.* @"\$s14generic_vtable8ConcreteC2m3yyF.ptrauth"}}
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* {{@"\$s14generic_vtable8ConcreteC2m3yyF"|.* @"\$s14generic_vtable8ConcreteC2m3yyF.ptrauth[.0-9]*"}}
 // -- vtable entry for 'm4()'
-// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* {{@"\$s14generic_vtable8ConcreteC2m4yyF"|.* @"\$s14generic_vtable8ConcreteC2m4yyF.ptrauth"}}
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* {{@"\$s14generic_vtable8ConcreteC2m4yyF"|.* @"\$s14generic_vtable8ConcreteC2m4yyF.ptrauth[.0-9]*"}}
 // --
 // CHECK-SAME: }>, align
 

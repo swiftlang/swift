@@ -164,25 +164,32 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   //
   // We can still succeed with a subtype match later in
   // OverrideMatcher::match().
-  if (decl->getDeclContext()->getSelfClassDecl()) {
-    if (auto declCtx = decl->getAsGenericContext()) {
-      auto *parentCtx = parentDecl->getAsGenericContext();
+  if (auto declCtx = decl->getAsGenericContext()) {
+    // The below logic now works correctly for protocol requirements which are
+    // themselves generic, but that would be an ABI break, since we would now
+    // drop the protocol requirements from witness tables. Simulate the old
+    // behavior by not considering generic declarations in protocols as
+    // overrides at all.
+    if (decl->getDeclContext()->getSelfProtocolDecl() &&
+        declCtx->isGeneric())
+      return false;
 
-      if (declCtx->isGeneric() != parentCtx->isGeneric())
-        return false;
+    auto *parentCtx = parentDecl->getAsGenericContext();
 
-      if (declCtx->isGeneric() &&
-          (declCtx->getGenericParams()->size() !=
-           parentCtx->getGenericParams()->size()))
-        return false;
+    if (declCtx->isGeneric() != parentCtx->isGeneric())
+      return false;
 
-      auto &ctx = decl->getASTContext();
-      auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
-      if (sig &&
-          declCtx->getGenericSignature().getCanonicalSignature() !=
-              sig.getCanonicalSignature()) {
-        return false;
-      }
+    if (declCtx->isGeneric() &&
+        (declCtx->getGenericParams()->size() !=
+         parentCtx->getGenericParams()->size()))
+      return false;
+
+    auto &ctx = decl->getASTContext();
+    auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
+    if (sig &&
+        declCtx->getGenericSignature().getCanonicalSignature() !=
+            sig.getCanonicalSignature()) {
+      return false;
     }
   }
 
@@ -1466,6 +1473,7 @@ namespace  {
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
+    UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(NoLocks)
     UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(Inlinable)
@@ -1505,7 +1513,7 @@ namespace  {
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
-    UNINTERESTING_ATTR(PredatesConcurrency)
+    UNINTERESTING_ATTR(Preconcurrency)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
@@ -1559,8 +1567,16 @@ namespace  {
     UNINTERESTING_ATTR(InheritActorContext)
     UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(NoImplicitCopy)
+    UNINTERESTING_ATTR(UnavailableFromAsync)
 
     UNINTERESTING_ATTR(TypeSequence)
+    UNINTERESTING_ATTR(CompileTimeConst)
+
+    UNINTERESTING_ATTR(BackDeploy)
+    UNINTERESTING_ATTR(KnownToBeLocal)
+
+    UNINTERESTING_ATTR(UnsafeInheritExecutor)
+
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

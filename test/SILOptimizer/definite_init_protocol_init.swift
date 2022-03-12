@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -swift-version 5 -verify | %FileCheck %s
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -emit-sil %s -swift-version 5 -verify | %FileCheck %s
 
 // Ensure that convenience initializers on concrete types can
 // delegate to factory initializers defined in protocol

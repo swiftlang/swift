@@ -1,10 +1,10 @@
-// RUN: %target-swift-emit-silgen -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -swift-version 4 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
-// RUN: %target-swift-emit-ir -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-silgen -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify | %FileCheck %s
+// RUN: %target-swift-emit-sil -swift-version 4 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify
+// RUN: %target-swift-emit-ir -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify
 
-// RUN: %target-swift-emit-silgen -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -swift-version 5 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
-// RUN: %target-swift-emit-ir -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-silgen -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify | %FileCheck %s
+// RUN: %target-swift-emit-sil -swift-version 5 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify
+// RUN: %target-swift-emit-ir -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -requirement-machine-abstract-signatures=verify
 
 protocol P {
   func f() -> Self
@@ -246,8 +246,9 @@ class Z {
     // so that IRGen can recover metadata.
 
     // CHECK:      [[WEAK_SELF:%.*]] = alloc_box ${ var @sil_weak Optional<Z> }
+    // CHECK:      [[WEAK_SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[WEAK_SELF]]
     // CHECK:      [[FN:%.*]] = function_ref @$s12dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tFyycfU1_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
-    // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF]] : ${ var @sil_weak Optional<Z> }
+    // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF_LIFETIME]] : ${ var @sil_weak Optional<Z> }
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type
     // CHECK:      partial_apply [callee_guaranteed] [[FN]]([[WEAK_SELF_COPY]], [[DYNAMIC_SELF]]) : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
     let fn3 = {

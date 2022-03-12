@@ -13,13 +13,14 @@
 #define DEBUG_TYPE "sil-combine"
 
 #include "SILCombiner.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
@@ -654,6 +655,11 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
         continue;
       }
 
+      if (isa<DeinitExistentialAddrInst>(Op->getUser())) {
+        eraseInstFromFunction(*Op->getUser());
+        continue;
+      }
+
       if (!isa<DeallocStackInst>(Op->getUser()))
         continue;
 
@@ -735,7 +741,7 @@ SILInstruction *SILCombiner::visitAllocRefInst(AllocRefInst *AR) {
     ++UI;
     auto *User = Op->getUser();
     if (!isa<DeallocRefInst>(User) && !isa<SetDeallocatingInst>(User) &&
-        !isa<FixLifetimeInst>(User)) {
+        !isa<FixLifetimeInst>(User) && !isa<DeallocStackRefInst>(User)) {
       HasNonRemovableUses = true;
       break;
     }
@@ -804,6 +810,18 @@ SILInstruction *SILCombiner::optimizeLoadFromStringLiteral(LoadInst *LI) {
   return Builder.createIntegerLiteral(LI->getLoc(), LI->getType(), str[index]);
 }
 
+static bool isShiftRightByAtLeastOne(SILInstruction *inst) {
+  auto *bi = dyn_cast<BuiltinInst>(inst);
+  if (!bi)
+    return false;
+  if (bi->getBuiltinInfo().ID != BuiltinValueKind::LShr)
+    return false;
+  auto *shiftVal = dyn_cast<IntegerLiteralInst>(bi->getArguments()[1]);
+  if (!shiftVal)
+    return false;
+  return shiftVal->getValue().isStrictlyPositive();
+}
+
 /// Returns true if \p LI loads a zero integer from the empty Array, Dictionary
 /// or Set singleton.
 static bool isZeroLoadFromEmptyCollection(SingleValueInstruction *LI) {
@@ -826,15 +844,23 @@ static bool isZeroLoadFromEmptyCollection(SingleValueInstruction *LI) {
       }
       case ValueKind::StructElementAddrInst: {
         auto *SEA = cast<StructElementAddrInst>(addr);
-        // For Array, we only support "count". The value of "capacityAndFlags"
-        // is not defined in the ABI and could change in another version of the
-        // runtime (the capacity must be 0, but the flags may be not 0).
-        if (SEA->getStructDecl()->getName().is("_SwiftArrayBodyStorage") &&
-            !SEA->getField()->getName().is("count")) {
-          return false;
-        }
         addr = SEA->getOperand();
-        break;
+        if (!SEA->getStructDecl()->getName().is("_SwiftArrayBodyStorage"))
+          break;
+        if (SEA->getField()->getName().is("count"))
+          break;
+        // For Array, the value of `capacityAndFlags` has only a zero capacity
+        // but not necessarily a zero flag (in fact, the flag is 1).
+        // Therefore only replace `capacityAndFlags` with zero if the flag is
+        // masked out by a right-shift of 1.
+        if (SEA->getField()->getName().is("_capacityAndFlags")) {
+          for (Operand *loadUse : LI->getUses()) {
+            if (!isShiftRightByAtLeastOne(loadUse->getUser()))
+              return false;
+          }
+          break;
+        }
+        return false;
       }
       case ValueKind::RefElementAddrInst: {
         auto *REA = cast<RefElementAddrInst>(addr);
@@ -858,6 +884,13 @@ static bool isZeroLoadFromEmptyCollection(SingleValueInstruction *LI) {
       case ValueKind::EndCOWMutationInst:
         addr = cast<SingleValueInstruction>(addr)->getOperand(0);
         break;
+      case ValueKind::MultipleValueInstructionResult:
+        if (auto *bci = dyn_cast<BeginCOWMutationInst>(
+                                              addr->getDefiningInstruction())) {
+          addr = bci->getOperand();
+          break;
+        }
+        return false;
       default:
         return false;
     }
@@ -2116,6 +2149,43 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *fli) {
   return nullptr;
 }
 
+static Optional<SILType>
+shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
+                                                   CanType storageMetaTy) {
+  auto metaTy = dyn_cast<MetatypeType>(storageMetaTy);
+  if (!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thick)
+    return None;
+
+  auto storageTy = metaTy.getInstanceType()->getCanonicalType();
+  if (!storageTy->is_ContiguousArrayStorage())
+    return None;
+
+  auto boundGenericTy = dyn_cast<BoundGenericType>(storageTy);
+  if (!boundGenericTy)
+    return None;
+
+  // On SwiftStdlib 5.7 we can replace the call.
+  auto &ctxt = storageMetaTy->getASTContext();
+  auto deployment = AvailabilityContext::forDeploymentTarget(ctxt);
+  if (!deployment.isContainedIn(ctxt.getSwift57Availability()))
+    return None;
+
+  auto genericArgs = boundGenericTy->getGenericArgs();
+  if (genericArgs.size() != 1)
+    return None;
+
+  auto ty = genericArgs[0]->getCanonicalType();
+  if (!ty->getClassOrBoundGenericClass() && !ty->isObjCExistentialType())
+    return None;
+
+  auto anyObjectTy = ctxt.getAnyObjectType();
+  auto arrayStorageTy =
+      BoundGenericClassType::get(ctxt.get_ContiguousArrayStorageDecl(), nullptr,
+                                 {anyObjectTy})
+          ->getCanonicalType();
+  return F.getTypeLowering(arrayStorageTy).getLoweredType();
+}
+
 SILInstruction *
 SILCombiner::
 visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
@@ -2177,6 +2247,32 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
                                        ARDI->getTailAllocatedTypes(),
                                        getCounts(ARDI));
     }
+  } else if (auto *AI = dyn_cast<ApplyInst>(MDVal)) {
+    SILFunction *SF = AI->getReferencedFunctionOrNull();
+    if (!SF)
+      return nullptr;
+
+    if (!SF->hasSemanticsAttr(semantics::ARRAY_GET_CONTIGUOUSARRAYSTORAGETYPE))
+      return nullptr;
+
+    auto use = AI->getSingleUse();
+    if (!use || use->getUser() != ARDI)
+      return nullptr;
+
+    auto silTy = AI->getType();
+    auto storageTy = AI->getType().getASTType();
+    // getContiguousArrayStorageType<SomeClass> =>
+    //   ContiguousArrayStorage<AnyObject>
+    auto instanceTy = shouldReplaceCallByContiguousArrayStorageAnyObject(
+        *AI->getFunction(), storageTy);
+    if (!instanceTy)
+      return nullptr;
+    NewInst = Builder.createAllocRef(
+        ARDI->getLoc(), *instanceTy, ARDI->isObjC(), false,
+        ARDI->getTailAllocatedTypes(), getCounts(ARDI));
+    NewInst = Builder.createUncheckedRefCast(ARDI->getLoc(), NewInst,
+                                             ARDI->getType());
+    return NewInst;
   }
   if (NewInst && NewInst->getType() != ARDI->getType()) {
     // In case the argument was an upcast of the metatype, we have to upcast the

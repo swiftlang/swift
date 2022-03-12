@@ -113,6 +113,12 @@ ios
 ios
 """
 
+EXPAND_OPTION_NAME = """
+[preset: test]
+
+%(my_option)s
+"""
+
 
 # -----------------------------------------------------------------------------
 
@@ -281,3 +287,12 @@ class TestPresetParser(unittest.TestCase):
 
         self.assertEqual(set(parser.preset_names),
                          set(['foo', 'bar', 'baz']))
+
+    def test_expand_option_name(self):
+        parser = PresetParser()
+        parser.read_string(EXPAND_OPTION_NAME)
+
+        preset = parser.get_preset('test', vars={'my_option': 'macos'})
+        self.assertEqual(preset.options, [
+            ('macos', None),
+        ])

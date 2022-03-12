@@ -62,20 +62,24 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
   using ArgumentModifierIntBase = uint16_t;
   enum class ArgumentModifier : ArgumentModifierIntBase {
     // Option Space 4 bits (i.e. 16 options).
-    Unmodified=0,
-    ConstantProp=1,
-    ClosureProp=2,
-    BoxToValue=3,
-    BoxToStack=4,
-    First_Option=0, Last_Option=31,
+    Unmodified = 0,
+    ConstantProp = 1,
+    ClosureProp = 2,
+    BoxToValue = 3,
+    BoxToStack = 4,
+    InOutToOut = 5,
+
+    First_Option = 0,
+    Last_Option = 31,
 
     // Option Set Space. 12 bits (i.e. 12 option).
-    Dead=32,
-    OwnedToGuaranteed=64,
-    SROA=128,
-    GuaranteedToOwned=256,
-    ExistentialToGeneric=512,
-    First_OptionSetEntry=32, LastOptionSetEntry=32768,
+    Dead = 32,
+    OwnedToGuaranteed = 64,
+    SROA = 128,
+    GuaranteedToOwned = 256,
+    ExistentialToGeneric = 512,
+    First_OptionSetEntry = 32,
+    LastOptionSetEntry = 32768,
   };
 
   using ArgInfo = std::pair<ArgumentModifierIntBase,
@@ -91,7 +95,9 @@ public:
   FunctionSignatureSpecializationMangler(SpecializationPass Pass,
                                          IsSerialized_t Serialized,
                                          SILFunction *F);
-  void setArgumentConstantProp(unsigned OrigArgIdx, LiteralInst *LI);
+  void setArgumentConstantProp(unsigned OrigArgIdx, SILInstruction *constInst);
+  void appendStringAsIdentifier(StringRef str);
+
   void setArgumentClosureProp(unsigned OrigArgIdx, PartialApplyInst *PAI);
   void setArgumentClosureProp(unsigned OrigArgIdx,
                               ThinToThickFunctionInst *TTTFI);
@@ -102,12 +108,13 @@ public:
   void setArgumentSROA(unsigned OrigArgIdx);
   void setArgumentBoxToValue(unsigned OrigArgIdx);
   void setArgumentBoxToStack(unsigned OrigArgIdx);
+  void setArgumentInOutToOut(unsigned OrigArgIdx);
   void setReturnValueOwnedToUnowned();
 
   std::string mangle();
   
 private:
-  void mangleConstantProp(LiteralInst *LI);
+  void mangleConstantProp(SILInstruction *constInst);
   void mangleClosureProp(SILInstruction *Inst);
   void mangleArgument(ArgumentModifierIntBase ArgMod,
                       NullablePtr<SILInstruction> Inst);

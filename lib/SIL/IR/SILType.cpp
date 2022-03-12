@@ -34,18 +34,18 @@ using namespace swift::Lowering;
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
-CanArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
+CanOpenedArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
   if (!Ty)
-    return CanArchetypeType();
+    return CanOpenedArchetypeType();
   while (auto MetaTy = dyn_cast<AnyMetatypeType>(Ty))
     Ty = MetaTy.getInstanceType();
   if (Ty->isOpenedExistential())
-    return cast<ArchetypeType>(Ty);
-  return CanArchetypeType();
+    return cast<OpenedArchetypeType>(Ty);
+  return CanOpenedArchetypeType();
 }
 
 SILType SILType::getExceptionType(const ASTContext &C) {
-  return SILType::getPrimitiveObjectType(C.getExceptionType());
+  return SILType::getPrimitiveObjectType(C.getErrorExistentialType());
 }
 
 SILType SILType::getNativeObjectType(const ASTContext &C) {
@@ -109,6 +109,11 @@ bool SILType::isTrivial(const SILFunction &F) const {
 }
 
 bool SILType::isEmpty(const SILFunction &F) const {
+  // Infinite types are never empty.
+  if (F.getTypeLowering(*this).getRecursiveProperties().isInfinite()) {
+    return false;
+  }
+  
   if (auto tupleTy = getAs<TupleType>()) {
     // A tuple is empty if it either has no elements or if all elements are
     // empty.

@@ -33,6 +33,31 @@ namespace runtime {
 
 namespace bincompat {
 
+#if BINARY_COMPATIBILITY_APPLE
+enum sdk_test {
+  oldOS, // Can't tell the app SDK used because this is too old an OS
+  oldApp,
+  newApp
+};
+static enum sdk_test isAppAtLeast(dyld_build_version_t version) {
+  if (__builtin_available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *)) {
+    // Query the SDK version used to build the currently-running executable
+    if (dyld_program_sdk_at_least(version)) {
+      return newApp;
+    } else {
+      return oldApp;
+    }
+  }
+  // Older Apple OS lack the ability to test the SDK version of the running app
+  return oldOS;
+}
+
+static enum sdk_test isAppAtLeastSpring2021() {
+    const dyld_build_version_t spring_2021_os_versions = {0xffffffff, 0x007e50301};
+    return isAppAtLeast(spring_2021_os_versions);
+}
+#endif
+
 // Should we mimic the old override behavior when scanning protocol conformance records?
 
 // Old apps expect protocol conformances to override each other in a particular
@@ -40,15 +65,12 @@ namespace bincompat {
 // significant performance improvements to protocol conformance scanning.  If
 // this returns `true`, the protocol conformance scan will do extra work to
 // mimic the old override behavior.
-bool workaroundProtocolConformanceReverseIteration() {
+bool useLegacyProtocolConformanceReverseIteration() {
 #if BINARY_COMPATIBILITY_APPLE
-  // If this is a newer Apple OS ...
-  if (__builtin_available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *)) {
-    const dyld_build_version_t spring_2021_os_versions = {0xffffffff, 0x007e50301};
-    // ... but the app was compiled before Spring 2021, use the legacy behavior.
-    return !dyld_program_sdk_at_least(spring_2021_os_versions);
-  } else {
-    return false; // Use new (non-legacy) behavior on old Apple OSes
+  switch (isAppAtLeastSpring2021()) {
+  case oldOS: return false; // New (non-legacy) behavior on old OSes
+  case oldApp: return true; // Legacy behavior for pre-Spring 2021 apps on new OS
+  case newApp: return false; // New behavior for new apps
   }
 #else
   return false; // Never use the legacy behavior on non-Apple OSes
@@ -63,18 +85,15 @@ bool workaroundProtocolConformanceReverseIteration() {
 // declared non-nullable.  Such null pointers can lead to undefined behavior
 // later on.  Starting in Swift 5.4, these unexpected null pointers are fatal
 // runtime errors, but this is selectively disabled for old apps.
-bool unexpectedObjCNullWhileCastingIsFatal() {
+bool useLegacyPermissiveObjCNullSemanticsInCasting() {
 #if BINARY_COMPATIBILITY_APPLE
-  // If this is a new enough Apple OS ...
-  if (__builtin_available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *)) {
-    const dyld_build_version_t spring_2021_os_versions = {0xffffffff, 0x007e50301};
-    // ... use strict behavior for apps compiled on or after Spring 2021.
-    return dyld_program_sdk_at_least(spring_2021_os_versions);
-  } else {
-    return false; // Use permissive behavior on old Apple OS
+  switch (isAppAtLeastSpring2021()) {
+  case oldOS: return true; // Permissive (legacy) behavior on old OS
+  case oldApp: return true; // Permissive (legacy) behavior for old apps
+  case newApp: return false; // Strict behavior for new apps
   }
 #else
-  return true;  // Always use the strict behavior on non-Apple OSes
+  return false;  // Always use the strict behavior on non-Apple OSes
 #endif
 }
 
@@ -87,18 +106,36 @@ bool unexpectedObjCNullWhileCastingIsFatal() {
 // Earlier versions of the Swift runtime did not do this if the source
 // optional was nil.  In that case, the outer target optional would be
 // set to nil.
-bool useLegacyOptionalNilInjection() {
+bool useLegacyOptionalNilInjectionInCasting() {
 #if BINARY_COMPATIBILITY_APPLE
-  // If this is a new enough Apple OS ...
-  if (__builtin_available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *)) {
-    const dyld_build_version_t spring_2021_os_versions = {0xffffffff, 0x007e50301};
-    // It's using Spring 2021 or later SDK, so don't use the legacy behavior.
-    return !dyld_program_sdk_at_least(spring_2021_os_versions);
-  } else {
-    return true; // Use the legacy behavior on old Apple OS
+  switch (isAppAtLeastSpring2021()) {
+  case oldOS: return true; // Legacy behavior on old OS
+  case oldApp: return true; // Legacy behavior for old apps
+  case newApp: return false; // Consistent behavior for new apps
   }
 #else
   return false;  // Always use the 5.4 behavior on non-Apple OSes
+#endif
+}
+
+// Should casting be strict about protocol conformance when
+// boxing Swift values to pass to Obj-C?
+
+// Earlier versions of the Swift runtime would allow you to
+// cast a swift value to e.g., `NSCopying` or `NSObjectProtocol`
+// even if that value did not actually conform.  This was
+// due to the fact that the `__SwiftValue` box type itself
+// conformed to these protocols.
+
+// But this was not really sound, as it implies for example that
+// `x is NSCopying` is always `true` regardless of whether
+// `x` actually has the `copyWithZone()` method required
+// by that protocol.
+bool useLegacyObjCBoxingInCasting() {
+#if BINARY_COMPATIBILITY_APPLE
+  return true; // For now, continue using the legacy behavior on Apple OSes
+#else
+  return false; // Always use the new behavior on non-Apple OSes
 #endif
 }
 

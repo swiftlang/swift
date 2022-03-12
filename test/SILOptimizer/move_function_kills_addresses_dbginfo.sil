@@ -1,0 +1,73 @@
+// RUN: %target-sil-opt %s -sil-move-kills-copyable-addresses-checker | %FileCheck %s
+
+// REQUIRES: optimized_stdlib
+
+sil_stage raw
+
+import Builtin
+
+// Make sure that when we process a move_addr on an alloc_stack/debug_value that
+// we properly put the [moved] marker on them.
+
+// CHECK-LABEL: sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK:   [[SRC_ADDR:%.*]] = alloc_stack [lexical] [moved] $Builtin.NativeObject, let, name "[[VAR_NAME:.*]]"
+// CHECK:   [[DEST_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   copy_addr [take] [[SRC_ADDR]] to [initialization] [[DEST_ADDR]]
+// CHECK-NEXT: debug_value [moved] undef
+// CHECK: } // end sil function 'singleBlock'
+sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack [lexical] $Builtin.NativeObject, let, name "myName"
+  %2 = copy_value %0 : $Builtin.NativeObject
+  store %2 to [init] %1 : $*Builtin.NativeObject
+
+  %dest = alloc_stack $Builtin.NativeObject
+  mark_unresolved_move_addr %1 to %dest : $*Builtin.NativeObject
+
+  destroy_addr %dest : $*Builtin.NativeObject
+  dealloc_stack %dest : $*Builtin.NativeObject
+
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multipleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0(
+// CHECK:   [[SRC_ADDR:%.*]] = alloc_stack [lexical] [moved] $Builtin.NativeObject, let, name "[[VAR_NAME:.*]]"
+// CHECK:   [[DEST_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   cond_br undef, [[LHS:bb[0-9]+]], [[RHS:bb[0-9]+]]
+//
+// CHECK: [[LHS]]:
+// CHECK:   copy_addr [take] [[SRC_ADDR]] to [initialization] [[DEST_ADDR]]
+// CHECK:   debug_value [moved] undef : $*Builtin.NativeObject, let, name "[[VAR_NAME]]"
+// CHECK:   br bb
+//
+// CHECK: } // end sil function 'multipleBlock'
+sil [ossa] @multipleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack [lexical] $Builtin.NativeObject, let, name "myName"
+  %2 = copy_value %0 : $Builtin.NativeObject
+  store %2 to [init] %1 : $*Builtin.NativeObject
+  %dest = alloc_stack $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  mark_unresolved_move_addr %1 to %dest : $*Builtin.NativeObject
+  destroy_addr %dest : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %dest : $*Builtin.NativeObject
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

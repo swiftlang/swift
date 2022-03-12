@@ -46,8 +46,8 @@ ReferenceTestSuite.test("pass-lvalue-reference") {
 
 ReferenceTestSuite.test("pass-const-lvalue-reference") {
   expectNotEqual(22, getStaticInt())
-  var val: CInt = 22
-  setConstStaticIntRef(&val)
+  let val: CInt = 22
+  setConstStaticIntRef(val)
   expectEqual(22, getStaticInt())
 }
 
@@ -60,8 +60,8 @@ ReferenceTestSuite.test("pass-rvalue-reference") {
 
 ReferenceTestSuite.test("pass-const-rvalue-reference") {
   expectNotEqual(53, getStaticInt())
-  var val: CInt = 53
-  setConstStaticIntRvalueRef(&val)
+  let val: CInt = 53
+  setConstStaticIntRvalueRef(val)
   expectEqual(53, getStaticInt())
 }
 
@@ -79,6 +79,26 @@ ReferenceTestSuite.test("func-rvalue-reference") {
   expectNotEqual(61, getStaticInt())
   setStaticInt(61)
   expectEqual(61, cxxF())
+}
+
+ReferenceTestSuite.test("pod-struct-const-lvalue-reference") {
+  expectNotEqual(getStaticInt(), 78)
+  takeConstRef(78)
+  expectEqual(getStaticInt(), 78)
+}
+
+ReferenceTestSuite.test("reference to template") {
+  var val: CInt = 53
+  let ref = refToTemplate(&val)
+  expectEqual(53, ref.pointee)
+  ref.pointee = 42
+  expectEqual(42, val)
+}
+
+ReferenceTestSuite.test("const reference to template") {
+  var val: CInt = 53
+  let ref = constRefToTemplate(val)
+  expectEqual(53, ref.pointee)
 }
 
 runAllTests()

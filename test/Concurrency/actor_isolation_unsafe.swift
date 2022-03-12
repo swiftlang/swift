@@ -29,12 +29,18 @@ struct S3_P1: P1 {
   nonisolated func onMainActor() { }
 }
 
-struct S4_P1: P1 {
-  @SomeGlobalActor func onMainActor() { } // expected-error{{instance method 'onMainActor()' isolated to global actor 'SomeGlobalActor' can not satisfy corresponding requirement from protocol 'P1' isolated to global actor 'MainActor'}}
+struct S4_P1_quietly: P1 {
+  @SomeGlobalActor func onMainActor() { }
 }
 
+@SomeGlobalActor
+struct S4_P1: P1 {
+  @SomeGlobalActor func onMainActor() { } // expected-warning{{instance method 'onMainActor()' isolated to global actor 'SomeGlobalActor' can not satisfy corresponding requirement from protocol 'P1' isolated to global actor 'MainActor'}}
+}
+
+
 @MainActor(unsafe)
-protocol P2 { // expected-note{{protocol 'P2' does not conform to the 'Sendable' protocol}}
+protocol P2 {
   func f() // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func g()
 }
@@ -44,7 +50,6 @@ struct S5_P2: P2 {
   func g() { }
 }
 
-// expected-warning@+1{{cannot pass argument of non-sendable type 'P2' across actors}}
 nonisolated func testP2(x: S5_P2, p2: P2) {
   p2.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // OKAY

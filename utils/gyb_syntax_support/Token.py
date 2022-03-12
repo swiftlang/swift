@@ -18,7 +18,7 @@ class Token(object):
         else:
             self.unprefixed_kind = unprefixed_kind
         self.serialization_code = serialization_code
-        self.text = text or ""
+        self.text = text
         self.classification = classification_by_name(classification)
         self.is_keyword = is_keyword
         self.requires_leading_space = requires_leading_space
@@ -330,6 +330,7 @@ SYNTAX_TOKENS = [
             classification='FloatingLiteral', serialization_code=112),
     Literal('StringLiteral', 'string_literal',
             classification='StringLiteral', serialization_code=113),
+    Literal('RegexLiteral', 'regex_literal', serialization_code=124),
 
     Misc('Unknown', 'unknown', serialization_code=115),
     Misc('Identifier', 'identifier', classification='Identifier',

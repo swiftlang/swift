@@ -2,14 +2,14 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CAPTURE
 // RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 
-// CHECK-DAG: [[FILENAME:@[0-9]+]] = {{.*}} c"{{.*}}closure.swift\00"
-// OPT: [[FILENAME:@[0-9]+]] = {{.*}} [1 x i8] zeroinitializer
+// CHECK-DAG: [[FILENAME:@.str]] = {{.*}} c"{{.*}}closure.swift\00"
+// OPT: [[FILENAME:@.str]] = {{.*}} [1 x i8] zeroinitializer
 
 // -- partial_apply context metadata
 
-// CHECK-DAG: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { void (%swift.refcounted*)* @objectdestroy, i8** null, %swift.type { i64 1024 }, i32 16, i8* bitcast ({ i32, i32, i32, i32 }* @"\01l__swift5_reflection_descriptor" to i8*) }
+// CHECK-DAG: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { void (%swift.refcounted*)* {{.*}}@objectdestroy{{(\.ptrauth.*)?}}, i8** null, %swift.type { i64 1024 }, i32 16, i8* bitcast ({ i32, i32, i32, i32 }* @"\01l__swift5_reflection_descriptor" to i8*) }
 
 func a(i i: Int) -> (Int) -> Int {
   return { x in i }

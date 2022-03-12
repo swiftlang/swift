@@ -468,7 +468,15 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
 
   if (ObjCInterop)
     this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
-  
+
+  // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
+  if (Context.LangOpts.EnableCXXInterop) {
+    if (Context.LangOpts.Target.isOSDarwin())
+      this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
+    else if (Context.LangOpts.Target.isOSLinux())
+      this->addLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
+  }
+
   // FIXME: It'd be better to have the driver invocation or build system that
   // executes the linker introduce these compatibility libraries, since at
   // that point we know whether we're building an executable, which is the only
@@ -1272,6 +1280,11 @@ void IRGenerator::emitTypeMetadataRecords() {
   }
 }
 
+void IRGenerator::emitAccessibleFunctions() {
+  for (auto &m : *this)
+    m.second->emitAccessibleFunctions();
+}
+
 static void
 deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
     IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
@@ -2011,7 +2024,11 @@ void IRGenModule::emitVTableStubs() {
     if (F.getEffectiveSymbolLinkage() == SILLinkage::Hidden)
       alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
     else
-      ApplyIRLinkage(IRLinkage::ExternalExport).to(alias);
+      ApplyIRLinkage(IRGen.Opts.InternalizeSymbols
+                        ? IRLinkage{llvm::GlobalValue::ExternalLinkage,
+                                    llvm::GlobalValue::HiddenVisibility,
+                                    llvm::GlobalValue::DefaultStorageClass}
+                        : IRLinkage::ExternalExport).to(alias);
   }
 }
 
@@ -2081,14 +2098,14 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
   switch (linkage) {
   case SILLinkage::Public:
     return {llvm::GlobalValue::ExternalLinkage, PublicDefinitionVisibility,
-            ExportedStorage};
+            info.Internalize ? llvm::GlobalValue::DefaultStorageClass
+                             : ExportedStorage};
 
   case SILLinkage::PublicNonABI:
     return isDefinition ? RESULT(WeakODR, Hidden, Default)
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
     return isDefinition ? RESULT(LinkOnceODR, Hidden, Default)
                         : RESULT(External, Hidden, Default);
 
@@ -2196,11 +2213,9 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
                        SILLinkage linkage, ForDefinition_t isDefinition,
                        bool isWeakImported) {
   LinkInfo result;
-
-  // TODO(compnerd) handle this properly
-
   result.Name += name;
-  result.IRL = getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported);
+  result.IRL = getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported,
+                            linkInfo.Internalize);
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2248,10 +2263,8 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
   llvm::AttrBuilder initialAttrs;
   IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
   // Merge initialAttrs with attrs.
-  auto updatedAttrs =
-    signature.getAttributes().addAttributes(IGM.getLLVMContext(),
-                                      llvm::AttributeList::FunctionIndex,
-                                            initialAttrs);
+  auto updatedAttrs = signature.getAttributes().addFnAttributes(
+      IGM.getLLVMContext(), initialAttrs);
   if (!updatedAttrs.isEmpty())
     fn->setAttributes(updatedAttrs);
 
@@ -2619,9 +2632,8 @@ static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
   auto &attrs = signature.getMutableAttributes();
   switch (f->getInlineStrategy()) {
   case NoInline:
-    attrs = attrs.addAttribute(signature.getType()->getContext(),
-                               llvm::AttributeList::FunctionIndex,
-                               llvm::Attribute::NoInline);
+    attrs = attrs.addFnAttribute(signature.getType()->getContext(),
+                                 llvm::Attribute::NoInline);
     break;
   case AlwaysInline:
     // FIXME: We do not currently transfer AlwaysInline since doing so results
@@ -2631,9 +2643,8 @@ static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
   }
 
   if (isReadOnlyFunction(f)) {
-    attrs = attrs.addAttribute(signature.getType()->getContext(),
-                               llvm::AttributeList::FunctionIndex,
-                               llvm::Attribute::ReadOnly);
+    attrs = attrs.addFnAttribute(signature.getType()->getContext(),
+                                 llvm::Attribute::ReadOnly);
   }
 }
 
@@ -2751,27 +2762,27 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     auto *realReplFn = Builder.CreateBitCast(ReplFn, fnType);
     auto asyncFnPtr =
         FunctionPointer(silFunctionType, realReplFn, authInfo, signature);
+    // We never emit a function that uses special conventions, so we
+    // can just use the default async kind.
+    FunctionPointerKind fpKind =
+        FunctionPointerKind::AsyncFunctionPointer;
     PointerAuthInfo codeAuthInfo =
         asyncFnPtr.getAuthInfo().getCorrespondingCodeAuthInfo();
     auto newFnPtr = FunctionPointer(
         FunctionPointer::Kind::Function, asyncFnPtr.getPointer(IGF),
         codeAuthInfo,
-        Signature::forAsyncAwait(IGM, silFunctionType,
-                                 /*useSpecialConvention*/ false));
+        Signature::forAsyncAwait(IGM, silFunctionType, fpKind));
     SmallVector<llvm::Value *, 16> forwardedArgs;
     for (auto &arg : IGF.CurFn->args())
       forwardedArgs.push_back(&arg);
     auto layout = getAsyncContextLayout(
         IGM, silFunctionType, silFunctionType,
-        f->getForwardingSubstitutionMap(), false,
-        FunctionPointer::Kind(
-            FunctionPointer::BasicKind::AsyncFunctionPointer));
+        f->getForwardingSubstitutionMap());
     llvm::Value *dynamicContextSize32;
     llvm::Value *calleeFunction;
-    auto initialContextSize = Size(0);
     std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
         IGF, silFunctionType->getRepresentation(), asyncFnPtr, nullptr,
-        std::make_pair(false, true), initialContextSize);
+        std::make_pair(false, true));
     auto *dynamicContextSize =
         Builder.CreateZExt(dynamicContextSize32, IGM.SizeTy);
     auto calleeContextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
@@ -2843,7 +2854,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     unsigned argIdx = 0;
     for (auto arg : forwardedArgs) {
       // Replace the context argument.
-      if (argIdx == asyncContextIndex)
+      if (argIdx == asyncFnPtr.getSignature().getAsyncContextIndex())
         arguments.push_back(Builder.CreateBitOrPointerCast(
             calleeContextBuffer.getAddress(), IGM.SwiftContextPtrTy));
       else
@@ -3097,8 +3108,8 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   llvm::AttrBuilder attrBuilder;
   IGM.constructInitialFnAttributes(attrBuilder);
   attrBuilder.addAttribute(llvm::Attribute::AlwaysInline);
-  llvm::AttributeList attr = signature.getAttributes().addAttributes(
-      IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, attrBuilder);
+  llvm::AttributeList attr = signature.getAttributes().addFnAttributes(
+      IGM.getLLVMContext(), attrBuilder);
   thunk->setAttributes(attr);
 
   IRGenFunction subIGF(IGM, thunk);
@@ -3220,7 +3231,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   }
   auto fpKind = irgen::classifyFunctionPointerKind(f);
   Signature signature =
-      getSignature(f->getLoweredFunctionType(), fpKind.useSpecialConvention());
+      getSignature(f->getLoweredFunctionType(), fpKind);
   addLLVMFunctionAttributes(f, signature);
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
@@ -3663,7 +3674,7 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     auto clas = dyn_cast<ClassDecl>(decl);
-    if (!clas) {
+    if (!clas || clas->isForeignReferenceType()) {
       return getTypeContextDescriptorEntityReference(*this, nominal);
     }
 
@@ -3761,9 +3772,7 @@ void IRGenModule::appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
                             llvm::ConstantAsMetadata::get(dependsOn),
                         }),
   };
-  auto *usedConditional =
-      Module.getOrInsertNamedMetadata("llvm.used.conditional");
-  usedConditional->addOperand(llvm::MDNode::get(Module.getContext(), metadata));
+  UsedConditionals.push_back(llvm::MDNode::get(Module.getContext(), metadata));
 }
 
 /// Expresses that `var` is removable (dead-strippable) when either the protocol
@@ -3790,9 +3799,32 @@ void IRGenModule::appendLLVMUsedConditionalEntry(
                             llvm::ConstantAsMetadata::get(type),
                         }),
   };
+  UsedConditionals.push_back(llvm::MDNode::get(Module.getContext(), metadata));
+}
+
+void IRGenModule::emitUsedConditionals() {
+  if (UsedConditionals.empty())
+    return;
+
   auto *usedConditional =
       Module.getOrInsertNamedMetadata("llvm.used.conditional");
-  usedConditional->addOperand(llvm::MDNode::get(Module.getContext(), metadata));
+
+  for (auto *M : UsedConditionals) {
+    // Process the dependencies ("edges") and strip any pointer casts on them.
+    // Those might appear when a dependency is originally added against a
+    // declaration only, and later the declaration is RAUW'd with a definition
+    // causing a bitcast to get added to the metadata entry in the dependency.
+    auto *DependenciesMD =
+        dyn_cast_or_null<llvm::MDNode>(M->getOperand(2).get());
+    for (unsigned int I = 0; I < DependenciesMD->getNumOperands(); I++) {
+      auto *Dependency = DependenciesMD->getOperand(I).get();
+      auto *C = llvm::mdconst::extract_or_null<llvm::Constant>(Dependency)
+                    ->stripPointerCasts();
+      DependenciesMD->replaceOperandWith(I, llvm::ConstantAsMetadata::get(C));
+    }
+
+    usedConditional->addOperand(M);
+  }
 }
 
 /// Emit the protocol descriptors list and return it (if asContiguousArray is
@@ -3887,6 +3919,10 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
 
   // Add this conformance to the conformance list.
   ProtocolConformances.push_back(std::move(record));
+}
+
+void IRGenModule::addAccessibleFunction(SILFunction *func) {
+  AccessibleFunctions.push_back(func);
 }
 
 /// Emit the protocol conformance list and return it (if asContiguousArray is
@@ -4088,6 +4124,88 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
   }
 
   return nullptr;
+}
+
+void IRGenModule::emitAccessibleFunctions() {
+  if (AccessibleFunctions.empty())
+    return;
+
+  StringRef sectionName;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::GOFF:
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("Don't know how to emit accessible functions for "
+                     "the selected object format.");
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift5_acfuncs, regular";
+    break;
+  case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
+    sectionName = "swift5_accessible_functions";
+    break;
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::COFF:
+    sectionName = ".sw5acfn$B";
+    break;
+  }
+
+  for (auto *func : AccessibleFunctions) {
+    auto mangledRecordName =
+        LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
+
+    auto var = new llvm::GlobalVariable(
+        Module, AccessibleFunctionRecordTy, /*isConstant*/ true,
+        llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
+        mangledRecordName);
+
+    ConstantInitBuilder builder(*this);
+    ConstantStructBuilder fields =
+        builder.beginStruct(AccessibleFunctionRecordTy);
+
+    std::string mangledFunctionName =
+        LinkEntity::forSILFunction(func).mangleAsString();
+    llvm::Constant *name = getAddrOfGlobalString(
+        mangledFunctionName, /*willBeRelativelyAddressed*/ true);
+    fields.addRelativeAddress(name);
+
+    llvm::Constant *genericEnvironment = nullptr;
+
+    GenericSignature signature;
+    if (auto *env = func->getGenericEnvironment()) {
+      signature = env->getGenericSignature();
+      genericEnvironment =
+          getAddrOfGenericEnvironment(signature.getCanonicalSignature());
+    }
+
+    fields.addRelativeAddressOrNull(genericEnvironment);
+
+    llvm::Constant *type = getTypeRef(func->getLoweredFunctionType(), signature,
+                                      MangledTypeRefRole::Metadata)
+                               .first;
+    fields.addRelativeAddress(type);
+
+    llvm::Constant *funcAddr = nullptr;
+    if (func->isDistributed()) {
+      funcAddr = getAddrOfAsyncFunctionPointer(
+          LinkEntity::forDistributedTargetAccessor(func));
+    } else if (func->isAsync()) {
+      funcAddr = getAddrOfAsyncFunctionPointer(func);
+    } else {
+      funcAddr = getAddrOfSILFunction(func, NotForDefinition);
+    }
+
+    fields.addRelativeAddress(funcAddr);
+
+    AccessibleFunctionFlags flags;
+    flags.setDistributed(func->isDistributed());
+    fields.addInt32(flags.getOpaqueValue());
+
+    fields.finishAndSetAsInitializer(var);
+    var->setSection(sectionName);
+    var->setAlignment(llvm::MaybeAlign(4));
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
+  }
 }
 
 /// Fetch a global reference to a reference to the given Objective-C class.
@@ -5166,7 +5284,9 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     return entry.second;
   }
 
-  entry = createStringConstant(data, willBeRelativelyAddressed);
+  entry = createStringConstant(data, willBeRelativelyAddressed,
+                               /*sectionName*/ "",
+                               ".str" /* match how Clang creates strings */);
   return entry.second;
 }
 
@@ -5195,9 +5315,9 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   ArrayRef<llvm::UTF16> utf16(&buffer[0], utf16Length + 1);
 
   auto init = llvm::ConstantDataArray::get(getLLVMContext(), utf16);
-  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
-                                         llvm::GlobalValue::PrivateLinkage,
-                                         init);
+  auto global = new llvm::GlobalVariable(
+      Module, init->getType(), true, llvm::GlobalValue::PrivateLinkage, init,
+      ".str" /* match how Clang creates strings */);
   global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
   // Drill down to make an i16*.

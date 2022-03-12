@@ -18,6 +18,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include <vector>
+#include "Diagnostics.h"
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -30,12 +31,42 @@ namespace swift {
 
 class AssociatedTypeDecl;
 class ProtocolDecl;
+class ProtocolTypeAlias;
 class Requirement;
 
 namespace rewriting {
 
-void
-desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
+// Entry points used by AbstractGenericSignatureRequest and
+// InferredGenericSignatureRequest; see RequiremetnLowering.cpp for
+// documentation
+// comments.
+
+void desugarRequirement(Requirement req,
+                        SmallVectorImpl<Requirement> &result,
+                        SmallVectorImpl<RequirementError> &errors);
+
+void inferRequirements(Type type, SourceLoc loc, ModuleDecl *module,
+                       SmallVectorImpl<StructuralRequirement> &result);
+
+void realizeRequirement(Requirement req, RequirementRepr *reqRepr,
+                        ModuleDecl *moduleForInference,
+                        SmallVectorImpl<StructuralRequirement> &result,
+                        SmallVectorImpl<RequirementError> &errors);
+
+void realizeInheritedRequirements(TypeDecl *decl, Type type,
+                                  ModuleDecl *moduleForInference,
+                                  SmallVectorImpl<StructuralRequirement> &result,
+                                  SmallVectorImpl<RequirementError> &errors);
+
+bool diagnoseRequirementErrors(ASTContext &ctx,
+                               ArrayRef<RequirementError> errors,
+                               bool allowConcreteGenericParams);
+
+std::pair<MutableTerm, MutableTerm>
+getRuleForRequirement(const Requirement &req,
+                      const ProtocolDecl *proto,
+                      Optional<ArrayRef<Term>> substitutions,
+                      RewriteContext &ctx);
 
 /// A utility class for bulding rewrite rules from the top-level requirements
 /// of a generic signature.
@@ -44,7 +75,6 @@ desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
 /// appearing on the right hand side of conformance requirements.
 struct RuleBuilder {
   RewriteContext &Context;
-  bool Dump;
 
   /// The keys are the unique protocols we've added so far. The value indicates
   /// whether the protocol's SCC is an initial component for the rewrite system.
@@ -60,7 +90,9 @@ struct RuleBuilder {
   ///
   /// This is what breaks the cycle in requirement signature computation for a
   /// group of interdependent protocols.
-  llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
+  llvm::DenseMap<const ProtocolDecl *, bool> &ProtocolMap;
+
+  /// The keys of the above map in insertion order.
   std::vector<const ProtocolDecl *> Protocols;
 
   /// New rules to add which will be marked 'permanent'. These are rules for
@@ -72,23 +104,44 @@ struct RuleBuilder {
 
   /// New rules derived from requirements written by the user, which can be
   /// eliminated by homotopy reduction.
-  std::vector<std::pair<MutableTerm, MutableTerm>> RequirementRules;
+  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>>
+      RequirementRules;
 
-  CanType getConcreteSubstitutionSchema(CanType concreteType,
-                                        const ProtocolDecl *proto,
-                                        SmallVectorImpl<Term> &result);
+  /// Requirements written in source code. The requirement ID in the above
+  /// \c RequirementRules vector is an index into this array.
+  std::vector<StructuralRequirement> WrittenRequirements;
 
-  RuleBuilder(RewriteContext &ctx, bool dump) : Context(ctx), Dump(dump) {}
+  /// Enables debugging output. Controlled by the -dump-requirement-machine
+  /// frontend flag.
+  bool Dump;
+
+  RuleBuilder(RewriteContext &ctx,
+              llvm::DenseMap<const ProtocolDecl *, bool> &protocolMap)
+      : Context(ctx), ProtocolMap(protocolMap),
+        Dump(ctx.getASTContext().LangOpts.DumpRequirementMachine) {}
+
   void addRequirements(ArrayRef<Requirement> requirements);
+  void addRequirements(ArrayRef<StructuralRequirement> requirements);
   void addProtocols(ArrayRef<const ProtocolDecl *> proto);
   void addProtocol(const ProtocolDecl *proto,
                    bool initialComponent);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
+                      const ProtocolDecl *proto,
+                      Optional<unsigned> requirementID);
+  void addRequirement(const StructuralRequirement &req,
                       const ProtocolDecl *proto);
+  void addTypeAlias(const ProtocolTypeAlias &alias,
+                    const ProtocolDecl *proto);
   void collectRulesFromReferencedProtocols();
 };
+
+// Defined in ConcreteContraction.cpp.
+bool performConcreteContraction(
+    ArrayRef<StructuralRequirement> requirements,
+    SmallVectorImpl<StructuralRequirement> &result,
+    bool debug);
 
 } // end namespace rewriting
 

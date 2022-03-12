@@ -106,13 +106,13 @@ public func precondition(
 /// one of the other cases must be satisfied. To protect code from invalid
 /// usage in Release builds, see `preconditionFailure(_:file:line:)`.
 ///
-/// * In playgrounds and -Onone builds (the default for Xcode's Debug
+/// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
 ///   configuration), stop program execution in a debuggable state after
 ///   printing `message`.
 ///
-/// * In -O builds, has no effect.
+/// * In `-O` builds, has no effect.
 ///
-/// * In -Ounchecked builds, the optimizer may assume that this function is
+/// * In `-Ounchecked` builds, the optimizer may assume that this function is
 ///   never called. Failure to satisfy that assumption is a serious
 ///   programming error.
 ///
@@ -261,6 +261,9 @@ internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
+#if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
+  _precondition(condition(), message, file: file, line: line)
+#else
   // Only check in debug mode.
   if _slowPath(_isDebugAssertConfiguration()) {
     if !_fastPath(condition()) {
@@ -268,6 +271,7 @@ internal func _debugPrecondition(
         flags: _fatalErrorFlags())
     }
   }
+#endif
 }
 
 @usableFromInline @_transparent
@@ -275,10 +279,14 @@ internal func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
+#if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
+  _preconditionFailure(message, file: file, line: line)
+#else
   if _slowPath(_isDebugAssertConfiguration()) {
     _precondition(false, message, file: file, line: line)
   }
   _conditionallyUnreachable()
+#endif
 }
 
 /// Internal checks.

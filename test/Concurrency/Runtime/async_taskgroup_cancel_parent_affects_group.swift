@@ -8,6 +8,9 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://86773147
+// REQUIRES: swift_test_mode_optimize_none
+
 import Dispatch
 
 @available(SwiftStdlib 5.1, *)

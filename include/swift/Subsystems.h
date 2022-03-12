@@ -157,7 +157,7 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
-  /// Resolve the given \c TypeRepr to a contextual type.
+  /// Resolve the given \c TypeRepr to an interface type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,
   /// code completion).

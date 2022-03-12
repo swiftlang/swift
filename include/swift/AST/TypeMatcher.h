@@ -143,6 +143,42 @@ class TypeMatcher {
       return mismatch(firstTuple.getPointer(), secondType, sugaredFirstType);
     }
 
+    bool visitPackType(CanPackType firstTuple, Type secondType,
+                       Type sugaredFirstType) {
+      if (auto secondTuple = secondType->getAs<PackType>()) {
+        auto sugaredFirstTuple = sugaredFirstType->getAs<PackType>();
+        if (firstTuple->getNumElements() != secondTuple->getNumElements())
+          return mismatch(firstTuple.getPointer(), secondTuple,
+                          sugaredFirstType);
+
+        for (unsigned i = 0, n = firstTuple->getNumElements(); i != n; ++i) {
+          Type secondElt = secondTuple->getElementType(i);
+
+          // Recurse on the pack elements.
+          if (!this->visit(firstTuple.getElementType(i), secondElt,
+                           sugaredFirstTuple->getElementType(i)))
+            return false;
+        }
+
+        return true;
+      }
+
+      // Pack/non-pack mismatch.
+      return mismatch(firstTuple.getPointer(), secondType, sugaredFirstType);
+    }
+
+    bool visitPackExpansionType(CanPackExpansionType firstPE, Type secondType,
+                                Type sugaredFirstType) {
+      if (auto secondInOut = secondType->getAs<PackExpansionType>()) {
+        return this->visit(firstPE.getPatternType(),
+                           secondInOut->getPatternType(),
+                           sugaredFirstType->castTo<PackExpansionType>()
+                             ->getPatternType());
+      }
+
+      return mismatch(firstPE.getPointer(), secondType, sugaredFirstType);
+    }
+
     bool visitReferenceStorageType(CanReferenceStorageType firstStorage,
                                    Type secondType, Type sugaredFirstType) {
       auto _secondStorage = secondType->getCanonicalType();
@@ -193,8 +229,26 @@ class TypeMatcher {
     }
 
     TRIVIAL_CASE(ModuleType)
-    TRIVIAL_CASE(DynamicSelfType)
     TRIVIAL_CASE(ArchetypeType)
+
+    bool visitDynamicSelfType(CanDynamicSelfType firstDynamicSelf,
+                              Type secondType,
+                              Type sugaredFirstType) {
+      if (auto secondDynamicSelf = secondType->getAs<DynamicSelfType>()) {
+        auto firstBase = firstDynamicSelf->getSelfType();
+        auto secondBase = secondDynamicSelf->getSelfType();
+        auto firstSugaredBase = sugaredFirstType->getAs<DynamicSelfType>()
+            ->getSelfType();
+
+        if (!this->visit(CanType(firstBase), secondBase, firstSugaredBase))
+          return false;
+
+        return true;
+      }
+
+      return mismatch(firstDynamicSelf.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     bool visitDependentMemberType(CanDependentMemberType firstType,
                                    Type secondType,
@@ -267,7 +321,77 @@ class TypeMatcher {
     TRIVIAL_CASE(SILFunctionType)
     TRIVIAL_CASE(SILBlockStorageType)
     TRIVIAL_CASE(SILBoxType)
-    TRIVIAL_CASE(ProtocolCompositionType)
+
+    bool visitProtocolCompositionType(CanProtocolCompositionType firstProtocolComposition,
+                                      Type secondType,
+                                      Type sugaredFirstType) {
+      if (auto secondProtocolComposition = secondType->getAs<ProtocolCompositionType>()) {
+        auto firstMembers = firstProtocolComposition->getMembers();
+        auto secondMembers = secondProtocolComposition->getMembers();
+
+        if (firstMembers.size() == secondMembers.size()) {
+          for (unsigned i : indices(firstMembers)) {
+            auto firstMember = firstMembers[i];
+            auto secondMember = secondMembers[i];
+
+            // FIXME: We lose sugar here, because the sugared type might have a different
+            // number of members, or the members might appear in a different order.
+            if (!this->visit(CanType(firstMember), secondMember, firstMember)) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+      }
+
+      return mismatch(firstProtocolComposition.getPointer(), secondType,
+                      sugaredFirstType);
+    }
+
+    bool visitParameterizedProtocolType(CanParameterizedProtocolType firstParametrizedProto,
+                                        Type secondType,
+                                        Type sugaredFirstType) {
+      if (auto secondParametrizedProto = secondType->getAs<ParameterizedProtocolType>()) {
+        if (!this->visit(firstParametrizedProto.getBaseType(),
+                         secondParametrizedProto->getBaseType(),
+                         sugaredFirstType->castTo<ParameterizedProtocolType>()
+                             ->getBaseType())) {
+          return false;
+        }
+
+        auto firstArgs = firstParametrizedProto->getArgs();
+        auto secondArgs = secondParametrizedProto->getArgs();
+
+        if (firstArgs.size() == secondArgs.size()) {
+          for (unsigned i : indices(firstArgs)) {
+            return this->visit(CanType(firstArgs[i]),
+                               secondArgs[i],
+                               sugaredFirstType->castTo<ParameterizedProtocolType>()
+                                   ->getArgs()[i]);
+          }
+
+          return true;
+        }
+      }
+
+      return mismatch(firstParametrizedProto.getPointer(), secondType,
+                      sugaredFirstType);
+    }
+
+    bool visitExistentialType(CanExistentialType firstExistential,
+                              Type secondType,
+                              Type sugaredFirstType) {
+      if (auto secondExistential = secondType->getAs<ExistentialType>()) {
+        return this->visit(firstExistential.getConstraintType(),
+                           secondExistential->getConstraintType(),
+                           sugaredFirstType->castTo<ExistentialType>()
+                               ->getConstraintType());
+      }
+
+      return mismatch(firstExistential.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     bool visitLValueType(CanLValueType firstLValue, Type secondType,
                          Type sugaredFirstType) {

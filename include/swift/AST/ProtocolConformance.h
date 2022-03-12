@@ -514,6 +514,13 @@ public:
     return ContextAndBits.getInt() & UncheckedFlag;
   }
 
+  /// Mark the conformance as unchecked (equivalent to the @unchecked
+  /// conformance attribute).
+  void setUnchecked() {
+    // OK to mutate because the flags are not part of the folding set node ID.
+    ContextAndBits.setInt(ContextAndBits.getInt() | UncheckedFlag);
+  }
+
   /// Get the kind of source from which this conformance comes.
   ConformanceEntryKind getSourceKind() const {
     return SourceKindAndImplyingConformance.getInt();
@@ -653,7 +660,7 @@ class SelfProtocolConformance : public RootProtocolConformance {
 public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const {
-    return getType()->castTo<ProtocolType>()->getDecl();
+    return dyn_cast<ProtocolDecl>(getType()->getAnyNominal());
   }
 
   /// Get the declaration context in which this conformance was declared.

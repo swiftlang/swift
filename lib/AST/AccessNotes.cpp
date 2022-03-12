@@ -163,8 +163,8 @@ void AccessNote::dump(llvm::raw_ostream &os, int indent) const {
 
 }
 
-LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::AccessNoteDeclName, QuotingType::Single);
-LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::ObjCSelector, QuotingType::Single);
+LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::AccessNoteDeclName, QuotingType::Single)
+LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::ObjCSelector, QuotingType::Single)
 LLVM_YAML_IS_SEQUENCE_VECTOR(swift::AccessNote)
 LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::AccessNotesFile)
 

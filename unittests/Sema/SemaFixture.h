@@ -53,8 +53,7 @@ public:
 
     SearchPathOpts.RuntimeResourcePath = SWIFTLIB_DIR;
     SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(libDir.str()));
-    SearchPathOpts.RuntimeLibraryImportPaths.push_back(
-        std::string(libDir.str()));
+    SearchPathOpts.setRuntimeLibraryImportPaths({libDir.str().str()});
   }
 };
 

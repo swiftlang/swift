@@ -18,36 +18,14 @@
 
 using namespace swift;
 
-/// Return true iff the \p applySite calls a constant-evaluable function and
-/// it is non-generic and read/destroy only, which means that the call can do
-/// only the following and nothing else:
-///   (1) The call may read any memory location.
-///   (2) The call may destroy owned parameters i.e., consume them.
-///   (3) The call may write into memory locations newly created by the call.
-///   (4) The call may use assertions, which traps at runtime on failure.
-///   (5) The call may return a non-generic value.
-/// Essentially, these are calls whose "effect" is visible only in their return
-/// value or through the parameters that are destroyed. The return value
-/// is also guaranteed to have value semantics as it is non-generic and
-/// reference semantics is not constant evaluable.
-static bool isNonGenericReadOnlyConstantEvaluableCall(FullApplySite applySite) {
-  assert(applySite);
-  SILFunction *callee = applySite.getCalleeFunction();
-  if (!callee || !isConstantEvaluable(callee)) {
-    return false;
-  }
-  return !applySite.hasSubstitutions() && !getNumInOutArguments(applySite) &&
-         !applySite.getNumIndirectSILResults();
-}
-
 static bool hasOnlyIncidentalUses(SILInstruction *inst,
-                                  bool disallowDebugUses = false) {
+                                  bool preserveDebugInfo = false) {
   for (SILValue result : inst->getResults()) {
     for (Operand *use : result->getUses()) {
       SILInstruction *user = use->getUser();
       if (!isIncidentalUse(user))
         return false;
-      if (disallowDebugUses && user->isDebugInstruction())
+      if (preserveDebugInfo && user->isDebugInstruction())
         return false;
     }
   }
@@ -88,6 +66,12 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
     return true;
 
   switch (inst->getKind()) {
+  case SILInstructionKind::AllocStackInst: {
+    // An alloc_stack only used by dealloc_stack is dead.
+    return
+      fun->getEffectiveOptimizationMode() > OptimizationMode::NoOptimization
+      || !cast<AllocStackInst>(inst)->getVarInfo();
+  }
   case SILInstructionKind::LoadBorrowInst: {
     // A load_borrow only used in an end_borrow is dead.
     return true;
@@ -160,7 +144,7 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
     // provided the parameter lifetimes are handled correctly, which is taken
     // care of by the function: \c deleteInstruction.
     FullApplySite applySite(cast<ApplyInst>(inst));
-    return isNonGenericReadOnlyConstantEvaluableCall(applySite);
+    return isReadOnlyConstantEvaluableCall(applySite);
   }
   default: {
     return false;
@@ -183,9 +167,9 @@ bool InstructionDeleter::trackIfDead(SILInstruction *inst) {
 }
 
 void InstructionDeleter::forceTrackAsDead(SILInstruction *inst) {
-  bool disallowDebugUses = inst->getFunction()->getEffectiveOptimizationMode()
+  bool preserveDebugInfo = inst->getFunction()->getEffectiveOptimizationMode()
                            <= OptimizationMode::NoOptimization;
-  assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
+  assert(hasOnlyIncidentalUses(inst, preserveDebugInfo));
   getCallbacks().notifyWillBeDeleted(inst);
   deadInstructions.insert(inst);
 }
@@ -227,8 +211,8 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
       auto uses = llvm::to_vector<4>(result->getUses());
       for (Operand *use : uses) {
         SILInstruction *user = use->getUser();
-        assert(forceDeleteUsers || isIncidentalUse(user) ||
-               isa<DestroyValueInst>(user));
+        assert(forceDeleteUsers || isIncidentalUse(user)
+               || isa<DestroyValueInst>(user) || isa<DeallocStackInst>(user));
         assert(!isa<BranchInst>(user) && "can't delete phis");
 
         toDeleteInsts.push_back(user);
@@ -238,8 +222,12 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
     }
   }
   // Process the remaining operands. Insert destroys for consuming
-  // operands. Track newly dead operand values.
+  // operands. Track newly dead operand values. Instructions with multiple dead
+  // operands may occur in toDeleteInsts multiple times.
   for (auto *inst : toDeleteInsts) {
+    if (inst->isDeleted())
+      continue;
+
     for (Operand &operand : inst->getAllOperands()) {
       SILValue operandValue = operand.get();
       // Check for dead operands, which are dropped above.
@@ -271,6 +259,9 @@ void InstructionDeleter::cleanupDeadInstructions() {
     // append to deadInstructions. So we need to iterate until this it is empty.
     deadInstructions.clear();
     for (SILInstruction *deadInst : currentDeadInsts) {
+      if (deadInst->isDeleted())
+        continue;
+
       // deadInst will not have been deleted in the previous iterations,
       // because, by definition, deleteInstruction will only delete an earlier
       // instruction and its incidental/destroy uses. The former cannot be
@@ -296,17 +287,16 @@ bool InstructionDeleter::deleteIfDead(SILInstruction *inst) {
 
 void InstructionDeleter::forceDeleteAndFixLifetimes(SILInstruction *inst) {
   SILFunction *fun = inst->getFunction();
-  bool disallowDebugUses =
+  bool preserveDebugInfo =
       fun->getEffectiveOptimizationMode() <= OptimizationMode::NoOptimization;
-  assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
+  assert(hasOnlyIncidentalUses(inst, preserveDebugInfo));
   deleteWithUses(inst, /*fixLifetimes*/ fun->hasOwnership());
 }
 
 void InstructionDeleter::forceDelete(SILInstruction *inst) {
-  bool disallowDebugUses =
-      inst->getFunction()->getEffectiveOptimizationMode() <=
-      OptimizationMode::NoOptimization;
-  assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
+  bool preserveDebugInfo = inst->getFunction()->getEffectiveOptimizationMode()
+                           <= OptimizationMode::NoOptimization;
+  assert(hasOnlyIncidentalUses(inst, preserveDebugInfo));
   deleteWithUses(inst, /*fixLifetimes*/ false);
 }
 

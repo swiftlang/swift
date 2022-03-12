@@ -71,7 +71,7 @@ class BuilderClosureVisitor
   Type builderType;
   NominalTypeDecl *builder = nullptr;
   Identifier buildOptionalId;
-  llvm::SmallDenseMap<Identifier, bool> supportedOps;
+  llvm::SmallDenseMap<DeclName, bool> supportedOps;
 
   SkipUnhandledConstructInResultBuilder::UnhandledNode unhandledNode;
 
@@ -141,15 +141,18 @@ class BuilderClosureVisitor
   }
 
   /// Check whether the builder supports the given operation.
-  bool builderSupports(Identifier fnName,
-                       ArrayRef<Identifier> argLabels = {}) {
-    auto known = supportedOps.find(fnName);
+  bool builderSupports(Identifier fnBaseName,
+                       ArrayRef<Identifier> argLabels = {},
+                       bool checkAvailability = false) {
+    DeclName name(dc->getASTContext(), fnBaseName, argLabels);
+    auto known = supportedOps.find(name);
     if (known != supportedOps.end()) {
       return known->second;
     }
 
-    return supportedOps[fnName] = TypeChecker::typeSupportsBuilderOp(
-               builderType, dc, fnName, argLabels);
+    return supportedOps[name] = TypeChecker::typeSupportsBuilderOp(
+               builderType, dc, fnBaseName, argLabels, /*allResults*/ {},
+               checkAvailability);
   }
 
   /// Build an implicit variable in this context.
@@ -367,10 +370,73 @@ protected:
     if (!cs || hadError)
       return nullptr;
 
-    // Call Builder.buildBlock(... args ...)
-    auto call = buildCallIfWanted(braceStmt->getStartLoc(),
-                                  ctx.Id_buildBlock, expressions,
-                                  /*argLabels=*/{ });
+    Expr *call = nullptr;
+    // If the builder supports `buildPartialBlock(first:)` and
+    // `buildPartialBlock(accumulated:next:)`, use this to combine
+    // subexpressions pairwise.
+    if (ctx.LangOpts.EnableExperimentalPairwiseBuildBlock &&
+        !expressions.empty() &&
+        builderSupports(ctx.Id_buildPartialBlock, {ctx.Id_first},
+                        /*checkAvailability*/ true) &&
+        builderSupports(ctx.Id_buildPartialBlock,
+                        {ctx.Id_accumulated, ctx.Id_next},
+                        /*checkAvailability*/ true)) {
+      // NOTE: The current implementation uses one-way constraints in between
+      // subexpressions. It's functionally equivalent to the following:
+      //   let v0 = Builder.buildPartialBlock(first: arg_0)
+      //   let v1 = Builder.buildPartialBlock(accumulated: arg_1, next: v0)
+      //   ...
+      //   return Builder.buildPartialBlock(accumulated: arg_n, next: ...)
+      call = buildCallIfWanted(braceStmt->getStartLoc(),
+                               ctx.Id_buildPartialBlock,
+                               {expressions.front()},
+                               /*argLabels=*/{ctx.Id_first});
+      for (auto *expr : llvm::drop_begin(expressions)) {
+        call = buildCallIfWanted(braceStmt->getStartLoc(),
+                                 ctx.Id_buildPartialBlock,
+                                 {new (ctx) OneWayExpr(call), expr},
+                                 {ctx.Id_accumulated, ctx.Id_next});
+      }
+    }
+    // TODO: Remove support for the old method name,
+    // `buildBlock(combining:into:)`.
+    else if (ctx.LangOpts.EnableExperimentalPairwiseBuildBlock &&
+             !expressions.empty() &&
+             builderSupports(ctx.Id_buildBlock,
+                             {ctx.Id_combining, ctx.Id_into})) {
+      // NOTE: The current implementation uses one-way constraints in between
+      // subexpressions. It's functionally equivalent to the following:
+      //   let v0 = Builder.buildBlock(arg_0)
+      //   let v1 = Builder.buildBlock(combining: arg_1, into: v0)
+      //   ...
+      //   return Builder.buildBlock(combining: arg_n, into: ...)
+      call = buildCallIfWanted(braceStmt->getStartLoc(), ctx.Id_buildBlock,
+                               {expressions.front()}, /*argLabels=*/{});
+      for (auto *expr : llvm::drop_begin(expressions)) {
+        call = buildCallIfWanted(braceStmt->getStartLoc(), ctx.Id_buildBlock,
+                                 {expr, new (ctx) OneWayExpr(call)},
+                                 {ctx.Id_combining, ctx.Id_into});
+      }
+    }
+    // If `buildBlock` does not exist at this point, it could be the case that
+    // `buildPartialBlock` did not have the sufficient availability for this
+    // call site.  Diagnose it.
+    else if (ctx.LangOpts.EnableExperimentalPairwiseBuildBlock &&
+             !builderSupports(ctx.Id_buildBlock)) {
+      ctx.Diags.diagnose(
+          braceStmt->getStartLoc(),
+          diag::result_builder_missing_available_buildpartialblock,
+          builderType);
+      return nullptr;
+    }
+    // Otherwise, call `buildBlock` on all subexpressions.
+    else {
+      // Call Builder.buildBlock(... args ...)
+      call = buildCallIfWanted(braceStmt->getStartLoc(),
+                               ctx.Id_buildBlock, expressions,
+                               /*argLabels=*/{ });
+    }
+
     if (!call)
       return nullptr;
 
@@ -914,14 +980,14 @@ protected:
 
   /// Visit a throw statement, which never produces a result.
   VarDecl *visitThrowStmt(ThrowStmt *throwStmt) {
-    Type exnType = ctx.getErrorDecl()->getDeclaredInterfaceType();
-    if (!exnType) {
+    if (!ctx.getErrorDecl()) {
       hadError = true;
     }
 
     if (cs) {
      SolutionApplicationTarget target(
-         throwStmt->getSubExpr(), dc, CTP_ThrowStmt, exnType,
+         throwStmt->getSubExpr(), dc, CTP_ThrowStmt,
+         ctx.getErrorExistentialType(),
          /*isDiscarded=*/false);
      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
        hadError = true;
@@ -1109,26 +1175,6 @@ private:
     elements.push_back(pbd);
   }
 
-  /// Produce a final type-checked pattern binding.
-  void finishPatternBindingDecl(PatternBindingDecl *patternBinding) {
-    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
-      // Find the solution application target for this.
-      auto knownTarget =
-          *solution.getConstraintSystem().getSolutionApplicationTarget(
-            {patternBinding, index});
-
-      // Rewrite the target.
-      auto resultTarget = rewriteTarget(knownTarget);
-      if (!resultTarget)
-        continue;
-
-      patternBinding->setPattern(
-          index, resultTarget->getInitializationPattern(),
-          resultTarget->getDeclContext());
-      patternBinding->setInit(index, resultTarget->getAsExpr());
-    }
-  }
-
 public:
   BuilderClosureRewriter(
       const Solution &solution,
@@ -1226,14 +1272,18 @@ public:
       // Skip variable declarations; they're always part of a pattern
       // binding.
       if (isa<VarDecl>(decl)) {
+        TypeChecker::typeCheckDecl(decl);
         newElements.push_back(decl);
         continue;
       }
 
       // Handle pattern bindings.
       if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-        finishPatternBindingDecl(patternBinding);
-        newElements.push_back(decl);
+        auto resultTarget = rewriteTarget(SolutionApplicationTarget{patternBinding});
+        assert(resultTarget.hasValue()
+               && "Could not rewrite pattern binding entries!");
+        TypeChecker::typeCheckDecl(resultTarget->getAsPatternBinding());
+        newElements.push_back(resultTarget->getAsPatternBinding());
         continue;
       }
 
@@ -2008,7 +2058,8 @@ std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
 
 bool TypeChecker::typeSupportsBuilderOp(
     Type builderType, DeclContext *dc, Identifier fnName,
-    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults,
+    bool checkAvailability) {
   bool foundMatch = false;
   SmallVector<ValueDecl *, 4> foundDecls;
   dc->lookupQualified(
@@ -2025,6 +2076,17 @@ bool TypeChecker::typeSupportsBuilderOp(
         auto funcLabels = func->getName().getArgumentNames();
         if (argLabels.size() > funcLabels.size() ||
             funcLabels.slice(0, argLabels.size()) != argLabels)
+          continue;
+      }
+
+      // If we are checking availability, the candidate must have enough
+      // availability in the calling context.
+      if (checkAvailability) {
+        if (AvailableAttr::isUnavailable(func))
+          continue;
+        if (TypeChecker::checkDeclarationAvailability(
+                func, ExportContext::forFunctionBody(
+                    dc, extractNearestSourceLoc(dc))))
           continue;
       }
 

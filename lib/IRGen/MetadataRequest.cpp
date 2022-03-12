@@ -34,6 +34,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -612,8 +613,7 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
          cacheVariable});
     call->setDoesNotThrow();
     call->setCallingConv(IGF.IGM.SwiftCC);
-    call->addAttribute(llvm::AttributeList::FunctionIndex,
-                       llvm::Attribute::ReadNone);
+    call->addFnAttr(llvm::Attribute::ReadNone);
     return MetadataResponse::handle(IGF, request, call);
   }
   }
@@ -1341,6 +1341,17 @@ namespace {
       return emitNominalMetadataRef(IGF, type->getDecl(), type, request);
     }
 
+    MetadataResponse visitPackType(CanPackType type,
+                                   DynamicMetadataRequest request) {
+      llvm_unreachable("Unimplemented!");
+    }
+
+    MetadataResponse visitPackExpansionType(CanPackExpansionType type,
+                                            DynamicMetadataRequest request) {
+      llvm_unreachable("Unimplemented!");
+    }
+
+
     MetadataResponse visitTupleType(CanTupleType type,
                                     DynamicMetadataRequest request) {
       if (auto cached = tryGetLocal(type, request))
@@ -1670,8 +1681,12 @@ namespace {
       }
 
       auto layout = type.getExistentialLayout();
-      
-      auto protocols = layout.getProtocols();
+
+      SmallVector<ProtocolType *, 4> protocols;
+      for (auto proto : layout.getProtocols()) {
+        if (!proto->getDecl()->isMarkerProtocol())
+          protocols.push_back(proto);
+      }
 
       // Collect references to the protocol descriptors.
       auto descriptorArrayTy
@@ -1722,10 +1737,22 @@ namespace {
                                        DynamicMetadataRequest request) {
       return emitExistentialTypeMetadata(type, request);
     }
-      
+
     MetadataResponse
     visitProtocolCompositionType(CanProtocolCompositionType type,
                                  DynamicMetadataRequest request) {
+      return emitExistentialTypeMetadata(type, request);
+    }
+
+    MetadataResponse
+    visitParameterizedProtocolType(CanParameterizedProtocolType type,
+                                   DynamicMetadataRequest request) {
+      return emitExistentialTypeMetadata(type, request);
+    }
+
+    MetadataResponse
+    visitExistentialType(CanExistentialType type,
+                         DynamicMetadataRequest request) {
       return emitExistentialTypeMetadata(type, request);
     }
 
@@ -1831,8 +1858,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   accessor->setDoesNotThrow();
   // Don't inline cache functions, since doing so has little impact on
   // overall performance.
-  accessor->addAttribute(llvm::AttributeList::FunctionIndex,
-                         llvm::Attribute::NoInline);
+  accessor->addFnAttr(llvm::Attribute::NoInline);
   // Accessor functions don't need frame pointers.
   IGM.setHasNoFramePointer(accessor);
 
@@ -2051,10 +2077,9 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
   auto call = Builder.CreateCall(accessFunction, callArgs);
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     allocatedArgsBuffer
-                       ? llvm::Attribute::InaccessibleMemOrArgMemOnly
-                       : llvm::Attribute::ReadNone);
+  call->addFnAttr(allocatedArgsBuffer
+                      ? llvm::Attribute::InaccessibleMemOrArgMemOnly
+                      : llvm::Attribute::ReadNone);
 
   // If we allocated a buffer for the arguments, end its lifetime.
   if (allocatedArgsBuffer)
@@ -2110,8 +2135,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     }
     call->setDoesNotThrow();
     call->setCallingConv(IGM.SwiftCC);
-    call->addAttribute(llvm::AttributeList::FunctionIndex,
-                         llvm::Attribute::ReadOnly);
+    call->addFnAttr(llvm::Attribute::ReadOnly);
     result = call;
   } else {
     static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,
@@ -2536,6 +2560,14 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
       }
     }
 
+    void visitPackType(CanPackType tup) {
+      llvm_unreachable("Unimplemented!");
+    }
+
+    void visitPackExpansionType(CanPackExpansionType tup) {
+      llvm_unreachable("Unimplemented!");
+    }
+
     void visitTupleType(CanTupleType tup) {
       // The empty tuple has trivial metadata.
       if (tup->getNumElements() == 0) {
@@ -2860,6 +2892,15 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
+  if (type->isForeignReferenceType()) {
+    type->getASTContext().Diags.diagnose(
+        type->lookThroughAllOptionalTypes()
+            ->getClassOrBoundGenericClass()
+            ->getLoc(),
+        diag::foreign_reference_types_unsupported.ID, {});
+    exit(1);
+  }
+
   type = IGM.getRuntimeReifiedType(type);
   // Look through any opaque types we're allowed to.
   type = IGM.substOpaqueTypesWithUnderlyingTypes(type);
@@ -2934,6 +2975,14 @@ public:
     return ty;
   }
 
+  CanType visitPackType(CanPackType ty) {
+    llvm_unreachable("");
+  }
+
+  CanType visitPackExpansionType(CanPackExpansionType ty) {
+    llvm_unreachable("");
+  }
+
   CanType visitTupleType(CanTupleType ty) {
     bool changed = false;
     SmallVector<TupleTypeElt, 4> loweredElts;
@@ -2984,6 +3033,7 @@ public:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::CFunctionPointer:
     case SILFunctionType::Representation::Closure:
       // A thin function looks like a plain pointer.
@@ -3187,6 +3237,7 @@ namespace {
       case SILFunctionType::Representation::Method:
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
+      case SILFunctionType::Representation::CXXMethod:
       case SILFunctionType::Representation::CFunctionPointer:
       case SILFunctionType::Representation::Closure:
         // A thin function looks like a plain pointer.
@@ -3249,6 +3300,9 @@ namespace {
       case ReferenceCounting::Bridge:
       case ReferenceCounting::Error:
         llvm_unreachable("classes shouldn't have this kind of refcounting");
+      case ReferenceCounting::None:
+        llvm_unreachable(
+            "Foreign reference types don't conform to 'AnyClass'.");
       }
 
       llvm_unreachable("Not a valid ReferenceCounting.");
@@ -3262,6 +3316,16 @@ namespace {
     llvm::Value *visitBoundGenericClassType(CanBoundGenericClassType type,
                                             DynamicMetadataRequest request) {
       return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
+    }
+
+    llvm::Value *visitPackType(CanPackType type,
+                               DynamicMetadataRequest request) {
+      llvm_unreachable("");
+    }
+
+    llvm::Value *visitPackExpansionType(CanPackExpansionType type,
+                                        DynamicMetadataRequest request) {
+      llvm_unreachable("");
     }
 
     llvm::Value *visitTupleType(CanTupleType type,

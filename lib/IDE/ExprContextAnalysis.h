@@ -17,6 +17,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/IDE/PossibleParamInfo.h"
 
 namespace swift {
 class DeclContext;
@@ -24,7 +25,7 @@ class Expr;
 class ValueDecl;
 
 namespace ide {
-enum class SemanticContextKind;
+enum class SemanticContextKind : uint8_t;
 
 /// Type check parent contexts of the given decl context, and the body of the
 /// given context until \c Loc if the context is a function body.
@@ -56,23 +57,6 @@ struct FunctionTypeAndDecl {
   FunctionTypeAndDecl(AnyFunctionType *Type, ValueDecl *Decl,
                       SemanticContextKind SemanticContext)
       : Type(Type), Decl(Decl), SemanticContext(SemanticContext) {}
-};
-
-struct PossibleParamInfo {
-  /// Expected parameter.
-  /// 
-  /// 'nullptr' indicates that the code completion position is at out of
-  /// expected argument position. E.g.
-  ///   func foo(x: Int) {}
-  ///   foo(x: 1, <HERE>)
-  const AnyFunctionType::Param *Param;
-  bool IsRequired;
-
-  PossibleParamInfo(const AnyFunctionType::Param *Param, bool IsRequired)
-      : Param(Param), IsRequired(IsRequired) {
-    assert((Param || !IsRequired) &&
-           "nullptr with required flag is not allowed");
-  };
 };
 
 /// Given an expression and its decl context, the analyzer tries to figure out

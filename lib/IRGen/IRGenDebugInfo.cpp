@@ -97,6 +97,19 @@ public:
   };
 };
 
+static bool equalWithoutExistentialTypes(Type t1, Type t2) {
+  auto withoutExistentialTypes = [](Type type) -> Type {
+    return type.transform([](Type type) -> Type {
+      if (auto existential = type->getAs<ExistentialType>())
+        return existential->getConstraintType();
+      return type;
+    });
+  };
+
+  return withoutExistentialTypes(t1)
+      ->isEqual(withoutExistentialTypes(t2));
+}
+
 class IRGenDebugInfoImpl : public IRGenDebugInfo {
   friend class IRGenDebugInfoImpl;
   const IRGenOptions &Opts;
@@ -191,10 +204,14 @@ public:
   void emitImport(ImportDecl *D);
   llvm::DISubprogram *emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
                                    SILFunctionTypeRepresentation Rep,
-                                   SILType Ty, DeclContext *DeclCtx = nullptr);
+                                   SILType Ty, DeclContext *DeclCtx = nullptr,
+                                   StringRef oulinedFromName = StringRef());
   llvm::DISubprogram *emitFunction(SILFunction &SILFn, llvm::Function *Fn);
   void emitArtificialFunction(IRBuilder &Builder, llvm::Function *Fn,
                               SILType SILTy);
+  void emitOutlinedFunction(IRBuilder &Builder,
+                            llvm::Function *Fn,
+                            StringRef outlinedFromName);
 
   /// Return false if we fail to create the right DW_OP_LLVM_fragment operand.
   bool handleFragmentDIExpr(const SILDIExprOperand &CurDIExprOp,
@@ -203,17 +220,21 @@ public:
   bool buildDebugInfoExpression(const SILDebugVariable &VarInfo,
                                 SmallVectorImpl<uint64_t> &Operands);
 
+  /// Emit a dbg.declare at the current insertion point in Builder.
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
                                Optional<SILLocation> VarLoc,
                                SILDebugVariable VarInfo,
                                IndirectionKind = DirectValue,
-                               ArtificialKind = RealValue);
+                               ArtificialKind = RealValue,
+                               AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
+
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
-                        const SILDebugScope *DS, bool InCoroContext);
+                        const SILDebugScope *DS, bool InCoroContext,
+                        AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
 
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
@@ -736,9 +757,7 @@ private:
     // but LLVM detects skeleton CUs by looking for a non-zero DWO id.
     // We use the lower 64 bits for debug info.
     uint64_t Signature =
-        Desc.getSignature()
-            ? (uint64_t)Desc.getSignature()[1] << 32 | Desc.getSignature()[0]
-            : ~1ULL;
+      Desc.getSignature() ? Desc.getSignature().truncatedValue() : ~1ULL;
 
     // Handle Clang modules.
     if (ClangModule) {
@@ -902,6 +921,9 @@ private:
         Ty->dump(llvm::errs());
         abort();
       } else if (!Reconstructed->isEqual(Ty) &&
+                 // FIXME: Some existential types are reconstructed without
+                 // an explicit ExistentialType wrapping the constraint.
+                 !equalWithoutExistentialTypes(Reconstructed, Ty) &&
                  !EqualUpToClangTypes().check(Reconstructed, Ty)) {
         // [FIXME: Include-Clang-type-in-mangling] Remove second check
         llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
@@ -1458,7 +1480,9 @@ private:
                                 Flags, MangledName);
     }
 
-    case TypeKind::ProtocolComposition: {
+    case TypeKind::Existential:
+    case TypeKind::ProtocolComposition:
+    case TypeKind::ParameterizedProtocol: {
       auto *Decl = DbgTy.getDecl();
       auto L = getFilenameAndLocation(*this, Decl);
       auto *File = getOrCreateFile(L.filename);
@@ -1506,6 +1530,10 @@ private:
                                       File, FwdDeclLine, Flags, MangledName);
     }
 
+    case TypeKind::Pack:
+    case TypeKind::PackExpansion:
+      llvm_unreachable("Unimplemented!");
+
     case TypeKind::Tuple: {
       // Tuples are also represented as structs.  Since tuples are ephemeral
       // (not nominal) they don't have a source location.
@@ -1523,12 +1551,12 @@ private:
     case TypeKind::OpaqueTypeArchetype:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::NestedArchetype:
     case TypeKind::SequenceArchetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
       AssociatedTypeDecl *assocType = nullptr;
-      if (auto nested = dyn_cast<NestedArchetypeType>(Archetype))
-        assocType = nested->getAssocType();
+      if (auto depMemTy = Archetype->getInterfaceType()
+              ->getAs<DependentMemberType>())
+        assocType = depMemTy->getAssocType();
       auto L = getFilenameAndLocation(*this, assocType);
       auto *File = getOrCreateFile(L.filename);
       unsigned FwdDeclLine = 0;
@@ -1894,7 +1922,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                  ? createFile(SourcePath, {}, {})
                  : DBuilder.createFile(RemappedFile, RemappedDir);
 
-  StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
+  StringRef Sysroot = IGM.Context.SearchPathOpts.getSDKPath();
   StringRef SDK;
   {
     auto B = llvm::sys::path::rbegin(Sysroot);
@@ -2237,7 +2265,8 @@ llvm::DISubprogram *IRGenDebugInfoImpl::emitFunction(SILFunction &SILFn,
 llvm::DISubprogram *
 IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
                                  SILFunctionTypeRepresentation Rep,
-                                 SILType SILTy, DeclContext *DeclCtx) {
+                                 SILType SILTy, DeclContext *DeclCtx,
+                                 StringRef outlinedFromName) {
   auto Cached = ScopeCache.find(DS);
   if (Cached != ScopeCache.end()) {
     auto SP = cast<llvm::DISubprogram>(Cached->second);
@@ -2253,7 +2282,9 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   auto *SILFn = DS ? DS->Parent.dyn_cast<SILFunction *>() : nullptr;
 
   StringRef LinkageName;
-  if (Fn)
+  if (!outlinedFromName.empty())
+    LinkageName = outlinedFromName;
+  else if (Fn)
     LinkageName = Fn->getName();
   else if (DS)
     LinkageName = SILFn->getName();
@@ -2383,6 +2414,18 @@ void IRGenDebugInfoImpl::emitArtificialFunction(IRBuilder &Builder,
   setCurrentLoc(Builder, Scope, ALoc);
 }
 
+void IRGenDebugInfoImpl::emitOutlinedFunction(IRBuilder &Builder,
+                                              llvm::Function *Fn,
+                                              StringRef outlinedFromName) {
+  RegularLocation ALoc = RegularLocation::getAutoGeneratedLocation();
+  const SILDebugScope *Scope = new (IGM.getSILModule()) SILDebugScope(ALoc);
+  emitFunction(Scope, Fn, SILFunctionTypeRepresentation::Thin, SILType(),
+               nullptr, outlinedFromName);
+  /// Reusing the current file would be wrong: An objc thunk, for example, could
+  /// be triggered from any random location. Use a placeholder name instead.
+  setCurrentLoc(Builder, Scope, ALoc);
+}
+
 bool IRGenDebugInfoImpl::handleFragmentDIExpr(
     const SILDIExprOperand &CurDIExprOp, SmallVectorImpl<uint64_t> &Operands) {
   assert(CurDIExprOp.getOperator() == SILDIExprOperator::Fragment);
@@ -2463,7 +2506,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     const SILDebugScope *DS, Optional<SILLocation> DbgInstLoc,
     SILDebugVariable VarInfo, IndirectionKind Indirection,
-    ArtificialKind Artificial) {
+    ArtificialKind Artificial, AddrDbgInstrKind AddrDInstrKind) {
   assert(DS && "variable has no scope");
 
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
@@ -2597,7 +2640,8 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (DIExpr)
       emitDbgIntrinsic(
           Builder, Piece, Var, DIExpr, DInstLine, DInstLoc.column, Scope, DS,
-          Indirection == CoroDirectValue || Indirection == CoroIndirectValue);
+          Indirection == CoroDirectValue || Indirection == CoroIndirectValue,
+          AddrDInstrKind);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
@@ -2606,19 +2650,20 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
                        DIExpr, DInstLine, DInstLoc.column, Scope, DS,
                        Indirection == CoroDirectValue ||
-                           Indirection == CoroIndirectValue);
+                           Indirection == CoroIndirectValue,
+                       AddrDInstrKind);
   }
 }
 
 void IRGenDebugInfoImpl::emitDbgIntrinsic(
     IRBuilder &Builder, llvm::Value *Storage, llvm::DILocalVariable *Var,
     llvm::DIExpression *Expr, unsigned Line, unsigned Col,
-    llvm::DILocalScope *Scope, const SILDebugScope *DS, bool InCoroContext) {
+    llvm::DILocalScope *Scope, const SILDebugScope *DS, bool InCoroContext,
+    AddrDbgInstrKind AddrDInstKind) {
   // Set the location/scope of the intrinsic.
   auto *InlinedAt = createInlinedAt(DS);
   auto DL =
       llvm::DILocation::get(IGM.getLLVMContext(), Line, Col, Scope, InlinedAt);
-  auto *BB = Builder.GetInsertBlock();
 
   // An alloca may only be described by exactly one dbg.declare.
   if (isa<llvm::AllocaInst>(Storage) &&
@@ -2627,12 +2672,11 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
   // Fragment DIExpression cannot cover the whole variable
   // or going out-of-bound.
-  if (auto Fragment = Expr->getFragmentInfo())
+  if (auto Fragment = Expr->getFragmentInfo()) {
     if (auto VarSize = Var->getSizeInBits()) {
       unsigned FragSize = Fragment->SizeInBits;
       unsigned FragOffset = Fragment->OffsetInBits;
-      if (FragOffset + FragSize > *VarSize ||
-          FragSize == *VarSize) {
+      if (FragOffset + FragSize > *VarSize || FragSize == *VarSize) {
         // Drop the fragment part
         assert(Expr->isValid());
         // Since this expression is valid, DW_OP_LLVM_fragment
@@ -2641,49 +2685,86 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
         Expr = DBuilder.createExpression(OrigElements.drop_back(3));
       }
     }
+  }
 
-  // A dbg.declare is only meaningful if there is a single alloca for
-  // the variable that is live throughout the function.
+  struct DbgInserter {
+    llvm::DIBuilder &builder;
+    AddrDbgInstrKind forceDbgDeclare;
+
+    llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                              llvm::DIExpression *Expr,
+                              const llvm::DILocation *DL,
+                              llvm::Instruction *InsertBefore) {
+      if (forceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
+        return builder.insertDeclare(Addr, VarInfo, Expr, DL, InsertBefore);
+      return builder.insertDbgAddrIntrinsic(Addr, VarInfo, Expr, DL,
+                                            InsertBefore);
+    }
+
+    llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                              llvm::DIExpression *Expr,
+                              const llvm::DILocation *DL,
+                              llvm::BasicBlock *Block) {
+      if (forceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
+        return builder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
+      return builder.insertDbgAddrIntrinsic(Addr, VarInfo, Expr, DL, Block);
+    }
+  };
+  DbgInserter inserter{DBuilder, AddrDInstKind};
+
+  // If we have a single alloca...
   if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {
-    auto *ParentBB = Alloca->getParent();
-    auto InsertBefore = std::next(Alloca->getIterator());
-    if (InsertBefore != ParentBB->end())
-      DBuilder.insertDeclare(Alloca, Var, Expr, DL, &*InsertBefore);
-    else
-      DBuilder.insertDeclare(Alloca, Var, Expr, DL, ParentBB);
-  } else if ((isa<llvm::IntrinsicInst>(Storage) &&
-              cast<llvm::IntrinsicInst>(Storage)->getIntrinsicID() ==
-                  llvm::Intrinsic::coro_alloca_get)) {
-    // FIXME: The live range of a coroutine alloca within the function may be
-    // limited, so using a dbg.addr instead of a dbg.declare would be more
-    // appropriate.
-    DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
-  } else if (InCoroContext) {
+    auto *ParentBB = Builder.GetInsertBlock();
+    auto InsertBefore = Builder.GetInsertPoint();
+
+    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare) {
+      ParentBB = Alloca->getParent();
+      InsertBefore = std::next(Alloca->getIterator());
+    }
+
+    if (InsertBefore != ParentBB->end()) {
+      inserter.insert(Alloca, Var, Expr, DL, &*InsertBefore);
+    } else {
+      inserter.insert(Alloca, Var, Expr, DL, ParentBB);
+    }
+    return;
+  }
+
+  auto *BB = Builder.GetInsertBlock();
+  if ((isa<llvm::IntrinsicInst>(Storage) &&
+       cast<llvm::IntrinsicInst>(Storage)->getIntrinsicID() ==
+           llvm::Intrinsic::coro_alloca_get)) {
+    inserter.insert(Storage, Var, Expr, DL, BB);
+    return;
+  }
+
+  if (InCoroContext) {
     // Function arguments in async functions are emitted without a shadow copy
     // (that would interfer with coroutine splitting) but with a dbg.declare to
     // give CoroSplit.cpp license to emit a shadow copy for them pointing inside
     // the Swift Context argument that is valid throughout the function.
     auto &EntryBlock = BB->getParent()->getEntryBlock();
     if (auto *InsertBefore = &*EntryBlock.getFirstInsertionPt())
-      DBuilder.insertDeclare(Storage, Var, Expr, DL, InsertBefore);
+      inserter.insert(Storage, Var, Expr, DL, InsertBefore);
     else
-      DBuilder.insertDeclare(Storage, Var, Expr, DL, &EntryBlock);
-  } else {
-    // Insert a dbg.value at the current insertion point.
-    if (isa<llvm::Argument>(Storage) && !Var->getArg() &&
-        BB->getFirstNonPHIOrDbg())
-      // SelectionDAGISel only generates debug info for a dbg.value
-      // that is associated with a llvm::Argument if either its !DIVariable
-      // is marked as argument or there is no non-debug intrinsic instruction
-      // before it. So In the case of associating a llvm::Argument with a
-      // non-argument debug variable -- usually via a !DIExpression -- we
-      // need to make sure that dbg.value is before any non-phi / no-dbg
-      // instruction.
-      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL,
-                                       BB->getFirstNonPHIOrDbg());
-    else
-      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
+      inserter.insert(Storage, Var, Expr, DL, &EntryBlock);
+    return;
   }
+
+  // Insert a dbg.value at the current insertion point.
+  if (isa<llvm::Argument>(Storage) && !Var->getArg() &&
+      BB->getFirstNonPHIOrDbg())
+    // SelectionDAGISel only generates debug info for a dbg.value
+    // that is associated with a llvm::Argument if either its !DIVariable
+    // is marked as argument or there is no non-debug intrinsic instruction
+    // before it. So In the case of associating a llvm::Argument with a
+    // non-argument debug variable -- usually via a !DIExpression -- we
+    // need to make sure that dbg.value is before any non-phi / no-dbg
+    // instruction.
+    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL,
+                                     BB->getFirstNonPHIOrDbg());
+  else
+    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
@@ -2849,13 +2930,19 @@ void IRGenDebugInfo::emitArtificialFunction(IRBuilder &Builder,
   static_cast<IRGenDebugInfoImpl *>(this)->emitArtificialFunction(Builder, Fn,
                                                                   SILTy);
 }
-
+void IRGenDebugInfo::emitOutlinedFunction(IRBuilder &Builder,
+                                          llvm::Function *Fn, StringRef name) {
+  static_cast<IRGenDebugInfoImpl *>(this)->emitOutlinedFunction(Builder, Fn,
+                                                                name);
+}
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo Ty,
-    const SILDebugScope *DS, Optional<SILLocation> VarLoc, SILDebugVariable VarInfo,
-    IndirectionKind Indirection, ArtificialKind Artificial) {
+    const SILDebugScope *DS, Optional<SILLocation> VarLoc,
+    SILDebugVariable VarInfo, IndirectionKind Indirection,
+    ArtificialKind Artificial, AddrDbgInstrKind AddrDInstKind) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitVariableDeclaration(
-      Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection, Artificial);
+      Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection, Artificial,
+      AddrDInstKind);
 }
 
 void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
@@ -2863,9 +2950,11 @@ void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                                       llvm::DIExpression *Expr, unsigned Line,
                                       unsigned Col, llvm::DILocalScope *Scope,
                                       const SILDebugScope *DS,
-                                      bool InCoroContext) {
+                                      bool InCoroContext,
+                                      AddrDbgInstrKind AddrDInstKind) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitDbgIntrinsic(
-      Builder, Storage, Var, Expr, Line, Col, Scope, DS, InCoroContext);
+      Builder, Storage, Var, Expr, Line, Col, Scope, DS, InCoroContext,
+      AddrDInstKind);
 }
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(

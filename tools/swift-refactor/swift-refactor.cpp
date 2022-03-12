@@ -74,6 +74,7 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "replace-bodies-with-fatalError", "Perform trailing closure refactoring"),
            clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer"),
            clEnumValN(RefactoringKind::AddEquatableConformance, "add-equatable-conformance", "Add Equatable conformance"),
+           clEnumValN(RefactoringKind::AddExplicitCodableImplementation, "add-explicit-codable-implementation", "Add Explicit Codable Implementation"),
            clEnumValN(RefactoringKind::ConvertToComputedProperty,
                       "convert-to-computed-property", "Convert from field initialization to computed property"),
            clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement"),
@@ -307,6 +308,7 @@ int main(int argc, char *argv[]) {
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
+  Invocation.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getLangOptions().BuildSyntaxTree = true;
@@ -325,8 +327,11 @@ int main(int argc, char *argv[]) {
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   switch (options::Action) {
     case RefactoringKind::GlobalRename:

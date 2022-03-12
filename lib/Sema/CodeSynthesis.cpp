@@ -31,6 +31,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -109,8 +110,8 @@ ArgumentList *swift::buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
     if (param->isInOut()) {
       ref = new (ctx) InOutExpr(SourceLoc(), ref, type, /*isImplicit=*/true);
     } else if (param->isVariadic()) {
-      ref = new (ctx) VarargExpansionExpr(ref, /*implicit*/ true);
-      ref->setType(type);
+      assert(ref->getType()->isEqual(type));
+      ref = VarargExpansionExpr::createParamExpansion(ctx, ref);
     }
     args.emplace_back(SourceLoc(), param->getArgumentName(), ref);
   }
@@ -186,7 +187,7 @@ enum class ImplicitConstructorKind {
   Default,
   /// The default constructor of a distributed actor.
   /// Similarly to a Default one it initializes each of the instance variables,
-  /// however it also implicitly gains an ActorTransport parameter.
+  /// however it also implicitly gains an DistributedActorSystem parameter.
   DefaultDistributedActor,
   /// The memberwise constructor, which initializes each of
   /// the instance variables from a parameter of the same type and
@@ -291,19 +292,21 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       params.push_back(arg);
     }
   } else if (ICK == ImplicitConstructorKind::DefaultDistributedActor) {
-    assert(isa<ClassDecl>(decl));
-    assert(decl->isDistributedActor() &&
+    auto classDecl = dyn_cast<ClassDecl>(decl);
+    assert(classDecl && decl->isDistributedActor() &&
            "Only 'distributed actor' type can gain implicit distributed actor init");
 
+    /// Add 'system' parameter to default init of distributed actors.
     if (swift::ensureDistributedModuleLoaded(decl)) {
       // copy access level of distributed actor init from the nominal decl
       accessLevel = decl->getEffectiveAccess();
+      auto systemTy = getDistributedActorSystemType(classDecl);
 
       // Create the parameter.
-      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_transport, Loc,
-                                      ctx.Id_transport, decl);
+      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_system, Loc,
+                                      ctx.Id_system, decl);
       arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(getDistributedActorTransportType(decl));
+      arg->setInterfaceType(systemTy);
       arg->setImplicit();
 
       params.push_back(arg);
@@ -467,9 +470,10 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
         depth = genericSig.getGenericParams().back()->getDepth() + 1;
 
       for (auto *param : genericParams->getParams()) {
-        auto *newParam = new (ctx) GenericTypeParamDecl(
+        auto *newParam = GenericTypeParamDecl::create(
             classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
-            depth, param->getIndex());
+            depth, param->getIndex(), param->isOpaqueType(),
+            /*opaqueTypeRepr=*/nullptr);
         newParams.push_back(newParam);
       }
 
@@ -926,10 +930,7 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
           if (VD->getAttrs().hasAttribute<NSManagedAttr>())
             CheckDefaultInitializer = false;
 
-          if (VD->hasStorage())
-            HasStorage = true;
-          auto *backing = VD->getPropertyWrapperBackingProperty();
-          if (backing && backing->hasStorage())
+          if (VD->hasStorageOrWrapsStorage())
             HasStorage = true;
         });
 
@@ -1286,8 +1287,8 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   }
     break;
   case ImplicitMemberAction::ResolveDistributedActor:
-  case ImplicitMemberAction::ResolveDistributedActorTransport:
-  case ImplicitMemberAction::ResolveDistributedActorIdentity: {
+  case ImplicitMemberAction::ResolveDistributedActorSystem:
+  case ImplicitMemberAction::ResolveDistributedActorID: {
     // init(transport:) and init(resolve:using:) may be synthesized as part of
     // derived conformance to the DistributedActor protocol.
     // If the target should conform to the DistributedActor protocol, check the

@@ -9,9 +9,11 @@ func getInt() -> Int { return zero }
 
 // CHECK-LABEL: sil hidden [ossa] @$s21copy_lvalue_peepholes014init_var_from_B0{{[_0-9a-zA-Z]*}}F
 // CHECK:   [[X:%.*]] = alloc_box ${ var Builtin.Int64 }
-// CHECK:   [[PBX:%.*]] = project_box [[X]]
+// CHECK:   [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK:   [[PBX:%.*]] = project_box [[XLIFETIME]]
 // CHECK:   [[Y:%.*]] = alloc_box ${ var Builtin.Int64 }
-// CHECK:   [[PBY:%.*]] = project_box [[Y]]
+// CHECK:   [[YLIFETIME:%[^,]+]] = begin_borrow [lexical] [[Y]]
+// CHECK:   [[PBY:%.*]] = project_box [[YLIFETIME]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
 // CHECK:   copy_addr [[READ]] to [initialization] [[PBY]] : $*Builtin.Int64
 func init_var_from_lvalue(x: Int) {
@@ -38,7 +40,8 @@ func init_var_from_computed_lvalue() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s21copy_lvalue_peepholes021assign_computed_from_B0{{[_0-9a-zA-Z]*}}F
 // CHECK:   [[Y:%.*]] = alloc_box
-// CHECK:   [[PBY:%.*]] = project_box [[Y]]
+// CHECK:   [[YLIFETIME:%[^,]+]] = begin_borrow [lexical] [[Y]]
+// CHECK:   [[PBY:%.*]] = project_box [[YLIFETIME]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBY]]
 // CHECK:   [[Y_VAL:%.*]] = load [trivial] [[READ]]
 // CHECK:   [[SETTER:%.*]] = function_ref @$s21copy_lvalue_peepholes8computedBi64_vs

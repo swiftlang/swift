@@ -129,6 +129,8 @@ getSILFunctionTypeRepresentationString(SILFunctionType::Representation value) {
   case SILFunctionType::Representation::Thick: return "thick";
   case SILFunctionType::Representation::Block: return "block";
   case SILFunctionType::Representation::CFunctionPointer: return "c";
+  case SILFunctionType::Representation::CXXMethod:
+    return "cxx_method";
   case SILFunctionType::Representation::Thin: return "thin";
   case SILFunctionType::Representation::Method: return "method";
   case SILFunctionType::Representation::ObjCMethod: return "objc_method";
@@ -567,7 +569,7 @@ namespace {
       OS << " naming_decl=";
       printDeclName(OTD->getNamingDecl());
       PrintWithColorRAII(OS, TypeColor) << " opaque_interface="
-        << Type(OTD->getUnderlyingInterfaceType()).getString();
+        << OTD->getDeclaredInterfaceType().getString();
       OS << " in "
          << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
       if (auto underlyingSubs = OTD->getUnderlyingTypeSubstitutions()) {
@@ -616,8 +618,8 @@ namespace {
 
       OS << " requirement signature=";
       if (PD->isRequirementSignatureComputed()) {
-        OS << GenericSignature::get({PD->getProtocolSelfType()} ,
-                                    PD->getRequirementSignature())
+        auto requirements = PD->getRequirementSignature().getRequirements();
+        OS << GenericSignature::get({PD->getProtocolSelfType()}, requirements)
                 ->getAsString();
       } else {
         OS << "<null>";
@@ -746,6 +748,9 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " lazy";
       printStorageImpl(VD);
       printAccessors(VD);
+      if (VD->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+        OS << " known-to-be-local";
+      }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -856,8 +861,11 @@ namespace {
         D->getCaptureInfo().print(OS);
       }
 
+      if (D->getAttrs().hasAttribute<NonisolatedAttr>()) {
+        PrintWithColorRAII(OS, ExprModifierColor) << " nonisolated";
+      }
       if (D->isDistributed()) {
-        OS << " distributed";
+        PrintWithColorRAII(OS, ExprModifierColor) << " distributed";
       }
 
       if (auto fac = D->getForeignAsyncConvention()) {
@@ -891,6 +899,9 @@ namespace {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ParameterColor) << "parameter ";
+      if (P->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+        OS << "known-to-be-local ";
+      }
       printDeclName(P);
       if (!P->getArgumentName().empty())
         PrintWithColorRAII(OS, IdentifierColor)
@@ -1313,6 +1324,10 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
   } else {
     auto moduleName = cast<ModuleDecl>(this)->getRealName();
     os << moduleName;
+  }
+
+  if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
+    os << " known-to-be-local";
   }
 
   // Print location.
@@ -1907,6 +1922,14 @@ public:
     E->getInitializer().dump(OS);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitRegexLiteralExpr(RegexLiteralExpr *E) {
+    printCommon(E, "regex_literal_expr");
+    PrintWithColorRAII(OS, LiteralValueColor)
+        << " text=" << QuotedString(E->getRegexText())
+        << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     printCommon(E, "object_literal") 
@@ -2066,6 +2089,15 @@ public:
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitPackExpr(PackExpr *E) {
+    printCommon(E, "pack_expr");
+
+    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
+      OS << '\n';
+      printRec(E->getElement(i));
+    }
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitArrayExpr(ArrayExpr *E) {
     printCommon(E, "array_expr");
     PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
@@ -2209,6 +2241,11 @@ public:
   }
   void visitBridgeToObjCExpr(BridgeToObjCExpr *E) {
     printCommon(E, "bridge_to_objc_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitReifyPackExpr(ReifyPackExpr *E) {
+    printCommon(E, "reify_pack") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -3059,6 +3096,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
+    printCommon("_const") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitOptionalTypeRepr(OptionalTypeRepr *T) {
     printCommon("type_optional") << '\n';
     printRec(T->getBase());
@@ -3081,6 +3124,12 @@ public:
   void visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T) {
     printCommon("type_named_opaque_return") << '\n';
     printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitExistentialTypeRepr(ExistentialTypeRepr *T) {
+    printCommon("type_existential");
+    printRec(T->getConstraint());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -3458,6 +3507,7 @@ namespace {
       printFlag(paramFlags.isVariadic(), "vararg");
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
+      printFlag(paramFlags.isCompileTimeConst(), "compileTimeConst");
       switch (paramFlags.getValueOwnership()) {
       case ValueOwnership::Default: break;
       case ValueOwnership::Owned: printFlag("owned"); break;
@@ -3567,6 +3617,25 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void visitPackType(PackType *T, StringRef label) {
+      printCommon(label, "pack_type");
+      printField("num_elements", T->getNumElements());
+      Indent += 2;
+      for (Type elt : T->getElementTypes()) {
+        OS.indent(Indent) << "(";
+        printRec(elt);
+        OS << ")";
+      }
+      Indent -= 2;
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitPackExpansionType(PackExpansionType *T, StringRef label) {
+      printCommon(label, "pack_expansion_type");
+      printField("pattern", T->getPatternType());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitParenType(ParenType *T, StringRef label) {
       printCommon(label, "paren_type");
       dumpParameterFlags(T->getParameterFlags());
@@ -3666,6 +3735,7 @@ namespace {
                               StringRef label) {
       printCommon(label, className);
       printField("address", static_cast<void *>(T));
+      printRec("interface_type", T->getInterfaceType());
       printFlag(T->requiresClass(), "class");
       if (auto layout = T->getLayoutConstraint()) {
         OS << " layout=";
@@ -3675,47 +3745,20 @@ namespace {
         printField("conforms_to", proto->printRef());
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);
+
     }
     
-    void printArchetypeNestedTypes(ArchetypeType *T) {
-      Indent += 2;
-      for (auto nestedType : T->getKnownNestedTypes()) {
-        OS << "\n";
-        OS.indent(Indent) << "(";
-        PrintWithColorRAII(OS, TypeFieldColor) << "nested_type";
-        OS << "=";
-        OS << nestedType.first.str() << " ";
-        if (!nestedType.second) {
-          PrintWithColorRAII(OS, TypeColor) << "<<unresolved>>";
-        } else {
-          PrintWithColorRAII(OS, TypeColor);
-          OS << "=" << nestedType.second.getString();
-        }
-        OS << ")";
-      }
-      Indent -= 2;
-    }
-
     void visitPrimaryArchetypeType(PrimaryArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "primary_archetype_type", label);
       printField("name", T->getFullName());
       OS << "\n";
-      printArchetypeNestedTypes(T);
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
-    }
-    void visitNestedArchetypeType(NestedArchetypeType *T, StringRef label) {
-      printArchetypeCommon(T, "nested_archetype_type", label);
-      printField("name", T->getFullName());
-      printField("parent", T->getParent());
-      printField("assoc_type", T->getAssocType()->printRef());
-      printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitOpenedArchetypeType(OpenedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "opened_archetype_type", label);
-      printRec("opened_existential", T->getOpenedExistentialType());
+      printRec("opened_existential",
+               T->getGenericEnvironment()->getOpenedExistentialType());
       printField("opened_existential_id", T->getOpenedExistentialID());
-      printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T,
@@ -3729,14 +3772,12 @@ namespace {
                                SubstitutionMap::DumpStyle::Full,
                                Indent + 2, Dumped);
       }
-      printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitSequenceArchetypeType(SequenceArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "sequence_archetype_type", label);
       printField("name", T->getFullName());
       OS << "\n";
-      printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -3796,6 +3837,10 @@ namespace {
       printFlag(T->isAsync(), "async");
       printFlag(T->isThrowing(), "throws");
 
+      if (Type globalActor = T->getGlobalActor()) {
+        printField("global_actor", globalActor.getString());
+      }
+
       OS << "\n";
       Indent += 2;
       // [TODO: Improve-Clang-type-printing]
@@ -3806,10 +3851,6 @@ namespace {
           ->getClangASTContext();
         T->getClangTypeInfo().dump(os, ctx);
         printField("clang_type", os.str());
-      }
-
-      if (Type globalActor = T->getGlobalActor()) {
-        printField("global_actor", globalActor.getString());
       }
 
       printAnyFunctionParams(T->getParams(), "input");
@@ -3912,6 +3953,23 @@ namespace {
       for (auto proto : T->getMembers()) {
         printRec(proto);
       }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitParameterizedProtocolType(ParameterizedProtocolType *T,
+                                        StringRef label) {
+      printCommon(label, "parameterized_protocol_type");
+      printRec("base", T->getBaseType());
+      for (auto arg : T->getArgs()) {
+        printRec(arg);
+      }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitExistentialType(ExistentialType *T,
+                              StringRef label) {
+      printCommon(label, "existential_type");
+      printRec(T->getConstraintType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

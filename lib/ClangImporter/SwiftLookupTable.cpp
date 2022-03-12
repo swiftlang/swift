@@ -1849,12 +1849,12 @@ SwiftNameLookupExtension::getExtensionMetadata() const {
   return metadata;
 }
 
-llvm::hash_code
-SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
-  return llvm::hash_combine(code, StringRef("swift.lookup"),
-                            SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
-                            SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            version::getSwiftFullVersion());
+void
+SwiftNameLookupExtension::hashExtension(ExtensionHashBuilder &HBuilder) const {
+  HBuilder.add(StringRef("swift.lookup"));
+  HBuilder.add(SWIFT_LOOKUP_TABLE_VERSION_MAJOR);
+  HBuilder.add(SWIFT_LOOKUP_TABLE_VERSION_MINOR);
+  HBuilder.add(version::getSwiftFullVersion());
 }
 
 void importer::addEntryToLookupTable(SwiftLookupTable &table,
@@ -2117,7 +2117,7 @@ void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
 
   // Finalize the lookup table, which may fail.
   finalizeLookupTable(table, nameImporter, buffersForDiagnostics);
-};
+}
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {

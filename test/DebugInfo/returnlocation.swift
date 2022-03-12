@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -g -emit-ir %s -o %t.ll
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -g -emit-ir %s -o %t.ll
 
 // REQUIRES: objc_interop
 

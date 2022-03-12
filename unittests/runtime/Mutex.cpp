@@ -46,17 +46,7 @@ TEST(MutexTest, BasicLockableThreaded) {
   basicLockableThreaded(mutex);
 }
 
-TEST(ConditionMutexTest, BasicLockableThreaded) {
-  ConditionVariable::Mutex mutex(/* checked = */ true);
-  basicLockableThreaded(mutex);
-}
-
 TEST(StaticMutexTest, BasicLockableThreaded) {
-  static StaticMutex mutex;
-  basicLockableThreaded(mutex);
-}
-
-TEST(StaticConditionMutexTest, BasicLockableThreaded) {
   static StaticMutex mutex;
   basicLockableThreaded(mutex);
 }
@@ -136,19 +126,9 @@ TEST(MutexTest, ScopedLockThreaded) {
   scopedLockThreaded<Mutex::ScopedLock>(mutex);
 }
 
-TEST(ConditionMutexTest, ScopedLockThreaded) {
-  ConditionVariable::Mutex mutex(/* checked = */ true);
-  scopedLockThreaded<ConditionVariable::Mutex::ScopedLock>(mutex);
-}
-
 TEST(StaticMutexTest, ScopedLockThreaded) {
   static StaticMutex Mutex;
   scopedLockThreaded<StaticMutex::ScopedLock>(Mutex);
-}
-
-TEST(StaticConditionMutexTest, ScopedLockThreaded) {
-  static StaticConditionVariable::StaticMutex Mutex;
-  scopedLockThreaded<StaticConditionVariable::StaticMutex::ScopedLock>(Mutex);
 }
 
 TEST(SmallMutexTest, ScopedLockThreaded) {
@@ -185,24 +165,10 @@ TEST(MutexTest, ScopedUnlockUnderScopedLockThreaded) {
       mutex);
 }
 
-TEST(ConditionMutexTest, ScopedUnlockUnderScopedLockThreaded) {
-  ConditionVariable::Mutex mutex(/* checked = */ true);
-  scopedUnlockUnderScopedLockThreaded<ConditionVariable::Mutex::ScopedLock,
-                                      ConditionVariable::Mutex::ScopedUnlock>(
-      mutex);
-}
-
 TEST(StaticMutexTest, ScopedUnlockUnderScopedLockThreaded) {
   static StaticMutex Mutex;
   scopedUnlockUnderScopedLockThreaded<StaticMutex::ScopedLock,
                                       StaticMutex::ScopedUnlock>(Mutex);
-}
-
-TEST(StaticConditionMutexTest, ScopedUnlockUnderScopedLockThreaded) {
-  static StaticConditionVariable::StaticMutex Mutex;
-  scopedUnlockUnderScopedLockThreaded<
-      StaticConditionVariable::StaticMutex::ScopedLock,
-      StaticConditionVariable::StaticMutex::ScopedUnlock>(Mutex);
 }
 
 TEST(SmallMutexTest, ScopedUnlockUnderScopedLockThreaded) {
@@ -234,134 +200,9 @@ TEST(MutexTest, CriticalSectionThreaded) {
   criticalSectionThreaded(mutex);
 }
 
-TEST(ConditionMutexTest, CriticalSectionThreaded) {
-  ConditionVariable::Mutex mutex(/* checked = */ true);
-  criticalSectionThreaded(mutex);
-}
-
 TEST(StaticMutexTest, CriticalSectionThreaded) {
   static StaticMutex Mutex;
   criticalSectionThreaded(Mutex);
-}
-
-TEST(StaticConditionMutexTest, CriticalSectionThreaded) {
-  static StaticConditionVariable::StaticMutex Mutex;
-  criticalSectionThreaded(Mutex);
-}
-
-template <typename SL, typename SU, typename M, typename C>
-void conditionThreaded(M &mutex, C &condition) {
-  bool doneCondition = false;
-  int count = 200;
-
-  threadedExecute(
-      mutex, condition, doneCondition,
-      [&](int index) {
-        SL guard(mutex);
-        while (true) {
-          if (count > 50) {
-            count -= 1;
-            {
-              // To give other consumers a chance.
-              SU unguard(mutex);
-            }
-            if (trace)
-              printf("Consumer[%d] count = %d.\n", index, count);
-            continue; // keep trying to consume before waiting again.
-          } else if (doneCondition && count == 50) {
-            if (trace)
-              printf("Consumer[%d] count == %d and done!\n", index, count);
-            break;
-          }
-          mutex.wait(condition);
-        }
-      },
-      [&](int index) {
-        for (int j = 0; j < 10; j++) {
-          mutex.lock();
-          count += index;
-          if (trace)
-            printf("Producer[%d] count = %d.\n", index, count);
-          condition.notifyOne();
-          mutex.unlock();
-        }
-        if (trace)
-          printf("Producer[%d] done!\n", index);
-      });
-
-  ASSERT_EQ(count, 50);
-}
-
-TEST(MutexTest, ConditionThreaded) {
-  ConditionVariable::Mutex mutex(/* checked = */ true);
-  ConditionVariable condition;
-  conditionThreaded<ConditionVariable::Mutex::ScopedLock,
-                    ConditionVariable::Mutex::ScopedUnlock>(mutex, condition);
-}
-
-TEST(StaticMutexTest, ConditionThreaded) {
-  static StaticConditionVariable::StaticMutex mutex;
-  static StaticConditionVariable condition;
-  conditionThreaded<StaticConditionVariable::StaticMutex::ScopedLock,
-                    StaticConditionVariable::StaticMutex::ScopedUnlock>(
-      mutex, condition);
-}
-
-template <typename SU, typename M, typename C>
-void conditionLockOrWaitLockThenNotifyThreaded(M &mutex, C &condition) {
-  bool doneCondition = false;
-  int count = 200;
-
-  threadedExecute(
-      mutex, condition, doneCondition,
-      [&](int index) {
-        mutex.withLockOrWait(condition, [&, index] {
-          while (true) {
-            if (count > 50) {
-              count -= 1;
-              {
-                // To give other consumers a chance.
-                SU unguard(mutex);
-              }
-              if (trace)
-                printf("Consumer[%d] count = %d.\n", index, count);
-              continue; // keep trying to consume before waiting again.
-            } else if (doneCondition && count == 50) {
-              if (trace)
-                printf("Consumer[%d] count == %d and done!\n", index, count);
-              return true;
-            }
-            return false;
-          }
-        });
-      },
-      [&](int index) {
-        for (int j = 0; j < 10; j++) {
-          mutex.withLockThenNotifyOne(condition, [&, index] {
-            count += index;
-            if (trace)
-              printf("Producer[%d] count = %d.\n", index, count);
-          });
-        }
-        if (trace)
-          printf("Producer[%d] done!\n", index);
-      });
-
-  ASSERT_EQ(count, 50);
-}
-
-TEST(MutexTest, ConditionLockOrWaitLockThenNotifyThreaded) {
-  ConditionVariable::Mutex mutex(/* checked = */ true);
-  ConditionVariable condition;
-  conditionLockOrWaitLockThenNotifyThreaded<
-      ConditionVariable::Mutex::ScopedUnlock>(mutex, condition);
-}
-
-TEST(StaticMutexTest, ConditionLockOrWaitLockThenNotifyThreaded) {
-  static StaticConditionVariable::StaticMutex mutex;
-  static StaticConditionVariable condition;
-  conditionLockOrWaitLockThenNotifyThreaded<
-      StaticConditionVariable::StaticMutex::ScopedUnlock>(mutex, condition);
 }
 
 template <typename SRL, bool Locking, typename RW>

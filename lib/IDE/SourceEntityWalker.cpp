@@ -55,10 +55,12 @@ private:
     return SEWalker.shouldWalkIntoGenericParams();
   }
   bool walkToDeclPre(Decl *D) override;
+  bool walkToDeclPreProper(Decl *D);
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
 
   bool walkToDeclPost(Decl *D) override;
+  bool walkToDeclPostProper(Decl *D);
   Expr *walkToExprPost(Expr *E) override;
   bool walkToTypeReprPost(TypeRepr *T) override;
 
@@ -118,6 +120,21 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     return isa<PatternBindingDecl>(D);
   }
 
+  SEWalker.beginBalancedASTOrderDeclVisit(D);
+  bool Continue = walkToDeclPreProper(D);
+
+  if (!Continue) {
+    // To satisfy the contract of balanced calls to
+    // begin/endBalancedASTOrderDeclVisit, we must call
+    // endBalancedASTOrderDeclVisit here if walkToDeclPost isn't going to be
+    // called.
+    SEWalker.endBalancedASTOrderDeclVisit(D);
+  }
+
+  return Continue;
+}
+
+bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
   if (!handleCustomAttributes(D)) {
     Cancelled = true;
     return false;
@@ -203,6 +220,12 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
 }
 
 bool SemaAnnotator::walkToDeclPost(Decl *D) {
+  bool Continue = walkToDeclPostProper(D);
+  SEWalker.endBalancedASTOrderDeclVisit(D);
+  return Continue;
+}
+
+bool SemaAnnotator::walkToDeclPostProper(Decl *D) {
   if (isDone())
     return false;
 
@@ -580,6 +603,12 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   if (isDone())
     return false;
 
+  bool Continue = SEWalker.walkToTypeReprPre(T);
+  if (!Continue) {
+    Cancelled = true;
+    return false;
+  }
+
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
       if (auto *ModD = dyn_cast<ModuleDecl>(VD)) {
@@ -591,11 +620,19 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
                            ReferenceMetaData(SemaReferenceKind::TypeRef, None));
     }
   }
+
   return true;
 }
 
 bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
-  return !isDone();
+  if (isDone()) {
+    return false;
+  }
+
+  bool Continue = SEWalker.walkToTypeReprPost(T);
+  if (!Continue)
+    Cancelled = true;
+  return Continue;
 }
 
 std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {

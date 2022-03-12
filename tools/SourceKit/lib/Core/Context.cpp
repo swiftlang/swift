@@ -27,7 +27,7 @@ GlobalConfig::update(Optional<unsigned> CompletionMaxASTContextReuseCount,
     State.CompletionOpts.CheckDependencyInterval =
         *CompletionCheckDependencyInterval;
   return State;
-};
+}
 
 GlobalConfig::Settings::CompletionOptions
 GlobalConfig::getCompletionOpts() const {

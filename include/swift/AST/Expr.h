@@ -255,7 +255,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -266,7 +266,11 @@ protected:
 
     /// True if this @Sendable async closure parameter should implicitly
     /// inherit the actor context from where it was formed.
-    InheritActorContext : 1
+    InheritActorContext : 1,
+
+    /// True if this closure's actor isolation behavior was determined by an
+    /// \c \@preconcurrency declaration.
+    IsolatedByPreconcurrency : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -293,9 +297,10 @@ protected:
     IsNonAccessing : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32+20,
     : NumPadBits,
-    NumConformances : 32
+    NumConformances : 32,
+    NumArgumentConversions : 20
   );
 
   SWIFT_INLINE_BITFIELD_FULL(UnresolvedSpecializeExpr, Expr, 32,
@@ -308,7 +313,7 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1+1,
     ThrowsIsSet : 1,
     Throws : 1,
     ImplicitlyAsync : 1,
@@ -348,6 +353,10 @@ protected:
     IsPlaceholder : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(PackExpr, Expr, 32,
+    : NumPadBits,
+    NumElements : 32
+  );
   } Bits;
 
 private:
@@ -486,7 +495,10 @@ public:
   bool isSemanticallyInOutExpr() const {
     return getSemanticsProvidingExpr()->getKind() == ExprKind::InOut;
   }
-  
+
+  bool printConstExprValue(llvm::raw_ostream *OS) const;
+  bool isSemanticallyConstExpr() const;
+
   /// Returns false if this expression needs to be wrapped in parens when
   /// used inside of a any postfix expression, true otherwise.
   ///
@@ -959,7 +971,50 @@ public:
     return E->getKind() == ExprKind::InterpolatedStringLiteral;
   }
 };
-  
+
+/// A regular expression literal e.g '(a|c)*'.
+class RegexLiteralExpr : public LiteralExpr {
+  SourceLoc Loc;
+  StringRef RegexText;
+  unsigned Version;
+  ArrayRef<uint8_t> SerializedCaptureStructure;
+
+  RegexLiteralExpr(SourceLoc loc, StringRef regexText, unsigned version,
+                   ArrayRef<uint8_t> serializedCaps,
+                   bool isImplicit)
+      : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Loc(loc),
+        RegexText(regexText), Version(version),
+        SerializedCaptureStructure(serializedCaps) {}
+
+public:
+  static RegexLiteralExpr *createParsed(
+      ASTContext &ctx, SourceLoc loc, StringRef regexText, unsigned version,
+      ArrayRef<uint8_t> serializedCaptureStructure);
+
+  typedef uint16_t CaptureStructureSerializationVersion;
+
+  static unsigned getCaptureStructureSerializationAllocationSize(
+      unsigned regexLength) {
+    return sizeof(CaptureStructureSerializationVersion) + regexLength + 1;
+  }
+
+  /// Retrieve the raw regex text.
+  StringRef getRegexText() const { return RegexText; }
+
+  /// Retrieve the version of the regex string.
+  unsigned getVersion() const { return Version; }
+
+  ArrayRef<uint8_t> getSerializedCaptureStructure() {
+    return SerializedCaptureStructure;
+  }
+
+  SourceRange getSourceRange() const { return Loc; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::RegexLiteral;
+  }
+};
+
 /// MagicIdentifierLiteralExpr - A magic identifier like #file which expands
 /// out to a literal at SILGen time.
 class MagicIdentifierLiteralExpr : public BuiltinLiteralExpr {
@@ -1214,7 +1269,7 @@ public:
 
   /// Set whether this reference must account for a `throw` occurring for reasons
   /// other than the function implementation itself throwing, e.g. an
-  /// `ActorTransport` implementing a `distributed func` call throwing a
+  /// `DistributedActorSystem` implementing a `distributed func` call throwing a
   /// networking error.
   void setImplicitlyThrows(bool isImplicitlyThrows) {
     Bits.DeclRefExpr.IsImplicitlyThrows = isImplicitlyThrows;
@@ -1594,7 +1649,7 @@ public:
 
   /// Set whether this reference must account for a `throw` occurring for reasons
   /// other than the function implementation itself throwing, e.g. an
-  /// `ActorTransport` implementing a `distributed func` call throwing a
+  /// `DistributedActorSystem` implementing a `distributed func` call throwing a
   /// networking error.
   void setImplicitlyThrows(bool isImplicitlyThrows) {
     Bits.LookupExpr.IsImplicitlyThrows = isImplicitlyThrows;
@@ -1853,6 +1908,11 @@ public:
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Try;
   }
+
+  static TryExpr *createImplicit(ASTContext &ctx, SourceLoc tryLoc, Expr *sub,
+                                 Type type = Type()) {
+    return new (ctx) TryExpr(tryLoc, sub, type, /*implicit=*/true);
+  }
 };
 
 /// ForceTryExpr - A 'try!' surrounding an expression, marking that
@@ -2011,7 +2071,11 @@ public:
             bool implicit = false)
     : IdentityExpr(ExprKind::Await, sub, type, implicit), AwaitLoc(awaitLoc) {
   }
-  
+
+  static AwaitExpr *createImplicit(ASTContext &ctx, SourceLoc awaitLoc, Expr *sub, Type type = Type()) {
+    return new (ctx) AwaitExpr(awaitLoc, sub, type, /*implicit=*/true);
+  }
+
   SourceLoc getLoc() const { return AwaitLoc; }
   
   SourceLoc getAwaitLoc() const { return AwaitLoc; }
@@ -2969,8 +3033,13 @@ public:
 /// (opaque type)" and "S<T> ---> S<(opaque type)>".
 class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
 public:
-  UnderlyingToOpaqueExpr(Expr *subExpr, Type ty)
-    : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty) {}
+  /// The substitutions to be applied to the opaque type declaration to
+  /// produce the resulting type.
+  const SubstitutionMap substitutions;
+
+  UnderlyingToOpaqueExpr(Expr *subExpr, Type ty, SubstitutionMap substitutions)
+    : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty),
+      substitutions(substitutions) {}
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnderlyingToOpaque;
@@ -3185,20 +3254,35 @@ public:
 /// "Appropriate kind" means e.g. a concrete/existential metatype if the
 /// result is an existential metatype.
 class ErasureExpr final : public ImplicitConversionExpr,
-    private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef> {
+    private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef,
+                                  CollectionUpcastConversionExpr::ConversionPair> {
   friend TrailingObjects;
+  using ConversionPair = CollectionUpcastConversionExpr::ConversionPair;
 
   ErasureExpr(Expr *subExpr, Type type,
-              ArrayRef<ProtocolConformanceRef> conformances)
+              ArrayRef<ProtocolConformanceRef> conformances,
+              ArrayRef<ConversionPair> argConversions)
     : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type) {
     Bits.ErasureExpr.NumConformances = conformances.size();
     std::uninitialized_copy(conformances.begin(), conformances.end(),
                             getTrailingObjects<ProtocolConformanceRef>());
+
+    Bits.ErasureExpr.NumArgumentConversions = argConversions.size();
+    std::uninitialized_copy(argConversions.begin(), argConversions.end(),
+                            getTrailingObjects<ConversionPair>());
   }
 
 public:
   static ErasureExpr *create(ASTContext &ctx, Expr *subExpr, Type type,
-                             ArrayRef<ProtocolConformanceRef> conformances);
+                             ArrayRef<ProtocolConformanceRef> conformances,
+                             ArrayRef<ConversionPair> argConversions);
+
+  size_t numTrailingObjects(OverloadToken<ProtocolConformanceRef>) const {
+    return Bits.ErasureExpr.NumConformances;
+  }
+  size_t numTrailingObjects(OverloadToken<ConversionPair>) const {
+    return Bits.ErasureExpr.NumArgumentConversions;
+  }
 
   /// Retrieve the mapping specifying how the type of the subexpression
   /// maps to the resulting existential type. If the resulting existential
@@ -3213,6 +3297,30 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return {getTrailingObjects<ProtocolConformanceRef>(),
             Bits.ErasureExpr.NumConformances };
+  }
+
+  /// Retrieve the conversion expressions mapping requirements from any
+  /// parameterized existentials involved in this erasure.
+  ///
+  /// If the destination type is not a parameterized protocol type,
+  /// this array will be empty
+  ArrayRef<ConversionPair> getArgumentConversions() const {
+    return {getTrailingObjects<ConversionPair>(),
+            Bits.ErasureExpr.NumArgumentConversions };
+  }
+
+  /// Retrieve the conversion expressions mapping requirements from any
+  /// parameterized existentials involved in this erasure.
+  ///
+  /// If the destination type is not a parameterized protocol type,
+  /// this array will be empty
+  MutableArrayRef<ConversionPair> getArgumentConversions() {
+    return {getTrailingObjects<ConversionPair>(),
+            Bits.ErasureExpr.NumArgumentConversions };
+  }
+
+  void setArgumentConversion(unsigned i, const ConversionPair &p) {
+    getArgumentConversions()[i] = p;
   }
 
   static bool classof(const Expr *E) {
@@ -3286,6 +3394,18 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::BridgeToObjC;
+  }
+};
+
+/// ReifyPackExpr - Drop the pack structure and reify it either as a tuple or
+/// single value.
+class ReifyPackExpr : public ImplicitConversionExpr {
+public:
+  ReifyPackExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::ReifyPack, subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ReifyPack;
   }
 };
 
@@ -3388,9 +3508,12 @@ public:
 class VarargExpansionExpr : public Expr {
   Expr *SubExpr;
 
-public:
   VarargExpansionExpr(Expr *subExpr, bool implicit, Type type = Type())
     : Expr(ExprKind::VarargExpansion, implicit, type), SubExpr(subExpr) {}
+
+public:
+  static VarargExpansionExpr *createParamExpansion(ASTContext &ctx, Expr *E);
+  static VarargExpansionExpr *createArrayExpansion(ASTContext &ctx, ArrayExpr *AE);
 
   SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
 
@@ -3467,40 +3590,46 @@ public:
   };
 
 private:
-    /// The actor to which this closure is isolated.
+    /// The actor to which this closure is isolated, plus a bit indicating
+    /// whether the isolation was imposed by a preconcurrency declaration.
     ///
-    /// There are three possible states:
+    /// There are three possible states for the pointer:
     ///   - NULL: The closure is independent of any actor.
     ///   - VarDecl*: The 'self' variable for the actor instance to which
     ///     this closure is isolated. It will always have a type that conforms
     ///     to the \c Actor protocol.
     ///   - Type: The type of the global actor on which
-  llvm::PointerUnion<VarDecl *, Type> storage;
+  llvm::PointerIntPair<llvm::PointerUnion<VarDecl *, Type>, 1, bool> storage;
 
-  ClosureActorIsolation(VarDecl *selfDecl) : storage(selfDecl) { }
-  ClosureActorIsolation(Type globalActorType) : storage(globalActorType) { }
+  ClosureActorIsolation(VarDecl *selfDecl, bool preconcurrency)
+      : storage(selfDecl, preconcurrency) { }
+  ClosureActorIsolation(Type globalActorType, bool preconcurrency)
+      : storage(globalActorType, preconcurrency) { }
 
 public:
-  ClosureActorIsolation() : storage() { }
+  ClosureActorIsolation(bool preconcurrency = false)
+      : storage(nullptr, preconcurrency) { }
 
-  static ClosureActorIsolation forIndependent() {
-    return ClosureActorIsolation();
+  static ClosureActorIsolation forIndependent(bool preconcurrency) {
+    return ClosureActorIsolation(preconcurrency);
   }
 
-  static ClosureActorIsolation forActorInstance(VarDecl *selfDecl) {
-    return ClosureActorIsolation(selfDecl);
+  static ClosureActorIsolation forActorInstance(VarDecl *selfDecl,
+                                                bool preconcurrency) {
+    return ClosureActorIsolation(selfDecl, preconcurrency);
   }
 
-  static ClosureActorIsolation forGlobalActor(Type globalActorType) {
-    return ClosureActorIsolation(globalActorType);
+  static ClosureActorIsolation forGlobalActor(Type globalActorType,
+                                              bool preconcurrency) {
+    return ClosureActorIsolation(globalActorType, preconcurrency);
   }
 
   /// Determine the kind of isolation.
   Kind getKind() const {
-    if (storage.isNull())
+    if (storage.getPointer().isNull())
       return Kind::Independent;
 
-    if (storage.is<VarDecl *>())
+    if (storage.getPointer().is<VarDecl *>())
       return Kind::ActorInstance;
 
     return Kind::GlobalActor;
@@ -3517,11 +3646,15 @@ public:
   }
 
   VarDecl *getActorInstance() const {
-    return storage.dyn_cast<VarDecl *>();
+    return storage.getPointer().dyn_cast<VarDecl *>();
   }
 
   Type getGlobalActor() const {
-    return storage.dyn_cast<Type>();
+    return storage.getPointer().dyn_cast<Type>();
+  }
+
+  bool preconcurrency() const {
+    return storage.getInt();
   }
 };
 
@@ -3590,6 +3723,9 @@ public:
   /// \brief Return whether this closure is async when fully applied.
   bool isBodyAsync() const;
 
+  /// Whether this closure is Sendable.
+  bool isSendable() const;
+
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 
@@ -3598,6 +3734,13 @@ public:
   ///
   /// Only valid when \c hasSingleExpressionBody() is true.
   Expr *getSingleExpressionBody() const;
+
+  /// Whether this closure has a body
+  bool hasBody() const;
+
+  /// Returns the body of closures that have a body
+  /// returns nullptr if the closure doesn't have a body
+  BraceStmt *getBody() const;
 
   ClosureActorIsolation getActorIsolation() const { return actorIsolation; }
 
@@ -3782,6 +3925,16 @@ public:
 
   void setInheritsActorContext(bool value = true) {
     Bits.ClosureExpr.InheritActorContext = value;
+  }
+
+  /// Whether the closure's concurrency behavior was determined by an
+  /// \c \@preconcurrency declaration.
+  bool isIsolatedByPreconcurrency() const {
+    return Bits.ClosureExpr.IsolatedByPreconcurrency;
+  }
+
+  void setIsolatedByPreconcurrency(bool value = true) {
+    Bits.ClosureExpr.IsolatedByPreconcurrency = value;
   }
 
   /// Determine whether this closure expression has an
@@ -4365,11 +4518,11 @@ public:
   }
 
   /// Is this application _implicitly_ required to be a throwing call?
-  /// This can happen if the function is actually a proxy function invocation,
-  /// which may throw, regardless of the target function throwing, e.g.
-  /// a distributed instance method call on a 'remote' actor, may throw due to network
-  /// issues reported by the transport, regardless if the actual target function
-  /// can throw.
+  /// This can happen if the function is actually a distributed thunk
+  /// invocation, which may throw, regardless of the target function throwing,
+  /// e.g. a distributed instance method call on a 'remote' actor, may throw due
+  /// to network issues reported by the transport, regardless if the actual
+  /// target function can throw.
   bool implicitlyThrows() const {
     return Bits.ApplyExpr.ImplicitlyThrows;
   }
@@ -5721,6 +5874,56 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OneWay;
   }
+};
+
+/// An expression node that aggregates a set of heterogeneous arguments into a
+/// parameter pack suitable for passing off to a variadic generic function
+/// argument.
+///
+/// There is no user-visible way to spell a pack expression, they are always
+/// implicitly created at applies. As such, any appearance of pack types outside
+/// of applies are illegal. In general, packs appearing in such positions should
+/// have a \c ReifyPackExpr to convert them to a user-available AST type.
+class PackExpr final : public Expr,
+    private llvm::TrailingObjects<PackExpr, Expr *> {
+  friend TrailingObjects;
+
+  size_t numTrailingObjects() const {
+    return getNumElements();
+  }
+
+  PackExpr(ArrayRef<Expr *> SubExprs, Type Ty);
+
+public:
+  /// Create a pack.
+  static PackExpr *create(ASTContext &ctx, ArrayRef<Expr *> SubExprs, Type Ty);
+
+  /// Create an empty pack.
+  static PackExpr *createEmpty(ASTContext &ctx);
+
+  SourceLoc getLoc() const { return SourceLoc(); }
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  /// Retrieve the elements of this pack.
+  MutableArrayRef<Expr *> getElements() {
+    return { getTrailingObjects<Expr *>(), getNumElements() };
+  }
+
+  /// Retrieve the elements of this pack.
+  ArrayRef<Expr *> getElements() const {
+    return { getTrailingObjects<Expr *>(), getNumElements() };
+  }
+
+  unsigned getNumElements() const { return Bits.PackExpr.NumElements; }
+
+  Expr *getElement(unsigned i) const {
+    return getElements()[i];
+  }
+  void setElement(unsigned i, Expr *e) {
+    getElements()[i] = e;
+  }
+
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Pack; }
 };
 
 inline bool Expr::isInfixOperator() const {

@@ -16,8 +16,13 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/RawComment.h"
 #include "swift/Basic/BasicSourceInfo.h"
+#include "swift/Basic/Debug.h"
+
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
+class SynthesizedFileUnit;
+
 /// A container for module-scope declarations that itself provides a scope; the
 /// smallest unit of code organization.
 ///
@@ -33,18 +38,24 @@ class FileUnit : public DeclContext, public ASTAllocated<FileUnit> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
-  // FIXME: Stick this in a PointerIntPair.
-  const FileUnitKind Kind;
+  // The pointer is FileUnit insted of SynthesizedFileUnit to break circularity.
+  llvm::PointerIntPair<FileUnit *, 3, FileUnitKind> SynthesizedFileAndKind;
 
 protected:
   FileUnit(FileUnitKind kind, ModuleDecl &M)
-    : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind) {
+    : DeclContext(DeclContextKind::FileUnit, &M),
+      SynthesizedFileAndKind(nullptr, kind) {
   }
 
 public:
   FileUnitKind getKind() const {
-    return Kind;
+    return SynthesizedFileAndKind.getInt();
   }
+
+  /// Returns the synthesized file for this source file, if it exists.
+  SynthesizedFileUnit *getSynthesizedFile() const;
+
+  SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
@@ -178,6 +189,8 @@ public:
   virtual Identifier
   getDiscriminatorForPrivateValue(const ValueDecl *D) const = 0;
 
+  virtual bool shouldCollectDisplayDecls() const { return true; }
+
   /// Finds all top-level decls in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -233,7 +246,7 @@ public:
   ///
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
-  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
+  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const {
     getTopLevelDecls(results);
   }
 
@@ -297,6 +310,9 @@ public:
   virtual StringRef getExportedModuleName() const {
     return getParentModule()->getRealName().str();
   }
+
+  SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
+  SWIFT_DEBUG_DUMPER(dumpTopLevelDecls());
 
   /// Traverse the decls within this file.
   ///
@@ -395,6 +411,8 @@ public:
   virtual void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {}
 
+  virtual void collectSerializedSearchPath(
+      llvm::function_ref<void(StringRef)> callback) const {}
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||
            file->getKind() == FileUnitKind::ClangModule ||

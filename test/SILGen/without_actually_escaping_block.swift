@@ -11,7 +11,7 @@ typealias Callback = @convention(block) () -> Void
 // CHECK-LABEL: sil {{.*}} @$s25without_actually_escaping9testBlock5blockyyyXB_tF
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@convention(block) @noescape () -> ()):
 // CHECK:  [[C1:%.*]] = copy_block [[ARG]]
-// CHECK:  [[B1:%.*]] = begin_borrow [[C1]]
+// CHECK:  [[B1:%.*]] = begin_borrow [lexical] [[C1]]
 // CHECK:  [[C2:%.*]] = copy_value [[B1]]
 // CHECK:  [[CVT:%.*]] = convert_function [[C2]] : $@convention(block) @noescape () -> () to [without_actually_escaping] $@convention(block) () -> ()
 // CHECK:  [[FN:%.*]] = function_ref @$s25without_actually_escaping9testBlock5blockyyyXB_tFyyyXBXEfU_

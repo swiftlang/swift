@@ -45,3 +45,12 @@ func testBigArrays(_ maxSize: UnsafeMutablePointer<Int8>?, _ maxSizePlusOne: Uns
 func testBigArrays2d(_ maxSize: UnsafeMutablePointer<IntTuple4096>?, _ maxSizePlusOne: OpaquePointer?) {
     useBigArray2d(maxSize, maxSizePlusOne)
 }
+
+
+// Make sure fields with a swift_name attribute only produce one stored
+// property, not two. (rdar://86069786)
+// CHECK-LABEL: define swiftcc void @"$s9ctypes_ir22testFieldWithSwiftName1oySo12Rdar86069786V_tF"
+// CHECK-SAME: (double %0)
+
+public func testFieldWithSwiftName(o : Rdar86069786) {
+}

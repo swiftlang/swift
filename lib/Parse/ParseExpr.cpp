@@ -1545,7 +1545,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       
   case tok::string_literal:  // "foo"
     return parseExprStringLiteral();
-  
+
+  case tok::regex_literal:
+    return parseExprRegexLiteral();
+
   case tok::kw_nil:
     ExprContext.setCreateSyntax(SyntaxKind::NilLiteralExpr);
     return makeParserResult(new (Context)
@@ -1620,6 +1623,15 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         SyntaxContext->addSyntax(std::move(ExprNode));
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
+    }
+
+    // 'any' followed by another identifier is an existential type.
+    if (Tok.isContextualKeyword("any") &&
+        peekToken().is(tok::identifier) &&
+        !peekToken().isAtStartOfLine()) {
+      ParserResult<TypeRepr> ty = parseType();
+      auto *typeExpr = new (Context) TypeExpr(ty.get());
+      return makeParserResult(typeExpr);
     }
 
     LLVM_FALLTHROUGH;

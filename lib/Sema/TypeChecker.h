@@ -245,6 +245,26 @@ Type getOptionalType(SourceLoc loc, Type elementType);
 Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
                          bool replaceInvalidRefsWithErrors);
 
+/// Check for invalid existential types in the given declaration.
+void checkExistentialTypes(Decl *decl);
+
+/// Check for invalid existential types in the given statement.
+void checkExistentialTypes(ASTContext &ctx, Stmt *stmt);
+
+/// Check for invalid existential types in the underlying type of
+/// the given type alias.
+void checkExistentialTypes(ASTContext &ctx, TypeAliasDecl *typeAlias);
+
+/// Check for invalid existential types in the given generic requirement
+/// list.
+void checkExistentialTypes(ASTContext &ctx,
+                           TrailingWhereClause *whereClause);
+
+/// Check for invalid existential types in the given generic requirement
+/// list.
+void checkExistentialTypes(ASTContext &ctx,
+                           GenericParamList *genericParams);
+
 /// Substitute the given base type into the type of the given nested type,
 /// producing the effective type that the nested type will have.
 ///
@@ -445,7 +465,7 @@ std::string gatherGenericParamBindingsText(
 /// Check the given set of generic arguments against the requirements in a
 /// generic signature.
 ///
-/// \param dc The context in which the generic arguments should be checked.
+/// \param module The module to use for conformace lookup.
 /// \param loc The location at which any diagnostics should be emitted.
 /// \param noteLoc The location at which any notes will be printed.
 /// \param owner The type that owns the generic signature.
@@ -454,7 +474,7 @@ std::string gatherGenericParamBindingsText(
 /// should be checked.
 /// \param substitutions Substitutions from interface types of the signature.
 RequirementCheckResult checkGenericArguments(
-    DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
+    ModuleDecl *module, SourceLoc loc, SourceLoc noteLoc, Type owner,
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
     SubstOptions options = None);
@@ -465,10 +485,49 @@ RequirementCheckResult checkGenericArguments(
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions);
 
-bool checkContextualRequirements(GenericTypeDecl *decl,
-                                 Type parentTy,
-                                 SourceLoc loc,
-                                 DeclContext *dc);
+/// Checks whether the generic requirements imposed on the nested type
+/// declaration \p decl (if present) are in agreement with the substitutions
+/// that are needed to spell it as a member of the given parent type
+/// \p parentTy.
+///
+/// For example, given
+/// \code
+/// struct S<X> {}
+/// extension S where X == Bool {
+///   struct Inner {}
+/// }
+/// \endcode
+/// \c Inner cannot be referenced on \c S<Int>, because its contextual
+/// requirement \c X \c == \c Bool is not satisfied by the substitution
+/// \c [X \c = \c Int].
+///
+/// Similarly, \c typealias \c Y below is a viable type witness in the
+/// conformance of \c S to \c P, because its contextual requirement
+/// \c Self.X \c == \c Bool is satisfied by the substitution
+/// \c [Self \c = \c S].
+/// \code
+/// protocol P {
+///   associatedtype X
+///   associatedtype Y
+/// }
+/// extension P where X == Bool {
+///   typealias Y = Bool
+/// }
+///
+/// struct S: P {
+///   typealias X = Bool
+/// }
+/// \endcode
+///
+/// \param module The module to use for conformace lookup.
+/// \param contextSig The generic signature that should be used to map
+/// \p parentTy into context. We pass a generic signature to secure on-demand
+/// computation of the associated generic enviroment.
+///
+/// \returns \c true on success.
+bool checkContextualRequirements(GenericTypeDecl *decl, Type parentTy,
+                                 SourceLoc loc, ModuleDecl *module,
+                                 GenericSignature contextSig);
 
 /// Add any implicitly-defined constructors required for the given
 /// struct, class or actor.
@@ -617,6 +676,12 @@ Type typeCheckPattern(ContextualPattern pattern);
 Pattern *coercePatternToType(ContextualPattern pattern, Type type,
                              TypeResolutionOptions options);
 bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC, Type type);
+
+/// Synthesize ~= operator application used to infer enum members
+/// in `case` patterns.
+Optional<std::pair<VarDecl *, BinaryExpr *>>
+synthesizeTildeEqualsOperatorApplication(ExprPattern *EP, DeclContext *DC,
+                                         Type enumType);
 
 /// Coerce the specified parameter list of a ClosureExpr to the specified
 /// contextual type.
@@ -986,7 +1051,7 @@ diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
                                           const UnavailabilityReason &Reason);
 
 /// Type check a 'distributed actor' declaration.
-void checkDistributedActor(ClassDecl *decl);
+void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 
 void checkConcurrencyAvailability(SourceRange ReferenceRange,
                                   const DeclContext *ReferenceDC);
@@ -1120,7 +1185,8 @@ UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
 /// are verified against any candidates.
 bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
                            ArrayRef<Identifier> argLabels = {},
-                           SmallVectorImpl<ValueDecl *> *allResults = nullptr);
+                           SmallVectorImpl<ValueDecl *> *allResults = nullptr,
+                           bool checkAvailability = false);
 
 /// Forces all changes specified by the module's access notes file to be
 /// applied to this declaration. It is safe to call this function more than
@@ -1158,7 +1224,7 @@ bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
 /// type repr. \param inferredType The type inferred by the type checker.
 void notePlaceholderReplacementTypes(Type writtenType, Type inferredType);
 
-}; // namespace TypeChecker
+} // namespace TypeChecker
 
 /// Returns the protocol requirement kind of the given declaration.
 /// Used in diagnostics.
@@ -1220,6 +1286,10 @@ Expr *buildPropertyWrapperInitCall(
     const VarDecl *var, Type backingStorageType, Expr *value,
     PropertyWrapperInitKind initKind,
     llvm::function_ref<void(ApplyExpr *)> callback = [](ApplyExpr *) {});
+
+/// Check if this var is the \c wrappedValue property belonging to
+/// a property wrapper type declaration.
+bool isWrappedValueOfPropWrapper(VarDecl *var);
 
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {

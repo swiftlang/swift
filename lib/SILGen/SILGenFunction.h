@@ -704,7 +704,9 @@ public:
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
 
-  ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var);
+  /// Generate code to obtain the address of the given global variable.
+  ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var,
+                                     Optional<ActorIsolation> actorIso);
 
   /// Generate a lazy global initializer.
   void emitLazyGlobalInitializer(PatternBindingDecl *binding,
@@ -816,6 +818,7 @@ public:
   /// are created by different emissions; it's just a little
   /// counter-intuitive within a single emission.)
   SILBasicBlock *createBasicBlock();
+  SILBasicBlock *createBasicBlock(llvm::StringRef debugName);
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
@@ -861,6 +864,10 @@ public:
   /// inside an async actor-independent function. No hop-back is expected.
   void emitHopToActorValue(SILLocation loc, ManagedValue actor);
 
+  /// Return true if the function being emitted is an async function
+  /// that unsafely inherits its executor.
+  bool unsafelyInheritsExecutor();
+
   /// A version of `emitHopToTargetActor` that is specialized to the needs
   /// of various types of ConstructorDecls, like class or value initializers,
   /// because their prolog emission is not the same as for regular functions.
@@ -872,10 +879,21 @@ public:
   void emitConstructorPrologActorHop(SILLocation loc,
                                      Optional<ActorIsolation> actorIso);
 
+  /// Set the given global actor as the isolation for this function
+  /// (generally a thunk) and hop to it.
+  void emitPrologGlobalActorHop(SILLocation loc, Type globalActor);
+
   /// Emit the executor for the given actor isolation.
   Optional<SILValue> emitExecutor(SILLocation loc,
                                   ActorIsolation isolation,
                                   Optional<ManagedValue> maybeSelf);
+
+  /// Emit the executor value that corresponds to the generic (concurrent)
+  /// executor.
+  SILValue emitGenericExecutor(SILLocation loc);
+
+  /// Emit the executor value that corresponds to the main actor.
+  SILValue emitMainExecutor(SILLocation loc);
 
   /// Emit a precondition check to ensure that the function is executing in
   /// the expected isolation context.
@@ -981,12 +999,16 @@ public:
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
   SILValue emitSelfDecl(VarDecl *selfDecl);
-  
+
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
+  ///
+  /// \p isLexical if set to true, this is a temporary that we are using for a
+  /// local let that we need to mark with the lexical flag.
   SILValue emitTemporaryAllocation(SILLocation loc, SILType ty,
-                                   bool hasDynamicLifetime = false);
-  
+                                   bool hasDynamicLifetime = false,
+                                   bool isLexical = false);
+
   /// Prepares a buffer to receive the result of an expression, either using the
   /// 'emit into' initialization buffer if available, or allocating a temporary
   /// allocation if not.
@@ -1065,6 +1087,16 @@ public:
   /// - The fourth argument is the line number.
   SourceLocArgs
   emitSourceLocationArgs(SourceLoc loc, SILLocation emitLoc);
+
+  /// Emit a 'String' literal for the passed 'text'.
+  ///
+  /// See also: 'emitLiteral' which works with various types of literals,
+  /// however requires an expression to base the creation on.
+  ManagedValue
+  emitStringLiteral(SILLocation loc,
+                    StringRef text,
+                    StringLiteralExpr::Encoding encoding = StringLiteralExpr::Encoding::UTF8,
+                    SGFContext ctx = SGFContext());
 
   /// Emit a call to the library intrinsic _doesOptionalHaveValue.
   ///
@@ -1580,7 +1612,7 @@ public:
                        SubstitutionMap subMap);
   
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
-  
+
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
   void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,
@@ -2002,41 +2034,46 @@ public:
                                            CanSILFunctionType toType,
                                            bool reorderSelf);
 
+  //===--------------------------------------------------------------------===//
+  // Back Deployment thunks
+  //===--------------------------------------------------------------------===//
+
+  /// Invokes an original function if it is available at runtime. Otherwise,
+  /// invokes a fallback copy of the function emitted into the client.
+  void emitBackDeploymentThunk(SILDeclRef thunk);
+
   //===---------------------------------------------------------------------===//
   // Distributed Actors
   //===---------------------------------------------------------------------===//
 
   /// Initializes the implicit stored properties of a distributed actor that correspond to
   /// its transport and identity.
-  void emitDistActorImplicitPropertyInits(
+  void emitDistributedActorImplicitPropertyInits(
       ConstructorDecl *ctor, ManagedValue selfArg);
 
   /// Given a function representing a distributed actor factory, emits the
   /// corresponding SIL function for it.
   void emitDistributedActorFactory(FuncDecl *fd);
 
-  /// Generates a thunk from an actor function
-  void emitDistributedThunk(SILDeclRef thunk);
-
   /// Notify transport that actor has initialized successfully,
   /// and is ready to receive messages.
   void emitDistributedActorReady(
       SILLocation loc, ConstructorDecl *ctor, ManagedValue actorSelf);
   
-  /// For a distributed actor, emits code to invoke the transport's
-  /// resignIdentity function.
+  /// For a distributed actor, emits code to invoke the system's
+  /// resignID function.
   ///
   /// Specifically, this code emits SIL that performs the call
   ///
   /// \verbatim
-  ///   self.transport.resignIdentity(self.id)
+  ///   self.actorSystem.resignID(self.id)
   /// \endverbatim
   ///
   /// using the current builder's state as the injection point.
   ///
   /// \param actorDecl the declaration corresponding to the actor
   /// \param actorSelf the SIL value representing the distributed actor instance
-  void emitResignIdentityCall(SILLocation loc,
+  void emitDistributedActorSystemResignIDCall(SILLocation loc,
                               ClassDecl *actorDecl, ManagedValue actorSelf);
   
   /// Emit code that tests whether the distributed actor is local, and if so,

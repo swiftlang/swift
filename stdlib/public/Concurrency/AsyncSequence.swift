@@ -222,7 +222,7 @@ extension AsyncSequence {
   }
   
   /// Returns a Boolean value that indicates whether all elements produced by the
-  /// asynchronous sequence satisfies the given predicate.
+  /// asynchronous sequence satisfy the given predicate.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
   /// values from `1` to `10`. The `allSatisfy(_:)` method checks to see whether
@@ -235,6 +235,8 @@ extension AsyncSequence {
   ///
   /// The predicate executes each time the asynchronous sequence produces an
   /// element, until either the predicate returns `false` or the sequence ends.
+  ///
+  /// If the asynchronous sequence is empty, this method returns `true`.
   ///
   /// - Parameter predicate: A closure that takes an element of the asynchronous
   ///   sequence as its argument and returns a Boolean value that indicates

@@ -602,6 +602,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     return E;
   }
+  Expr *visitPackExpr(PackExpr *E) {
+    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
+      if (E->getElement(i)) {
+        if (Expr *Elt = doIt(E->getElement(i)))
+          E->setElement(i, Elt);
+        else
+          return nullptr;
+      }
+    return E;
+  }
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
     if (Expr *Base = doIt(E->getBase()))
       E->setBase(Base);
@@ -685,7 +695,29 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
-  
+
+  Expr *visitErasureExpr(ErasureExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+    } else {
+      return nullptr;
+    }
+
+    for (unsigned i = 0; i < E->getArgumentConversions().size(); ++i) {
+      const auto &conv = E->getArgumentConversions()[i];
+      auto kConv = conv.Conversion;
+      if (!kConv) {
+        return nullptr;
+      } else if (Expr *E2 = doIt(kConv)) {
+        E->setArgumentConversion(i, {conv.OrigValue, E2});
+      } else {
+        return nullptr;
+      }
+    }
+    
+    return E;
+  }
+
   Expr *visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
@@ -1149,6 +1181,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
 
+    return E;
+  }
+
+  Expr *visitRegexLiteralExpr(RegexLiteralExpr *E) {
     return E;
   }
 
@@ -1842,12 +1878,20 @@ bool Traversal::visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
 bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
   return doIt(T->getConstraint());
 }
 
 bool Traversal::visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T) {
   return doIt(T->getBase());
+}
+
+bool Traversal::visitExistentialTypeRepr(ExistentialTypeRepr *T) {
+  return doIt(T->getConstraint());
 }
 
 bool Traversal::visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {

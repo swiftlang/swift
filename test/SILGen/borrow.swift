@@ -18,7 +18,8 @@ func useD(_ d: D) {}
 // CHECK-LABEL: sil hidden [ossa] @$s6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}} : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var C }, var, name "c"
-// CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
+// CHECK:   [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[PB_BOX:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PB_BOX]] : $*C
 // CHECK:   [[CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK:   [[BORROWED_CLASS:%.*]] = begin_borrow [[CLASS]]
@@ -29,6 +30,7 @@ func useD(_ d: D) {}
 // CHECK:   destroy_value [[CLASS]]
 // CHECK:   [[FUNC:%.*]] = function_ref @$s6borrow4useD{{.*}} : $@convention(thin) (@guaranteed D) -> ()
 // CHECK:   apply [[FUNC]]([[LOADED_VALUE]])
+// CHECK:   end_borrow [[BOX_LIFETIME]]
 // CHECK:   destroy_value [[BOX]]
 // CHECK: } // end sil function '$s6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}}'
 func lvalueBorrowShouldBeAtEndOfFormalAccessScope() {

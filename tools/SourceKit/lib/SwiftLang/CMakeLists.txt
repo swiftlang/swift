@@ -1,6 +1,7 @@
 add_sourcekit_library(SourceKitSwiftLang
   CodeCompletionOrganizer.cpp
   SwiftASTManager.cpp
+  SwiftCompile.cpp
   SwiftCompletion.cpp
   SwiftConformingMethodList.cpp
   SwiftDocSupport.cpp
