@@ -1,9 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name CdeclFunctions -emit-cxx-header-path %t/empty.h
-// RUN: %FileCheck %s < %t/empty.h
+// RUN: %target-swift-frontend %s -typecheck -module-name CdeclFunctions -emit-cxx-header-path %t/cdecl.h
+// RUN: %FileCheck %s < %t/cdecl.h
 
-// RUN: %check-cxx-header-in-clang -std=c++14 %t/empty.h
-// RUN: %check-cxx-header-in-clang -std=c++17 %t/empty.h
+// RUN: %check-interop-cxx-header-in-clang(%t/cdecl.h)
 
 // CHECK-LABEL: namespace CdeclFunctions {
 
