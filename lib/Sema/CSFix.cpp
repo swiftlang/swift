@@ -1146,7 +1146,9 @@ bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const 
   // Referencing an enum element directly is considered a compile-time literal.
   if (auto *d = solution.resolveLocatorToDecl(locator).getDecl()) {
     if (isa<EnumElementDecl>(d)) {
-      return true;
+      if (!d->hasParameterList()) {
+        return true;
+      }
     }
   }
   NotCompileTimeConstFailure failure(solution, locator);
