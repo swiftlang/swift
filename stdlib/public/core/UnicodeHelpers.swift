@@ -125,7 +125,7 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
 @inlinable @inline(__always)
 internal func _utf16LengthOfScalar(
   _ buffer: UnsafeRawBufferPointer,
-  readIdx: inout Int
+  _ readIdx: inout Int
 ) -> Int {
   let byte = rawBuffer.load(fromByteOffset: readIdx, as: UInt8.self)
   let len = _utf8ScalarLength(byte)
