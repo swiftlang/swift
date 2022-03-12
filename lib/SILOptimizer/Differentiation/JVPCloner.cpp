@@ -1290,10 +1290,9 @@ public:
           });
     }
 
-    // Call the differential.
+    // Call the differential.  It is `@callee_owned` so the `apply` consumes it.
     auto *differentialCall =
         diffBuilder.createApply(loc, differential, SubstitutionMap(), diffArgs);
-    diffBuilder.emitDestroyValueOperation(loc, differential);
 
     // Get the original `apply` results.
     SmallVector<SILValue, 8> origDirectResults;
