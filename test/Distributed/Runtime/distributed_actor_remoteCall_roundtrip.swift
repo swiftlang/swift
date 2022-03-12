@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope --color
 
-// X: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library -Xfrontend -I -Xfrontend %t ) | %FileCheck %s
+// X: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking  -parse-as-library -Xfrontend -I -Xfrontend %t ) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -15,9 +15,6 @@
 
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
-
-// FIXME(distributed): rdar://90078069
-// UNSUPPORTED: linux
 
 import _Distributed
 import FakeDistributedActorSystems

@@ -150,3 +150,20 @@ isVisibleToObjC(const ValueDecl *VD, AccessLevel minRequiredAccess,
   }
   return false;
 }
+
+bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
+                                            AccessLevel minRequiredAccess,
+                                            bool checkParent) {
+  if (VD->isObjC())
+    return false;
+  if (VD->getFormalAccess() >= minRequiredAccess) {
+    return true;
+  } else if (checkParent) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(VD)) {
+      // Check if we're overriding an initializer that is visible to obj-c
+      if (auto parent = ctor->getOverriddenDecl())
+        return isVisibleToCxx(parent, minRequiredAccess, false);
+    }
+  }
+  return false;
+}

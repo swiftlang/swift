@@ -352,6 +352,8 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
       ctx.getRewriteContext()));
 
+  SmallVector<RequirementError, 4> errors;
+
   auto status = machine->initWithProtocols(component);
   if (status.first != CompletionResult::Success) {
     // All we can do at this point is diagnose and give each protocol an empty
@@ -417,6 +419,13 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
         RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
         std::move(temp));
     }
+  }
+
+  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
+      RequirementMachineMode::Enabled) {
+    machine->System.computeRedundantRequirementDiagnostics(errors);
+    diagnoseRequirementErrors(ctx, errors,
+                              /*allowConcreteGenericParams=*/false);
   }
 
   // Return the result for the specific protocol this request was kicked off on.
@@ -667,7 +676,9 @@ InferredGenericSignatureRequestRQM::evaluate(
 
   if (ctx.LangOpts.RequirementMachineInferredSignatures ==
       RequirementMachineMode::Enabled) {
-    hadError |= diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
+    machine->System.computeRedundantRequirementDiagnostics(errors);
+    hadError |= diagnoseRequirementErrors(ctx, errors,
+                                          allowConcreteGenericParams);
   }
 
   // FIXME: Handle allowConcreteGenericParams

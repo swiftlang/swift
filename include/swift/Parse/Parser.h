@@ -748,14 +748,6 @@ public:
       Context.LangOpts.ParseForSyntaxTreeOnly;
   }
 
-  /// Returns true to indicate that experimental 'distributed actor' syntax
-  /// should be parsed if the parser is only a syntax tree or if the user has
-  /// passed the `-enable-experimental-distributed' flag to the frontend.
-  bool shouldParseExperimentalDistributed() const {
-    return Context.LangOpts.EnableExperimentalDistributed ||
-      Context.LangOpts.ParseForSyntaxTreeOnly;
-  }
-
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&

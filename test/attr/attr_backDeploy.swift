@@ -14,7 +14,7 @@ public func backDeployedTopLevelFunc() {}
 @usableFromInline
 internal func backDeployedUsableFromInlineTopLevelFunc() {}
 
-// OK: function decls in a struct
+// OK: function/property/subscript decls in a struct
 public struct TopLevelStruct {
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
@@ -23,6 +23,10 @@ public struct TopLevelStruct {
   @available(macOS 11.0, *)
   @_backDeploy(macOS 12.0)
   public var backDeployedComputedProperty: Int { 98 }
+
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public subscript(_ index: Int) -> Int { index }
 }
 
 // OK: final function decls in a non-final class
@@ -127,6 +131,33 @@ protocol CannotBackDeployProtocol {}
 @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public actor CannotBackDeployActor {}
+
+// FIXME(backDeploy): support coroutines rdar://90111169
+public struct CannotBackDeployCoroutines {
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' is not supported on coroutine _modify accessor}}
+  public var readWriteProperty: Int {
+    get { 42 }
+    set(newValue) {}
+  }
+
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' is not supported on coroutine _modify accessor}}
+  public subscript(at index: Int) -> Int {
+    get { 42 }
+    set(newValue) {}
+  }
+
+  public var explicitReadAndModify: Int {
+    @available(macOS 11.0, *)
+    @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' is not supported on coroutine _read accessor}}
+    _read { yield 42 }
+
+    @available(macOS 11.0, *)
+    @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' is not supported on coroutine _modify accessor}}
+    _modify {}
+  }
+}
 
 // MARK: - Incompatible declarations
 

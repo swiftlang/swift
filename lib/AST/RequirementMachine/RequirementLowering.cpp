@@ -77,14 +77,14 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
                   Type sugaredFirstType) {
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
-                            firstType, secondType);
+                            sugaredFirstType, secondType);
         recordedRequirements = true;
         return true;
       }
 
       if (firstType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
-                            firstType, secondType);
+                            sugaredFirstType, secondType);
         recordedRequirements = true;
         return true;
       }
@@ -530,7 +530,7 @@ void swift::rewriting::realizeInheritedRequirements(
 /// \returns true if any errors were emitted, and false otherwise (including
 /// when only warnings were emitted).
 bool swift::rewriting::diagnoseRequirementErrors(
-    ASTContext &ctx, SmallVectorImpl<RequirementError> &errors,
+    ASTContext &ctx, ArrayRef<RequirementError> errors,
     bool allowConcreteGenericParams) {
   bool diagnosedError = false;
 
@@ -1034,7 +1034,7 @@ void RuleBuilder::addRequirements(ArrayRef<Requirement> requirements) {
 
   // Add rewrite rules for all top-level requirements.
   for (const auto &req : requirements)
-    addRequirement(req, /*proto=*/nullptr);
+    addRequirement(req, /*proto=*/nullptr, /*requirementID=*/None);
 }
 
 void RuleBuilder::addRequirements(ArrayRef<StructuralRequirement> requirements) {
@@ -1184,22 +1184,26 @@ swift::rewriting::getRuleForRequirement(const Requirement &req,
 }
 
 void RuleBuilder::addRequirement(const Requirement &req,
-                                 const ProtocolDecl *proto) {
+                                 const ProtocolDecl *proto,
+                                 Optional<unsigned> requirementID) {
   if (Dump) {
     llvm::dbgs() << "+ ";
     req.dump(llvm::dbgs());
     llvm::dbgs() << "\n";
   }
 
-  RequirementRules.push_back(
+  auto rule =
       getRuleForRequirement(req, proto, /*substitutions=*/None,
-                            Context));
+                            Context);
+  RequirementRules.push_back(
+      std::make_tuple(rule.first, rule.second, requirementID));
 }
 
 void RuleBuilder::addRequirement(const StructuralRequirement &req,
                                  const ProtocolDecl *proto) {
-  // FIXME: Preserve source location information for diagnostics.
-  addRequirement(req.req.getCanonical(), proto);
+  WrittenRequirements.push_back(req);
+  unsigned requirementID = WrittenRequirements.size() - 1;
+  addRequirement(req.req.getCanonical(), proto, requirementID);
 }
 
 /// Lowers a protocol typealias to a rewrite rule.
@@ -1231,7 +1235,8 @@ void RuleBuilder::addTypeAlias(const ProtocolTypeAlias &alias,
     constraintTerm.add(Symbol::forConcreteType(concreteType, result, Context));
   }
 
-  RequirementRules.emplace_back(subjectTerm, constraintTerm);
+  RequirementRules.emplace_back(subjectTerm, constraintTerm,
+                                /*requirementID=*/None);
 }
 
 /// Record information about a protocol if we have no seen it yet.
@@ -1292,11 +1297,11 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
         addRequirement(req, proto);
 
       for (auto req : proto->getTypeAliasRequirements())
-        addRequirement(req.getCanonical(), proto);
+        addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
     } else {
       auto reqs = proto->getRequirementSignature();
       for (auto req : reqs.getRequirements())
-        addRequirement(req.getCanonical(), proto);
+        addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
       for (auto alias : reqs.getTypeAliases())
         addTypeAlias(alias, proto);
     }

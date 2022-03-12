@@ -106,6 +106,7 @@ getDistributedSerializationRequirements(
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 extractDistributedSerializationRequirements(
     ASTContext &C, ArrayRef<Requirement> allRequirements);
+
 }
 
 #endif /* SWIFT_DECL_TYPECHECKDISTRIBUTED_H */

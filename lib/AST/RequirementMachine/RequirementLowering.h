@@ -59,7 +59,7 @@ void realizeInheritedRequirements(TypeDecl *decl, Type type,
                                   SmallVectorImpl<RequirementError> &errors);
 
 bool diagnoseRequirementErrors(ASTContext &ctx,
-                               SmallVectorImpl<RequirementError> &errors,
+                               ArrayRef<RequirementError> errors,
                                bool allowConcreteGenericParams);
 
 std::pair<MutableTerm, MutableTerm>
@@ -104,7 +104,12 @@ struct RuleBuilder {
 
   /// New rules derived from requirements written by the user, which can be
   /// eliminated by homotopy reduction.
-  std::vector<std::pair<MutableTerm, MutableTerm>> RequirementRules;
+  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>>
+      RequirementRules;
+
+  /// Requirements written in source code. The requirement ID in the above
+  /// \c RequirementRules vector is an index into this array.
+  std::vector<StructuralRequirement> WrittenRequirements;
 
   /// Enables debugging output. Controlled by the -dump-requirement-machine
   /// frontend flag.
@@ -123,7 +128,8 @@ struct RuleBuilder {
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
-                      const ProtocolDecl *proto);
+                      const ProtocolDecl *proto,
+                      Optional<unsigned> requirementID);
   void addRequirement(const StructuralRequirement &req,
                       const ProtocolDecl *proto);
   void addTypeAlias(const ProtocolTypeAlias &alias,

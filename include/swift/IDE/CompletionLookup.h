@@ -541,7 +541,6 @@ public:
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                     bool IsConcurrencyEnabled,
-                                    bool IsDistributedEnabled,
                                     Optional<DeclKind> DK);
 
   void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK);

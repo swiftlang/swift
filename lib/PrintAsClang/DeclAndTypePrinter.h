@@ -13,6 +13,8 @@
 #ifndef SWIFT_PRINTASCLANG_DECLANDTYPEPRINTER_H
 #define SWIFT_PRINTASCLANG_DECLANDTYPEPRINTER_H
 
+#include "OutputLanguageMode.h"
+
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
 #include "swift/ClangImporter/ClangImporter.h"
@@ -35,8 +37,10 @@ private:
 
   ModuleDecl &M;
   raw_ostream &os;
+  raw_ostream &prologueOS;
   const DelayedMemberSet &delayedMembers;
   AccessLevel minRequiredAccess;
+  OutputLanguageMode outputLang;
 
   struct CTypeInfo {
     StringRef name;
@@ -59,9 +63,11 @@ private:
   Implementation getImpl();
 
 public:
-  DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out,
-                     DelayedMemberSet &delayed, AccessLevel access)
-    : M(mod), os(out), delayedMembers(delayed), minRequiredAccess(access) {}
+  DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out, raw_ostream &prologueOS,
+                     DelayedMemberSet &delayed, AccessLevel access,
+                     OutputLanguageMode outputLang)
+      : M(mod), os(out), prologueOS(prologueOS), delayedMembers(delayed),
+        minRequiredAccess(access), outputLang(outputLang) {}
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.

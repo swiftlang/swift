@@ -300,12 +300,13 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
     if (swift::ensureDistributedModuleLoaded(decl)) {
       // copy access level of distributed actor init from the nominal decl
       accessLevel = decl->getEffectiveAccess();
+      auto systemTy = getDistributedActorSystemType(classDecl);
 
       // Create the parameter.
       auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_system, Loc,
                                       ctx.Id_system, decl);
       arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(getDistributedActorSystemType(classDecl));
+      arg->setInterfaceType(systemTy);
       arg->setImplicit();
 
       params.push_back(arg);

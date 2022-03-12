@@ -1312,6 +1312,7 @@ public:
 
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
+      // FIXME(backDeploy): Handle calls to back deployed methods on super?
       constant = SILDeclRef(declRef->getDecl())
         .asForeign(requiresForeignEntryPoint(declRef->getDecl()));
 
@@ -5767,8 +5768,11 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
 }
 
 SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {
-  return SILDeclRef(accessor, SILDeclRef::Kind::Func)
-    .asForeign(requiresForeignEntryPoint(accessor));
+  auto declRef = SILDeclRef(accessor, SILDeclRef::Kind::Func);
+  if (accessor->isBackDeployed())
+    return declRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
+
+  return declRef.asForeign(requiresForeignEntryPoint(accessor));
 }
 
 /// Emit a call to a getter.

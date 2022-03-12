@@ -3,7 +3,7 @@
 // REQUIRES: distributed
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -enable-testing -enable-experimental-distributed -disable-availability-checking -emit-ir -o %t/test.ll -emit-tbd -emit-tbd-path %t/test.tbd -I %t
+// RUN: %target-swift-frontend %s -enable-testing -disable-availability-checking -emit-ir -o %t/test.ll -emit-tbd -emit-tbd-path %t/test.tbd -I %t
 // RUN cat %t/test.tbd | %FileCheck %s --dump-input=always
 
 import _Distributed

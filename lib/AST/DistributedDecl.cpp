@@ -102,7 +102,7 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
 
   auto DA = C.getDistributedActorDecl();
   if (!DA)
-    return ErrorType::get(C);
+    return ErrorType::get(C); // FIXME(distributed): just use Type()
 
   // Dig out the actor system type.
   auto module = actor->getParentModule();

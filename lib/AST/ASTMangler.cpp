@@ -1323,9 +1323,15 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       // type ::= archetype
     case TypeKind::PrimaryArchetype:
-    case TypeKind::OpenedArchetype:
     case TypeKind::SequenceArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
+
+    case TypeKind::OpenedArchetype: {
+      // Opened archetypes have always been mangled via their interface type,
+      // although those manglings aren't used in any stable manner.
+      auto openedType = cast<OpenedArchetypeType>(tybase);
+      return appendType(openedType->getInterfaceType(), sig, forDecl);
+    }
 
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);

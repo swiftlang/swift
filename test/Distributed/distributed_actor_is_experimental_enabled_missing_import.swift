@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-distributed
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 // REQUIRES: concurrency
 // REQUIRES: distributed
 

@@ -386,6 +386,12 @@ Decl::getBackDeployBeforeOSVersion(PlatformKind Kind) const {
       }
     }
   }
+
+  // Accessors may inherit `@_backDeploy`.
+  if (getKind() == DeclKind::Accessor) {
+    return cast<AccessorDecl>(this)->getStorage()->getBackDeployBeforeOSVersion(Kind);
+  }
+
   return None;
 }
 
@@ -7649,7 +7655,16 @@ bool AbstractFunctionDecl::isSendable() const {
 }
 
 bool AbstractFunctionDecl::isBackDeployed() const {
-  return getAttrs().hasAttribute<BackDeployAttr>();
+  if (getAttrs().hasAttribute<BackDeployAttr>())
+    return true;
+
+  // Property and subscript accessors inherit the attribute.
+  if (auto *AD = dyn_cast<AccessorDecl>(this)) {
+    if (AD->getStorage()->getAttrs().hasAttribute<BackDeployAttr>())
+      return true;
+  }
+
+  return false;
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
@@ -9060,7 +9075,9 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   }
 
   if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
-    if (dc->isAsyncContext()) {
+    if (dc->isAsyncContext() ||
+        (dc->getASTContext().LangOpts.WarnConcurrency &&
+         dc->getASTContext().LangOpts.EnableExperimentalAsyncTopLevel)) {
       if (Type mainActor = dc->getASTContext().getMainActorType())
         return ActorIsolation::forGlobalActor(mainActor, /*unsafe=*/false);
     }
