@@ -123,6 +123,17 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
 }
 
 @inlinable @inline(__always)
+internal func _utf16LengthOfScalar(
+  _ buffer: UnsafeRawBufferPointer,
+  readIdx: inout Int
+) -> Int {
+  let byte = rawBuffer.load(fromByteOffset: readIdx, as: UInt8.self)
+  let len = _utf8ScalarLength(byte)
+  readIdx &+= len
+  return len == 4 ? 2 : 1
+}
+
+@inlinable @inline(__always)
 internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
   guard rawBuffer.count > 0 else { return 0 }
   _internalInvariant(!UTF8.isContinuation(rawBuffer.first.unsafelyUnwrapped))
@@ -142,21 +153,13 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
     } else {
       let endIdx = readIdx + MemoryLayout<UInt>.stride
       while readIdx < endIdx {
-        let byte = rawBuffer.load(fromByteOffset: readIdx, as: UInt8.self)
-        let len = _utf8ScalarLength(byte)
-        let utf16Len = len == 4 ? 2 : 1
-        utf16Count &+= utf16Len
-        readIdx &+= len
+        utf16Count &+= _utf16LengthOfScalar(rawBuffer, &readIdx)
       }
     }
   }
   
   while readIdx < rawBuffer.count {
-    let byte = rawBuffer.load(fromByteOffset: readIdx, as: UInt8.self)
-    let len = _utf8ScalarLength(byte)
-    let utf16Len = len == 4 ? 2 : 1
-    utf16Count &+= utf16Len
-    readIdx &+= len
+    utf16Count &+= _utf16LengthOfScalar(rawBuffer, &readIdx)
   }
   
   return utf16Count
