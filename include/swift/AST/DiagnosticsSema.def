@@ -6320,5 +6320,9 @@ ERROR(attr_incompatible_with_back_deploy,none,
       "'%0' cannot be applied to a back deployed %1",
       (DeclAttribute, DescriptiveDeclKind))
 
+ERROR(back_deploy_not_on_coroutine,none,
+      "'%0' is not supported on coroutine %1",
+      (DeclAttribute, DescriptiveDeclKind))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

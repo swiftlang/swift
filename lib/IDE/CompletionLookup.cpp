@@ -2852,7 +2852,6 @@ void CompletionLookup::getGenericRequirementCompletions(
 
 bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                              bool IsConcurrencyEnabled,
-                                             bool IsDistributedEnabled,
                                              Optional<DeclKind> DK) {
   if (DeclAttribute::isUserInaccessible(DAK))
     return false;
@@ -2863,8 +2862,6 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
   if (!IsInSil && DeclAttribute::isSilOnly(DAK))
     return false;
   if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
-    return false;
-  if (!IsDistributedEnabled && DeclAttribute::isDistributedOnly(DAK))
     return false;
   if (!DK.hasValue())
     return true;
@@ -2885,11 +2882,10 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
     }
   }
   bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
-  bool IsDistributedEnabled = Ctx.LangOpts.EnableExperimentalDistributed;
   std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
   if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled,         \
-                            IsDistributedEnabled, DK))                         \
+                            DK))                         \
     addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/Attr.def"
 }

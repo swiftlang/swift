@@ -656,8 +656,7 @@ static void addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
 }
 
 static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
-                            bool IsConcurrencyEnabled,
-                            bool IsDistributedEnabled) {
+                            bool IsConcurrencyEnabled) {
   auto isTypeDeclIntroducer = [](CodeCompletionKeywordKind Kind,
                                  Optional<DeclAttrKind> DAK) -> bool {
     switch (Kind) {
@@ -776,11 +775,6 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     // Remove keywords only available when concurrency is enabled.
     if (DAK.hasValue() && !IsConcurrencyEnabled &&
         DeclAttribute::isConcurrencyOnly(*DAK))
-      return;
-
-    // Remove keywords only available when distributed is enabled.
-    if (DAK.hasValue() && !IsDistributedEnabled &&
-        DeclAttribute::isDistributedOnly(*DAK))
       return;
 
     addKeyword(Sink, Name, Kind, /*TypeAnnotation=*/"", getFlair(Kind, DAK));
@@ -943,8 +937,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   }
   case CompletionKind::StmtOrExpr:
     addDeclKeywords(Sink, CurDeclContext,
-                    Context.LangOpts.EnableExperimentalConcurrency,
-                    Context.LangOpts.EnableExperimentalDistributed);
+                    Context.LangOpts.EnableExperimentalConcurrency);
     addStmtKeywords(Sink, CurDeclContext, MaybeFuncBody);
     LLVM_FALLTHROUGH;
   case CompletionKind::ReturnStmtExpr:
@@ -1013,8 +1006,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     }) != ParsedKeywords.end();
     if (!HasDeclIntroducer) {
       addDeclKeywords(Sink, CurDeclContext,
-                      Context.LangOpts.EnableExperimentalConcurrency,
-                      Context.LangOpts.EnableExperimentalDistributed);
+                      Context.LangOpts.EnableExperimentalConcurrency);
       addLetVarKeywords(Sink);
     }
     break;
@@ -1758,8 +1750,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         if (CurDeclContext->isTypeContext()) {
           // Override completion (CompletionKind::NominalMemberBeginning).
           addDeclKeywords(Sink, CurDeclContext,
-                          Context.LangOpts.EnableExperimentalConcurrency,
-                          Context.LangOpts.EnableExperimentalDistributed);
+                          Context.LangOpts.EnableExperimentalConcurrency);
           addLetVarKeywords(Sink);
           SmallVector<StringRef, 0> ParsedKeywords;
           CompletionOverrideLookup OverrideLookup(Sink, Context, CurDeclContext,
@@ -1768,8 +1759,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         } else {
           // Global completion (CompletionKind::PostfixExprBeginning).
           addDeclKeywords(Sink, CurDeclContext,
-                          Context.LangOpts.EnableExperimentalConcurrency,
-                          Context.LangOpts.EnableExperimentalDistributed);
+                          Context.LangOpts.EnableExperimentalConcurrency);
           addStmtKeywords(Sink, CurDeclContext, MaybeFuncBody);
           addSuperKeyword(Sink, CurDeclContext);
           addLetVarKeywords(Sink);

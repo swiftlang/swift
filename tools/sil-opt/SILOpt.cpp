@@ -130,7 +130,7 @@ static llvm::cl::opt<llvm::cl::boolOrDefault>
 
 static llvm::cl::opt<llvm::cl::boolOrDefault> EnableExperimentalMoveOnly(
     "enable-experimental-move-only", llvm::cl::init(llvm::cl::BOU_UNSET),
-    llvm::cl::desc("Enable experimental distributed actors."));
+    llvm::cl::desc("Enable experimental move-only semantics."));
 
 static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",

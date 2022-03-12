@@ -6315,7 +6315,8 @@ public:
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
   
-  /// Returns 'true' if the function has the @c @_backDeploy attribute.
+  /// Returns 'true' if the function has (or inherits) the @c @_backDeploy
+  /// attribute.
   bool isBackDeployed() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
