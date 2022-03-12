@@ -1,10 +1,10 @@
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-  set(sources vcruntime.apinotes)
-else()
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(sources
     Dispatch.apinotes
     os.apinotes
   )
+elseif(WINDOWS IN_LIST SWIFT_SDKS)
+  list(APPEND sources vcruntime.apinotes)
 endif()
 
 set(output_dir "${SWIFTLIB_DIR}/apinotes")

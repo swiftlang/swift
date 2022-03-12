@@ -241,12 +241,14 @@ option(SWIFT_INCLUDE_DOCS
     TRUE)
 
 set(_swift_include_apinotes_default FALSE)
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "Windows")
+# FIXME: Windows support should depend on SWIFT_SDKS instead of CMAKE_SYSTEM_NAME,
+# but SDKs are not configured yet.
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin|Windows")
   set(_swift_include_apinotes_default TRUE)
 endif()
 
 option(SWIFT_INCLUDE_APINOTES
-  "Create targets for installing the remaining apinotes in the built toolchain."
+  "Create targets for installing the remaining apinotes in runtime resources."
   ${_swift_include_apinotes_default})
 
 #

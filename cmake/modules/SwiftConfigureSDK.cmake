@@ -438,7 +438,7 @@ macro(configure_sdk_windows name environment architectures)
   string(TOLOWER ${name} platform)
 
   set(SWIFT_SDK_${prefix}_NAME "${name}")
-  set(SWIFT_SDK_${prefix}_LIB_SUBDIR "windows")
+  set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${platform}")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
   set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
