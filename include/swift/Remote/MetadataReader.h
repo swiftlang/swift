@@ -420,11 +420,7 @@ public:
           return nullptr;
         }
       } else {
-        resolved = Reader->resolvePointer(RemoteAddress(remoteAddress), 0);
-        if (resolved.getSymbol().empty()) {
-          // No symbol found, use the already calculated address.
-          resolved = RemoteAbsolutePointer("", remoteAddress);
-        }
+        resolved = Reader->getSymbol(RemoteAddress(remoteAddress));
       }
 
       switch (kind) {
