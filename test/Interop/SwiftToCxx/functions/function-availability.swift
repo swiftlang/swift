@@ -2,8 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Functions -emit-cxx-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
-// RUN: %check-cxx-header-in-clang -std=c++14 %t/functions.h
-// RUN: %check-cxx-header-in-clang -std=c++17 %t/functions.h
+// RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
 // CHECK-LABEL: namespace Functions {
 
