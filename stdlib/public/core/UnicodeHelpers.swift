@@ -124,13 +124,39 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
 
 @inlinable @inline(__always)
 internal func _utf16LengthOfScalar(
-  _ rawBuffer: UnsafeRawBufferPointer,
-  _ readIdx: inout Int
+  _ readPtr: inout UnsafeRawPointer
 ) -> Int {
-  let byte = rawBuffer.load(fromByteOffset: readIdx, as: UInt8.self)
+  let byte = readPtr.load(as: UInt8.self)
   let len = _utf8ScalarLength(byte)
-  readIdx &+= len
+  readPtr += len
   return len == 4 ? 2 : 1
+}
+
+@inlinable @inline(__always)
+internal func _utf16Length<U: SIMD, S: SIMD>(
+  readPtr: inout UnsafeRawPointer,
+  endPtr: UnsafeRawPointer,
+  unsignedSIMDType: U.Type,
+  signedSIMDType: S.Type
+) -> Int where U.Scalar == UInt8, S.Scalar == Int8 {
+  var utf16Count = 0
+  
+  while readPtr + MemoryLayout<U>.stride < endPtr {
+    //Find the number of continuations (0b10xxxxxx)
+    let sValue = readPtr.load(as: S.self)
+    let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
+    let continuationCount = Int(continuations.wrappedSum())
+    
+    //Find the number of 4 byte code points (0b1110xxxx)
+    let uValue = readPtr.load(as: U.self)
+    let fourBytes = U.zero.replacing(with: U.one, where: uValue .>= 0b11110000)
+    let fourByteCount = Int(fourBytes.wrappedSum())
+    
+    utf16Count &+= (U.scalarCount - continuationCount) + fourByteCount
+    readPtr += MemoryLayout<U>.stride
+  }
+  
+  return utf16Count
 }
 
 @inlinable @inline(__always)
@@ -140,26 +166,71 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
   _internalInvariant(
        UTF8.isASCII(rawBuffer.last.unsafelyUnwrapped)
     || UTF8.isContinuation(rawBuffer.last.unsafelyUnwrapped))
-  let wordASCIIMask = UInt(truncatingIfNeeded: 0x8080_8080_8080_8080 as UInt64)
+  
   var utf16Count = 0
-  var readIdx = 0
-
-  while readIdx + MemoryLayout<UInt>.stride < rawBuffer.count {
-    let maybeASCII = Builtin.loadRaw((rawBuffer.baseAddress._unsafelyUnwrappedUnchecked + readIdx)._rawValue) as UInt
-   //let maybeASCII = rawBuffer.load(fromByteOffset: readIdx, as: UInt.self)
-    if maybeASCII & wordASCIIMask == 0 {
-      utf16Count &+= MemoryLayout<UInt>.stride
-      readIdx &+= MemoryLayout<UInt>.stride
-    } else {
-      let endIdx = readIdx + MemoryLayout<UInt>.stride
-      while readIdx < endIdx {
-        utf16Count &+= _utf16LengthOfScalar(rawBuffer, &readIdx)
-      }
-    }
+  
+  var readPtr = rawBuffer.baseAddress.unsafelyUnwrapped
+  let endPtr = readPtr + rawBuffer.count
+  
+  //align
+  while readPtr < endPtr
+        && UInt(bitPattern: readPtr) % UInt(MemoryLayout<SIMD8<UInt8>>.stride) != 0 {
+    utf16Count &+= _utf16LengthOfScalar(&readPtr)
   }
   
-  while readIdx < rawBuffer.count {
-    utf16Count &+= _utf16LengthOfScalar(rawBuffer, &readIdx)
+//  utf16Count &+= _utf16Length(
+//    readPtr: &readPtr,
+//    endPtr: endPtr,
+//    unsignedSIMDType: SIMD64<UInt8>.self,
+//    signedSIMDType: SIMD64<Int8>.self
+//  )
+//
+//  utf16Count &+= _utf16Length(
+//    readPtr: &readPtr,
+//    endPtr: endPtr,
+//    unsignedSIMDType: SIMD32<UInt8>.self,
+//    signedSIMDType: SIMD32<Int8>.self
+//  )
+//
+//  utf16Count &+= _utf16Length(
+//    readPtr: &readPtr,
+//    endPtr: endPtr,
+//    unsignedSIMDType: SIMD16<UInt8>.self,
+//    signedSIMDType: SIMD16<Int8>.self
+//  )
+
+  utf16Count &+= _utf16Length(
+    readPtr: &readPtr,
+    endPtr: endPtr,
+    unsignedSIMDType: SIMD8<UInt8>.self,
+    signedSIMDType: SIMD8<Int8>.self
+  )
+//
+//  utf16Count &+= _utf16Length(
+//    readPtr: &readPtr,
+//    endPtr: endPtr,
+//    unsignedSIMDType: SIMD4<UInt8>.self,
+//    signedSIMDType: SIMD4<Int8>.self
+//  )
+//
+//  utf16Count &+= _utf16Length(
+//    readPtr: &readPtr,
+//    endPtr: endPtr,
+//    unsignedSIMDType: SIMD2<UInt8>.self,
+//    signedSIMDType: SIMD2<Int8>.self
+//  )
+  
+  //eat trailing continuations from the last chunk
+  while readPtr < endPtr {
+    if !UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
+      break
+    }
+    readPtr += 1
+  }
+
+  //trailing bytes
+  while readPtr < endPtr {
+    utf16Count &+= _utf16LengthOfScalar(&readPtr)
   }
   
   return utf16Count
