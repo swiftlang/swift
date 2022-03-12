@@ -864,10 +864,11 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
     out << "- " << rule;
     if (auto ID = rule.getRequirementID()) {
       auto requirement = WrittenRequirements[*ID];
-      out << ", ID: " << *ID << ", ";
+      out << " [ID: " << *ID << " - ";
       requirement.req.dump(out);
       out << " at ";
       requirement.loc.print(out, Context.getASTContext().SourceMgr);
+      out << "]";
     }
     out << "\n";
   }
