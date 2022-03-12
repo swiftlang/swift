@@ -2509,7 +2509,8 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
     GenericEnvironment *&genericEnv,
     SubstitutionMap &interfaceSubs,
     CanType &dynamicSelfType,
-    bool withoutActuallyEscaping) {
+    bool withoutActuallyEscaping,
+    Optional<DifferentiationThunkKind> differentiationThunkKind) {
   // We shouldn't be thunking generic types here, and substituted function types
   // ought to have their substitutions applied before we get here.
   assert(!expectedType->isPolymorphic() &&
@@ -2517,15 +2518,19 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   assert(!sourceType->isPolymorphic() &&
          !sourceType->getCombinedSubstitutions());
 
-  // Can't build a thunk without context, so we require ownership semantics
-  // on the result type.
-  assert(expectedType->getExtInfo().hasContext());
-
   // This may inherit @noescape from the expectedType. The @noescape attribute
   // is only stripped when using this type to materialize a new decl.
-  auto extInfoBuilder =
-      expectedType->getExtInfo().intoBuilder().withRepresentation(
+  auto extInfoBuilder = expectedType->getExtInfo().intoBuilder();
+  if (!differentiationThunkKind ||
+      *differentiationThunkKind == DifferentiationThunkKind::Reabstraction ||
+      extInfoBuilder.hasContext()) {
+    // Can't build a reabstraction thunk without context, so we require
+    // ownership semantics on the result type.
+    assert(expectedType->getExtInfo().hasContext());
+
+    extInfoBuilder = extInfoBuilder.withRepresentation(
           SILFunctionType::Representation::Thin);
+  }
 
   if (withoutActuallyEscaping)
     extInfoBuilder = extInfoBuilder.withNoEscape(false);
@@ -2631,10 +2636,14 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   SmallVector<SILParameterInfo, 4> params;
   params.append(expectedType->getParameters().begin(),
                 expectedType->getParameters().end());
-  params.push_back({sourceType,
-                    sourceType->getExtInfo().hasContext()
-                      ? contextConvention
-                      : ParameterConvention::Direct_Unowned});
+
+  if (!differentiationThunkKind ||
+      *differentiationThunkKind == DifferentiationThunkKind::Reabstraction) {
+    params.push_back({sourceType,
+                      sourceType->getExtInfo().hasContext()
+                        ? contextConvention
+                        : ParameterConvention::Direct_Unowned});
+  }
 
   // If this thunk involves DynamicSelfType in any way, add a capture for it
   // in case we need to recover metadata.
