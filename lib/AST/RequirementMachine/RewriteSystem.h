@@ -160,6 +160,8 @@ public:
 
   Optional<Identifier> isProtocolTypeAliasRule() const;
 
+  bool isDerivedFromConcreteProtocolTypeAliasRule() const;
+
   void markLHSSimplified() {
     assert(!LHSSimplified);
     LHSSimplified = true;

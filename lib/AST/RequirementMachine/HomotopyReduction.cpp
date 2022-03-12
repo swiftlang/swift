@@ -83,8 +83,7 @@ void RewriteLoop::recompute(const RewriteSystem &system) {
       Useful |= (!step.isInContext() && !evaluator.isInContext());
 
       const auto &rule = system.getRule(step.getRuleID());
-      if (rule.isProtocolTypeAliasRule() &&
-          rule.getLHS().size() == 3)
+      if (rule.isDerivedFromConcreteProtocolTypeAliasRule())
         HasConcreteTypeAliasRule = 1;
 
       break;
