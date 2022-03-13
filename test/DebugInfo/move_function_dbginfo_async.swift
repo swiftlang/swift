@@ -146,6 +146,8 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}):
 // DWARF-SAME:        DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref
 // DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}})
+// DWARF-SAME:        DW_OP_breg{{.*}}, DW_OP_deref, DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref
+// DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}})
 // DWARF-SAME:        DW_OP_breg{{.*}}, DW_OP_deref, DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref)
 // DWARF-NEXT: DW_AT_name	("msg")
 //

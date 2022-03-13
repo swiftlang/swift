@@ -214,16 +214,6 @@ bool DebugInfoCanonicalizer::process() {
           continue;
         }
 
-        // If we have a SILUndef, mark this debug info as being mapped to
-        // nullptr.
-        if (isa<SILUndef>(dvi->getOperand())) {
-          LLVM_DEBUG(llvm::dbgs() << "        SILUndef.\n");
-          auto iter = state.debugValues.insert({*debugInfo, nullptr});
-          if (!iter.second)
-            iter.first->second = nullptr;
-          continue;
-        }
-
         // Otherwise, we may have a new debug_value to track. Try to begin
         // tracking it...
         auto iter = state.debugValues.insert({*debugInfo, dvi});

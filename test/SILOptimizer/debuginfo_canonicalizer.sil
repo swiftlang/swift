@@ -113,6 +113,7 @@ bb3:
 // CHECK: [[BB_RHS]]:
 // CHECK-NEXT:   debug_value [moved] undef
 // CHECK-NEXT:   abort_apply
+// CHECK-NEXT:   debug_value [moved] undef
 // CHECK-NEXT:   br [[BB_CONT]]
 // CHECK: } // end sil function 'testUndefDiamond'
 sil @testUndefDiamond : $@convention(thin) (@guaranteed Klass) -> () {
