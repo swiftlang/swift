@@ -999,15 +999,20 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
   lookupResult.setAllowHidden(true);
   lookupResult.suppressDiagnostics();
 
-  if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
+  if (clangSema.LookupName(lookupResult, /*scope=*/clangSema.TUScope)) {
     if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
       return true;
   }
 
-  lookupResult.clear(clang::Sema::LookupTagName);
-  if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
-    if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
-      return true;
+  // No need to lookup tags if we are using C++ mode.
+  if (!clang::LangStandard::getLangStandardForKind(
+          clangSema.getLangOpts().LangStd)
+          .isCPlusPlus()) {
+    lookupResult.clear(clang::Sema::LookupTagName);
+    if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
+      if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
+        return true;
+    }
   }
 
   return false;

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=verify
 
 // Tests for typealias inside protocols
 
@@ -262,9 +262,9 @@ protocol P10 {
 
   @available(*, deprecated, message: "just use Int, silly")
   typealias V = Int
-}
 
-extension P10 {
+  // FIXME: This used to be in a protocol extension, but the Requirement Machine does
+  // not permit `where` clauses to reference typealiases in protocol extensions.
   typealias U = Float
 }
 
