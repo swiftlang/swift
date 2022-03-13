@@ -152,17 +152,8 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       // There is no relation between P and C here.
       //
       // With concrete types, a missing conformance is a conflict.
-      if (requirementKind == RequirementKind::SameType) {
-        // FIXME: Diagnose conflict
-        auto &concreteRule = System.getRule(concreteRuleID);
-        if (concreteRule.getRHS().size() == key.size())
-          concreteRule.markConflicting();
-
-        auto &conformanceRule = System.getRule(conformanceRuleID);
-        if (!conformanceRule.isIdentityConformanceRule() &&
-            conformanceRule.getRHS().size() == key.size())
-          conformanceRule.markConflicting();
-      }
+      if (requirementKind == RequirementKind::SameType)
+        System.recordConflict(conformanceRuleID, concreteRuleID);
 
       if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
         llvm::dbgs() << "^^ " << concreteType << " does not conform to "
