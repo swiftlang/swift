@@ -50,6 +50,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
@@ -68,22 +69,22 @@ using namespace swift;
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
-static SILInstruction *cloneDebugValue(DebugValueInst *original,
+static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
                                        SILInstruction *insertPt) {
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
   builder.setCurrentDebugScope(original->getDebugScope());
-  return builder.createDebugValue(original->getLoc(), original->getOperand(),
-                                  *original->getVarInfo(), false,
-                                  true /*was moved*/);
+  return builder.createDebugValue(
+      original->getLoc(), original.getOperandForDebugValueClone(),
+      *original.getVarInfo(), false, true /*was moved*/);
 }
 
-static SILInstruction *cloneDebugValue(DebugValueInst *original,
+static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
                                        SILBasicBlock *block) {
   SILBuilderWithScope builder(&block->front());
   builder.setCurrentDebugScope(original->getDebugScope());
-  return builder.createDebugValue(original->getLoc(), original->getOperand(),
-                                  *original->getVarInfo(), false,
-                                  true /*was moved*/);
+  return builder.createDebugValue(
+      original->getLoc(), original.getOperandForDebugValueClone(),
+      *original.getVarInfo(), false, true /*was moved*/);
 }
 
 //===----------------------------------------------------------------------===//
@@ -93,7 +94,7 @@ static SILInstruction *cloneDebugValue(DebugValueInst *original,
 namespace {
 
 struct BlockState {
-  llvm::SmallMapVector<SILDebugVariable, DebugValueInst *, 4> debugValues;
+  llvm::SmallMapVector<SILDebugVariable, DebugVarCarryingInst, 4> debugValues;
 };
 
 struct DebugInfoCanonicalizer {
@@ -202,13 +203,20 @@ bool DebugInfoCanonicalizer::process() {
     // Then for each inst in the block...
     for (auto &inst : *block) {
       LLVM_DEBUG(llvm::dbgs() << "    Inst: " << inst);
-      // If we have a debug_value that was moved, store state for it.
-      if (auto *dvi = dyn_cast<DebugValueInst>(&inst)) {
-        if (!dvi->getWasMoved())
+
+      // Skip any alloc box inst we see, we do not support them yet.
+      if (isa<AllocBoxInst>(&inst))
+        continue;
+
+      // If we have a debug_value or alloc_stack that was moved, store state for
+      // it. Once the isa check above is removed, this will handle alloc_box as
+      // well.
+      if (auto dvi = DebugVarCarryingInst(&inst)) {
+        if (!dvi.getWasMoved())
           continue;
 
         LLVM_DEBUG(llvm::dbgs() << "        Found DebugValueInst!\n");
-        auto debugInfo = dvi->getVarInfo();
+        auto debugInfo = dvi.getVarInfo();
         if (!debugInfo) {
           LLVM_DEBUG(llvm::dbgs() << "        Has no var info?! Skipping!\n");
           continue;
