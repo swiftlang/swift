@@ -174,8 +174,13 @@ Optional<Identifier> Rule::isProtocolTypeAliasRule() const {
     //
     // We shouldn't have unresolved symbols on the right hand side;
     // they should have been simplified away.
-    if (RHS.containsUnresolvedSymbols())
-      return None;
+    if (RHS.containsUnresolvedSymbols()) {
+      if (RHS.size() != 2 ||
+          RHS[0] != LHS[0] ||
+          RHS[1].getKind() != Symbol::Kind::Name) {
+        return None;
+      }
+    }
   } else {
     // This is the case where the underlying type is concrete.
     assert(LHS.size() == 3);
@@ -660,6 +665,28 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     for (unsigned index : indices(lhs)) {
       auto symbol = lhs[index];
 
+      // The left hand side can contain a single name symbol if it has the form
+      // T.N or T.N.[p], where T is some prefix that does not contain name
+      // symbols, N is a name symbol, and [p] is an optional property symbol.
+      //
+      // In the latter case, we have a protocol typealias, or a rule derived
+      // via resolving a critical pair involving a protocol typealias.
+      //
+      // Any other valid occurrence of a name symbol should have been reduced by
+      // an associated type introduction rule [P].N, marking the rule as
+      // LHS-simplified.
+      if (!rule.isLHSSimplified() &&
+          (rule.isPropertyRule()
+           ? index != lhs.size() - 2
+           : index != lhs.size() - 1)) {
+        // This is only true if the input requirements were valid.
+        if (policy == DisallowInvalidRequirements) {
+          ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
+        } else {
+          // FIXME: Assert that we diagnosed an error
+        }
+      }
+
       if (index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Layout);
         ASSERT_RULE(!symbol.hasSubstitutions());
@@ -677,14 +704,18 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     for (unsigned index : indices(rhs)) {
       auto symbol = rhs[index];
 
-      // RHS-simplified rules might have unresolved name symbols on the
-      // right hand side. Also, completion can introduce rules of the
-      // form T.X.[concrete: C] => T.X, where T is some resolved term,
-      // and X is a name symbol for a protocol typealias.
-      if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !(rule.isPropertyRule() &&
-            index == rhs.size() - 1)) {
+      // The right hand side can contain a single name symbol if it has the form
+      // T.N, where T is some prefix that does not contain name symbols, and
+      // N is a name symbol.
+      //
+      // In this case, we have a protocol typealias, or a rule derived via
+      // resolving a critical pair involving a protocol typealias.
+      //
+      // Any other valid occurrence of a name symbol should have been reduced by
+      // an associated type introduction rule [P].N, marking the rule as
+      // RHS-simplified.
+      if (!rule.isRHSSimplified() &&
+          index != rhs.size() - 1) {
         // This is only true if the input requirements were valid.
         if (policy == DisallowInvalidRequirements) {
           ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
