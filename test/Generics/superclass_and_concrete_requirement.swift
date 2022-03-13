@@ -14,7 +14,7 @@ protocol P1 {
 }
 
 // CHECK-LABEL: .P2@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P2]T == S>
+// CHECK-NEXT: Requirement signature: <Self>
 protocol P2 {
   associatedtype T where T : C, T == S
   // expected-error@-1 {{'Self.T' requires that 'S' inherit from 'C'}}
@@ -23,7 +23,7 @@ protocol P2 {
 }
 
 // CHECK-LABEL: .P3@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P3]T == S>
+// CHECK-NEXT: Requirement signature: <Self>
 protocol P3 {
   associatedtype T where T == S, T : C
   // expected-error@-1 {{'Self.T' requires that 'S' inherit from 'C'}}

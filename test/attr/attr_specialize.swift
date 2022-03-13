@@ -177,6 +177,8 @@ func funcWithForbiddenSpecializeRequirement<T>(_ t: T) {
 // expected-warning@-3{{redundant constraint 'T' : '_Trivial'}}
 // expected-note@-4 {{constraint 'T' : '_Trivial' implied here}}
 // expected-note@-5 2{{constraint conflicts with 'T' : '_Trivial(32)'}}
+// expected-error@-6 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
+// expected-note@-7 {{missing constraint for 'T' in '_specialize' attribute}}
 @_specialize(where T: _Trivial, T: _Trivial(64))
 // expected-warning@-1{{redundant constraint 'T' : '_Trivial'}}
 // expected-note@-2 1{{constraint 'T' : '_Trivial' implied here}}
