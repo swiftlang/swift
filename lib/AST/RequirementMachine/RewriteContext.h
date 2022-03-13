@@ -55,9 +55,6 @@ class RewriteContext final {
   /// Cache for associated type declarations.
   llvm::DenseMap<Symbol, AssociatedTypeDecl *> AssocTypes;
 
-  /// Cache for merged associated type symbols.
-  llvm::DenseMap<std::pair<Symbol, Symbol>, Symbol> MergedAssocTypes;
-
   /// Requirement machines built from generic signatures.
   llvm::DenseMap<GenericSignature, RequirementMachine *> Machines;
 

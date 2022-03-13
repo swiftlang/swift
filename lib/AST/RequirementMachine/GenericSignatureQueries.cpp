@@ -239,7 +239,8 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
     case Symbol::Kind::Superclass:
     case Symbol::Kind::ConcreteType:
     case Symbol::Kind::ConcreteConformance:
-      llvm_unreachable("Property symbol cannot appear in a type term");
+      llvm::errs() <<"Invalid symbol in a type term: " << term << "\n";
+      abort();
     }
 
     // This symbol is valid, add it to the longest prefix.
@@ -265,6 +266,9 @@ bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
     explicit Walker(const RequirementMachine &self) : Self(self) {}
 
     Action walkToTypePre(Type component) override {
+      if (!component->hasTypeParameter())
+        return Action::SkipChildren;
+
       if (!component->isTypeParameter())
         return Action::Continue;
 
@@ -305,6 +309,9 @@ Type RequirementMachine::getCanonicalTypeInContext(
     TypeArrayView<GenericTypeParamType> genericParams) const {
 
   return type.transformRec([&](Type t) -> Optional<Type> {
+    if (!t->hasTypeParameter())
+      return t;
+
     if (!t->isTypeParameter())
       return None;
 
