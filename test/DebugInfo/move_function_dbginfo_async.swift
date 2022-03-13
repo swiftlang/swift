@@ -41,7 +41,7 @@ public func forceSplit() async {}
 
 // CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async13letSimpleTestyyxnYalF"(%swift.context* swiftasync %0, %swift.opaque* noalias %1, %swift.type* %T)
 // CHECK: entry:
-// CHECK:   call void @llvm.dbg.addr(metadata %swift.opaque** %msg.debug, metadata ![[SIMPLE_TEST_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]+]]
+// CHECK:   call void @llvm.dbg.addr(metadata %swift.context* %0, metadata ![[SIMPLE_TEST_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 8, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]+]]
 // CHECK:   musttail call swifttailcc void
 // CHECK-NEXT: ret void
 
@@ -60,10 +60,8 @@ public func forceSplit() async {}
 
 // DWARF:  DW_AT_linkage_name	("$s3out13letSimpleTestyyxnYalF")
 // DWARF:  DW_TAG_formal_parameter
-// Disable this part of the test due to a different codegen bug.
-// XWARF-NEXT:  DW_AT_location         (0x{{[a-f0-9]+}}:
-// XWARF-NEXT:     [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_breg0 RAX+0, DW_OP_deref)
-// XWARF-NEXT:  DW_AT_name ("msg")
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT:  DW_AT_name ("msg")
 //
 // DWARF:  DW_AT_linkage_name	("$s3out13letSimpleTestyyxnYalFTQ0_")
 // DWARF:  DW_AT_name	("letSimpleTest")
@@ -83,7 +81,7 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 }
 
 // CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async13varSimpleTestyyxz_xtYalF"(%swift.context* swiftasync %0, %swift.opaque* %1, %swift.opaque* noalias %2, %swift.type* %T)
-// CHECK:   call void @llvm.dbg.addr(metadata %swift.opaque** %msg.debug, metadata !{{[0-9]+}}, metadata !DIExpression(DW_OP_deref))
+// CHECK:   call void @llvm.dbg.addr(metadata %swift.context* %0, metadata !{{[0-9]+}}, metadata !DIExpression(DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 8, DW_OP_deref))
 // CHECK:   musttail call swifttailcc void @"$s27move_function_dbginfo_async10forceSplityyYaF"(%swift.context* swiftasync %{{[0-9]+}})
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
@@ -118,10 +116,8 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // DWARF: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalF")
 // DWARF: DW_AT_name	("varSimpleTest")
 // DWARF: DW_TAG_formal_parameter
-// Disable this part of the test due to an additional error.
-// XWARF-NEXT:  DW_AT_location (0x{{[a-f0-9]+}}:
-// XWARF-NEXT:     [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_breg2 RCX+0, DW_OP_deref)
-// XWARF-NEXT:  DW_AT_name ("msg")
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT: DW_AT_name ("msg")
 //
 // DWARF: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalFTQ0_")
 // DWARF: DW_AT_name	("varSimpleTest")
@@ -162,8 +158,10 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // DWARF: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalFTY5_")
 // DWARF: DW_AT_name	("varSimpleTest")
 // DWARF: DW_TAG_formal_parameter
-// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref)
-// DWARF-NEXT: DW_AT_name	("msg")
+// DWARF: DW_AT_location	(0x{{[a-f0-9]+}}:
+// DWARF:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref
+// DWARF:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_breg6 RBP-88, DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF: DW_AT_name	("msg")
 
 public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
     await forceSplit()
