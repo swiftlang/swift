@@ -294,10 +294,9 @@ bool RequirementMachine::isComplete() const {
   return Complete;
 }
 
-bool RequirementMachine::hadError() const {
-  // FIXME: Implement other checks here
-  // FIXME: Assert if hadError() is true but we didn't emit any diagnostics?
-  return System.hadError();
+GenericSignatureErrors RequirementMachine::getErrors() const {
+  // FIXME: Assert if we had errors but we didn't emit any diagnostics?
+  return System.getErrors();
 }
 
 void RequirementMachine::dump(llvm::raw_ostream &out) const {

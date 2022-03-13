@@ -1747,12 +1747,6 @@ public:
 
 void simple_display(llvm::raw_ostream &out, AncestryFlags value);
 
-/// AbstractGenericSignatureRequest and InferredGenericSignatureRequest
-/// return this type, which stores a GenericSignature together with a bit
-/// indicating if there were any errors detected in the original
-/// requirements.
-using GenericSignatureWithError = llvm::PointerIntPair<GenericSignature, 1>;
-
 class AbstractGenericSignatureRequest :
     public SimpleRequest<AbstractGenericSignatureRequest,
                          GenericSignatureWithError (const GenericSignatureImpl *,

@@ -155,7 +155,7 @@ public:
 
   std::string getRuleAsStringForDiagnostics(unsigned ruleID) const;
 
-  bool hadError() const;
+  GenericSignatureErrors getErrors() const;
 
   void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;

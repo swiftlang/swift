@@ -930,31 +930,31 @@ void RewriteSystem::minimizeRewriteSystem() {
   normalizeRedundantRules();
 }
 
-/// In a conformance-valid rewrite system, any rule with unresolved symbols on
-/// the left or right hand side should be redundant. The presence of unresolved
-/// non-redundant rules means one of the original requirements written by the
-/// user was invalid.
-bool RewriteSystem::hadError() const {
+/// Returns flags indicating if the rewrite system has unresolved or
+/// conflicting rules in our minimization domain.
+GenericSignatureErrors RewriteSystem::getErrors() const {
   assert(Complete);
   assert(Minimized);
 
-  for (const auto &rule : Rules) {
-    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
-      continue;
+  GenericSignatureErrors result;
 
+  for (const auto &rule : Rules) {
     if (rule.isPermanent())
       continue;
 
-    if (rule.isConflicting())
-      return true;
+    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
+      continue;
 
     if (!rule.isRedundant() &&
         !rule.isProtocolTypeAliasRule() &&
         rule.containsUnresolvedSymbols())
-      return true;
+      result |= GenericSignatureErrorFlags::HasUnresolvedType;
+
+    if (rule.isConflicting())
+      result |= GenericSignatureErrorFlags::HasConflict;
   }
 
-  return false;
+  return result;
 }
 
 /// Collect all non-permanent, non-redundant rules whose domain is equal to

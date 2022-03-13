@@ -76,7 +76,8 @@ RequirementMachine::computeMinimalProtocolRequirements() {
                                reqs, aliases);
 
     result[proto] = RequirementSignature(ctx.AllocateCopy(reqs),
-                                         ctx.AllocateCopy(aliases));
+                                         ctx.AllocateCopy(aliases),
+                                         getErrors());
   }
 
   return result;
@@ -133,11 +134,11 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       if (otherProto != proto) {
         ctx.evaluator.cacheOutput(
           RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
-          RequirementSignature());
+          RequirementSignature(GenericSignatureErrorFlags::CompletionFailed));
       }
     }
 
-    return RequirementSignature();
+    return RequirementSignature(GenericSignatureErrorFlags::CompletionFailed);
   }
 
   auto minimalRequirements = machine->computeMinimalProtocolRequirements();
@@ -252,7 +253,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
   // If nothing is added to the base signature, just return the base
   // signature.
   if (addedParameters.empty() && addedRequirements.empty())
-    return GenericSignatureWithError(baseSignature, /*hadError=*/false);
+    return GenericSignatureWithError(baseSignature, GenericSignatureErrors());
 
   ASTContext &ctx = addedParameters.empty()
       ? addedRequirements.front().getFirstType()->getASTContext()
@@ -270,7 +271,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
   if (addedRequirements.empty()) {
     auto result = GenericSignature::get(genericParams,
                                         baseSignature.getRequirements());
-    return GenericSignatureWithError(result, /*hadError=*/false);
+    return GenericSignatureWithError(result, GenericSignatureErrors());
   }
 
   // If the request is non-canonical, we won't need to build our own
@@ -388,12 +389,12 @@ AbstractGenericSignatureRequestRQM::evaluate(
         /*reconstituteSugar=*/false);
 
   auto result = GenericSignature::get(genericParams, minimalRequirements);
-  bool hadError = machine->hadError();
+  auto errorFlags = machine->getErrors();
 
-  if (!hadError)
+  if (!errorFlags)
     result.verify();
 
-  return GenericSignatureWithError(result, hadError);
+  return GenericSignatureWithError(result, errorFlags);
 }
 
 GenericSignatureWithError
@@ -522,7 +523,8 @@ InferredGenericSignatureRequestRQM::evaluate(
                        rule);
 
     auto result = GenericSignature::get(genericParams, {});
-    return GenericSignatureWithError(result, /*hadError=*/true);
+    return GenericSignatureWithError(
+        result, GenericSignatureErrorFlags::CompletionFailed);
   }
 
   auto minimalRequirements =
@@ -530,20 +532,19 @@ InferredGenericSignatureRequestRQM::evaluate(
         /*reconstituteSugar=*/true);
 
   auto result = GenericSignature::get(genericParams, minimalRequirements);
-  bool hadError = machine->hadError();
+  auto errorFlags = machine->getErrors();
 
   if (ctx.LangOpts.RequirementMachineInferredSignatures ==
       RequirementMachineMode::Enabled) {
     machine->System.computeRedundantRequirementDiagnostics(errors);
-    hadError |= diagnoseRequirementErrors(ctx, errors,
-                                          allowConcreteGenericParams);
+    diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
   }
 
   // FIXME: Handle allowConcreteGenericParams
 
   // Check invariants.
-  if (!hadError)
+  if (!errorFlags)
     result.verify();
 
-  return GenericSignatureWithError(result, hadError);
+  return GenericSignatureWithError(result, errorFlags);
 }

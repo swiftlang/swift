@@ -8234,7 +8234,7 @@ AbstractGenericSignatureRequest::evaluate(
   // If nothing is added to the base signature, just return the base
   // signature.
   if (addedParameters.empty() && addedRequirements.empty())
-    return GenericSignatureWithError(baseSignature, /*hadError=*/false);
+    return GenericSignatureWithError(baseSignature, GenericSignatureErrors());
 
   ASTContext &ctx = addedParameters.empty()
       ? addedRequirements.front().getFirstType()->getASTContext()
@@ -8328,7 +8328,7 @@ AbstractGenericSignatureRequestGSB::evaluate(
   // If nothing is added to the base signature, just return the base
   // signature.
   if (addedParameters.empty() && addedRequirements.empty())
-    return GenericSignatureWithError(baseSignature, /*hadError=*/false);
+    return GenericSignatureWithError(baseSignature, GenericSignatureErrors());
 
   ASTContext &ctx = addedParameters.empty()
       ? addedRequirements.front().getFirstType()->getASTContext()
@@ -8343,7 +8343,7 @@ AbstractGenericSignatureRequestGSB::evaluate(
 
     auto result = GenericSignature::get(addedParameters,
                                         baseSignature.getRequirements());
-    return GenericSignatureWithError(result, /*hadError=*/false);
+    return GenericSignatureWithError(result, GenericSignatureErrors());
   }
 
   // If the request is non-canonical, we won't need to build our own
@@ -8423,10 +8423,12 @@ AbstractGenericSignatureRequestGSB::evaluate(
   for (const auto &req : addedRequirements)
     builder.addRequirement(req, source, nullptr);
 
-  bool hadError = builder.hadAnyError();
+  GenericSignatureErrors errorFlags;
+  if (builder.hadAnyError())
+    errorFlags |= GenericSignatureErrorFlags::HasUnresolvedType;
   auto result = std::move(builder).computeGenericSignature(
       /*allowConcreteGenericParams=*/true);
-  return GenericSignatureWithError(result, hadError);
+  return GenericSignatureWithError(result, errorFlags);
 }
 
 GenericSignatureWithError
@@ -8627,10 +8629,12 @@ InferredGenericSignatureRequestGSB::evaluate(
   for (const auto &req : addedRequirements)
     builder.addRequirement(req, source, parentModule);
 
-  bool hadError = builder.hadAnyError();
+  GenericSignatureErrors errorFlags;
+  if (builder.hadAnyError())
+    errorFlags |= GenericSignatureErrorFlags::HasUnresolvedType;
   auto result = std::move(builder).computeGenericSignature(
       allowConcreteGenericParams);
-  return GenericSignatureWithError(result, hadError);
+  return GenericSignatureWithError(result, errorFlags);
 }
 
 RequirementSignature
