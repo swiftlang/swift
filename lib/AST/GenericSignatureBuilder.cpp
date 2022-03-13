@@ -8275,7 +8275,8 @@ AbstractGenericSignatureRequest::evaluate(
     if (!rqmResult.getPointer() && !gsbResult.getPointer())
       return rqmResult;
 
-    if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
+    if (!rqmResult.getInt().contains(GenericSignatureErrorFlags::HasConflict) &&
+        !rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
       PrintOptions opts;
       opts.ProtocolQualifiedDependentMemberTypes = true;
 
@@ -8487,7 +8488,8 @@ InferredGenericSignatureRequest::evaluate(
     if (!rqmResult.getPointer() && !gsbResult.getPointer())
       return rqmResult;
 
-    if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
+    if (!rqmResult.getInt().contains(GenericSignatureErrorFlags::HasConflict) &&
+        !rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
       PrintOptions opts;
       opts.ProtocolQualifiedDependentMemberTypes = true;
 
@@ -8689,7 +8691,9 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
-    if (!compare(rqmResult.getRequirements(), gsbResult.getRequirements())) {
+    if (!rqmResult.getErrors().contains(GenericSignatureErrorFlags::HasConflict) &&
+        !compare(rqmResult.getRequirements(),
+                 gsbResult.getRequirements())) {
       PrintOptions opts;
       opts.ProtocolQualifiedDependentMemberTypes = true;
 
