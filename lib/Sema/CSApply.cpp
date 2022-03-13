@@ -1298,56 +1298,14 @@ namespace {
                                      ConstraintLocatorBuilder locator) {
       auto &context = cs.getASTContext();
 
-      OptionSet<ParameterList::CloneFlags> options
-        = (ParameterList::Implicit |
-           ParameterList::NamedArguments);
-      auto *params = getParameterList(member)->clone(context, options);
-
-      for (auto idx : indices(*params)) {
-        auto *param = params->get(idx);
-        auto arg = selfFnTy->getParams()[idx];
-
-        param->setInterfaceType(
-            arg.getParameterType()->mapTypeOutOfContext());
-        param->setSpecifier(
-          ParamDecl::getParameterSpecifierForValueOwnership(
-            arg.getValueOwnership()));
-      }
-
       auto resultTy = selfFnTy->getResult();
-      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
-      auto closure = new (context) AutoClosureExpr(/*set body later*/ nullptr,
-                                                   resultTy, discriminator, dc);
-      closure->setParameterList(params);
-      closure->setType(selfFnTy);
-      closure->setThunkKind(AutoClosureExpr::Kind::SingleCurryThunk);
-      cs.cacheType(closure);
 
       auto refTy = cs.getType(ref)->castTo<FunctionType>();
-      auto calleeFnType = refTy->getResult()->castTo<FunctionType>();
-      auto calleeParams = calleeFnType->getParams();
-      auto calleeResultTy = calleeFnType->getResult();
 
       auto selfParam = refTy->getParams()[0];
       auto selfParamTy = selfParam.getPlainType();
 
       Expr *selfOpenedRef = selfParamRef;
-
-      // If the 'self' parameter has non-trivial ownership, adjust the
-      // argument accordingly.
-      switch (selfParam.getValueOwnership()) {
-      case ValueOwnership::Default:
-      case ValueOwnership::InOut:
-        break;
-
-      case ValueOwnership::Owned:
-      case ValueOwnership::Shared:
-        auto selfArgTy = ParenType::get(context, selfParam.getPlainType(),
-                                        selfParam.getParameterFlags());
-        selfOpenedRef->setType(selfArgTy);
-        cs.cacheType(selfOpenedRef);
-        break;
-      }
 
       if (selfParamTy->hasOpenedExistential()) {
         // If we're opening an existential:
@@ -1363,93 +1321,23 @@ namespace {
         cs.cacheType(selfOpenedRef);
       }
 
-      // (Self) -> ...
-      ApplyExpr *selfCall =
-          DotSyntaxCallExpr::create(context, ref, SourceLoc(), selfOpenedRef);
-      selfCall->setType(refTy->getResult());
-      cs.cacheType(selfCall);
+      // FIXME: selfParamRef ownership
 
-      auto &appliedWrappers = solution.appliedPropertyWrappers[locator.getAnchor()];
-      if (!appliedWrappers.empty()) {
-        auto fnDecl = AnyFunctionRef(dyn_cast<AbstractFunctionDecl>(member));
-        auto callee = resolveConcreteDeclRef(member, locator);
-        auto *closure = buildPropertyWrapperFnThunk(selfCall, calleeFnType,
-                                                    fnDecl, callee, appliedWrappers);
-
-        // FIXME: Verify ExtInfo state is correct, not working by accident.
-        FunctionType::ExtInfo info;
-        ref->setType(
-            FunctionType::get(refTy->getParams(), selfCall->getType(), info));
-        cs.cacheType(ref);
-
-        // FIXME: There's more work to do.
-        return closure;
-      }
-
-      // Pass all the closure parameters to the call.
-      SmallVector<Argument, 4> args;
-      for (auto idx : indices(*params)) {
-        auto *param = params->get(idx);
-        auto calleeParamType = calleeParams[idx].getParameterType();
-
-        auto type = param->getType();
-
-        Expr *paramRef =
-          new (context) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
-        paramRef->setType(
-            param->isInOut()
-              ? LValueType::get(type)
-              : type);
-        cs.cacheType(paramRef);
-
-        paramRef = coerceToType(
-            paramRef,
-            param->isInOut()
-              ? LValueType::get(calleeParamType)
-              : calleeParamType,
-            locator);
-
-        if (param->isInOut()) {
-          paramRef =
-            new (context) InOutExpr(SourceLoc(), paramRef, calleeParamType,
-                                    /*implicit=*/true);
-          cs.cacheType(paramRef);
-        } else if (param->isVariadic()) {
-          assert(calleeParamType->isEqual(paramRef->getType()));
-          paramRef = VarargExpansionExpr::createParamExpansion(context, paramRef);
-          cs.cacheType(paramRef);
-        }
-
-        args.emplace_back(SourceLoc(), calleeParams[idx].getLabel(), paramRef);
-      }
-
-      // (Self) -> (Args...) -> ...
-      auto *argList = ArgumentList::createImplicit(context, args);
-      auto *closureCall = CallExpr::createImplicit(context, selfCall, argList);
-      closureCall->setType(calleeResultTy);
-      cs.cacheType(closureCall);
-
-      Expr *closureBody = closureCall;
-      closureBody = coerceToType(closureCall, resultTy, locator);
-
-      if (selfFnTy->getExtInfo().isThrowing()) {
-        closureBody = new (context) TryExpr(closureBody->getStartLoc(), closureBody,
-                                            cs.getType(closureBody),
-                                            /*implicit=*/true);
-        cs.cacheType(closureBody);
-      }
+      auto *const thunk = buildSingleCurryThunk(
+          selfOpenedRef, ref, dyn_cast<AbstractFunctionDecl>(member), selfFnTy,
+          locator);
 
       if (selfParam.getPlainType()->hasOpenedExistential()) {
-        closureBody =
-          new (context) OpenExistentialExpr(
-            selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef),
-            closureBody, resultTy);
-        cs.cacheType(closureBody);
+        auto *body = thunk->getSingleExpressionBody();
+        body = new (context) OpenExistentialExpr(
+            selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef), body,
+            resultTy);
+        cs.cacheType(body);
+
+        thunk->setBody(body);
       }
 
-      closure->setBody(closureBody);
-
-      return closure;
+      return thunk;
     }
 
     /// Build a new member reference with the given base and member.
