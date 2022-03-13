@@ -42,8 +42,8 @@ if var nonOptional { nonOptional = nonOptionalStruct(); _ = nonOptional } // exp
 guard let nonOptional else { _ = nonOptional; fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 guard var nonOptional else { _ = nonOptional; fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 
-if let nonOptional.property { } // expected-error{{variable binding in a condition requires an initializer}} expected-error{{pattern matching in a condition requires the 'case' keyword}}
-if var nonOptional.property { } // expected-error{{variable binding in a condition requires an initializer}} expected-error{{pattern matching in a condition requires the 'case' keyword}}
+if let nonOptional.property { } // expected-error{{unwrap condition requires a valid identifier}} expected-error{{pattern matching in a condition requires the 'case' keyword}}
+if var nonOptional.property { } // expected-error{{unwrap condition requires a valid identifier}} expected-error{{pattern matching in a condition requires the 'case' keyword}}
 
 guard let _ = nonOptionalStruct() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 guard let _ = nonOptionalEnum() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}

@@ -1635,6 +1635,13 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     
     declRefExpr->setImplicit();
     Init = makeParserResult(declRefExpr);
+  } else if (!ThePattern.isNull()) {
+    // If the pattern is present but isn't an identifier, the user wrote
+    // something invalid like `let foo.bar`. Emit a special diagnostic for this,
+    // with a fix-it prepending "<#identifier#> = "
+    auto diagLoc = ThePattern.get()->getSemanticsProvidingPattern()->getStartLoc();
+    diagnose(diagLoc, diag::conditional_var_valid_identifiers_only)
+      .fixItInsert(diagLoc, "<#identifier#> = ");
   } else {
     diagnose(Tok, diag::conditional_var_initializer_required);
   }
