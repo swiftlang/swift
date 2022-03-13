@@ -848,7 +848,7 @@ private:
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
-    os << " noexcept";
+    os << " SWIFT_NOEXCEPT";
     if (!funcABI.useCCallingConvention())
       os << " SWIFT_CALL";
     printAvailability(FD);

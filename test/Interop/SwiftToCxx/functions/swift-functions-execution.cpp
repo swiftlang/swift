@@ -14,6 +14,10 @@
 #include "functions.h"
 
 int main() {
+  static_assert(noexcept(Functions::passVoidReturnVoid()), "noexcept function");
+  static_assert(noexcept(Functions::_impl::$s9Functions014passVoidReturnC0yyF()),
+                "noexcept function");
+
   Functions::passVoidReturnVoid();
   Functions::passIntReturnVoid(-1);
   assert(Functions::passTwoIntReturnIntNoArgLabel(1, 2) == 42);
