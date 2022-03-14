@@ -522,7 +522,8 @@ InferredGenericSignatureRequestRQM::evaluate(
                        diag::requirement_machine_completion_rule,
                        rule);
 
-    auto result = GenericSignature::get(genericParams, {});
+    auto result = GenericSignature::get(genericParams,
+                                        parentSig.getRequirements());
     return GenericSignatureWithError(
         result, GenericSignatureErrorFlags::CompletionFailed);
   }
