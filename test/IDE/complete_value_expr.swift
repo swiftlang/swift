@@ -2041,3 +2041,11 @@ func testProtocolMetatype(protoProto: MetaProto.Protocol, protoType: MetaProto.T
 // PROTOCOLMETA_3: End completions
 }
 
+func testRdar90136020() {
+    let a: Int64 = #^RDAR90136020^#
+// RDAR90136020: Begin completions
+// RDAR90136020-NOT: name=Int64{{$}}
+// RDAR90136020: Decl[Struct]/OtherModule[Swift]/IsSystem/TypeRelation[Identical]: Int64[#Int64#]; name=Int64
+// RDAR90136020-NOT: name=Int64{{$}}
+// RDAR90136020: End completions
+}

@@ -7,6 +7,10 @@
 // CHECK:   mutating func callAsFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK: }
 
+// CHECK: struct LoadableBoolWrapper {
+// CHECK:   static func ! (lhs: inout LoadableBoolWrapper) -> LoadableBoolWrapper
+// CHECK: }
+
 // CHECK: struct AddressOnlyIntWrapper {
 // CHECK:   mutating func callAsFunction() -> Int32
 // CHECK:   mutating func callAsFunction(_ x: Int32) -> Int32

@@ -7,8 +7,18 @@ import StdlibUnittest
 
 var MembersTestSuite = TestSuite("MembersTestSuite")
 
-MembersTestSuite.test("constructor calls function") {
+MembersTestSuite.test("constructor calls function (explicit)") {
   expectEqual(42, callConstructor(41))
+}
+
+MembersTestSuite.test("constructor calls function (implicit)") {
+  let holder = Hold42()
+  expectEqual(42, holder.m)
+}
+
+MembersTestSuite.test("constructor calls template function (implicit)") {
+  let holder = Hold23()
+  expectEqual(23, holder.m)
 }
 
 runAllTests()
