@@ -1188,6 +1188,29 @@ namespace {
                                    thunkTy, locator);
     }
 
+    /// Build a "{ args in base.fn(args) }" single-expression curry thunk.
+    ///
+    /// \param baseExpr The base expression to be captured.
+    /// \param fnExpr The expression to be called by consecutively applying
+    /// the \p baseExpr and thunk parameters.
+    /// \param declOrClosure The underlying function-like declaration or
+    /// closure we're going to call.
+    /// \param locator The locator pinned on the function reference carried
+    /// by \p fnExpr. If the function has associated applied property wrappers,
+    /// the locator is used to pull them in.
+    AutoClosureExpr *buildSingleCurryThunk(Expr *baseExpr, Expr *fnExpr,
+                                           DeclContext *declOrClosure,
+                                           ConstraintLocatorBuilder locator) {
+      assert(baseExpr);
+      auto *const thunkTy = cs.getType(fnExpr)
+                                ->castTo<FunctionType>()
+                                ->getResult()
+                                ->castTo<FunctionType>();
+
+      return buildSingleCurryThunk(baseExpr, fnExpr, declOrClosure, thunkTy,
+                                   locator);
+    }
+
     AutoClosureExpr *buildCurryThunk(ValueDecl *member,
                                      FunctionType *selfFnTy,
                                      Expr *selfParamRef,
@@ -1221,8 +1244,7 @@ namespace {
       // FIXME: selfParamRef ownership
 
       auto *const thunk = buildSingleCurryThunk(
-          selfOpenedRef, ref, dyn_cast<AbstractFunctionDecl>(member), selfFnTy,
-          locator);
+          selfOpenedRef, ref, cast<DeclContext>(member), selfFnTy, locator);
 
       if (selfParam.getPlainType()->hasOpenedExistential()) {
         auto *body = thunk->getSingleExpressionBody();
@@ -1516,33 +1538,30 @@ namespace {
       cs.setType(declRefExpr, refTy);
       Expr *ref = declRefExpr;
 
+      // A partial application thunk consists of two nested closures:
+      //
+      // { self in { args... in self.method(args...) } }
+      //
+      // If the reference has an applied 'self', eg 'let fn = foo.method',
+      // the outermost closure is wrapped inside a single ApplyExpr:
+      //
+      // { self in { args... in self.method(args...) } }(foo)
+      //
+      // This is done instead of just hoising the expression 'foo' up
+      // into the closure, which would change evaluation order.
+      //
+      // However, for a super method reference, eg, 'let fn = super.foo',
+      // the base expression is always a SuperRefExpr, possibly wrapped
+      // by an upcast. Since SILGen expects super method calls to have a
+      // very specific shape, we only emit a single closure here and
+      // capture the original SuperRefExpr, since its evaluation does not
+      // have side effects, instead of abstracting out a 'self' parameter.
       const auto isSuperPartialApplication = isPartialApplication && isSuper;
       if (isSuperPartialApplication) {
-        // A partial application thunk consists of two nested closures:
-        //
-        // { self in { args... in self.method(args...) } }
-        //
-        // If the reference has an applied 'self', eg 'let fn = foo.method',
-        // the outermost closure is wrapped inside a single ApplyExpr:
-        //
-        // { self in { args... in self.method(args...) } }(foo)
-        //
-        // This is done instead of just hoising the expression 'foo' up
-        // into the closure, which would change evaluation order.
-        //
-        // However, for a super method reference, eg, 'let fn = super.foo',
-        // the base expression is always a SuperRefExpr, possibly wrapped
-        // by an upcast. Since SILGen expects super method calls to have a
-        // very specific shape, we only emit a single closure here and
-        // capture the original SuperRefExpr, since its evaluation does not
-        // have side effects, instead of abstracting out a 'self' parameter.
-        const auto selfFnTy =
-            refTy->castTo<FunctionType>()->getResult()->castTo<FunctionType>();
-
-        ref = buildCurryThunk(member, selfFnTy, base, ref, memberLocator);
+        ref = buildSingleCurryThunk(base, declRefExpr,
+                                    cast<AbstractFunctionDecl>(member),
+                                    memberLocator);
       } else if (isPartialApplication) {
-        auto curryThunkTy = refTy->castTo<FunctionType>();
-
         // Another case where we want to build a single closure is when
         // we have a partial application of a constructor on a statically-
         // derived metatype value. Again, there are no order of evaluation
@@ -1550,21 +1569,22 @@ namespace {
         // improves SILGen.
         if (isa<ConstructorDecl>(member) &&
             cs.isStaticallyDerivedMetatype(base)) {
-          auto selfFnTy = curryThunkTy->getResult()->castTo<FunctionType>();
-
           // Add a useless ".self" to avoid downstream diagnostics.
           base = new (context) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
                                            cs.getType(base));
           cs.setType(base, base->getType());
 
-          auto closure = buildCurryThunk(member, selfFnTy, base, ref,
-                                         memberLocator);
+          auto *closure = buildSingleCurryThunk(
+              base, declRefExpr, cast<AbstractFunctionDecl>(member),
+              memberLocator);
 
           // Skip the code below -- we're not building an extra level of
           // call by applying the metatype; instead, the closure we just
           // built is the curried reference.
           return closure;
         }
+
+        auto *curryThunkTy = refTy->castTo<FunctionType>();
 
         // Check if we need to open an existential stored inside 'self'.
         auto knownOpened = solution.OpenedExistentialTypes.find(
