@@ -532,12 +532,16 @@ extension String.UTF16View {
     let idx = _utf16AlignNativeIndex(idx)
 
     guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
-      return _guts.withFastUTF8 { utf8 in
-        let sliced = UnsafeBufferPointer(
-          rebasing: utf8[startIndex._encodedOffset ..< idx._encodedOffset]
-        )
-        return _utf16Length(UnsafeRawBufferPointer(sliced))
+      let fastCalculation: Int = _guts.withFastUTF8(
+        range: startIndex._encodedOffset ..< idx._encodedOffset
+      ) { utf8 in
+        return _utf16Length(UnsafeRawBufferPointer(utf8))
       }
+      
+//      _internalInvariant(
+//        fastCalculation == _distance(from: startIndex, to: idx)
+//      )
+      return fastCalculation
     }
 
     // Simple and common: endIndex aka `length`.
@@ -547,13 +551,17 @@ extension String.UTF16View {
     // Otherwise, find the nearest lower-bound breadcrumb and count from there
     let (crumb, crumbOffset) = breadcrumbsPtr.pointee.getBreadcrumb(
       forIndex: idx)
-    
-    return _guts.withFastUTF8 { utf8 in
-      let sliced = UnsafeBufferPointer(
-        rebasing: utf8[crumb._encodedOffset ..< idx._encodedOffset]
-      )
-      return crumbOffset + _utf16Length(UnsafeRawBufferPointer(sliced))
+        
+    let fastCalculation: Int = _guts.withFastUTF8(
+      range: crumb._encodedOffset ..< idx._encodedOffset
+    ) { utf8 in
+      return crumbOffset + _utf16Length(UnsafeRawBufferPointer(utf8))
     }
+    
+//    _internalInvariant(
+//      fastCalculation == crumbOffset + _distance(from: crumb, to: idx)
+//    )
+    return fastCalculation
   }
 
   @usableFromInline

@@ -170,12 +170,20 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
   var utf16Count = 0
   
   var readPtr = rawBuffer.baseAddress.unsafelyUnwrapped
+  let initialReadPtr = readPtr
   let endPtr = readPtr + rawBuffer.count
   
-  //align
+ // align
   while readPtr < endPtr
-        && UInt(bitPattern: readPtr) % UInt(MemoryLayout<SIMD8<UInt8>>.stride) != 0 {
-    utf16Count &+= _utf16LengthOfScalar(&readPtr)
+          && UInt(bitPattern: readPtr) % UInt(MemoryLayout<SIMD8<UInt8>>.stride) != 0 {
+    let byte = readPtr.load(as: UInt8.self)
+    let len = _utf8ScalarLength(byte)
+    readPtr += len
+    //if we don't have enough bytes left, we don't have a complete scalar, so
+    //don't add it to the count.
+    if readPtr + len <= endPtr {
+      utf16Count &+= len == 4 ? 2 : 1
+    }
   }
   
 //  utf16Count &+= _utf16Length(
@@ -220,17 +228,34 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
 //    signedSIMDType: SIMD2<Int8>.self
 //  )
   
-  //eat trailing continuations from the last chunk
-  while readPtr < endPtr {
-    if !UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
-      break
+  //back up to the start of the current scalar if we may have a trailing
+  //incomplete scalar
+  if utf16Count > 0 && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
+    while readPtr > initialReadPtr && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
+      readPtr -= 1
     }
-    readPtr += 1
+    
+    //The trailing scalar may be incomplete, subtract it out and check below
+    let byte = readPtr.load(as: UInt8.self)
+    let len = _utf8ScalarLength(byte)
+    utf16Count &-= len
+    if readPtr == initialReadPtr {
+      //if we backed up all the way and didn't hit a non-continuation, then
+      //we don't have any complete scalars, and we should bail.
+      return 0
+    }
   }
 
   //trailing bytes
   while readPtr < endPtr {
-    utf16Count &+= _utf16LengthOfScalar(&readPtr)
+    let byte = readPtr.load(as: UInt8.self)
+    let len = _utf8ScalarLength(byte)
+    readPtr += len
+    //if we don't have enough bytes left, we don't have a complete scalar, so
+    //don't add it to the count.
+    if readPtr + len <= endPtr {
+      utf16Count &+= len == 4 ? 2 : 1
+    }
   }
   
   return utf16Count
