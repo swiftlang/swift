@@ -1116,6 +1116,80 @@ namespace {
       return callExpr;
     }
 
+    /// Build a "{ args in base.fn(args) }" single-expression curry thunk.
+    ///
+    /// \param baseExpr The base expression to be captured, if warranted.
+    /// \param fnExpr The expression to be called by consecutively applying
+    /// the optional \p baseExpr and thunk parameters.
+    /// \param declOrClosure The underlying function-like declaration or
+    /// closure we're going to call.
+    /// \param thunkTy The type of the thunk.
+    /// \param locator The locator pinned on the function reference carried
+    /// by \p fnExpr. If the function has associated applied property wrappers,
+    /// the locator is used to pull them in.
+    AutoClosureExpr *buildSingleCurryThunk(Expr *baseExpr, Expr *fnExpr,
+                                           DeclContext *declOrClosure,
+                                           FunctionType *thunkTy,
+                                           ConstraintLocatorBuilder locator) {
+      auto &ctx = cs.getASTContext();
+
+      const OptionSet<ParameterList::CloneFlags> options =
+          (ParameterList::Implicit | ParameterList::NamedArguments);
+      auto *const thunkParamList =
+          getParameterList(declOrClosure)->clone(ctx, options);
+
+      for (const auto idx : indices(*thunkParamList)) {
+        auto *param = thunkParamList->get(idx);
+        auto arg = thunkTy->getParams()[idx];
+
+        param->setInterfaceType(arg.getParameterType()->mapTypeOutOfContext());
+        param->setSpecifier(ParamDecl::getParameterSpecifierForValueOwnership(
+            arg.getValueOwnership()));
+      }
+
+      auto *const thunk =
+          new (ctx) AutoClosureExpr(/*set body later*/ nullptr, thunkTy,
+                                    AutoClosureExpr::InvalidDiscriminator, dc);
+      thunk->setParameterList(thunkParamList);
+      thunk->setThunkKind(AutoClosureExpr::Kind::SingleCurryThunk);
+      cs.cacheType(thunk);
+
+      Expr *thunkBody = buildSingleCurryThunkBodyCall(
+          baseExpr, fnExpr, declOrClosure, thunkParamList, locator);
+
+      // Coerce to the result type of the thunk.
+      thunkBody = coerceToType(thunkBody, thunkTy->getResult(), locator);
+
+      if (thunkTy->getExtInfo().isThrowing()) {
+        thunkBody = new (ctx)
+            TryExpr(thunkBody->getStartLoc(), thunkBody, cs.getType(thunkBody),
+                    /*implicit=*/true);
+        cs.cacheType(thunkBody);
+      }
+
+      thunk->setBody(thunkBody);
+
+      return thunk;
+    }
+
+    /// Build a "{ args in fn(args) }" single-expression curry thunk.
+    ///
+    /// \param fnExpr The expression to be called by applying the thunk
+    /// parameters.
+    /// \param declOrClosure The underlying function-like declaration or
+    /// closure we're going to call.
+    /// \param locator The locator pinned on the function reference carried
+    /// by \p fnExpr. If the function has associated applied property wrappers,
+    /// the locator is used to pull them in.
+    AutoClosureExpr *buildSingleCurryThunk(Expr *fnExpr,
+                                           DeclContext *declOrClosure,
+                                           ConstraintLocatorBuilder locator) {
+      auto *const thunkTy = cs.getType(fnExpr)->castTo<FunctionType>();
+
+      return buildSingleCurryThunk(/*baseExpr=*/nullptr, fnExpr, declOrClosure,
+                                   thunkTy, locator);
+    }
+
     AutoClosureExpr *buildPropertyWrapperFnThunk(
         Expr *fnRef, FunctionType *fnType, AnyFunctionRef fnDecl, ConcreteDeclRef ref,
         ArrayRef<AppliedPropertyWrapper> appliedPropertyWrappers) {
