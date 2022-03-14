@@ -248,13 +248,13 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
 ///
 /// Returns true if any rewrite steps were replaced; false means the
 /// rule did not appear in this path.
-bool RewritePath::replaceRuleWithPath(unsigned ruleID,
-                                      const RewritePath &path) {
+bool RewritePath::replaceRulesWithPaths(
+    llvm::function_ref<const RewritePath *(unsigned)> fn) {
   bool foundAny = false;
 
   for (const auto &step : Steps) {
     if (step.Kind == RewriteStep::Rule &&
-        step.getRuleID() == ruleID) {
+        fn(step.getRuleID()) != nullptr) {
       foundAny = true;
       break;
     }
@@ -268,13 +268,13 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
   for (const auto &step : Steps) {
     switch (step.Kind) {
     case RewriteStep::Rule: {
-      // All other rewrite rules remain unchanged.
-      if (step.getRuleID() != ruleID) {
+      auto *replacementPath = fn(step.getRuleID());
+      if (replacementPath == nullptr) {
         newSteps.push_back(step);
         break;
       }
 
-      // Ok, we found a rewrite step referencing the redundant rule.
+      // Ok, we found a rewrite step referencing a redundant rule.
       // Replace this step with the provided path. If this rewrite step has
       // context, the path's own steps must be re-contextualized.
 
@@ -305,10 +305,10 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 
       // If this rewrite step is inverted, invert the entire path.
       if (step.Inverse) {
-        for (auto newStep : llvm::reverse(path))
+        for (auto newStep : llvm::reverse(*replacementPath))
           recontextualizeStep(newStep);
       } else {
-        for (auto newStep : path)
+        for (auto newStep : *replacementPath)
           recontextualizeStep(newStep);
       }
 
@@ -331,6 +331,17 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 
   std::swap(newSteps, Steps);
   return true;
+}
+
+bool RewritePath::replaceRuleWithPath(unsigned ruleID,
+                                      const RewritePath &path) {
+  return replaceRulesWithPaths(
+      [&](unsigned otherRuleID) -> const RewritePath * {
+        if (ruleID == otherRuleID)
+          return &path;
+
+        return nullptr;
+      });
 }
 
 SmallVector<unsigned, 1>

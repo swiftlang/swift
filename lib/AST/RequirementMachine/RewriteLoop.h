@@ -407,6 +407,8 @@ public:
 
   RewritePath splitCycleAtRule(unsigned ruleID) const;
 
+  bool replaceRulesWithPaths(llvm::function_ref<const RewritePath *(unsigned)> fn);
+
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
   SmallVector<unsigned, 1> getRulesInEmptyContext(const MutableTerm &term,
