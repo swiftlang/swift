@@ -8,11 +8,11 @@
 
 // CHECK-LABEL: namespace _impl {
 
-// CHECK: extern "C" void $s9Functions16alwaysDeprecatedyyF(void) noexcept SWIFT_CALL SWIFT_DEPRECATED; // alwaysDeprecated()
-// CHECK: extern "C" void $s9Functions19alwaysDeprecatedTwoyyF(void) noexcept SWIFT_CALL SWIFT_DEPRECATED_MSG("it should not be used"); // alwaysDeprecatedTwo()
-// CHECK: extern "C" void $s9Functions17alwaysUnavailableyyF(void) noexcept SWIFT_CALL SWIFT_UNAVAILABLE; // alwaysUnavailable()
-// CHECK: extern "C" void $s9Functions24alwaysUnavailableMessageyyF(void) noexcept SWIFT_CALL SWIFT_UNAVAILABLE_MSG("stuff happened"); // alwaysUnavailableMessage()
-// CHECK: extern "C" void $s9Functions22singlePlatAvailabilityyyF(void) noexcept SWIFT_CALL SWIFT_AVAILABILITY(macos,introduced=11); // singlePlatAvailability()
+// CHECK: SWIFT_EXTERN void $s9Functions16alwaysDeprecatedyyF(void) SWIFT_NOEXCEPT SWIFT_CALL SWIFT_DEPRECATED; // alwaysDeprecated()
+// CHECK: SWIFT_EXTERN void $s9Functions19alwaysDeprecatedTwoyyF(void) SWIFT_NOEXCEPT SWIFT_CALL SWIFT_DEPRECATED_MSG("it should not be used"); // alwaysDeprecatedTwo()
+// CHECK: SWIFT_EXTERN void $s9Functions17alwaysUnavailableyyF(void) SWIFT_NOEXCEPT SWIFT_CALL SWIFT_UNAVAILABLE; // alwaysUnavailable()
+// CHECK: SWIFT_EXTERN void $s9Functions24alwaysUnavailableMessageyyF(void) SWIFT_NOEXCEPT SWIFT_CALL SWIFT_UNAVAILABLE_MSG("stuff happened"); // alwaysUnavailableMessage()
+// CHECK: SWIFT_EXTERN void $s9Functions22singlePlatAvailabilityyyF(void) SWIFT_NOEXCEPT SWIFT_CALL SWIFT_AVAILABILITY(macos,introduced=11); // singlePlatAvailability()
 
 // CHECK: }
 
