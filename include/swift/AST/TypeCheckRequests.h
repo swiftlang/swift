@@ -1039,6 +1039,30 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Retrieve the implicit conformance for the given distributed actor type to
+/// the Codable protocol protocol.
+///
+/// Similar to 'GetImplicitSendableRequest'.
+class GetDistributedActorImplicitCodableRequest :
+    public SimpleRequest<GetDistributedActorImplicitCodableRequest,
+                         NormalProtocolConformance *(NominalTypeDecl *, KnownProtocolKind),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NormalProtocolConformance *evaluate(
+      Evaluator &evaluator,
+      NominalTypeDecl *nominal,
+      KnownProtocolKind protoKind) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Obtain the 'remoteCall' function of a 'DistributedActorSystem'.
 class GetDistributedActorSystemRemoteCallFunctionRequest :
     public SimpleRequest<GetDistributedActorSystemRemoteCallFunctionRequest,
@@ -1182,6 +1206,27 @@ private:
 public:
     // Caching
     bool isCached() const { return true; }
+};
+
+/// Obtain the 'distributed thunk' for the passed-in function.
+///
+/// The thunk is responsible for invoking 'remoteCall' when invoked on a remote
+/// 'distributed actor'.
+class GetDistributedThunkRequest :
+    public SimpleRequest<GetDistributedThunkRequest,
+                         FuncDecl *(AbstractFunctionDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *distributedFunc) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
 };
 
 /// Obtain the 'id' property of a 'distributed actor'.

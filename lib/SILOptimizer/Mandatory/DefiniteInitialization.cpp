@@ -2777,6 +2777,104 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   return ControlVariableAddr;
 }
 
+/// Move the end_borrow that guards an alloc_box's lifetime to before the
+/// dealloc_box in the CFG diamond that is created for destruction when it is
+/// not statically known whether the value is initialized.
+///
+/// In the following context
+///
+///    %box = alloc_box
+///    %mark_uninit = mark_uninitialized %box
+///    %lifetime = begin_borrow [lexical] %mark_uninit
+///    %proj_box = project_box %lifetime
+///
+/// We are replacing a
+///
+///     destroy_value %mark_uninit
+///
+/// with a
+///
+///     destroy_addr %proj_box
+///
+/// That's a problem, though, because by SILGen construction the
+/// destroy_value is always preceded by an end_borrow
+///
+///     end_borrow %lifetime
+///     destroy_value %mark_uninit
+///
+/// Consequently, it's not sufficient to just replace the destroy_value
+/// %mark_uninit with a destroy_addr %proj_box (or to replace it with a diamond
+/// where one branch has that destroy_addr) because the destroy_addr is a use
+/// of %proj_box which must be within the lexical lifetime of the box.
+///
+/// On the other side, we are hemmed in by the fact that the end_borrow must
+/// precede the dealloc_box which will be created in the diamond.  So we
+/// couldn't simply start inserting before the end_borrow (because the bottom
+/// of the diamond contains a dealloc_box, so we would have an end_borrow after
+/// the dealloc_box).
+///
+/// At this point, we have the following code:
+///
+///       end_borrow %lifetime
+///       %initialized = load %addr
+///       cond_br %initialized, yes, no
+///
+///     yes:
+///       destroy_addr %proj_box
+///       br bottom
+///
+///     no:
+///       br bottom
+///
+///     bottom:
+///       br keep_going
+///
+///     keep_going:
+///
+/// So just move the end_borrow to the right position, at the top of the bottom
+/// block.  The caller will then add the dealloc_box.
+static bool adjustAllocBoxEndBorrow(SILInstruction *previous,
+                                    SILValue destroyedAddr,
+                                    SILBuilderWithScope &builder) {
+  // This fixup only applies if we're destroying a project_box.
+  auto *pbi = dyn_cast<ProjectBoxInst>(destroyedAddr);
+  if (!pbi)
+    return false;
+
+  // This fixup only applies if we're destroying a project_box of the lexical
+  // lifetime of an alloc_box.
+  auto *lifetime = dyn_cast<BeginBorrowInst>(pbi->getOperand());
+  if (!lifetime)
+    return false;
+  assert(lifetime->isLexical());
+  assert(isa<AllocBoxInst>(
+      cast<MarkUninitializedInst>(lifetime->getOperand())->getOperand()));
+
+  // Scan the block backwards from previous, looking for an end_borrow.  SILGen
+  // will emit the sequence
+  //
+  //     end_borrow %lifetime
+  //     destroy_value %mark_uninit
+  //
+  // but other passes may have moved them apart.
+  EndBorrowInst *ebi = nullptr;
+  for (auto *instruction = previous; instruction;
+       instruction = instruction->getPreviousInstruction()) {
+    auto *candidate = dyn_cast<EndBorrowInst>(instruction);
+    if (!candidate)
+      continue;
+    auto *bbi = dyn_cast<BeginBorrowInst>(candidate->getOperand());
+    if (bbi != lifetime)
+      continue;
+    ebi = candidate;
+  }
+  if (!ebi)
+    return false;
+
+  ebi->moveBefore(&*builder.getInsertionPoint());
+  return true;
+}
+
 /// Process any destroy_addr and strong_release instructions that are invoked on
 /// a partially initialized value.  This generates code to destroy the elements
 /// that are known to be alive, ignore the ones that are known to be dead, and
@@ -2797,7 +2895,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
   // Utilities.
 
-  auto destroyMemoryElement = [&](SILLocation Loc, unsigned Elt) {
+  auto destroyMemoryElement = [&](SILLocation Loc, unsigned Elt) -> SILValue {
     using EndScopeKind = DIMemoryObjectInfo::EndScopeKind;
     SmallVector<std::pair<SILValue, EndScopeKind>, 4> EndScopeList;
     SILValue EltPtr =
@@ -2820,12 +2918,14 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       }
       llvm_unreachable("Covered switch isn't covered!");
     }
+    return EltPtr;
   };
 
   // Destroy all the allocation's fields, not including the allocation
   // itself, if we have a class initializer.
-  auto destroyMemoryElements = [&](SILLocation Loc,
+  auto destroyMemoryElements = [&](SILInstruction *Release, SILLocation Loc,
                                    AvailabilitySet Availability) {
+    auto *Previous = Release->getPreviousInstruction();
     // Delegating initializers don't model the fields of the class.
     if (TheMemory.isClassInitSelf() && TheMemory.isDelegatingInit())
       return;
@@ -2865,9 +2965,10 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
       // Set up the initialized release block.
       B.setInsertionPoint(ReleaseBlock->begin());
-      destroyMemoryElement(Loc, Elt);
+      auto EltPtr = destroyMemoryElement(Loc, Elt);
 
       B.setInsertionPoint(ContBlock->begin());
+      adjustAllocBoxEndBorrow(Previous, EltPtr, B);
     }
   };
 
@@ -2944,10 +3045,10 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // If false, self is uninitialized and must be freed.
         B.setInsertionPoint(DeallocBlock->begin());
         B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
-        destroyMemoryElements(Loc, Availability);
+        destroyMemoryElements(Release, Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
       } else {
-        destroyMemoryElements(Loc, Availability);
+        destroyMemoryElements(Release, Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
         // The original strong_release or destroy_addr instruction is
@@ -2972,7 +3073,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
       // self.init or super.init was not called. If we're in the super.init
       // case, destroy any initialized fields.
-      destroyMemoryElements(Loc, Availability);
+      destroyMemoryElements(Release, Loc, Availability);
       processUninitializedRelease(Release, false, B.getInsertionPoint());
       break;
 
@@ -3019,7 +3120,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // If false, self is uninitialized and must be freed.
         B.setInsertionPoint(DeallocBlock->begin());
         B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
-        destroyMemoryElements(Loc, Availability);
+        destroyMemoryElements(Release, Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
         break;
@@ -3054,7 +3155,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // If false, self is uninitialized and must be freed.
         B.setInsertionPoint(DeallocBlock->begin());
         B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
-        destroyMemoryElements(Loc, Availability);
+        destroyMemoryElements(Release, Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
         break;

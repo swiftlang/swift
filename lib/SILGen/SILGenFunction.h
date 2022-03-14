@@ -680,6 +680,24 @@ public:
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
                                   CleanupLocation cleanupLoc);
 
+  /// Generates code to destroy linearly recursive data structures, without
+  /// building up the call stack.
+  ///
+  /// E.x.: In the following we want to deinit next without recursing into next.
+  ///
+  /// class Node<A> {
+  ///   let value: A
+  ///   let next: Node<A>?
+  /// }
+  ///
+  /// \param selfValue The 'self' value.
+  /// \param cd The class declaration whose members are being destroyed.
+  /// \param recursiveLink The property that forms the recursive structure.
+  void emitRecursiveChainDestruction(ManagedValue selfValue,
+                                ClassDecl *cd,
+                                VarDecl* recursiveLink,
+                                CleanupLocation cleanupLoc);
+
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to foreign conventions.
@@ -2048,15 +2066,12 @@ public:
 
   /// Initializes the implicit stored properties of a distributed actor that correspond to
   /// its transport and identity.
-  void emitDistActorImplicitPropertyInits(
+  void emitDistributedActorImplicitPropertyInits(
       ConstructorDecl *ctor, ManagedValue selfArg);
 
   /// Given a function representing a distributed actor factory, emits the
   /// corresponding SIL function for it.
   void emitDistributedActorFactory(FuncDecl *fd);
-
-  /// Generates a thunk from an actor function
-  void emitDistributedThunk(SILDeclRef thunk);
 
   /// Notify transport that actor has initialized successfully,
   /// and is ready to receive messages.

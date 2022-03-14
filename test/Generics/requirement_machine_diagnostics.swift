@@ -82,3 +82,99 @@ func cascadingConflictingRequirement<T>(_: T) where DoesNotExist : EqualComparab
 
 func cascadingInvalidConformance<T>(_: T) where T : DoesNotExist { }
 // expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}
+
+func trivialRedundant1<T>(_: T) where T: P, T: P {}
+// expected-warning@-1 {{redundant conformance constraint 'T' : 'P'}}
+
+func trivialRedundant2<T>(_: T) where T: AnyObject, T: AnyObject {}
+// expected-warning@-1 {{redundant constraint 'T' : 'AnyObject'}}
+
+func trivialRedundant3<T>(_: T) where T: C, T: C {}
+// expected-warning@-1 {{redundant superclass constraint 'T' : 'C'}}
+
+func trivialRedundant4<T>(_: T) where T == T {}
+// expected-warning@-1 {{redundant same-type constraint 'T' == 'T'}}
+
+protocol TrivialRedundantConformance: P, P {}
+// expected-warning@-1 {{redundant conformance constraint 'Self' : 'P'}}
+
+protocol TrivialRedundantLayout: AnyObject, AnyObject {}
+// expected-warning@-1 {{redundant constraint 'Self' : 'AnyObject'}}
+// expected-error@-2 {{duplicate inheritance from 'AnyObject'}}
+
+protocol TrivialRedundantSuperclass: C, C {}
+// expected-warning@-1 {{redundant superclass constraint 'Self' : 'C'}}
+// expected-error@-2 {{duplicate inheritance from 'C'}}
+
+protocol TrivialRedundantSameType where Self == Self {
+// expected-warning@-1 {{redundant same-type constraint 'Self' == 'Self'}}
+  associatedtype T where T == T
+  // expected-warning@-1 {{redundant same-type constraint 'Self.T' == 'Self.T'}}
+}
+
+struct G<T> { }
+
+protocol Pair {
+  associatedtype A
+  associatedtype B
+}
+
+func test1<T: Pair>(_: T) where T.A == G<Int>, T.A == G<T.B>, T.B == Int { }
+// expected-warning@-1 {{redundant same-type constraint 'T.A' == 'G<T.B>'}}
+
+
+protocol P1 {
+  func p1()
+}
+
+protocol P2 : P1 { }
+
+protocol P3 {
+  associatedtype P3Assoc : P2
+}
+
+protocol P4 {
+  associatedtype P4Assoc : P1
+}
+
+func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
+// expected-warning@-1{{redundant conformance constraint 'U.P4Assoc' : 'P2'}}
+
+protocol P5 {
+  associatedtype Element
+}
+
+protocol P6 {
+  associatedtype AssocP6 : P5
+}
+
+protocol P7 : P6 {
+  associatedtype AssocP7: P6
+}
+
+// expected-warning@+1{{redundant conformance constraint 'Self.AssocP6.Element' : 'P6'}}
+extension P7 where AssocP6.Element : P6,
+        AssocP7.AssocP6.Element : P6,
+        AssocP6.Element == AssocP7.AssocP6.Element {
+  func nestedSameType1() { }
+}
+
+protocol P8 {
+  associatedtype A
+  associatedtype B
+}
+
+protocol P9 : P8 {
+  associatedtype A
+  associatedtype B
+}
+
+protocol P10 {
+  associatedtype A
+  associatedtype C
+}
+
+class X3 { }
+
+func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
+// expected-warning@-1{{redundant superclass constraint 'T.B' : 'X3'}}

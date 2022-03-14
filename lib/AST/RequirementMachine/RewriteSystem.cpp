@@ -174,8 +174,13 @@ Optional<Identifier> Rule::isProtocolTypeAliasRule() const {
     //
     // We shouldn't have unresolved symbols on the right hand side;
     // they should have been simplified away.
-    if (RHS.containsUnresolvedSymbols())
-      return None;
+    if (RHS.containsUnresolvedSymbols()) {
+      if (RHS.size() != 2 ||
+          RHS[0] != LHS[0] ||
+          RHS[1].getKind() != Symbol::Kind::Name) {
+        return None;
+      }
+    }
   } else {
     // This is the case where the underlying type is concrete.
     assert(LHS.size() == 3);
@@ -276,19 +281,26 @@ RewriteSystem::~RewriteSystem() {
 
 void RewriteSystem::initialize(
     bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
+    ArrayRef<StructuralRequirement> writtenRequirements,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-    std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
+    std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>>
+        &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
   RecordLoops = recordLoops;
   Protos = protos;
+  WrittenRequirements = writtenRequirements;
 
   for (const auto &rule : permanentRules)
     addPermanentRule(rule.first, rule.second);
 
-  for (const auto &rule : requirementRules)
-    addExplicitRule(rule.first, rule.second);
+  for (const auto &rule : requirementRules) {
+    auto lhs = std::get<0>(rule);
+    auto rhs = std::get<1>(rule);
+    auto requirementID = std::get<2>(rule);
+    addExplicitRule(lhs, rhs, requirementID);
+  }
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.
@@ -487,10 +499,13 @@ bool RewriteSystem::addPermanentRule(MutableTerm lhs, MutableTerm rhs) {
 }
 
 /// Add a new rule, marking it explicit.
-bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs) {
+bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
+                                    Optional<unsigned> requirementID) {
   bool added = addRule(std::move(lhs), std::move(rhs));
-  if (added)
+  if (added) {
     Rules.back().markExplicit();
+    Rules.back().setRequirementID(requirementID);
+  }
 
   return added;
 }
@@ -650,6 +665,28 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     for (unsigned index : indices(lhs)) {
       auto symbol = lhs[index];
 
+      // The left hand side can contain a single name symbol if it has the form
+      // T.N or T.N.[p], where T is some prefix that does not contain name
+      // symbols, N is a name symbol, and [p] is an optional property symbol.
+      //
+      // In the latter case, we have a protocol typealias, or a rule derived
+      // via resolving a critical pair involving a protocol typealias.
+      //
+      // Any other valid occurrence of a name symbol should have been reduced by
+      // an associated type introduction rule [P].N, marking the rule as
+      // LHS-simplified.
+      if (!rule.isLHSSimplified() &&
+          (rule.isPropertyRule()
+           ? index != lhs.size() - 2
+           : index != lhs.size() - 1)) {
+        // This is only true if the input requirements were valid.
+        if (policy == DisallowInvalidRequirements) {
+          ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
+        } else {
+          // FIXME: Assert that we diagnosed an error
+        }
+      }
+
       if (index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Layout);
         ASSERT_RULE(!symbol.hasSubstitutions());
@@ -667,14 +704,18 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     for (unsigned index : indices(rhs)) {
       auto symbol = rhs[index];
 
-      // RHS-simplified rules might have unresolved name symbols on the
-      // right hand side. Also, completion can introduce rules of the
-      // form T.X.[concrete: C] => T.X, where T is some resolved term,
-      // and X is a name symbol for a protocol typealias.
-      if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !(rule.isPropertyRule() &&
-            index == rhs.size() - 1)) {
+      // The right hand side can contain a single name symbol if it has the form
+      // T.N, where T is some prefix that does not contain name symbols, and
+      // N is a name symbol.
+      //
+      // In this case, we have a protocol typealias, or a rule derived via
+      // resolving a critical pair involving a protocol typealias.
+      //
+      // Any other valid occurrence of a name symbol should have been reduced by
+      // an associated type introduction rule [P].N, marking the rule as
+      // RHS-simplified.
+      if (!rule.isRHSSimplified() &&
+          index != rhs.size() - 1) {
         // This is only true if the input requirements were valid.
         if (policy == DisallowInvalidRequirements) {
           ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
@@ -707,10 +748,105 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 #undef ASSERT_RULE
 }
 
+/// Computes the set of explicit redundant requirements to
+/// emit warnings for in the source code.
+void RewriteSystem::computeRedundantRequirementDiagnostics(
+    SmallVectorImpl<RequirementError> &errors) {
+  // Map redundant rule IDs to their rewrite path for easy access
+  // in the `isRedundantRule` lambda.
+  llvm::SmallDenseMap<unsigned, RewritePath> redundantRules;
+  for (auto &pair : RedundantRules)
+    redundantRules[pair.first] = pair.second;
+
+  // Collect all rule IDs for each unique requirement ID.
+  llvm::SmallDenseMap<unsigned, llvm::SmallDenseSet<unsigned, 2>>
+      rulesPerRequirement;
+
+  // Collect non-explicit requirements that are not redundant.
+  llvm::SmallDenseSet<unsigned, 2> impliedRequirements;
+
+  for (unsigned ruleID : indices(getRules())) {
+    auto &rule = getRules()[ruleID];
+
+    if (!rule.getRequirementID().hasValue() &&
+        !rule.isPermanent() && !rule.isRedundant() &&
+        isInMinimizationDomain(rule.getLHS().getRootProtocol()))
+      impliedRequirements.insert(ruleID);
+
+    auto requirementID = rule.getRequirementID();
+    if (!requirementID.hasValue())
+      continue;
+
+    rulesPerRequirement[*requirementID].insert(ruleID);
+  }
+
+  auto isRedundantRule = [&](unsigned ruleID) {
+    auto &rule = getRules()[ruleID];
+
+    // If this rule is replaced using a non-explicit,
+    // non-redundant rule, it's not redundant.
+    auto rewritePath = redundantRules[ruleID];
+    for (auto step : rewritePath) {
+      switch (step.Kind) {
+      case RewriteStep::Rule: {
+        if (impliedRequirements.count(step.getRuleID()))
+          return false;
+
+        break;
+      }
+
+      case RewriteStep::LeftConcreteProjection:
+      case RewriteStep::Decompose:
+      case RewriteStep::PrefixSubstitutions:
+      case RewriteStep::Shift:
+      case RewriteStep::Relation:
+      case RewriteStep::DecomposeConcrete:
+      case RewriteStep::RightConcreteProjection:
+        break;
+      }
+    }
+
+    return rule.isRedundant();
+  };
+
+  for (auto requirementID : indices(WrittenRequirements)) {
+    auto requirement = WrittenRequirements[requirementID];
+    auto pairIt = rulesPerRequirement.find(requirementID);
+
+    // If there are no rules for this structural requirement, then
+    // the requirement was never added to the rewrite system because
+    // it is trivially redundant.
+    if (pairIt == rulesPerRequirement.end()) {
+      errors.push_back(
+          RequirementError::forRedundantRequirement(requirement.req,
+                                                    requirement.loc));
+      continue;
+    }
+
+    // If all rules derived from this structural requirement are redundant,
+    // then the requirement is unnecessary in the source code.
+    auto ruleIDs = pairIt->second;
+    if (llvm::all_of(ruleIDs, isRedundantRule)) {
+      auto requirement = WrittenRequirements[requirementID];
+      errors.push_back(
+          RequirementError::forRedundantRequirement(requirement.req,
+                                                    requirement.loc));
+    }
+  }
+}
+
 void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "Rewrite system: {\n";
   for (const auto &rule : Rules) {
-    out << "- " << rule << "\n";
+    out << "- " << rule;
+    if (auto ID = rule.getRequirementID()) {
+      auto requirement = WrittenRequirements[*ID];
+      out << ", ID: " << *ID << ", ";
+      requirement.req.dump(out);
+      out << " at ";
+      requirement.loc.print(out, Context.getASTContext().SourceMgr);
+    }
+    out << "\n";
   }
   out << "}\n";
   if (!Relations.empty()) {

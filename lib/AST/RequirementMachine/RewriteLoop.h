@@ -409,6 +409,9 @@ public:
 
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
+  SmallVector<unsigned, 1> getRulesInEmptyContext(const MutableTerm &term,
+                                                  const RewriteSystem &system);
+
   void invert();
 
   bool computeFreelyReducedForm();
@@ -454,6 +457,9 @@ private:
   /// Cached value for getDecomposeCount().
   unsigned DecomposeCount : 15;
 
+  /// Cached value for hasConcreteTypeAliasRule().
+  unsigned HasConcreteTypeAliasRule : 1;
+
   /// A useful loop contains at least one rule in empty context, even if that
   /// rule appears multiple times or also in non-empty context. The only loops
   /// that are elimination candidates contain a rule in empty context *exactly
@@ -475,6 +481,7 @@ public:
     : Basepoint(basepoint), Path(path) {
     ProjectionCount = 0;
     DecomposeCount = 0;
+    HasConcreteTypeAliasRule = 0;
     Useful = 0;
     Deleted = 0;
 
@@ -505,6 +512,8 @@ public:
   unsigned getProjectionCount(const RewriteSystem &system) const;
 
   unsigned getDecomposeCount(const RewriteSystem &system) const;
+
+  bool hasConcreteTypeAliasRule(const RewriteSystem &system) const;
 
   void findProtocolConformanceRules(
       llvm::SmallDenseMap<const ProtocolDecl *,

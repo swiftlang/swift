@@ -10,6 +10,9 @@ let resultCall0 = lhs()
 let resultCall1 = lhs(1)
 let resultCall2 = lhs(1, 2)
 
+var boolWrapper = LoadableBoolWrapper(value: true)
+let notBoolResult = !boolWrapper
+
 var addressOnly = AddressOnlyIntWrapper(42)
 
 let addressOnlyResultCall0 = addressOnly()

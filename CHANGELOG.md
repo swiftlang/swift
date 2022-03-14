@@ -5,6 +5,36 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0336][]:
+
+It is now possible to declare `distributed actor` and `distributed func`s inside of them.
+
+Distributed actors provide stronger isolation guarantees than "local" actors, and enable additional checks to be made on return types and parameters of distributed methods, e.g. checking if they conform to `Codable`. Distributed methods can be called on "remote" references of distributed actors, turning those invocations into remote procedure calls, by means of pluggable and user extensible distributed actor system implementations. 
+
+Swift does not provide any specific distributed actor system by itself, however, packages in the ecosystem fulfil the role of providing those implementations.
+
+```swift
+distributed actor Greeter { 
+  var greetingsSent = 0
+  
+  distributed func greet(name: String) -> String {
+    greetingsSent += 1
+    return "Hello, \(name)!"
+  }
+}
+
+func talkTo(greeter: Greeter) async throws {
+  // isolation of distributed actors is stronger, it is impossible to refer to
+  // any stored properties of distributed actors from outside of them:
+  greeter.greetingsSent // distributed actor-isolated property 'name' can not be accessed from a non-isolated context
+  
+  // remote calls are implicitly throwing and async, 
+  // to account for the potential networking involved:
+  let greeting = try await greeter.greet(name: "Alice")
+  print(greeting) // Hello, Alice!
+}
+```
+
 * The compiler now emits a warning when a non-final class conforms to a protocol that imposes a same-type requirement between `Self` and an associated type. This is because such a requirement makes the conformance unsound for subclasses.
 
 For example, Swift 5.6 would allow the following code, which at runtime would construct an instanec of `C` and not `SubC` as expected:
@@ -9034,6 +9064,7 @@ Swift 1.0
 [SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
 [SE-0335]: <https://github.com/apple/swift-evolution/blob/main/proposals/0335-existential-any.md>
 [SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
+[SE-0336]: <https://github.com/apple/swift-evolution/blob/main/proposals/0336-distributed-actor-isolation.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

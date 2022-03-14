@@ -4917,20 +4917,22 @@ void PrintAST::visitRepeatWhileStmt(RepeatWhileStmt *stmt) {
   visit(stmt->getCond());
 }
 
-void PrintAST::printStmtCondition(StmtCondition stmt) {
-  for (auto elt : stmt) {
-    if (auto pattern = elt.getPatternOrNull()) {
-      printPattern(pattern);
-      auto initializer = elt.getInitializer();
-      if (initializer) {
-        Printer << " = ";
-        visit(initializer);
-      }
-    }
-    else if (auto boolean = elt.getBooleanOrNull()) {
-      visit(boolean);
-    }
-  }
+void PrintAST::printStmtCondition(StmtCondition condition) {
+  interleave(
+      condition,
+      [&](StmtConditionElement &elt) {
+        if (auto pattern = elt.getPatternOrNull()) {
+          printPattern(pattern);
+          auto initializer = elt.getInitializer();
+          if (initializer) {
+            Printer << " = ";
+            visit(initializer);
+          }
+        } else if (auto boolean = elt.getBooleanOrNull()) {
+          visit(boolean);
+        }
+      },
+      [&] { Printer << ", "; });
 }
 
 void PrintAST::visitDoStmt(DoStmt *stmt) {

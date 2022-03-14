@@ -1,4 +1,4 @@
-//===--- ModuleContentsWriter.cpp - Walk a module's decls to print ObjC ---===//
+//===--- ModuleContentsWriter.cpp - Walk module decls to print ObjC/C++ ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,9 @@
 
 #include "ModuleContentsWriter.h"
 
+#include "CxxSynthesis.h"
 #include "DeclAndTypePrinter.h"
+#include "OutputLanguageMode.h"
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
@@ -122,10 +124,13 @@ class ModuleWriter {
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
   DeclAndTypePrinter printer;
+
 public:
-  ModuleWriter(raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-               ModuleDecl &mod, AccessLevel access)
-    : os(os), imports(imports), M(mod), printer(M, os, delayedMembers, access){}
+  ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
+               llvm::SmallPtrSetImpl<ImportModuleTy> &imports, ModuleDecl &mod,
+               AccessLevel access, OutputLanguageMode outputLang)
+      : os(os), imports(imports), M(mod),
+        printer(M, os, prologueOS, delayedMembers, access, outputLang) {}
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -611,23 +616,43 @@ public:
 };
 } // end anonymous namespace
 
+static AccessLevel getRequiredAccess(const ModuleDecl &M) {
+  return M.isExternallyConsumed() ? AccessLevel::Public : AccessLevel::Internal;
+}
+
 void
 swift::printModuleContentsAsObjC(raw_ostream &os,
                                  llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
                                  ModuleDecl &M) {
-  auto requiredAccess = M.isExternallyConsumed() ? AccessLevel::Public
-                                                 : AccessLevel::Internal;
-  ModuleWriter(os, imports, M, requiredAccess).write();
+  llvm::raw_null_ostream prologueOS;
+  ModuleWriter(os, prologueOS, imports, M, getRequiredAccess(M),
+               OutputLanguageMode::ObjC)
+      .write();
 }
 
 void swift::printModuleContentsAsCxx(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     ModuleDecl &M) {
-  os << "namespace ";
-  M.ValueDecl::getName().print(os);
-  os << " {\n\n";
-  // TODO (Alex): Emit module contents.
-  os << "\n} // namespace ";
-  M.ValueDecl::getName().print(os);
-  os << "\n\n";
+  using cxx_synthesis::CxxPrinter;
+  // Construct a C++ namespace for the module.
+  CxxPrinter(os).printNamespace(
+      [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
+      [&](raw_ostream &os) {
+        std::string moduleContentsBuf;
+        llvm::raw_string_ostream moduleOS{moduleContentsBuf};
+        std::string modulePrologueBuf;
+        llvm::raw_string_ostream prologueOS{modulePrologueBuf};
+
+        ModuleWriter(moduleOS, prologueOS, imports, M, getRequiredAccess(M),
+                     OutputLanguageMode::Cxx)
+            .write();
+
+        // The module's prologue contains implementation details,
+        // like extern "C" symbols for the referenced Swift functions.
+        CxxPrinter(os).printNamespace(
+            cxx_synthesis::getCxxImplNamespaceName(),
+            [&](raw_ostream &os) { os << prologueOS.str(); });
+
+        os << moduleOS.str();
+      });
 }

@@ -22,6 +22,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -1258,47 +1259,19 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
   return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
 }
 
-AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
-    NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
-  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
-  const NominalTypeDecl *system = actorOrSystem;
-  if (actorOrSystem->isDistributedActor()) {
-    auto var = actorOrSystem->getDistributedActorSystemProperty();
-    system = var->getInterfaceType()->getAnyNominal();
-  }
-
-  if (!system)
-    system = getProtocol(KnownProtocolKind::DistributedActorSystem);
-
-  auto mutableSystem = const_cast<NominalTypeDecl *>(system);
-  return evaluateOrDefault(
-      system->getASTContext().evaluator,
-      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem, /*isVoidReturn=*/isVoidReturn},
-      nullptr);
-}
-
 FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
-    NominalTypeDecl *actorOrSystem) const {
-  NominalTypeDecl *system = actorOrSystem;
-  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
-  if (actorOrSystem->isDistributedActor()) {
-    auto var = actorOrSystem->getDistributedActorSystemProperty();
-    system = var->getInterfaceType()->getAnyNominal();
-  }
+    AbstractFunctionDecl *thunk) const {
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
+  assert(systemTy && "No specific ActorSystem type found!");
 
-  for (auto result : system->lookupDirect(Id_makeInvocationEncoder)) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-    if (fd->getParameters()->size() != 0)
-      continue;
-    if (fd->hasAsync())
-      continue;
-    if (fd->hasThrows())
-      continue;
-    // TODO(distributed): more checks, return type etc
+  auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
+  assert(systemNominal && "No system nominal type found!");
 
-    return fd;
+  for (auto result : systemNominal->lookupDirect(Id_makeInvocationEncoder)) {
+    auto *func = dyn_cast<FuncDecl>(result);
+    if (func && func->isDistributedActorSystemMakeInvocationEncoder()) {
+      return func;
+    }
   }
 
   return nullptr;
@@ -1308,29 +1281,11 @@ FuncDecl *
 ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
   for (auto result : nominal->lookupDirect(Id_recordGenericSubstitution)) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-    if (fd->getParameters()->size() != 1)
-      continue;
-    if (fd->hasAsync())
-      continue;
-    if (!fd->hasThrows())
-      continue;
-    // TODO(distributed): more checks
-
-    auto genericParamList = fd->getGenericParams();
-
-    // A single generic parameter.
-    if (genericParamList->size() != 1)
-      continue;
-
-    // No requirements on the generic parameter
-    if (fd->getGenericRequirements().size() != 0)
-      continue;
-
-    if (fd->getResultInterfaceType()->isVoid())
-      return fd;
+    auto *func = dyn_cast<FuncDecl>(result);
+    if (func &&
+        func->isDistributedTargetInvocationEncoderRecordGenericSubstitution()) {
+      return func;
+    }
   }
 
   return nullptr;
@@ -3073,23 +3028,21 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
       // FIXME(distributed): pending swift-evolution, allow `self =` in class
       //  inits in general.
       //  See also: https://github.com/apple/swift/pull/19151 general impl
-      if (Ctx.LangOpts.EnableExperimentalDistributed) {
-        auto ext = dyn_cast<ExtensionDecl>(AFD->getDeclContext());
-        auto distProto =
-            Ctx.getProtocol(KnownProtocolKind::DistributedActor);
-        if (distProto && ext && ext->getExtendedNominal() &&
-            ext->getExtendedNominal()->getInterfaceType()
-                ->isEqual(distProto->getInterfaceType())) {
-          auto name = CD->getName();
-          auto params = name.getArgumentNames();
-          if (params.size() == 1 && params[0] == Ctx.Id_from) {
-            // FIXME(distributed): this is a workaround to allow init(from:) to
-            //  be implemented in AST by allowing the self to be mutable in the
-            //  decoding initializer. This should become a general Swift
-            //  feature, allowing this in all classes:
-            //  https://forums.swift.org/t/allow-self-x-in-class-convenience-initializers/15924
-            selfAccess = SelfAccessKind::Mutating;
-          }
+      auto ext = dyn_cast<ExtensionDecl>(AFD->getDeclContext());
+      auto distProto =
+          Ctx.getProtocol(KnownProtocolKind::DistributedActor);
+      if (distProto && ext && ext->getExtendedNominal() &&
+          ext->getExtendedNominal()->getInterfaceType()
+              ->isEqual(distProto->getInterfaceType())) {
+        auto name = CD->getName();
+        auto params = name.getArgumentNames();
+        if (params.size() == 1 && params[0] == Ctx.Id_from) {
+          // FIXME(distributed): this is a workaround to allow init(from:) to
+          //  be implemented in AST by allowing the self to be mutable in the
+          //  decoding initializer. This should become a general Swift
+          //  feature, allowing this in all classes:
+          //  https://forums.swift.org/t/allow-self-x-in-class-convenience-initializers/15924
+          selfAccess = SelfAccessKind::Mutating;
         }
       }
     } else {

@@ -53,6 +53,15 @@ public:
     return true;
   }
 
+  bool VisitCXXConstructorDecl(clang::CXXConstructorDecl *CXXCD) {
+    callback(CXXCD);
+    for (clang::CXXCtorInitializer *CXXCI : CXXCD->inits()) {
+      if (clang::FieldDecl *FD = CXXCI->getMember())
+        callback(FD);
+    }
+    return true;
+  }
+
   bool VisitCXXConstructExpr(clang::CXXConstructExpr *CXXCE) {
     callback(CXXCE->getConstructor());
     return true;

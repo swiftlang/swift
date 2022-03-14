@@ -2427,6 +2427,11 @@ public:
 const TypeInfo *
 TypeConverter::getTypeInfo(const TypeRef *TR,
                            remote::TypeInfoProvider *ExternalTypeInfo) {
+  if (!TR) {
+    DEBUG_LOG(fprintf(stderr, "null TypeRef"));
+    return nullptr;
+  }
+
   // See if we already computed the result
   auto found = Cache.find({TR, ExternalTypeInfo});
   if (found != Cache.end())

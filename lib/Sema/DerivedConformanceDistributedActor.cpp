@@ -128,15 +128,17 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
 
 static ValueDecl *deriveDistributedActor_actorSystem(
     DerivedConformance &derived) {
-  assert(derived.Nominal->isDistributedActor());
   auto &C = derived.Context;
+
+  auto classDecl = dyn_cast<ClassDecl>(derived.Nominal);
+  assert(classDecl && derived.Nominal->isDistributedActor());
 
   // ```
   // nonisolated
   // let actorSystem: ActorSystem
   // ```
   // (no need for @actorIndependent because it is an immutable let)
-  auto propertyType = getDistributedActorSystemType(derived.Nominal);
+  auto propertyType = getDistributedActorSystemType(classDecl);
 
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;

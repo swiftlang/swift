@@ -313,7 +313,7 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1+1,
     ThrowsIsSet : 1,
     Throws : 1,
     ImplicitlyAsync : 1,
@@ -1908,6 +1908,11 @@ public:
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Try;
   }
+
+  static TryExpr *createImplicit(ASTContext &ctx, SourceLoc tryLoc, Expr *sub,
+                                 Type type = Type()) {
+    return new (ctx) TryExpr(tryLoc, sub, type, /*implicit=*/true);
+  }
 };
 
 /// ForceTryExpr - A 'try!' surrounding an expression, marking that
@@ -2066,7 +2071,11 @@ public:
             bool implicit = false)
     : IdentityExpr(ExprKind::Await, sub, type, implicit), AwaitLoc(awaitLoc) {
   }
-  
+
+  static AwaitExpr *createImplicit(ASTContext &ctx, SourceLoc awaitLoc, Expr *sub, Type type = Type()) {
+    return new (ctx) AwaitExpr(awaitLoc, sub, type, /*implicit=*/true);
+  }
+
   SourceLoc getLoc() const { return AwaitLoc; }
   
   SourceLoc getAwaitLoc() const { return AwaitLoc; }
@@ -4509,11 +4518,11 @@ public:
   }
 
   /// Is this application _implicitly_ required to be a throwing call?
-  /// This can happen if the function is actually a proxy function invocation,
-  /// which may throw, regardless of the target function throwing, e.g.
-  /// a distributed instance method call on a 'remote' actor, may throw due to network
-  /// issues reported by the transport, regardless if the actual target function
-  /// can throw.
+  /// This can happen if the function is actually a distributed thunk
+  /// invocation, which may throw, regardless of the target function throwing,
+  /// e.g. a distributed instance method call on a 'remote' actor, may throw due
+  /// to network issues reported by the transport, regardless if the actual
+  /// target function can throw.
   bool implicitlyThrows() const {
     return Bits.ApplyExpr.ImplicitlyThrows;
   }
