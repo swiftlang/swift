@@ -57,6 +57,9 @@ bool RewriteStep::isInverseOf(const RewriteStep &other) const {
   case RewriteStep::Rule:
     return Arg == other.Arg;
 
+  case RewriteStep::Relation:
+    return Arg == other.Arg;
+
   default:
     return false;
   }
@@ -67,8 +70,7 @@ bool RewriteStep::isInverseOf(const RewriteStep &other) const {
 
 bool RewriteStep::maybeSwapRewriteSteps(RewriteStep &other,
                                         const RewriteSystem &system) {
-  if (Kind != RewriteStep::Rule ||
-      other.Kind != RewriteStep::Rule)
+  if (Kind != other.Kind)
     return false;
 
   // Two rewrite steps are _orthogonal_ if they rewrite disjoint subterms
@@ -122,22 +124,43 @@ bool RewriteStep::maybeSwapRewriteSteps(RewriteStep &other,
   // other.StartOffset = |A|+|V|+|B|
   // other.EndOffset = |C|
 
-  const auto &rule = system.getRule(Arg);
-  auto lhs = (Inverse ? rule.getRHS() : rule.getLHS());
-  auto rhs = (Inverse ? rule.getLHS() : rule.getRHS());
+  if (Kind == RewriteStep::Rule) {
+    const auto &rule = system.getRule(Arg);
+    auto lhs = (Inverse ? rule.getRHS() : rule.getLHS());
+    auto rhs = (Inverse ? rule.getLHS() : rule.getRHS());
 
-  const auto &otherRule = system.getRule(other.Arg);
-  auto otherLHS = (other.Inverse ? otherRule.getRHS() : otherRule.getLHS());
-  auto otherRHS = (other.Inverse ? otherRule.getLHS() : otherRule.getRHS());
+    const auto &otherRule = system.getRule(other.Arg);
+    auto otherLHS = (other.Inverse ? otherRule.getRHS() : otherRule.getLHS());
+    auto otherRHS = (other.Inverse ? otherRule.getLHS() : otherRule.getRHS());
 
-  if (StartOffset < other.StartOffset + otherLHS.size())
-    return false;
+    if (StartOffset < other.StartOffset + otherLHS.size())
+      return false;
 
-  std::swap(*this, other);
-  EndOffset += (lhs.size() - rhs.size());
-  other.StartOffset += (otherRHS.size() - otherLHS.size());
+    std::swap(*this, other);
+    EndOffset += (lhs.size() - rhs.size());
+    other.StartOffset += (otherRHS.size() - otherLHS.size());
 
-  return true;
+    return true;
+  } else if (Kind == RewriteStep::Relation) {
+    const auto &relation = system.getRelation(Arg);
+    auto lhs = (Inverse ? relation.second : relation.first);
+    auto rhs = (Inverse ? relation.first : relation.second);
+
+    const auto &otherRelation = system.getRelation(other.Arg);
+    auto otherLHS = (other.Inverse ? otherRelation.second : otherRelation.first);
+    auto otherRHS = (other.Inverse ? otherRelation.first : otherRelation.second);
+
+    if (StartOffset < other.StartOffset + otherLHS.size())
+      return false;
+
+    std::swap(*this, other);
+    EndOffset += (lhs.size() - rhs.size());
+    other.StartOffset += (otherRHS.size() - otherLHS.size());
+
+    return true;
+  }
+
+  return false;
 }
 
 /// Cancels out adjacent rewrite steps that are inverses of each other.
