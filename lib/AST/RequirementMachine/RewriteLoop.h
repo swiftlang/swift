@@ -421,7 +421,7 @@ public:
 
   bool computeLeftCanonicalForm(const RewriteSystem &system);
 
-  void computeNormalForm(const RewriteSystem &system);
+  bool computeNormalForm(const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out,
             MutableTerm term,
