@@ -803,15 +803,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // First, set up default minimum inlining target versions.
   auto getDefaultMinimumInliningTargetVersion =
       [&](const llvm::Triple &triple) -> llvm::VersionTuple {
-#if SWIFT_DEFAULT_TARGET_MIN_INLINING_VERSION_TO_ABI
-    // In ABI-stable modules, default to the version where the target's ABI
-    // was first frozen; older versions will use that one's backwards
-    // compatibility libraries.
+#if SWIFT_DEFAULT_TARGET_MIN_INLINING_VERSION_TO_MIN
+    // In ABI-stable modules, default to the version when Swift first became
+    // available.
     if (FrontendOpts.EnableLibraryEvolution)
-      if (auto abiStability = minimumABIStableOSVersionForTriple(triple))
-        // FIXME: Should we raise it to the minimum supported OS version for
-        //        architectures which were born ABI-stable?
-        return *abiStability;
+      if (auto minTriple = minimumAvailableOSVersionForTriple(triple))
+        return minTriple;
 #endif
 
     // In ABI-unstable modules, we will never have to interoperate with
@@ -834,10 +831,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (!A)
       return None;
 
+    if (StringRef(A->getValue()) == "min")
+      return minimumAvailableOSVersionForTriple(Opts.Target);
     if (StringRef(A->getValue()) == "target")
       return Opts.getMinPlatformVersion();
-    if (StringRef(A->getValue()) == "abi")
-      return minimumABIStableOSVersionForTriple(Opts.Target);
 
     if (auto vers = version::Version::parseVersionString(A->getValue(),
                                                          SourceLoc(), &Diags))

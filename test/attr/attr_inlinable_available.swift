@@ -11,10 +11,9 @@
 
 // REQUIRES: swift_stable_abi
 
-
 // Primary execution of this test. Uses the default minimum inlining version,
-// which is the version when the ABI became stable.
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -target-min-inlining-version abi
+// which is the version when Swift was introduced.
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -target-min-inlining-version min
 
 
 // Check that these rules are only applied when requested and that at least some
@@ -34,12 +33,12 @@ public struct NoAvailable {
   @usableFromInline internal init() {}
 }
 
-@available(macOS 10.14.3, iOS 12.1, tvOS 12.1, watchOS 5.1, *)
+@available(macOS 10.9, iOS 7.0, tvOS 8.0, watchOS 1.0, *)
 public struct BeforeInliningTarget {
   @usableFromInline internal init() {}
 }
 
-@available(macOS 10.14.4, iOS 12.2, tvOS 12.2, watchOS 5.2, *)
+@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
 public struct AtInliningTarget {
   @usableFromInline internal init() {}
 }
@@ -90,7 +89,7 @@ public func deployedUseNoAvailable( // expected-note 5 {{add @available attribut
   }
 }
 
-@available(macOS 10.14.3, iOS 12.1, tvOS 12.1, watchOS 5.1, *)
+@available(macOS 10.9, iOS 7.0, tvOS 8.0, watchOS 1.0, *)
 public func deployedUseBeforeInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -115,7 +114,7 @@ public func deployedUseBeforeInliningTarget(
   }
 }
 
-@available(macOS 10.14.4, iOS 12.2, tvOS 12.2, watchOS 5.2, *)
+@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
 public func deployedUseAtInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -248,7 +247,7 @@ public func deployedUseAfterDeploymentTarget(
   }
 }
 
-@available(macOS 10.14.3, iOS 12.1, tvOS 12.1, watchOS 5.1, *)
+@available(macOS 10.9, iOS 7.0, tvOS 8.0, watchOS 1.0, *)
 @inlinable public func inlinedUseBeforeInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -264,7 +263,7 @@ public func deployedUseAfterDeploymentTarget(
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
-  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} {{18-25=10.14.5}} || {{31-35=12.3}} || {{42-46=12.3}} || {{56-59=5.3}}
+  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} expected-note {{add 'if #available'}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
@@ -279,7 +278,7 @@ public func deployedUseAfterDeploymentTarget(
   }
 }
 
-@available(macOS 10.14.4, iOS 12.2, tvOS 12.2, watchOS 5.2, *)
+@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
 @inlinable public func inlinedUseAtInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -295,7 +294,7 @@ public func deployedUseAfterDeploymentTarget(
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
-  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} {{18-25=10.14.5}} || {{31-35=12.3}} || {{42-46=12.3}} || {{56-59=5.3}}
+  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} expected-note {{add 'if #available'}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
@@ -397,6 +396,40 @@ internal func fn() {
 // @_alwaysEmitIntoClient acts like @inlinable.
 
 @_alwaysEmitIntoClient public func aEICUseNoAvailable( // expected-note 8 {{add @available attribute}}
+  _: NoAvailable,
+  _: BeforeInliningTarget,
+  _: AtInliningTarget,
+  _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in}}
+  _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in}}
+  _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
+) {
+  defer {
+    _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+    _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  }
+  _ = NoAvailable()
+  _ = BeforeInliningTarget()
+  _ = AtInliningTarget()
+  _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in}} expected-note {{add 'if #available'}}
+  _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+
+  if #available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *) {
+    _ = BetweenTargets()
+  }
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+    _ = AtDeploymentTarget()
+  }
+  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+    _ = AfterDeploymentTarget()
+  }
+}
+
+// @_backDeploy acts like @inlinable.
+
+@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
+@_backDeploy(macOS 999.0, iOS 999.0, tvOS 999.0, watchOS 999.0)
+public func backDeployedToInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,

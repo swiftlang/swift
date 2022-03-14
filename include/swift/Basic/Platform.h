@@ -55,8 +55,10 @@ namespace swift {
   bool triplesAreValidForZippering(const llvm::Triple &target,
                                    const llvm::Triple &targetVariant);
 
+  /// Returns the VersionTuple at which Swift first became available for the OS
+  /// represented by `triple`.
   const Optional<llvm::VersionTuple>
-  minimumABIStableOSVersionForTriple(const llvm::Triple &triple);
+  minimumAvailableOSVersionForTriple(const llvm::Triple &triple);
 
   /// Returns true if the given triple represents an OS that has all the
   /// "built-in" ABI-stable libraries (stdlib and _Concurrency)
