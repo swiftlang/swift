@@ -2281,7 +2281,8 @@ namespace {
     ExprRewriter(ConstraintSystem &cs, Solution &solution,
                  Optional<SolutionApplicationTarget> target,
                  bool suppressDiagnostics)
-        : cs(cs), dc(cs.DC), solution(solution), target(target),
+        : cs(cs), dc(target ? target->getDeclContext() : cs.DC),
+          solution(solution), target(target),
           SuppressDiagnostics(suppressDiagnostics) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }

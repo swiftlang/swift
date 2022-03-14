@@ -233,3 +233,19 @@ func test_local_function_capturing_vars() {
     }
   }
 }
+
+func test_taps_type_checked_with_correct_decl_context() {
+  struct Path {
+    func contains<T>(_: T) -> Bool where T: StringProtocol { return false }
+  }
+
+  let paths: [Path] = []
+  let strs: [String] = []
+
+  _ = paths.filter { path in
+    for str in strs where path.contains("\(str).hello") {
+      return true
+    }
+    return false
+  }
+}
