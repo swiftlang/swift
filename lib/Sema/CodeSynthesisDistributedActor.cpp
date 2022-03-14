@@ -269,9 +269,14 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       auto recordArgumentDeclRef = UnresolvedDeclRefExpr::createImplicit(
           C, recordArgumentDecl->getName());
 
+      auto argumentName = param->getArgumentName().str();
       auto recordArgArgsList = ArgumentList::forImplicitCallTo(
           recordArgumentDeclRef->getName(),
           {
+            // name:
+           new (C) StringLiteralExpr(argumentName, SourceRange(),
+                                     /*implicit=*/true),
+            // _ argument:
             new (C) DeclRefExpr(
                ConcreteDeclRef(param), dloc, implicit,
                AccessSemantics::Ordinary,

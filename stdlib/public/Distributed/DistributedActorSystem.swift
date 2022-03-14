@@ -418,8 +418,7 @@ public protocol DistributedTargetInvocationEncoder {
 //  ///
 //  /// Record an argument of `Argument` type.
 //  /// This will be invoked for every argument of the target, in declaration order.
-//  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws
-  // TODO(distributed): offer recordArgument(label:type:)
+//  mutating func recordArgument<Argument: SerializationRequirement>(name: String, _ argument: Argument) throws
 
   /// Record the error type of the distributed method.
   /// This method will not be invoked if the target is not throwing.

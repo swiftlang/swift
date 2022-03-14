@@ -635,60 +635,72 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
 
     // === Check all parameters
     auto params = getParameters();
-    if (params->size() != 1) {
+    if (params->size() != 2) {
+      return false;
+    }
+
+    // --- Check parameter: label
+    auto labelParam = params->get(0);
+    if (!labelParam->getArgumentName().is("name")) {
+      return false;
+    }
+    if (!labelParam->getInterfaceType()->isEqual(C.getStringType())) {
       return false;
     }
 
     // --- Check parameter: _ argument
-  auto argumentParam = params->get(0);
-  if (!argumentParam->getArgumentName().is("")) {
-    return false;
-  }
-
-  // === Check generic parameters in detail
-  // --- Check: Argument: SerializationRequirement
-  GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
-
-  auto sig = getGenericSignature();
-  auto requirements = sig.getRequirements();
-
-  if (requirements.size() != expectedRequirementsNum) {
-    return false;
-  }
-
-  // --- Check the expected requirements
-  // --- all the Argument requirements ---
-  // conforms_to: Argument Decodable
-  // conforms_to: Argument Encodable
-  // ...
-
-  auto func = dyn_cast<FuncDecl>(this);
-  if (!func) {
-    return false;
-  }
-
-  auto resultType = func->mapTypeIntoContext(argumentParam->getInterfaceType())
-                        ->getDesugaredType();
-  auto resultParamType = func->mapTypeIntoContext(
-      ArgumentParam->getInterfaceType()->getMetatypeInstanceType());
-  // The result of the function must be the `Res` generic argument.
-  if (!resultType->isEqual(resultParamType)) {
-    return false;
-  }
-
-  for (auto requirementProto : requirementProtos) {
-    auto conformance = module->lookupConformance(resultType, requirementProto);
-    if (conformance.isInvalid()) {
+    auto argumentParam = params->get(1);
+    if (!argumentParam->getArgumentName().is("")) {
       return false;
     }
-  }
 
-  // === Check result type: Void
-  if (!func->getResultInterfaceType()->isVoid()) {
-    return false;
-  }
+    // === Check generic parameters in detail
+    // --- Check: Argument: SerializationRequirement
+    GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
 
-  return true;
+    auto sig = getGenericSignature();
+    auto requirements = sig.getRequirements();
+
+    if (requirements.size() != expectedRequirementsNum) {
+      return false;
+    }
+
+    // --- Check the expected requirements
+    // --- all the Argument requirements ---
+    // e.g.
+    // conforms_to: Argument Decodable
+    // conforms_to: Argument Encodable
+    // ...
+
+    auto func = dyn_cast<FuncDecl>(this);
+    if (!func) {
+      return false;
+    }
+
+    auto resultType =
+        func->mapTypeIntoContext(argumentParam->getInterfaceType())
+            ->getDesugaredType();
+    auto resultParamType = func->mapTypeIntoContext(
+        ArgumentParam->getInterfaceType()->getMetatypeInstanceType());
+    // The result of the function must be the `Res` generic argument.
+    if (!resultType->isEqual(resultParamType)) {
+      return false;
+    }
+
+    for (auto requirementProto : requirementProtos) {
+      auto conformance =
+          module->lookupConformance(resultType, requirementProto);
+      if (conformance.isInvalid()) {
+        return false;
+      }
+    }
+
+    // === Check result type: Void
+    if (!func->getResultInterfaceType()->isVoid()) {
+      return false;
+    }
+
+    return true;
 }
 
 bool
@@ -879,8 +891,8 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     }
 
     // --- Check parameter: _ errorType
-    auto argumentParam = params->get(0);
-    if (!argumentParam->getArgumentName().is("")) {
+    auto errorTypeParam = params->get(0);
+    if (!errorTypeParam->getArgumentName().is("")) {
       return false;
     }
 

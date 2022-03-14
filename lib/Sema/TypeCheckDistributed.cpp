@@ -305,7 +305,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
                      decl->getName(), identifier,
-                     "mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws\n");
+                     "mutating func recordArgument<Argument: SerializationRequirement>(name: String, _ argument: Argument) throws\n");
       anyMissingAdHocRequirements = true;
     }
     if (checkAdHocRequirementAccessControl(decl, Proto, recordArgumentDecl))

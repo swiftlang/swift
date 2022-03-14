@@ -257,8 +257,8 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
     genericSubs.append(type)
   }
 
-  public mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
-    print(" > encode argument: \(argument)")
+  public mutating func recordArgument<Argument: SerializationRequirement>(name: String, _ argument: Argument) throws {
+    print(" > encode argument name:\(name), argument: \(argument)")
     arguments.append(argument)
   }
   public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
