@@ -386,12 +386,6 @@ findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
 void RewriteSystem::deleteRule(unsigned ruleID,
                                const RewritePath &replacementPath) {
   // Replace all occurrences of the rule with the replacement path in
-  // all redundant rule paths recorded so far.
-  for (auto &pair : RedundantRules) {
-    (void) pair.second.replaceRuleWithPath(ruleID, replacementPath);
-  }
-
-  // Replace all occurrences of the rule with the replacement path in
   // all remaining rewrite loops.
   for (unsigned loopID : indices(Loops)) {
     auto &loop = Loops[loopID];
@@ -458,8 +452,34 @@ void RewriteSystem::performHomotopyReduction(
 }
 
 void RewriteSystem::normalizeRedundantRules() {
-  for (auto &pair : RedundantRules) {
+  llvm::DenseMap<unsigned, unsigned> RedundantRuleMap;
+
+  // A redundant path in the range [0, i-1] might contain rewrite steps naming
+  // rules that subsequently became redundant in the range [i, e-1].
+  //
+  // We back-substitute later rules into earlier paths here.
+  for (unsigned i = 0, e = RedundantRules.size(); i < e; ++i) {
+    // Pre-condition: Redundant paths in the range [i+1, e-1] do not involve
+    // any other redundant rules.
+    unsigned j = e - i - 1;
+
+    // Replace all occurrences of redundant rules with their path at
+    // RedundantRules[i].
+    auto &pair = RedundantRules[j];
+    pair.second.replaceRulesWithPaths(
+        [&](unsigned ruleID) -> RewritePath * {
+          auto found = RedundantRuleMap.find(ruleID);
+          if (found != RedundantRuleMap.end())
+            return &RedundantRules[found->second].second;
+
+          return nullptr;
+        });
     pair.second.computeNormalForm(*this);
+
+    RedundantRuleMap[RedundantRules[j].first] = j;
+
+    // Post-condition: the path for RedundantRules[i] does not contain any
+    // redundant rules.
   }
 
   if (Debug.contains(DebugFlags::RedundantRules)) {
@@ -616,12 +636,12 @@ void RewriteSystem::minimizeRewriteSystem() {
     return false;
   });
 
+  normalizeRedundantRules();
+
   // Check invariants after homotopy reduction.
   verifyRewriteLoops();
   verifyRedundantConformances(redundantConformances);
   verifyMinimizedRules(redundantConformances);
-
-  normalizeRedundantRules();
 }
 
 /// Returns flags indicating if the rewrite system has unresolved or
@@ -825,6 +845,18 @@ void RewriteSystem::verifyMinimizedRules(
                    << rule << "\n";
       dump(llvm::errs());
       abort();
+    }
+
+    for (const auto &step : pair.second) {
+      if (step.Kind == RewriteStep::Rule) {
+        const auto &rule = getRule(step.getRuleID());
+        if (rule.isRedundant()) {
+          llvm::errs() << "Redundant requirement path contains a redundant "
+                          "rule " << rule << "\n";
+          dump(llvm::errs());
+          abort();
+        }
+      }
     }
   }
 }
