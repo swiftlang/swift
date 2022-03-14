@@ -7,7 +7,7 @@
 // CHECK-LABEL: namespace CdeclFunctions {
 
 // CHECK: namespace _impl {
-// CHECK: extern "C" int cfuncPassTwo(int x, int y) noexcept;
+// CHECK: SWIFT_EXTERN int cfuncPassTwo(int x, int y) SWIFT_NOEXCEPT;
 // CHECK: }
 
 @_cdecl("cfuncPassTwo")

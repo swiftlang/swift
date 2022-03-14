@@ -272,6 +272,12 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
     out << "#endif\n";
   };
   emitMacro("SWIFT_CALL", "__attribute__((swiftcall))");
+  // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
+  out << "#if defined(__cplusplus)\n";
+  emitMacro("SWIFT_NOEXCEPT", "noexcept");
+  out << "#else\n";
+  emitMacro("SWIFT_NOEXCEPT", "");
+  out << "#endif\n";
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
 }
