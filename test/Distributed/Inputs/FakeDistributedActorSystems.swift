@@ -87,7 +87,7 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   public func remoteCallVoid<Act, Err>(
@@ -99,7 +99,7 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
     where Act: DistributedActor,
           Act.ID == ActorID,
           Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   public nonisolated var description: Swift.String {
@@ -184,7 +184,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
       try await executeDistributedTarget(
         on: active,
-        mangledTargetName: target.mangledName,
+        target: target,
         invocationDecoder: &decoder,
         handler: resultHandler
       )
@@ -234,7 +234,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
       try await executeDistributedTarget(
         on: active,
-        mangledTargetName: target.mangledName,
+        target: target,
         invocationDecoder: &decoder,
         handler: resultHandler
       )

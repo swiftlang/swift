@@ -35,7 +35,7 @@ func test() async throws {
 
   do {
     let value = try await ref.takeThrowReturn(name: "Example")
-    // CHECK: >> remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC15takeThrowReturn4nameS2S_tYaKFTE"), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Example"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.takeThrowReturn(name:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Example"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
 
     print("did not throw")
     // CHECK-NOT: did not throw

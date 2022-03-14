@@ -310,7 +310,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
     }
     if (checkAdHocRequirementAccessControl(decl, Proto, recordArgumentDecl))
       anyMissingAdHocRequirements = true;
-    
+
     // - recordReturnType
     auto recordReturnTypeDecl = C.getRecordReturnTypeOnDistributedInvocationEncoder(decl);
     if (!recordReturnTypeDecl) {
