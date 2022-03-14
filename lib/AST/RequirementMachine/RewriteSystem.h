@@ -14,6 +14,7 @@
 #define SWIFT_REWRITESYSTEM_H
 
 #include "swift/AST/Requirement.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -159,6 +160,8 @@ public:
   }
 
   Optional<Identifier> isProtocolTypeAliasRule() const;
+
+  bool isDerivedFromConcreteProtocolTypeAliasRule() const;
 
   void markLHSSimplified() {
     assert(!LHSSimplified);
@@ -535,7 +538,7 @@ public:
 
   void minimizeRewriteSystem();
 
-  bool hadError() const;
+  GenericSignatureErrors getErrors() const;
 
   struct MinimizedProtocolRules {
     std::vector<unsigned> Requirements;

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify
-// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify > %t.dump 2>&1
 
 
 func sameType<T>(_: T.Type, _: T.Type) {}

@@ -193,6 +193,29 @@ Optional<Identifier> Rule::isProtocolTypeAliasRule() const {
   return LHS[1].getName();
 }
 
+/// A rule was derived from a concrete protocol typealias if it
+/// takes the following form:
+///
+/// T.A.[concrete: C] => T.A
+///
+/// Where the prefix term T does not contain any name symbols, and
+/// A is a name symbol.
+bool Rule::isDerivedFromConcreteProtocolTypeAliasRule() const {
+  auto optSymbol = isPropertyRule();
+  if (!optSymbol || optSymbol->getKind() != Symbol::Kind::ConcreteType)
+    return false;
+
+  for (unsigned i = 0, e = RHS.size() - 1; i < e; ++i) {
+    if (RHS[i].getKind() == Symbol::Kind::Name)
+      return false;
+  }
+
+  if (RHS.back().getKind() != Symbol::Kind::Name)
+    return false;
+
+  return true;
+}
+
 /// Returns the length of the left hand side.
 unsigned Rule::getDepth() const {
   auto result = LHS.size();
@@ -841,10 +864,11 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
     out << "- " << rule;
     if (auto ID = rule.getRequirementID()) {
       auto requirement = WrittenRequirements[*ID];
-      out << ", ID: " << *ID << ", ";
+      out << " [ID: " << *ID << " - ";
       requirement.req.dump(out);
       out << " at ";
       requirement.loc.print(out, Context.getASTContext().SourceMgr);
+      out << "]";
     }
     out << "\n";
   }

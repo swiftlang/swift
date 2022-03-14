@@ -529,6 +529,29 @@ GenericSignature buildGenericSignature(
     SmallVector<GenericTypeParamType *, 2> addedParameters,
     SmallVector<Requirement, 2> addedRequirements);
 
+/// Summary of error conditions detected by the Requirement Machine.
+enum class GenericSignatureErrorFlags {
+  /// The original requirements referenced a non-existent type parameter.
+  HasUnresolvedType = (1<<0),
+
+  /// The original requirements were in conflict with each other, meaning
+  /// there are no possible concrete substitutions which statisfy the
+  /// generic signature.
+  HasConflict = (1<<1),
+
+  /// The Knuth-Bendix completion procedure failed to construct a confluent
+  /// rewrite system.
+  CompletionFailed = (1<<2)
+};
+
+using GenericSignatureErrors = OptionSet<GenericSignatureErrorFlags>;
+
+/// AbstractGenericSignatureRequest and InferredGenericSignatureRequest
+/// return this type, which stores a GenericSignature together with the
+/// above set of error flags.
+using GenericSignatureWithError = llvm::PointerIntPair<GenericSignature, 3,
+                                                       GenericSignatureErrors>;
+
 } // end namespace swift
 
 namespace llvm {

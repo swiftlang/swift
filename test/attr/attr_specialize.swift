@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=verify
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -disable-objc-attr-requires-foundation-module -define-availability 'SwiftStdlib 5.1:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0' | %FileCheck %s
 
 struct S<T> {}
@@ -54,8 +54,10 @@ class G<T> {
   // expected-error@-1 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
   // expected-note@-2 {{missing constraint for 'T' in '_specialize' attribute}}
   @_specialize(where T == S<T>) // expected-error{{same-type constraint 'T' == 'S<T>' is recursive}}
-  // expected-error@-1 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
-  // expected-note@-2 {{missing constraint for 'T' in '_specialize' attribute}}
+  // expected-error@-1 {{cannot build rewrite system for generic signature; concrete nesting limit exceeded}}
+  // expected-note@-2 {{failed rewrite rule is τ_0_0.[concrete: S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<τ_0_0>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => τ_0_0}}
+  // expected-error@-3 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
+  // expected-note@-4 {{missing constraint for 'T' in '_specialize' attribute}}
   @_specialize(where T == Int, U == Int) // expected-error{{cannot find type 'U' in scope}}
 
   func noGenericParams() {}
@@ -177,6 +179,8 @@ func funcWithForbiddenSpecializeRequirement<T>(_ t: T) {
 // expected-warning@-3{{redundant constraint 'T' : '_Trivial'}}
 // expected-note@-4 {{constraint 'T' : '_Trivial' implied here}}
 // expected-note@-5 2{{constraint conflicts with 'T' : '_Trivial(32)'}}
+// expected-error@-6 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
+// expected-note@-7 {{missing constraint for 'T' in '_specialize' attribute}}
 @_specialize(where T: _Trivial, T: _Trivial(64))
 // expected-warning@-1{{redundant constraint 'T' : '_Trivial'}}
 // expected-note@-2 1{{constraint 'T' : '_Trivial' implied here}}

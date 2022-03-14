@@ -105,9 +105,6 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
     }
   } matcher(loc, result, errors);
 
-  if (lhs->hasError() || rhs->hasError())
-    return;
-
   (void) matcher.match(lhs, rhs);
 
   // If neither side is directly a type parameter, the type parameter

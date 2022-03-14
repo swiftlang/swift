@@ -228,7 +228,6 @@ void PropertyMap::recordSuperclassRelation(Term key,
 void PropertyMap::addSuperclassProperty(
     Term key, Symbol property, unsigned ruleID) {
   auto *props = getOrCreateProperties(key);
-  auto &newRule = System.getRule(ruleID);
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   const auto *superclassDecl = property.getConcreteType()
@@ -345,8 +344,9 @@ void PropertyMap::addSuperclassProperty(
                    << props->SuperclassDecl->getName() << "\n";
     }
 
-    // FIXME: Record the conflict better
-    newRule.markConflicting();
+    auto &req = props->Superclasses[props->SuperclassDecl];
+    for (const auto &pair : req.SuperclassRules)
+      System.recordConflict(pair.second, ruleID);
   }
 }
 
