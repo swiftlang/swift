@@ -955,6 +955,167 @@ namespace {
       return false;
     }
 
+    /// If the given parameter \p param has non-trivial ownership semantics,
+    /// adjust the type of the given expression \p expr to reflect it. The
+    /// expression is expected to serve as either an argument or reference
+    /// to the parameter.
+    void adjustExprOwnershipForParam(Expr *expr,
+                                     const AnyFunctionType::Param &param) {
+      // If the 'self' parameter has non-trivial ownership, adjust the
+      // argument accordingly.
+      switch (param.getValueOwnership()) {
+      case ValueOwnership::Default:
+      case ValueOwnership::InOut:
+        break;
+
+      case ValueOwnership::Owned:
+      case ValueOwnership::Shared:
+        assert(param.getPlainType()->isEqual(cs.getType(expr)));
+
+        expr->setType(ParenType::get(cs.getASTContext(), param.getPlainType(),
+                                     param.getParameterFlags()));
+        cs.cacheType(expr);
+        break;
+      }
+    }
+
+    /// Build the call inside the body of a single curry thunk
+    /// "{ args in base.fn(args) }".
+    ///
+    /// \param baseExpr The captured base expression, if warranted.
+    /// \param fnExpr The expression to be called by consecutively applying
+    /// the optional \p baseExpr and thunk parameters.
+    /// \param declOrClosure The underlying function-like declaration or
+    /// closure we're going to call.
+    /// \param thunkParamList The enclosing thunk's parameter list.
+    /// \param locator The locator pinned on the function reference carried
+    /// by \p fnExpr. If the function has associated applied property wrappers,
+    /// the locator is used to pull them in.
+    ApplyExpr *buildSingleCurryThunkBodyCall(Expr *baseExpr, Expr *fnExpr,
+                                             DeclContext *declOrClosure,
+                                             ParameterList *thunkParamList,
+                                             ConstraintLocatorBuilder locator) {
+      auto &ctx = cs.getASTContext();
+      auto *const fnTy = cs.getType(fnExpr)->castTo<FunctionType>();
+      auto *calleeFnTy = fnTy;
+
+      if (baseExpr) {
+        const auto calleeSelfParam = calleeFnTy->getParams().front();
+
+        // If the 'self' parameter has non-trivial ownership, adjust the
+        // argument type accordingly.
+        adjustExprOwnershipForParam(baseExpr, calleeSelfParam);
+
+        // Uncurry the callee type in the presence of a base expression; we
+        // want '(args) -> result' vs. '(self) -> (args) -> result'.
+        calleeFnTy = calleeFnTy->getResult()->castTo<FunctionType>();
+      }
+
+      const auto &appliedPropertyWrappers =
+          solution.appliedPropertyWrappers[locator.getAnchor()];
+      const auto calleeDeclRef = resolveConcreteDeclRef(
+          dyn_cast<AbstractFunctionDecl>(declOrClosure), locator);
+
+      auto *const calleeParamList = getParameterList(declOrClosure);
+      const auto calleeParams = calleeFnTy->getParams();
+
+      // Rebuild the callee params: SILGen knows how to emit property-wrapped
+      // parameters, but the corresponding parameter types need to match the
+      // backing wrapper types.
+      SmallVector<AnyFunctionType::Param, 4> newCalleeParams;
+      newCalleeParams.reserve(calleeParams.size());
+
+      // Build the argument list for the call.
+      SmallVector<Argument, 4> args;
+      unsigned appliedWrapperIndex = 0;
+      for (const auto idx : indices(*thunkParamList)) {
+        auto *const thunkParamDecl = thunkParamList->get(idx);
+
+        const auto calleeParam = calleeParams[idx];
+        const auto calleeParamType = calleeParam.getParameterType();
+        const auto thunkParamType = thunkParamDecl->getType();
+
+        Expr *paramRef = new (ctx)
+            DeclRefExpr(thunkParamDecl, DeclNameLoc(), /*implicit*/ true);
+        paramRef->setType(thunkParamDecl->isInOut()
+                              ? LValueType::get(thunkParamType)
+                              : thunkParamType);
+        cs.cacheType(paramRef);
+
+        paramRef = coerceToType(paramRef,
+                                thunkParamDecl->isInOut()
+                                    ? LValueType::get(calleeParamType)
+                                    : calleeParamType,
+                                locator);
+
+        auto *const calleeParamDecl = calleeParamList->get(idx);
+        if (calleeParamDecl->hasAttachedPropertyWrapper()) {
+          // Rewrite the parameter ref to the backing wrapper initialization
+          // expression.
+          auto &appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];
+
+          using ValueKind = AppliedPropertyWrapperExpr::ValueKind;
+          ValueKind valueKind = (appliedWrapper.initKind ==
+                                         PropertyWrapperInitKind::ProjectedValue
+                                     ? ValueKind::ProjectedValue
+                                     : ValueKind::WrappedValue);
+
+          paramRef = AppliedPropertyWrapperExpr::create(
+              ctx, calleeDeclRef, calleeParamDecl, SourceLoc(),
+              appliedWrapper.wrapperType, paramRef, valueKind);
+          cs.cacheExprTypes(paramRef);
+
+          newCalleeParams.push_back(calleeParam.withType(paramRef->getType()));
+
+          // TODO: inout
+          // FIXME: vararg
+        } else {
+          if (thunkParamDecl->isInOut()) {
+            paramRef =
+                new (ctx) InOutExpr(SourceLoc(), paramRef, calleeParamType,
+                                    /*implicit=*/true);
+          } else if (thunkParamDecl->isVariadic()) {
+            assert(calleeParamType->isEqual(paramRef->getType()));
+            paramRef = VarargExpansionExpr::createParamExpansion(ctx, paramRef);
+          }
+          cs.cacheType(paramRef);
+
+          newCalleeParams.push_back(calleeParam);
+        }
+
+        args.emplace_back(SourceLoc(), calleeParam.getLabel(), paramRef);
+      }
+
+      // SILGen knows how to emit property-wrapped parameters, but the
+      // corresponding parameter types need to match the backing wrapper types.
+      // To handle this, build a new callee function type out of the adjusted
+      // callee params, hand it over to the conditional 'self' call, and use it
+      // to update the type of the called expression with respect to whether
+      // it's 'self'-curried.
+      auto *const newCalleeFnTy = FunctionType::get(
+          newCalleeParams, calleeFnTy->getResult(), calleeFnTy->getExtInfo());
+
+      // If given, apply the base expression to the curried 'self'
+      // parameter first.
+      if (baseExpr) {
+        fnExpr->setType(FunctionType::get(fnTy->getParams(), newCalleeFnTy,
+                                          fnTy->getExtInfo()));
+        cs.cacheType(fnExpr);
+
+        fnExpr = DotSyntaxCallExpr::create(ctx, fnExpr, SourceLoc(), baseExpr);
+      }
+      fnExpr->setType(newCalleeFnTy);
+      cs.cacheType(fnExpr);
+
+      // Finally, apply the argument list to the callee.
+      ApplyExpr *callExpr = CallExpr::createImplicit(
+          ctx, fnExpr, ArgumentList::createImplicit(ctx, args));
+      callExpr->setType(calleeFnTy->getResult());
+      cs.cacheType(callExpr);
+
+      return callExpr;
+    }
+
     AutoClosureExpr *buildPropertyWrapperFnThunk(
         Expr *fnRef, FunctionType *fnType, AnyFunctionRef fnDecl, ConcreteDeclRef ref,
         ArrayRef<AppliedPropertyWrapper> appliedPropertyWrappers) {
