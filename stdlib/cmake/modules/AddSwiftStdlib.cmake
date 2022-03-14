@@ -288,7 +288,7 @@ function(_add_target_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "WASI")
-    list(APPEND result "-D_WASI_EMULATED_MMAN")
+    list(APPEND result "-D_WASI_EMULATED_MMAN" "-D_WASI_EMULATED_SIGNAL" "-D_WASI_EMULATED_PROCESS_CLOCKS")
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
@@ -296,10 +296,6 @@ function(_add_target_variant_c_compile_flags)
       # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
       list(APPEND result "-march=core2")
     endif()
-  endif()
-
-  if("${CFLAGS_SDK}" STREQUAL "WASI")
-    list(APPEND result "-D_WASI_EMULATED_MMAN")
   endif()
 
   if(NOT SWIFT_STDLIB_ENABLE_OBJC_INTEROP)

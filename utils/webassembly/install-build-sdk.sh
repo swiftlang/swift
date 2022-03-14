@@ -19,20 +19,12 @@ install_icu() {
   mv icu_out "$BUILD_SDK_PATH/icu"
 }
 
-install_wasi-sdk() {
-  # We only use wasi-sysroot and do not use binaries in wasi-sdk,
-  # so build machine's os and wasi-sdk's host os don't have to be matched
-  WASI_SDK_URL="https://github.com/swiftwasm/wasi-sdk/releases/download/0.2.2-swiftwasm/dist-ubuntu-18.04.zip"
+install_wasi-sysroot() {
+  WASI_SYSROOT_URL="https://github.com/swiftwasm/wasi-sdk-build/releases/download/wasi-sdk-14%2Bswiftwasm-2022-03-13/wasi-sysroot.tar.gz"
 
-  curl -L -o dist-wasi-sdk.zip "$WASI_SDK_URL"
-  unzip -u dist-wasi-sdk.zip -d .
+  curl -L "$WASI_SYSROOT_URL" | tar xz
 
-  WASI_SDK_TAR_PATH=$(find . -type f -name "wasi-sdk-*")
-  WASI_SDK_FULL_NAME=$(basename "$WASI_SDK_TAR_PATH" -linux.tar.gz)
-  tar xfz "$WASI_SDK_TAR_PATH"
-
-  rm -rf "$BUILD_SDK_PATH/wasi-sdk"
-  mv "$WASI_SDK_FULL_NAME" "$BUILD_SDK_PATH/wasi-sdk"
+  mv "wasi-sysroot" "$BUILD_SDK_PATH/wasi-sysroot"
 }
 
 workdir=$(mktemp -d)
@@ -48,6 +40,6 @@ if [ ! -e "$BUILD_SDK_PATH/icu" ]; then
   install_icu
 fi
 
-if [ ! -e "$BUILD_SDK_PATH/wasi-sdk" ]; then
-  install_wasi-sdk
+if [ ! -e "$BUILD_SDK_PATH/wasi-sysroot" ]; then
+  install_wasi-sysroot
 fi
