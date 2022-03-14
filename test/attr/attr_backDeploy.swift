@@ -159,6 +159,28 @@ public struct CannotBackDeployCoroutines {
   }
 }
 
+// MARK: - Function body diagnostics
+
+public struct FunctionBodyDiagnostics {
+  public func publicFunc() {}
+  @usableFromInline func usableFromInlineFunc() {}
+  func internalFunc() {} // expected-note {{instance method 'internalFunc()' is not '@usableFromInline' or public}}
+  fileprivate func fileprivateFunc() {} // expected-note {{instance method 'fileprivateFunc()' is not '@usableFromInline' or public}}
+  private func privateFunc() {} // expected-note {{instance method 'privateFunc()' is not '@usableFromInline' or public}}
+
+  @available(macOS 11.0, *)
+  @_backDeploy(macOS 12.0)
+  public func backDeployedMethod() {
+    struct Nested {} // expected-error {{type 'Nested' cannot be nested inside a '@_backDeploy' function}}
+
+    publicFunc()
+    usableFromInlineFunc()
+    internalFunc() // expected-error {{instance method 'internalFunc()' is internal and cannot be referenced from a '@_backDeploy' function}}
+    fileprivateFunc() // expected-error {{instance method 'fileprivateFunc()' is fileprivate and cannot be referenced from a '@_backDeploy' function}}
+    privateFunc() // expected-error {{instance method 'privateFunc()' is private and cannot be referenced from a '@_backDeploy' function}}
+  }
+}
+
 // MARK: - Incompatible declarations
 
 @_backDeploy(macOS 12.0) // expected-error {{'@_backDeploy' may not be used on fileprivate declarations}}
