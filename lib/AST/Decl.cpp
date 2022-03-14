@@ -9088,9 +9088,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   }
 
   if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
-    if (dc->isAsyncContext() ||
-        (dc->getASTContext().LangOpts.WarnConcurrency &&
-         dc->getASTContext().LangOpts.EnableExperimentalAsyncTopLevel)) {
+    if (dc->isAsyncContext() || dc->getASTContext().LangOpts.WarnConcurrency) {
       if (Type mainActor = dc->getASTContext().getMainActorType())
         return ActorIsolation::forGlobalActor(mainActor, /*unsafe=*/false);
     }
