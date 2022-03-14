@@ -43,8 +43,16 @@
 
 STATISTIC(NumInvocationFunctionsChanged,
           "Number of invocation functions rewritten");
-STATISTIC(NumStaticPartialApplicationForwarders,
-          "Number of static partial application forwarder thunks generated");
+STATISTIC(NumUnsupportedChangesToInvocationFunctions,
+          "Number of invocation functions that could be rewritten, but aren't yet");
+STATISTIC(NumPartialApplyCalleesWithNonPartialApplyUses,
+          "Number of invocation functions with non-partial_apply uses");
+STATISTIC(NumPartialApplyCalleesPossiblyUsedExternally,
+          "Number of invocation functions possibly used externally");
+STATISTIC(NumPartialApplyCalleesDeclarationOnly,
+          "Number of invocation functions that are declaration-only");
+STATISTIC(NumPartialApplyCalleesWithMismatchedPartialApplies,
+          "Number of invocation functions that have mismatched partial_apply sites");
 STATISTIC(NumDynamicPartialApplicationForwarders,
           "Number of dynamic partial application forwarder thunks generated");
 
@@ -61,8 +69,8 @@ struct KnownCallee {
   llvm::SetVector<FunctionRefInst *> FunctionRefs;
   /// The set of partial application sites.
   llvm::SetVector<PartialApplyInst *> PartialApplications;
-  /// Whether the callee has non-partial-apply uses.
-  bool HasNonPartialApplyUses = false;
+  /// If the callee has a non-partial-apply use, this points to an arbitrary one.
+  SILInstruction *NonPartialApplyUse = nullptr;
 };
 
 class PartialApplySimplificationPass : public SILModuleTransform {
@@ -128,7 +136,9 @@ static bool isSimplePartialApply(PartialApplyInst *i) {
   auto argTy = i->getArguments()[0]->getType();
 
   if (i->getFunctionType()->isNoEscape()) {
-    // TODO
+    if (argTy.isAddress()) {
+      return true;
+    }
     return false;
   } else {
     if (!argTy.isObject()) {
@@ -166,7 +176,7 @@ void PartialApplySimplificationPass::scanFunction(SILFunction *f,
           }
           
           // Record if the function has uses that aren't partial applies.
-          knownCallee.HasNonPartialApplyUses = true;
+          knownCallee.NonPartialApplyUse = frUse->getUser();
         }
       }
       
@@ -197,8 +207,10 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
   
   // If the subject of the partial application has other uses that aren't
   // partial applications, then thunk it.
-  if (pa.HasNonPartialApplyUses) {
-    LLVM_DEBUG(llvm::dbgs() << "Callee has non-partial_apply uses; thunking\n");
+  if (pa.NonPartialApplyUse) {
+    LLVM_DEBUG(llvm::dbgs() << "Callee has non-partial_apply uses; thunking\n";
+               pa.NonPartialApplyUse->print(llvm::dbgs()));
+    ++NumPartialApplyCalleesWithNonPartialApplyUses;
     goto create_forwarding_thunks;
   }
 
@@ -207,10 +219,12 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
   // signature. We'll always use forwarding thunks in this case.
   if (callee->isPossiblyUsedExternally()) {
     LLVM_DEBUG(llvm::dbgs() << "Callee is possibly used externally; thunking\n");
+    ++NumPartialApplyCalleesPossiblyUsedExternally;
     goto create_forwarding_thunks;
   }
   if (callee->empty()) {
     LLVM_DEBUG(llvm::dbgs() << "Callee is a declaration only; thunking\n");
+    ++NumPartialApplyCalleesDeclarationOnly;
     goto create_forwarding_thunks;
   }
   
@@ -229,11 +243,15 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
          i != e;
          ++i) {
       auto thisPA = *i;
-      if (examplePA->getType() != thisPA->getType()) {
+      if (examplePA->getNumArguments() != thisPA->getNumArguments()
+          || examplePA->getFunctionType()->getCalleeConvention()
+              != thisPA->getFunctionType()->getCalleeConvention()
+          || !examplePA->getFunctionType()->getExtInfo()
+              .isEqualTo(thisPA->getFunctionType()->getExtInfo(), true)) {
         LLVM_DEBUG(llvm::dbgs() << "Mismatched partial application arguments; thunking:\n";
                    thisPA->print(llvm::dbgs());
                    examplePA->print(llvm::dbgs()));
-                   
+        ++NumPartialApplyCalleesWithMismatchedPartialApplies;
         goto create_forwarding_thunks;
       }
     }
@@ -290,44 +308,49 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
     
     // Instead of the applied arguments, we receive a box containing the
     // values for those arguments. Work out what that box type is.
-    // TODO: We need a representation of boxes that are nonescaping and/or
+    // TODO: We need a representation of boxes that
     // capture the generic environment to represent partial applications in
     // their full generality.
-    if (examplePA->getFunctionType()->isNoEscape()) {
-      LLVM_DEBUG(llvm::dbgs() << "TODO: Nonescaping partial_apply not yet implemented\n");
-      return;
-    }
     if (origTy->getInvocationGenericSignature()) {
       LLVM_DEBUG(llvm::dbgs() << "TODO: generic partial_apply not yet implemented\n");
+      ++NumUnsupportedChangesToInvocationFunctions;
       return;
     }
 
-    // TODO: SILBoxType is only implemented for a single field right now, so
-    // represent the captures as a tuple.
-#if MULTI_FIELD_BOXES_ARE_SUPPORTED
-    auto newBoxLayout = SILLayout::get(C,
-       origTy->getInvocationGenericSignature(),
-       boxFields,
-       /*capturesGenerics*/ !origTy->getInvocationGenericSignature().isNull());
-#else
+    // TODO: SILBoxType is only implemented for a single field right now, and we
+    // don't yet have a corresponding type for nonescaping captures, so
+    // represent the captures as a tuple for now.
     llvm::SmallVector<TupleTypeElt, 4> tupleElts;
     for (auto field : boxFields) {
       tupleElts.push_back(TupleTypeElt(field.getLoweredType()));
     }
     auto tupleTy = TupleType::get(tupleElts, C)->getCanonicalType();
-    SILField tupleField(tupleTy, /*mutable*/ false);
     
-    auto newBoxLayout = SILLayout::get(C,
-                                       origTy->getInvocationGenericSignature(),
-                                       tupleField,
-                                       /*capturesGenerics*/ false);
-#endif
-    SubstitutionMap identitySubstitutionMap;
-    if (auto origSig = origTy->getInvocationGenericSignature()) {
-      identitySubstitutionMap = origSig->getIdentitySubstitutionMap();
+    CanType contextTy;
+    SILParameterInfo contextParam;
+    
+    bool isNoEscape = examplePA->getFunctionType()->isNoEscape();
+    if (isNoEscape) {
+      contextTy = tupleTy;
+      // Nonescaping closures borrow their context from the outer frame.
+      contextParam = SILParameterInfo(contextTy,
+                                   ParameterConvention::Indirect_In_Guaranteed);
+    } else {
+      SILField tupleField(tupleTy, /*mutable*/ false);
+      auto newBoxLayout = SILLayout::get(C,
+                                         origTy->getInvocationGenericSignature(),
+                                         tupleField,
+                                         /*capturesGenerics*/ false);
+      SubstitutionMap identitySubstitutionMap;
+      if (auto origSig = origTy->getInvocationGenericSignature()) {
+        identitySubstitutionMap = origSig->getIdentitySubstitutionMap();
+      }
+      contextTy = SILBoxType::get(C, newBoxLayout, identitySubstitutionMap);
+      contextParam = SILParameterInfo(contextTy,
+                                      paResultTy->getCalleeConvention());
     }
-    auto newBoxTy = SILBoxType::get(C, newBoxLayout, identitySubstitutionMap);
-    newParams.push_back(SILParameterInfo(newBoxTy, paResultTy->getCalleeConvention()));
+    
+    newParams.push_back(contextParam);
     
     auto newExtInfo = origTy->getExtInfo()
       .withRepresentation(SILFunctionTypeRepresentation::Method);
@@ -352,22 +375,25 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
     callee->rewriteLoweredTypeUnsafe(newTy);
     
     // Update the entry block.
-    auto boxConvention = examplePA->getFunctionType()->getCalleeConvention();
     {
       SILBuilder B(*callee);
       auto &entry = *callee->begin();
       
-      // Insert an argument for the box before the originally applied args.
-      auto boxArgTy = callee->mapTypeIntoContext(
-                                     SILType::getPrimitiveObjectType(newBoxTy));
-      ValueOwnershipKind boxOwnership(*callee, boxArgTy,
-                                      SILArgumentConvention(boxConvention));
+      // Insert an argument for the context before the originally applied args.
+      auto contextArgTy = callee->mapTypeIntoContext(
+                                   SILType::getPrimitiveObjectType(contextTy));
+      if (isIndirectFormalParameter(contextParam.getConvention())) {
+        contextArgTy = contextArgTy.getAddressType();
+      }
       
+      ValueOwnershipKind contextOwnership(*callee, contextArgTy,
+                           SILArgumentConvention(contextParam.getConvention()));
+
       auto numUnappliedArgs = numUnapplied + origTy->getNumIndirectFormalResults();
       
-      auto boxArg = entry.insertFunctionArgument(numUnappliedArgs,
-                                                 boxArgTy,
-                                                 boxOwnership);
+      auto contextArg = entry.insertFunctionArgument(numUnappliedArgs,
+                                                 contextArgTy,
+                                                 contextOwnership);
       auto appliedBBArgs = entry.getArguments().slice(numUnappliedArgs + 1);
 
       // Replace the original arguments applied by the partial_apply, by
@@ -379,15 +405,16 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
         auto appliedArg = appliedBBArgs[i];
         auto param = partiallyAppliedParams[i];
 
-#if MULTI_FIELD_BOXES_ARE_SUPPORTED
-        SILValue proj = B.createProjectBox(loc, boxArg, i);
-#else
-        SILValue proj = B.createProjectBox(loc, boxArg, 0);
+        SILValue proj;
+        if (isNoEscape) {
+          proj = contextArg;
+        } else {
+          proj = B.createProjectBox(loc, contextArg, 0);
+        }
         if (boxFields.size() > 1) {
           proj = B.createTupleElementAddr(loc, proj, i);
         }
-#endif
-        // Load the value out of the box according to the current ownership
+        // Load the value out of the context according to the current ownership
         // mode of the function and the calling convention for the parameter.
         SILValue projectedArg;
         if (callee->hasOwnership()) {
@@ -466,7 +493,7 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
           case ParameterConvention::Indirect_InoutAliasable: {
             // The box capture is a RawPointer with the value of the capture
             // address.
-            auto ptrVal = B.createLoad(loc, proj, LoadOwnershipQualifier::Trivial);
+            auto ptrVal = B.createLoad(loc, proj, LoadOwnershipQualifier::Unqualified);
             projectedArg = B.createPointerToAddress(loc, ptrVal,
                         appliedArg->getType(),
                         /*strict*/ conv == ParameterConvention::Indirect_Inout);
@@ -480,11 +507,11 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
       }
       
       // If the box is callee-consumed, we can release it now.
-      if (boxConvention == ParameterConvention::Direct_Owned) {
+      if (contextParam.getConvention() == ParameterConvention::Direct_Owned) {
         if (callee->hasOwnership()) {
-          B.createDestroyValue(loc, boxArg);
+          B.createDestroyValue(loc, contextArg);
         } else {
-          B.createStrongRelease(loc, boxArg, Atomicity::Atomic);
+          B.createStrongRelease(loc, contextArg, Atomicity::Atomic);
         }
       }
       
@@ -509,24 +536,39 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
       B.setInsertionPoint(pa);
       
       auto newFunctionRef = B.createFunctionRef(loc, callee);
-      auto boxTy = SILBoxType::get(C, newBoxLayout, pa->getSubstitutionMap());
-      auto newBox = B.createAllocBox(loc, boxTy,
-                                     /*debug variable*/ None,
-                                     /*dynamic lifetime*/ false,
-                                     /*reflection*/ true);
+      SILValue contextBuffer, contextProj;
+      auto contextStorageTy = SILType::getPrimitiveAddressType(contextTy)
+        .subst(getModule()->Types, pa->getSubstitutionMap());
+      if (isNoEscape) {
+        auto contextAlloc = B.createAllocStack(loc, contextStorageTy);
+        contextBuffer = contextProj = contextAlloc;
+        
+        // We'll need to deallocate the context buffer after the end of the
+        // original partial_apply's lifetime.
+        auto deallocStackUses = pa->getUsersOfType<DeallocStackInst>();
+        assert(deallocStackUses.begin() != deallocStackUses.end());
+        for (auto use : deallocStackUses) {
+          B.setInsertionPoint(use->getNextInstruction());
+          B.createDeallocStack(loc, contextBuffer);
+        }
+        B.setInsertionPoint(contextAlloc->getNextInstruction());
+      } else {
+        contextBuffer = B.createAllocBox(loc,
+                                         contextStorageTy.castTo<SILBoxType>(),
+                                         /*debug variable*/ None,
+                                         /*dynamic lifetime*/ false,
+                                         /*reflection*/ true);
+        contextProj = B.createProjectBox(loc, contextBuffer, 0);
+      }
       
       // Transfer the formerly partially-applied arguments into the box.
       auto appliedArgs = pa->getArguments();
       for (unsigned i = 0; i < appliedArgs.size(); ++i) {
         auto arg = appliedArgs[i];
-#if MULTI_FIELD_BOXES_ARE_SUPPORTED
-        SILValue proj = B.createProjectBox(loc, newBox, i);
-#else
-        SILValue proj = B.createProjectBox(loc, newBox, 0);
+        SILValue proj = contextProj;
         if (boxFields.size() > 1) {
           proj = B.createTupleElementAddr(loc, proj, i);
         }
-#endif
         auto param = partiallyAppliedParams[i];
 
         switch (auto conv = param.getConvention()) {
@@ -563,10 +605,15 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
       }
       
       // Partially apply the new box to create the closure.
+      auto paConvention = isNoEscape ? ParameterConvention::Direct_Guaranteed
+                                     : contextParam.getConvention();
+      auto paOnStack = isNoEscape ? PartialApplyInst::OnStack
+                                  : PartialApplyInst::NotOnStack;
       auto newPA = B.createPartialApply(loc, newFunctionRef,
                                         pa->getSubstitutionMap(),
-                                        SILValue(newBox),
-                                        boxConvention);
+                                        contextBuffer,
+                                        paConvention,
+                                        paOnStack);
       assert(isSimplePartialApply(newPA)
              && "partial apply wasn't simple after transformation?");
       pa->replaceAllUsesWith(newPA);
@@ -592,6 +639,7 @@ create_forwarding_thunks:
 
 void PartialApplySimplificationPass::processDynamicCallee(PartialApplyInst *pa){
   // TODO
+  ++NumDynamicPartialApplicationForwarders;
 }
 
 SILTransform *swift::createPartialApplySimplification() {

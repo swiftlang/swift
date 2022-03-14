@@ -461,11 +461,11 @@ public:
     locationStorage = loc.storage;
   }
 
-  /// Return the next instruction or nullptr if this is the last instruction in
-  /// its block.
+  /// Return the previous instruction, or nullptr if this is the first
+  /// instruction in its block.
   SILInstruction *getPreviousInstruction();
 
-  /// Return the previous instruction or nullptr if this is the first
+  /// Return the next instruction, or nullptr if this is the final
   /// instruction in its block.
   SILInstruction *getNextInstruction();
 

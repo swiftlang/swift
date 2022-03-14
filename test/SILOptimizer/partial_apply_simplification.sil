@@ -105,7 +105,7 @@ sil @add : $@convention(thin) (Int, Int) -> Int
 // CHECK-NEXT:   [[BOX_PROJ:%.*]] = project_box [[YZ]] :
 // CHECK-NEXT:   [[BOX_1:%.*]] = tuple_element_addr [[BOX_PROJ]] : {{.*}}, 1
 // CHECK-NEXT:   [[Z:%.*]] = load [[BOX_1]] : $*Int
-// CHECK:   [[ADD:%.*]] = function_ref @add
+// CHECK:        [[ADD:%.*]] = function_ref @add
 // CHECK-NEXT:   apply [[ADD]]([[Y]], [[Z]])
 sil private @closure_multi_capture : $@convention(thin) (Int, Int, Int) -> Int {
 entry(%x : $Int, %y : $Int, %z : $Int):
@@ -120,7 +120,6 @@ entry(%x : $Int, %y : $Int, %z : $Int):
 // CHECK:         [[BOX_PROJ:%.*]] = project_box [[BOX]]
 // CHECK:         [[BOX_0:%.*]] = tuple_element_addr [[BOX_PROJ]] : {{.*}}, 0
 // CHECK:         store [[Y]] to [[BOX_0]]
-// CHECK:         [[BOX_PROJ:%.*]] = project_box [[BOX]]
 // CHECK:         [[BOX_1:%.*]] = tuple_element_addr [[BOX_PROJ]] : {{.*}}, 1
 // CHECK:         store [[Z]] to [[BOX_1]]
 // CHECK:         [[RESULT:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX]])
@@ -132,3 +131,45 @@ entry(%y : $Int, %z : $Int):
   return %c : $@callee_guaranteed (Int) -> Int
 }
 
+// CHECK-LABEL: sil private @closure_nonescaping
+// CHECK-SAME:    : $@convention(method) (Int, @in_guaranteed (Int, Int)) -> Int
+// CHECK:       bb0([[X:%.*]] : $Int, [[YZ:%.*]] : $*(Int, Int)):
+// CHECK:         [[BOX_0:%.*]] = tuple_element_addr [[YZ]] : {{.*}}, 0
+// CHECK-NEXT:    [[Y:%.*]] = load [[BOX_0]] : $*Int
+// CHECK-NEXT:    [[BOX_1:%.*]] = tuple_element_addr [[YZ]] : {{.*}}, 1
+// CHECK-NEXT:    [[Z:%.*]] = load [[BOX_1]] : $*Int
+// CHECK:         [[ADD:%.*]] = function_ref @add
+// CHECK-NEXT:    apply [[ADD]]([[Y]], [[Z]])
+sil private @closure_nonescaping : $@convention(thin) (Int, Int, Int) -> Int {
+entry(%x : $Int, %y : $Int, %z : $Int):
+  %f = function_ref @add : $@convention(thin) (Int, Int) -> Int
+  %r = apply %f(%y, %z) : $@convention(thin) (Int, Int) -> Int
+  return %r : $Int
+}
+
+sil @closure_nonescaping_consumer : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int, Int) -> Int {
+entry(%f : $@noescape @callee_guaranteed (Int) -> Int, %x : $Int):
+  %y = apply %f(%x) : $@noescape @callee_guaranteed (Int) -> Int
+  return %y : $Int
+}
+
+// CHECK-LABEL: sil @closure_nonescaping_user
+// CHECK:       bb0([[X:%.*]] : $Int, [[Y:%.*]] : $Int, [[Z:%.*]] : $Int):
+// CHECK:         [[F:%.*]] = function_ref @closure_nonescaping
+// CHECK:         [[CONTEXT:%.*]] = alloc_stack $(Int, Int)
+// CHECK:         [[CONTEXT_Y:%.*]] = tuple_element_addr [[CONTEXT]] {{.*}}, 0
+// CHECK:         store [[Y]] to [[CONTEXT_Y]]
+// CHECK:         [[CONTEXT_Z:%.*]] = tuple_element_addr [[CONTEXT]] {{.*}}, 1
+// CHECK:         store [[Z]] to [[CONTEXT_Z]]
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[F]]([[CONTEXT]])
+// CHECK:         [[CONSUMER:%.*]] = function_ref @closure_nonescaping_consumer
+// CHECK:         apply [[CONSUMER]]([[CLOSURE]], [[X]])
+sil @closure_nonescaping_user : $@convention(thin) (Int, Int, Int) -> Int {
+entry(%x : $Int, %y : $Int, %z : $Int):
+  %f = function_ref @closure_nonescaping : $@convention(thin) (Int, Int, Int) -> Int
+  %c = partial_apply [callee_guaranteed] [on_stack] %f(%y, %z) : $@convention(thin) (Int, Int, Int) -> Int
+  %g = function_ref @closure_nonescaping_consumer : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int, Int) -> Int
+  %r = apply %g(%c, %x) : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int, Int) -> Int
+  dealloc_stack %c : $@noescape @callee_guaranteed (Int) -> Int
+  return %r : $Int
+}
