@@ -800,7 +800,8 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
-  SyntaxParsingContext SomeTypeContext(SyntaxContext, SyntaxKind::SomeType);
+  SyntaxParsingContext ConstrainedSugarTypeContext(
+      SyntaxContext, SyntaxKind::ConstrainedSugarType);
   // Check for the opaque modifier.
   // This is only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
@@ -816,7 +817,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     anyLoc = consumeToken();
   } else {
     // This isn't a some type.
-    SomeTypeContext.setTransparent();
+    ConstrainedSugarTypeContext.setTransparent();
   }
   
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {
