@@ -310,22 +310,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
     }
     if (checkAdHocRequirementAccessControl(decl, Proto, recordArgumentDecl))
       anyMissingAdHocRequirements = true;
-
-    // - recordErrorType
-    auto recordErrorTypeDecl = C.getRecordErrorTypeOnDistributedInvocationEncoder(decl);
-    if (!recordErrorTypeDecl) {
-      auto identifier = C.Id_recordErrorType;
-      decl->diagnose(
-          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl->getDescriptiveKind(), decl->getName(), identifier);
-      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     decl->getName(), identifier,
-                     "mutating func recordErrorType<Err: Error>(_ errorType: Err.Type) throws\n");
-      anyMissingAdHocRequirements = true;
-    }
-    if (checkAdHocRequirementAccessControl(decl, Proto, recordErrorTypeDecl))
-      anyMissingAdHocRequirements = true;
-
+    
     // - recordReturnType
     auto recordReturnTypeDecl = C.getRecordReturnTypeOnDistributedInvocationEncoder(decl);
     if (!recordReturnTypeDecl) {

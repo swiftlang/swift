@@ -407,11 +407,9 @@ public protocol DistributedTargetInvocationEncoder {
 //  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws
   // TODO(distributed): offer recordArgument(label:type:)
 
-//  /// Ad-hoc requirement
-//  ///
-//  /// Record the error type of the distributed method.
-//  /// This method will not be invoked if the target is not throwing.
-//  mutating func recordErrorType<E: Error>(_ type: E.Type) throws // TODO: make not adhoc
+  /// Record the error type of the distributed method.
+  /// This method will not be invoked if the target is not throwing.
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 
 //  /// Ad-hoc requirement
 //  ///
