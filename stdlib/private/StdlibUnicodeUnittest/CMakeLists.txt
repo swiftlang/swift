@@ -6,6 +6,7 @@ add_swift_target_library(swiftStdlibUnicodeUnittest ${SWIFT_STDLIB_LIBRARY_BUILD
   StdlibUnicodeUnittest.swift
   Collation.swift
   UnicodeScalarProperties.swift
+  GraphemeBreaking.swift
 
   SWIFT_MODULE_DEPENDS StdlibUnittest
   SWIFT_MODULE_DEPENDS_LINUX Glibc
