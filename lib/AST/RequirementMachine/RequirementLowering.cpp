@@ -105,9 +105,6 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
     }
   } matcher(loc, result, errors);
 
-  if (lhs->hasError() || rhs->hasError())
-    return;
-
   (void) matcher.match(lhs, rhs);
 
   // If neither side is directly a type parameter, the type parameter
@@ -504,9 +501,37 @@ void swift::rewriting::realizeInheritedRequirements(
     Type inheritedType
       = evaluateOrDefault(ctx.evaluator,
                           InheritedTypeRequest{decl, index,
-                            TypeResolutionStage::Structural},
+                          TypeResolutionStage::Structural},
                           Type());
     if (!inheritedType) continue;
+
+    // The GenericSignatureBuilder allowed an associated type's inheritance
+    // clause to reference a protocol typealias whose underlying type was a
+    // protocol or class.
+    //
+    // Since protocol typealiases resolve to DependentMemberTypes in
+    // ::Structural mode, this relied on the GSB's "delayed requirements"
+    // mechanism.
+    //
+    // The RequirementMachine does not have an equivalent, and cannot really
+    // support that because we need to collect the protocols mentioned on
+    // the right hand sides of conformance requirements ahead of time.
+    //
+    // However, we can support it in simple cases where the typealias is
+    // defined in the protocol itself and is accessed as a member of 'Self'.
+    if (auto *assocTypeDecl = dyn_cast<AssociatedTypeDecl>(decl)) {
+      if (auto memberType = inheritedType->getAs<DependentMemberType>()) {
+        if (memberType->getBase()->isEqual(
+            assocTypeDecl->getProtocol()->getSelfInterfaceType())) {
+          inheritedType
+            = evaluateOrDefault(ctx.evaluator,
+                                InheritedTypeRequest{decl, index,
+                                TypeResolutionStage::Interface},
+                                Type());
+          if (!inheritedType) continue;
+        }
+      }
+    }
 
     auto *typeRepr = inheritedTypes[index].getTypeRepr();
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());

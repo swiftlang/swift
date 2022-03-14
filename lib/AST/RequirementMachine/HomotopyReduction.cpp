@@ -83,8 +83,7 @@ void RewriteLoop::recompute(const RewriteSystem &system) {
       Useful |= (!step.isInContext() && !evaluator.isInContext());
 
       const auto &rule = system.getRule(step.getRuleID());
-      if (rule.isProtocolTypeAliasRule() &&
-          rule.getLHS().size() == 3)
+      if (rule.isDerivedFromConcreteProtocolTypeAliasRule())
         HasConcreteTypeAliasRule = 1;
 
       break;
@@ -245,36 +244,25 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
   }
 }
 
-/// After propagating the 'explicit' bit on rules, process pairs of
-/// conflicting rules, marking one or both of the rules as conflicting,
-/// which instructs minimization to drop them.
+/// Process pairs of conflicting rules, marking the more specific rule as
+/// conflicting, which instructs minimization to drop this rule.
 void RewriteSystem::processConflicts() {
   for (auto pair : ConflictingRules) {
-    auto existingRuleID = pair.first;
-    auto newRuleID = pair.second;
+    auto *existingRule = &getRule(pair.first);
+    auto *newRule = &getRule(pair.second);
 
-    auto *existingRule = &getRule(existingRuleID);
-    auto *newRule = &getRule(newRuleID);
+    // The identity conformance rule ([P].[P] => [P]) will conflict with
+    // a concrete type requirement in an invalid protocol declaration
+    // where 'Self' is constrained to a type that does not conform to
+    // the protocol. This rule is permanent, so don't mark it as
+    // conflicting in this case.
 
-    auto existingKind = existingRule->isPropertyRule()->getKind();
-    auto newKind = newRule->isPropertyRule()->getKind();
-
-    // The GSB preferred to drop an explicit rule in a conflict, but
-    // only if the kinds were the same.
-    if (existingRule->isExplicit() && !newRule->isExplicit() &&
-        existingKind == newKind) {
-      std::swap(existingRule, newRule);
-    }
-
-    if (newRule->getRHS().size() >= existingRule->getRHS().size()) {
+    if (!existingRule->isIdentityConformanceRule() &&
+        existingRule->getRHS().size() >= newRule->getRHS().size())
+      existingRule->markConflicting();
+    if (!newRule->isIdentityConformanceRule() &&
+        newRule->getRHS().size() >= existingRule->getRHS().size())
       newRule->markConflicting();
-    } else if (existingKind != Symbol::Kind::Superclass &&
-               existingKind == newKind) {
-      // The GSB only dropped the new rule in the case of a conflicting
-      // superclass requirement, so maintain that behavior here.
-      if (existingRule->getRHS().size() >= newRule->getRHS().size())
-        existingRule->markConflicting();
-    }
 
     // FIXME: Diagnose the conflict later.
   }
@@ -931,31 +919,31 @@ void RewriteSystem::minimizeRewriteSystem() {
   normalizeRedundantRules();
 }
 
-/// In a conformance-valid rewrite system, any rule with unresolved symbols on
-/// the left or right hand side should be redundant. The presence of unresolved
-/// non-redundant rules means one of the original requirements written by the
-/// user was invalid.
-bool RewriteSystem::hadError() const {
+/// Returns flags indicating if the rewrite system has unresolved or
+/// conflicting rules in our minimization domain.
+GenericSignatureErrors RewriteSystem::getErrors() const {
   assert(Complete);
   assert(Minimized);
 
-  for (const auto &rule : Rules) {
-    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
-      continue;
+  GenericSignatureErrors result;
 
+  for (const auto &rule : Rules) {
     if (rule.isPermanent())
       continue;
 
-    if (rule.isConflicting())
-      return true;
+    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
+      continue;
 
     if (!rule.isRedundant() &&
         !rule.isProtocolTypeAliasRule() &&
         rule.containsUnresolvedSymbols())
-      return true;
+      result |= GenericSignatureErrorFlags::HasUnresolvedType;
+
+    if (rule.isConflicting())
+      result |= GenericSignatureErrorFlags::HasConflict;
   }
 
-  return false;
+  return result;
 }
 
 /// Collect all non-permanent, non-redundant rules whose domain is equal to
