@@ -3593,6 +3593,18 @@ namespace {
           // by changing the name of one. That changed method needs to be added
           // to the lookup table since it cannot be found lazily.
           if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(m)) {
+            auto cxxOperatorKind = cxxMethod->getOverloadedOperator();
+
+            // Check if this method _is_ an overloaded operator but is not a
+            // call / subscript. Those 2 operators do not need static versions
+            if(cxxOperatorKind != clang::OverloadedOperatorKind::OO_None &&
+                cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call &&
+                cxxOperatorKind != clang::OverloadedOperatorKind::OO_Subscript) {
+              auto d = makeOperator(MD, cxxMethod);
+              result->addMember(d);
+              result->addMemberToLookupTable(d);
+              recordMemberInContext(MD->getDeclContext(), d);
+            }
             if (cxxMethod->getDeclName().isIdentifier()) {
               auto &mutableFuncPtrs = Impl.cxxMethods[cxxMethod->getName()].second;
               if(mutableFuncPtrs.contains(cxxMethod)) {
@@ -3756,10 +3768,6 @@ namespace {
           // carried into derived classes.
           auto *subscriptImpl = getterAndSetter.first ? getterAndSetter.first : getterAndSetter.second;
           Impl.addAlternateDecl(subscriptImpl, subscript);
-        }
-
-        for(auto &recordOp : Impl.cxxOperators) {
-          result->addMember(makeOperator(recordOp));
         }
       }
 
@@ -5393,10 +5401,11 @@ namespace {
     /// \param setter function returning `UnsafeMutablePointer<T>`
     /// \return subscript declaration
     SubscriptDecl *makeSubscript(FuncDecl *getter, FuncDecl *setter);
+    FuncDecl *makeOperator(FuncDecl *operatorMethod, clang::CXXMethodDecl *clangOperator);
+
     VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                                 FuncDecl *setter);
 
-    FuncDecl *makeOperator(FuncDecl *operatorMethod);
 
     /// Import the accessor and its attributes.
     AccessorDecl *importAccessor(const clang::ObjCMethodDecl *clangAccessor,
@@ -8088,10 +8097,10 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   ASTContext &ctx = afd->getASTContext();
 
   auto funcDecl = cast<FuncDecl>(afd);
-  auto methodDecl = cast<FuncDecl>(context);
+  auto methodDecl = static_cast<FuncDecl *>(context);
 
   SmallVector<Expr *, 8> forwardingParams;
-  for (auto param : *methodDecl->getParameters()) {
+  for (auto param : *funcDecl->getParameters()) {
     auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
                                               /*Implicit=*/true);
     paramRefExpr->setType(param->getType());
@@ -8109,35 +8118,77 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
 
   auto *argList = ArgumentList::forImplicitUnlabeled(ctx, forwardingParams);
   auto callExpr = CallExpr::createImplicit(ctx, dotCallExpr, argList);
+  callExpr->setType(funcDecl->getResultInterfaceType());
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), callExpr,
                                          /*implicit=*/true);
+
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
   return {body, /*isTypeChecked=*/true};
 }
 
-FuncDecl *SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod) {
+FuncDecl *SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod, clang::CXXMethodDecl *clangOperator) {
   auto &ctx = Impl.SwiftContext;
+  auto opName = clang::getOperatorSpelling(clangOperator->getOverloadedOperator());
   auto loc = operatorMethod->getLoc();
   auto paramList = operatorMethod->getParameters();
-  auto topLevelStaticFuncDecl = FuncDecl::create(
-          ctx, SourceLoc(),
-          StaticSpellingKind::None, SourceLoc(),
-          operatorMethod->getName(), /*NameLoc=*/ SourceLoc(),
-          false, /*AsyncLoc=*/ SourceLoc(),
-          false, /*ThrowsLoc=*/ SourceLoc(),
-          nullptr,
-          paramList,
-          operatorMethod->getResultTypeRepr(),
-          operatorMethod->getModuleContext()
+  auto genericParamList = operatorMethod->getGenericParams();
+
+  auto opId = ctx.getIdentifier(opName);
+
+  auto parentCtx = operatorMethod->getDeclContext();
+
+  auto lhsId = ctx.getIdentifier("lhs");
+  auto lhsParam = new (ctx)
+      ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                lhsId, parentCtx);
+
+  lhsParam->setInterfaceType(parentCtx->getSelfInterfaceType());
+
+  lhsParam->setSpecifier(ParamSpecifier::Default);
+  if (operatorMethod->isMutating()) {
+    // This implicitly makes the parameter indirect.
+    lhsParam->setSpecifier(ParamSpecifier::InOut);
+  } else {
+    lhsParam->setSpecifier(ParamSpecifier::Default);
+  }
+
+  SmallVector<ParamDecl *, 4> newParams;
+  newParams.push_back(lhsParam);
+
+  for(auto param : *paramList) {
+    newParams.push_back(param);
+  }
+
+  auto newParamList = ParameterList::create(ctx, newParams);
+
+  auto oldArgNames = operatorMethod->getName().getArgumentNames();
+  SmallVector<Identifier, 4> newArgNames;
+  newArgNames.push_back(lhsId);
+
+  for(auto id : oldArgNames) {
+    newArgNames.push_back(id);
+  }
+
+  auto opDeclName = DeclName(ctx, opId, {newArgNames.begin(), newArgNames.end()});
+
+  auto topLevelStaticFuncDecl = FuncDecl::createImplicit(
+      ctx,
+      StaticSpellingKind::None,
+      opDeclName, SourceLoc(),
+      false, false,
+      genericParamList, ParameterList::create(ctx, newParams),
+      operatorMethod->getResultInterfaceType(),
+      operatorMethod->getDeclContext()
       );
 
   topLevelStaticFuncDecl->setAccess(AccessLevel::Public);
   topLevelStaticFuncDecl->setImplicit();
   topLevelStaticFuncDecl->setIsDynamic(false);
-
+  topLevelStaticFuncDecl->setStatic();
+  topLevelStaticFuncDecl->setImportAsStaticMember();
   topLevelStaticFuncDecl->setBodySynthesizer(synthesizeOperatorMethodBody, operatorMethod);
 
   return topLevelStaticFuncDecl;
