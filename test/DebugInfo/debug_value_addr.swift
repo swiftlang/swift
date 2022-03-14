@@ -1,9 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend %s -emit-sil -g -o - | %FileCheck -check-prefix=CHECK-SIL %s
 
-// Temporarily disable on arm64 (rdar://89237318)
-// UNSUPPORTED: CPU=arm64
-
 // Verify that -Onone shadow copies are emitted for debug_value_addr
 // instructions.
 
