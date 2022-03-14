@@ -8,6 +8,11 @@ module ConstructorCallsFunctionFromNestedStruct {
   requires cplusplus
 }
 
+module ConstructorCallsFunctionFromNestedCalls {
+  header "constructor-calls-function-from-nested-calls.h"
+  requires cplusplus
+}
+
 module ConstructorCallsMethod {
   header "constructor-calls-method.h"
   requires cplusplus
