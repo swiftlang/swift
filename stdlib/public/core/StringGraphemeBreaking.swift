@@ -390,7 +390,8 @@ extension _StringGuts {
       // If we're currently in an indic sequence (or if our lhs is a linking
       // consonant), then this check and everything underneath ensures that
       // we continue being in one and may check if this extend is a Virama.
-      if state.isInIndicSequence || scalar1._isLinkingConsonant {
+      if state.isInIndicSequence ||
+         (!isBackwards && scalar1._isLinkingConsonant) {
         if y == .extend {
           let extendNormData = Unicode._NormData(scalar2, fastUpperbound: 0x300)
 
@@ -440,7 +441,8 @@ extension _StringGuts {
     // GB999
     default:
       // GB9c
-      if state.isInIndicSequence, state.hasSeenVirama, scalar2._isLinkingConsonant {
+      if !isBackwards, state.isInIndicSequence, state.hasSeenVirama,
+         scalar2._isLinkingConsonant {
         state.hasSeenVirama = false
         return false
       }
