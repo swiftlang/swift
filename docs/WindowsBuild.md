@@ -705,21 +705,23 @@ cmake -B S:\b\11 ^
 cmake --build S:\b\11
 ```
 
-## Gather the toolchain and SDK
+## Use the toolchain and SDK
 
-If you want a toolchain for real-world testing, you can use CMake to perform the install step.
+If you want a toolchain for real-world testing, you can use CMake to perform the install step.  However, the built toolchain is not expected to be distributed, mainly because there're plenty of unnecessary or local files that need to be stripped.
 
-### Swift compiler and standard libraries
+### Swift compiler
 
 ```cmd
 cmake --build S:\b\1 --target install
 ```
 
-For testing, add the target to path:
+For testing, add the toolchain to path:
 
 ```cmd
-path S:\b\toolchain\usr\bin:%PATH%
+path S:\b\toolchain\usr\bin;%PATH%
 ```
+
+> **NOTE**: The built compiler cannot actually compile Swift files without a compatible SDK. You may need to specify `-sdk <sdk>` explicitly.
 
 ### Swift Windows SDK (with core libraries)
 
@@ -730,17 +732,51 @@ cmake --build S:\b\4 --target install
 cmake --build S:\b\5 --target install
 ```
 
-For testing, set `%SDKROOT%` and the default runtime:
+Usually, you also need to bundle external libraries required by `Foundation`:
+
+```cmd
+copy /Y S:\b\4\bin\*.dll S:\b\sdk\usr\bin
+```
+
+For testing, set `%SDKROOT%` and add runtime libraries to path:
 
 ```cmd
 set SDKROOT=S:\b\sdk
-python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" > S:\b\sdk\SDKSettings.plist
+path S:\b\sdk\usr\bin;%PATH%
 ```
 
-### Swift toolchain with developer tools
+#### Fix SDK layout
+
+You may notice that the SDK is not functioning correctly. This is caused by the mismatch of expected SDK layout and the build output. Before these issues get addressed, we may need some extra workaround.
+
+1. Compiler expects Swift libraries to live in `\usr\lib\swift\windows\x86_64`, but the build output is `\usr\lib\swift\windows`. This is likely to trigger `unable to load standard library for target 'x86_64-unknown-windows-msvc'` error. Fix by:
 
 ```cmd
-cmake --build S:\b\1 --target install
+for /D %m in (S:\b\sdk\usr\lib\swift\windows\*.swiftmodule) do ^
+move /Y %m S:\b\sdk\usr\lib\swift\windows\x86_64
+```
+
+> **NOTE(stevapple)**: The compiler convention shall be wrong here — Swift libraries can be bundled with multiple architectures, so there's no need to place them in arch-specific directory.
+
+2. Compiler expects underlying modules to be imported from `\usr\include`, but the build output is `\usr\lib\swift`. This is likely to trigger `cannot load underlying module for '<Module>'` error. Fix by:
+
+```cmd
+move /Y S:\b\sdk\usr\lib\swift\Block S:\b\sdk\usr\include
+move /Y S:\b\sdk\usr\lib\swift\dispatch S:\b\sdk\usr\include
+move /Y S:\b\sdk\usr\lib\swift\os S:\b\sdk\usr\include
+```
+
+3. Compiler expects Swift runtime import libraries to live in `\usr\lib\swift\windows\x86_64`, but the build output is `\usr\lib\swift\windows`. This is likely to trigger `fatal error LNK1104: cannot open file '<Module>.lib'` error. Fix by:
+
+```cmd
+move /Y S:\b\sdk\usr\lib\swift\windows\*.lib S:\b\sdk\usr\lib\swift\windows\x86_64
+```
+
+> **NOTE(stevapple)**: The build script shall be wrong here — Swift shared libraries are closely tied to target architecture, so we should place them in arch-specific directory if Universal binary is not available.
+
+### Swift developer tools
+
+```cmd
 cmake --build S:\b\6 --target install
 cmake --build S:\b\7\Yams --target install
 cmake --build S:\b\7\ArgumentParser --target install
@@ -752,18 +788,14 @@ cmake --build S:\b\8 --target install
 cmake --build S:\b\9 --target install
 cmake --build S:\b\10 --target install
 cmake --build S:\b\11 --target install
+copy /Y S:\b\8\bin\sqlite3.dll S:\b\toolchain\usr\bin
 ```
 
-To use Swift Driver in place of the old driver:
+To use Swift Driver in place of the old driver (default since Swift 5.7):
 
 ```cmd
 copy /Y S:\b\toolchain\usr\bin\swift-driver.exe S:\b\toolchain\usr\bin\swift.exe
 copy /Y S:\b\toolchain\usr\bin\swift-driver.exe S:\b\toolchain\usr\bin\swiftc.exe
 ```
 
-Add the built toolchain to `%Path%` to use directly:
-
-```cmd
-path S:\b\toolchain\usr\bin;%Path%
-swift --version
-```
+You should be able to compile Swift packages without any additional steps.
