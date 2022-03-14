@@ -628,9 +628,7 @@ namespace {
         if (AnyFunctionRef(fnDecl).hasExternalPropertyWrapperParameters() &&
             (declRefExpr->getFunctionRefKind() == FunctionRefKind::Compound ||
              declRefExpr->getFunctionRefKind() == FunctionRefKind::Unapplied)) {
-          auto &appliedWrappers = solution.appliedPropertyWrappers[locator.getAnchor()];
-          result = buildPropertyWrapperFnThunk(result, fullType->getAs<FunctionType>(), fnDecl,
-                                               ref, appliedWrappers);
+          result = buildSingleCurryThunk(result, fnDecl, locator);
         }
       }
 
@@ -8360,8 +8358,6 @@ namespace {
 
     AutoClosureExpr *rewriteClosure(ClosureExpr *closure) {
       auto &solution = Rewriter.solution;
-      auto closureType = solution.simplifyType(solution.getType(closure));
-      FunctionType *closureFnType = closureType->castTo<FunctionType>();
 
       // Apply types to synthesized property wrapper vars.
       for (auto *param : *closure->getParameters()) {
@@ -8399,9 +8395,8 @@ namespace {
 
       TypeChecker::checkParameterList(closure->getParameters(), closure);
 
-      auto &appliedWrappers = Rewriter.solution.appliedPropertyWrappers[closure];
-      return Rewriter.buildPropertyWrapperFnThunk(closure, closureFnType, closure,
-                                                  ConcreteDeclRef(), appliedWrappers);
+      return Rewriter.buildSingleCurryThunk(
+          closure, closure, Rewriter.cs.getConstraintLocator(closure));
     }
 
     /// Rewrite the function for the given solution.
