@@ -37,9 +37,41 @@ RewriteSystem::~RewriteSystem() {
                         Context.RuleTrieRootHistogram);
 }
 
+/// Initialize the rewrite system using rewrite rules built by the RuleBuilder.
+///
+/// - recordLoops: Whether this is a rewrite system built from user-written
+///   requirements, in which case we will perform minimization using rewrite
+///   loops recorded during completion.
+///
+/// - protos: If this is a rewrite system built from a protocol connected
+///   component, this contains the members of the protocol. For a rewrite
+///   system built from a generic signature, this is empty. Used by
+///   RewriteSystem::isInMinimizationDomain().
+///
+/// These parameters should be populated from the corresponding fields of the
+/// RuleBuilder instance:
+///
+/// - writtenRequirements: The user-written requirements, if any, used to
+///   track source locations for redundancy diagnostics.
+///
+/// - importedRules: Rewrite rules for referenced protocols. These come from
+///   the Requirement Machine instances for these protocols' connected
+///   components, so they are already confluent and can be imported verbatim.
+///
+/// - permanentRules: Permanent rules, such as associated type introduction
+///   rules for associated types defined in protocols in this connected
+///   component.
+///
+/// - requirementRules: Rules corresponding to generic requirements written
+///   by the user.
+///
+/// This can only be called once. It adds the rules to the rewrite system,
+/// allowing computeConfluentCompletion() to be called to compute the
+/// complete rewrite system.
 void RewriteSystem::initialize(
     bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
     ArrayRef<StructuralRequirement> writtenRequirements,
+    std::vector<Rule> &&importedRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
     std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>>
         &&requirementRules) {
@@ -50,6 +82,36 @@ void RewriteSystem::initialize(
   Protos = protos;
   WrittenRequirements = writtenRequirements;
 
+  // Pre-populate our rules vector with the list of imported rules, and note
+  // the position of the first local (not imported) rule.
+  Rules = std::move(importedRules);
+  FirstLocalRule = Rules.size();
+
+  // Add the imported rules to the trie.
+  for (unsigned newRuleID : indices(Rules)) {
+    const auto &newRule = Rules[newRuleID];
+    // Skip simplified rules. At the very least we need to skip RHS-simplified
+    // rules since their left hand sides might duplicate existing rules; the
+    // others are skipped purely as an optimization.
+    if (newRule.isLHSSimplified() ||
+        newRule.isRHSSimplified() ||
+        newRule.isSubstitutionSimplified())
+      continue;
+
+    auto oldRuleID = Trie.insert(newRule.getLHS().begin(),
+                                 newRule.getLHS().end(),
+                                 newRuleID);
+    if (oldRuleID) {
+      llvm::errs() << "Imported rules have duplicate left hand sides!\n";
+      llvm::errs() << "New rule #" << newRuleID << ": " << newRule << "\n";
+      const auto &oldRule = getRule(*oldRuleID);
+      llvm::errs() << "Old rule #" << *oldRuleID << ": " << oldRule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
+
+  // Now add our own rules.
   for (const auto &rule : permanentRules)
     addPermanentRule(rule.first, rule.second);
 

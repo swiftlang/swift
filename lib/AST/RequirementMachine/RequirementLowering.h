@@ -20,6 +20,7 @@
 #include <vector>
 #include "Diagnostics.h"
 #include "RewriteContext.h"
+#include "Rule.h"
 #include "Symbol.h"
 #include "Term.h"
 
@@ -92,6 +93,10 @@ struct RuleBuilder {
   /// rewrite system itself; those protocols are added directly instead of
   /// being imported.
   std::vector<const ProtocolDecl *> ProtocolsToImport;
+
+  /// The rules representing a complete rewrite system for the above vector,
+  /// pulled in by collectRulesFromReferencedProtocols().
+  std::vector<Rule> ImportedRules;
 
   /// New rules to add which will be marked 'permanent'. These are rules for
   /// introducing associated types, and relationships between layout,

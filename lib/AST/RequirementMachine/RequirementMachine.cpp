@@ -91,6 +91,7 @@ RequirementMachine::initWithProtocolSignatureRequirements(
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true, protos,
                     std::move(builder.WrittenRequirements),
+                    std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
@@ -137,6 +138,7 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   System.initialize(/*recordLoops=*/false,
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
                     std::move(builder.WrittenRequirements),
+                    std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
@@ -181,6 +183,7 @@ RequirementMachine::initWithProtocolWrittenRequirements(
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true, protos,
                     std::move(builder.WrittenRequirements),
+                    std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
@@ -229,6 +232,7 @@ RequirementMachine::initWithWrittenRequirements(
   System.initialize(/*recordLoops=*/true,
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
                     std::move(builder.WrittenRequirements),
+                    std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 

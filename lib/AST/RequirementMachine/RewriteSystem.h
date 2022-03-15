@@ -72,6 +72,8 @@ class RewriteSystem final {
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
 
+  unsigned FirstLocalRule = 0;
+
   /// A prefix trie of rule left hand sides to optimize lookup. The value
   /// type is an index into the Rules array defined above.
   Trie<unsigned, MatchKind::Shortest> Trie;
@@ -122,8 +124,10 @@ public:
 
   DebugOptions getDebugOptions() const { return Debug; }
 
-  void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
+  void initialize(bool recordLoops,
+                  ArrayRef<const ProtocolDecl *> protos,
                   ArrayRef<StructuralRequirement> writtenRequirements,
+                  std::vector<Rule> &&importedRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
                   std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
 
