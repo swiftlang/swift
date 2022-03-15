@@ -1259,6 +1259,103 @@ namespace {
       return thunk;
     }
 
+    /// Build a "{ self in { args in self.fn(args) } }" nested curry thunk.
+    ///
+    /// \param memberRef The expression to be called in the inner thunk by
+    /// consecutively applying the captured outer thunk's 'self' parameter and
+    /// the parameters of the inner thunk.
+    /// \param member The underlying function declaration to be called.
+    /// \param outerThunkTy The type of the outer thunk.
+    /// \param memberLocator The locator pinned on the member reference. If the
+    /// function has associated applied property wrappers, the locator is used
+    /// to pull them in.
+    AutoClosureExpr *
+    buildDoubleCurryThunk(DeclRefExpr *memberRef, ValueDecl *member,
+                          FunctionType *outerThunkTy,
+                          ConstraintLocatorBuilder memberLocator) {
+      auto &ctx = cs.getASTContext();
+
+      const auto selfThunkParam = outerThunkTy->getParams().front();
+      const auto selfThunkParamTy = selfThunkParam.getPlainType();
+
+      // Build the 'self' param for the outer thunk, "{ self in ... }".
+      auto *const selfParamDecl =
+          new (ctx) ParamDecl(SourceLoc(),
+                              /*argument label*/ SourceLoc(), Identifier(),
+                              /*parameter name*/ SourceLoc(), ctx.Id_self, dc);
+      selfParamDecl->setInterfaceType(selfThunkParamTy->mapTypeOutOfContext());
+      selfParamDecl->setSpecifier(
+          ParamDecl::getParameterSpecifierForValueOwnership(
+              selfThunkParam.getValueOwnership()));
+      selfParamDecl->setImplicit();
+
+      // Build a reference to the 'self' parameter.
+      Expr *selfParamRef = new (ctx) DeclRefExpr(selfParamDecl, DeclNameLoc(),
+                                                 /*implicit=*/true);
+      selfParamRef->setType(selfThunkParam.isInOut()
+                                ? LValueType::get(selfThunkParamTy)
+                                : selfThunkParamTy);
+      cs.cacheType(selfParamRef);
+
+      if (selfThunkParam.isInOut()) {
+        selfParamRef =
+            new (ctx) InOutExpr(SourceLoc(), selfParamRef, selfThunkParamTy,
+                                /*implicit=*/true);
+        cs.cacheType(selfParamRef);
+      }
+
+      const auto selfCalleeParam =
+          cs.getType(memberRef)->castTo<FunctionType>()->getParams().front();
+      const auto selfCalleeParamTy = selfCalleeParam.getPlainType();
+
+      // Open the 'self' parameter reference if warranted.
+      Expr *selfOpenedRef = selfParamRef;
+      if (selfCalleeParamTy->hasOpenedExistential()) {
+        // If we're opening an existential:
+        // - The type of 'ref' inside the thunk is written in terms of the
+        //   open existental archetype.
+        // - The type of the thunk is written in terms of the
+        //   erased existential bounds.
+        auto opaqueValueTy = selfCalleeParamTy;
+        if (selfCalleeParam.isInOut())
+          opaqueValueTy = LValueType::get(opaqueValueTy);
+
+        selfOpenedRef = new (ctx) OpaqueValueExpr(SourceLoc(), opaqueValueTy);
+        cs.cacheType(selfOpenedRef);
+
+        // If we're opening an existential and the thunk's 'self' parameter has
+        // non-trivial ownership, we must adjust the parameter reference type
+        // here, because the body will use the opaque value instead.
+        adjustExprOwnershipForParam(selfParamRef, selfThunkParam);
+      }
+
+      // The inner thunk, "{ args... in self.member(args...) }".
+      auto *const innerThunk = buildSingleCurryThunk(
+          selfOpenedRef, memberRef, cast<DeclContext>(member),
+          outerThunkTy->getResult()->castTo<FunctionType>(), memberLocator);
+
+      // Rewrite the body to close the existential if warranted.
+      if (selfCalleeParamTy->hasOpenedExistential()) {
+        auto *body = innerThunk->getSingleExpressionBody();
+        body = new (ctx) OpenExistentialExpr(
+            selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef), body,
+            body->getType());
+        cs.cacheType(body);
+
+        innerThunk->setBody(body);
+      }
+
+      // Finally, construct the outer thunk.
+      auto outerThunk = new (ctx) AutoClosureExpr(
+          innerThunk, outerThunkTy, AutoClosureExpr::InvalidDiscriminator, dc);
+      outerThunk->setThunkKind(AutoClosureExpr::Kind::DoubleCurryThunk);
+      outerThunk->setParameterList(
+          ParameterList::create(ctx, SourceLoc(), selfParamDecl, SourceLoc()));
+      cs.cacheType(outerThunk);
+
+      return outerThunk;
+    }
+
     /// Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, SourceLoc dotLoc,
                          SelectedOverload overload, DeclNameLoc memberLoc,
@@ -1597,65 +1694,10 @@ namespace {
                              ->castTo<FunctionType>();
         }
 
-        auto discriminator = AutoClosureExpr::InvalidDiscriminator;
-
-        // The outer closure.
-        //
-        //    let outerClosure = "{ self in \(closure) }"
-        auto selfParam = curryThunkTy->getParams()[0];
-        auto selfParamDecl = new (context) ParamDecl(
-            SourceLoc(),
-            /*argument label*/ SourceLoc(), Identifier(),
-            /*parameter name*/ SourceLoc(), context.Id_self,
-            dc);
-
-        auto selfParamTy = selfParam.getPlainType();
-        bool isLValue = selfParam.isInOut();
-
-        selfParamDecl->setInterfaceType(selfParamTy->mapTypeOutOfContext());
-        selfParamDecl->setSpecifier(
-          ParamDecl::getParameterSpecifierForValueOwnership(
-            selfParam.getValueOwnership()));
-        selfParamDecl->setImplicit();
-
-        auto *outerParams =
-            ParameterList::create(context, SourceLoc(), selfParamDecl,
-                                  SourceLoc());
-
-        // The inner closure.
-        //
-        //     let closure = "{ args... in self.member(args...) }"
-        auto selfFnTy = curryThunkTy->getResult()->castTo<FunctionType>();
-
-        Expr *selfParamRef =
-            new (context) DeclRefExpr(selfParamDecl, DeclNameLoc(),
-                                      /*implicit=*/true);
-
-        selfParamRef->setType(
-          isLValue ? LValueType::get(selfParamTy) : selfParamTy);
-        cs.cacheType(selfParamRef);
-
-        if (isLValue) {
-          selfParamRef =
-            new (context) InOutExpr(SourceLoc(), selfParamRef, selfParamTy,
-                                    /*implicit=*/true);
-          cs.cacheType(selfParamRef);
-        }
-
-        auto closure = buildCurryThunk(member, selfFnTy, selfParamRef, ref,
-                                       memberLocator);
-
-        auto outerClosure =
-            new (context) AutoClosureExpr(closure, selfFnTy, discriminator, dc);
-        outerClosure->setThunkKind(AutoClosureExpr::Kind::DoubleCurryThunk);
-
-        outerClosure->setParameterList(outerParams);
-        outerClosure->setType(curryThunkTy);
-        cs.cacheType(outerClosure);
-
         // Replace the DeclRefExpr with a closure expression which SILGen
         // knows how to emit.
-        ref = outerClosure;
+        ref = buildDoubleCurryThunk(declRefExpr, member, curryThunkTy,
+                                    memberLocator);
       }
 
       // If the member is a method with a dynamic 'Self' result type, wrap an
