@@ -169,6 +169,10 @@ public:
     FOREACH_IMPL_RETURN(getCalleeFunction());
   }
 
+  bool isCalleeDynamicallyReplaceable() const {
+    FOREACH_IMPL_RETURN(isCalleeDynamicallyReplaceable());
+  }
+
   /// Return the referenced function if the callee is a function_ref
   /// instruction.
   SILFunction *getReferencedFunctionOrNull() const {
