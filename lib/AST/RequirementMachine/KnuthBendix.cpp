@@ -301,7 +301,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
     ruleCount = Rules.size();
 
     // For every rule, looking for other rules that overlap with this rule.
-    for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
+    for (unsigned i = FirstLocalRule, e = Rules.size(); i < e; ++i) {
       const auto &lhs = getRule(i);
       if (lhs.isLHSSimplified() ||
           lhs.isRHSSimplified() ||

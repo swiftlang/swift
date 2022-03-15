@@ -337,7 +337,7 @@ bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
 void RewriteSystem::simplifyLeftHandSides() {
   assert(Complete);
 
-  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
     if (rule.isLHSSimplified())
       continue;
@@ -380,7 +380,7 @@ void RewriteSystem::simplifyLeftHandSides() {
 void RewriteSystem::simplifyRightHandSides() {
   assert(Complete);
 
-  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
     if (rule.isRHSSimplified())
       continue;
@@ -478,7 +478,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     abort(); \
   }
 
-  for (const auto &rule : Rules) {
+  for (const auto &rule : getLocalRules()) {
     const auto &lhs = rule.getLHS();
     const auto &rhs = rule.getRHS();
 
@@ -585,7 +585,8 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
   // Collect non-explicit requirements that are not redundant.
   llvm::SmallDenseSet<unsigned, 2> impliedRequirements;
 
-  for (unsigned ruleID : indices(getRules())) {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
+       ruleID < e; ++ruleID) {
     auto &rule = getRules()[ruleID];
 
     if (!rule.getRequirementID().hasValue() &&
