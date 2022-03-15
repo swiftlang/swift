@@ -87,7 +87,7 @@ public struct MissingRemoteCallVoidActorSystem: DistributedActorSystem {
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
 //  func remoteCallVoid<Act, Err>(
@@ -99,7 +99,7 @@ public struct MissingRemoteCallVoidActorSystem: DistributedActorSystem {
 //    where Act: DistributedActor,
 //          Act.ID == ActorID,
 //          Err: Error {
-//    throw ExecuteDistributedTargetError(message: "Not implemented.")
+//    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
 //  }
 }
 
@@ -177,7 +177,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
       }
       try await executeDistributedTarget(
         on: active,
-        mangledTargetName: target.mangledName,
+        target: target,
         invocationDecoder: invocation.makeDecoder(),
         handler: resultHandler
       )
@@ -224,7 +224,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
       }
       try await executeDistributedTarget(
         on: active,
-        mangledTargetName: target.mangledName,
+        target: target,
         invocationDecoder: invocation.makeDecoder(),
         handler: resultHandler
       )

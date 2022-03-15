@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeCodableForDistributedTests.swiftmodule -module-name FakeCodableForDistributedTests -disable-availability-checking %S/../Inputs/FakeCodableForDistributedTests.swift
-// RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeCodableForDistributedTests.swift -o %t/a.out
+// RUN: %target-build-swift -module-name main -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeCodableForDistributedTests.swift -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
@@ -304,7 +304,7 @@ func test() async throws {
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: emptyName,
+      target: RemoteCallTarget(emptyName),
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
@@ -312,7 +312,7 @@ func test() async throws {
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: helloName,
+      target: RemoteCallTarget(helloName),
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
@@ -320,7 +320,7 @@ func test() async throws {
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: answerName,
+      target: RemoteCallTarget(answerName),
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
@@ -328,7 +328,7 @@ func test() async throws {
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: largeResultName,
+      target: RemoteCallTarget(largeResultName),
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
@@ -336,7 +336,7 @@ func test() async throws {
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: enumResultName,
+      target: RemoteCallTarget(enumResultName),
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
@@ -350,7 +350,7 @@ func test() async throws {
   var echoDecoder = echoInvocation.makeDecoder()
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: echoName,
+      target: RemoteCallTarget(echoName),
       invocationDecoder: &echoDecoder,
       handler: FakeResultHandler()
   )
@@ -365,7 +365,7 @@ func test() async throws {
   var generic1Decoder = generic1Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: generic1Name,
+    target: RemoteCallTarget(generic1Name),
     invocationDecoder: &generic1Decoder,
     handler: FakeResultHandler()
   )
@@ -383,7 +383,7 @@ func test() async throws {
   var generic2Decoder = generic2Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: generic2Name,
+    target: RemoteCallTarget(generic2Name),
     invocationDecoder: &generic2Decoder,
     handler: FakeResultHandler()
   )
@@ -404,7 +404,7 @@ func test() async throws {
   var generic3Decoder = generic3Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: generic3Name,
+    target: RemoteCallTarget(generic3Name),
     invocationDecoder: &generic3Decoder,
     handler: FakeResultHandler()
   )
@@ -426,7 +426,7 @@ func test() async throws {
   var generic4Decoder = generic4Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: generic4Name,
+    target: RemoteCallTarget(generic4Name),
     invocationDecoder: &generic4Decoder,
     handler: FakeResultHandler()
   )
@@ -450,7 +450,7 @@ func test() async throws {
   var generic5Decoder = generic5Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: generic5Name,
+    target: RemoteCallTarget(generic5Name),
     invocationDecoder: &generic5Decoder,
     handler: FakeResultHandler()
   )
@@ -473,7 +473,7 @@ func test() async throws {
   var genericOptDecoder = genericOptInvocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: genericOptionalName,
+    target: RemoteCallTarget(genericOptionalName),
     invocationDecoder: &genericOptDecoder,
     handler: FakeResultHandler()
   )
@@ -488,7 +488,7 @@ func test() async throws {
   var decodeErrDecoder = decodeErrInvocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
-    mangledTargetName: expectsDecodeErrorName,
+    target: RemoteCallTarget(expectsDecodeErrorName),
     invocationDecoder: &decodeErrDecoder,
     handler: FakeResultHandler()
   )

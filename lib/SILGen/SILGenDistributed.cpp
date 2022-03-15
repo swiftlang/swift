@@ -43,8 +43,6 @@ using namespace Lowering;
 ///          or the subsequent cast to VarDecl failed.
 static VarDecl* lookupProperty(NominalTypeDecl *decl, DeclName name) {
   assert(decl && "decl was null");
-  auto &C = decl->getASTContext();
-  
   if (auto clazz = dyn_cast<ClassDecl>(decl)) {
     auto refs = decl->lookupDirect(name);
     if (refs.size() != 1)

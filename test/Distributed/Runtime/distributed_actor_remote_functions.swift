@@ -128,11 +128,11 @@ struct FakeActorSystem: DistributedActorSystem {
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    guard target.mangledName != "$s4main28SomeSpecificDistributedActorC24helloThrowsTransportBoomSSyYaKFTE" else {
+    guard "\(target)" != "main.SomeSpecificDistributedActor.helloThrowsTransportBoom()" else {
       throw Boom("system")
     }
 
-    return "remote(\(target.mangledName))" as! Res
+    return "remote(\(target))" as! Res
   }
 
   func remoteCallVoid<Act, Err>(
@@ -234,18 +234,12 @@ func test_remote_invoke(address: ActorAddress, system: FakeActorSystem) async {
   print("remote isRemote: \(__isRemoteActor(remote))")
   // CHECK: remote isRemote: true
   await check(actor: remote)
-  // TODO(distributed): remote - helloAsyncThrows: remote(_remote_impl_helloAsyncThrows())
-  // CHECK: remote - helloAsyncThrows: remote($s4main28SomeSpecificDistributedActorC16helloAsyncThrowsSSyYaKFTE)
-  // TODO(distributed): remote - helloAsync: remote()
-  // CHECK: remote - helloAsync: remote($s4main28SomeSpecificDistributedActorC10helloAsyncSSyYaKFTE)
-  // TODO(distributed): remote - helloThrows: remote(_remote_impl_helloThrows())
-  // CHECK: remote - helloThrows: remote($s4main28SomeSpecificDistributedActorC11helloThrowsSSyYaKFTE)
-  // TODO(distributed): remote - hello: remote(_remote_impl_hello())
-  // CHECK: remote - hello: remote($s4main28SomeSpecificDistributedActorC5helloSSyYaKFTE)
-  // TODO(distributed): remote - callTaskSelf: remote(_remote_impl_callTaskSelf())
-  // CHECK: remote - callTaskSelf: remote($s4main28SomeSpecificDistributedActorC12callTaskSelfSSyYaKFTE)
-  // TODO(distributed): remote - callDetachedSelf: remote(_remote_impl_callDetachedSelf())
-  // CHECK: remote - callDetachedSelf: remote($s4main28SomeSpecificDistributedActorC16callDetachedSelfSSyYaKFTE)
+  // CHECK: remote - helloAsyncThrows: remote(main.SomeSpecificDistributedActor.helloAsyncThrows())
+  // CHECK: remote - helloAsync: remote(main.SomeSpecificDistributedActor.helloAsync())
+  // CHECK: remote - helloThrows: remote(main.SomeSpecificDistributedActor.helloThrows())
+  // CHECK: remote - hello: remote(main.SomeSpecificDistributedActor.hello())
+  // CHECK: remote - callTaskSelf: remote(main.SomeSpecificDistributedActor.callTaskSelf())
+  // CHECK: remote - callDetachedSelf: remote(main.SomeSpecificDistributedActor.callDetachedSelf())
   // CHECK: remote - helloThrowsTransportBoom: Boom(whoFailed: "system")
 
   print(local)
