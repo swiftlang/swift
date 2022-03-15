@@ -167,7 +167,7 @@ static llvm::cl::opt<DebugOnlyPassNumberOpt, true,
               llvm::cl::location(DebugOnlyPassNumberOptLoc),
               llvm::cl::ValueRequired);
 
-static bool isFunctionSelectedForPrinting(SILFunction *F) {
+bool isFunctionSelectedForPrinting(SILFunction *F) {
   if (!SILPrintFunction.empty() && SILPrintFunction.end() ==
       std::find(SILPrintFunction.begin(), SILPrintFunction.end(), F->getName()))
     return false;
