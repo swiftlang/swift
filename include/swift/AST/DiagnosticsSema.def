@@ -5631,10 +5631,6 @@ WARNING(public_decl_needs_availability, none,
         "public declarations should have an availability attribute when building "
         "with -require-explicit-availability", ())
 
-ERROR(availability_macro_in_inlinable, none,
-      "availability macro cannot be used in inlinable %0",
-      (DescriptiveDeclKind))
-
 ERROR(attr_requires_decl_availability_for_platform,none,
       "'%0' requires that %1 have explicit availability for %2",
       (DeclAttribute, DeclName, StringRef))
@@ -5731,7 +5727,8 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "an '@inlinable' function|" \
   "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
-  "a property initializer in a '@frozen' type}"
+  "a property initializer in a '@frozen' type|" \
+  "a '@_backDeploy' function'}"
 
 #define DECL_OR_ACCESSOR "%select{%0|%0 for}"
 
@@ -5755,6 +5752,10 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "it is an SPI imported from %3|"
       "it is SPI}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
+
+ERROR(availability_macro_in_inlinable, none,
+      "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
+      (unsigned))
 
 #undef FRAGILE_FUNC_KIND
 
