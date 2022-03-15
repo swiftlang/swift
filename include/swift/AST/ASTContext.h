@@ -988,11 +988,11 @@ public:
   /// one.
   void loadExtensions(NominalTypeDecl *nominal, unsigned previousGeneration);
 
-  /// Load the methods within the given class that produce
+  /// Load the methods within the given type that produce
   /// Objective-C class or instance methods with the given selector.
   ///
-  /// \param classDecl The class in which we are searching for @objc methods.
-  /// The search only considers this class and its extensions; not any
+  /// \param tyDecl The type in which we are searching for @objc methods.
+  /// The search only considers this type and its extensions; not any
   /// superclasses.
   ///
   /// \param selector The selector to search for.
@@ -1010,7 +1010,11 @@ public:
   ///
   /// \param swiftOnly If true, only loads methods from imported Swift modules,
   /// skipping the Clang importer.
-  void loadObjCMethods(ClassDecl *classDecl, ObjCSelector selector,
+  ///
+  /// \note Passing a protocol is supported, but currently a no-op, because
+  /// Objective-C protocols cannot be extended in ways that make the ObjC method
+  /// lookup table relevant.
+  void loadObjCMethods(NominalTypeDecl *tyDecl, ObjCSelector selector,
                        bool isInstanceMethod, unsigned previousGeneration,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods,
                        bool swiftOnly = false);

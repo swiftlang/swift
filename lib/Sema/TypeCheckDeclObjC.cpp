@@ -2008,9 +2008,9 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
       }
     }
 
-    // Record the method in the class, if it's a member of one.
-    if (auto classDecl = D->getDeclContext()->getSelfClassDecl()) {
-      classDecl->recordObjCMethod(method, selector);
+    // Record the method in the type, if it's a member of one.
+    if (auto tyDecl = D->getDeclContext()->getSelfNominalTypeDecl()) {
+      tyDecl->recordObjCMethod(method, selector);
     }
 
     // Record the method in the source file.
@@ -2406,11 +2406,11 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
 /// Retrieve the source file for the given Objective-C member conflict.
 static TinyPtrVector<AbstractFunctionDecl *>
 getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
-  ClassDecl *classDecl = std::get<0>(conflict);
+  NominalTypeDecl *typeDecl = std::get<0>(conflict);
   ObjCSelector selector = std::get<1>(conflict);
   bool isInstanceMethod = std::get<2>(conflict);
 
-  return classDecl->lookupDirect(selector, isInstanceMethod);
+  return typeDecl->lookupDirect(selector, isInstanceMethod);
 }
 
 static ObjCAttr *getObjCAttrIfFromAccessNote(ValueDecl *VD) {
