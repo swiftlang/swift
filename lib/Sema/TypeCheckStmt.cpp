@@ -429,8 +429,8 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
     // Reject inlinable code using availability macros.
     PoundAvailableInfo *info = elt.getAvailability();
     if (auto *decl = dc->getAsDecl()) {
-      if (decl->getAttrs().hasAttribute<InlinableAttr>() ||
-          decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      auto fragileKind = dc->getFragileFunctionKind();
+      if (fragileKind.kind != FragileFunctionKind::None)
         for (auto queries : info->getQueries())
           if (auto availSpec =
                   dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
@@ -438,7 +438,7 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
               Context.Diags.diagnose(
                   availSpec->getMacroLoc(),
                   swift::diag::availability_macro_in_inlinable,
-                  decl->getDescriptiveKind());
+                  fragileKind.getSelector());
               break;
             }
     }
@@ -1754,8 +1754,7 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
     auto kind = ctor->getFragileFunctionKind();
     if (kind.kind != FragileFunctionKind::None) {
       ctor->diagnose(diag::class_designated_init_inlinable_resilient,
-                     classDecl->getDeclaredInterfaceType(),
-                     static_cast<unsigned>(kind.kind));
+                     classDecl->getDeclaredInterfaceType(), kind.getSelector());
     }
   }
 
