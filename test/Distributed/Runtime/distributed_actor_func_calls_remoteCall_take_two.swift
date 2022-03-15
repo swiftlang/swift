@@ -29,6 +29,12 @@ distributed actor Greeter {
   distributed func take(name: String, int: Int, clazz: SomeClass) {
     print("take: \(name), int: \(int), clazz: \(clazz)")
   }
+
+  distributed func params(param p1: String, param p2: Int) -> String {
+    let message = "params: p1: \(p1), p2: \(p2)"
+    print(message)
+    return message
+  }
 }
 
 func test() async throws {
@@ -40,8 +46,10 @@ func test() async throws {
   try await ref.take(name: "Caplin", int: 1337)
   // CHECK: >> remoteCallVoid: on:main.Greeter, target:main.Greeter.take(name:int:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Caplin", 1337], returnType: nil, errorType: nil), throwing:Swift.Never
 
-  // try await ref.take(name: "Caplin", int: 1337, clazz: .init()) // FIXME(distributed): crashes
+  try await ref.take(name: "Caplin", int: 1337, clazz: .init())
 
+  let r3 = try await ref.params(param: "one", param: 2)
+  print("r3 = \(r3)") // CHECK: r3 = params: p1: one, p2: 2
 }
 
 @main struct Main {
