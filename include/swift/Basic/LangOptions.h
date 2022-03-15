@@ -735,7 +735,7 @@ namespace swift {
 
     /// Enable experimental support for type inference through multi-statement
     /// closures.
-    bool EnableMultiStatementClosureInference = false;
+    bool EnableMultiStatementClosureInference = true;
 
     /// Enable experimental support for generic parameter inference in
     /// parameter positions from associated default expressions.
