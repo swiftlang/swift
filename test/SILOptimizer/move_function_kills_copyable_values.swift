@@ -227,10 +227,10 @@ public struct Pair {
 // have invalidated a part of pair. We can be less restrictive in the future.
 //
 // TODO: Why are we emitting two uses here.
-public func performMoveOnOneEltOfPair(_ p: __owned Pair) {
+public func performMoveOnOneEltOfPair(_ p: __owned Pair) { // expected-error {{'p' used after being moved}}
     let _ = p.z
-    let _ = _move(p.x) // expected-error {{_move applied to value that the compiler does not support checking}}
-    nonConsumingUse(p.y)
+    let _ = _move(p.x) // expected-note {{move here}}
+    nonConsumingUse(p.y) // expected-note 2 {{use here}}
 }
 
 public class KlassPair {

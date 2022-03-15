@@ -5060,6 +5060,13 @@ protected:
           SourceLoc nameLoc, Identifier name, DeclContext *dc,
           StorageIsMutable_t supportsMutation);
 
+protected:
+  // Only \c ParamDecl::setSpecifier is allowed to flip this - and it's also
+  // on the way out of that business.
+  void setIntroducer(Introducer value) {
+    Bits.VarDecl.Introducer = uint8_t(value);
+  }
+
 public:
   VarDecl(bool isStatic, Introducer introducer,
           SourceLoc nameLoc, Identifier name, DeclContext *dc)
@@ -5241,9 +5248,8 @@ public:
   
   /// Is this an immutable 'let' property?
   ///
-  /// If this is a ParamDecl, isLet() is true iff
-  /// getSpecifier() == Specifier::Default.
-  bool isLet() const { return getIntroducer() == Introducer::Let; }
+  /// For \c ParamDecl instances, using \c isImmutable is preferred.
+  bool isLet() const;
 
   /// Is this an "async let" property?
   bool isAsyncLet() const;
@@ -5261,10 +5267,6 @@ public:
 
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
-  }
-
-  void setIntroducer(Introducer value) {
-    Bits.VarDecl.Introducer = uint8_t(value);
   }
 
   CaptureListExpr *getParentCaptureList() const {

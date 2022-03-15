@@ -498,16 +498,27 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   return getterDecl;
 }
 
+static VarDecl::Introducer
+mapIntroducer(DerivedConformance::SynthesizedIntroducer intro) {
+  switch (intro) {
+  case DerivedConformance::SynthesizedIntroducer::Let:
+    return VarDecl::Introducer::Let;
+  case DerivedConformance::SynthesizedIntroducer::Var:
+    return VarDecl::Introducer::Var;
+  }
+  llvm_unreachable("Invalid synthesized introducer!");
+}
+
 std::pair<VarDecl *, PatternBindingDecl *>
-DerivedConformance::declareDerivedProperty(Identifier name,
+DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
+                                           Identifier name,
                                            Type propertyInterfaceType,
                                            Type propertyContextType,
                                            bool isStatic, bool isFinal) {
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (Context)
-      VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
-              SourceLoc(), name, parentDC);
+  VarDecl *propDecl = new (Context) VarDecl(
+      /*IsStatic*/ isStatic, mapIntroducer(intro), SourceLoc(), name, parentDC);
   propDecl->setImplicit();
   propDecl->setSynthesized();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
