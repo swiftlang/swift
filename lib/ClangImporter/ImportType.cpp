@@ -30,6 +30,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeVisitor.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
@@ -1733,6 +1734,197 @@ ImportedType ClangImporter::Implementation::importPropertyType(
                     Bridgeability::Full, optionality);
 }
 
+namespace {
+
+class GetSendableType :
+    private TypeVisitor<GetSendableType, std::pair<Type, bool>> {
+  ASTContext &ctx;
+
+public:
+  GetSendableType(ASTContext &ctx) : ctx(ctx) {}
+
+  /// The result of a conversion. Contains the converted type and a \c bool that
+  /// is \c true if the operation found something to change, or \c false
+  /// otherwise.
+  using Result = std::pair<Type, /*found=*/bool>;
+
+  /// Returns a modified version of \p type that has been made explicitly
+  /// \c Sendable by adding an \c \@Sendable attribute to a function type
+  /// or forming a protocol composition with \c & \c Sendable.
+  Result convert(Type type) { return visit(type); }
+
+private:
+  /// Decide how to represent the given type in a protocol composition. This
+  /// is specialized for \c ProtocolCompositionType to avoid nesting
+  /// compositions.
+  ///
+  /// \param members The types to include in the composition.
+  /// \return \c true if the composition should include \c AnyObject, \c false
+  ///         otherwise.
+  bool getAsComposition(ProtocolCompositionType *ty,
+                        SmallVectorImpl<Type> &members) {
+    llvm::append_range(members, ty->getMembers());
+    return ty->hasExplicitAnyObject();
+  }
+
+  /// Decide how to represent the given type in a protocol composition. This
+  /// is specialized for \c ProtocolCompositionType to avoid nesting
+  /// compositions.
+  ///
+  /// \param members The types to include in the composition.
+  /// \return \c true if the composition should include \c AnyObject, \c false
+  ///         otherwise.
+  bool getAsComposition(TypeBase *ty, SmallVectorImpl<Type> &members) {
+    members.push_back(ty);
+    return false;
+  }
+
+  // MARK: Visitor Actions
+
+  /// Visitor action: Replace this type with a protocol composition that
+  /// includes \c Sendable.
+  template <typename Ty> Result compose(Ty *ty) {
+    SmallVector<Type, 8> members;
+    bool explicitAnyObject = getAsComposition(ty, members);
+
+    auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
+    members.push_back(proto->getDeclaredInterfaceType());
+
+    return {
+      ProtocolCompositionType::get(ctx, members, explicitAnyObject), true };
+  }
+
+  /// Visitor action: Recurse into the children of this type and try to add
+  /// \c Sendable to them.
+  Result recurse(Type ty) {
+    bool anyFound = false;
+
+    Type newTy = ty.transformRec([&](TypeBase *childTy) -> Optional<Type> {
+      // We want to visit the first level of children.
+      if (childTy == ty.getPointer())
+        return None;
+
+      auto result = this->visit(childTy);
+      anyFound |= result.second;
+      return result.first;
+    });
+
+    return { newTy, anyFound };
+  }
+
+  /// Visitor action: Ignore this type; do not modify it and do not recurse into
+  /// it to find other types to modify.
+  Result pass(Type ty, bool found = false) {
+    return { ty, found };
+  }
+
+  // Macros to define visitors based on these actions.
+#define VISIT(CLASS, ACT)  Result visit##CLASS(CLASS *ty) { return ACT(ty); }
+#define NEVER_VISIT(CLASS) Result visit##CLASS(CLASS *ty) { \
+    llvm_unreachable("can't have " #CLASS " in imported clang type"); \
+    return pass(ty); \
+  }
+
+  // MARK: Visitors
+
+  friend TypeVisitor<GetSendableType, Result>;
+
+  Result visitErrorType(ErrorType *ty) {
+    // Pass, but suppress diagnostic about not finding anything `Sendable`.
+    return pass(ty, /*found=*/true);
+  }
+
+  NEVER_VISIT(UnresolvedType)
+  NEVER_VISIT(PlaceholderType)
+  NEVER_VISIT(BuiltinType)
+
+  VISIT(TupleType, recurse)
+
+  NEVER_VISIT(ReferenceStorageType)
+
+  VISIT(EnumType, pass)
+  VISIT(StructType, pass)
+  VISIT(ClassType, compose)
+  VISIT(ProtocolType, compose)
+
+  Result visitBoundGenericType(BoundGenericType *ty) {
+    assert(!isa<BoundGenericClassType>(ty) && "classes handled elsewhere");
+
+    // These types are produced during bridging and have conditional
+    // conformances to Sendable depending on their generic parameters, so we
+    // want to make their generic parameters `Sendable`.
+    if (ty->isOptional() || ty->isArray() || ty->isSet() ||
+        ty->isDictionary())
+      return recurse(ty);
+
+    // Other non-class generic types (e.g. pointers) cannot be made Sendable.
+    return pass(ty);
+  }
+
+  VISIT(BoundGenericClassType, compose)
+  NEVER_VISIT(UnboundGenericType)
+
+  VISIT(AnyMetatypeType, recurse)
+
+  VISIT(ModuleType, pass)
+  VISIT(DynamicSelfType, pass)
+
+  NEVER_VISIT(SubstitutableType)
+  NEVER_VISIT(DependentMemberType)
+
+  Result visitAnyFunctionType(AnyFunctionType *ty) {
+    auto newFn = applyToFunctionType(ty, [](ASTExtInfo extInfo) {
+      return extInfo.withConcurrent();
+    });
+    return { newFn, true };
+  }
+
+  NEVER_VISIT(SILFunctionType)
+  NEVER_VISIT(SILBlockStorageType)
+  NEVER_VISIT(SILBoxType)
+  NEVER_VISIT(SILTokenType)
+
+  VISIT(ProtocolCompositionType, compose)
+
+  // ProtocolCompositionType doesn't handle ParameterizedProtocolType
+  // correctly, but we currently never import anything with it, so forbid it
+  // until we find we need it.
+  NEVER_VISIT(ParameterizedProtocolType)
+
+  VISIT(ExistentialType, recurse)
+  NEVER_VISIT(LValueType)
+  VISIT(InOutType, recurse)
+
+  NEVER_VISIT(PackType)
+  NEVER_VISIT(PackExpansionType)
+  NEVER_VISIT(TypeVariableType)
+
+  VISIT(SugarType, recurse)
+
+  Result visitTypeAliasType(TypeAliasType *ty) {
+    // Try converting the underlying type.
+    Type underlying = ty->getSinglyDesugaredType();
+    auto result = visit(underlying);
+
+    // If nothing that could be made Sendable was found in the underlying type,
+    // keep the sugar.
+    if (!result.second)
+      return pass(ty);
+
+    // If something Sendable-capable *was* found but the operation was a no-op,
+    // keep the sugar but indicate that we did find something to avoid a
+    // diagnostic.
+    if (result.first->getCanonicalType() == underlying->getCanonicalType())
+      return pass(ty, /*found=*/true);
+
+    // We found something and it did change the type. Desugar to the converted
+    // underlying type.
+    return result;
+  }
+};
+
+} // anonymous namespace
+
 Type ClangImporter::Implementation::applyParamAttributes(
     const clang::ParmVarDecl *param, Type type, bool sendableByDefault) {
   bool sendableRequested = sendableByDefault;
@@ -1780,9 +1972,23 @@ Type ClangImporter::Implementation::applyParamAttributes(
   }
 
   if (!sendableDisqualified && sendableRequested) {
-    type = applyToFunctionType(type, [](ASTExtInfo extInfo) {
-      return extInfo.withConcurrent();
-    });
+    bool changed;
+    std::tie(type, changed) = GetSendableType(SwiftContext).convert(type);
+
+    // Diagnose if we couldn't find a place to add `Sendable` to the type.
+    if (!changed) {
+      auto parentDecl = cast<clang::Decl>(param->getDeclContext());
+
+      addImportDiagnostic(parentDecl,
+          Diagnostic(diag::clang_param_ignored_sendable_attr,
+                     param->getName(), type),
+          param->getLocation());
+
+      if (sendableByDefault)
+        addImportDiagnostic(parentDecl,
+            Diagnostic(diag::clang_param_should_be_implicitly_sendable),
+            param->getLocation());
+    }
   }
 
   return type;
