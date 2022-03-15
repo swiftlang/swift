@@ -31,7 +31,7 @@ This status table describes which of the following C++ language features can be 
 | Typedefs / Type aliases                     | Yes    |
 | Global Variables                            | Yes    |
 | Namespaces                                  | Yes    |
-| Inline Namespaces                           | Yes, with some known issues |
+| Inline Namespaces                           | Yes, with some known issues (https://bugs.swift.org/browse/SR-15956) |
 | Exceptions                                  | No  |
 | Fields                                      | Yes |
 | Member functions                            | Yes. Some value category overloads aren't imported |
@@ -54,8 +54,8 @@ The following C++ code patterns or language features have specific mappings to S
 
 | **C++ Language Feature**                             | **Imported Into Swift**                                                                  |
 |------------------------------------------------------|------------------------------------------------------------------------------------------|
-| `get`/`set` member functions                         | Imported as computed property (since Swift-5.7)                                          |
-| `const`/non-`const` member function overload set     | Both overloads are imported as a method, with non-`const` method being renamed to `mutating…`. (since Swift-5.7). This will change in a future version of Swift                        |
+| `get`/`set` member functions                         | Imported as computed property (starting from Swift-5.7)                                          |
+| `const`/non-`const` member function overload set     | Both overloads are imported as a method, with non-`const` method being renamed to `mutating…` (starting from Swift-5.7). The renaming logic will change in a future version of Swift, and non-`const` methods won't be renamed |
 
 
 Unless stated otherwise (i.e., imported reference types) all Swift features work with imported types. For example: use in generic contexts, protocol conformance, extensions, etc.
@@ -63,15 +63,14 @@ Unless stated otherwise (i.e., imported reference types) all Swift features work
 
 ### C++ Standard Library Support
 
-Libc++ can be imported and used from Swift.
+Parts of libc++ can be imported and used from Swift.
 
-This status table describes which of the following C++ standard library features have some experimental support for using them in Swift:
+This status table describes which of the following C++ standard library features have some experimental support for using them in Swift. Please note that this is not a comprehensive list and other libc++ APIs that use the above supported C++ language features could be imported into Swift.
 
 | **C++ Standard Library Feature**   | **Can Be Used From Swift**                   |
 |------------------------------------|----------------------------------------------|
 | `std::string`                      | Yes                                          |
 | `std::vector`                      | Yes                                          |
-
 
 ## Known Issues
 
