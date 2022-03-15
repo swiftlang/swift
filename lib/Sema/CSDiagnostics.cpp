@@ -2351,7 +2351,9 @@ bool ContextualFailure::diagnoseAsError() {
     if (isExpr<OptionalTryExpr>(anchor) ||
         isExpr<OptionalEvaluationExpr>(anchor)) {
       auto objectType = fromType->getOptionalObjectType();
-      if (objectType->isEqual(toType)) {
+      // Cannot assume that `fromType` is always optional here since
+      // it could assume a type from context.
+      if (objectType && objectType->isEqual(toType)) {
         MissingOptionalUnwrapFailure failure(getSolution(), getType(anchor),
                                              toType,
                                              getConstraintLocator(anchor));
