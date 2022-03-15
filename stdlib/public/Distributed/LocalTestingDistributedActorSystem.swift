@@ -45,7 +45,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   public typealias InvocationDecoder = LocalTestingInvocationDecoder
   public typealias SerializationRequirement = Codable
 
-  private var activeActors: [ActorID: DistributedActor] = [:]
+  private var activeActors: [ActorID: any DistributedActor] = [:]
   private let activeActorsLock = _Lock()
 
   private var idProvider: ActorIDProvider = ActorIDProvider()
