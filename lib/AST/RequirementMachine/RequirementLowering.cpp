@@ -33,6 +33,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/SmallVector.h"
+#include "RequirementMachine.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
 #include "Symbol.h"
@@ -1403,21 +1404,32 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
   // if this is a rewrite system for a connected component of the protocol
   // dependency graph, add rewrite rules for each referenced protocol not part
   // of this connected component.
+
+  // First, collect all unique requirement machines, one for each connected
+  // component of each referenced protocol.
+  llvm::DenseSet<RequirementMachine *> machines;
+
+  // Now visit each subordinate requirement machine pull in its rules.
   for (auto *proto : ProtocolsToImport) {
+    // This will trigger requirement signature computation for this protocol,
+    // if neccessary, which will cause us to re-enter into a new RuleBuilder
+    // instace under RuleBuilder::initWithProtocolWrittenRequirements().
     if (Dump) {
-      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
+      llvm::dbgs() << "importing protocol " << proto->getName() << " {\n";
     }
 
-    addPermanentProtocolRules(proto);
-
-    auto reqs = proto->getRequirementSignature();
-    for (auto req : reqs.getRequirements())
-      addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
-    for (auto alias : reqs.getTypeAliases())
-      addTypeAlias(alias, proto);
-
-    if (Dump) {
-      llvm::dbgs() << "}\n";
+    auto *machine = Context.getRequirementMachine(proto);
+    if (!machines.insert(machine).second) {
+      // We've already seen this connected component.
+      continue;
     }
+
+    // We grab the machine's local rules, not *all* of its rules, to avoid
+    // duplicates in case multiple machines share a dependency on a downstream
+    // protocol connected component.
+    auto localRules = machine->getLocalRules();
+    ImportedRules.insert(ImportedRules.end(),
+                         localRules.begin(),
+                         localRules.end());
   }
 }
