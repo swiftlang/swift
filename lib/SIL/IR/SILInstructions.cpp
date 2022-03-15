@@ -75,7 +75,7 @@ static void buildTypeDependentOperands(
     bool hasDynamicSelf, SmallVectorImpl<SILValue> &TypeDependentOperands,
     SILFunction &F) {
 
-  for (const auto archetype : RootOpenedArchetypes) {
+  for (const auto &archetype : RootOpenedArchetypes) {
     SILValue def = F.getModule().getRootOpenedArchetypeDef(archetype, &F);
     assert(def->getFunction() == &F &&
            "def of root opened archetype is in wrong function");

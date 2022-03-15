@@ -125,7 +125,8 @@ public:
       phiArg->getIncomingPhiValues(pointerWorklist);
   }
 
-  void visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper) {
+  void visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper,
+                        AccessStorageCast) {
     // Allow conversions to/from pointers and addresses on disjoint phi paths
     // only if the underlying useDefVisitor allows it.
     if (storageCastTy == IgnoreStorageCast)
@@ -209,7 +210,8 @@ public:
     return this->asImpl().visitNonAccess(phiArg);
   }
 
-  SILValue visitStorageCast(SingleValueInstruction *, Operand *sourceAddr) {
+  SILValue visitStorageCast(SingleValueInstruction *, Operand *sourceAddr,
+                            AccessStorageCast cast) {
     assert(storageCastTy == IgnoreStorageCast);
     return sourceAddr->get();
   }
@@ -331,11 +333,12 @@ public:
   }
 
   // Override visitStorageCast to avoid seeing through arbitrary address casts.
-  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceAddr) {
+  SILValue visitStorageCast(SingleValueInstruction *svi, Operand *sourceAddr,
+                            AccessStorageCast cast) {
     if (storageCastTy == StopAtStorageCast)
-      return visitNonAccess(cast);
+      return visitNonAccess(svi);
 
-    return SuperTy::visitStorageCast(cast, sourceAddr);
+    return SuperTy::visitStorageCast(svi, sourceAddr, cast);
   }
 };
 
@@ -1062,11 +1065,13 @@ namespace {
 // AccessStorage object for all projection paths.
 class FindAccessStorageVisitor
     : public FindAccessVisitorImpl<FindAccessStorageVisitor> {
+  using SuperTy = FindAccessVisitorImpl<FindAccessStorageVisitor>;
 
 public:
   struct Result {
     Optional<AccessStorage> storage;
     SILValue base;
+    Optional<AccessStorageCast> seenCast;
   };
 
 private:
@@ -1102,6 +1107,8 @@ public:
   // may be multiple global_addr bases for identical storage.
   SILValue getBase() const { return result.base; }
 
+  Optional<AccessStorageCast> getCast() const { return result.seenCast; }
+
   // MARK: AccessPhiVisitor::UseDefVisitor implementation.
 
   // A valid result requires valid storage, but not a valid base.
@@ -1128,22 +1135,41 @@ public:
     invalidateResult();
     return SILValue();
   }
+
+  SILValue visitStorageCast(SingleValueInstruction *svi, Operand *sourceOper,
+                            AccessStorageCast cast) {
+    result.seenCast = result.seenCast ? std::max(*result.seenCast, cast) : cast;
+    return SuperTy::visitStorageCast(svi, sourceOper, cast);
+  }
 };
 
 } // end anonymous namespace
 
+RelativeAccessStorageWithBase
+RelativeAccessStorageWithBase::compute(SILValue address) {
+  FindAccessStorageVisitor visitor(NestedAccessType::IgnoreAccessBegin);
+  visitor.findStorage(address);
+  return {
+      address, {visitor.getStorage(), visitor.getBase()}, visitor.getCast()};
+}
+
+RelativeAccessStorageWithBase
+RelativeAccessStorageWithBase::computeInScope(SILValue address) {
+  FindAccessStorageVisitor visitor(NestedAccessType::StopAtAccessBegin);
+  visitor.findStorage(address);
+  return {
+      address, {visitor.getStorage(), visitor.getBase()}, visitor.getCast()};
+}
+
 AccessStorageWithBase
 AccessStorageWithBase::compute(SILValue sourceAddress) {
-  FindAccessStorageVisitor visitor(NestedAccessType::IgnoreAccessBegin);
-  visitor.findStorage(sourceAddress);
-  return {visitor.getStorage(), visitor.getBase()};
+  return RelativeAccessStorageWithBase::compute(sourceAddress).storageWithBase;
 }
 
 AccessStorageWithBase
 AccessStorageWithBase::computeInScope(SILValue sourceAddress) {
-  FindAccessStorageVisitor visitor(NestedAccessType::StopAtAccessBegin);
-  visitor.findStorage(sourceAddress);
-  return {visitor.getStorage(), visitor.getBase()};
+  return RelativeAccessStorageWithBase::computeInScope(sourceAddress)
+      .storageWithBase;
 }
 
 AccessStorage AccessStorage::compute(SILValue sourceAddress) {
@@ -1355,6 +1381,36 @@ AccessPathWithBase AccessPathWithBase::computeInScope(SILValue address) {
   return AccessPathVisitor(address->getModule(),
                            NestedAccessType::StopAtAccessBegin)
       .findAccessPath(address);
+}
+
+void swift::visitProductLeafAccessPathNodes(
+    SILValue address, TypeExpansionContext tec, SILModule &module,
+    std::function<void(AccessPath::PathNode, SILType)> visitor) {
+  SmallVector<std::pair<SILType, IndexTrieNode *>, 32> worklist;
+  auto rootPath = AccessPath::compute(address);
+  auto *node = rootPath.getPathNode().node;
+  worklist.push_back({address->getType(), node});
+  while (!worklist.empty()) {
+    auto pair = worklist.pop_back_val();
+    auto silType = pair.first;
+    auto *node = pair.second;
+    if (auto tupleType = silType.getAs<TupleType>()) {
+      for (unsigned index : indices(tupleType->getElements())) {
+        auto *elementNode = node->getChild(index);
+        worklist.push_back({silType.getTupleElementType(index), elementNode});
+      }
+    } else if (auto *decl = silType.getStructOrBoundGenericStruct()) {
+      unsigned index = 0;
+      for (auto *field : decl->getStoredProperties()) {
+        auto *fieldNode = node->getChild(index);
+        worklist.push_back(
+            {silType.getFieldType(field, module, tec), fieldNode});
+        ++index;
+      }
+    } else {
+      visitor(AccessPath::PathNode(node), silType);
+    }
+  }
 }
 
 void AccessPath::Index::print(raw_ostream &os) const {
