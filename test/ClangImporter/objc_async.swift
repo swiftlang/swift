@@ -295,4 +295,57 @@ func check() async {
   _ = await BazFrame(size: 0)
 }
 
+func testSender(
+  sender: NXSender,
+  sendableObject: SendableClass,
+  nonSendableObject: NonSendableClass,
+  sendableSubclassOfNonSendableObject: NonSendableClass & Sendable,
+  sendableProtos: LabellyProtocol & ObjCClub & Sendable,
+  nonSendableProtos: LabellyProtocol & ObjCClub,
+  sendableGeneric: GenericObject<SendableClass> & Sendable,
+  nonSendableGeneric: GenericObject<SendableClass>,
+  ptr: UnsafeMutableRawPointer,
+  stringArray: [String]
+) {
+  sender.sendAny(sendableObject)
+  sender.sendAny(nonSendableObject)
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
+
+  sender.sendOptionalAny(sendableObject)
+  sender.sendOptionalAny(nonSendableObject)
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
+
+  sender.sendSendable(sendableObject)
+
+  sender.sendSendableSubclasses(nonSendableObject)
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
+  sender.sendSendableSubclasses(sendableSubclassOfNonSendableObject)
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
+  // FIXME(rdar://89992569): Should allow for the possibility that NonSendableClass will have a Sendable subclass
+
+  sender.sendProto(sendableProtos)
+  sender.sendProto(nonSendableProtos)
+  // expected-error@-1 {{argument type 'any LabellyProtocol & ObjCClub' does not conform to expected type 'Sendable'}}
+  // FIXME(rdar://89992095): Should be a warning because we're in -warn-concurrency
+
+  sender.sendProtos(sendableProtos)
+  sender.sendProtos(nonSendableProtos)
+  // expected-error@-1 {{argument type 'any LabellyProtocol & ObjCClub' does not conform to expected type 'Sendable'}}
+  // FIXME(rdar://89992095): Should be a warning because we're in -warn-concurrency
+
+  sender.sendAnyArray([sendableObject])
+  sender.sendAnyArray([nonSendableObject])
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
+
+  sender.sendGeneric(sendableGeneric)
+  // expected-warning@-1 {{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
+  // FIXME(rdar://89992569): Should allow for the possibility that GenericObject will have a Sendable subclass
+  sender.sendGeneric(nonSendableGeneric)
+  // expected-error@-1 {{argument type 'GenericObject<SendableClass>' does not conform to expected type 'Sendable'}}
+  // FIXME(rdar://89992095): Should be a warning because we're in -warn-concurrency
+
+  sender.sendPtr(ptr)
+  sender.sendStringArray(stringArray)
+}
+
 } // SwiftStdlib 5.5

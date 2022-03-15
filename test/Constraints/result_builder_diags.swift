@@ -78,7 +78,7 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   static func buildDo<T>(_ value: T) -> T { return value }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note {{in call to function 'tuplify(_:body:)'}}
   print(body(cond))
 }
 
@@ -307,21 +307,6 @@ struct MyTuplifiedStruct {
   }
 }
 
-func test_invalid_return_type_in_body() {
-  tuplify(true) { _ -> (Void, Int) in
-    tuplify(false) { condition in
-      if condition {
-        return 42 // expected-error {{cannot use explicit 'return' statement in the body of result builder 'TupleBuilder'}}
-        // expected-note@-1 {{remove 'return' statements to apply the result builder}} {{9-16=}}
-      } else {
-        1
-      }
-    }
-
-    42
-  }
-}
-
 // Check that we're performing syntactic use diagnostics.
 func acceptMetatype<T>(_: T.Type) -> Bool { true }
 
@@ -481,7 +466,7 @@ struct TestConstraintGenerationErrors {
   func buildTupleClosure() {
     tuplify(true) { _ in
       let a = nothing // expected-error {{cannot find 'nothing' in scope}}
-      String(nothing)
+      String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
   }
 }
@@ -522,7 +507,7 @@ enum E3 {
 }
 
 func testCaseMutabilityMismatches(e: E3) {
-    tuplify(true) { c in
+   tuplify(true) { c in // expected-error {{generic parameter 'T' could not be inferred}}
     "testSwitch"
     switch e {
     case .a(let x, var y),
