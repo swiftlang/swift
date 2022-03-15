@@ -165,7 +165,8 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      C.Id_rawValue, rawInterfaceType, rawType, /*isStatic=*/false,
+      DerivedConformance::SynthesizedIntroducer::Var, C.Id_rawValue,
+      rawInterfaceType, rawType, /*isStatic=*/false,
       /*isFinal=*/false);
 
   // Define the getter.

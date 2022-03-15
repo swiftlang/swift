@@ -97,6 +97,7 @@ deriveBridgedNSError_enum_nsErrorDomain(
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
+      DerivedConformance::SynthesizedIntroducer::Var,
       derived.Context.Id_nsErrorDomain, stringTy, stringTy, /*isStatic=*/true,
       /*isFinal=*/true);
 

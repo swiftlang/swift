@@ -112,11 +112,9 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      C.Id_id,
-      propertyType, propertyType,
+      DerivedConformance::SynthesizedIntroducer::Let, C.Id_id, propertyType,
+      propertyType,
       /*isStatic=*/false, /*isFinal=*/true);
-
-  propDecl->setIntroducer(VarDecl::Introducer::Let);
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
@@ -143,11 +141,9 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      C.Id_actorSystem,
+      DerivedConformance::SynthesizedIntroducer::Let, C.Id_actorSystem,
       propertyType, propertyType,
       /*isStatic=*/false, /*isFinal=*/true);
-
-  propDecl->setIntroducer(VarDecl::Introducer::Let);
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
