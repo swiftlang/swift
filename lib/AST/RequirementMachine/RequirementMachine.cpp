@@ -91,7 +91,7 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
-  builder.addRequirements(sig.getRequirements());
+  builder.initWithGenericSignatureRequirements(sig.getRequirements());
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
@@ -135,7 +135,7 @@ RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
   }
 
   RuleBuilder builder(Context, System.getReferencedProtocols());
-  builder.addProtocols(protos);
+  builder.initWithProtocolWrittenRequirements(protos);
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true, protos,
@@ -182,7 +182,7 @@ RequirementMachine::initWithWrittenRequirements(
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
-  builder.addRequirements(requirements);
+  builder.initWithWrittenRequirements(requirements);
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,

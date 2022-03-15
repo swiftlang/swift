@@ -1047,7 +1047,13 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
 // Building rewrite rules from desugared requirements.
 //
 
-void RuleBuilder::addRequirements(ArrayRef<Requirement> requirements) {
+/// For building a rewrite system for a generic signature from canonical
+/// requirements.
+void RuleBuilder::initWithGenericSignatureRequirements(
+    ArrayRef<Requirement> requirements) {
+  assert(!Initialized);
+  Initialized = 1;
+
   // Collect all protocols transitively referenced from these requirements.
   for (auto req : requirements) {
     if (req.getKind() == RequirementKind::Conformance) {
@@ -1062,7 +1068,13 @@ void RuleBuilder::addRequirements(ArrayRef<Requirement> requirements) {
     addRequirement(req, /*proto=*/nullptr, /*requirementID=*/None);
 }
 
-void RuleBuilder::addRequirements(ArrayRef<StructuralRequirement> requirements) {
+/// For building a rewrite system for a generic signature from user-written
+/// requirements.
+void RuleBuilder::initWithWrittenRequirements(
+    ArrayRef<StructuralRequirement> requirements) {
+  assert(!Initialized);
+  Initialized = 1;
+
   // Collect all protocols transitively referenced from these requirements.
   for (auto req : requirements) {
     if (req.req.getKind() == RequirementKind::Conformance) {
@@ -1080,7 +1092,11 @@ void RuleBuilder::addRequirements(ArrayRef<StructuralRequirement> requirements) 
 /// For building a rewrite system for a protocol connected component from
 /// user-written requirements. Used when actually building requirement
 /// signatures.
-void RuleBuilder::addProtocols(ArrayRef<const ProtocolDecl *> protos) {
+void RuleBuilder::initWithProtocolWrittenRequirements(
+    ArrayRef<const ProtocolDecl *> protos) {
+  assert(!Initialized);
+  Initialized = 1;
+
   for (auto *proto : protos) {
     ReferencedProtocols.insert(proto);
   }

@@ -111,16 +111,21 @@ struct RuleBuilder {
 
   /// Enables debugging output. Controlled by the -dump-requirement-machine
   /// frontend flag.
-  bool Dump;
+  unsigned Dump : 1;
+
+  /// Used to ensure the initWith*() methods are only called once.
+  unsigned Initialized : 1;
 
   RuleBuilder(RewriteContext &ctx,
               llvm::DenseSet<const ProtocolDecl *> &referencedProtocols)
-      : Context(ctx), ReferencedProtocols(referencedProtocols),
-        Dump(ctx.getASTContext().LangOpts.DumpRequirementMachine) {}
+      : Context(ctx), ReferencedProtocols(referencedProtocols) {
+    Dump = ctx.getASTContext().LangOpts.DumpRequirementMachine;
+    Initialized = 0;
+  }
 
-  void addRequirements(ArrayRef<Requirement> requirements);
-  void addRequirements(ArrayRef<StructuralRequirement> requirements);
-  void addProtocols(ArrayRef<const ProtocolDecl *> proto);
+  void initWithGenericSignatureRequirements(ArrayRef<Requirement> requirements);
+  void initWithWrittenRequirements(ArrayRef<StructuralRequirement> requirements);
+  void initWithProtocolWrittenRequirements(ArrayRef<const ProtocolDecl *> proto);
   void addReferencedProtocol(const ProtocolDecl *proto);
   void collectRulesFromReferencedProtocols();
 
