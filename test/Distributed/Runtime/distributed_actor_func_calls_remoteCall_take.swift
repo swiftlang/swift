@@ -32,7 +32,7 @@ func test() async throws {
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   try await ref.take(name: "Caplin")
-  // CHECK: >> remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC4take4nameySS_tYaKFTE"), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Caplin"], returnType: nil, errorType: nil), throwing:Swift.Never
+  // CHECK: >> remoteCallVoid: on:main.Greeter, target:main.Greeter.take(name:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Caplin"], returnType: nil, errorType: nil), throwing:Swift.Never
   // CHECK: take: Caplin
 
 }

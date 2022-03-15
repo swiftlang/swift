@@ -1101,6 +1101,15 @@ swift_getTypeName(const Metadata *type, bool qualified);
 ///   -> (UnsafePointer<UInt8>, Int)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 TypeNamePair
+swift_getFunctionFullNameFromMangledName(
+        const char *mangledNameStart, uintptr_t mangledNameLength);
+
+/// Return the human-readable full name of the mangled function name passed in.
+/// func _getMangledTypeName(_ mangledName: UnsafePointer<UInt8>,
+///                          mangledNameLength: UInt)
+///   -> (UnsafePointer<UInt8>, Int)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+TypeNamePair
 swift_getMangledTypeName(const Metadata *type);
 
 } // end namespace swift
