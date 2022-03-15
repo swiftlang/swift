@@ -73,8 +73,6 @@ static VarDecl *addImplicitDistributedActorIDProperty(
       C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
       nominal);
 
-  propDecl->setIntroducer(VarDecl::Introducer::Let);
-
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
       new (C) NonisolatedAttr(/*IsImplicit=*/true));

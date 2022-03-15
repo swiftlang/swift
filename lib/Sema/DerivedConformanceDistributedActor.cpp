@@ -116,8 +116,6 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
       propertyType, propertyType,
       /*isStatic=*/false, /*isFinal=*/true);
 
-  propDecl->setIntroducer(VarDecl::Introducer::Let);
-
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
       new (C) NonisolatedAttr(/*IsImplicit=*/true));
@@ -146,8 +144,6 @@ static ValueDecl *deriveDistributedActor_actorSystem(
       C.Id_actorSystem,
       propertyType, propertyType,
       /*isStatic=*/false, /*isFinal=*/true);
-
-  propDecl->setIntroducer(VarDecl::Introducer::Let);
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
