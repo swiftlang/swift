@@ -15,7 +15,7 @@
 // UNSUPPORTED: windows
 
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
