@@ -15,7 +15,7 @@
 
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <vector>
 #include "Diagnostics.h"
@@ -76,24 +76,22 @@ getRuleForRequirement(const Requirement &req,
 struct RuleBuilder {
   RewriteContext &Context;
 
-  /// The keys are the unique protocols we've added so far. The value indicates
-  /// whether the protocol's SCC is an initial component for the rewrite system.
-  ///
-  /// A rewrite system built from a generic signature does not have any initial
-  /// protocols.
-  ///
-  /// A rewrite system built from a protocol SCC has the protocols of the SCC
-  /// itself as initial protocols.
-  ///
-  /// If a protocol is an initial protocol, we use its structural requirements
-  /// instead of its requirement signature as the basis of its rewrite rules.
-  ///
-  /// This is what breaks the cycle in requirement signature computation for a
-  /// group of interdependent protocols.
-  llvm::DenseMap<const ProtocolDecl *, bool> &ProtocolMap;
+  /// The transitive closure of all protocols appearing on the right hand
+  /// side of conformance requirements.
+  llvm::DenseSet<const ProtocolDecl *> &ReferencedProtocols;
 
-  /// The keys of the above map in insertion order.
-  std::vector<const ProtocolDecl *> Protocols;
+  /// A subset of the above in insertion order, consisting of the protocols
+  /// whose rules we are going to import.
+  ///
+  /// If this is a rewrite system built from a generic signature, this vector
+  /// contains all elements in the above set.
+  ///
+  /// If this is a rewrite system built from a strongly connected component
+  /// of the protocol, this vector contains all elements in the above set
+  /// except for the protocols belonging to the component representing the
+  /// rewrite system itself; those protocols are added directly instead of
+  /// being imported.
+  std::vector<const ProtocolDecl *> ProtocolsToImport;
 
   /// New rules to add which will be marked 'permanent'. These are rules for
   /// introducing associated types, and relationships between layout,
@@ -116,18 +114,18 @@ struct RuleBuilder {
   bool Dump;
 
   RuleBuilder(RewriteContext &ctx,
-              llvm::DenseMap<const ProtocolDecl *, bool> &protocolMap)
-      : Context(ctx), ProtocolMap(protocolMap),
+              llvm::DenseSet<const ProtocolDecl *> &referencedProtocols)
+      : Context(ctx), ReferencedProtocols(referencedProtocols),
         Dump(ctx.getASTContext().LangOpts.DumpRequirementMachine) {}
 
   void addRequirements(ArrayRef<Requirement> requirements);
   void addRequirements(ArrayRef<StructuralRequirement> requirements);
   void addProtocols(ArrayRef<const ProtocolDecl *> proto);
-  void addProtocol(const ProtocolDecl *proto,
-                   bool initialComponent);
+  void addReferencedProtocol(const ProtocolDecl *proto);
   void collectRulesFromReferencedProtocols();
 
 private:
+  void addPermanentProtocolRules(const ProtocolDecl *proto);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,

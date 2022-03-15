@@ -562,8 +562,8 @@ void PropertyMap::inferConditionalRequirements(
           llvm::dbgs() << "@@@ Unknown protocol: "<< proto->getName() << "\n";
         }
 
-        RuleBuilder builder(Context, System.getProtocolMap());
-        builder.addProtocol(proto, /*initialComponent=*/false);
+        RuleBuilder builder(Context, System.getReferencedProtocols());
+        builder.addReferencedProtocol(proto);
         builder.collectRulesFromReferencedProtocols();
 
         for (const auto &rule : builder.PermanentRules)
