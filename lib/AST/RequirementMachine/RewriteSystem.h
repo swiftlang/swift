@@ -144,10 +144,19 @@ public:
     return (unsigned)(&rule - &*Rules.begin());
   }
 
+  /// Get an array of all rewrite rules.
   ArrayRef<Rule> getRules() const {
     return Rules;
   }
 
+  /// Get an array of rewrite rules, not including rewrite rules imported
+  /// from referenced protocols.
+  ArrayRef<Rule> getLocalRules() const {
+    return getRules().slice(FirstLocalRule);
+  }
+
+  /// Get the rewrite rule at the given index. Note that this is an index
+  /// into getRules(), *NOT* getLocalRules().
   Rule &getRule(unsigned ruleID) {
     return Rules[ruleID];
   }

@@ -335,6 +335,10 @@ std::string RequirementMachine::getRuleAsStringForDiagnostics(
   return out.str();
 }
 
+ArrayRef<Rule> RequirementMachine::getLocalRules() const {
+  return System.getLocalRules();
+}
+
 bool RequirementMachine::isComplete() const {
   return Complete;
 }

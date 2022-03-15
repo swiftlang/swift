@@ -158,6 +158,8 @@ public:
   std::vector<Requirement>
   computeMinimalGenericSignatureRequirements(bool reconstituteSugar);
 
+  ArrayRef<Rule> getLocalRules() const;
+
   std::string getRuleAsStringForDiagnostics(unsigned ruleID) const;
 
   GenericSignatureErrors getErrors() const;
