@@ -417,10 +417,10 @@ extension Task where Success == Never, Failure == Never {
   ///
   @available(SwiftStdlib 5.7, *)
   public static func sleep<C: Clock>(
-    until deadine: C.Instant,
+    until deadline: C.Instant,
     tolerance: C.Instant.Duration? = nil,
     clock: C
   ) async throws {
-    try await clock.sleep(until: deadine, tolerance: tolerance)
+    try await clock.sleep(until: deadline, tolerance: tolerance)
   }
 }
