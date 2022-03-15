@@ -125,6 +125,7 @@ struct RuleBuilder {
 
   void initWithGenericSignatureRequirements(ArrayRef<Requirement> requirements);
   void initWithWrittenRequirements(ArrayRef<StructuralRequirement> requirements);
+  void initWithProtocolSignatureRequirements(ArrayRef<const ProtocolDecl *> proto);
   void initWithProtocolWrittenRequirements(ArrayRef<const ProtocolDecl *> proto);
   void addReferencedProtocol(const ProtocolDecl *proto);
   void collectRulesFromReferencedProtocols();

@@ -1090,6 +1090,51 @@ void RuleBuilder::initWithWrittenRequirements(
 }
 
 /// For building a rewrite system for a protocol connected component from
+/// a previously-built requirement signature.
+///
+/// Will trigger requirement signature computation if we haven't built
+/// requirement signatures for this connected component yet, in which case we
+/// will recursively end up building another rewrite system for this component
+/// using initWithProtocolWrittenRequirements().
+void RuleBuilder::initWithProtocolSignatureRequirements(
+    ArrayRef<const ProtocolDecl *> protos) {
+  assert(!Initialized);
+  Initialized = 1;
+
+  // Add all protocols to the referenced set, so that subsequent calls
+  // to addReferencedProtocol() with one of these protocols don't add
+  // them to the import list.
+  for (auto *proto : protos) {
+    ReferencedProtocols.insert(proto);
+  }
+
+  for (auto *proto : protos) {
+    if (Dump) {
+      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
+    }
+
+    addPermanentProtocolRules(proto);
+
+    auto reqs = proto->getRequirementSignature();
+    for (auto req : reqs.getRequirements())
+      addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
+    for (auto alias : reqs.getTypeAliases())
+      addTypeAlias(alias, proto);
+
+    for (auto *otherProto : proto->getProtocolDependencies())
+      addReferencedProtocol(otherProto);
+
+    if (Dump) {
+      llvm::dbgs() << "}\n";
+    }
+  }
+
+  // Collect all protocols transitively referenced from this connected component
+  // of the protocol dependency graph.
+  collectRulesFromReferencedProtocols();
+}
+
+/// For building a rewrite system for a protocol connected component from
 /// user-written requirements. Used when actually building requirement
 /// signatures.
 void RuleBuilder::initWithProtocolWrittenRequirements(
@@ -1097,6 +1142,9 @@ void RuleBuilder::initWithProtocolWrittenRequirements(
   assert(!Initialized);
   Initialized = 1;
 
+  // Add all protocols to the referenced set, so that subsequent calls
+  // to addReferencedProtocol() with one of these protocols don't add
+  // them to the import list.
   for (auto *proto : protos) {
     ReferencedProtocols.insert(proto);
   }

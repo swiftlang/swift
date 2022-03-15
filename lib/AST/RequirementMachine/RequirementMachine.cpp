@@ -63,6 +63,46 @@ void RequirementMachine::checkCompletionResult(CompletionResult result) const {
   }
 }
 
+/// Build a requirement machine for the previously-computed requirement
+/// signatures connected component of protocols.
+///
+/// This must only be called exactly once, before any other operations are
+/// performed on this requirement machine.
+///
+/// Used by RewriteContext::getRequirementMachine(const ProtocolDecl *).
+///
+/// Returns failure if completion fails within the configured number of steps.
+std::pair<CompletionResult, unsigned>
+RequirementMachine::initWithProtocolSignatureRequirements(
+    ArrayRef<const ProtocolDecl *> protos) {
+  FrontendStatsTracer tracer(Stats, "build-rewrite-system");
+
+  if (Dump) {
+    llvm::dbgs() << "Adding protocols";
+    for (auto *proto : protos) {
+      llvm::dbgs() << " " << proto->getName();
+    }
+    llvm::dbgs() << " {\n";
+  }
+
+  RuleBuilder builder(Context, System.getReferencedProtocols());
+  builder.initWithProtocolSignatureRequirements(protos);
+
+  // Add the initial set of rewrite rules to the rewrite system.
+  System.initialize(/*recordLoops=*/true, protos,
+                    std::move(builder.WrittenRequirements),
+                    std::move(builder.PermanentRules),
+                    std::move(builder.RequirementRules));
+
+  auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+
+  if (Dump) {
+    llvm::dbgs() << "}\n";
+  }
+
+  return result;
+}
+
 /// Build a requirement machine for the requirements of a generic signature.
 ///
 /// In this mode, minimization is not going to be performed, so rewrite loops
@@ -109,12 +149,12 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   return result;
 }
 
-/// Build a requirement machine for the structural requirements of a set
-/// of protocols, which are understood to form a strongly-connected component
-/// (SCC) of the protocol dependency graph.
+/// Build a requirement machine for the user-written requirements of connected
+/// component of protocols.
 ///
-/// In this mode, minimization will be performed, so rewrite loops are recorded
-/// during completion.
+/// This is used when actually building the requirement signatures of these
+/// protocols. In this mode, minimization will be performed, so rewrite loops
+/// are recorded during completion.
 ///
 /// This must only be called exactly once, before any other operations are
 /// performed on this requirement machine.

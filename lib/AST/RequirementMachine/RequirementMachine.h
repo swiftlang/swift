@@ -91,6 +91,10 @@ class RequirementMachine final {
   void checkCompletionResult(CompletionResult result) const;
 
   std::pair<CompletionResult, unsigned>
+  initWithProtocolSignatureRequirements(
+      ArrayRef<const ProtocolDecl *> protos);
+
+  std::pair<CompletionResult, unsigned>
   initWithGenericSignature(CanGenericSignature sig);
 
   std::pair<CompletionResult, unsigned>
