@@ -178,6 +178,12 @@ extension DistributedActorSystem {
   ) async throws where Act: DistributedActor,
                        // Act.ID == ActorID, // FIXME(distributed): can we bring this back?
                        ResultHandler: DistributedTargetInvocationResultHandler {
+    // NOTE: Implementation could be made more efficient because we still risk
+    // demangling a RemoteCallTarget identity (if it is a mangled name) multiple
+    // times. We would prefer to store if it is a mangled name, demangle, and
+    // always refer to that demangled repr perhaps? We do cache the resulting
+    // pretty formatted name of the call target, but perhaps we can do better.
+
     // Get the expected parameter count of the func
     guard let targetName = target.identifier else {
       throw ExecuteDistributedTargetError(
@@ -338,33 +344,24 @@ extension DistributedActorSystem {
 /// however its exact format is not specified and may change in future versions.
 @available(SwiftStdlib 5.7, *)
 public struct RemoteCallTarget: CustomStringConvertible {
-  private let _storage: _Storage
-  private enum _Storage {
-    case mangledName(String)
-  }
+  private let _identifier: String
 
-  // Only intended to be created by the _Distributed library.
-  // TODO(distributed): make this internal and only allow calling by the synthesized code?
-  public init(_mangledName: String) {
-    self._storage = .mangledName(_mangledName)
+  public init(_ identifier: String) {
+    self._identifier = identifier
   }
 
   /// The underlying identifier of the target, returned as-is.
   public var identifier: String? {
-    switch self._storage {
-    case .mangledName(let name):
-      return name
-    }
+    return _identifier
   }
 
+  /// Attempts to pretty format the underlying target identifier.
+  /// If unable to, returns the raw underlying identifier.
   public var description: String {
-    switch self._storage {
-    case .mangledName(let mangledName):
-      if let name = _getFunctionFullNameFromMangledName(mangledName: mangledName) {
-        return name
-      } else {
-        return "\(mangledName)"
-      }
+    if let name = _getFunctionFullNameFromMangledName(mangledName: _identifier) {
+      return name
+    } else {
+      return "\(_identifier)"
     }
   }
 }
