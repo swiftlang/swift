@@ -17,6 +17,7 @@ struct MissingRemoteCall: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -47,6 +48,7 @@ struct MissingRemoteCall_missing_makeInvocationEncoder: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -106,6 +108,7 @@ struct Error_wrongReturn: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -180,6 +183,7 @@ struct BadRemoteCall_param: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -230,6 +234,7 @@ public struct BadRemoteCall_notPublic: DistributedActorSystem {
   public typealias InvocationDecoder = PublicFakeInvocationDecoder
   public typealias InvocationEncoder = PublicFakeInvocationEncoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeResultHandler
 
   public func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -285,6 +290,7 @@ public struct BadRemoteCall_badResultConformance: DistributedActorSystem {
   public typealias InvocationDecoder = PublicFakeInvocationDecoder
   public typealias InvocationEncoder = PublicFakeInvocationEncoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeResultHandler
 
   public func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -337,6 +343,7 @@ struct BadRemoteCall_largeSerializationRequirement: DistributedActorSystem {
   typealias InvocationDecoder = LargeSerializationReqFakeInvocationDecoder
   typealias InvocationEncoder = LargeSerializationReqFakeInvocationEncoder
   typealias SerializationRequirement = Codable & SomeProtocol
+  typealias ResultHandler = LargeSerializationReqFakeInvocationResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -390,6 +397,7 @@ struct BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition: Distr
   typealias InvocationDecoder = LargeSerializationReqFakeInvocationDecoder
   typealias InvocationEncoder = LargeSerializationReqFakeInvocationEncoder
   typealias SerializationRequirement = Codable & SomeProtocol
+  typealias ResultHandler = LargeSerializationReqFakeInvocationResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -440,6 +448,7 @@ struct BadRemoteCall_anySerializationRequirement: DistributedActorSystem {
   typealias InvocationDecoder = AnyInvocationDecoder
   typealias InvocationEncoder = AnyInvocationEncoder
   typealias SerializationRequirement = Any // !!
+  typealias ResultHandler = AnyResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -696,10 +705,37 @@ final class PublicFakeInvocationDecoder_badBadProtoRequirement: DistributedTarge
   func decodeErrorType() throws -> Any.Type? { nil }
 }
 
-struct FakeResultHandler: DistributedTargetInvocationResultHandler {
-  typealias SerializationRequirement = Codable
+public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
 
-  func onReturn<Res>(value: Res) async throws {
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    print("RETURN: \(value)")
+  }
+  public func onReturnVoid() async throws {
+    print("RETURN VOID")
+  }
+  public func onThrow<Err: Error>(error: Err) async throws {
+    print("ERROR: \(error)")
+  }
+}
+
+struct AnyResultHandler: DistributedTargetInvocationResultHandler {
+  typealias SerializationRequirement = Any
+
+  func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    print("RETURN: \(value)")
+  }
+  func onReturnVoid() async throws {
+    print("RETURN VOID")
+  }
+  func onThrow<Err: Error>(error: Err) async throws {
+    print("ERROR: \(error)")
+  }
+}
+struct LargeSerializationReqFakeInvocationResultHandler: DistributedTargetInvocationResultHandler {
+  typealias SerializationRequirement = Codable & SomeProtocol
+
+  func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print("RETURN: \(value)")
   }
   func onReturnVoid() async throws {
@@ -710,10 +746,29 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
   }
 }
 
+struct BadResultHandler_missingOnReturn: DistributedTargetInvocationResultHandler {
+  // expected-error@-1{{struct 'BadResultHandler_missingOnReturn' is missing witness for protocol requirement 'onReturn'}}
+  // expected-note@-2{{protocol 'BadResultHandler_missingOnReturn' requires function 'onReturn' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  // func onReturn<Res: SerializationRequirement>(value: Res) async throws {} // MISSING
+  func onReturnVoid() async throws {}
+  func onThrow<Err: Error>(error: Err) async throws {}
+}
+struct BadResultHandler_missingRequirement: DistributedTargetInvocationResultHandler {
+  // expected-error@-1{{struct 'BadResultHandler_missingRequirement' is missing witness for protocol requirement 'onReturn'}}
+  // expected-note@-2{{protocol 'BadResultHandler_missingRequirement' requires function 'onReturn' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  func onReturn<Success>(value: Success) async throws {} // MISSING : Codable
+  func onReturnVoid() async throws {}
+  func onThrow<Err: Error>(error: Err) async throws {}
+}
+
 public struct PublicFakeResultHandler: DistributedTargetInvocationResultHandler {
   public typealias SerializationRequirement = Codable
 
-  public func onReturn<Res>(value: Res) async throws {
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print("RETURN: \(value)")
   }
   public func onReturnVoid() async throws {

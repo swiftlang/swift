@@ -252,9 +252,10 @@ void SILGenFunction::emitDistributedActorReady(
   emitActorReadyCall(B, loc, borrowedSelf.getValue(), transport);
 }
 
+// ==== ------------------------------------------------------------------------
 // MARK: remote instance initialization
 
-/// Synthesize the distributed actor's identity (`id`) initialization:
+/// emit a call to the distributed actor system's resolve function:
 ///
 /// \verbatim
 ///     system.resolve(id:as:)
@@ -408,6 +409,7 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
   }
 }
 
+// ==== ------------------------------------------------------------------------
 // MARK: system.resignID()
 
 void SILGenFunction::emitDistributedActorSystemResignIDCall(

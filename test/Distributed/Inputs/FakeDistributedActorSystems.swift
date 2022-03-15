@@ -41,6 +41,7 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
   public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias InvocationEncoder = FakeInvocationEncoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeRoundtripResultHandler
 
   // just so that the struct does not become "trivial"
   let someValue: String = ""
@@ -115,6 +116,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
   public typealias InvocationEncoder = FakeInvocationEncoder
   public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeRoundtripResultHandler
 
   var activeActors: [ActorID: any DistributedActor] = [:]
 
@@ -252,6 +254,19 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
     try await _openExistential(targetActor, do: doIt)
   }
 
+//  public func invokeHandlerOnReturn(
+//    handler: ResultHandler,
+//    resultBuffer: UnsafeRawPointer,
+//    metatype: Any.Type
+//  ) async throws {
+//    let m = metatype as! any SerializationRequirement.Type
+//    func invokeOnReturn<R: Codable>(_ returnType: R.Type) async throws {
+//      let value = resultBuffer.load(as: returnType)
+//      try await handler.onReturn(value: value)
+//    }
+//    try await _openExistential(m, do: invokeOnReturn)
+//  }
+
 }
 
 public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
@@ -362,13 +377,13 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
     self.storeError = storeError
   }
 
-  public func onReturn<Res>(value: Res) async throws {
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print(" << onReturn: \(value)")
     storeReturn(value)
   }
 
   public func onReturnVoid() async throws {
-    print(" << onReturnVoid:()")
+    print(" << onReturnVoid: ()")
     storeReturn(())
   }
 
