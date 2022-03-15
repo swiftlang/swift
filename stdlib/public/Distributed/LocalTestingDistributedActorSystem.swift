@@ -20,24 +20,11 @@ import Glibc
 import WinSDK
 #endif
 
-public struct LocalTestingActorAddress: Hashable, Sendable, Codable {
-  public let address: String
-
-  public init(parse address: String) {
-    self.address = address
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    self.address = try container.decode(String.self)
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(self.address)
-  }
-}
-
+/// A `DistributedActorSystem` designed for local only testing.
+///
+/// It will crash on any attempt of remote communication, but can be useful
+/// for learning about `distributed actor` isolation, as well as early
+/// prototyping stages of development where a real system is not necessary yet.
 @available(SwiftStdlib 5.7, *)
 public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = LocalTestingActorAddress
@@ -86,9 +73,6 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 
   public func resignID(_ id: ActorID) {
-    guard self.assignedIDsLock.withLock({ self.assignedIDs.contains(id) }) else {
-      fatalError("Attempted to resign unknown id '\(id)'")
-    }
     self.activeActorsLock.withLock {
       self.activeActors.removeValue(forKey: id)
     }
@@ -109,7 +93,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    fatalError("Attempted to make remote call on actor \(actor) in a local-only actor system")
+    fatalError("Attempted to make remote call to \(target) on actor \(actor) using a local-only actor system")
   }
 
   public func remoteCallVoid<Act, Err>(
@@ -121,7 +105,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
     where Act: DistributedActor,
           Act.ID == ActorID,
           Err: Error {
-    fatalError("Attempted to make remote call on actor \(actor) in a local-only actor system")
+    fatalError("Attempted to make remote call to \(target) on actor \(actor) using  a local-only actor system")
   }
 
   private struct ActorIDProvider {
@@ -140,6 +124,26 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 }
 
+@available(SwiftStdlib 5.7, *)
+public struct LocalTestingActorAddress: Hashable, Sendable, Codable {
+  public let address: String
+
+  public init(parse address: String) {
+    self.address = address
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    self.address = try container.decode(String.self)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(self.address)
+  }
+}
+
+@available(SwiftStdlib 5.7, *)
 public struct LocalTestingInvocationEncoder: DistributedTargetInvocationEncoder {
   public typealias SerializationRequirement = Codable
 
@@ -164,7 +168,8 @@ public struct LocalTestingInvocationEncoder: DistributedTargetInvocationEncoder 
   }
 }
 
-public class LocalTestingInvocationDecoder : DistributedTargetInvocationDecoder {
+@available(SwiftStdlib 5.7, *)
+public final class LocalTestingInvocationDecoder : DistributedTargetInvocationDecoder {
   public typealias SerializationRequirement = Codable
 
   public func decodeGenericSubstitutions() throws -> [Any.Type] {
@@ -197,6 +202,7 @@ public struct LocalTestingDistributedActorSystemError: DistributedActorSystemErr
 
 // === lock ----------------------------------------------------------------
 
+@available(SwiftStdlib 5.7, *)
 fileprivate class _Lock {
   #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
   private let underlying: UnsafeMutablePointer<os_unfair_lock>
