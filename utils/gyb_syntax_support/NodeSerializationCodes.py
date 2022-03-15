@@ -232,7 +232,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'NamedAttributeStringArgument': 227,
     'DeclName': 228,
     'PoundAssertStmt': 229,
-    'SomeType': 230,
+    'ConstrainedSugarType': 230,
     'CustomAttribute': 231,
     'GenericRequirement': 232,
     'DifferentiableAttributeArguments': 233,
