@@ -1,4 +1,4 @@
-//===--- LeftCanonicalForm.cpp - Left canonical form of a rewrite path ----===//
+//===--- NormalizeRewritePath.cpp - Canonical form of a rewrite path ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -57,6 +57,9 @@ bool RewriteStep::isInverseOf(const RewriteStep &other) const {
   case RewriteStep::Rule:
     return Arg == other.Arg;
 
+  case RewriteStep::Relation:
+    return Arg == other.Arg;
+
   default:
     return false;
   }
@@ -67,8 +70,7 @@ bool RewriteStep::isInverseOf(const RewriteStep &other) const {
 
 bool RewriteStep::maybeSwapRewriteSteps(RewriteStep &other,
                                         const RewriteSystem &system) {
-  if (Kind != RewriteStep::Rule ||
-      other.Kind != RewriteStep::Rule)
+  if (Kind != other.Kind)
     return false;
 
   // Two rewrite steps are _orthogonal_ if they rewrite disjoint subterms
@@ -122,46 +124,79 @@ bool RewriteStep::maybeSwapRewriteSteps(RewriteStep &other,
   // other.StartOffset = |A|+|V|+|B|
   // other.EndOffset = |C|
 
-  const auto &rule = system.getRule(Arg);
-  auto lhs = (Inverse ? rule.getRHS() : rule.getLHS());
-  auto rhs = (Inverse ? rule.getLHS() : rule.getRHS());
+  if (Kind == RewriteStep::Rule) {
+    const auto &rule = system.getRule(Arg);
+    auto lhs = (Inverse ? rule.getRHS() : rule.getLHS());
+    auto rhs = (Inverse ? rule.getLHS() : rule.getRHS());
 
-  const auto &otherRule = system.getRule(other.Arg);
-  auto otherLHS = (other.Inverse ? otherRule.getRHS() : otherRule.getLHS());
-  auto otherRHS = (other.Inverse ? otherRule.getLHS() : otherRule.getRHS());
+    const auto &otherRule = system.getRule(other.Arg);
+    auto otherLHS = (other.Inverse ? otherRule.getRHS() : otherRule.getLHS());
+    auto otherRHS = (other.Inverse ? otherRule.getLHS() : otherRule.getRHS());
 
-  if (StartOffset < other.StartOffset + otherLHS.size())
-    return false;
+    if (StartOffset < other.StartOffset + otherLHS.size())
+      return false;
 
-  std::swap(*this, other);
-  EndOffset += (lhs.size() - rhs.size());
-  other.StartOffset += (otherRHS.size() - otherLHS.size());
+    std::swap(*this, other);
+    EndOffset += (lhs.size() - rhs.size());
+    other.StartOffset += (otherRHS.size() - otherLHS.size());
 
-  return true;
+    return true;
+  } else if (Kind == RewriteStep::Relation) {
+    const auto &relation = system.getRelation(Arg);
+    auto lhs = (Inverse ? relation.second : relation.first);
+    auto rhs = (Inverse ? relation.first : relation.second);
+
+    const auto &otherRelation = system.getRelation(other.Arg);
+    auto otherLHS = (other.Inverse ? otherRelation.second : otherRelation.first);
+    auto otherRHS = (other.Inverse ? otherRelation.first : otherRelation.second);
+
+    if (StartOffset < other.StartOffset + otherLHS.size())
+      return false;
+
+    std::swap(*this, other);
+    EndOffset += (lhs.size() - rhs.size());
+    other.StartOffset += (otherRHS.size() - otherLHS.size());
+
+    return true;
+  }
+
+  return false;
 }
 
 /// Cancels out adjacent rewrite steps that are inverses of each other.
 /// This does not change either endpoint of the path, and the path does
 /// not necessarily need to be a loop.
 bool RewritePath::computeFreelyReducedForm() {
-  SmallVector<RewriteStep, 4> newSteps;
-  bool changed = false;
+  unsigned j = 0;
 
-  for (const auto &step : Steps) {
-    if (!newSteps.empty() &&
-        newSteps.back().isInverseOf(step)) {
-      changed = true;
-      newSteps.pop_back();
-      continue;
+  for (unsigned i = 0, e = Steps.size(); i < e; ++i) {
+    // Pre-condition:
+    // - Steps in the range [0, j-1] are freely reduced.
+    // - Steps in the range [i, e-1] remain to be considered.
+    if (j > 0) {
+      // If Steps[j-1] and Steps[i] are inverses of each other,
+      // discard both Steps[j-1] and Steps[i].
+      const auto &otherStep = Steps[j - 1];
+      const auto &step = Steps[i];
+
+      if (otherStep.isInverseOf(step)) {
+        --j;
+        continue;
+      }
     }
 
-    newSteps.push_back(step);
+    // Post-condition:
+    // - Steps in the range [0, j] are freely reduced.
+    // - Steps in the range [i+1, e-1] remain to be considered.
+    Steps[j] = Steps[i];
+    ++j;
   }
 
-  if (!changed)
+  if (j == Steps.size())
     return false;
-  std::swap(newSteps, Steps);
-  return changed;
+
+  Steps.erase(Steps.begin() + j, Steps.end());
+  return true;
 }
 
 /// Apply the interchange rule until fixed point (see maybeSwapRewriteSteps()).
@@ -169,25 +204,54 @@ bool RewritePath::computeLeftCanonicalForm(const RewriteSystem &system) {
   bool changed = false;
 
   for (unsigned i = 1, e = Steps.size(); i < e; ++i) {
-    auto &prevStep = Steps[i - 1];
-    auto &step = Steps[i];
+    // Pre-condition: steps in the range [0, i-1] are in left-canonical
+    // normal form.
+    //
+    // If Steps[i] can be swapped with Steps[i-1], swap them, and check
+    // if Steps[i-1] (the old Steps[i]) can be swapped with Steps[i-2],
+    // etc.
+    for (unsigned j = i; j >= 1; --j) {
+      auto &prevStep = Steps[j - 1];
+      auto &step = Steps[j];
 
-    if (prevStep.maybeSwapRewriteSteps(step, system))
+      if (!prevStep.maybeSwapRewriteSteps(step, system))
+        break;
+
       changed = true;
+    }
+
+    // Post-condition: steps in the range [0, i] are in left-canonical
+    // normal form.
   }
 
   return changed;
 }
 
 /// Compute freely-reduced left-canonical normal form of a path.
-void RewritePath::computeNormalForm(const RewriteSystem &system) {
-  // FIXME: This can be more efficient.
-  bool changed;
-  do {
-    changed = false;
-    changed |= computeFreelyReducedForm();
-    changed |= computeLeftCanonicalForm(system);
-  } while (changed);
+bool RewritePath::computeNormalForm(const RewriteSystem &system) {
+  // Note that computeFreelyReducedForm() and computeLeftCanonicalForm()
+  // are both idempotent, but their composition is not.
+
+  // Begin by freely reducing the path.
+  bool changed = computeFreelyReducedForm();
+
+  // Then, bring it into left canonical form.
+  while (computeLeftCanonicalForm(system)) {
+    changed = true;
+
+    // If it was not already in left-canonical form, freely reduce it
+    // again.
+    if (!computeFreelyReducedForm()) {
+      // If it was already freely reduced, then we're done, because it
+      // is freely reduced *and* in left-canonical form.
+      break;
+    }
+
+    // Otherwise, perform another round, since freely reducing may have
+    // opened up new opportunities for left-canonicalization.
+  }
+
+  return changed;
 }
 
 /// Given a path that is a loop around the given basepoint, cancels out
@@ -227,15 +291,9 @@ bool RewritePath::computeCyclicallyReducedForm(MutableTerm &basepoint,
 
 /// Compute cyclically-reduced left-canonical normal form of a loop.
 void RewriteLoop::computeNormalForm(const RewriteSystem &system) {
-  // FIXME: This can be more efficient.
-  bool changed;
-  do {
-    changed = false;
-    changed |= Path.computeFreelyReducedForm();
-    changed |= Path.computeCyclicallyReducedForm(Basepoint, system);
-    changed |= Path.computeLeftCanonicalForm(system);
+  bool changed = Path.computeNormalForm(system);
+  changed |= Path.computeCyclicallyReducedForm(Basepoint, system);
 
-    if (changed)
-      markDirty();
-  } while (changed);
+  if (changed)
+    markDirty();
 }
