@@ -721,13 +721,13 @@ GetDistributedRemoteCallTargetInitFunctionRequest::evaluate(
     if (params->size() != 1)
       return nullptr;
 
-    if (params->get(0)->getArgumentName() == C.getIdentifier("_mangledName"))
+    // _ identifier
+    if (params->get(0)->getArgumentName().empty())
       return ctor;
 
     return nullptr;
   }
 
-  // TODO(distributed): make a Request for it?
   return nullptr;
 }
 

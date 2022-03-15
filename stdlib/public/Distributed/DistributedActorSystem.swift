@@ -185,10 +185,7 @@ extension DistributedActorSystem {
     // pretty formatted name of the call target, but perhaps we can do better.
 
     // Get the expected parameter count of the func
-    guard let targetName = target.identifier else {
-      throw ExecuteDistributedTargetError(
-        message: "Unable to extract target identifier from remote call target: \(target)")
-    }
+    let targetName = target.identifier
     let nameUTF8 = Array(targetName.utf8)
 
     // Gen the generic environment (if any) associated with the target.
@@ -351,7 +348,7 @@ public struct RemoteCallTarget: CustomStringConvertible {
   }
 
   /// The underlying identifier of the target, returned as-is.
-  public var identifier: String? {
+  public var identifier: String {
     return _identifier
   }
 
