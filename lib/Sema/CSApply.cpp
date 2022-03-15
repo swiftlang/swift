@@ -1211,54 +1211,6 @@ namespace {
                                    locator);
     }
 
-    AutoClosureExpr *buildCurryThunk(ValueDecl *member,
-                                     FunctionType *selfFnTy,
-                                     Expr *selfParamRef,
-                                     Expr *ref,
-                                     ConstraintLocatorBuilder locator) {
-      auto &context = cs.getASTContext();
-
-      auto resultTy = selfFnTy->getResult();
-
-      auto refTy = cs.getType(ref)->castTo<FunctionType>();
-
-      auto selfParam = refTy->getParams()[0];
-      auto selfParamTy = selfParam.getPlainType();
-
-      Expr *selfOpenedRef = selfParamRef;
-
-      if (selfParamTy->hasOpenedExistential()) {
-        // If we're opening an existential:
-        // - the type of 'ref' inside the closure is written in terms of the
-        //   open existental archetype
-        // - the type of the closure, 'selfFnTy' is written in terms of the
-        //   erased existential bounds
-        if (selfParam.isInOut())
-          selfParamTy = LValueType::get(selfParamTy);
-
-        selfOpenedRef =
-            new (context) OpaqueValueExpr(SourceLoc(), selfParamTy);
-        cs.cacheType(selfOpenedRef);
-      }
-
-      // FIXME: selfParamRef ownership
-
-      auto *const thunk = buildSingleCurryThunk(
-          selfOpenedRef, ref, cast<DeclContext>(member), selfFnTy, locator);
-
-      if (selfParam.getPlainType()->hasOpenedExistential()) {
-        auto *body = thunk->getSingleExpressionBody();
-        body = new (context) OpenExistentialExpr(
-            selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef), body,
-            resultTy);
-        cs.cacheType(body);
-
-        thunk->setBody(body);
-      }
-
-      return thunk;
-    }
-
     /// Build a "{ self in { args in self.fn(args) } }" nested curry thunk.
     ///
     /// \param memberRef The expression to be called in the inner thunk by
