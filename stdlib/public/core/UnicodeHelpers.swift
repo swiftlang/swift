@@ -173,17 +173,26 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
   let initialReadPtr = readPtr
   let endPtr = readPtr + rawBuffer.count
   
+  //eat leading continuations
+  while readPtr < endPtr {
+    let byte = readPtr.load(as: UInt8.self)
+    if !UTF8.isContinuation(byte) {
+      break
+    }
+    readPtr += 1
+  }
+  
  // align
   while readPtr < endPtr
           && UInt(bitPattern: readPtr) % UInt(MemoryLayout<SIMD8<UInt8>>.stride) != 0 {
     let byte = readPtr.load(as: UInt8.self)
     let len = _utf8ScalarLength(byte)
-    readPtr += len
     //if we don't have enough bytes left, we don't have a complete scalar, so
     //don't add it to the count.
     if readPtr + len <= endPtr {
       utf16Count &+= len == 4 ? 2 : 1
     }
+    readPtr += len
   }
   
 //  utf16Count &+= _utf16Length(
@@ -238,7 +247,7 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
     //The trailing scalar may be incomplete, subtract it out and check below
     let byte = readPtr.load(as: UInt8.self)
     let len = _utf8ScalarLength(byte)
-    utf16Count &-= len
+    utf16Count &-= len == 4 ? 2 : 1
     if readPtr == initialReadPtr {
       //if we backed up all the way and didn't hit a non-continuation, then
       //we don't have any complete scalars, and we should bail.
@@ -250,12 +259,12 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
   while readPtr < endPtr {
     let byte = readPtr.load(as: UInt8.self)
     let len = _utf8ScalarLength(byte)
-    readPtr += len
     //if we don't have enough bytes left, we don't have a complete scalar, so
     //don't add it to the count.
     if readPtr + len <= endPtr {
       utf16Count &+= len == 4 ? 2 : 1
     }
+    readPtr += len
   }
   
   return utf16Count

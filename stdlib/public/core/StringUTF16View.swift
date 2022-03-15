@@ -538,9 +538,9 @@ extension String.UTF16View {
         return _utf16Length(UnsafeRawBufferPointer(utf8))
       }
       
-//      _internalInvariant(
-//        fastCalculation == _distance(from: startIndex, to: idx)
-//      )
+      _internalInvariant(
+        fastCalculation == _distance(from: startIndex, to: idx)
+      )
       return fastCalculation
     }
 
@@ -553,14 +553,14 @@ extension String.UTF16View {
       forIndex: idx)
         
     let fastCalculation: Int = _guts.withFastUTF8(
-      range: crumb._encodedOffset ..< idx._encodedOffset
+      range: _utf16AlignNativeIndex(crumb)._encodedOffset ..< idx._encodedOffset
     ) { utf8 in
       return crumbOffset + _utf16Length(UnsafeRawBufferPointer(utf8))
     }
     
-//    _internalInvariant(
-//      fastCalculation == crumbOffset + _distance(from: crumb, to: idx)
-//    )
+    _internalInvariant(
+      fastCalculation == crumbOffset + _distance(from: crumb, to: idx)
+    )
     return fastCalculation
   }
 
