@@ -125,6 +125,9 @@ struct RuleBuilder {
   void addProtocols(ArrayRef<const ProtocolDecl *> proto);
   void addProtocol(const ProtocolDecl *proto,
                    bool initialComponent);
+  void collectRulesFromReferencedProtocols();
+
+private:
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
@@ -134,7 +137,6 @@ struct RuleBuilder {
                       const ProtocolDecl *proto);
   void addTypeAlias(const ProtocolTypeAlias &alias,
                     const ProtocolDecl *proto);
-  void collectRulesFromReferencedProtocols();
 };
 
 // Defined in ConcreteContraction.cpp.
