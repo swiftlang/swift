@@ -1487,7 +1487,7 @@ bool NominalTypeDecl::createObjCMethodLookup() {
   assert(!ObjCMethodLookup && "Already have an Objective-C member table");
 
   // Most types cannot have ObjC methods.
-  if (!(isa<ClassDecl>(this)))
+  if (!(isa<ClassDecl>(this) || isa<ProtocolDecl>(this)))
     return false;
 
   auto &ctx = getASTContext();

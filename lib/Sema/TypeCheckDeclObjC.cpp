@@ -2447,6 +2447,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
   // Diagnose each conflict.
   bool anyConflicts = false;
   for (const auto &conflict : localConflicts) {
+    NominalTypeDecl *tyDecl = std::get<0>(conflict);
     ObjCSelector selector = std::get<1>(conflict);
 
     auto methods = getObjCMethodConflictDecls(conflict);
@@ -2529,6 +2530,9 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      diagInfo.first, diagInfo.second,
                                      origDiagInfo.first, origDiagInfo.second,
                                      selector);
+
+      // Protocols weren't checked for selector conflicts in 5.0.
+      diag.warnUntilSwiftVersionIf(!isa<ClassDecl>(tyDecl), 6);
 
       auto objcAttr = getObjCAttrIfFromAccessNote(conflictingDecl);
       swift::softenIfAccessNote(conflictingDecl, objcAttr, diag);
