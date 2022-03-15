@@ -123,7 +123,8 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 ///
 /// Returns failure if completion fails within the configured number of steps.
 std::pair<CompletionResult, unsigned>
-RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
+RequirementMachine::initWithProtocolWrittenRequirements(
+    ArrayRef<const ProtocolDecl *> protos) {
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
   if (Dump) {

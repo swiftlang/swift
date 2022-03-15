@@ -116,7 +116,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
   SmallVector<RequirementError, 4> errors;
 
-  auto status = machine->initWithProtocols(component);
+  auto status = machine->initWithProtocolWrittenRequirements(component);
   if (status.first != CompletionResult::Success) {
     // All we can do at this point is diagnose and give each protocol an empty
     // requirement signature.
