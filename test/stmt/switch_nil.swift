@@ -6,10 +6,9 @@ enum Hey {
 
 func test() {
   switch Hey.listen {
-  case nil: // expected-error{{type 'Hey' is not optional, value can never be nil}}
+  case nil: // expected-warning {{type 'Hey' is not optional, value can never be nil}}
     break
   default:
     break
   }
 }
-

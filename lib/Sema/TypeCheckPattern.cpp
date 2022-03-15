@@ -1294,8 +1294,11 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       } else {
         // ...but for non-optional types it can never match! Diagnose it.
         diags.diagnose(NLE->getLoc(),
-                       diag::value_type_comparison_with_nil_illegal, type);
-        return nullptr;
+                       diag::value_type_comparison_with_nil_illegal, type)
+             .warnUntilSwiftVersion(6);
+
+        if (type->getASTContext().isSwiftVersionAtLeast(6))
+          return nullptr;
       }
     }
 
