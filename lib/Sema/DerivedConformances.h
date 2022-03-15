@@ -50,6 +50,9 @@ class VarDecl;
 
 class DerivedConformance {
 public:
+  enum class SynthesizedIntroducer : bool { Let, Var };
+
+public:
   ASTContext &Context;
   Decl *ConformanceDecl;
   NominalTypeDecl *Nominal;
@@ -335,8 +338,9 @@ public:
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
-  declareDerivedProperty(Identifier name, Type propertyInterfaceType,
-                         Type propertyContextType, bool isStatic, bool isFinal);
+  declareDerivedProperty(SynthesizedIntroducer intro, Identifier name,
+                         Type propertyInterfaceType, Type propertyContextType,
+                         bool isStatic, bool isFinal);
 
   /// Add a getter to a derived property.  The property becomes read-only.
   static AccessorDecl *
