@@ -811,3 +811,30 @@ func test_redeclations() {
     let (foo, foo) = (5, 6) // expected-error {{invalid redeclaration of 'foo'}} expected-note {{'foo' previously declared here}}
   }
 }
+
+func test_rdar89742267() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ t: T) -> T { t }
+    static func buildEither<T>(first: T) -> T { first }
+    static func buildEither<T>(second: T) -> T { second }
+  }
+
+  struct S {}
+
+  enum Hey {
+    case listen
+  }
+
+  struct MyView {
+    var entry: Hey
+
+    @Builder var body: S {
+      switch entry {
+      case .listen: S()
+      case nil: S() // expected-warning {{type 'Hey' is not optional, value can never be nil; this is an error in Swift 6}}
+      default: S()
+      }
+    }
+  }
+}

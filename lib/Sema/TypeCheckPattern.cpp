@@ -1269,10 +1269,10 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Expr: {
     assert(cast<ExprPattern>(P)->isResolved()
            && "coercing unresolved expr pattern!");
+    auto *EP = cast<ExprPattern>(P);
     if (type->isBool()) {
       // The type is Bool.
       // Check if the pattern is a Bool literal
-      auto EP = cast<ExprPattern>(P);
       if (auto *BLE = dyn_cast<BooleanLiteralExpr>(
               EP->getSubExpr()->getSemanticsProvidingExpr())) {
         P = new (Context) BoolPattern(BLE->getLoc(), BLE->getValue());
@@ -1282,9 +1282,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     }
 
     // case nil is equivalent to .none when switching on Optionals.
-    if (type->getOptionalObjectType()) {
-      auto EP = cast<ExprPattern>(P);
-      if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
+    if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
+      if (type->getOptionalObjectType()) {
         auto *NoneEnumElement = Context.getOptionalNoneDecl();
         auto *BaseTE = TypeExpr::createImplicit(type, Context);
         P = new (Context) EnumElementPattern(
@@ -1292,10 +1291,18 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
             NoneEnumElement->createNameRef(), NoneEnumElement, nullptr);
         return TypeChecker::coercePatternToType(
             pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options);
+      } else {
+        // ...but for non-optional types it can never match! Diagnose it.
+        diags.diagnose(NLE->getLoc(),
+                       diag::value_type_comparison_with_nil_illegal, type)
+             .warnUntilSwiftVersion(6);
+
+        if (type->getASTContext().isSwiftVersionAtLeast(6))
+          return nullptr;
       }
     }
 
-    if (TypeChecker::typeCheckExprPattern(cast<ExprPattern>(P), dc, type))
+    if (TypeChecker::typeCheckExprPattern(EP, dc, type))
       return nullptr;
 
     return P;
