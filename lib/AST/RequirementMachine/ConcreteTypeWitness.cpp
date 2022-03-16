@@ -132,9 +132,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     //
     // This occurs when a pair of rules are inherited from the property map
     // entry for this key's suffix.
-    auto pair = std::make_pair(concreteRuleID, conformanceRuleID);
-    auto found = ConcreteConformances.find(pair);
-    if (found != ConcreteConformances.end())
+    if (!checkRulePairOnce(concreteRuleID, conformanceRuleID))
       continue;
 
     // FIXME: Either remove the ModuleDecl entirely from conformance lookup,
@@ -167,13 +165,6 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     // FIXME: Maybe this can happen if the concrete type is an
     // opaque result type?
     assert(!conformance.isAbstract());
-
-    // Save this conformance for later.
-    auto *concrete = conformance.getConcrete();
-    auto inserted = ConcreteConformances.insert(
-        std::make_pair(pair, concrete));
-    assert(inserted.second);
-    (void) inserted;
 
     auto concreteConformanceSymbol = Symbol::forConcreteConformance(
         concreteType, substitutions, proto, Context);
