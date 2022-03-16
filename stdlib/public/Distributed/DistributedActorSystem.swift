@@ -12,6 +12,7 @@
 import Swift
 import _Concurrency
 
+/// A distributed actor system
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedActorSystem: Sendable {
   /// The identity used by actors that communicate via this transport
@@ -340,7 +341,7 @@ extension DistributedActorSystem {
 /// The string representation will attempt to pretty print the target identifier,
 /// however its exact format is not specified and may change in future versions.
 @available(SwiftStdlib 5.7, *)
-public struct RemoteCallTarget: CustomStringConvertible {
+public struct RemoteCallTarget: CustomStringConvertible, Hashable {
   private let _identifier: String
 
   public init(_ identifier: String) {
@@ -407,6 +408,7 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 /// Note that the decoding will be provided the specific types that the sending side used to preform the call,
 /// so decoding can rely on simply invoking e.g. `Codable` (if that is the `SerializationRequirement`) decoding
 /// entry points on the provided types.
+@available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationEncoder {
   associatedtype SerializationRequirement
 
@@ -418,7 +420,7 @@ public protocol DistributedTargetInvocationEncoder {
 //  ///
 //  /// Record an argument of `Argument` type.
 //  /// This will be invoked for every argument of the target, in declaration order.
-//  mutating func recordArgument<Argument: SerializationRequirement>(name: String, _ argument: Argument) throws
+//  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws
 
   /// Record the error type of the distributed method.
   /// This method will not be invoked if the target is not throwing.
@@ -433,8 +435,12 @@ public protocol DistributedTargetInvocationEncoder {
   mutating func doneRecording() throws
 }
 
+@available(SwiftStdlib 5.7, *)
+public
+
 /// Decoder that must be provided to `executeDistributedTarget` and is used
 /// by the Swift runtime to decode arguments of the invocation.
+@available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationDecoder {
   associatedtype SerializationRequirement
 
