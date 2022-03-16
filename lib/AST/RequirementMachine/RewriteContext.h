@@ -86,15 +86,27 @@ class RewriteContext final {
     /// The members of this connected component.
     ArrayRef<const ProtocolDecl *> Protos;
 
-    /// Each connected component has a lazily-created requirement machine.
-    bool InProgress = false;
+    /// Whether we are currently computing the requirement signatures of
+    /// the protocols in this component.
+    bool ComputingRequirementSignatures = false;
+
+    /// Each connected component has a lazily-created requirement machine
+    /// built from the requirement signatures of the protocols in this
+    /// component.
+    RequirementMachine *Machine = nullptr;
   };
 
-  /// The protocol dependency graph.
+  /// We pre-load protocol dependencies here to avoid re-entrancy.
+  llvm::DenseMap<const ProtocolDecl *, ArrayRef<ProtocolDecl *>> Dependencies;
+
+  /// Maps protocols to their connected components.
   llvm::DenseMap<const ProtocolDecl *, ProtocolNode> Protos;
 
   /// Used by Tarjan's algorithm.
   unsigned NextComponentIndex = 0;
+
+  /// Prevents re-entrant calls into getProtocolComponentRec().
+  bool ProtectProtocolComponentRec = false;
 
   /// The connected components. Keys are the ComponentID fields of
   /// ProtocolNode.
@@ -111,6 +123,7 @@ class RewriteContext final {
 
   void getProtocolComponentRec(const ProtocolDecl *proto,
                                SmallVectorImpl<const ProtocolDecl *> &stack);
+  ProtocolComponent &getProtocolComponentImpl(const ProtocolDecl *proto);
 
 public:
   /// Statistics.
@@ -182,6 +195,7 @@ public:
   bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);
 
   ArrayRef<const ProtocolDecl *> getProtocolComponent(const ProtocolDecl *proto);
+  RequirementMachine *getRequirementMachine(const ProtocolDecl *proto);
   bool isRecursivelyConstructingRequirementMachine(const ProtocolDecl *proto);
 
   ~RewriteContext();

@@ -40,8 +40,8 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK:      }
 // CHECK: Property map: {
 // CHECK-NEXT:   [P1] => { conforms_to: [P1] }
-// CHECK-NEXT:   [P2] => { conforms_to: [P2] }
 // CHECK-NEXT:   [P1:X] => { layout: _NativeClass superclass: [superclass: Generic<Int, [P1:A1], [P1:B1]>] }
+// CHECK-NEXT:   [P2] => { conforms_to: [P2] }
 // CHECK-NEXT:   [P2:X] => { layout: _NativeClass superclass: [superclass: Generic<[P2:A2], String, [P2:B2]>] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P1 P2] }
 // CHECK-NEXT:   τ_0_0.[P1:X] => { layout: _NativeClass superclass: [superclass: Generic<Int, String, τ_0_0.[P1:B1]>] }

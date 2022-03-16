@@ -682,7 +682,8 @@ RewriteSystem::getMinimizedProtocolRules() const {
   assert(!Protos.empty());
 
   llvm::DenseMap<const ProtocolDecl *, MinimizedProtocolRules> rules;
-  for (unsigned ruleID : indices(Rules)) {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
+       ruleID < e; ++ruleID) {
     const auto &rule = getRule(ruleID);
 
     if (rule.isPermanent() ||
@@ -713,7 +714,8 @@ RewriteSystem::getMinimizedGenericSignatureRules() const {
   assert(Protos.empty());
 
   std::vector<unsigned> rules;
-  for (unsigned ruleID : indices(Rules)) {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
+       ruleID < e; ++ruleID) {
     const auto &rule = getRule(ruleID);
 
     if (rule.isPermanent() ||
@@ -768,7 +770,8 @@ void RewriteSystem::verifyMinimizedRules(
     const llvm::DenseSet<unsigned> &redundantConformances) const {
   unsigned redundantRuleCount = 0;
 
-  for (unsigned ruleID : indices(Rules)) {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
+       ruleID < e; ++ruleID) {
     const auto &rule = getRule(ruleID);
 
     // Ignore the rewrite rule if it is not part of our minimization domain.

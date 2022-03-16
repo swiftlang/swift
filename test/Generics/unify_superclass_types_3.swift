@@ -32,9 +32,9 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 
 // CHECK-LABEL: Requirement machine for <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2>
 // CHECK-NEXT: Rewrite system: {
-// CHECK:      - τ_0_0.[P2:X] => τ_0_0.[P1:X]
 // CHECK:      - [P1:X].[layout: _NativeClass] => [P1:X]
 // CHECK:      - [P2:X].[layout: _NativeClass] => [P2:X]
+// CHECK:      - τ_0_0.[P2:X] => τ_0_0.[P1:X]
 // CHECK:      - τ_0_0.[P1:X].[superclass: Generic<Int, τ_0_0.[P1:A1], τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
 // CHECK:      - τ_0_0.[P1:X].[superclass: Generic<Int, String, τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
 // CHECK:      - τ_0_0.[P2:A2].[concrete: Int] => τ_0_0.[P2:A2]
@@ -44,8 +44,8 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK:      }
 // CHECK: Property map: {
 // CHECK-NEXT:   [P1] => { conforms_to: [P1] }
-// CHECK-NEXT:   [P2] => { conforms_to: [P2] }
 // CHECK-NEXT:   [P1:X] => { layout: _NativeClass superclass: [superclass: Derived<[P1:A1], [P1:B1]>] }
+// CHECK-NEXT:   [P2] => { conforms_to: [P2] }
 // CHECK-NEXT:   [P2:X] => { layout: _NativeClass superclass: [superclass: Generic<[P2:A2], String, [P2:B2]>] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P1 P2] }
 // CHECK-NEXT:   τ_0_0.[P1:X] => { layout: _NativeClass superclass: [superclass: Derived<τ_0_0.[P1:A1], τ_0_0.[P1:B1]>] }
