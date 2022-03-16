@@ -444,7 +444,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
 
   auto cxxHeaderOutputPath = determineSupplementaryOutputFilename(
       OPT_emit_cxx_header, pathsFromArguments.CxxHeaderOutputPath,
-      file_types::TY_CXXHeader, "",
+      file_types::TY_ObjCHeader, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
   auto loadedModuleTracePath = determineSupplementaryOutputFilename(
@@ -587,7 +587,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
     return paths;
   const std::pair<file_types::ID, std::string &> typesAndStrings[] = {
       {file_types::TY_ObjCHeader, paths.ObjCHeaderOutputPath},
-      {file_types::TY_CXXHeader, paths.CxxHeaderOutputPath},
+      {file_types::TY_ObjCHeader, paths.CxxHeaderOutputPath},
       {file_types::TY_SwiftModuleFile, paths.ModuleOutputPath},
       {file_types::TY_SwiftModuleDocFile, paths.ModuleDocOutputPath},
       {file_types::TY_SwiftSourceInfoFile, paths.ModuleSourceInfoOutputPath},

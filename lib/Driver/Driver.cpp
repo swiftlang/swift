@@ -1981,8 +1981,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
-        if (Ty == file_types::TY_ObjCHeader ||
-            Ty == file_types::TY_CXXHeader) {
+        if (Ty == file_types::TY_ObjCHeader) {
           auto *HeaderInput = C.createAction<InputAction>(*A, Ty);
           StringRef PersistentPCHDir;
           if (const Arg *A = Args.getLastArg(options::OPT_pch_output_dir)) {
@@ -2066,7 +2065,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_LLVM_BC:
       case file_types::TY_SerializedDiagnostics:
       case file_types::TY_ObjCHeader:
-      case file_types::TY_CXXHeader:
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:
       case file_types::TY_ExternalSwiftDeps:
