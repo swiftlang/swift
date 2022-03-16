@@ -6196,8 +6196,14 @@ public:
   }
 
   void visitVariadicSequenceType(VariadicSequenceType *T) {
-    visit(T->getBaseType());
-    Printer << "...";
+    if (Options.PrintForSIL) {
+      Printer << "[";
+      visit(T->getBaseType());
+      Printer << "]";
+    } else {
+      visit(T->getBaseType());
+      Printer << "...";
+    }
   }
 
   void visitProtocolType(ProtocolType *T) {
