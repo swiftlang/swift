@@ -4920,6 +4920,9 @@ void constraints::simplifyLocator(ASTNode &anchor,
       path = path.slice(1);
       continue;
     }
+
+    case ConstraintLocator::ImplicitConversion:
+      break;
     }
 
     // If we get here, we couldn't simplify the path further.
