@@ -4880,6 +4880,11 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::ConstructorMemberType:
     case ConstraintLocator::ExistentialSuperclassType:
       break;
+
+    case ConstraintLocator::GenericArgument:
+    case ConstraintLocator::FunctionArgument:
+    case ConstraintLocator::SynthesizedArgument:
+      break;
     }
 
     // If we get here, we couldn't simplify the path further.
