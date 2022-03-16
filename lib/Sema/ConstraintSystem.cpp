@@ -4871,8 +4871,14 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    default:
-      // FIXME: Lots of other cases to handle.
+    case ConstraintLocator::PackType:
+    case ConstraintLocator::ParentType:
+    case ConstraintLocator::KeyPathType:
+    case ConstraintLocator::InstanceType:
+    case ConstraintLocator::PlaceholderType:
+    case ConstraintLocator::SequenceElementType:
+    case ConstraintLocator::ConstructorMemberType:
+    case ConstraintLocator::ExistentialSuperclassType:
       break;
     }
 
