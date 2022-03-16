@@ -531,8 +531,8 @@ void PropertyMap::inferConditionalRequirements(
     return;
 
   SmallVector<Requirement, 2> desugaredRequirements;
-  // FIXME: Store errors in the rewrite system to be diagnosed
-  // from the top-level generic signature requests.
+
+  // FIXME: Do we need to diagnose these errors?
   SmallVector<RequirementError, 2> errors;
 
   // First, desugar all conditional requirements.
@@ -547,47 +547,17 @@ void PropertyMap::inferConditionalRequirements(
   }
 
   // Now, convert desugared conditional requirements to rules.
-  for (auto req : desugaredRequirements) {
-    if (Debug.contains(DebugFlags::ConditionalRequirements)) {
-      llvm::dbgs() << "@@@ Desugared requirement: ";
-      req.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
 
-    if (req.getKind() == RequirementKind::Conformance) {
-      auto *proto = req.getProtocolDecl();
+  // This will update System.getReferencedProtocols() with any new
+  // protocols that were imported.
+  RuleBuilder builder(Context, System.getReferencedProtocols());
+  builder.initWithConditionalRequirements(desugaredRequirements,
+                                          substitutions);
 
-      // If we haven't seen this protocol before, add rules for its
-      // requirements.
-      if (!System.isKnownProtocol(proto)) {
-        if (Debug.contains(DebugFlags::ConditionalRequirements)) {
-          llvm::dbgs() << "@@@ Unknown protocol: "<< proto->getName() << "\n";
-        }
+  assert(builder.PermanentRules.empty());
+  assert(builder.WrittenRequirements.empty());
 
-        RuleBuilder builder(Context, System.getReferencedProtocols());
-        builder.addReferencedProtocol(proto);
-        builder.collectRulesFromReferencedProtocols();
-
-        for (const auto &rule : builder.PermanentRules)
-          System.addPermanentRule(rule.first, rule.second);
-
-        for (const auto &rule : builder.RequirementRules) {
-          auto lhs = std::get<0>(rule);
-          auto rhs = std::get<1>(rule);
-          System.addExplicitRule(lhs, rhs, /*requirementID=*/None);
-        }
-      }
-    }
-
-    auto pair = getRuleForRequirement(req.getCanonical(), /*proto=*/nullptr,
-                                      substitutions, Context);
-
-    if (Debug.contains(DebugFlags::ConditionalRequirements)) {
-      llvm::dbgs() << "@@@ Induced rule from conditional requirement: "
-                   << pair.first << " => " << pair.second << "\n";
-    }
-
-    // FIXME: Do we need a rewrite path here?
-    (void) System.addRule(pair.first, pair.second);
-  }
+  System.addRules(std::move(builder.ImportedRules),
+                  std::move(builder.PermanentRules),
+                  std::move(builder.RequirementRules));
 }
