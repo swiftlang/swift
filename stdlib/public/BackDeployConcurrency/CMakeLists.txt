@@ -58,4 +58,11 @@ set(swift_concurrency_extra_sources
   "../stubs/SwiftNativeNSObject.mm")
 set(swift_concurrency_async_fp_mode "never")
 
+set(LLVM_OPTIONAL_SOURCES
+  Clock.cpp
+  Clock.swift
+  ContinuousClock.swift
+  SuspendingClock.swift
+  TaskSleepDuration.swift)
+
 add_subdirectory(../Concurrency stdlib/public/BackDeployConcurrency)
