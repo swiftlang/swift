@@ -305,7 +305,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
         }
       }
 
-      if (System.getRules().size() > MaxRuleCount) {
+      if (System.getLocalRules().size() > MaxRuleCount) {
         return std::make_pair(CompletionResult::MaxRuleCount,
                               System.getRules().size() - 1);
       }
