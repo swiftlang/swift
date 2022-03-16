@@ -3493,8 +3493,11 @@ public:
   /// Find, or potentially synthesize, the implicit 'id' property of this actor.
   VarDecl *getDistributedActorIDProperty() const;
 
-  /// Find the 'RemoteCallTarget.init(_mangledName:)' initializer function
+  /// Find the 'RemoteCallTarget.init(_:)' initializer function
   ConstructorDecl* getDistributedRemoteCallTargetInitFunction() const;
+
+  /// Find the 'RemoteCallArgument(label:name:value:)' initializer function
+  ConstructorDecl* getDistributedRemoteCallArgumentInitFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
