@@ -200,7 +200,9 @@ void PropertyMap::concretizeTypeWitnessInConformance(
     AssociatedTypeDecl *assocType) const {
   auto concreteType = concreteConformanceSymbol.getConcreteType();
   auto substitutions = concreteConformanceSymbol.getSubstitutions();
-  auto *proto = concreteConformanceSymbol.getProtocol();
+
+  auto *proto = assocType->getProtocol();
+  assert(proto == concreteConformanceSymbol.getProtocol());
 
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
     llvm::dbgs() << "^^ " << "Looking up type witness for "

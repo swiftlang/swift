@@ -1416,7 +1416,7 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
     // if neccessary, which will cause us to re-enter into a new RuleBuilder
     // instace under RuleBuilder::initWithProtocolWrittenRequirements().
     if (Dump) {
-      llvm::dbgs() << "importing protocol " << proto->getName() << " {\n";
+      llvm::dbgs() << "importing protocol " << proto->getName() << "\n";
     }
 
     auto *machine = Context.getRequirementMachine(proto);

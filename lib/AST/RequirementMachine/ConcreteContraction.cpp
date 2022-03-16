@@ -531,6 +531,12 @@ bool ConcreteContraction::performConcreteContraction(
   // Phase 2: Replace each concretely-conforming generic parameter with its
   // concrete type.
   for (auto req : requirements) {
+    if (Debug) {
+      llvm::dbgs() << "@ Original requirement: ";
+      req.req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+
     // Substitute the requirement.
     Optional<Requirement> substReq = substRequirement(req.req);
 
