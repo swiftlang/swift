@@ -76,6 +76,11 @@ ExpressionTimer::~ExpressionTimer() {
   if (!PrintWarning)
     return;
 
+  const auto WarnLimit = getWarnLimit();
+
+  if (WarnLimit == 0 || elapsedMS < WarnLimit)
+    return;
+
   ASTNode anchor;
   if (auto *locator = Anchor.dyn_cast<ConstraintLocator *>()) {
     anchor = simplifyLocatorToAnchor(locator);
@@ -87,9 +92,7 @@ ExpressionTimer::~ExpressionTimer() {
     anchor = Anchor.get<Expr *>();
   }
 
-  const auto WarnLimit = getWarnLimit();
-  if (WarnLimit != 0 && elapsedMS >= WarnLimit &&
-      anchor.getStartLoc().isValid()) {
+  if (anchor.getStartLoc().isValid()) {
     Context.Diags
         .diagnose(anchor.getStartLoc(), diag::debug_long_expression, elapsedMS,
                   WarnLimit)
