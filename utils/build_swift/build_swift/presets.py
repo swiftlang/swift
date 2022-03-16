@@ -15,8 +15,8 @@ import functools
 import io
 from collections import OrderedDict, namedtuple
 
-from six import StringIO
-from six.moves import configparser
+from io import StringIO
+import configparser
 
 from . import class_utils
 
