@@ -4906,6 +4906,20 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::ConformanceRequirement:
     case ConstraintLocator::TypeParameterRequirement:
       break;
+
+    case ConstraintLocator::PackElement:
+      break;
+
+    case ConstraintLocator::PatternBindingElement: {
+      auto pattern = path[0].castTo<LocatorPathElt::PatternBindingElement>();
+      auto *patternBinding = cast<PatternBindingDecl>(anchor.get<Decl *>());
+      anchor = patternBinding->getInit(pattern.getIndex());
+      // If this pattern is uninitialized, let's use it as anchor.
+      if (!anchor)
+        anchor = patternBinding->getPattern(pattern.getIndex());
+      path = path.slice(1);
+      continue;
+    }
     }
 
     // If we get here, we couldn't simplify the path further.
