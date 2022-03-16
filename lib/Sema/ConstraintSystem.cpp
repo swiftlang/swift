@@ -4817,16 +4817,28 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::Condition: {
-      anchor = castToExpr<IfExpr>(anchor)->getCondExpr();
+      if (auto *condStmt = getAsStmt<LabeledConditionalStmt>(anchor)) {
+        anchor = &condStmt->getCond().front();
+      } else {
+        anchor = castToExpr<IfExpr>(anchor)->getCondExpr();
+      }
+
       path = path.slice(1);
       continue;
     }
 
     case ConstraintLocator::TernaryBranch: {
       auto branch = path[0].castTo<LocatorPathElt::TernaryBranch>();
-      auto *ifExpr = castToExpr<IfExpr>(anchor);
 
-      anchor = branch.forThen() ? ifExpr->getThenExpr() : ifExpr->getElseExpr();
+      if (auto *ifStmt = getAsStmt<IfStmt>(anchor)) {
+        anchor =
+            branch.forThen() ? ifStmt->getThenStmt() : ifStmt->getElseStmt();
+      } else {
+        auto *ifExpr = castToExpr<IfExpr>(anchor);
+        anchor =
+            branch.forThen() ? ifExpr->getThenExpr() : ifExpr->getElseExpr();
+      }
+
       path = path.slice(1);
       continue;
     }
