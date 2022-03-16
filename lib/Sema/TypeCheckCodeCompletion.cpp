@@ -596,9 +596,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     options |= ConstraintSystemFlags::AllowFixes;
     options |= ConstraintSystemFlags::SuppressDiagnostics;
     options |= ConstraintSystemFlags::ForCodeCompletion;
-    options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
-
-
+    
     ConstraintSystem cs(DC, options);
 
     llvm::SmallVector<Solution, 4> solutions;
