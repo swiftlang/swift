@@ -194,8 +194,6 @@ sourcekitd_response_t createErrorRequestCancelled();
 sourcekitd_uid_t SKDUIDFromUIdent(SourceKit::UIdent UID);
 SourceKit::UIdent UIdentFromSKDUID(sourcekitd_uid_t uid);
 
-void writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS);
-
 static inline sourcekitd_variant_t makeNullVariant() {
   return {{ 0, 0, 0 }};
 }
