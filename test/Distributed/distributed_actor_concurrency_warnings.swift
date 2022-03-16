@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 actor Charlie {
     // should not cause sendable warnings, Worker is Sendable as implied by DA

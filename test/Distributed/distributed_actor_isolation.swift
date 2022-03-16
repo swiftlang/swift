@@ -7,7 +7,7 @@
 // TODO(distributed): rdar://82419661 remove -verify-ignore-unknown here, no warnings should be emitted for our
 //  generated code but right now a few are, because of Sendability checks -- need to track it down more.
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 @available(SwiftStdlib 5.5, *)

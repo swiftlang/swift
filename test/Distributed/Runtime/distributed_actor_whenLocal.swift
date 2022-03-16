@@ -14,7 +14,7 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
-import _Distributed
+import Distributed
 
 distributed actor Capybara {
   // only the local capybara can do this!

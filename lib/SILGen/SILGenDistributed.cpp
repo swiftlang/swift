@@ -115,7 +115,7 @@ static void emitDistributedIfRemoteBranch(SILGenFunction &SGF, SILLocation Loc,
 
   FuncDecl *isRemoteFn = ctx.getIsRemoteDistributedActor();
   assert(isRemoteFn && "Could not find 'is remote' function, is the "
-                       "'_Distributed' module available?");
+                       "'Distributed' module available?");
 
   ManagedValue selfAnyObject = B.createInitExistentialRef(
       Loc, SGF.getLoweredType(ctx.getAnyObjectType()), CanType(selfTy),

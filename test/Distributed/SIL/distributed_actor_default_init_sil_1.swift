@@ -6,7 +6,7 @@
 
 /// The convention in this test is that the Swift declaration comes before its FileCheck lines.
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
@@ -35,7 +35,7 @@ distributed actor MyDistActor {
 // CHECK:    store [[SYSTEM]] to [[TP_FIELD]] : $*FakeActorSystem
                 // *** obtain an identity ***
 // CHECK:    [[SELF_METATYPE:%[0-9]+]] = metatype $@thick MyDistActor.Type
-// CHECK:    [[ASSIGN_ID_FN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV8assignIDyAA0C7AddressVxm01_B00bC0RzAF0G0RtzlF : $@convention(method) <τ_0_0 where τ_0_0 : DistributedActor, τ_0_0.ID == ActorAddress> (@thick τ_0_0.Type, @guaranteed FakeActorSystem) -> @owned ActorAddress
+// CHECK:    [[ASSIGN_ID_FN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV8assignIDyAA0C7AddressVxm0B00bC0RzAF0G0RtzlF : $@convention(method) <τ_0_0 where τ_0_0 : DistributedActor, τ_0_0.ID == ActorAddress> (@thick τ_0_0.Type, @guaranteed FakeActorSystem) -> @owned ActorAddress // user: %12
 // CHECK:    [[ID:%[0-9]+]] = apply [[ASSIGN_ID_FN]]<MyDistActor>([[SELF_METATYPE]], [[SYSTEM]]) : $@convention(method) <τ_0_0 where τ_0_0 : DistributedActor, τ_0_0.ID == ActorAddress> (@thick τ_0_0.Type, @guaranteed FakeActorSystem) -> @owned ActorAddress
                 // *** save identity ***
 // CHECK:    [[ID_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
@@ -43,7 +43,7 @@ distributed actor MyDistActor {
                 // *** save user-defined property ***
 // CHECK:    store {{%[0-9]+}} to {{%[0-9]+}} : $*SomeClass
                 // *** invoke actorReady ***
-// CHECK:    [[READY_FN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10actorReadyyyx01_B00bC0RzAA0C7AddressV2IDRtzlF : $@convention(method) <τ_0_0 where τ_0_0 : DistributedActor, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @guaranteed FakeActorSystem) -> ()
+// CHECK:    [[READY_FN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10actorReadyyyx0B00bC0RzAA0C7AddressV2IDRtzlF : $@convention(method) <τ_0_0 where τ_0_0 : DistributedActor, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @guaranteed FakeActorSystem) -> ()
 // CHECK:    = apply [[READY_FN]]<MyDistActor>([[SELF]], [[SYSTEM]])
                 // *** clean-ups ***
 // CHECK:    release_value [[SYSTEM]] : $FakeActorSystem

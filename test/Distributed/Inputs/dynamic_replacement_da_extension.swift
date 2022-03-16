@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import _Distributed
+import Distributed
 
 extension DA {
   @_dynamicReplacement(for:_remote_hello(other:))

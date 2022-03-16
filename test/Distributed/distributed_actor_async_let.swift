@@ -6,7 +6,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 distributed actor Philosopher {

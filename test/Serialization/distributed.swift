@@ -7,7 +7,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 import def_distributed
 
 func testDoSomethingDistributed(system: FakeActorSystem) {

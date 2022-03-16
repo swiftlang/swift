@@ -10,7 +10,7 @@
 
 // UNSUPPORTED: OS=windows-msvc
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 @available(SwiftStdlib 5.5, *)
