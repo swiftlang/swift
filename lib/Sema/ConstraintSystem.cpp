@@ -4857,6 +4857,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
+    case ConstraintLocator::ClosureBodyElement: {
+      auto bodyElt = path[0].castTo<LocatorPathElt::ClosureBodyElement>();
+      anchor = bodyElt.getElement();
+      path = path.slice(1);
+      continue;
+    }
+
     case ConstraintLocator::PatternMatch: {
       auto patternElt = path[0].castTo<LocatorPathElt::PatternMatch>();
       anchor = patternElt.getPattern();
