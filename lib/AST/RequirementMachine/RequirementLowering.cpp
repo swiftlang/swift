@@ -1258,26 +1258,39 @@ void RuleBuilder::addAssociatedType(const AssociatedTypeDecl *type,
 
 /// Lowers a desugared generic requirement to a rewrite rule.
 ///
-/// If \p proto is null, this is a generic requirement from the top-level
-/// generic signature. The added rewrite rule will be rooted in a generic
-/// parameter symbol.
+/// Convert a requirement to a rule and add it to the builder.
+///
+/// The types in the requirement must be canonical.
+///
+/// If \p proto is null and \p substitutions is None, this is a generic
+/// requirement from the top-level generic signature. The added rewrite
+/// rule will be rooted in a generic parameter symbol.
 ///
 /// If \p proto is non-null, this is a generic requirement in the protocol's
 /// requirement signature. The added rewrite rule will be rooted in a
 /// protocol symbol.
-std::pair<MutableTerm, MutableTerm>
-swift::rewriting::getRuleForRequirement(const Requirement &req,
-                                        const ProtocolDecl *proto,
-                                        Optional<ArrayRef<Term>> substitutions,
-                                        RewriteContext &ctx) {
+///
+/// If \p substitutions is not None, this is a conditional requirement
+/// added by conditional requirement inference. The added rewrite rule
+/// will be added in the corresponding term from the substitution array.
+void RuleBuilder::addRequirement(const Requirement &req,
+                                 const ProtocolDecl *proto,
+                                 Optional<ArrayRef<Term>> substitutions,
+                                 Optional<unsigned> requirementID) {
+  if (Dump) {
+    llvm::dbgs() << "+ ";
+    req.dump(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  }
+
   assert(!substitutions.hasValue() || proto == nullptr && "Can't have both");
 
   // Compute the left hand side.
   auto subjectType = CanType(req.getFirstType());
   auto subjectTerm = (substitutions
-                      ? ctx.getRelativeTermForType(
+                      ? Context.getRelativeTermForType(
                           subjectType, *substitutions)
-                      : ctx.getMutableTermForType(
+                      : Context.getMutableTermForType(
                           subjectType, proto));
 
   // Compute the right hand side.
@@ -1293,7 +1306,7 @@ swift::rewriting::getRuleForRequirement(const Requirement &req,
     auto *proto = req.getProtocolDecl();
 
     constraintTerm = subjectTerm;
-    constraintTerm.add(Symbol::forProtocol(proto, ctx));
+    constraintTerm.add(Symbol::forProtocol(proto, Context));
     break;
   }
 
@@ -1306,11 +1319,11 @@ swift::rewriting::getRuleForRequirement(const Requirement &req,
     // Build the symbol [superclass: C<X, Y>].
     SmallVector<Term, 1> result;
     otherType = (substitutions
-                 ? ctx.getRelativeSubstitutionSchemaFromType(
+                 ? Context.getRelativeSubstitutionSchemaFromType(
                     otherType, *substitutions, result)
-                 : ctx.getSubstitutionSchemaFromType(
+                 : Context.getSubstitutionSchemaFromType(
                     otherType, proto, result));
-    auto superclassSymbol = Symbol::forSuperclass(otherType, result, ctx);
+    auto superclassSymbol = Symbol::forSuperclass(otherType, result, Context);
 
     // Build the term T.[superclass: C<X, Y>].
     constraintTerm = subjectTerm;
@@ -1323,7 +1336,7 @@ swift::rewriting::getRuleForRequirement(const Requirement &req,
     //
     //   T.[layout: L] == T
     constraintTerm = subjectTerm;
-    constraintTerm.add(Symbol::forLayout(req.getLayoutConstraint(), ctx));
+    constraintTerm.add(Symbol::forLayout(req.getLayoutConstraint(), Context));
     break;
   }
 
@@ -1337,49 +1350,28 @@ swift::rewriting::getRuleForRequirement(const Requirement &req,
       //   T.[concrete: C<X, Y>] => T
       SmallVector<Term, 1> result;
       otherType = (substitutions
-                   ? ctx.getRelativeSubstitutionSchemaFromType(
+                   ? Context.getRelativeSubstitutionSchemaFromType(
                         otherType, *substitutions, result)
-                   : ctx.getSubstitutionSchemaFromType(
+                   : Context.getSubstitutionSchemaFromType(
                         otherType, proto, result));
 
       constraintTerm = subjectTerm;
-      constraintTerm.add(Symbol::forConcreteType(otherType, result, ctx));
+      constraintTerm.add(Symbol::forConcreteType(otherType, result, Context));
       break;
     }
 
     constraintTerm = (substitutions
-                      ? ctx.getRelativeTermForType(
+                      ? Context.getRelativeTermForType(
                             otherType, *substitutions)
-                      : ctx.getMutableTermForType(
+                      : Context.getMutableTermForType(
                             otherType, proto));
     break;
   }
   }
 
-  return std::make_pair(subjectTerm, constraintTerm);
-}
-
-/// Convert a requirement to a rule and add it to the builder.
-///
-/// The types in the requirement must be canonical.
-///
-/// If \p substitutions is not None, the interface types in the requirement
-/// are converted to terms relative to these substitutions, using
-/// RewriteContext::getRelativeTermForType().
-void RuleBuilder::addRequirement(const Requirement &req,
-                                 const ProtocolDecl *proto,
-                                 Optional<ArrayRef<Term>> substitutions,
-                                 Optional<unsigned> requirementID) {
-  if (Dump) {
-    llvm::dbgs() << "+ ";
-    req.dump(llvm::dbgs());
-    llvm::dbgs() << "\n";
-  }
-
-  auto rule =
-      getRuleForRequirement(req, proto, substitutions, Context);
-  RequirementRules.push_back(
-      std::make_tuple(rule.first, rule.second, requirementID));
+  RequirementRules.emplace_back(
+      std::move(subjectTerm), std::move(constraintTerm),
+      requirementID);
 }
 
 void RuleBuilder::addRequirement(const StructuralRequirement &req,

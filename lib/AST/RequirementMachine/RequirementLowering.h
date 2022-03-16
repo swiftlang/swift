@@ -63,12 +63,6 @@ bool diagnoseRequirementErrors(ASTContext &ctx,
                                ArrayRef<RequirementError> errors,
                                bool allowConcreteGenericParams);
 
-std::pair<MutableTerm, MutableTerm>
-getRuleForRequirement(const Requirement &req,
-                      const ProtocolDecl *proto,
-                      Optional<ArrayRef<Term>> substitutions,
-                      RewriteContext &ctx);
-
 /// A utility class for bulding rewrite rules from the top-level requirements
 /// of a generic signature.
 ///
