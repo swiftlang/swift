@@ -33,6 +33,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "RequirementMachine.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
@@ -1014,7 +1015,7 @@ ArrayRef<ProtocolDecl *>
 ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *proto) const {
   auto &ctx = proto->getASTContext();
-  SmallVector<ProtocolDecl *, 4> result;
+  SmallSetVector<ProtocolDecl *, 4> result;
 
   // If we have a serialized requirement signature, deserialize it and
   // look at conformance requirements.
@@ -1026,7 +1027,7 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
         == RequirementMachineMode::Disabled)) {
     for (auto req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
-        result.push_back(req.getProtocolDecl());
+        result.insert(req.getProtocolDecl());
       }
     }
 
@@ -1038,7 +1039,7 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
   // signature. Look at the structural requirements instead.
   for (auto req : proto->getStructuralRequirements()) {
     if (req.req.getKind() == RequirementKind::Conformance)
-      result.push_back(req.req.getProtocolDecl());
+      result.insert(req.req.getProtocolDecl());
   }
 
   return ctx.AllocateCopy(result);
