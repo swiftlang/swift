@@ -233,8 +233,21 @@ typedef struct swift_async_task_info {
   /// swift_reflection call on the given context.
   const char *Error;
 
-  uint32_t JobFlags;
-  uint64_t TaskStatusFlags;
+  unsigned Kind;
+  unsigned EnqueuePriority;
+  uint8_t IsChildTask;
+  uint8_t IsFuture;
+  uint8_t IsGroupChildTask;
+  uint8_t IsAsyncLetTask;
+
+  unsigned MaxPriority;
+  uint8_t IsCancelled;
+  uint8_t IsStatusRecordLocked;
+  uint8_t IsEscalated;
+  uint8_t HasIsRunning; // If false, the IsRunning flag is not valid.
+  uint8_t IsRunning;
+  uint8_t IsEnqueued;
+
   uint64_t Id;
   swift_reflection_ptr_t RunJob;
   swift_reflection_ptr_t AllocatorSlabPtr;
