@@ -137,7 +137,7 @@ extension String.UTF16View: BidirectionalCollection {
   /// In an empty UTF-16 view, `endIndex` is equal to `startIndex`.
   @inlinable @inline(__always)
   public var endIndex: Index { return _guts.endIndex }
-
+  
   @inlinable @inline(__always)
   public func index(after idx: Index) -> Index {
     if _slowPath(_guts.isForeign) { return _foreignIndex(after: idx) }
@@ -149,6 +149,7 @@ extension String.UTF16View: BidirectionalCollection {
     // TODO: If transcoded is 1, can we just skip ahead 4?
 
     let idx = _utf16AlignNativeIndex(idx)
+
     let len = _guts.fastUTF8ScalarLength(startingAt: idx._encodedOffset)
     if len == 4 && idx.transcodedOffset == 0 {
       return idx.nextTranscoded
@@ -530,17 +531,15 @@ extension String.UTF16View {
     }
 
     let idx = _utf16AlignNativeIndex(idx)
+    _internalInvariant(idx.transcodedOffset == 0 || idx.transcodedOffset == 1)
 
     guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
-      let fastCalculation: Int = _guts.withFastUTF8(
+      let fastCalculation: Int = idx.transcodedOffset + _guts.withFastUTF8(
         range: startIndex._encodedOffset ..< idx._encodedOffset
       ) { utf8 in
         return _utf16Length(UnsafeRawBufferPointer(utf8))
       }
-      
-      _internalInvariant(
-        fastCalculation == _distance(from: startIndex, to: idx)
-      )
+
       return fastCalculation
     }
 
@@ -552,16 +551,11 @@ extension String.UTF16View {
     let (crumb, crumbOffset) = breadcrumbsPtr.pointee.getBreadcrumb(
       forIndex: idx)
         
-    let fastCalculation: Int = _guts.withFastUTF8(
+    return idx.transcodedOffset + _guts.withFastUTF8(
       range: _utf16AlignNativeIndex(crumb)._encodedOffset ..< idx._encodedOffset
     ) { utf8 in
       return crumbOffset + _utf16Length(UnsafeRawBufferPointer(utf8))
     }
-    
-    _internalInvariant(
-      fastCalculation == crumbOffset + _distance(from: crumb, to: idx)
-    )
-    return fastCalculation
   }
 
   @usableFromInline

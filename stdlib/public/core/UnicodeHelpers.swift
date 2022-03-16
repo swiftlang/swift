@@ -123,16 +123,6 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
 }
 
 @inlinable @inline(__always)
-internal func _utf16LengthOfScalar(
-  _ readPtr: inout UnsafeRawPointer
-) -> Int {
-  let byte = readPtr.load(as: UInt8.self)
-  let len = _utf8ScalarLength(byte)
-  readPtr += len
-  return len == 4 ? 2 : 1
-}
-
-@inlinable @inline(__always)
 internal func _utf16Length<U: SIMD, S: SIMD>(
   readPtr: inout UnsafeRawPointer,
   endPtr: UnsafeRawPointer,
@@ -146,13 +136,14 @@ internal func _utf16Length<U: SIMD, S: SIMD>(
     let sValue = readPtr.load(as: S.self)
     let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
     let continuationCount = Int(continuations.wrappedSum())
-    
+        
     //Find the number of 4 byte code points (0b1110xxxx)
     let uValue = readPtr.load(as: U.self)
     let fourBytes = U.zero.replacing(with: U.one, where: uValue .>= 0b11110000)
     let fourByteCount = Int(fourBytes.wrappedSum())
-    
+        
     utf16Count &+= (U.scalarCount - continuationCount) + fourByteCount
+    
     readPtr += MemoryLayout<U>.stride
   }
   
@@ -168,7 +159,6 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
     || UTF8.isContinuation(rawBuffer.last.unsafelyUnwrapped))
   
   var utf16Count = 0
-  
   var readPtr = rawBuffer.baseAddress.unsafelyUnwrapped
   let initialReadPtr = readPtr
   let endPtr = readPtr + rawBuffer.count
@@ -266,7 +256,7 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
     }
     readPtr += len
   }
-  
+
   return utf16Count
 }
 
