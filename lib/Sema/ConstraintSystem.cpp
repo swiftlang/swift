@@ -4885,6 +4885,11 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::FunctionArgument:
     case ConstraintLocator::SynthesizedArgument:
       break;
+
+    case ConstraintLocator::DynamicLookupResult:
+    case ConstraintLocator::KeyPathComponentResult:
+      break;
+
     }
 
     // If we get here, we couldn't simplify the path further.
