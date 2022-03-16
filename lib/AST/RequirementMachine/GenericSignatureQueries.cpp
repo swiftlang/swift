@@ -14,13 +14,13 @@
 // Use those methods instead of calling into the RequirementMachine directly.
 //
 //===----------------------------------------------------------------------===//
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include <vector>
-
+#include "NameLookup.h"
 #include "RequirementMachine.h"
 
 using namespace swift;
@@ -607,26 +607,6 @@ RequirementMachine::getConformanceAccessPath(Type type,
       }
     }
   }
-}
-
-static void lookupConcreteNestedType(NominalTypeDecl *decl,
-                                     Identifier name,
-                                     SmallVectorImpl<TypeDecl *> &concreteDecls) {
-  SmallVector<ValueDecl *, 2> foundMembers;
-  decl->getParentModule()->lookupQualified(
-      decl, DeclNameRef(name),
-      NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
-      foundMembers);
-  for (auto member : foundMembers)
-    concreteDecls.push_back(cast<TypeDecl>(member));
-}
-
-static TypeDecl *
-findBestConcreteNestedType(SmallVectorImpl<TypeDecl *> &concreteDecls) {
-  return *std::min_element(concreteDecls.begin(), concreteDecls.end(),
-                           [](TypeDecl *type1, TypeDecl *type2) {
-                             return TypeDecl::compare(type1, type2) < 0;
-                           });
 }
 
 TypeDecl *

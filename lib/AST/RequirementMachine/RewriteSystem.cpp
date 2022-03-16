@@ -70,7 +70,7 @@ RewriteSystem::~RewriteSystem() {
 /// complete rewrite system.
 void RewriteSystem::initialize(
     bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
-    ArrayRef<StructuralRequirement> writtenRequirements,
+    std::vector<StructuralRequirement> &&writtenRequirements,
     std::vector<Rule> &&importedRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
     std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>>
@@ -80,47 +80,11 @@ void RewriteSystem::initialize(
 
   RecordLoops = recordLoops;
   Protos = protos;
-  WrittenRequirements = writtenRequirements;
+  WrittenRequirements = std::move(writtenRequirements);
 
-  // Pre-populate our rules vector with the list of imported rules, and note
-  // the position of the first local (not imported) rule.
-  Rules = std::move(importedRules);
-  FirstLocalRule = Rules.size();
-
-  // Add the imported rules to the trie.
-  for (unsigned newRuleID : indices(Rules)) {
-    const auto &newRule = Rules[newRuleID];
-    // Skip simplified rules. At the very least we need to skip RHS-simplified
-    // rules since their left hand sides might duplicate existing rules; the
-    // others are skipped purely as an optimization.
-    if (newRule.isLHSSimplified() ||
-        newRule.isRHSSimplified() ||
-        newRule.isSubstitutionSimplified())
-      continue;
-
-    auto oldRuleID = Trie.insert(newRule.getLHS().begin(),
-                                 newRule.getLHS().end(),
-                                 newRuleID);
-    if (oldRuleID) {
-      llvm::errs() << "Imported rules have duplicate left hand sides!\n";
-      llvm::errs() << "New rule #" << newRuleID << ": " << newRule << "\n";
-      const auto &oldRule = getRule(*oldRuleID);
-      llvm::errs() << "Old rule #" << *oldRuleID << ": " << oldRule << "\n\n";
-      dump(llvm::errs());
-      abort();
-    }
-  }
-
-  // Now add our own rules.
-  for (const auto &rule : permanentRules)
-    addPermanentRule(rule.first, rule.second);
-
-  for (const auto &rule : requirementRules) {
-    auto lhs = std::get<0>(rule);
-    auto rhs = std::get<1>(rule);
-    auto requirementID = std::get<2>(rule);
-    addExplicitRule(lhs, rhs, requirementID);
-  }
+  addRules(std::move(importedRules),
+           std::move(permanentRules),
+           std::move(requirementRules));
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.
@@ -328,6 +292,75 @@ bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
   }
 
   return added;
+}
+
+/// Add a set of rules from a RuleBuilder.
+///
+/// This is used when building a rewrite system in initialize() above.
+///
+/// It is also used when conditional requirement inference pulls in additional
+/// protocols after the fact.
+void RewriteSystem::addRules(
+    std::vector<Rule> &&importedRules,
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+    std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules) {
+  unsigned ruleCount = Rules.size();
+
+  if (ruleCount == 0) {
+    // Fast path if this is called from initialization; just steal the
+    // underlying storage of the imported rule vector.
+    Rules = std::move(importedRules);
+  }
+  else {
+    // Otherwise, copy the imported rules in.
+    Rules.insert(Rules.end(), importedRules.begin(), importedRules.end());
+  }
+
+  // If this is the initial call, note the first non-imported rule so that
+  // we can skip over imported rules later.
+  if (ruleCount == 0)
+    FirstLocalRule = Rules.size();
+
+  // Add the imported rules to the trie.
+  for (unsigned newRuleID = ruleCount, e = Rules.size();
+       newRuleID < e; ++newRuleID) {
+    const auto &newRule = Rules[newRuleID];
+    // Skip simplified rules. At the very least we need to skip RHS-simplified
+    // rules since their left hand sides might duplicate existing rules; the
+    // others are skipped purely as an optimization.
+    if (newRule.isLHSSimplified() ||
+        newRule.isRHSSimplified() ||
+        newRule.isSubstitutionSimplified())
+      continue;
+
+    auto oldRuleID = Trie.insert(newRule.getLHS().begin(),
+                                 newRule.getLHS().end(),
+                                 newRuleID);
+    if (oldRuleID) {
+      llvm::errs() << "Imported rules have duplicate left hand sides!\n";
+      llvm::errs() << "New rule #" << newRuleID << ": " << newRule << "\n";
+      const auto &oldRule = getRule(*oldRuleID);
+      llvm::errs() << "Old rule #" << *oldRuleID << ": " << oldRule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
+
+  // Now add our own rules.
+  for (const auto &rule : permanentRules)
+    addPermanentRule(rule.first, rule.second);
+
+  for (const auto &rule : requirementRules) {
+    auto lhs = std::get<0>(rule);
+    auto rhs = std::get<1>(rule);
+    auto requirementID = std::get<2>(rule);
+
+    // When this is called while adding conditional requirements, there
+    // shouldn't be any new structural requirement IDs.
+    assert(ruleCount == 0 || !requirementID.hasValue());
+
+    addExplicitRule(lhs, rhs, requirementID);
+  }
 }
 
 /// Delete any rules whose left hand sides can be reduced by other rules.

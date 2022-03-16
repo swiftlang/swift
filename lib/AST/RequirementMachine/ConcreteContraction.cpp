@@ -146,6 +146,7 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "NameLookup.h"
 #include "RequirementLowering.h"
 
 using namespace swift;
@@ -181,30 +182,6 @@ public:
 };
 
 }  // end namespace
-
-/// Find the most canonical member type of \p decl named \p name, using the
-/// canonical type order.
-static TypeDecl *lookupConcreteNestedType(ModuleDecl *module,
-                                          NominalTypeDecl *decl,
-                                          Identifier name) {
-  SmallVector<ValueDecl *, 2> foundMembers;
-  module->lookupQualified(
-      decl, DeclNameRef(name),
-      NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
-      foundMembers);
-
-  SmallVector<TypeDecl *, 2> concreteDecls;
-  for (auto member : foundMembers)
-    concreteDecls.push_back(cast<TypeDecl>(member));
-
-  if (concreteDecls.empty())
-    return nullptr;
-
-  return *std::min_element(concreteDecls.begin(), concreteDecls.end(),
-                           [](TypeDecl *type1, TypeDecl *type2) {
-                             return TypeDecl::compare(type1, type2) < 0;
-                           });
-}
 
 /// A re-implementation of Type::subst() that also handles unresolved
 /// DependentMemberTypes by performing name lookup into the base type.
@@ -267,12 +244,12 @@ Optional<Type> ConcreteContraction::substTypeParameter(
     return None;
   }
 
-  auto *module = decl->getParentModule();
-
   // An unresolved DependentMemberType stores an identifier. Handle this
   // by performing a name lookup into the base type.
-  auto *typeDecl = lookupConcreteNestedType(module, decl,
-                                            memberType->getName());
+  SmallVector<TypeDecl *> concreteDecls;
+  lookupConcreteNestedType(decl, memberType->getName(), concreteDecls);
+
+  auto *typeDecl = findBestConcreteNestedType(concreteDecls);
   if (typeDecl == nullptr) {
     // The base type doesn't contain a member type with this name, in which
     // case the requirement remains unsubstituted.
@@ -285,7 +262,7 @@ Optional<Type> ConcreteContraction::substTypeParameter(
 
   // Substitute the base type into the member type.
   auto subMap = (*substBaseType)->getContextSubstitutionMap(
-      module, typeDecl->getDeclContext());
+      decl->getParentModule(), typeDecl->getDeclContext());
   return typeDecl->getDeclaredInterfaceType().subst(subMap);
 }
 
@@ -531,6 +508,12 @@ bool ConcreteContraction::performConcreteContraction(
   // Phase 2: Replace each concretely-conforming generic parameter with its
   // concrete type.
   for (auto req : requirements) {
+    if (Debug) {
+      llvm::dbgs() << "@ Original requirement: ";
+      req.req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+
     // Substitute the requirement.
     Optional<Requirement> substReq = substRequirement(req.req);
 

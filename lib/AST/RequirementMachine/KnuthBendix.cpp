@@ -391,7 +391,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
 
     for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.
-      if (Rules.size() > maxRuleCount)
+      if (getLocalRules().size() > maxRuleCount)
         return std::make_pair(CompletionResult::MaxRuleCount, Rules.size() - 1);
 
       if (!addRule(pair.LHS, pair.RHS, &pair.Path))
