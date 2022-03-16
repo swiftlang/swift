@@ -186,4 +186,36 @@ void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
       F.mapTypeIntoContext(actor->getType()), { actor });
 }
 
+void emitResignIdentityCall(SILBuilder &B, SILLocation loc,
+                            ClassDecl* actorDecl,
+                            SILValue actor, SILValue idRef) {
+  auto &F = B.getFunction();
+  auto &C = F.getASTContext();
+
+  SILValue systemRef = refDistributedActorSystem(B, loc, actorDecl, actor);
+
+  emitDistributedActorSystemWitnessCall(
+      B, loc, C.Id_resignID,
+      systemRef,
+      SILType(),
+      { idRef });
+}
+
+/// Creates a reference to the distributed actor's \p actorSystem
+/// stored property.
+SILValue refDistributedActorSystem(SILBuilder &b,
+                                   SILLocation loc,
+                                   ClassDecl *actDecl,
+                                   SILValue actorInstance) {
+  assert(actDecl);
+  assert(actDecl->isDistributedActor());
+
+  // get the VarDecl corresponding to the actorSystem.
+  auto refs = actDecl->lookupDirect(actDecl->getASTContext().Id_actorSystem);
+  assert(refs.size() == 1);
+  VarDecl *actorSystemVar = dyn_cast<VarDecl>(refs.front());
+
+  return b.createRefElementAddr(loc, actorInstance, actorSystemVar);
+}
+
 } // namespace swift

@@ -629,6 +629,8 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   //     because the 'DerivedConformanceDistributedActor' won't trigger for 'id'
   //     because it has a default impl via 'Identifiable' (ObjectIdentifier)
   //     which we do not want.
+  // Also, the 'id' var must be added before the 'actorSystem'.
+  // See NOTE (id-before-actorSystem) for more details.
   (void)nominal->getDistributedActorIDProperty();
 }
 

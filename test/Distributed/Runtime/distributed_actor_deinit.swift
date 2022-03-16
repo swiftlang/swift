@@ -15,17 +15,23 @@ import Distributed
 actor A {}
 
 distributed actor DA {
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 }
 
 distributed actor DA_userDefined {
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 
   deinit {}
 }
 
 distributed actor DA_userDefined2 {
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -37,7 +43,9 @@ distributed actor DA_state {
   var name = "Hello"
   var age = 42
 
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 
   deinit {
     print("Deinitializing \(self.id)")

@@ -15,5 +15,5 @@ distributed actor DA {
 func take<A: Codable>(actor: A) {}
 
 func test(actorSystem: FakeActorSystem) {
-  take(actor: DA(system: actorSystem)) // ok
+  take(actor: DA(actorSystem: actorSystem)) // ok
 }

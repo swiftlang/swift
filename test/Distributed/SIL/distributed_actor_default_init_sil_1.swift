@@ -23,6 +23,7 @@ distributed actor MyDistActor {
   var localOnlyField: SomeClass
 
   init(system_sync: FakeActorSystem) {
+    self.actorSystem = system_sync
     self.localOnlyField = SomeClass()
   }
 

@@ -17,6 +17,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILOptimizer/Utils/DistributedActor.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -223,6 +224,33 @@ SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
                            Module, MemorySILType, EltNo, isNonDelegatingInit());
 }
 
+/// During tear-down of a distributed actor, we must invoke its
+/// \p actorSystem.resignID method, passing in the \p id from the
+/// instance. Thus, this function inspects the VarDecl about to be destroyed
+/// and if it matches the \p id, the \p resignIdentity call is emitted.
+///
+/// NOTE (id-before-actorSystem): it is crucial that the \p id is
+/// deinitialized before the \p actorSystem is deinitialized, because
+/// resigning the identity requires a call into the \p actorSystem.
+/// Since deinitialization consistently happens in-order, according to the
+/// listing returned by \p NominalTypeDecl::getStoredProperties
+/// it is important the the VarDecl for the \p id is synthesized before
+/// the \p actorSystem so that we get the right ordering in DI and deinits.
+///
+/// \param nomDecl a distributed actor decl
+/// \param var a VarDecl that is a member of the \p nomDecl
+static void tryToResignIdentity(SILLocation loc, SILBuilder &B,
+                                NominalTypeDecl* nomDecl, VarDecl *var,
+                                SILValue idRef, SILValue actorInst) {
+  assert(nomDecl->isDistributedActor());
+
+  if (var != nomDecl->getDistributedActorIDProperty())
+    return;
+
+  emitResignIdentityCall(B, loc, cast<ClassDecl>(nomDecl),
+                         actorInst, idRef);
+}
+
 /// Given a tuple element number (in the flattened sense) return a pointer to a
 /// leaf element of the specified number, so we can insert destroys for it.
 SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
@@ -262,6 +290,7 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
     // lifetimes for each of the tuple members.
     if (IsSelf) {
       if (auto *NTD = PointeeType.getNominalOrBoundGenericNominal()) {
+        const bool IsDistributedActor = NTD->isDistributedActor();
         bool HasStoredProperties = false;
         for (auto *VD : NTD->getStoredProperties()) {
           if (!HasStoredProperties) {
@@ -289,10 +318,15 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
                 Borrowed = Ptr = B.createBeginBorrow(Loc, Ptr);
                 EndScopeList.emplace_back(Borrowed, EndScopeKind::Borrow);
               }
+              SILValue Self = Ptr;
               Ptr = B.createRefElementAddr(Loc, Ptr, VD);
               Ptr = B.createBeginAccess(
                   Loc, Ptr, SILAccessKind::Deinit, SILAccessEnforcement::Static,
                   false /*noNestedConflict*/, false /*fromBuiltin*/);
+
+              if (IsDistributedActor)
+                tryToResignIdentity(Loc, B, NTD, VD, Ptr, Self);
+
               EndScopeList.emplace_back(Ptr, EndScopeKind::Access);
             }
 

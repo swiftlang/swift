@@ -41,7 +41,7 @@ extension Greeter {
 
 func test() async throws {
   let system = DefaultDistributedActorSystem()
-  let g = Greeter(system: system)
+  let g = Greeter(actorSystem: system)
   let greeter = try Greeter.resolve(id: g.id, using: system)
 
   try await greeter.noParams()

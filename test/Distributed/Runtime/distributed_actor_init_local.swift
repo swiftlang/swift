@@ -8,8 +8,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: radar_86543336
-
 import Distributed
 
 enum MyError: Error {
