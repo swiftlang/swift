@@ -72,20 +72,21 @@ class RewriteSystem final {
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
 
+  unsigned FirstLocalRule = 0;
+
   /// A prefix trie of rule left hand sides to optimize lookup. The value
   /// type is an index into the Rules array defined above.
   Trie<unsigned, MatchKind::Shortest> Trie;
 
-  /// The set of protocols known to this rewrite system. The boolean associated
-  /// with each key is true if the protocol is part of the 'Protos' set above,
-  /// otherwies it is false.
+  /// The set of protocols known to this rewrite system.
   ///
-  /// See RuleBuilder::ProtocolMap for a more complete explanation. For the most
-  /// part, this is only used while building the rewrite system, but conditional
-  /// requirement inference forces us to be able to add new protocols to the
-  /// rewrite system after the fact, so this little bit of RuleBuilder state
-  /// outlives the initialization phase.
-  llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
+  /// See RuleBuilder::ReferencedProtocols for a more complete explanation.
+  ///
+  /// For the most part, this is only used while building the rewrite system,
+  /// but conditional requirement inference forces us to be able to add new
+  /// protocols to the rewrite system after the fact, so this little bit of
+  /// RuleBuilder state outlives the initialization phase.
+  llvm::DenseSet<const ProtocolDecl *> ReferencedProtocols;
 
   DebugOptions Debug;
 
@@ -117,14 +118,16 @@ public:
   /// Return the rewrite context used for allocating memory.
   RewriteContext &getRewriteContext() const { return Context; }
 
-  llvm::DenseMap<const ProtocolDecl *, bool> &getProtocolMap() {
-    return ProtocolMap;
+  llvm::DenseSet<const ProtocolDecl *> &getReferencedProtocols() {
+    return ReferencedProtocols;
   }
 
   DebugOptions getDebugOptions() const { return Debug; }
 
-  void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
+  void initialize(bool recordLoops,
+                  ArrayRef<const ProtocolDecl *> protos,
                   ArrayRef<StructuralRequirement> writtenRequirements,
+                  std::vector<Rule> &&importedRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
                   std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
 
@@ -133,7 +136,7 @@ public:
   }
 
   bool isKnownProtocol(const ProtocolDecl *proto) const {
-    return ProtocolMap.find(proto) != ProtocolMap.end();
+    return ReferencedProtocols.count(proto) > 0;
   }
 
   unsigned getRuleID(const Rule &rule) const {
@@ -141,10 +144,19 @@ public:
     return (unsigned)(&rule - &*Rules.begin());
   }
 
+  /// Get an array of all rewrite rules.
   ArrayRef<Rule> getRules() const {
     return Rules;
   }
 
+  /// Get an array of rewrite rules, not including rewrite rules imported
+  /// from referenced protocols.
+  ArrayRef<Rule> getLocalRules() const {
+    return getRules().slice(FirstLocalRule);
+  }
+
+  /// Get the rewrite rule at the given index. Note that this is an index
+  /// into getRules(), *NOT* getLocalRules().
   Rule &getRule(unsigned ruleID) {
     return Rules[ruleID];
   }

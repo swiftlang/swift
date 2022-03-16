@@ -133,8 +133,7 @@ RequirementMachine *RewriteContext::getRequirementMachine(
   auto *newMachine = new rewriting::RequirementMachine(*this);
   machine = newMachine;
 
-  // This might re-entrantly invalidate 'machine', which is a reference
-  // into Protos.
+  // This might re-entrantly invalidate 'machine'.
   auto status = newMachine->initWithGenericSignature(sig);
   newMachine->checkCompletionResult(status.first);
 
@@ -170,7 +169,10 @@ void RewriteContext::getProtocolComponentRec(
   stack.push_back(proto);
 
   // Look at each successor.
-  for (auto *depProto : proto->getProtocolDependencies()) {
+  auto found = Dependencies.find(proto);
+  assert(found != Dependencies.end());
+
+  for (auto *depProto : found->second) {
     auto found = Protos.find(depProto);
     if (found == Protos.end()) {
       // Successor has not yet been visited. Recurse.
@@ -223,38 +225,119 @@ void RewriteContext::getProtocolComponentRec(
   }
 }
 
-/// Lazily construct a requirement machine for the given protocol's strongly
-/// connected component (SCC) in the protocol dependency graph.
+/// Get the strongly connected component (SCC) of the protocol dependency
+/// graph containing the given protocol.
 ///
-/// This can only be called once, to prevent multiple requirement machines
-/// for being built with the same component.
-ArrayRef<const ProtocolDecl *> RewriteContext::getProtocolComponent(
-    const ProtocolDecl *proto) {
+/// You must not hold on to this reference across calls to any other
+/// Requirement Machine operations, since they might insert new entries
+/// into the underlying DenseMap, invalidating the reference.
+RewriteContext::ProtocolComponent &
+RewriteContext::getProtocolComponentImpl(const ProtocolDecl *proto) {
+  {
+    // We pre-load protocol dependencies into the Dependencies map
+    // because getProtocolDependencies() can trigger recursive calls into
+    // the requirement machine in highly-invalid code, which violates
+    // invariants in getProtocolComponentRec().
+    SmallVector<const ProtocolDecl *, 3> worklist;
+    worklist.push_back(proto);
+
+    while (!worklist.empty()) {
+      const auto *otherProto = worklist.back();
+      worklist.pop_back();
+
+      auto found = Dependencies.find(otherProto);
+      if (found != Dependencies.end())
+        continue;
+
+      auto protoDeps = otherProto->getProtocolDependencies();
+      Dependencies.insert(std::make_pair(otherProto, protoDeps));
+      for (auto *nextProto : protoDeps)
+        worklist.push_back(nextProto);
+    }
+  }
+
   auto found = Protos.find(proto);
   if (found == Protos.end()) {
+    if (ProtectProtocolComponentRec) {
+      llvm::errs() << "Too much recursion is bad\n";
+      abort();
+    }
+
+    ProtectProtocolComponentRec = true;
+
     SmallVector<const ProtocolDecl *, 3> stack;
     getProtocolComponentRec(proto, stack);
     assert(stack.empty());
 
     found = Protos.find(proto);
     assert(found != Protos.end());
+
+    ProtectProtocolComponentRec = false;
   }
 
   assert(Components.count(found->second.ComponentID) != 0);
   auto &component = Components[found->second.ComponentID];
 
-  if (component.InProgress) {
-    llvm::errs() << "Re-entrant construction of requirement "
-                 << "machine for:";
+  assert(std::find(component.Protos.begin(), component.Protos.end(), proto)
+         != component.Protos.end() && "Protocol is in the wrong SCC");
+  return component;
+}
+
+/// Get the list of protocols in the strongly connected component (SCC)
+/// of the protocol dependency graph containing the given protocol.
+///
+/// This can only be called once, to prevent multiple requirement machines
+/// for being built with the same component.
+ArrayRef<const ProtocolDecl *> RewriteContext::getProtocolComponent(
+    const ProtocolDecl *proto) {
+  auto &component = getProtocolComponentImpl(proto);
+
+  if (component.ComputingRequirementSignatures) {
+    llvm::errs() << "Re-entrant minimization of requirement signatures for: ";
     for (auto *proto : component.Protos)
       llvm::errs() << " " << proto->getName();
     llvm::errs() << "\n";
     abort();
   }
 
-  component.InProgress = true;
+  component.ComputingRequirementSignatures = true;
 
   return component.Protos;
+}
+
+/// Get the list of protocols in the strongly connected component (SCC)
+/// of the protocol dependency graph containing the given protocol.
+///
+/// This can only be called once, to prevent multiple requirement machines
+/// for being built with the same component.
+RequirementMachine *RewriteContext::getRequirementMachine(
+    const ProtocolDecl *proto) {
+  auto &component = getProtocolComponentImpl(proto);
+
+  if (component.Machine) {
+    if (!component.Machine->isComplete()) {
+      llvm::errs() << "Re-entrant construction of requirement machine for: ";
+      for (auto *proto : component.Protos)
+        llvm::errs() << " " << proto->getName();
+      llvm::errs() << "\n";
+      abort();
+    }
+
+    return component.Machine;
+  }
+
+  // Store this requirement machine before adding the protocols, to catch
+  // re-entrant construction via initWithProtocolSignatureRequirements()
+  // below.
+  auto *newMachine = new rewriting::RequirementMachine(*this);
+  component.Machine = newMachine;
+
+  // This might re-entrantly invalidate 'component.Machine'.
+  auto status = newMachine->initWithProtocolSignatureRequirements(
+      component.Protos);
+  newMachine->checkCompletionResult(status.first);
+
+  return newMachine;
 }
 
 bool RewriteContext::isRecursivelyConstructingRequirementMachine(
@@ -270,12 +353,17 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
   if (component == Components.end())
     return false;
 
-  return component->second.InProgress;
+  return component->second.ComputingRequirementSignatures;
 }
 
 /// We print stats in the destructor, which should get executed at the end of
 /// a compilation job.
 RewriteContext::~RewriteContext() {
+  for (const auto &pair : Components)
+    delete pair.second.Machine;
+
+  Components.clear();
+
   for (const auto &pair : Machines)
     delete pair.second;
 

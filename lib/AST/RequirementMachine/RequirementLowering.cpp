@@ -33,6 +33,8 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SetVector.h"
+#include "RequirementMachine.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
 #include "Symbol.h"
@@ -1013,7 +1015,7 @@ ArrayRef<ProtocolDecl *>
 ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *proto) const {
   auto &ctx = proto->getASTContext();
-  SmallVector<ProtocolDecl *, 4> result;
+  SmallSetVector<ProtocolDecl *, 4> result;
 
   // If we have a serialized requirement signature, deserialize it and
   // look at conformance requirements.
@@ -1025,7 +1027,7 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
         == RequirementMachineMode::Disabled)) {
     for (auto req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
-        result.push_back(req.getProtocolDecl());
+        result.insert(req.getProtocolDecl());
       }
     }
 
@@ -1037,7 +1039,7 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
   // signature. Look at the structural requirements instead.
   for (auto req : proto->getStructuralRequirements()) {
     if (req.req.getKind() == RequirementKind::Conformance)
-      result.push_back(req.req.getProtocolDecl());
+      result.insert(req.req.getProtocolDecl());
   }
 
   return ctx.AllocateCopy(result);
@@ -1047,11 +1049,17 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
 // Building rewrite rules from desugared requirements.
 //
 
-void RuleBuilder::addRequirements(ArrayRef<Requirement> requirements) {
+/// For building a rewrite system for a generic signature from canonical
+/// requirements.
+void RuleBuilder::initWithGenericSignatureRequirements(
+    ArrayRef<Requirement> requirements) {
+  assert(!Initialized);
+  Initialized = 1;
+
   // Collect all protocols transitively referenced from these requirements.
   for (auto req : requirements) {
     if (req.getKind() == RequirementKind::Conformance) {
-      addProtocol(req.getProtocolDecl(), /*initialComponent=*/false);
+      addReferencedProtocol(req.getProtocolDecl());
     }
   }
 
@@ -1062,11 +1070,17 @@ void RuleBuilder::addRequirements(ArrayRef<Requirement> requirements) {
     addRequirement(req, /*proto=*/nullptr, /*requirementID=*/None);
 }
 
-void RuleBuilder::addRequirements(ArrayRef<StructuralRequirement> requirements) {
+/// For building a rewrite system for a generic signature from user-written
+/// requirements.
+void RuleBuilder::initWithWrittenRequirements(
+    ArrayRef<StructuralRequirement> requirements) {
+  assert(!Initialized);
+  Initialized = 1;
+
   // Collect all protocols transitively referenced from these requirements.
   for (auto req : requirements) {
     if (req.req.getKind() == RequirementKind::Conformance) {
-      addProtocol(req.req.getProtocolDecl(), /*initialComponent=*/false);
+      addReferencedProtocol(req.req.getProtocolDecl());
     }
   }
 
@@ -1077,14 +1091,115 @@ void RuleBuilder::addRequirements(ArrayRef<StructuralRequirement> requirements) 
     addRequirement(req, /*proto=*/nullptr);
 }
 
-void RuleBuilder::addProtocols(ArrayRef<const ProtocolDecl *> protos) {
-  // Collect all protocols transitively referenced from this connected component
-  // of the protocol dependency graph.
-  for (auto proto : protos) {
-    addProtocol(proto, /*initialComponent=*/true);
+/// For building a rewrite system for a protocol connected component from
+/// a previously-built requirement signature.
+///
+/// Will trigger requirement signature computation if we haven't built
+/// requirement signatures for this connected component yet, in which case we
+/// will recursively end up building another rewrite system for this component
+/// using initWithProtocolWrittenRequirements().
+void RuleBuilder::initWithProtocolSignatureRequirements(
+    ArrayRef<const ProtocolDecl *> protos) {
+  assert(!Initialized);
+  Initialized = 1;
+
+  // Add all protocols to the referenced set, so that subsequent calls
+  // to addReferencedProtocol() with one of these protocols don't add
+  // them to the import list.
+  for (auto *proto : protos) {
+    ReferencedProtocols.insert(proto);
   }
 
+  for (auto *proto : protos) {
+    if (Dump) {
+      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
+    }
+
+    addPermanentProtocolRules(proto);
+
+    auto reqs = proto->getRequirementSignature();
+    for (auto req : reqs.getRequirements())
+      addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
+    for (auto alias : reqs.getTypeAliases())
+      addTypeAlias(alias, proto);
+
+    for (auto *otherProto : proto->getProtocolDependencies())
+      addReferencedProtocol(otherProto);
+
+    if (Dump) {
+      llvm::dbgs() << "}\n";
+    }
+  }
+
+  // Collect all protocols transitively referenced from this connected component
+  // of the protocol dependency graph.
   collectRulesFromReferencedProtocols();
+}
+
+/// For building a rewrite system for a protocol connected component from
+/// user-written requirements. Used when actually building requirement
+/// signatures.
+void RuleBuilder::initWithProtocolWrittenRequirements(
+    ArrayRef<const ProtocolDecl *> protos) {
+  assert(!Initialized);
+  Initialized = 1;
+
+  // Add all protocols to the referenced set, so that subsequent calls
+  // to addReferencedProtocol() with one of these protocols don't add
+  // them to the import list.
+  for (auto *proto : protos) {
+    ReferencedProtocols.insert(proto);
+  }
+
+  for (auto *proto : protos) {
+    if (Dump) {
+      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
+    }
+
+    addPermanentProtocolRules(proto);
+
+    for (auto req : proto->getStructuralRequirements())
+      addRequirement(req, proto);
+
+    for (auto req : proto->getTypeAliasRequirements())
+      addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
+
+    for (auto *otherProto : proto->getProtocolDependencies())
+      addReferencedProtocol(otherProto);
+
+    if (Dump) {
+      llvm::dbgs() << "}\n";
+    }
+  }
+
+  // Collect all protocols transitively referenced from this connected component
+  // of the protocol dependency graph.
+  collectRulesFromReferencedProtocols();
+}
+
+/// Add permanent rules for a protocol, consisting of:
+///
+/// - The identity conformance rule [P].[P] => [P].
+/// - An associated type introduction rule for each associated type.
+/// - An inherited associated type introduction rule for each associated
+///   type of each inherited protocol.
+void RuleBuilder::addPermanentProtocolRules(const ProtocolDecl *proto) {
+  MutableTerm lhs;
+  lhs.add(Symbol::forProtocol(proto, Context));
+  lhs.add(Symbol::forProtocol(proto, Context));
+
+  MutableTerm rhs;
+  rhs.add(Symbol::forProtocol(proto, Context));
+
+  PermanentRules.emplace_back(lhs, rhs);
+
+  for (auto *assocType : proto->getAssociatedTypeMembers())
+    addAssociatedType(assocType, proto);
+
+  for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+    for (auto *assocType : inheritedProto->getAssociatedTypeMembers())
+      addAssociatedType(assocType, proto);
+  }
 }
 
 /// For an associated type T in a protocol P, we add a rewrite rule:
@@ -1264,75 +1379,58 @@ void RuleBuilder::addTypeAlias(const ProtocolTypeAlias &alias,
                                 /*requirementID=*/None);
 }
 
-/// Record information about a protocol if we have no seen it yet.
-void RuleBuilder::addProtocol(const ProtocolDecl *proto,
-                              bool initialComponent) {
-  if (ProtocolMap.count(proto) > 0)
-    return;
-
-  ProtocolMap[proto] = initialComponent;
-  Protocols.push_back(proto);
+/// If we haven't seen this protocol yet, save it for later so that we can
+/// import the rewrite rules from its connected component.
+void RuleBuilder::addReferencedProtocol(const ProtocolDecl *proto) {
+  if (ReferencedProtocols.insert(proto).second)
+    ProtocolsToImport.push_back(proto);
 }
 
 /// Compute the transitive closure of the set of all protocols referenced from
 /// the right hand sides of conformance requirements, and convert their
 /// requirements to rewrite rules.
 void RuleBuilder::collectRulesFromReferencedProtocols() {
+  // Compute the transitive closure.
   unsigned i = 0;
-  while (i < Protocols.size()) {
-    auto *proto = Protocols[i++];
+  while (i < ProtocolsToImport.size()) {
+    auto *proto = ProtocolsToImport[i++];
     for (auto *depProto : proto->getProtocolDependencies()) {
-      addProtocol(depProto, /*initialComponent=*/false);
+      addReferencedProtocol(depProto);
     }
   }
 
-  // Add rewrite rules for each protocol.
-  for (auto *proto : Protocols) {
+  // If this is a rewrite system for a generic signature, add rewrite rules for
+  // each referenced protocol.
+  //
+  // if this is a rewrite system for a connected component of the protocol
+  // dependency graph, add rewrite rules for each referenced protocol not part
+  // of this connected component.
+
+  // First, collect all unique requirement machines, one for each connected
+  // component of each referenced protocol.
+  llvm::DenseSet<RequirementMachine *> machines;
+
+  // Now visit each subordinate requirement machine pull in its rules.
+  for (auto *proto : ProtocolsToImport) {
+    // This will trigger requirement signature computation for this protocol,
+    // if neccessary, which will cause us to re-enter into a new RuleBuilder
+    // instace under RuleBuilder::initWithProtocolWrittenRequirements().
     if (Dump) {
-      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
+      llvm::dbgs() << "importing protocol " << proto->getName() << " {\n";
     }
 
-    // Add the identity conformance rule [P].[P] => [P].
-    MutableTerm lhs;
-    lhs.add(Symbol::forProtocol(proto, Context));
-    lhs.add(Symbol::forProtocol(proto, Context));
-
-    MutableTerm rhs;
-    rhs.add(Symbol::forProtocol(proto, Context));
-
-    PermanentRules.emplace_back(lhs, rhs);
-
-    for (auto *assocType : proto->getAssociatedTypeMembers())
-      addAssociatedType(assocType, proto);
-
-    for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
-      for (auto *assocType : inheritedProto->getAssociatedTypeMembers())
-        addAssociatedType(assocType, proto);
+    auto *machine = Context.getRequirementMachine(proto);
+    if (!machines.insert(machine).second) {
+      // We've already seen this connected component.
+      continue;
     }
 
-    // If this protocol is part of the initial connected component, we're
-    // building requirement signatures for all protocols in this component,
-    // and so we must start with the structural requirements.
-    //
-    // Otherwise, we should either already have a requirement signature, or
-    // we can trigger the computation of the requirement signatures of the
-    // next component recursively.
-    if (ProtocolMap[proto]) {
-      for (auto req : proto->getStructuralRequirements())
-        addRequirement(req, proto);
-
-      for (auto req : proto->getTypeAliasRequirements())
-        addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
-    } else {
-      auto reqs = proto->getRequirementSignature();
-      for (auto req : reqs.getRequirements())
-        addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
-      for (auto alias : reqs.getTypeAliases())
-        addTypeAlias(alias, proto);
-    }
-
-    if (Dump) {
-      llvm::dbgs() << "}\n";
-    }
+    // We grab the machine's local rules, not *all* of its rules, to avoid
+    // duplicates in case multiple machines share a dependency on a downstream
+    // protocol connected component.
+    auto localRules = machine->getLocalRules();
+    ImportedRules.insert(ImportedRules.end(),
+                         localRules.begin(),
+                         localRules.end());
   }
 }

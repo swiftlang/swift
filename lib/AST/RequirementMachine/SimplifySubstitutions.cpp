@@ -378,7 +378,7 @@ RewriteSystem::simplifySubstitutions(Term baseTerm, Symbol symbol,
 /// is built, and a final simplification pass is performed with \p map set to
 /// the new property map.
 void RewriteSystem::simplifyLeftHandSideSubstitutions(const PropertyMap *map) {
-  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
     if (rule.isSubstitutionSimplified())
       continue;
