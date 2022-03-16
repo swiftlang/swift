@@ -178,3 +178,19 @@ class X3 { }
 
 func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
 // expected-warning@-1{{redundant superclass constraint 'T.B' : 'X3'}}
+
+
+// Redundant requirement warnings are suppressed for inferred requirements.
+
+protocol P11 {
+ associatedtype X
+ associatedtype Y
+ associatedtype Z
+}
+
+func inferred1<T : Hashable>(_: Set<T>) {}
+func inferred2<T>(_: Set<T>) where T: Hashable {}
+func inferred3<T : P11>(_: T) where T.X : Hashable, T.Z == Set<T.Y>, T.X == T.Y {}
+func inferred4<T : P11>(_: T) where T.Z == Set<T.Y>, T.X : Hashable, T.X == T.Y {}
+func inferred5<T : P11>(_: T) where T.Z == Set<T.X>, T.Y : Hashable, T.X == T.Y {}
+func inferred6<T : P11>(_: T) where T.Y : Hashable, T.Z == Set<T.X>, T.X == T.Y {}
