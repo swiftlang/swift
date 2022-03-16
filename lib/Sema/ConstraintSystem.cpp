@@ -4900,6 +4900,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::KeyPathRoot:
     case ConstraintLocator::KeyPathValue:
       break;
+
+    case ConstraintLocator::ProtocolRequirement:
+    case ConstraintLocator::ConditionalRequirement:
+    case ConstraintLocator::ConformanceRequirement:
+    case ConstraintLocator::TypeParameterRequirement:
+      break;
     }
 
     // If we get here, we couldn't simplify the path further.
