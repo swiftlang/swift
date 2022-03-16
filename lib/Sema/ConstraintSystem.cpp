@@ -4758,6 +4758,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
         path = path.slice(1);
         continue;
       }
+
+      if (anchor.is<Pattern *>()) {
+        path = path.slice(1);
+        continue;
+      }
+
       break;
 
     case ConstraintLocator::SubscriptMember:
@@ -4847,6 +4853,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::UnresolvedMemberChainResult: {
       auto *resultExpr = castToExpr<UnresolvedMemberChainResultExpr>(anchor);
       anchor = resultExpr->getSubExpr();
+      path = path.slice(1);
+      continue;
+    }
+
+    case ConstraintLocator::PatternMatch: {
+      auto patternElt = path[0].castTo<LocatorPathElt::PatternMatch>();
+      anchor = patternElt.getPattern();
       path = path.slice(1);
       continue;
     }
