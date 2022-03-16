@@ -1,6 +1,6 @@
 # The swift-frontend tool
 
-if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
+if(${SWIFT_BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
 
   # Bootstrapping - level 0
   # For more information on how bootstrapping works, see docs/SwiftInTheCompiler.md
