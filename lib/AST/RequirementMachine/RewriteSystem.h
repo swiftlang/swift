@@ -126,7 +126,7 @@ public:
 
   void initialize(bool recordLoops,
                   ArrayRef<const ProtocolDecl *> protos,
-                  ArrayRef<StructuralRequirement> writtenRequirements,
+                  std::vector<StructuralRequirement> &&writtenRequirements,
                   std::vector<Rule> &&importedRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
                   std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
