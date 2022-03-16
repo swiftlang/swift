@@ -4935,6 +4935,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::ImplicitConversion:
       break;
+
+    case ConstraintLocator::Witness:
+    case ConstraintLocator::WrappedValue:
+    case ConstraintLocator::OptionalPayload:
+    case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
+      break;
     }
 
     // If we get here, we couldn't simplify the path further.
