@@ -1,6 +1,4 @@
-// RUN: not --crash %target-swift-frontend -disable-availability-checking -emit-ir -enable-parameterized-protocol-types %s
-
-// REQUIRES: asserts
+// RUN: %target-swift-frontend -disable-availability-checking -emit-ir -enable-parameterized-protocol-types %s
 
 protocol P<X: P, Y: P> {
   var x: X { get }

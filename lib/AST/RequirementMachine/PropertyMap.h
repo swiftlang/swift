@@ -285,7 +285,7 @@ private:
   void concretizeTypeWitnessInConformance(
                    Term key, RequirementKind requirementKind,
                    Symbol concreteConformanceSymbol,
-                   ProtocolConformance *concrete,
+                   ProtocolConformanceRef conformance,
                    AssociatedTypeDecl *assocType) const;
 
   void inferConditionalRequirements(
