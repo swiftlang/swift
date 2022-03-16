@@ -1067,7 +1067,7 @@ void RuleBuilder::initWithGenericSignatureRequirements(
 
   // Add rewrite rules for all top-level requirements.
   for (const auto &req : requirements)
-    addRequirement(req, /*proto=*/nullptr, /*requirementID=*/None);
+    addRequirement(req, /*proto=*/nullptr);
 }
 
 /// For building a rewrite system for a generic signature from user-written
@@ -1119,7 +1119,7 @@ void RuleBuilder::initWithProtocolSignatureRequirements(
 
     auto reqs = proto->getRequirementSignature();
     for (auto req : reqs.getRequirements())
-      addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
+      addRequirement(req.getCanonical(), proto);
     for (auto alias : reqs.getTypeAliases())
       addTypeAlias(alias, proto);
 
@@ -1160,9 +1160,8 @@ void RuleBuilder::initWithProtocolWrittenRequirements(
 
     for (auto req : proto->getStructuralRequirements())
       addRequirement(req, proto);
-
     for (auto req : proto->getTypeAliasRequirements())
-      addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
+      addRequirement(req.getCanonical(), proto);
 
     for (auto *otherProto : proto->getProtocolDependencies())
       addReferencedProtocol(otherProto);
@@ -1175,6 +1174,43 @@ void RuleBuilder::initWithProtocolWrittenRequirements(
   // Collect all protocols transitively referenced from this connected component
   // of the protocol dependency graph.
   collectRulesFromReferencedProtocols();
+}
+
+/// For adding conditional conformance requirements to an existing rewrite
+/// system. This might pull in additional protocols that we haven't seen
+/// before.
+///
+/// The interface types in the requirements are converted to terms relative
+/// to the given array of substitutions, using
+/// RewriteContext::getRelativeTermForType().
+///
+/// For example, given a concrete conformance rule:
+///
+///    X.Y.[concrete: Array<X.Z> : Equatable]
+///
+/// The substitutions are {τ_0_0 := X.Z}, and the Array : Equatable conformance
+/// has a conditional requirement 'τ_0_0 : Equatable', so the following
+/// conformance rule will be added:
+///
+///    X.Z.[Equatable] => X.Z
+void RuleBuilder::initWithConditionalRequirements(
+    ArrayRef<Requirement> requirements,
+    ArrayRef<Term> substitutions) {
+  assert(!Initialized);
+  Initialized = 1;
+
+  // Collect all protocols transitively referenced from these requirements.
+  for (auto req : requirements) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      addReferencedProtocol(req.getProtocolDecl());
+    }
+  }
+
+  collectRulesFromReferencedProtocols();
+
+  // Add rewrite rules for all top-level requirements.
+  for (const auto &req : requirements)
+    addRequirement(req.getCanonical(), /*proto=*/nullptr, substitutions);
 }
 
 /// Add permanent rules for a protocol, consisting of:
@@ -1323,8 +1359,16 @@ swift::rewriting::getRuleForRequirement(const Requirement &req,
   return std::make_pair(subjectTerm, constraintTerm);
 }
 
+/// Convert a requirement to a rule and add it to the builder.
+///
+/// The types in the requirement must be canonical.
+///
+/// If \p substitutions is not None, the interface types in the requirement
+/// are converted to terms relative to these substitutions, using
+/// RewriteContext::getRelativeTermForType().
 void RuleBuilder::addRequirement(const Requirement &req,
                                  const ProtocolDecl *proto,
+                                 Optional<ArrayRef<Term>> substitutions,
                                  Optional<unsigned> requirementID) {
   if (Dump) {
     llvm::dbgs() << "+ ";
@@ -1333,8 +1377,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
   }
 
   auto rule =
-      getRuleForRequirement(req, proto, /*substitutions=*/None,
-                            Context);
+      getRuleForRequirement(req, proto, substitutions, Context);
   RequirementRules.push_back(
       std::make_tuple(rule.first, rule.second, requirementID));
 }
@@ -1343,7 +1386,8 @@ void RuleBuilder::addRequirement(const StructuralRequirement &req,
                                  const ProtocolDecl *proto) {
   WrittenRequirements.push_back(req);
   unsigned requirementID = WrittenRequirements.size() - 1;
-  addRequirement(req.req.getCanonical(), proto, requirementID);
+  addRequirement(req.req.getCanonical(), proto, /*substitutions=*/None,
+                 requirementID);
 }
 
 /// Lowers a protocol typealias to a rewrite rule.

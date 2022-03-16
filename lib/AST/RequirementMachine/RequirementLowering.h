@@ -132,6 +132,8 @@ struct RuleBuilder {
   void initWithWrittenRequirements(ArrayRef<StructuralRequirement> requirements);
   void initWithProtocolSignatureRequirements(ArrayRef<const ProtocolDecl *> proto);
   void initWithProtocolWrittenRequirements(ArrayRef<const ProtocolDecl *> proto);
+  void initWithConditionalRequirements(ArrayRef<Requirement> requirements,
+                                       ArrayRef<Term> substitutions);
   void addReferencedProtocol(const ProtocolDecl *proto);
   void collectRulesFromReferencedProtocols();
 
@@ -141,7 +143,8 @@ private:
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
                       const ProtocolDecl *proto,
-                      Optional<unsigned> requirementID);
+                      Optional<ArrayRef<Term>> substitutions=None,
+                      Optional<unsigned> requirementID=None);
   void addRequirement(const StructuralRequirement &req,
                       const ProtocolDecl *proto);
   void addTypeAlias(const ProtocolTypeAlias &alias,
