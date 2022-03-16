@@ -17,6 +17,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Requirement.h"
 #include "RequirementLowering.h"
+#include "RuleBuilder.h"
 
 using namespace swift;
 using namespace rewriting;

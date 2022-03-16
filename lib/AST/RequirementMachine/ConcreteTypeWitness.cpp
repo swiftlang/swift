@@ -24,6 +24,7 @@
 #include <vector>
 #include "PropertyMap.h"
 #include "RequirementLowering.h"
+#include "RuleBuilder.h"
 
 using namespace swift;
 using namespace rewriting;
