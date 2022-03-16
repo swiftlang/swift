@@ -10,6 +10,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://90373022
+// UNSUPPORTED: OS=watchos
+
 import Distributed
 
 distributed actor Worker {
