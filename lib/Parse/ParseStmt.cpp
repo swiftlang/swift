@@ -1635,10 +1635,12 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     
     declRefExpr->setImplicit();
     Init = makeParserResult(declRefExpr);
-  } else if (!ThePattern.isNull()) {
+  } else if (!ThePattern.isNull() && BindingKindStr != "case") {
     // If the pattern is present but isn't an identifier, the user wrote
     // something invalid like `let foo.bar`. Emit a special diagnostic for this,
     // with a fix-it prepending "<#identifier#> = "
+    //  - We don't emit this fix-it if the user wrote `case let` (etc),
+    //    since the shorthand syntax isn't available for pattern matching
     auto diagLoc = ThePattern.get()->getSemanticsProvidingPattern()->getStartLoc();
     diagnose(diagLoc, diag::conditional_var_valid_identifiers_only)
       .fixItInsert(diagLoc, "<#identifier#> = ");

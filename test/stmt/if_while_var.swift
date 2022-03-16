@@ -55,8 +55,8 @@ class B {} // expected-note * {{did you mean 'B'?}}
 class D : B {}// expected-note * {{did you mean 'D'?}}
 
 // TODO poor recovery in these cases
-if let {} // expected-error {{expected '{' after 'if' condition}} expected-error {{pattern matching in a condition requires the 'case' keyword}}
-if let x = { } // expected-error{{'{' after 'if'}} expected-error {{variable binding in a condition requires an initializer}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
+if let {} // expected-error {{expected '{' after 'if' condition}} expected-error {{pattern matching in a condition requires the 'case' keyword}} expected-error {{unwrap condition requires a valid identifier}}
+if let x = { } // expected-error{{'{' after 'if'}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
 // expected-warning@-1{{value 'x' was defined but never used}}
 
 if let x = foo() {
