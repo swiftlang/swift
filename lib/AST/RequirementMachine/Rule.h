@@ -97,7 +97,6 @@ public:
   }
 
   void setRequirementID(Optional<unsigned> requirementID) {
-    assert(!getRequirementID().hasValue());
     this->requirementID = requirementID;
   }
 

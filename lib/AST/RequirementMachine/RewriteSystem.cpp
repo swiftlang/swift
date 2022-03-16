@@ -634,6 +634,10 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
     auto requirement = WrittenRequirements[requirementID];
     auto pairIt = rulesPerRequirement.find(requirementID);
 
+    // Inferred requirements can be re-stated without warning.
+    if (requirement.inferred)
+      continue;
+
     // If there are no rules for this structural requirement, then
     // the requirement was never added to the rewrite system because
     // it is trivially redundant.
