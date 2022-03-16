@@ -47,7 +47,7 @@ DistributedModuleIsAvailableRequest::evaluate(Evaluator &evaluator,
   if (C.getLoadedModule(C.Id_Distributed))
     return true;
 
-  // seems we're missing the _Distributed module, ask to import it explicitly
+  // seems we're missing the Distributed module, ask to import it explicitly
   decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
   return false;
 }
@@ -639,7 +639,7 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   if (!nominal)
     return;
 
-  // ==== Ensure the _Distributed module is available,
+  // ==== Ensure the Distributed module is available,
   // without it there's no reason to check the decl in more detail anyway.
   if (!swift::ensureDistributedModuleLoaded(nominal))
     return;

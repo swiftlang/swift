@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 distributed actor DA {
   typealias ActorSystem = FakeActorSystem

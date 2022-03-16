@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 /// Use the existential wrapper as the default actor system.
 typealias DefaultDistributedActorSystem = FakeActorSystem

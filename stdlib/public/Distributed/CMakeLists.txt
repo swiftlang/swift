@@ -14,7 +14,7 @@ set(swift_distributed_link_libraries
   swiftCore)
 
 
-add_swift_target_library(swift_Distributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   DistributedActor.cpp
   DistributedActor.swift
   DistributedActorSystem.swift
@@ -30,7 +30,7 @@ add_swift_target_library(swift_Distributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   LINK_LIBRARIES ${swift_distributed_link_libraries}
 
   C_COMPILE_FLAGS
-    -Dswift_Distributed_EXPORTS
+    -DswiftDistributed_EXPORTS
     -I${SWIFT_SOURCE_DIR}/stdlib/include
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

@@ -10,7 +10,7 @@
 
 // REQUIRES: radar_86543336
 
-import _Distributed
+import Distributed
 
 enum MyError: Error {
   case test

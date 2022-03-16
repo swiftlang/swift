@@ -408,7 +408,7 @@ def disable_implicit_concurrency_module_import : Flag<["-"],
 
 def disable_implicit_distributed_module_import : Flag<["-"],
   "disable-implicit-distributed-module-import">,
-  HelpText<"Disable the implicit import of the _Distributed module.">;
+  HelpText<"Disable the implicit import of the Distributed module.">;
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
