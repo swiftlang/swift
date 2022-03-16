@@ -1359,8 +1359,7 @@ public:
         auto TypeName = nodeToString(demangleTypeRef(TypeRef));
         clearNodeFactory();
         if (OptionalMangledTypeName.hasValue()) {
-          typeNameToManglingMap[TypeName] =
-              "$s" + OptionalMangledTypeName.getValue();
+          typeNameToManglingMap[TypeName] = OptionalMangledTypeName.getValue();
         }
       }
     }
