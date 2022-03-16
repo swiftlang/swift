@@ -1807,18 +1807,13 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
       ElseBody = parseStmtIf(LabeledStmtInfo(), implicitlyInsertIf);
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
-        CodeCompletion->completeAfterIfStmt(/*hasElse*/true);
+        CodeCompletion->completeAfterIfStmtElse();
       Status.setHasCodeCompletionAndIsError();
       consumeToken(tok::code_complete);
     } else {
       ElseBody = parseBraceItemList(diag::expected_lbrace_or_if_after_else);
     }
     Status |= ElseBody;
-  } else if (Tok.is(tok::code_complete)) {
-    if (CodeCompletion)
-      CodeCompletion->completeAfterIfStmt(/*hasElse*/false);
-    Status.setHasCodeCompletionAndIsError();
-    consumeToken(tok::code_complete);
   }
 
   return makeParserResult(
