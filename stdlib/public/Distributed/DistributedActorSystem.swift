@@ -78,7 +78,7 @@ public protocol DistributedActorSystem: Sendable {
   ///
   /// The `actor.id` of the passed actor must be an `ActorID` that this system previously has assigned.
   ///
-  /// If the `actorReady` gets called with some unknown ID, it should crash immediately as it signifies some
+  /// If `actorReady` gets called with some unknown ID, it should crash immediately as it signifies some
   /// very unexpected use of the system.
   ///
   /// - Parameter actor: reference to the (local) actor that was just fully initialized.
@@ -93,7 +93,7 @@ public protocol DistributedActorSystem: Sendable {
   /// and not re-cycled by the system), i.e. if it is called during a failure to initialize completely,
   /// the call from the actor's deinitalizer will not happen (as under these circumstances, `deinit` will be run).
   ///
-  /// If the `actorReady` gets called with some unknown ID, it should crash immediately as it signifies some
+  /// If `resignID` gets called with some unknown ID, it should crash immediately as it signifies some
   /// very unexpected use of the system.
   ///
   /// - Parameter id: the id of an actor managed by this system that has begun its `deinit`.
