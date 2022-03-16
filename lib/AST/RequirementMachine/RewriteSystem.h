@@ -173,6 +173,10 @@ public:
   bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
                        Optional<unsigned> requirementID);
 
+  void addRules(std::vector<Rule> &&importedRules,
+                std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+                std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
+
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
   Optional<unsigned>
