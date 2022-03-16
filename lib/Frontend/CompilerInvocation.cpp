@@ -487,16 +487,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
 
-  Opts.EnableExperimentalAsyncTopLevel |=
-    Args.hasArg(OPT_enable_experimental_async_top_level);
-
   /// experimental distributed also implicitly enables experimental concurrency
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_distributed);
-  Opts.EnableExperimentalConcurrency |=
-    Args.hasArg(OPT_enable_experimental_async_top_level);
+
+  if (Args.hasArg(OPT_enable_experimental_async_top_level))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-enable-experimental-async-top-level");
 
   Opts.DiagnoseInvalidEphemeralnessAsError |=
       Args.hasArg(OPT_enable_invalid_ephemeralness_as_error);
