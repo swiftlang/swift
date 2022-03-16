@@ -27,9 +27,18 @@
 // CHECK-NEXT: # define __has_warning(x) 0
 // CHECK-NEXT: #endif
 
-// CHECK-LABEL: #include <cstdint>
-// CHECK: #include <cstddef>
-// CHECK: #include <cstdbool>
+// CHECK-LABEL: #if defined(__OBJC__)
+// CHECK-NEXT:  #include <Foundation/Foundation.h>
+// CHECK-NEXT:  #endif
+// CHECK-NEXT:  #if defined(__cplusplus)
+// CHECK-NEXT:  #include <cstdint>
+// CHECK-NEXT:  #include <cstddef>
+// CHECK-NEXT:  #include <cstdbool>
+// CHECK-NEXT:  #else
+// CHECK-NEXT:  #include <stdint.h>
+// CHECK-NEXT:  #include <stddef.h>
+// CHECK-NEXT:  #include <stdbool.h>
+// CHECK-NEXT:  #endif
 
 // CHECK-LABEL: !defined(SWIFT_TYPEDEFS)
 // CHECK-NEXT:  # define SWIFT_TYPEDEFS 1
