@@ -267,7 +267,7 @@ public:
   void completeAfterPoundDirective() override;
   void completePlatformCondition() override;
   void completeGenericRequirement() override;
-  void completeAfterIfStmt(bool hasElse) override;
+  void completeAfterIfStmtElse() override;
   void completeStmtLabel(StmtKind ParentKind) override;
   void completeForEachPatternBeginning(bool hasTry, bool hasAwait) override;
   void completeTypeAttrBeginning() override;
@@ -578,13 +578,9 @@ void CodeCompletionCallbacksImpl::completePlatformCondition() {
   Kind = CompletionKind::PlatformConditon;
 }
 
-void CodeCompletionCallbacksImpl::completeAfterIfStmt(bool hasElse) {
+void CodeCompletionCallbacksImpl::completeAfterIfStmtElse() {
   CurDeclContext = P.CurDeclContext;
-  if (hasElse) {
-    Kind = CompletionKind::AfterIfStmtElse;
-  } else {
-    Kind = CompletionKind::StmtOrExpr;
-  }
+  Kind = CompletionKind::AfterIfStmtElse;
 }
 
 void CodeCompletionCallbacksImpl::completeGenericRequirement() {
