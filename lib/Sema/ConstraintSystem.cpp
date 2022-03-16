@@ -4893,6 +4893,10 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::GenericParameter:
       break;
 
+    case ConstraintLocator::OpenedGeneric:
+    case ConstraintLocator::OpenedOpaqueArchetype:
+      break;
+
     case ConstraintLocator::KeyPathRoot:
     case ConstraintLocator::KeyPathValue:
       break;
