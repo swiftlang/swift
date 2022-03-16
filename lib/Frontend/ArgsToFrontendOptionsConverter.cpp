@@ -625,13 +625,8 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     return true;
   }
   if (!FrontendOptions::canActionEmitClangHeader(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+      Opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
-    return true;
-  }
-  if (!FrontendOptions::canActionEmitClangHeader(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasCxxHeaderOutputPath()) {
-    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_cxx_header);
     return true;
   }
   if (!FrontendOptions::canActionEmitLoadedModuleTrace(Opts.RequestedAction) &&
