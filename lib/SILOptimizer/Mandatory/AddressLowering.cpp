@@ -1269,6 +1269,9 @@ protected:
 ///
 /// If the operand projects into its use, then the memory was already
 /// initialized when visiting the use.
+///
+/// It's ok for the builder to reuse the user's SILLocation because
+/// initializeComposingUse always inserts code immediately before the user.
 void AddressMaterialization::initializeComposingUse(Operand *operand) {
   SILValue def = operand->get();
   if (def->getType().isAddressOnly(*pass.function)) {
@@ -1405,7 +1408,7 @@ SILValue AddressMaterialization::materializeStructExtract(
   SILValue srcAddr = pass.getMaterializedAddress(structVal);
   auto *structType = structVal->getType().getStructOrBoundGenericStruct();
   auto *varDecl = structType->getStoredProperties()[fieldIdx];
-  return B.createStructElementAddr(extractInst->getLoc(), srcAddr, varDecl,
+  return B.createStructElementAddr(pass.genLoc(), srcAddr, varDecl,
                                    elementValue->getType().getAddressType());
 }
 
@@ -1413,7 +1416,7 @@ SILValue AddressMaterialization::materializeStructExtract(
 SILValue AddressMaterialization::materializeTupleExtract(
     SILInstruction *extractInst, SILValue elementValue, unsigned fieldIdx) {
   SILValue srcAddr = pass.getMaterializedAddress(extractInst->getOperand(0));
-  return B.createTupleElementAddr(extractInst->getLoc(), srcAddr, fieldIdx,
+  return B.createTupleElementAddr(pass.genLoc(), srcAddr, fieldIdx,
                                   elementValue->getType().getAddressType());
 }
 
@@ -1431,7 +1434,7 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
   case SILInstructionKind::EnumInst: {
     auto *enumInst = cast<EnumInst>(user);
     SILValue enumAddr = materializeComposingUser(enumInst, intoPhiOperand);
-    return B.createInitEnumDataAddr(enumInst->getLoc(), enumAddr,
+    return B.createInitEnumDataAddr(pass.genLoc(), enumAddr,
                                     enumInst->getElement(),
                                     operand->get()->getType().getAddressType());
   }
@@ -1443,8 +1446,8 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     auto &concreteTL = pass.function->getTypeLowering(opaque, canTy);
     return B.createInitExistentialAddr(
-        initExistentialValue->getLoc(), containerAddr, canTy,
-        concreteTL.getLoweredType(), initExistentialValue->getConformances());
+      pass.genLoc(), containerAddr, canTy,
+      concreteTL.getLoweredType(), initExistentialValue->getConformances());
   }
   case SILInstructionKind::StructInst: {
     auto *structInst = cast<StructInst>(user);
@@ -1454,8 +1457,8 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
 
     SILValue structAddr = materializeComposingUser(structInst, intoPhiOperand);
     return B.createStructElementAddr(
-        structInst->getLoc(), structAddr, *fieldIter,
-        operand->get()->getType().getAddressType());
+      pass.genLoc(), structAddr, *fieldIter,
+      operand->get()->getType().getAddressType());
   }
   case SILInstructionKind::TupleInst: {
     auto *tupleInst = cast<TupleInst>(user);
@@ -1467,7 +1470,7 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
       return pass.function->getArguments()[resultIdx];
     }
     SILValue tupleAddr = materializeComposingUser(tupleInst, intoPhiOperand);
-    return B.createTupleElementAddr(tupleInst->getLoc(), tupleAddr,
+    return B.createTupleElementAddr(pass.genLoc(), tupleAddr,
                                     operand->getOperandNumber(),
                                     operand->get()->getType().getAddressType());
   }
@@ -2739,7 +2742,7 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
     auto *caseAddr =
         caseBuilder.createUncheckedTakeEnumDataAddr(loc, enumAddr, caseDecl);
     auto *caseLoad = caseBuilder.createTrivialLoadOr(
-        switchEnum->getLoc(), caseAddr, LoadOwnershipQualifier::Take);
+        loc, caseAddr, LoadOwnershipQualifier::Take);
     caseArg->replaceAllUsesWith(caseLoad);
     if (caseArg->getType().isAddressOnly(*pass.function)) {
       // Remap caseArg to the new dummy load which will be deleted during
