@@ -515,6 +515,10 @@ public:
   int compare(NullTerminatedStringRef RHS) const { return Ref.compare(RHS); }
 };
 
+/// A variant of write_escaped that does not escape Unicode characters - useful for generating JSON,
+/// where escaped Unicode characters lead to malformed/invalid JSON.
+void writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS);
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_STRINGEXTRAS_H
