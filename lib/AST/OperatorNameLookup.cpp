@@ -164,6 +164,7 @@ DeclContext::lookupInfixOperator(Identifier name) const {
                                LookupInfixOperatorRequest{desc}, {});
   // Wrap the result in a InfixOperatorLookupResult. The request doesn't
   // return this directly to avoid unnecessarily caching the name and context.
+  ops[0]->dump();
   return InfixOperatorLookupResult(this, name, std::move(ops));
 }
 

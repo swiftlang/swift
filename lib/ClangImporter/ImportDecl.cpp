@@ -3601,6 +3601,7 @@ namespace {
                 cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call &&
                 cxxOperatorKind != clang::OverloadedOperatorKind::OO_Subscript) {
               auto d = makeOperator(MD, cxxMethod);
+              d->dump();
               result->addMember(d);
               result->addMemberToLookupTable(d);
               recordMemberInContext(MD->getDeclContext(), d);
@@ -8097,7 +8098,7 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   ASTContext &ctx = afd->getASTContext();
 
   auto funcDecl = cast<FuncDecl>(afd);
-  auto methodDecl = static_cast<FuncDecl *>(context);
+  auto methodDecl = static_cast<FuncDecl *>(context); /* Swift verison of CXXMethod */
 
   SmallVector<Expr *, 8> forwardingParams;
   for (auto param : *funcDecl->getParameters()) {
@@ -8188,7 +8189,6 @@ FuncDecl *SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod, clang::CXXM
   topLevelStaticFuncDecl->setImplicit();
   topLevelStaticFuncDecl->setIsDynamic(false);
   topLevelStaticFuncDecl->setStatic();
-  topLevelStaticFuncDecl->setImportAsStaticMember();
   topLevelStaticFuncDecl->setBodySynthesizer(synthesizeOperatorMethodBody, operatorMethod);
 
   return topLevelStaticFuncDecl;
