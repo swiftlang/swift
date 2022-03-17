@@ -518,37 +518,6 @@ extension _StringGuts {
   }
 }
 
-// FIXME: This is for debugging only; remove before merging.
-extension String.Index: CustomStringConvertible {
-  @_alwaysEmitIntoClient
-  @inline(never)
-  public var description: String {
-    var d = "Index("
-      d += "offset: \(_encodedOffset)"
-    if transcodedOffset != 0 {
-      d += "+\(transcodedOffset)"
-    }
-    if let stride = characterStride {
-      d += ", stride: \(stride)"
-    }
-    #if false // These aren't a thing yet
-    if _isCharacterAligned {
-      d += ", character"
-    } else if _isScalarAligned {
-      d += ", scalar"
-    }
-    if _rawBits & 0x4 != 0 {
-      d += ", utf8"
-    }
-    if _rawBits & 0x8 != 0 {
-      d += ", utf16"
-    }
-    #endif
-    d += ")"
-    return d
-  }
-}
-
 extension String.UTF16View {
   
   @inline(__always)
@@ -562,17 +531,17 @@ extension String.UTF16View {
     
     while readPtr + MemoryLayout<U>.stride < endPtr {
       //Find the number of continuations (0b10xxxxxx)
-      let sValue = readPtr.load(as: S.self)
+      let sValue = Builtin.loadRaw(readPtr._rawValue) as S
       let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
       let continuationCount = Int(continuations.wrappedSum())
             
       //Find the number of 4 byte code points (0b11110xxx)
-      let uValue = readPtr.load(as: U.self)
+      let uValue = Builtin.loadRaw(readPtr._rawValue) as U
       let fourBytes = U.zero.replacing(with: U.one, where: uValue .>= 0b11110000)
       let fourByteCount = Int(fourBytes.wrappedSum())
             
       utf16Count &+= (U.scalarCount - continuationCount) + fourByteCount
-      
+            
       readPtr += MemoryLayout<U>.stride
     }
     
@@ -582,8 +551,9 @@ extension String.UTF16View {
   @inline(__always)
   internal func _utf16Distance(from start: Index, to end: Index) -> Int {
     _internalInvariant(end.transcodedOffset == 0 || end.transcodedOffset == 1)
+        
     return (end.transcodedOffset - start.transcodedOffset) + _guts.withFastUTF8(
-      range: startIndex._encodedOffset ..< end._encodedOffset
+      range: start._encodedOffset ..< end._encodedOffset
     ) { utf8 in
       let rawBuffer = UnsafeRawBufferPointer(utf8)
       guard rawBuffer.count > 0 else { return 0 }
@@ -600,19 +570,6 @@ extension String.UTF16View {
           break
         }
         readPtr += 1
-      }
-      
-     // align
-      while readPtr < endPtr
-        && UInt(bitPattern: readPtr) % UInt(MemoryLayout<SIMD8<UInt8>>.stride) != 0 {
-        let byte = readPtr.load(as: UInt8.self)
-        let len = _utf8ScalarLength(byte)
-        // if we don't have enough bytes left, we don't have a complete scalar,
-        // so don't add it to the count.
-        if readPtr + len <= endPtr {
-          utf16Count &+= len == 4 ? 2 : 1
-        }
-        readPtr += len
       }
       
     //  utf16Count &+= _utf16Length(
@@ -716,7 +673,7 @@ extension String.UTF16View {
     // Otherwise, find the nearest lower-bound breadcrumb and count from there
     let (crumb, crumbOffset) = breadcrumbsPtr.pointee.getBreadcrumb(
       forIndex: idx)
-
+    
     return crumbOffset + _utf16Distance(from: crumb, to: idx)
   }
 
