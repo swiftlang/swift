@@ -79,6 +79,10 @@ protected:
     IsLet : 1
   );
 
+  SWIFT_INLINE_BITFIELD(AnyPattern, Pattern, 1,
+                        /// True if this is an "async let _"  pattern.
+                        IsAsyncLet : 1);
+
   } Bits;
 
   Pattern(PatternKind kind) {
@@ -369,14 +373,12 @@ public:
 /// bind a name to it.  This is spelled "_".
 class AnyPattern : public Pattern {
   SourceLoc Loc;
-  /// Flag representing if this is an "async let _: Type" pattern since 
-  /// `async let _` is a subPattern of a \c TypedPattern represented 
-  /// as \c AnyPattern
-  bool IsAsyncLet;
 
 public:
   explicit AnyPattern(SourceLoc Loc, bool IsAsyncLet = false)
-      : Pattern(PatternKind::Any), Loc(Loc), IsAsyncLet(IsAsyncLet) {}
+      : Pattern(PatternKind::Any), Loc(Loc) {
+    Bits.AnyPattern.IsAsyncLet = static_cast<uint64_t>(IsAsyncLet);
+  }
 
   static AnyPattern *createImplicit(ASTContext &Context) {
     auto *AP = new (Context) AnyPattern(SourceLoc());
@@ -387,7 +389,15 @@ public:
   SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
 
-  bool isAsyncLet() const { return IsAsyncLet; }
+  /// True if this is an "async let _ pattern since `async let _` could be a 
+  /// subPattern of a \c TypedPattern represented as \c AnyPattern e.g. 
+  /// "async let _: Type = <expr>" or simply just an \c AnyPattern in 
+  /// "async let _ = <expr>" case.
+  bool isAsyncLet() const { return bool(Bits.AnyPattern.IsAsyncLet); }
+  
+  void setIsAsyncLet() {
+    Bits.AnyPattern.IsAsyncLet = static_cast<uint64_t>(true);
+  }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Any;
