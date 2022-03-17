@@ -451,12 +451,9 @@ public:
                           SmallVectorImpl<ConformanceDiagnostic> *diagnostics);
 
   /// Retrieve the complete set of protocols to which this nominal
-  /// type conforms (if the set contains a protocol, the same is true for any
-  /// inherited protocols).
-  ///
-  /// \param sorted Whether to sort the protocols in canonical order.
+  /// type conforms.
   void getAllProtocols(NominalTypeDecl *nominal,
-                       SmallVectorImpl<ProtocolDecl *> &scratch, bool sorted);
+                       SmallVectorImpl<ProtocolDecl *> &scratch);
 
   /// Retrieve the complete set of protocol conformances for this
   /// nominal type.

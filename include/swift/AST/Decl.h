@@ -3513,9 +3513,7 @@ public:
          SmallVectorImpl<ProtocolConformance *> &conformances) const;
 
   /// Retrieve all of the protocols that this nominal type conforms to.
-  ///
-  /// \param sorted Whether to sort the protocols in canonical order.
-  SmallVector<ProtocolDecl *, 2> getAllProtocols(bool sorted = false) const;
+  SmallVector<ProtocolDecl *, 2> getAllProtocols() const;
 
   /// Retrieve all of the protocol conformances for this nominal type.
   SmallVector<ProtocolConformance *, 2> getAllConformances(
