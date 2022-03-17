@@ -1163,3 +1163,24 @@ swift::buildGenericSignature(ASTContext &ctx,
         addedRequirements},
       GenericSignatureWithError()).getPointer();
 }
+
+GenericSignature GenericSignature::withoutMarkerProtocols() const {
+  auto requirements = getRequirements();
+  SmallVector<Requirement, 4> reducedRequirements;
+
+  // Drop all conformance requirements to marker protocols (if any).
+  llvm::copy_if(requirements, std::back_inserter(reducedRequirements),
+                [](const Requirement &requirement) {
+                  if (requirement.getKind() == RequirementKind::Conformance) {
+                    auto *protocol = requirement.getProtocolDecl();
+                    return !protocol->isMarkerProtocol();
+                  }
+                  return true;
+                });
+
+  // If nothing changed, let's return this signature back.
+  if (requirements.size() == reducedRequirements.size())
+    return *this;
+
+  return GenericSignature::get(getGenericParams(), reducedRequirements);
+}
