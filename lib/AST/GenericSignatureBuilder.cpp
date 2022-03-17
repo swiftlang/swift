@@ -8662,23 +8662,24 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 
   auto compare = [&](ArrayRef<Requirement> rqmResult,
                      ArrayRef<Requirement> gsbResult) {
-    if (proto->getParentModule()->isStdlibModule() &&
-        (proto->getName().is("Collection") ||
-         proto->getName().is("StringProtocol"))) {
-      if (rqmResult.size() > gsbResult.size())
-        return false;
-    } else {
-      if (rqmResult.size() != gsbResult.size())
+    if (rqmResult.size() > gsbResult.size())
+      return false;
+    
+    if (!std::equal(rqmResult.begin(),
+                    rqmResult.end(),
+                    gsbResult.begin(),
+                    [](const Requirement &lhs,
+                       const Requirement &rhs) {
+                      return lhs.getCanonical() == rhs.getCanonical();
+                    }))
+      return false;
+
+    for (auto req : gsbResult.slice(rqmResult.size())) {
+      if (req.getKind() != RequirementKind::SameType)
         return false;
     }
 
-    return std::equal(rqmResult.begin(),
-                      rqmResult.end(),
-                      gsbResult.begin(),
-                      [](const Requirement &lhs,
-                         const Requirement &rhs) {
-                        return lhs.getCanonical() == rhs.getCanonical();
-                      });
+    return true;
   };
 
   switch (ctx.LangOpts.RequirementMachineProtocolSignatures) {

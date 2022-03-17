@@ -96,7 +96,7 @@
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output_unicode.swift.tmp.swiftsourceinfo"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
-// CHECK-NEXT:       "type": "objc-header",
+// CHECK-NEXT:       "type": "clang-header",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output_unicode.swift.tmp.h"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
