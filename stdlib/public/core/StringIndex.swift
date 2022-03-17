@@ -17,7 +17,7 @@ import SwiftShims
 String's Index has the following layout:
 
  ┌──────────┬────────────────╥────────────────┬───────╥───────┐
- │ b63:b16  │      b15:b14   ║     b13:b8     │ b7:b3 ║ b2:b0 │
+ │ b63:b16  │      b15:b14   ║     b13:b8     │ b7:b4 ║ b3:b0 │
  ├──────────┼────────────────╫────────────────┼───────╫───────┤
  │ position │ transc. offset ║ grapheme cache │ rsvd  ║ flags │
  └──────────┴────────────────╨────────────────┴───────╨───────┘
@@ -40,18 +40,35 @@ isn't frozen.
 - grapheme cache: A 6-bit value remembering the distance to the next grapheme
 boundary.
 
-- reserved: 5 unused bits available for future flags etc. The meaning of each
+- reserved: 4 unused bits available for future flags etc. The meaning of each
   bit may change between stdlib versions. These must be set to zero if
   constructing an index in inlinable code.
 
 <resilience barrier>
 
-  b2: UTF-16. If set, position is in known to be UTF-16 code units [Swift 5.7+]
-  b1: UTF-8. If set, position is in known to be UTF-8 code units [Swift 5.7+]
-  b0: Scalar alignment. If set, index is known to be scalar-aligned (see below)
+  * b3: UTF-16 encoding
 
-Before Swift 5.7, bits b1 and b2 used to be part of the resilient slice.
-See the note on Index Encoding below to see how this works.
+    If set, the position is known to be expressed in UTF-16 code units.
+    (Introduced in Swift 5.7)
+
+  * b2: UTF-8 encoding
+
+    If set, the position is known to be expressed in UTF-8 code units.
+    (Introduced in Swift 5.7)
+
+  * b1: `_isCharacterAligned`
+
+    If set, the index is known to be on an extended grapheme cluster
+    boundary (i.e., on a Swift `Character`.)
+    (Introduced in Swift 5.7)
+
+  * b0: `_isScalarAligned`
+
+    If set, index is known to be on a Unicode scalar boundary (see below).
+    (Introduced in Swift 5.1)
+
+Before Swift 5.7, bits b1, b2 and b3 used to be part of the resilient slice. See
+the notes on Character Alignment and Index Encoding below to see how this works.
 
 */
 extension String {
@@ -169,6 +186,9 @@ extension String.Index {
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
     _internalInvariant(_encodedOffset >= 0)
+    if self._isCharacterAligned {
+      _internalInvariant(_isScalarAligned)
+    }
     if self._isScalarAligned {
       _internalInvariant_5_1(transcodedOffset == 0)
     }
@@ -278,55 +298,91 @@ extension String.Index {
   }
 }
 
-/*
-  Index Encoding
-
-  Swift 5.7 introduced bookkeeping to keep track of the Unicode encoding
-  associated with the position value in String indices. Indices whose position
-  is an offset into UTF-8 storage come with the corresponding flag set, and a
-  separate flag is set for UTF-16 indices. (Only foreign strings can be UTF-16
-  encoded. As of 5.7, all foreign strings are UTF-16; but this is subject to
-  change later if we ever decide to implement additional foreign forms.)
-
-  In releases before 5.7, the bits corresponding to these flags were considered
-  reserved, and they were both set to zero in inlinable code. This means that
-  (on ABI stable platforms at least) we cannot assume that either of these bits
-  will be reliably set. If they are both clear, then we must fall back to
-  assuming that the index has the right encoding for whatever string it is used
-  on. However, if any of these bits are set, then the other bit's value is also
-  reliable -- whether it's set or cleared.
-
-  The indices of ASCII strings are encoding-independent, i.e. transcoding such
-  strings from UTF-8 to UTF-16 (or vice versa) does not change the position
-  value of any of their indices. Therefore it isn't an error for an index to
-  have both of these flags set. (The start index of every string also behaves
-  this way: position zero is the same no matter how the rest of string is
-  stored.)
-
-  These two bits (along with the isKnownUTF16 flag in StringObject) allows newer
-  versions of the Standard Library to more reliably catch runtime errors where
-  client code is applying an index from a UTF-16 string to a UTF-8 one, or vice
-  versa. This typically happens when indices from a UTF-16 Cocoa string that was
-  verbatim bridged into Swift are accidentally applied to a mutated version of
-  the same string. (The mutation turns it into a UTF-8 native string, where the
-  same numerical offsets might correspond to wildly different logical
-  positions.)
-
-  Such code has always been broken, as the old indices are documented to be no
-  longer valid after the mutation; however, in previous releases this bug wasn't
-  reliably detected, and if the code was only ever tested on ASCII strings, then
-  the bug could lie dormant for a long time. (Until the code encounters a
-  non-ASCII character and someone gets surprised that the results no longer make
-  sense.)
-
-  As more code gets rebuilt with Swift 5.7+, the stdlib will gradually become
-  able to reliably catch and correct all such issues. The error cases are
-  handled in `_StringGuts.ensureMatchingEncoding(_:)`; see there for the sordid
-  details.
-
-*/
+// ### Character (a.k.a. Extended Grapheme Cluster) Aligment
+//
+// Swift 5.7 assigned a new bit denoting that an index is known to be
+// `Character`-aligned. This is used to enable more reliable detection &
+// handling of extended grapheme cluster boundaries in indexing edge cases
+// introduced by SE-0180, without slowing down the usual case, when code isn't
+// interchanging indices between views.
+//
+// Beware! In substrings whose bounds aren't `Character`-aligned, extended
+// grapheme breaks are sometimes in different places than in their base string.
+// (The sequence of characters in a substring depend only on the Unicode scalars
+// that make up its contents, not on their surrounding context.) Therefore, such
+// substrings must not look at or set this bit: indices must be reliably
+// interchangable between strings and their associated substrings, even if the
+// latter are irregular.
+//
+// Note that `startIndex` and `endIndex` have fully inlinable implementations.
+// This means that when code built on older releases runs on 5.7, this bit may
+// not be set on these, even though they are always `Character`-aligned. This is
+// fine -- `index(after:)` and `index(before:)` do the right thing with
+// minimal/no performance loss.
 extension String.Index {
-  /// Returns true if the position in this index is okay to interpret as offset
+  @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
+  internal var _isCharacterAligned: Bool { return 0 != _rawBits & 0x2 }
+
+  /// Return the same index with both the scalar- and `Character`-aligned bits
+  /// set.
+  ///
+  /// (`Character` alignment implies scalar alignment.)
+  @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
+  internal var _characterAligned: String.Index {
+    let idx = Self(_rawBits | 0x3)
+    idx._invariantCheck()
+    return idx
+  }
+}
+
+// ### Index Encoding
+//
+// Swift 5.7 introduced bookkeeping to keep track of the Unicode encoding
+// associated with the position value in String indices. Indices whose position
+// is an offset into UTF-8 storage come with the corresponding flag set, and a
+// separate flag is set for UTF-16 indices. (Only foreign strings can be UTF-16
+// encoded. As of 5.7, all foreign strings are UTF-16; but this is subject to
+// change later if we ever decide to implement additional foreign forms.)
+//
+// In releases before 5.7, the bits corresponding to these flags were considered
+// reserved, and they were both set to zero in inlinable code. This means that
+// (on ABI stable platforms at least) we cannot assume that either of these bits
+// will be reliably set. If they are both clear, then we must fall back to
+// assuming that the index has the right encoding for whatever string it is used
+// on. However, if either of these bits are set, then the other bit's value is
+// also reliable -- whether it's set or cleared.
+//
+// The indices of ASCII strings are encoding-independent, i.e. transcoding such
+// strings from UTF-8 to UTF-16 (or vice versa) does not change the position
+// value of any of their indices. Therefore it isn't an error for an index to
+// have both of these flags set. (The start index of every string also behaves
+// this way: position zero is the same no matter how what encoding is used for
+// the rest of string.)
+//
+// These two bits (along with the isKnownUTF16 flag in StringObject) allow newer
+// versions of the Standard Library to more reliably catch runtime errors where
+// client code is applying an index from a UTF-16 string to a UTF-8 one, or vice
+// versa. This typically happens when indices from a UTF-16 Cocoa string that
+// was verbatim bridged into Swift are accidentally applied to a mutated version
+// of the same string. (The mutation turns it into a UTF-8 native string, where
+// the same numerical offsets might correspond to wildly different logical
+// positions.)
+//
+// Such code has always been broken, as the old indices are documented to be no
+// longer valid after the mutation; however, in previous releases such cases
+// weren't reliably detected, and if the code was only ever tested on ASCII
+// strings, then the bug could lie dormant for a long time. (Until the code
+// encounters a non-ASCII character and someone gets surprised that the results
+// no longer make sense.)
+//
+// As more code gets rebuilt with Swift 5.7+, the stdlib will gradually become
+// able to reliably catch and correct all such issues. The error cases are
+// handled in `_StringGuts.ensureMatchingEncoding(_:)`; see there for the sordid
+// details.
+extension String.Index {
+  /// Returns true if the position in this index can be interpreted as an offset
   /// into UTF-8-encoded string storage.
   ///
   /// (This returns true if either we know for sure that this is an UTF-8 index,
@@ -335,10 +391,10 @@ extension String.Index {
   @inline(__always)
   internal var _canBeUTF8: Bool {
     // The only way an index cannot be UTF-8 is it has only the UTF-16 flag set.
-    _rawBits & 0x6 != 0x04
+    _rawBits & 0xC != 0x08
   }
 
-  /// Returns true if the position in this index is okay to interpret as offset
+  /// Returns true if the position in this index can be interpreted as offset
   /// into UTF-16-encoded string storage.
   ///
   /// (This returns true if either we know for sure that this is an UTF-16
@@ -348,23 +404,41 @@ extension String.Index {
   @inline(__always)
   internal var _canBeUTF16: Bool {
     // The only way an index cannot be UTF-16 is it has only the UTF-8 flag set.
-    _rawBits & 0x6 != 0x02
+    _rawBits & 0xC != 0x04
   }
 
   /// Returns the same index with the UTF-8 bit set.
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
-  internal var _knownUTF8: Self { Self(_rawBits | 0x2) }
+  internal var _knownUTF8: Self { Self(_rawBits | 0x4) }
 
   /// Returns the same index with the UTF-16 bit set.
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
-  internal var _knownUTF16: Self { Self(_rawBits | 0x4) }
+  internal var _knownUTF16: Self { Self(_rawBits | 0x8) }
 
   /// Returns the same index with both UTF-8 & UTF-16 bits set.
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
-  internal var _encodingIndependent: Self { Self(_rawBits | 0x6) }
+  internal var _encodingIndependent: Self { Self(_rawBits | 0xC) }
+
+  /// Returns true if the UTF-8 flag is set.
+  ///
+  /// This is for debugging purposes only. Do not use this property to determine
+  /// whether an index is compatible with UTF-8 storage; instead, use
+  /// `_canBeUTF8`.
+  @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
+  internal var __isUTF8: Bool { _rawBits & 0x4 != 0 }
+
+  /// Returns true if the UTF-16 flag is set.
+  ///
+  /// This is for debugging purposes only. Do not use this property to determine
+  /// whether an index is compatible with UTF-16 storage; instead, use
+  /// `_canBeUTF16`.
+  @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
+  internal var __isUTF16: Bool { _rawBits & 0x8 != 0 }
 }
 
 extension String.Index: Equatable {
@@ -394,27 +468,33 @@ extension String.Index: Hashable {
 }
 
 // FIXME: This is for debugging only; remove before merging.
-extension String.Index: CustomStringConvertible {
+extension String.Index {
   @_alwaysEmitIntoClient
+  @inline(never)
   public var description: String {
-    var d = "Index("
-      d += "offset: \(_encodedOffset)"
+    var d = "String.Index("
+    switch (__isUTF8, __isUTF16) {
+    case (false, false): d += "unknown"
+    case (true, false): d += "UTF-8"
+    case (false, true): d += "UTF-16"
+    case (true, true): d += "universal"
+    }
+    d += " offset: \(_encodedOffset)"
     if transcodedOffset != 0 {
-      d += "+\(transcodedOffset)"
+      d += "(+\(transcodedOffset))"
     }
     if let stride = characterStride {
       d += ", stride: \(stride)"
     }
-    if _isScalarAligned {
-      d += ", scalarAligned"
-    }
-    if _rawBits & 0x2 != 0 {
-      d += ", utf8"
-    }
-    if _rawBits & 0x4 != 0 {
-      d += ", utf16"
+    if _isCharacterAligned {
+      d += ", character aligned"
+    } else if _isScalarAligned {
+      d += ", scalar aligned"
     }
     d += ")"
     return d
   }
 }
+
+@available(SwiftStdlib 5.7, *)
+extension String.Index: CustomStringConvertible {}

@@ -84,9 +84,73 @@ internal func _hasGraphemeBreakBetween(
 }
 
 extension _StringGuts {
+  internal func roundDownToNearestCharacter(
+    _ i: String.Index
+  ) -> String.Index {
+    _internalInvariant(i._isScalarAligned)
+    _internalInvariant(hasMatchingEncoding(i))
+    _internalInvariant(i._encodedOffset <= count)
+
+    let offset = i._encodedOffset
+    if i._isCharacterAligned { return i }
+    if offset == 0 || offset == count { return i._characterAligned }
+
+    let start = offset - _opaqueCharacterStride(endingAt: offset)
+    let stride = _opaqueCharacterStride(startingAt: start)
+    _internalInvariant(offset <= start + stride,
+      "Grapheme breaking inconsistency")
+    if offset >= start + stride {
+      // Already aligned, or grapheme breaking returned an unexpected result.
+      return i._characterAligned
+    }
+    let r = String.Index(encodedOffset: start, characterStride: stride)
+    return markEncoding(r._characterAligned)
+  }
+
+  internal func roundDownToNearestCharacter(
+    _ i: String.Index,
+    from start: String.Index,
+    to end: String.Index
+  ) -> String.Index {
+    _internalInvariant(start._isScalarAligned && end._isScalarAligned)
+    _internalInvariant(hasMatchingEncoding(start) && hasMatchingEncoding(end))
+    _internalInvariant(start <= end && end <= endIndex)
+
+    _internalInvariant(i._isScalarAligned)
+    _internalInvariant(hasMatchingEncoding(i))
+    _internalInvariant(i >= start && i <= end)
+
+    // We can only use the `_isCharacterAligned` bit if the start index is also
+    // character-aligned.
+    if start._isCharacterAligned && i._isCharacterAligned { return i }
+
+    if i == start || i == end { return i }
+
+    let offset = i._encodedOffset
+    let prior = offset - _opaqueCharacterStride(endingAt: offset)
+    let stride = _opaqueCharacterStride(startingAt: prior)
+    _internalInvariant(offset <= prior + stride,
+      "Grapheme breaking inconsistency")
+    if offset >= prior + stride {
+      // Already aligned, or grapheme breaking returned an unexpected result.
+      return i
+    }
+    var r = String.Index(encodedOffset: prior, characterStride: stride)
+    if start._isCharacterAligned {
+      r = r._characterAligned
+    } else {
+      r = r._scalarAligned
+    }
+    return markEncoding(r)
+  }
+}
+
+extension _StringGuts {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func isOnGraphemeClusterBoundary(_ i: String.Index) -> Bool {
+    if i._isCharacterAligned { return true }
+
     guard i.transcodedOffset == 0 else { return false }
 
     let offset = i._encodedOffset
@@ -94,10 +158,12 @@ extension _StringGuts {
 
     guard isOnUnicodeScalarBoundary(i) else { return false }
 
-    let str = String(self)
-    return i == str.index(before: str.index(after: i))
+    let nearest = roundDownToNearestCharacter(i)
+    return i == nearest
   }
+}
 
+extension _StringGuts {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {

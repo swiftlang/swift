@@ -288,12 +288,14 @@ extension _StringGuts {
 
   @inlinable @inline(__always)
   internal var startIndex: String.Index {
-    Index(_encodedOffset: 0)._scalarAligned._encodingIndependent
+    // The start index is always `Character` aligned.
+    Index(_encodedOffset: 0)._characterAligned._encodingIndependent
   }
 
   @inlinable @inline(__always)
   internal var endIndex: String.Index {
-    markEncoding(Index(_encodedOffset: self.count)._scalarAligned)
+    // The end index is always `Character` aligned.
+    markEncoding(Index(_encodedOffset: self.count)._characterAligned)
   }
 }
 
@@ -373,6 +375,7 @@ extension _StringGuts {
   }
 
   @_alwaysEmitIntoClient // TODO(lorentey): Should this remain internal?
+  @inline(never)
   internal func _slowEnsureMatchingEncoding(_ i: String.Index) -> String.Index {
     _internalInvariant(isForeign || !i._canBeUTF8)
     if isForeign {
@@ -441,7 +444,6 @@ extension _StringGuts {
   /// - has an encoding that matches this string,
   /// - is within `start ..< end`, and
   /// - is aligned on a scalar boundary.
-  @_alwaysEmitIntoClient
   internal func validateScalarIndex(
     _ i: String.Index,
     from start: String.Index,
@@ -512,6 +514,14 @@ extension _StringGuts {
 
     upper = scalarAlign(upper)
     lower = scalarAlign(lower)
+
+    // Older binaries may generate `startIndex` without the
+    // `_isCharacterAligned` flag. Compensate for that here so that substrings
+    // that start at the beginning will never get the sad path in
+    // `index(after:)`. Note that we don't need to do this for `upper` and we
+    // don't need to compare against the `endIndex` -- those aren't nearly as
+    // critical.
+    if lower._encodedOffset == 0 { lower = lower._characterAligned }
 
     return Range(_uncheckedBounds: (lower, upper))
   }

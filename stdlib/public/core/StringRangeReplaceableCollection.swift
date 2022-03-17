@@ -198,6 +198,9 @@ extension String: RangeReplaceableCollection {
     _ subrange: Range<Index>,
     with newElements: C
   ) where C: Collection, C.Iterator.Element == Character {
+    // Note: SE-0180 requires us to use `subrange` bounds even if they aren't
+    // `Character` aligned. (We still have to round things down to the nearest
+    // scalar boundary, though, or we may generate ill-formed encodings.)
     let subrange = _guts.validateScalarRange(subrange)
     _guts.replaceSubrange(subrange, with: newElements)
   }

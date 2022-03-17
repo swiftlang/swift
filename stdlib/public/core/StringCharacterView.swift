@@ -49,7 +49,7 @@ extension String: BidirectionalCollection {
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
-    let i = _guts.validateScalarIndex(i)
+    let i = _guts.roundDownToNearestCharacter(_guts.validateScalarIndex(i))
     let r = _uncheckedIndex(after: i)
     return _guts.internalMarkEncoding(r)
   }
@@ -62,20 +62,17 @@ extension String: BidirectionalCollection {
   ///
   /// It does not mark the encoding of the returned index.
   internal func _uncheckedIndex(after i: Index) -> Index {
-    // FIXME: Unlike `index(before:)`, this function may return incorrect
-    // results if `i` isn't on a grapheme cluster boundary. (The grapheme
-    // breaking algorithm assumes we start on a break when we go forward.)
     _internalInvariant(_guts.hasMatchingEncoding(i))
     _internalInvariant(i < endIndex)
-    _internalInvariant(i._isScalarAligned)
+    _internalInvariant(i._isCharacterAligned)
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(startingAt: i)
     let nextOffset = i._encodedOffset &+ stride
-    let nextIndex = Index(_encodedOffset: nextOffset)._scalarAligned
+    let nextIndex = Index(_encodedOffset: nextOffset)._characterAligned
     let nextStride = _characterStride(startingAt: nextIndex)
     let r = Index(encodedOffset: nextOffset, characterStride: nextStride)
-    return r._scalarAligned
+    return _guts.internalMarkEncoding(r._characterAligned)
   }
 
   /// Returns the position immediately before the given index.
@@ -84,13 +81,13 @@ extension String: BidirectionalCollection {
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
-    let i = _guts.validateInclusiveScalarIndex(i)
-    // Note: Scalar aligning an index may move it closer towards the
-    // `startIndex`, so the `i > startIndex` check needs to come after the
-    // `validateScalarIndex` call.
+    let i = _guts.roundDownToNearestCharacter(
+      _guts.validateInclusiveScalarIndex(i))
+    // Note: Aligning an index may move it closer towards the `startIndex`, so
+    // the `i > startIndex` check needs to come after rounding.
     _precondition(i > startIndex, "String index is out of bounds")
 
-    let r = _uncheckedIndex(before: _guts.scalarAlign(i))
+    let r = _uncheckedIndex(before: i)
     return _guts.internalMarkEncoding(r)
   }
 
@@ -98,20 +95,20 @@ extension String: BidirectionalCollection {
   ///
   /// - has the right encoding,
   /// - is within bounds, and
-  /// - is scalar aligned.
+  /// - is character aligned.
   ///
   /// It does not mark the encoding of the returned index.
   internal func _uncheckedIndex(before i: Index) -> Index {
     _internalInvariant(_guts.hasMatchingEncoding(i))
     _internalInvariant(i > startIndex && i <= endIndex)
-    _internalInvariant(i._isScalarAligned)
+    _internalInvariant(i._isCharacterAligned)
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(endingAt: i)
     let priorOffset = i._encodedOffset &- stride
 
     let r = Index(encodedOffset: priorOffset, characterStride: stride)
-    return r._scalarAligned
+    return r._characterAligned
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -142,7 +139,8 @@ extension String: BidirectionalCollection {
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
-    var i = _guts.validateInclusiveScalarIndex(i)
+    var i = _guts.roundDownToNearestCharacter(
+      _guts.validateInclusiveScalarIndex(i))
 
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
@@ -210,11 +208,12 @@ extension String: BidirectionalCollection {
     // breaks, in which case this function must still terminate without trapping
     // and return a result that makes sense.
 
-    // Note: `limit` is intentionally not scalar aligned to ensure our behavior
-    // exactly matches the documentation above.
+    // Note: `limit` is intentionally not scalar (or character-) aligned to
+    // ensure our behavior exactly matches the documentation above.
     let limit = _guts.ensureMatchingEncoding(limit)
 
-    var i = _guts.validateInclusiveScalarIndex(i)
+    var i = _guts.roundDownToNearestCharacter(
+      _guts.validateInclusiveScalarIndex(i))
 
     let start = i
     if distance >= 0 {
@@ -253,8 +252,10 @@ extension String: BidirectionalCollection {
     // grapheme breaks -- swapping `start` and `end` may change the magnitude of
     // the result.
 
-    let start = _guts.validateInclusiveScalarIndex(start)
-    let end = _guts.validateInclusiveScalarIndex(end)
+    let start = _guts.roundDownToNearestCharacter(
+      _guts.validateInclusiveScalarIndex(start))
+    let end = _guts.roundDownToNearestCharacter(
+      _guts.validateInclusiveScalarIndex(end))
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
@@ -297,17 +298,32 @@ extension String: BidirectionalCollection {
   @inlinable @inline(__always) // TODO(lorentey): Consider removing these. If
                                // `index(after:)` isn't inlinable, does it
                                // really matter if this one is? (Potential
-                               // _guts-related optimizations notwithstanding.)
-                               // `subscript` being inlinable forces a bunch of
-                               // new additions to be _aEIC, even though they
-                               // ought to be internal.
+                               // optimizations notwithstanding.) `subscript`
+                               // being inlinable forces a bunch of new
+                               // additions to be _aEIC, even though they ought
+                               // to be internal.
   public subscript(i: Index) -> Character {
+    // Note: SE-0180 requires us not to round `i` down to the nearest whole
+    // `Character` boundary.
     let i = _guts.validateScalarIndex(i)
     let distance = _characterStride(startingAt: i)
     return _guts.errorCorrectedCharacter(
       startingAt: i._encodedOffset, endingAt: i._encodedOffset &+ distance)
   }
 
+  /// Return the length of the `Character` starting at the given index, measured
+  /// in encoded code units, and without looking back at any scalar that
+  /// precedes `i`.
+  ///
+  /// Note: if `i` isn't `Character`-aligned, then this operation must still
+  /// finish successfully and return the length of the grapheme cluster starting
+  /// at `i` _as if the string started on that scalar_. (This can be different
+  /// from the length of the whole character when the preceding scalars are
+  /// present!)
+  ///
+  /// This method is called from inlinable `subscript` implementations in
+  /// current and previous versions of the stdlib, wich require this contract
+  /// not to be violated.
   @inlinable @inline(__always)
   internal func _characterStride(startingAt i: Index) -> Int {
     _internalInvariant_5_1(i._isScalarAligned)

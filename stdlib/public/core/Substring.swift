@@ -184,6 +184,13 @@ extension Substring {
     _slice._base._guts.validateScalarRange(
       range, from: startIndex, to: endIndex)
   }
+
+  @inline(__always)
+  internal func _roundDownToNearestCharacter(
+    _ i: String.Index
+  ) -> String.Index {
+    _wholeGuts.roundDownToNearestCharacter(i, from: startIndex, to: endIndex)
+  }
 }
 
 extension Substring: StringProtocol {
@@ -204,7 +211,7 @@ extension Substring: StringProtocol {
     // leads to Collection conformance issues when the `Substring`'s bounds do
     // not fall on grapheme boundaries in `base`.
 
-    let i = _validateScalarIndex(i)
+    let i = _roundDownToNearestCharacter(_validateScalarIndex(i))
     let r = _uncheckedIndex(after: i)
     return _slice.base._guts.internalMarkEncoding(r)
   }
@@ -217,29 +224,36 @@ extension Substring: StringProtocol {
   ///
   /// It does not mark the encoding of the returned index.
   internal func _uncheckedIndex(after i: Index) -> Index {
-    // FIXME: Unlike `index(before:)`, this function may return incorrect
-    // results if `i` isn't on a grapheme cluster boundary. (The grapheme
-    // breaking algorithm assumes we start on a break when we go forward.)
-    _internalInvariant(_slice.base._guts.hasMatchingEncoding(i))
-    _internalInvariant(i < endIndex)
+    _internalInvariant(_wholeGuts.hasMatchingEncoding(i))
     _internalInvariant(i._isScalarAligned)
+    _internalInvariant(i >= startIndex && i < endIndex)
 
+    // Implicit precondition: `i` must be `Character`-aligned within this
+    // substring, even if it doesn't have the corresponding flag set.
+
+    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(startingAt: i)
     let nextOffset = i._encodedOffset &+ stride
+    _internalInvariant(nextOffset <= endIndex._encodedOffset)
     let nextIndex = Index(_encodedOffset: nextOffset)._scalarAligned
-    guard
-      // Don't cache character strides in indices of exotic substrings whose
-      // startIndex isn't aligned on a grapheme cluster boundary. (Their
-      // grapheme breaks may not match with those in `base`.)
-      _knownToStartOnGraphemeBreak,
-      // Don't cache the stride if we end on a partial grapheme cluster.
-      nextIndex < endIndex || _knownToEndOnGraphemeBreak
-    else {
-      return nextIndex
-    }
     let nextStride = _characterStride(startingAt: nextIndex)
-    let r = Index(encodedOffset: nextOffset, characterStride: nextStride)
-    return r._scalarAligned
+
+    var r = Index(
+      encodedOffset: nextOffset, characterStride: nextStride)._scalarAligned
+
+    if
+      // Don't set the `_isCharacterAligned` bit in indices of exotic substrings
+      // whose startIndex isn't aligned on a grapheme cluster boundary. (Their
+      // grapheme breaks may not match with those in `base`.)
+      _startIsCharacterAligned,
+      // Likewise if this is the last character in a substring ending on a
+      // partial grapheme cluster.
+      _endIsCharacterAligned || nextOffset + nextStride < endIndex._encodedOffset
+    {
+      r = r._characterAligned
+    }
+
+    return r
   }
 
   public func index(before i: Index) -> Index {
@@ -250,10 +264,10 @@ extension Substring: StringProtocol {
     // leads to Collection conformance issues when the `Substring`'s bounds do
     // not fall on grapheme boundaries in `base`.
 
-    let i = _validateInclusiveScalarIndex(i)
-    // Note: Scalar aligning an index may move it closer towards the
-    // `startIndex`, so the `i > startIndex` check needs to come after the
-    // `validateScalarIndex` call.
+    let i = _roundDownToNearestCharacter(_validateInclusiveScalarIndex(i))
+    // Note: Aligning an index may move it closer towards the `startIndex`, so
+    // this `i > startIndex` check needs to come after all the
+    // alignment/validation work.
     _precondition(i > startIndex, "Substring index is out of bounds")
 
     let r = _uncheckedIndex(before: i)
@@ -268,24 +282,34 @@ extension Substring: StringProtocol {
   ///
   /// It does not mark the encoding of the returned index.
   internal func _uncheckedIndex(before i: Index) -> Index {
-    _internalInvariant(_slice.base._guts.hasMatchingEncoding(i))
-    _internalInvariant(i < endIndex)
+    _internalInvariant(_wholeGuts.hasMatchingEncoding(i))
     _internalInvariant(i._isScalarAligned)
+    _internalInvariant(i > startIndex && i <= endIndex)
+
+    // Implicit precondition: `i` must be `Character`-aligned within this
+    // substring, even if it doesn't have the corresponding flag set.
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
-    let stride = _characterStride(endingAt: i)
-    let priorOffset = i._encodedOffset &- stride
+    let priorStride = _characterStride(endingAt: i)
+    let priorOffset = i._encodedOffset &- priorStride
     _internalInvariant(priorOffset >= startIndex._encodedOffset)
 
-    guard _knownToStartOnGraphemeBreak else {
-      // Don't cache character strides in indices of exotic substrings whose
-      // startIndex isn't aligned on a grapheme cluster boundary. (Their
+    var r = Index(
+      encodedOffset: priorOffset, characterStride: priorStride)._scalarAligned
+
+    if
+      // Don't set the `_isCharacterAligned` bit in indices of exotic substrings
+      // whose startIndex isn't aligned on a grapheme cluster boundary. (Their
       // grapheme breaks may not match with those in `base`.)
-      return Index(_encodedOffset: priorOffset)._scalarAligned
+      _startIsCharacterAligned,
+      // Likewise if this is the last character in a substring ending on a
+      // partial grapheme cluster.
+      _endIsCharacterAligned || i < endIndex
+    {
+      r = r._characterAligned
     }
 
-    return Index(
-      encodedOffset: priorOffset, characterStride: stride)._scalarAligned
+    return r
   }
 
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
@@ -390,6 +414,8 @@ extension Substring: StringProtocol {
   }
 
   public subscript(i: Index) -> Character {
+    // Note: SE-0180 requires us not to round `i` down to the nearest whole
+    // `Character` boundary.
     let i = _validateScalarIndex(i)
     let distance = _characterStride(startingAt: i)
     return _slice.base._guts.errorCorrectedCharacter(
@@ -412,6 +438,9 @@ extension Substring: StringProtocol {
   internal mutating func _replaceSubrange<C: Collection>(
     _ subrange: Range<Index>, with newElements: C
   ) where C.Element == Element {
+    // Note: SE-0180 requires us to use `subrange` bounds even if they aren't
+    // `Character` aligned. (We still have to round things down to the nearest
+    // scalar boundary, though, or we may generate ill-formed encodings.)
     defer { _invariantCheck() }
     let subrange = _validateScalarRange(subrange)
 
@@ -430,7 +459,7 @@ extension Substring: StringProtocol {
     //      merged with the Character preceding/following the replaced range.
     //
     // The best way to avoid problems in these cases is to lower index
-    // calculations to Unicode scalars (or below) -- in this implementation, we
+    // calculations to Unicode scalars (or below). In this implementation, we
     // are measuring things in UTF-8 code units, for efficiency.
 
     if _slowPath(_slice._base._guts.isKnownUTF16) {
@@ -601,14 +630,12 @@ extension Substring: StringProtocol {
 }
 
 extension Substring {
-  // TODO(lorentey): Rename to proper terminology
-  internal var _knownToStartOnGraphemeBreak: Bool {
-    startIndex._encodedOffset == 0 || startIndex.characterStride != nil
+  internal var _startIsCharacterAligned: Bool {
+    startIndex._isCharacterAligned
   }
 
-  // TODO(lorentey): Rename to proper terminology
-  internal var _knownToEndOnGraphemeBreak: Bool {
-    endIndex == _slice.base.endIndex || endIndex.characterStride != nil
+  internal var _endIsCharacterAligned: Bool {
+    endIndex._isCharacterAligned
   }
 
   internal var _encodedOffsetRange: Range<Int> {
@@ -616,29 +643,39 @@ extension Substring {
     let upper = _slice._endIndex._encodedOffset
     return Range(_uncheckedBounds: (lower, upper))
   }
+}
 
+extension Substring {
   internal func _characterStride(startingAt i: Index) -> Int {
     _internalInvariant(i._isScalarAligned)
+    _internalInvariant(i._encodedOffset <= _wholeGuts.count)
 
-    // Fast path if the index already has its stride cached. Substrings that
-    // don't start on a grapheme cluster boundary may have different grapheme
-    // break positions than their base string, so we must ignore the cache in
-    // that case.
-    if let d = i.characterStride, _knownToStartOnGraphemeBreak {
-      // Make sure a cached stride cannot lead us beyond the substring's end
-      // index. This can happen if `self` ends between grapheme cluster
-      // boundaries.
-      return Swift.min(d, endIndex._encodedOffset &- i._encodedOffset)
+    // Implicit precondition: `i` must be `Character`-aligned within this
+    // substring, even if it doesn't have the corresponding flag set.
+
+    // If the index has a character stride, we are therefore free to use it.
+    if let d = i.characterStride {
+      // However, make sure a cached stride cannot lead us beyond the
+      // substring's end index. This can happen if the substring's end isn't
+      // also `Character` aligned, and someone passes us an index that comes
+      // from the base string.
+      return Swift.min(d, _wholeGuts.count &- i._encodedOffset)
     }
 
-    if i == endIndex { return 0 }
+    if i._encodedOffset == endIndex._encodedOffset { return 0 }
 
-    return _slice.base._guts._opaqueCharacterStride(
+    // I we don't have cached information, we can simply invoke the forward-only
+    // grapheme breaking algorithm.
+    return _wholeGuts._opaqueCharacterStride(
       startingAt: i._encodedOffset, in: _encodedOffsetRange)
   }
 
   internal func _characterStride(endingAt i: Index) -> Int {
+    // Implicit precondition: `i` must be `Character`-aligned within this
+    // substring, even if it doesn't have the corresponding flag set.
+
     _internalInvariant(i._isScalarAligned)
+    _internalInvariant(i._encodedOffset <= _wholeGuts.count)
 
     if i == startIndex { return 0 }
 
