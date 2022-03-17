@@ -386,6 +386,10 @@ public:
 
   bool isTypeSequence() const;
 
+  /// Determine whether this type variable represents a code completion
+  /// expression.
+  bool isCodeCompletionToken() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -2409,6 +2413,10 @@ private:
   /// diagnostics when result builder has multiple overloads.
   llvm::SmallDenseSet<AnyFunctionRef> InvalidResultBuilderBodies;
 
+  /// Arguments after the code completion token that were thus ignored (i.e.
+  /// assigned fresh type variables) for type checking.
+  llvm::SetVector<ConstraintLocator *> IgnoredArguments;
+
   /// Maps node types used within all portions of the constraint
   /// system, instead of directly using the types on the
   /// nodes themselves. This allows us to typecheck and
@@ -3174,9 +3182,24 @@ public:
     return TypeVariables.count(typeVar) > 0;
   }
 
-  /// Whether the given expression's source range contains the code
+  /// Whether the given ASTNode's source range contains the code
   /// completion location.
-  bool containsCodeCompletionLoc(Expr *expr) const;
+  bool containsCodeCompletionLoc(ASTNode node) const;
+  bool containsCodeCompletionLoc(const ArgumentList *args) const;
+
+  /// Marks the argument with the \p ArgLoc locator as being ignored because it
+  /// occurs after the code completion token. This assumes that the argument is
+  /// not type checked (by assigning it a fresh type variable) and prevents
+  /// fixes from being generated for this argument.
+  void markArgumentIgnoredForCodeCompletion(ConstraintLocator *ArgLoc) {
+    IgnoredArguments.insert(ArgLoc);
+  }
+
+  /// Whether the argument with the \p ArgLoc locator occurs after the code
+  /// completion tokena and thus should be ignored and not generate any fixes.
+  bool isArgumentIgnoredForCodeCompletion(ConstraintLocator *ArgLoc) {
+    return IgnoredArguments.count(ArgLoc) > 0;
+  }
 
   void setClosureType(const ClosureExpr *closure, FunctionType *type) {
     assert(closure);
@@ -5537,7 +5560,43 @@ public:
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool relabelArguments(ArrayRef<Identifier> newNames);
+
+  /// \returns true if matchCallArguments should try to claim the argument at
+  /// \p argIndex while recovering from a failure. This is used to prevent
+  /// claiming of arguments after the code completion token.
+  virtual bool shouldClaimArgDuringRecovery(unsigned argIdx);
+
+  /// \returns true if \p arg can be claimed even though its argument label
+  /// doesn't match. This is the case for arguments representing the code
+  /// completion token if they don't contain a label. In these cases completion
+  /// will suggest the label.
+  virtual bool
+  canClaimArgIgnoringNameMismatch(const AnyFunctionType::Param &arg);
 };
+
+/// For a callsite containing a code completion expression, stores the index of
+/// the arg containing it along with the index of the first trailing closure and
+/// how many arguments were passed in total.
+struct CompletionArgInfo {
+  unsigned completionIdx;
+  Optional<unsigned> firstTrailingIdx;
+  unsigned argCount;
+
+  /// \returns true if the given argument index is possibly about to be written
+  /// by the user (given the completion index) so shouldn't be penalised as
+  /// missing when ranking solutions.
+  bool allowsMissingArgAt(unsigned argInsertIdx, AnyFunctionType::Param param);
+
+  /// \returns true if the argument containing the completion location is before
+  /// the argument with the given index.
+  bool isBefore(unsigned argIdx) { return completionIdx < argIdx; }
+};
+
+/// Extracts the index of the argument containing the code completion location
+/// from the provided anchor if it's a \c CallExpr, \c SubscriptExpr, or
+/// \c ObjectLiteralExpr.
+Optional<CompletionArgInfo> getCompletionArgInfo(ASTNode anchor,
+                                                 ConstraintSystem &cs);
 
 /// Match the call arguments (as described by the given argument type) to
 /// the parameters (as described by the given parameter type).

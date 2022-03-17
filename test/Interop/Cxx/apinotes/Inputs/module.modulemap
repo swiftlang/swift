@@ -1,0 +1,4 @@
+module SomeModule [extern_c] {
+  requires objc
+  header "SomeModule.h"
+}

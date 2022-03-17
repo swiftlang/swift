@@ -895,7 +895,9 @@ private:
 
     // Single-expression closures are effectively a `return` statement,
     // so let's give them a special locator as to indicate that.
-    if (closure->hasSingleExpressionBody()) {
+    // Return statements might not have a result if we have a closure whose
+    // implicit returned value is coerced to Void.
+    if (closure->hasSingleExpressionBody() && returnStmt->hasResult()) {
       auto *expr = returnStmt->getResult();
       assert(expr && "single expression closure without expression?");
 

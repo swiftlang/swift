@@ -189,13 +189,19 @@ public:
         continue;
       }
 
-      // Restore '@autoclosure'd value.
       if (auto ACE = dyn_cast<AutoClosureExpr>(expr)) {
+        // Restore '@autoclosure'd value.
         // This is only valid if the closure doesn't have parameters.
         if (ACE->getParameters()->size() == 0) {
           expr = ACE->getSingleExpressionBody();
           continue;
         }
+        // Restore autoclosure'd function reference.
+        if (auto *unwrapped = ACE->getUnwrappedCurryThunkExpr()) {
+          expr = unwrapped;
+          continue;
+        }
+
         llvm_unreachable("other AutoClosureExpr must be handled specially");
       }
 
@@ -548,8 +554,7 @@ void TypeChecker::filterSolutionsForCodeCompletion(
   })->getFixedScore();
 
   llvm::erase_if(solutions, [&](const Solution &S) {
-    return S.getFixedScore().Data[SK_Fix] != 0 &&
-        S.getFixedScore() > minScore;
+    return S.getFixedScore().Data[SK_Fix] > minScore.Data[SK_Fix];
   });
 }
 
