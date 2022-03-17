@@ -4172,7 +4172,10 @@ void IRGenModule::emitAccessibleFunctions() {
 
     GenericSignature signature;
     if (auto *env = func->getGenericEnvironment()) {
-      signature = env->getGenericSignature();
+      // Drop all of the marker protocols because they are effect-less
+      // at runtime.
+      signature = env->getGenericSignature().withoutMarkerProtocols();
+
       genericEnvironment =
           getAddrOfGenericEnvironment(signature.getCanonicalSignature());
     }
