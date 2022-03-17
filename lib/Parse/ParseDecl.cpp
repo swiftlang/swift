@@ -8524,6 +8524,11 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                    Tok.getRawText().front() == '!'))
       diagnose(Tok, diag::postfix_operator_name_cannot_start_with_unwrap);
 
+  if (Attributes.hasAttribute<PrefixAttr>()) {
+    if (Tok.getText().contains("/"))
+      diagnose(Tok, diag::prefix_slash_not_allowed);
+  }
+
   // A common error is to try to define an operator with something in the
   // unicode plane considered to be an operator, or to try to define an
   // operator like "not".  Analyze and diagnose this specifically.
