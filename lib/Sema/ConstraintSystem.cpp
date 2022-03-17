@@ -344,8 +344,16 @@ ConstraintSystem::getAlternativeLiteralTypes(KnownProtocolKind kind,
   return scratch;
 }
 
-bool ConstraintSystem::containsCodeCompletionLoc(Expr *expr) const {
-  SourceRange range = expr->getSourceRange();
+bool ConstraintSystem::containsCodeCompletionLoc(ASTNode node) const {
+  SourceRange range = node.getSourceRange();
+  if (range.isInvalid())
+    return false;
+  return Context.SourceMgr.rangeContainsCodeCompletionLoc(range);
+}
+
+bool ConstraintSystem::containsCodeCompletionLoc(
+    const ArgumentList *args) const {
+  SourceRange range = args->getSourceRange();
   if (range.isInvalid())
     return false;
   return Context.SourceMgr.rangeContainsCodeCompletionLoc(range);
@@ -1941,6 +1949,38 @@ Type constraints::typeEraseOpenedExistentialReference(
   });
 }
 
+/// For every parameter in \p type that has an error type, replace that
+/// parameter's type by a placeholder type, where \p value is the declaration
+/// that declared \p type. This is useful for code completion so we can match
+/// the types we do know instead of bailing out completely because \p type
+/// contains an error type.
+static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value) {
+  if (!type->is<AnyFunctionType>() || !isa<AbstractFunctionDecl>(value)) {
+    return type;
+  }
+  auto funcType = type->castTo<AnyFunctionType>();
+  auto funcDecl = cast<AbstractFunctionDecl>(value);
+
+  auto declParams = funcDecl->getParameters();
+  auto typeParams = funcType->getParams();
+  assert(declParams->size() == typeParams.size());
+  SmallVector<AnyFunctionType::Param, 4> newParams;
+  newParams.reserve(declParams->size());
+  for (auto i : indices(typeParams)) {
+    AnyFunctionType::Param param = typeParams[i];
+    if (param.getPlainType()->is<ErrorType>()) {
+      auto paramDecl = declParams->get(i);
+      auto placeholder =
+          PlaceholderType::get(paramDecl->getASTContext(), paramDecl);
+      newParams.push_back(param.withType(placeholder));
+    } else {
+      newParams.push_back(param);
+    }
+  }
+  assert(newParams.size() == declParams->size());
+  return FunctionType::get(newParams, funcType->getResult());
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
@@ -2022,6 +2062,10 @@ ConstraintSystem::getTypeOfMemberReference(
 
   if (isa<AbstractFunctionDecl>(value) ||
       isa<EnumElementDecl>(value)) {
+    if (auto ErrorTy = value->getInterfaceType()->getAs<ErrorType>()) {
+      return {ErrorType::get(ErrorTy->getASTContext()),
+              ErrorType::get(ErrorTy->getASTContext())};
+    }
     // This is the easy case.
     funcType = value->getInterfaceType()->castTo<AnyFunctionType>();
 
@@ -2250,6 +2294,12 @@ ConstraintSystem::getTypeOfMemberReference(
   // If we need to wrap the type in an optional, do so now.
   if (isReferenceOptional && !isa<SubscriptDecl>(value))
     type = OptionalType::get(type->getRValueType());
+
+  if (isForCodeCompletion() && type->hasError()) {
+    // In code completion, replace error types by placeholder types so we can
+    // match the types we know instead of bailing out completely.
+    type = replaceParamErrorTypeByPlaceholder(type, value);
+  }
 
   // If we opened up any type variables, record the replacements.
   recordOpenedTypes(locator, replacements);
@@ -3203,7 +3253,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     refType = subscriptTy;
 
     // Increase the score so that actual subscripts get preference.
-    increaseScore(SK_KeyPathSubscript);
+    // ...except if we're solving for code completion and the index expression
+    // contains the completion location
+    auto SE = getAsExpr<SubscriptExpr>(locator->getAnchor());
+    if (!isForCodeCompletion() ||
+        (SE && !containsCodeCompletionLoc(SE->getArgs()))) {
+      increaseScore(SK_KeyPathSubscript);
+    }
     break;
   }
   }

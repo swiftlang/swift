@@ -216,7 +216,18 @@ OptionSetTaker5(.Option1, .Option4, .#^UNRESOLVED_13?check=UNRESOLVED_3^#, .West
 OptionSetTaker5(.#^UNRESOLVED_14?check=UNRESOLVED_1^#, .Option4, .South, .West)
 OptionSetTaker5([.#^UNRESOLVED_15?check=UNRESOLVED_1^#], .Option4, .South, .West)
 
-OptionSetTaker6(.#^UNRESOLVED_16?check=UNRESOLVED_4^#, .Option4)
+OptionSetTaker6(.#^UNRESOLVED_16^#, .Option4)
+// UNRESOLVED_16:  Begin completions
+// UNRESOLVED_16-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option1[#SomeOptions1#];
+// UNRESOLVED_16-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option2[#SomeOptions1#];
+// UNRESOLVED_16-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option3[#SomeOptions1#];
+// UNRESOLVED_16-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option4[#SomeOptions2#];
+// UNRESOLVED_16-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option5[#SomeOptions2#];
+// UNRESOLVED_16-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option6[#SomeOptions2#];
+// UNRESOLVED_16-DAG:  Decl[StaticVar]/CurrNominal:        NotOption[#Int#]; name=NotOption
+// UNRESOLVED_16:  End completion
+
+
 OptionSetTaker6(.Option4, .#^UNRESOLVED_17?check=UNRESOLVED_4^#,)
 
 var a = {() in

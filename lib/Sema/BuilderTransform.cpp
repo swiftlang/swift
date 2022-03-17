@@ -1876,6 +1876,13 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
         return getTypeMatchFailure(locator);
       }
 
+      // If we're solving for code completion and the body contains the code
+      // completion location, skipping it won't get us to a useful solution so
+      // just bail.
+      if (isForCodeCompletion() && containsCodeCompletionLoc(fn.getBody())) {
+        return getTypeMatchFailure(locator);
+      }
+
       // Record the first unhandled construct as a fix.
       if (recordFix(
               SkipUnhandledConstructInResultBuilder::create(
