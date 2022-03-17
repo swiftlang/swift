@@ -29,6 +29,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
@@ -5582,6 +5583,8 @@ static ValueDecl *generateThunkForExtraMetatypes(SubstitutionMap subst,
 ConcreteDeclRef
 ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
                                                     ValueDecl *decl) {
+  PrettyStackTraceDeclAndSubst trace("specializing", subst, decl);
+
   assert(isa<clang::FunctionTemplateDecl>(decl->getClangDecl()) &&
          "This API should only be used with function templates.");
 
