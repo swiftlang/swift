@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify -enable-parameterized-protocol-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on -enable-parameterized-protocol-types -disable-availability-checking
 
-// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -enable-parameterized-protocol-types -requirement-machine-inferred-signatures=verify -disable-availability-checking 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on -enable-parameterized-protocol-types -requirement-machine-inferred-signatures=on -disable-availability-checking 2>&1 | %FileCheck %s
 
 
 /// Test some invalid syntax first
@@ -77,6 +77,13 @@ protocol SequenceWrapperProtocol {
   associatedtype E
 }
 
+// https://bugs.swift.org/browse/SR-15979 - the GenericSignatureBuilder doesn't like this protocol.
+
+// CHECK-LABEL: .Recursive@
+// CHECK-NEXT: Requirement signature: <Self where Self.[Recursive]B == Self.[Recursive]D.[Recursive]B, Self.[Recursive]C == Self.[Recursive]D.[Recursive]C, Self.[Recursive]D : Recursive>
+protocol Recursive<B, C> {
+  associatedtype D: Recursive<B, C> = Self
+}
 
 /// Parametrized protocol in where clause of concrete type
 
@@ -178,6 +185,8 @@ protocol SomeProto {}
 
 func protocolCompositionNotSupported(_: SomeProto & Sequence<Int>) {}
 // expected-error@-1 {{non-protocol, non-class type 'Sequence<Int>' cannot be used within a protocol-constrained type}}
+
+/// More regression tests
 
 protocol DoubleWide<X, Y> {
   var x: X { get }
