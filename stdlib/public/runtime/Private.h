@@ -462,13 +462,17 @@ public:
   /// \param extraArguments The extra arguments determined while checking
   /// generic requirements (e.g., those that need to be
   /// passed to an instantiation function) will be added to this vector.
+  /// \param skipUnknownKinds If true, unknown requirement kinds will not be
+  /// reported as errors. This should used with care, and e.g. only to ignore
+  /// @_marker protocols at runtime, which cannot be checked at runtime.
   ///
   /// \returns the error if an error occurred, None otherwise.
   llvm::Optional<TypeLookupError> _checkGenericRequirements(
       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
       llvm::SmallVectorImpl<const void *> &extraArguments,
       SubstGenericParameterFn substGenericParam,
-      SubstDependentWitnessTableFn substWitnessTable);
+      SubstDependentWitnessTableFn substWitnessTable,
+      bool skipUnknownKinds = false);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
