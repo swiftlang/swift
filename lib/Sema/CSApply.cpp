@@ -902,11 +902,10 @@ namespace {
     bool shouldBuildCurryThunk(OverloadChoice choice,
                                bool baseIsInstance) {
       ValueDecl *member = choice.getDecl();
-      auto isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
 
       // FIXME: We should finish plumbing this through for dynamic
       // lookup as well.
-      if (isDynamic || member->getAttrs().hasAttribute<OptionalAttr>())
+      if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic)
         return false;
 
       // If we're inside a selector expression, don't build the thunk.
@@ -921,6 +920,11 @@ namespace {
       // representational issues.
       if (!baseIsInstance && member->isInstanceMember())
         return true;
+
+      // Bound optional method references are represented via
+      // DynamicMemberRefExpr instead of a curry thunk.
+      if (member->getAttrs().hasAttribute<OptionalAttr>())
+        return false;
 
       // Figure out how many argument lists we need.
       unsigned maxArgCount = member->getNumCurryLevels();
@@ -1224,7 +1228,8 @@ namespace {
     AutoClosureExpr *
     buildDoubleCurryThunk(DeclRefExpr *memberRef, ValueDecl *member,
                           FunctionType *outerThunkTy,
-                          ConstraintLocatorBuilder memberLocator) {
+                          ConstraintLocatorBuilder memberLocator,
+                          DeclNameLoc memberLoc, bool isDynamicLookup) {
       auto &ctx = cs.getASTContext();
 
       const auto selfThunkParam = outerThunkTy->getParams().front();
@@ -1256,15 +1261,15 @@ namespace {
         cs.cacheType(selfParamRef);
       }
 
-      const auto selfCalleeParam =
-          cs.getType(memberRef)->castTo<FunctionType>()->getParams().front();
+      auto *const selfCalleeTy = cs.getType(memberRef)->castTo<FunctionType>();
+      const auto selfCalleeParam = selfCalleeTy->getParams().front();
       const auto selfCalleeParamTy = selfCalleeParam.getPlainType();
 
       // Open the 'self' parameter reference if warranted.
       Expr *selfOpenedRef = selfParamRef;
       if (selfCalleeParamTy->hasOpenedExistential()) {
         // If we're opening an existential:
-        // - The type of 'ref' inside the thunk is written in terms of the
+        // - The type of 'memberRef' inside the thunk is written in terms of the
         //   open existental archetype.
         // - The type of the thunk is written in terms of the
         //   erased existential bounds.
@@ -1281,25 +1286,56 @@ namespace {
         adjustExprOwnershipForParam(selfParamRef, selfThunkParam);
       }
 
-      // The inner thunk, "{ args... in self.member(args...) }".
-      auto *const innerThunk = buildSingleCurryThunk(
-          selfOpenedRef, memberRef, cast<DeclContext>(member),
-          outerThunkTy->getResult()->castTo<FunctionType>(), memberLocator);
+      Expr *outerThunkBody = nullptr;
 
-      // Rewrite the body to close the existential if warranted.
-      if (selfCalleeParamTy->hasOpenedExistential()) {
-        auto *body = innerThunk->getSingleExpressionBody();
-        body = new (ctx) OpenExistentialExpr(
-            selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef), body,
-            body->getType());
-        cs.cacheType(body);
+      // For an @objc optional member or a member found via dynamic lookup,
+      // build a dynamic member reference. Otherwise, build a nested
+      // "{ args... in self.member(args...) }" thunk that calls the member.
+      if (isDynamicLookup || member->getAttrs().hasAttribute<OptionalAttr>()) {
+        outerThunkBody = new (ctx) DynamicMemberRefExpr(
+            selfOpenedRef, SourceLoc(),
+            resolveConcreteDeclRef(member, memberLocator), memberLoc);
+        outerThunkBody->setImplicit(true);
+        outerThunkBody->setType(selfCalleeTy->getResult());
+        cs.cacheType(outerThunkBody);
 
-        innerThunk->setBody(body);
+        outerThunkBody = coerceToType(outerThunkBody, outerThunkTy->getResult(),
+                                      memberLocator);
+
+        // Close the existential if warranted.
+        if (selfCalleeParamTy->hasOpenedExistential()) {
+          // If the callee's 'self' parameter has non-trivial ownership, adjust
+          // the argument type accordingly.
+          adjustExprOwnershipForParam(selfOpenedRef, selfCalleeParam);
+
+          outerThunkBody = new (ctx) OpenExistentialExpr(
+              selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef),
+              outerThunkBody, outerThunkBody->getType());
+          cs.cacheType(outerThunkBody);
+        }
+      } else {
+        auto *innerThunk = buildSingleCurryThunk(
+            selfOpenedRef, memberRef, cast<DeclContext>(member),
+            outerThunkTy->getResult()->castTo<FunctionType>(), memberLocator);
+
+        // Rewrite the body to close the existential if warranted.
+        if (selfCalleeParamTy->hasOpenedExistential()) {
+          auto *body = innerThunk->getSingleExpressionBody();
+          body = new (ctx) OpenExistentialExpr(
+              selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef), body,
+              body->getType());
+          cs.cacheType(body);
+
+          innerThunk->setBody(body);
+        }
+
+        outerThunkBody = innerThunk;
       }
 
       // Finally, construct the outer thunk.
-      auto outerThunk = new (ctx) AutoClosureExpr(
-          innerThunk, outerThunkTy, AutoClosureExpr::InvalidDiscriminator, dc);
+      auto *outerThunk =
+          new (ctx) AutoClosureExpr(outerThunkBody, outerThunkTy,
+                                    AutoClosureExpr::InvalidDiscriminator, dc);
       outerThunk->setThunkKind(AutoClosureExpr::Kind::DoubleCurryThunk);
       outerThunk->setParameterList(
           ParameterList::create(ctx, SourceLoc(), selfParamDecl, SourceLoc()));
@@ -1488,8 +1524,28 @@ namespace {
       }
       assert(base && "Unable to convert base?");
 
-      // Handle dynamic references.
       if (isDynamic || member->getAttrs().hasAttribute<OptionalAttr>()) {
+        // If the @objc attribute was inferred based on deprecated Swift 3
+        // rules, complain at this use site.
+        if (auto attr = member->getAttrs().getAttribute<ObjCAttr>()) {
+          if (attr->isSwift3Inferred() &&
+              context.LangOpts.WarnSwift3ObjCInference ==
+                  Swift3ObjCInferenceWarnings::Minimal) {
+            context.Diags.diagnose(
+                memberLoc, diag::expr_dynamic_lookup_swift3_objc_inference,
+                member->getDescriptiveKind(), member->getName(),
+                member->getDeclContext()->getSelfNominalTypeDecl()->getName());
+            context.Diags
+                .diagnose(member, diag::make_decl_objc,
+                          member->getDescriptiveKind())
+                .fixItInsert(member->getAttributeInsertionLoc(false), "@objc ");
+          }
+        }
+      }
+
+      // Handle dynamic references.
+      if (isDynamic || (!isPartialApplication &&
+                        member->getAttrs().hasAttribute<OptionalAttr>())) {
         base = cs.coerceToRValue(base);
         Expr *ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
                                                        memberLoc);
@@ -1509,23 +1565,6 @@ namespace {
         cs.setType(ref, refType);
 
         closeExistentials(ref, locator, /*force=*/openedExistential);
-
-        // If this attribute was inferred based on deprecated Swift 3 rules,
-        // complain.
-        if (auto attr = member->getAttrs().getAttribute<ObjCAttr>()) {
-          if (attr->isSwift3Inferred() &&
-              context.LangOpts.WarnSwift3ObjCInference ==
-                  Swift3ObjCInferenceWarnings::Minimal) {
-            context.Diags.diagnose(
-                memberLoc, diag::expr_dynamic_lookup_swift3_objc_inference,
-                member->getDescriptiveKind(), member->getName(),
-                member->getDeclContext()->getSelfNominalTypeDecl()->getName());
-            context.Diags
-                .diagnose(member, diag::make_decl_objc,
-                          member->getDescriptiveKind())
-                .fixItInsert(member->getAttributeInsertionLoc(false), "@objc ");
-          }
-        }
 
         // We also need to handle the implicitly unwrap of the result
         // of the called function if that's the type checking solution
@@ -1649,7 +1688,7 @@ namespace {
         // Replace the DeclRefExpr with a closure expression which SILGen
         // knows how to emit.
         ref = buildDoubleCurryThunk(declRefExpr, member, curryThunkTy,
-                                    memberLocator);
+                                    memberLocator, memberLoc, isDynamic);
       }
 
       // If the member is a method with a dynamic 'Self' result type, wrap an
