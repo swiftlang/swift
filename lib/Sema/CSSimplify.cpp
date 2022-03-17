@@ -3407,7 +3407,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
           if (last.is<LocatorPathElt::ApplyArgToParam>()) {
             auto *fix = AllowArgumentMismatch::create(
-                *this, type1, proto, getConstraintLocator(locator));
+                *this, type1, proto, getConstraintLocator(anchor, path));
 
             // Impact is 2 here because there are two failures
             // 1 - missing conformance and 2 - incorrect argument type.
@@ -3443,14 +3443,14 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
         if (isExpr<CoerceExpr>(anchor)) {
           auto *fix = ContextualMismatch::create(
-              *this, type1, type2, getConstraintLocator(locator));
+              *this, type1, type2, getConstraintLocator(anchor, path));
           if (recordFix(fix))
             return getTypeMatchFailure(locator);
           break;
         }
 
         auto *fix = MissingConformance::forContextual(
-            *this, type1, proto, getConstraintLocator(locator));
+            *this, type1, proto, getConstraintLocator(anchor, path));
 
         if (recordFix(fix))
           return getTypeMatchFailure(locator);
