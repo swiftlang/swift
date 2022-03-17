@@ -122,6 +122,16 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
   return (~x).leadingZeroBitCount
 }
 
+@inline(__always)
+internal func _utf16LengthOfScalar(
+  _ readPtr: inout UnsafeRawPointer
+) -> Int {
+  let byte = readPtr.load(as: UInt8.self)
+  let len = _utf8ScalarLength(byte)
+  readPtr += len
+  return len == 4 ? 2 : 1
+}
+
 @inlinable @inline(__always)
 internal func _utf16Length<U: SIMD, S: SIMD>(
   readPtr: inout UnsafeRawPointer,
@@ -136,29 +146,31 @@ internal func _utf16Length<U: SIMD, S: SIMD>(
     let sValue = readPtr.load(as: S.self)
     let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
     let continuationCount = Int(continuations.wrappedSum())
-        
+    
+   // print("SIMD loop found \(continuationCount) continuations")
+    
     //Find the number of 4 byte code points (0b1110xxxx)
     let uValue = readPtr.load(as: U.self)
     let fourBytes = U.zero.replacing(with: U.one, where: uValue .>= 0b11110000)
     let fourByteCount = Int(fourBytes.wrappedSum())
-        
+    
+  //  print("SIMD loop found \(fourByteCount) 4 byte UTF8 scalars")
+    
     utf16Count &+= (U.scalarCount - continuationCount) + fourByteCount
     
+  //  print("SIMD loop added \((U.scalarCount - continuationCount) + fourByteCount)")
     readPtr += MemoryLayout<U>.stride
   }
   
   return utf16Count
 }
 
-@inlinable @inline(__always)
+@inline(__always)
 internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
   guard rawBuffer.count > 0 else { return 0 }
-  _internalInvariant(!UTF8.isContinuation(rawBuffer.first.unsafelyUnwrapped))
-  _internalInvariant(
-       UTF8.isASCII(rawBuffer.last.unsafelyUnwrapped)
-    || UTF8.isContinuation(rawBuffer.last.unsafelyUnwrapped))
   
   var utf16Count = 0
+ // print("Starting UTF16 length for \(Array(rawBuffer))")
   var readPtr = rawBuffer.baseAddress.unsafelyUnwrapped
   let initialReadPtr = readPtr
   let endPtr = readPtr + rawBuffer.count
@@ -169,6 +181,7 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
     if !UTF8.isContinuation(byte) {
       break
     }
+    print("Eating leading continuation")
     readPtr += 1
   }
   
@@ -181,6 +194,9 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
     //don't add it to the count.
     if readPtr + len <= endPtr {
       utf16Count &+= len == 4 ? 2 : 1
+     // print("Alignment loop found a \(len == 4 ? 2 : 1) byte scalar")
+    } else {
+    //  print("Dropping incomplete scalar during alignment loop")
     }
     readPtr += len
   }
@@ -232,15 +248,18 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
   if utf16Count > 0 && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
     while readPtr > initialReadPtr && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
       readPtr -= 1
+  //    print("Backing up due to partial scalar")
     }
     
     //The trailing scalar may be incomplete, subtract it out and check below
     let byte = readPtr.load(as: UInt8.self)
     let len = _utf8ScalarLength(byte)
     utf16Count &-= len == 4 ? 2 : 1
+  //  print("Subtracted \(len == 4 ? 2 : 1) for reprocessing")
     if readPtr == initialReadPtr {
       //if we backed up all the way and didn't hit a non-continuation, then
       //we don't have any complete scalars, and we should bail.
+      print("Bailing due to backing up all the way")
       return 0
     }
   }
@@ -253,9 +272,14 @@ internal func _utf16Length(_ rawBuffer: UnsafeRawBufferPointer) -> Int {
     //don't add it to the count.
     if readPtr + len <= endPtr {
       utf16Count &+= len == 4 ? 2 : 1
+     // print("Cleanup loop found \(byte) and added \(len == 4 ? 2 : 1)")
+    } else {
+     // print("Dropping incomplete scalar \(byte) during cleanup loop")
     }
     readPtr += len
   }
+  
+  print("Ending UTF16 length for \(Array(rawBuffer)) with \(utf16Count)")
 
   return utf16Count
 }

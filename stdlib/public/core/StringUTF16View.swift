@@ -137,6 +137,42 @@ extension String.UTF16View: BidirectionalCollection {
   /// In an empty UTF-16 view, `endIndex` is equal to `startIndex`.
   @inlinable @inline(__always)
   public var endIndex: Index { return _guts.endIndex }
+
+  @inlinable // protocol-only
+  @inline(__always)
+  public func formIndex2(after i: inout Index) {
+    i = index2(after: i)
+  }
+  
+  @inlinable @inline(__always)
+  public func index2(after idx: Index) -> Index {
+    if _slowPath(_guts.isForeign) {
+      print("Foreign index case")
+      return _foreignIndex(after: idx)
+    }
+    if _guts.isASCII {
+      print("ASCII case")
+      return idx.nextEncoded
+    }
+
+    // For a BMP scalar (1-3 UTF-8 code units), advance past it. For a non-BMP
+    // scalar, use a transcoded offset first.
+
+    // TODO: If transcoded is 1, can we just skip ahead 4?
+
+    print("Pre-alignment UTF8: \( _guts.withFastUTF8 { $0[idx._encodedOffset] } )")
+
+    let idx = _utf16AlignNativeIndex(idx)
+    print("Post-alignment UTF8: \( _guts.withFastUTF8 { $0[idx._encodedOffset] } )")
+
+    let len = _guts.fastUTF8ScalarLength(startingAt: idx._encodedOffset)
+    print("Scalar length: \(len))")
+
+    if len == 4 && idx.transcodedOffset == 0 {
+      return idx.nextTranscoded
+    }
+    return idx.strippingTranscoding.encoded(offsetBy: len)._scalarAligned
+  }
   
   @inlinable @inline(__always)
   public func index(after idx: Index) -> Index {
@@ -518,7 +554,62 @@ extension _StringGuts {
   }
 }
 
+// FIXME: This is for debugging only; remove before merging.
+extension String.Index: CustomStringConvertible {
+  @_alwaysEmitIntoClient
+  @inline(never)
+  public var description: String {
+    var d = "Index("
+      d += "offset: \(_encodedOffset)"
+    if transcodedOffset != 0 {
+      d += "+\(transcodedOffset)"
+    }
+    if let stride = characterStride {
+      d += ", stride: \(stride)"
+    }
+    #if false // These aren't a thing yet
+    if _isCharacterAligned {
+      d += ", character"
+    } else if _isScalarAligned {
+      d += ", scalar"
+    }
+    if _rawBits & 0x4 != 0 {
+      d += ", utf8"
+    }
+    if _rawBits & 0x8 != 0 {
+      d += ", utf16"
+    }
+    #endif
+    d += ")"
+    return d
+  }
+}
+
 extension String.UTF16View {
+  
+  @inlinable // protocol-only
+  internal func __distance(from start: Index, to end: Index) -> Int {
+    var start = start
+    var count = 0
+    print("Starting old distance calculation from \(start) to \(end) for \(Array(String(_guts)[start ..< end].utf8))")
+    if start < end {
+      while start != end {
+        print("Index is: \(start)")
+        print("Old distance calculation found \(self[start])")
+        count += 1
+        formIndex2(after: &start)
+      }
+    }
+    else if start > end {
+      while start != end {
+        count -= 1
+        formIndex(before: &start)
+      }
+    }
+    print("Ended old distance calculation with \(count)")
+    return count
+  }
+  
   @usableFromInline
   @_effects(releasenone)
   internal func _nativeGetOffset(for idx: Index) -> Int {
@@ -531,15 +622,21 @@ extension String.UTF16View {
     }
 
     let idx = _utf16AlignNativeIndex(idx)
-    _internalInvariant(idx.transcodedOffset == 0 || idx.transcodedOffset == 1)
 
     guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
+      print("Starting fast calculation")
+      _internalInvariant(idx.transcodedOffset == 0 || idx.transcodedOffset == 1)
       let fastCalculation: Int = idx.transcodedOffset + _guts.withFastUTF8(
         range: startIndex._encodedOffset ..< idx._encodedOffset
       ) { utf8 in
         return _utf16Length(UnsafeRawBufferPointer(utf8))
       }
-
+      print("Finished fast calculation")
+      
+      if fastCalculation != _distance(from: startIndex, to: idx) {
+        print("BAD: \(fastCalculation) \(__distance(from: startIndex, to: idx)) \(self)")
+        fatalError()
+      }
       return fastCalculation
     }
 
@@ -550,12 +647,24 @@ extension String.UTF16View {
     // Otherwise, find the nearest lower-bound breadcrumb and count from there
     let (crumb, crumbOffset) = breadcrumbsPtr.pointee.getBreadcrumb(
       forIndex: idx)
-        
-    return idx.transcodedOffset + _guts.withFastUTF8(
-      range: _utf16AlignNativeIndex(crumb)._encodedOffset ..< idx._encodedOffset
+    
+    print("idx.transcodedOffset is \(idx.transcodedOffset)")
+    print("Crumb: \(crumb) idx: \(idx)")
+    
+    let fastCalculation: Int = (idx.transcodedOffset - crumb.transcodedOffset) + _guts.withFastUTF8(
+      range: crumb._encodedOffset ..< idx._encodedOffset
     ) { utf8 in
       return crumbOffset + _utf16Length(UnsafeRawBufferPointer(utf8))
     }
+    
+    if fastCalculation != crumbOffset + _distance(from: crumb, to: idx) {
+      print("BAD: \(fastCalculation) \(crumbOffset + _distance(from: crumb, to: idx)) \(self)")
+      fatalError()
+    }
+//    _internalInvariant(
+//      fastCalculation == crumbOffset + _distance(from: crumb, to: idx)
+//    )
+    return fastCalculation
   }
 
   @usableFromInline
