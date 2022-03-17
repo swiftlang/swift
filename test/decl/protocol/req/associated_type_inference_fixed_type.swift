@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=off
-// RUN: not %target-swift-frontend -typecheck -dump-type-witness-systems %s -requirement-machine-protocol-signatures=off 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -dump-type-witness-systems %s -requirement-machine-protocol-signatures=off 2>&1
 
 // TODO: Get this to pass with  -requirement-machine-protocol-signatures=on.
 
