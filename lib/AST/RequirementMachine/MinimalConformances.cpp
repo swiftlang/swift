@@ -396,7 +396,7 @@ void MinimalConformances::collectConformanceRules() {
       continue;
 
     // Save protocol refinement relations in a side table.
-    if (rule.isProtocolRefinementRule())
+    if (rule.isProtocolRefinementRule(Context))
       ProtocolRefinements.insert(ruleID);
 
     if (!System.isInMinimizationDomain(rule.getLHS().getRootProtocol()))
