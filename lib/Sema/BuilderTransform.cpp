@@ -1736,7 +1736,17 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 
   // Solve the constraint system.
   SmallVector<Solution, 4> solutions;
-  if (cs.solve(solutions) || solutions.size() != 1) {
+  bool solvingFailed = cs.solve(solutions);
+
+  if (cs.getASTContext().CompletionCallback) {
+    CompletionContextFinder analyzer(func, func->getDeclContext());
+    filterSolutionsForCodeCompletion(solutions, analyzer);
+    for (const auto &solution : solutions) {
+      cs.getASTContext().CompletionCallback->sawSolution(solution);
+    }
+  }
+
+  if (solvingFailed || solutions.size() != 1) {
     // Try to fix the system or provide a decent diagnostic.
     auto salvagedResult = cs.salvage();
     switch (salvagedResult.getKind()) {

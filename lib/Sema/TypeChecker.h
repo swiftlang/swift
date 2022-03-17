@@ -29,10 +29,11 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeRefinementContext.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Config.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Sema/CompletionContextFinder.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <functional>
@@ -570,6 +571,12 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
                                           Identifier opName,
                                           DeclRefKind refKind,
                                           ConcreteDeclRef &refdDecl);
+
+/// Remove any solutions from the provided vector that require more fixes than
+/// the best score or don't contain a type for the code completion token.
+void filterSolutionsForCodeCompletion(
+    SmallVectorImpl<constraints::Solution> &solutions,
+    CompletionContextFinder &contextAnalyzer);
 
 /// Type check the given expression and provide results back to code completion
 /// via specified callback.

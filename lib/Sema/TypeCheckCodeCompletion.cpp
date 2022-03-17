@@ -513,11 +513,32 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   }
 }
 
-/// Remove any solutions from the provided vector that both require fixes and
-/// have a score worse than the best.
-static void filterSolutions(SolutionApplicationTarget &target,
-                            SmallVectorImpl<Solution> &solutions,
-                            CodeCompletionExpr *completionExpr) {
+static bool hasTypeForCompletion(Solution &solution,
+                                 CompletionContextFinder &contextAnalyzer) {
+  if (contextAnalyzer.hasCompletionExpr()) {
+    return solution.hasType(contextAnalyzer.getCompletionExpr());
+  } else {
+    assert(contextAnalyzer.hasCompletionKeyPathComponent());
+    return solution.hasType(
+        contextAnalyzer.getKeyPathContainingCompletionComponent(),
+        contextAnalyzer.getKeyPathCompletionComponentIndex());
+  }
+}
+
+void TypeChecker::filterSolutionsForCodeCompletion(
+    SmallVectorImpl<Solution> &solutions,
+    CompletionContextFinder &contextAnalyzer) {
+  // Ignore solutions that didn't end up involving the completion (e.g. due to
+  // a fix to skip over/ignore it).
+  llvm::erase_if(solutions, [&](Solution &S) {
+    if (hasTypeForCompletion(S, contextAnalyzer))
+      return false;
+    // FIXME: Technically this should never happen, but it currently does in
+    // result builder contexts. Re-evaluate if we can assert here when we have
+    // multi-statement closure checking for result builders.
+    return true;
+  });
+
   if (solutions.size() <= 1)
     return;
 
@@ -608,15 +629,6 @@ bool TypeChecker::typeCheckForCodeCompletion(
     if (!cs.solveForCodeCompletion(target, solutions))
       return CompletionResult::Fallback;
 
-    // FIXME: instead of filtering, expose the score and viability to clients.
-    // Remove any solutions that both require fixes and have a score that is
-    // worse than the best.
-    CodeCompletionExpr *completionExpr = nullptr;
-    if (contextAnalyzer.hasCompletionExpr()) {
-      completionExpr = contextAnalyzer.getCompletionExpr();
-    }
-    filterSolutions(target, solutions, completionExpr);
-
     // Similarly, if the type-check didn't produce any solutions, fall back
     // to type-checking a sub-expression in isolation.
     if (solutions.empty())
@@ -626,19 +638,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     // closure body it could either be type-checked together with the context
     // or not, it's impossible to say without checking.
     if (contextAnalyzer.locatedInMultiStmtClosure()) {
-      auto &solution = solutions.front();
-
-      bool HasTypeForCompletionNode = false;
-      if (completionExpr) {
-        HasTypeForCompletionNode = solution.hasType(completionExpr);
-      } else {
-        assert(contextAnalyzer.hasCompletionKeyPathComponent());
-        HasTypeForCompletionNode = solution.hasType(
-            contextAnalyzer.getKeyPathContainingCompletionComponent(),
-            contextAnalyzer.getKeyPathCompletionComponentIndex());
-      }
-
-      if (!HasTypeForCompletionNode) {
+      if (!hasTypeForCompletion(solutions.front(), contextAnalyzer)) {
         // At this point we know the code completion node wasn't checked with
         // the closure's surrounding context, so can defer to regular
         // type-checking for the current call to typeCheckExpression. If that
@@ -650,6 +650,11 @@ bool TypeChecker::typeCheckForCodeCompletion(
         return CompletionResult::NotApplicable;
       }
     }
+
+    // FIXME: instead of filtering, expose the score and viability to clients.
+    // Remove solutions that skipped over/ignored the code completion point
+    // or that require fixes and have a score that is worse than the best.
+    filterSolutionsForCodeCompletion(solutions, contextAnalyzer);
 
     llvm::for_each(solutions, callback);
     return CompletionResult::Ok;
