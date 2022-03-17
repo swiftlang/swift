@@ -27,6 +27,7 @@
 
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/ObjectFile.h"
+#include "swift/Concurrency/Actor.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -58,8 +59,11 @@
 //   with escalation   |         present             |       full
 //   with escalation   |       not present           |     DEGRADED
 //
-// Currently, degraded info means that IsRunning is not available (indicated
-// with `HasIsRunning = false`) and async backtraces are not provided.
+// Currently, degraded info has these effects:
+// 1. Task.IsRunning is not available, indicated with Task.HasIsRunning = false.
+// 2. Task async backtraces are not provided.
+// 3. Task and actor thread ports are not available, indicated with
+//    HasThreadPort = false.
 
 #if __has_include(<dispatch/swift_concurrency_private.h>)
 #include <dispatch/swift_concurrency_private.h>
@@ -185,6 +189,9 @@ public:
     bool IsRunning;
     bool IsEnqueued;
 
+    bool HasThreadPort;
+    uint32_t ThreadPort;
+
     uint64_t Id;
     StoredPointer RunJob;
     StoredPointer AllocatorSlabPtr;
@@ -193,8 +200,15 @@ public:
   };
 
   struct ActorInfo {
-    StoredSize Flags;
     StoredPointer FirstJob;
+
+    uint8_t State;
+    bool IsDistributedRemote;
+    bool IsPriorityEscalated;
+    uint8_t MaxPriority;
+
+    bool HasThreadPort;
+    uint32_t ThreadPort;
   };
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
@@ -1532,6 +1546,44 @@ private:
         Task->PrivateStorage.Status.Flags[0] & ActiveTaskStatusFlags::IsRunning;
   }
 
+  std::pair<bool, uint32_t> getThreadPort(
+      const AsyncTask<Runtime, ActiveTaskStatusWithEscalation<Runtime>> *Task) {
+#if HAS_DISPATCH_LOCK_IS_LOCKED
+    return {true,
+            dispatch_lock_owner(Task->PrivateStorage.Status.ExecutionLock[0])};
+#else
+    // The target runtime was built with priority escalation but we don't have
+    // the swift_concurrency_private.h header needed to decode the lock.
+    return {false, 0};
+#endif
+  }
+
+  std::pair<bool, uint32_t> getThreadPort(
+      const AsyncTask<Runtime, ActiveTaskStatusWithoutEscalation<Runtime>>
+          *Task) {
+    // Tasks without escalation have no thread port to query.
+    return {false, 0};
+  }
+
+  std::pair<bool, uint32_t> getThreadPort(
+      const DefaultActorImpl<Runtime, ActiveActorStatusWithEscalation<Runtime>>
+          *Actor) {
+#if HAS_DISPATCH_LOCK_IS_LOCKED
+    return {true, dispatch_lock_owner(Actor->Status.DrainLock[0])};
+#else
+    // The target runtime was built with priority escalation but we don't have
+    // the swift_concurrency_private.h header needed to decode the lock.
+    return {false, 0};
+#endif
+  }
+
+  std::pair<bool, uint32_t>
+  getThreadPort(const DefaultActorImpl<
+                Runtime, ActiveActorStatusWithoutEscalation<Runtime>> *Actor) {
+    // Actors without escalation have no thread port to query.
+    return {false, 0};
+  }
+
   template <typename AsyncTaskType>
   std::pair<llvm::Optional<std::string>, AsyncTaskInfo>
   asyncTaskInfo(StoredPointer AsyncTaskPtr) {
@@ -1557,6 +1609,8 @@ private:
     Info.IsEnqueued = TaskStatusFlags & ActiveTaskStatusFlags::IsEnqueued;
 
     setIsRunning(Info, AsyncTaskObj.get());
+    std::tie(Info.HasThreadPort, Info.ThreadPort) =
+        getThreadPort(AsyncTaskObj.get());
 
     Info.Id =
         AsyncTaskObj->Id | ((uint64_t)AsyncTaskObj->PrivateStorage.Id << 32);
@@ -1626,15 +1680,26 @@ private:
       return {std::string("failure reading actor"), {}};
 
     ActorInfo Info{};
-    Info.Flags = ActorObj->Status.Flags[0];
 
-    // Status is the low 3 bits of Flags. Status of 0 is Idle. Don't read
-    // FirstJob when idle.
-    auto Status = Info.Flags & 0x7;
-    if (Status != 0) {
+    uint32_t Flags = ActorObj->Status.Flags[0];
+    Info.State = Flags & concurrency::ActorFlagConstants::ActorStateMask;
+    Info.IsDistributedRemote =
+        Flags & concurrency::ActorFlagConstants::DistributedRemote;
+    Info.IsPriorityEscalated =
+        Flags & concurrency::ActorFlagConstants::IsPriorityEscalated;
+    Info.MaxPriority =
+        (Flags & concurrency::ActorFlagConstants::PriorityMask) >>
+        concurrency::ActorFlagConstants::PriorityShift;
+
+    // Don't read FirstJob when idle.
+    if (Info.State != concurrency::ActorFlagConstants::Idle) {
       // This is a JobRef which stores flags in the low bits.
       Info.FirstJob = ActorObj->Status.FirstJob & ~StoredPointer(0x3);
     }
+
+    std::tie(Info.HasThreadPort, Info.ThreadPort) =
+        getThreadPort(ActorObj.get());
+
     return {llvm::None, Info};
   }
 

@@ -18,6 +18,7 @@
 #ifndef SWIFT_REMOTE_MIRROR_TYPES_H
 #define SWIFT_REMOTE_MIRROR_TYPES_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -235,18 +236,21 @@ typedef struct swift_async_task_info {
 
   unsigned Kind;
   unsigned EnqueuePriority;
-  uint8_t IsChildTask;
-  uint8_t IsFuture;
-  uint8_t IsGroupChildTask;
-  uint8_t IsAsyncLetTask;
+  bool IsChildTask;
+  bool IsFuture;
+  bool IsGroupChildTask;
+  bool IsAsyncLetTask;
 
   unsigned MaxPriority;
-  uint8_t IsCancelled;
-  uint8_t IsStatusRecordLocked;
-  uint8_t IsEscalated;
-  uint8_t HasIsRunning; // If false, the IsRunning flag is not valid.
-  uint8_t IsRunning;
-  uint8_t IsEnqueued;
+  bool IsCancelled;
+  bool IsStatusRecordLocked;
+  bool IsEscalated;
+  bool HasIsRunning; // If false, the IsRunning flag is not valid.
+  bool IsRunning;
+  bool IsEnqueued;
+
+  bool HasThreadPort;
+  uint32_t ThreadPort;
 
   uint64_t Id;
   swift_reflection_ptr_t RunJob;
@@ -265,8 +269,15 @@ typedef struct swift_actor_info {
   /// swift_reflection call on the given context.
   const char *Error;
 
-  uint64_t Flags;
+  uint8_t State;
+  bool IsDistributedRemote;
+  bool IsPriorityEscalated;
+  uint8_t MaxPriority;
+
   swift_reflection_ptr_t FirstJob;
+
+  bool HasThreadPort;
+  uint32_t ThreadPort;
 } swift_actor_info_t;
 
 /// An opaque pointer to a context which maintains state and
