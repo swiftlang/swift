@@ -93,7 +93,7 @@ bool Rule::isIdentityConformanceRule() const {
 
 /// If this is a rule of the form [P].[Q] => [P] where [P] and [Q] are
 /// protocol symbols, return true, otherwise return false.
-bool Rule::isProtocolRefinementRule() const {
+bool Rule::isProtocolRefinementRule(RewriteContext &ctx) const {
   if (LHS.size() == 2 &&
       RHS.size() == 1 &&
       LHS[0] == RHS[0] &&
@@ -111,7 +111,7 @@ bool Rule::isProtocolRefinementRule() const {
     auto *proto = LHS[0].getProtocol();
     auto *otherProto = LHS[1].getProtocol();
 
-    auto inherited = proto->getInheritedProtocols();
+    auto inherited = ctx.getInheritedProtocols(proto);
     return (std::find(inherited.begin(), inherited.end(), otherProto)
             != inherited.end());
   }

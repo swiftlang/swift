@@ -108,7 +108,7 @@ public:
 
   bool isIdentityConformanceRule() const;
 
-  bool isProtocolRefinementRule() const;
+  bool isProtocolRefinementRule(RewriteContext &ctx) const;
 
   bool isCircularConformanceRule() const;
 
