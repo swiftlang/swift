@@ -546,6 +546,10 @@ def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
 
+def enable_experimental_variadic_generics :
+  Flag<["-"], "enable-experimental-variadic-generics">,
+  HelpText<"Enable experimental support for variadic generic types">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;

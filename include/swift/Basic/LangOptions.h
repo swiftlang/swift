@@ -352,6 +352,9 @@ namespace swift {
     /// Enable experimental pairwise `buildBlock` for result builders.
     bool EnableExperimentalPairwiseBuildBlock = false;
 
+    /// Enable variadic generics.
+    bool EnableExperimentalVariadicGenerics = false;
+
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;
