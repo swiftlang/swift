@@ -511,6 +511,31 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   SyntaxParsingContext UnaryContext(SyntaxContext, SyntaxContextKind::Expr);
   UnresolvedDeclRefExpr *Operator;
+
+  // First check to see if we have the start of a regex literal /.../.
+  switch (Tok.getKind()) {
+  case tok::oper_prefix:
+  case tok::oper_binary_spaced:
+  case tok::oper_binary_unspaced: {
+    if (!Tok.getText().startswith("/"))
+      break;
+
+    // Try re-lex as a /.../ regex literal.
+    if (!L->tryLexAsForwardSlashRegexLiteral(getParserPosition().LS))
+      break;
+
+    // Discard the operator token, which will be replaced by the regex literal
+    // token.
+    discardToken();
+
+    assert(Tok.getText().startswith("/"));
+    assert(Tok.is(tok::regex_literal));
+    break;
+  }
+  default:
+    break;
+  }
+
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
@@ -532,18 +557,31 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   case tok::backslash:
     return parseExprKeyPath();
 
-  case tok::oper_postfix:
+  case tok::oper_postfix: {
     // Postfix operators cannot start a subexpression, but can happen
     // syntactically because the operator may just follow whatever precedes this
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
-    LLVM_FALLTHROUGH;
-  case tok::oper_prefix:
-    if (Tok.getText().contains("/"))
-      diagnose(Tok, diag::prefix_slash_not_allowed);
     Operator = parseExprOperator();
     break;
+  }
+  case tok::oper_prefix: {
+    // Check to see if we can split a prefix operator containing '/', e.g '!/',
+    // which might be a prefix operator on a regex literal.
+    auto slashIdx = Tok.getText().find("/");
+    if (slashIdx != StringRef::npos) {
+      auto prefix = Tok.getText().take_front(slashIdx);
+      if (!prefix.empty()) {
+        Operator = makeExprOperator({Tok.getKind(), prefix});
+        consumeStartingCharacterOfCurrentToken(Tok.getKind(), prefix.size());
+        break;
+      }
+      diagnose(Tok, diag::prefix_slash_not_allowed);
+    }
+    Operator = parseExprOperator();
+    break;
+  }
   case tok::oper_binary_spaced:
   case tok::oper_binary_unspaced: {
     // For recovery purposes, accept an oper_binary here.
@@ -862,17 +900,22 @@ static DeclRefKind getDeclRefKindForOperator(tok kind) {
   }
 }
 
-/// parseExprOperator - Parse an operator reference expression.  These
-/// are not "proper" expressions; they can only appear in binary/unary
-/// operators.
-UnresolvedDeclRefExpr *Parser::parseExprOperator() {
+UnresolvedDeclRefExpr *Parser::makeExprOperator(Token Tok) {
   assert(Tok.isAnyOperator());
   DeclRefKind refKind = getDeclRefKindForOperator(Tok.getKind());
   SourceLoc loc = Tok.getLoc();
   DeclNameRef name(Context.getIdentifier(Tok.getText()));
-  consumeToken();
   // Bypass local lookup.
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
+}
+
+/// parseExprOperator - Parse an operator reference expression.  These
+/// are not "proper" expressions; they can only appear in binary/unary
+/// operators.
+UnresolvedDeclRefExpr *Parser::parseExprOperator() {
+  auto *op = makeExprOperator(Tok);
+  consumeToken();
+  return op;
 }
 
 /// parseExprSuper

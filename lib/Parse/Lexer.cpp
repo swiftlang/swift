@@ -1997,6 +1997,62 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   return true;
 }
 
+bool Lexer::tryLexAsForwardSlashRegexLiteral(State S) {
+  auto priorState = getStateForBeginningOfToken(NextToken, LeadingTrivia);
+
+  // Re-lex from the given state.
+  restoreState(S);
+
+  // While we restored state, that would have re-advanced the lexer. This is
+  // good in that it's filled in all the interesting properties of the token
+  // (trivia, is on new line, etc), but we need to rewind to re-lex the actual
+  // kind.
+  auto *TokStart = getBufferPtrForSourceLoc(NextToken.getLoc());
+  assert(*TokStart == '/');
+  CurPtr = TokStart + 1;
+
+  auto bail = [&]() -> bool {
+    restoreState(priorState);
+    return false;
+  };
+
+  // We need to ban these characters at the start of a regex to avoid ambiguity
+  // with unapplied operator references, e.g 'foo(/, /)'.
+  switch (*CurPtr) {
+  case ' ': case '\t': case ',': case ')':
+    return bail();
+  default:
+    break;
+  }
+
+  while (true) {
+    uint32_t CharValue = validateUTF8CharacterAndAdvance(CurPtr, BufferEnd);
+    if (CharValue == ~0U)
+      return bail();
+
+    // Regex literals cannot span multiple lines.
+    if (CharValue == '\n' || CharValue == '\r')
+      return bail();
+
+    if (CharValue == '\\' && *CurPtr == '/') {
+      // Skip escaped delimiter and advance.
+      CurPtr++;
+    } else if (CharValue == '/') {
+      // End of literal, stop.
+      break;
+    }
+  }
+  // We've ended on the opening of a comment, bail.
+  // TODO: We could treat such cases as postfix operators on a regex literal,
+  // but it seems more likely the user has written a comment and is in the
+  // middle of editing the text before it.
+  if (*CurPtr == '*' || *CurPtr == '/')
+    return bail();
+
+  formToken(tok::regex_literal, TokStart);
+  return true;
+}
+
 /// lexEscapedIdentifier:
 ///   identifier ::= '`' identifier '`'
 ///
