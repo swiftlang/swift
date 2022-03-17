@@ -141,7 +141,7 @@ extension String.UTF16View: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(after idx: Index) -> Index {
     if _slowPath(_guts.isForeign) { return _foreignIndex(after: idx) }
-    if _guts.isASCII { return idx.nextEncoded }
+    if _guts.isASCII { return idx.nextEncoded._knownUTF8._knownUTF16 }
 
     // For a BMP scalar (1-3 UTF-8 code units), advance past it. For a non-BMP
     // scalar, use a transcoded offset first.
@@ -152,20 +152,24 @@ extension String.UTF16View: BidirectionalCollection {
 
     let len = _guts.fastUTF8ScalarLength(startingAt: idx._encodedOffset)
     if len == 4 && idx.transcodedOffset == 0 {
-      return idx.nextTranscoded
+      return idx.nextTranscoded._knownUTF8
     }
-    return idx.strippingTranscoding.encoded(offsetBy: len)._scalarAligned
+    return idx
+      .strippingTranscoding
+      .encoded(offsetBy: len)
+      ._scalarAligned
+      ._knownUTF8
   }
 
   @inlinable @inline(__always)
   public func index(before idx: Index) -> Index {
     _precondition(!idx.isZeroPosition)
     if _slowPath(_guts.isForeign) { return _foreignIndex(before: idx) }
-    if _guts.isASCII { return idx.priorEncoded }
+    if _guts.isASCII { return idx.priorEncoded._knownUTF8._knownUTF16 }
 
     if idx.transcodedOffset != 0 {
       _internalInvariant(idx.transcodedOffset == 1)
-      return idx.strippingTranscoding
+      return idx.strippingTranscoding._knownUTF8
     }
 
     let idx = _utf16AlignNativeIndex(idx)
@@ -173,12 +177,12 @@ extension String.UTF16View: BidirectionalCollection {
     if len == 4 {
       // 2 UTF-16 code units comprise this scalar; advance to the beginning and
       // start mid-scalar transcoding
-      return idx.encoded(offsetBy: -len).nextTranscoded
+      return idx.encoded(offsetBy: -len).nextTranscoded._knownUTF8
     }
 
     // Single UTF-16 code unit
     _internalInvariant((1...3) ~= len)
-    return idx.encoded(offsetBy: -len)._scalarAligned
+    return idx.encoded(offsetBy: -len)._scalarAligned._knownUTF8
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
@@ -660,10 +664,14 @@ extension String.UTF16View {
     // Trivial and common: start
     if offset == 0 { return startIndex }
 
-    if _guts.isASCII { return Index(_encodedOffset: offset) }
+    if _guts.isASCII {
+      return Index(
+        _encodedOffset: offset
+      )._scalarAligned._knownUTF8._knownUTF16
+    }
 
     guard _guts._useBreadcrumbs(forEncodedOffset: offset) else {
-      return _index(startIndex, offsetBy: offset)
+      return _index(startIndex, offsetBy: offset)._knownUTF8
     }
 
     // Simple and common: endIndex aka `length`.
@@ -699,9 +707,13 @@ extension String.UTF16View {
           // Uncommon: final sub-scalar transcoded offset
           if _slowPath(utf16I > utf16End) {
             _internalInvariant(utf16Len == 2)
-            return Index(encodedOffset: readIdx, transcodedOffset: 1)
+            return Index(
+              encodedOffset: readIdx, transcodedOffset: 1
+            )._knownUTF8
           }
-          return Index(_encodedOffset: readIdx &+ len)._scalarAligned
+          return Index(
+            _encodedOffset: readIdx &+ len
+          )._scalarAligned._knownUTF8
         }
 
         readIdx &+= len

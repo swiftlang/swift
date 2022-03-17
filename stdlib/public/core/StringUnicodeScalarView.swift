@@ -114,7 +114,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
 
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.fastUTF8ScalarLength(startingAt: i._encodedOffset)
-      return i.encoded(offsetBy: len)._scalarAligned
+      return i.encoded(offsetBy: len)._scalarAligned._knownUTF8
     }
 
     return _foreignIndex(after: i)
@@ -143,11 +143,11 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     _precondition(i > startIndex, "String index is out of bounds")
 
     if _fastPath(_guts.isFastUTF8) {
-      let len = _guts.withFastUTF8 { utf8 -> Int in
-        return _utf8ScalarLength(utf8, endingAt: i._encodedOffset)
+      let len = _guts.withFastUTF8 { utf8 in
+        _utf8ScalarLength(utf8, endingAt: i._encodedOffset)
       }
       _internalInvariant(len <= 4, "invalid UTF8")
-      return i.encoded(offsetBy: -len)._scalarAligned
+      return i.encoded(offsetBy: -len)._scalarAligned._knownUTF8
     }
 
     return _foreignIndex(before: i)
@@ -436,7 +436,8 @@ extension String.UnicodeScalarView {
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: i)
     let len = UTF16.isLeadSurrogate(cu) ? 2 : 1
 
-    return i.encoded(offsetBy: len)._scalarAligned
+    let r = i.encoded(offsetBy: len)._scalarAligned
+    return _guts.internalMarkEncoding(r)
   }
 
   @usableFromInline @inline(never)
@@ -447,6 +448,7 @@ extension String.UnicodeScalarView {
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: priorIdx)
     let len = UTF16.isTrailSurrogate(cu) ? 2 : 1
 
-    return i.encoded(offsetBy: -len)._scalarAligned
+    let r = i.encoded(offsetBy: -len)._scalarAligned
+    return _guts.internalMarkEncoding(r)
   }
 }

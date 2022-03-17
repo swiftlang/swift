@@ -137,7 +137,7 @@ extension String.UTF8View: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
     if _fastPath(_guts.isFastUTF8) {
-      return i.strippingTranscoding.nextEncoded
+      return i.strippingTranscoding.nextEncoded._knownUTF8
     }
 
     return _foreignIndex(after: i)
@@ -147,7 +147,7 @@ extension String.UTF8View: BidirectionalCollection {
   public func index(before i: Index) -> Index {
     _precondition(!i.isZeroPosition)
     if _fastPath(_guts.isFastUTF8) {
-      return i.strippingTranscoding.priorEncoded
+      return i.strippingTranscoding.priorEncoded._knownUTF8
     }
 
     return _foreignIndex(before: i)
@@ -428,17 +428,17 @@ extension String.UTF8View {
 
     if utf8Len == 1 {
       _internalInvariant(idx.transcodedOffset == 0)
-      return idx.nextEncoded._scalarAligned
+      return idx.nextEncoded._scalarAligned._knownUTF16
     }
 
     // Check if we're still transcoding sub-scalar
     if idx.transcodedOffset < utf8Len - 1 {
-      return idx.nextTranscoded
+      return idx.nextTranscoded._knownUTF16
     }
 
     // Skip to the next scalar
     _internalInvariant(idx.transcodedOffset == utf8Len - 1)
-    return idx.encoded(offsetBy: scalarLen)._scalarAligned
+    return idx.encoded(offsetBy: scalarLen)._scalarAligned._knownUTF16
   }
 
   @usableFromInline @inline(never)
@@ -450,7 +450,7 @@ extension String.UTF8View {
 
     if idx.transcodedOffset != 0 {
       _internalInvariant((1...3) ~= idx.transcodedOffset)
-      return idx.priorTranscoded
+      return idx.priorTranscoded._knownUTF16
     }
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
@@ -458,7 +458,7 @@ extension String.UTF8View {
     let utf8Len = UTF8.width(scalar)
     return idx.encoded(
       offsetBy: -scalarLen
-    ).transcoded(withOffset: utf8Len &- 1)
+    ).transcoded(withOffset: utf8Len &- 1)._knownUTF16
   }
 
   @usableFromInline @inline(never)
