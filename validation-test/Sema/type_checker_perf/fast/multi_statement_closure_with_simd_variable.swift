@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
 // REQUIRES: objc_interop,no_asan
+// REQUIRES: OS=macosx
 
 import simd
 
