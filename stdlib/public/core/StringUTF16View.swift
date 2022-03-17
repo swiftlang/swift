@@ -581,10 +581,11 @@ extension String.UTF16View {
   
   @inline(__always)
   internal func _utf16Distance(from start: Index, to end: Index) -> Int {
-    _internalInvariant(idx.transcodedOffset == 0 || idx.transcodedOffset == 1)
-    return (idx.transcodedOffset - start.transcodedOffset) + _guts.withFastUTF8(
-      range: startIndex._encodedOffset ..< idx._encodedOffset
-    ) { rawBuffer in
+    _internalInvariant(end.transcodedOffset == 0 || end.transcodedOffset == 1)
+    return (end.transcodedOffset - start.transcodedOffset) + _guts.withFastUTF8(
+      range: startIndex._encodedOffset ..< end._encodedOffset
+    ) { utf8 in
+      let rawBuffer = UnsafeRawBufferPointer(utf8)
       guard rawBuffer.count > 0 else { return 0 }
       
       var utf16Count = 0
