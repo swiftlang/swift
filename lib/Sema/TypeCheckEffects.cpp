@@ -724,6 +724,12 @@ public:
   DeclContext *RethrowsDC = nullptr;
   DeclContext *ReasyncDC = nullptr;
 
+  // Indicates if `classifyApply` will attempt to classify SelfApplyExpr
+  // because that should be done only in certain contexts like when infering
+  // if "async let" implicit auto closure wrapping initialize expression can
+  // throw.
+  bool ClassifySelfApplyExpr = false;
+
   DeclContext *getPolymorphicEffectDeclContext(EffectKind kind) const {
     switch (kind) {
     case EffectKind::Throws: return RethrowsDC;
@@ -745,15 +751,28 @@ public:
 
   /// Check to see if the given function application throws or is async.
   Classification classifyApply(ApplyExpr *E) {
-    if (isa<SelfApplyExpr>(E)) {
-      assert(!E->isImplicitlyAsync());
-      return Classification();
-    }
-
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
     if (!E->getType() || E->getType()->hasError())
       return Classification::forInvalidCode();
+
+    if (auto *SAE = dyn_cast<SelfApplyExpr>(E)) {
+      assert(!E->isImplicitlyAsync());
+
+      if (ClassifySelfApplyExpr) {
+        // Do not consider throw properties in SelfAssignExpr with an implicit
+        // conversion base.
+        if (isa<ImplicitConversionExpr>(SAE->getBase()))
+          return Classification();
+
+        auto fnType = E->getType()->getAs<AnyFunctionType>();
+        if (fnType && fnType->isThrowing()) {
+          return Classification::forUnconditional(
+              EffectKind::Throws, PotentialEffectReason::forApply());
+        }
+      }
+      return Classification();
+    }
 
     auto type = E->getFn()->getType();
     if (!type) return Classification::forInvalidCode();
@@ -2957,6 +2976,8 @@ void TypeChecker::checkPropertyWrapperEffects(
 }
 
 bool TypeChecker::canThrow(Expr *expr) {
-  return (ApplyClassifier().classifyExpr(expr, EffectKind::Throws)
-          == ConditionalEffectKind::Always);
+  ApplyClassifier classifier;
+  classifier.ClassifySelfApplyExpr = true;
+  return (classifier.classifyExpr(expr, EffectKind::Throws) ==
+          ConditionalEffectKind::Always);
 }
