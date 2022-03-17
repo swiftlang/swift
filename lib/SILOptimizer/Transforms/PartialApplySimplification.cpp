@@ -45,8 +45,10 @@ STATISTIC(NumInvocationFunctionsChanged,
           "Number of invocation functions rewritten");
 STATISTIC(NumUnsupportedChangesToInvocationFunctions,
           "Number of invocation functions that could be rewritten, but aren't yet");
-STATISTIC(NumPartialApplyCalleesWithNonPartialApplyUses,
-          "Number of invocation functions with non-partial_apply uses");
+STATISTIC(NumPartialApplyCalleesWithNonApplyUses,
+          "Number of invocation functions with non-apply uses");
+STATISTIC(NumPartialApplyCalleesWithEscapingAndApplyUses,
+          "Number of invocation functions with both escaping and full apply uses");
 STATISTIC(NumPartialApplyCalleesPossiblyUsedExternally,
           "Number of invocation functions possibly used externally");
 STATISTIC(NumPartialApplyCalleesDeclarationOnly,
@@ -69,8 +71,11 @@ struct KnownCallee {
   llvm::SetVector<FunctionRefInst *> FunctionRefs;
   /// The set of partial application sites.
   llvm::SetVector<PartialApplyInst *> PartialApplications;
-  /// If the callee has a non-partial-apply use, this points to an arbitrary one.
-  SILInstruction *NonPartialApplyUse = nullptr;
+  /// The set of full application sites.
+  llvm::SetVector<FullApplySite> FullApplications;
+  /// If the callee has a non-partial-apply, non-apply use, this points to an
+  /// arbitrary one, for logging purposes.
+  SILInstruction *NonApplyUse = nullptr;
 };
 
 class PartialApplySimplificationPass : public SILModuleTransform {
@@ -115,8 +120,8 @@ class PartialApplySimplificationPass : public SILModuleTransform {
 ///   out of the single applied argument
 /// - if the partial application is noescape:
 ///   - the argument is word-sized or smaller
-///   - the argument is either trivial, or passed with a +0 convention
-///     (guaranteed, unowned, in_guaranteed)
+///   - the argument is either trivial, or passed with a net +0 convention
+///     (guaranteed, unowned, in_guaranteed, inout)
 /// - if the partial application is escapable:
 ///   - the argument is either a single Swift-refcounted word, or trivial and
 ///     sized strictly less than one word
@@ -124,6 +129,11 @@ class PartialApplySimplificationPass : public SILModuleTransform {
 ///     resulting function
 static bool isSimplePartialApply(PartialApplyInst *i) {
   auto calleeTy = i->getCallee()->getType().castTo<SILFunctionType>();
+  if (calleeTy->isPolymorphic()) {
+    // TODO: Check if the "self" parameter provides the generic environment
+    return false;
+  }
+  
   if (calleeTy->getRepresentation() != SILFunctionTypeRepresentation::Method) {
     return false;
   }
@@ -136,10 +146,24 @@ static bool isSimplePartialApply(PartialApplyInst *i) {
   auto argTy = i->getArguments()[0]->getType();
 
   if (i->getFunctionType()->isNoEscape()) {
-    if (argTy.isAddress()) {
+    switch (calleeTy->getSelfParameter().getConvention()) {
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_In_Constant:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_InoutAliasable:
+      // Indirect arguments are trivially word sized.
       return true;
+        
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Unowned:
+      // TODO: Handle word-sized direct arguments.
+      return false;
+    
+    // +1 arguments need a thunk to stage a copy for the callee to consume.
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Indirect_In:
+      return false;
     }
-    return false;
   } else {
     if (!argTy.isObject()) {
       return false;
@@ -175,8 +199,14 @@ void PartialApplySimplificationPass::scanFunction(SILFunction *f,
             continue;
           }
           
+          // Collect full apply sites for potential transformation as well.
+          if (auto fa = FullApplySite::isa(frUse->getUser())) {
+            knownCallee.FullApplications.insert(fa);
+            continue;
+          }
+          
           // Record if the function has uses that aren't partial applies.
-          knownCallee.NonPartialApplyUse = frUse->getUser();
+          knownCallee.NonApplyUse = frUse->getUser();
         }
       }
       
@@ -207,10 +237,10 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
   
   // If the subject of the partial application has other uses that aren't
   // partial applications, then thunk it.
-  if (pa.NonPartialApplyUse) {
-    LLVM_DEBUG(llvm::dbgs() << "Callee has non-partial_apply uses; thunking\n";
-               pa.NonPartialApplyUse->print(llvm::dbgs()));
-    ++NumPartialApplyCalleesWithNonPartialApplyUses;
+  if (pa.NonApplyUse) {
+    LLVM_DEBUG(llvm::dbgs() << "Callee has non-apply uses; thunking\n";
+               pa.NonApplyUse->print(llvm::dbgs()));
+    ++NumPartialApplyCalleesWithNonApplyUses;
     goto create_forwarding_thunks;
   }
 
@@ -264,6 +294,22 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
     if (isSimplePartialApply(examplePA)) {
       LLVM_DEBUG(llvm::dbgs() << "And they're already simple, don't need to do anything!\n");
       return;
+    }
+
+    // TODO: Check if the partial_apply would become simple if we only change
+    // the callee type to convention(method).
+
+    // If the partial applications form escaping closures, and there are also
+    // full application sites, then we don't want to burden those full
+    // application sites with having to allocate a box for the captured arguments.
+    // Emit a thunk for the partial application sites.
+    //
+    // TODO: Evaluate if stack-allocating the escapable box is acceptable.
+    if (!examplePA->isOnStack() && !pa.FullApplications.empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "Callee has mix of escaping partial_apply and full application sites; thunking:\n";
+                 pa.FullApplications.front().getInstruction()->print(llvm::dbgs()));
+      ++NumPartialApplyCalleesWithEscapingAndApplyUses;
+      goto create_forwarding_thunks;
     }
     
     // Rewrite the function type to take the captures in box form.
@@ -529,28 +575,44 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
     }
     
     // Rewrite partial applications to partially apply the new clone.
-    for (auto pa : pa.PartialApplications) {
-      auto caller = pa->getFunction();
+    auto rewriteApplySite = [&](ApplySite site) {
+      auto caller = site->getFunction();
       SILBuilder B(*caller);
-      auto loc = pa->getLoc();
-      B.setInsertionPoint(pa);
+      auto loc = site->getLoc();
+      B.setInsertionPoint(site.getInstruction());
       
       auto newFunctionRef = B.createFunctionRef(loc, callee);
       SILValue contextBuffer, contextProj;
       auto contextStorageTy = SILType::getPrimitiveAddressType(contextTy)
-        .subst(getModule()->Types, pa->getSubstitutionMap());
+        .subst(getModule()->Types, site.getSubstitutionMap());
       if (isNoEscape) {
         auto contextAlloc = B.createAllocStack(loc, contextStorageTy);
         contextBuffer = contextProj = contextAlloc;
         
-        // We'll need to deallocate the context buffer after the end of the
-        // original partial_apply's lifetime.
-        auto deallocStackUses = pa->getUsersOfType<DeallocStackInst>();
-        assert(deallocStackUses.begin() != deallocStackUses.end());
-        for (auto use : deallocStackUses) {
-          B.setInsertionPoint(use->getNextInstruction());
+        // We'll need to deallocate the context buffer after we don't need it.
+        // For a partial_apply, that's after the partial_apply itself is
+        // deallocated.
+        if (auto ppa = dyn_cast<PartialApplyInst>(site.getInstruction())) {
+          auto deallocStackUses = ppa->getUsersOfType<DeallocStackInst>();
+          assert(deallocStackUses.begin() != deallocStackUses.end());
+          for (auto use : deallocStackUses) {
+            B.setInsertionPoint(use->getNextInstruction());
+            B.createDeallocStack(loc, contextBuffer);
+          }
+        // For a full application, we're done immediately after the call.
+        // If the apply site is a terminator, dealloc in all the successor
+        // blocks.
+        } else if (auto term = dyn_cast<TermInst>(site.getInstruction())) {
+          for (auto successor : term->getSuccessorBlocks()) {
+            B.setInsertionPoint(successor->begin());
+            B.createDeallocStack(loc, contextBuffer);
+          }
+        // If the apply site is a normal instruction, dealloc after it.
+        } else {
+          B.setInsertionPoint(site.getInstruction()->getNextInstruction());
           B.createDeallocStack(loc, contextBuffer);
         }
+        // Continue emitting code to populate the context.
         B.setInsertionPoint(contextAlloc->getNextInstruction());
       } else {
         contextBuffer = B.createAllocBox(loc,
@@ -562,9 +624,15 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
       }
       
       // Transfer the formerly partially-applied arguments into the box.
-      auto appliedArgs = pa->getArguments();
-      for (unsigned i = 0; i < appliedArgs.size(); ++i) {
-        auto arg = appliedArgs[i];
+      SmallVector<SILValue, 4> newArgs;
+      // Carry over non-partial-applied arguments, if any.
+      auto appliedArgs = site.getArguments();
+      auto paArgsOffset = appliedArgs.size() - boxFields.size();
+      for (unsigned i = 0; i < paArgsOffset; ++i) {
+        newArgs.push_back(appliedArgs[i]);
+      }
+      for (unsigned i = 0; i < boxFields.size(); ++i) {
+        auto arg = appliedArgs[i + paArgsOffset];
         SILValue proj = contextProj;
         if (boxFields.size() > 1) {
           proj = B.createTupleElementAddr(loc, proj, i);
@@ -604,23 +672,58 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
         }
       }
       
-      // Partially apply the new box to create the closure.
-      auto paConvention = isNoEscape ? ParameterConvention::Direct_Guaranteed
-                                     : contextParam.getConvention();
-      auto paOnStack = isNoEscape ? PartialApplyInst::OnStack
-                                  : PartialApplyInst::NotOnStack;
-      auto newPA = B.createPartialApply(loc, newFunctionRef,
-                                        pa->getSubstitutionMap(),
-                                        contextBuffer,
-                                        paConvention,
-                                        paOnStack);
-      assert(isSimplePartialApply(newPA)
-             && "partial apply wasn't simple after transformation?");
-      pa->replaceAllUsesWith(newPA);
-      pa->eraseFromParent();
+      // Transform the application to use the context instead of the original
+      // arguments.
+      newArgs.push_back(contextBuffer);
+      SILInstruction *newInst;
+      switch (site.getKind()) {
+      case ApplySiteKind::PartialApplyInst: {
+        auto paConvention = isNoEscape ? ParameterConvention::Direct_Guaranteed
+                                       : contextParam.getConvention();
+        auto paOnStack = isNoEscape ? PartialApplyInst::OnStack
+                                    : PartialApplyInst::NotOnStack;
+        auto newPA = B.createPartialApply(loc, newFunctionRef,
+                                       site.getSubstitutionMap(),
+                                       newArgs,
+                                       paConvention,
+                                       paOnStack);
+        assert(isSimplePartialApply(newPA)
+               && "partial apply wasn't simple after transformation?");
+        newInst = newPA;
+        break;
+      }
+      case ApplySiteKind::ApplyInst:
+        newInst = B.createApply(loc, newFunctionRef,
+                                site.getSubstitutionMap(), newArgs);
+        break;
+      case ApplySiteKind::BeginApplyInst:
+        newInst = B.createBeginApply(loc, newFunctionRef,
+                                     site.getSubstitutionMap(), newArgs);
+        break;
+      case ApplySiteKind::TryApplyInst: {
+        auto tai = cast<TryApplyInst>(site.getInstruction());
+        newInst = B.createTryApply(loc, newFunctionRef,
+                                   site.getSubstitutionMap(), newArgs,
+                                   tai->getNormalBB(),
+                                   tai->getErrorBB());
+        break;
+      }
+      }
+      site.getInstruction()->replaceAllUsesPairwiseWith(newInst);
+      site.getInstruction()->eraseFromParent();
+    };
+    
+    for (auto paSite : pa.PartialApplications) {
+      rewriteApplySite(paSite);
     }
     
-    // Once all the partial applications have been rewritten, then the original
+    // Rewrite full application sites to package up the partially applied
+    // arguments as well.
+    for (auto fa : pa.FullApplications) {
+      rewriteApplySite(fa);
+    }
+    
+    // Once all the applications have been rewritten, then the original
     // function refs with the old function type should all be unused. Delete
     // them, since they are no longer valid.
     for (auto fr : pa.FunctionRefs) {
