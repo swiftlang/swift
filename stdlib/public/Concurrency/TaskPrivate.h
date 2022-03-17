@@ -511,7 +511,9 @@ public:
   }
 
   void traceStatusChanged(AsyncTask *task) {
-    concurrency::trace::task_status_changed(task, Flags);
+    concurrency::trace::task_status_changed(
+        task, static_cast<uint8_t>(getStoredPriority()), isCancelled(),
+        isStoredPriorityEscalated(), isRunning(), isEnqueued());
   }
 };
 
@@ -775,7 +777,10 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
 
   // Set up task for enqueue to next location by setting the Job priority field
   Flags.setPriority(newStatus.getStoredPriority());
-  concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
+  concurrency::trace::task_flags_changed(
+      this, static_cast<uint8_t>(Flags.getPriority()), Flags.task_isChildTask(),
+      Flags.task_isFuture(), Flags.task_isGroupChildTask(),
+      Flags.task_isAsyncLetTask());
 
   swift_task_enqueue(this, newExecutor);
 }
