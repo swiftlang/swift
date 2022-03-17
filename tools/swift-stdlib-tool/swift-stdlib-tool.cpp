@@ -1035,56 +1035,41 @@ int main(int argc, const char *argv[]) {
   bool copy = false;
   bool stripBitcode = false;
   for (int i = 1; i < argc; i++) {
-    if (0 == strcmp(argv[i], "--print"))
+    if (0 == strcmp(argv[i], "--print")) {
       print = true;
-    if (0 == strcmp(argv[i], "--copy"))
+    } else if (0 == strcmp(argv[i], "--copy")) {
       copy = true;
-    if (0 == strcmp(argv[i], "--verbose"))
+    } else if (0 == strcmp(argv[i], "--verbose")) {
       Verbose++;
-    if (0 == strcmp(argv[i], "--help")) {
+    } else if (0 == strcmp(argv[i], "--help")) {
       printUsage();
       exit(0);
-    }
-
-    if (0 == strcmp(argv[i], "--scan-executable")) {
+    } else if (0 == strcmp(argv[i], "--scan-executable")) {
       executables.emplace_back(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--scan-folder")) {
+    } else if (0 == strcmp(argv[i], "--scan-folder")) {
       embedDirs.emplace_back(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--source-libraries")) {
+    } else if (0 == strcmp(argv[i], "--source-libraries")) {
       src_dirs.emplace_back(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--platform")) {
+    } else if (0 == strcmp(argv[i], "--platform")) {
       platform = std::string(argv[++i]);
-    }
-
-    if (0 == strcmp(argv[i], "--destination")) {
+    } else if (0 == strcmp(argv[i], "--destination")) {
       dst_dir = std::string(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--unsigned-destination")) {
+    } else if (0 == strcmp(argv[i], "--unsigned-destination")) {
       unsigned_dst_dir = std::string(argv[++i]);
-    }
-
-    if (0 == strcmp(argv[i], "--sign")) {
+    } else if (0 == strcmp(argv[i], "--sign")) {
       ident = std::string(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--keychain")) {
+    } else if (0 == strcmp(argv[i], "--keychain")) {
       keychain = std::string(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--Xcodesign")) {
+    } else if (0 == strcmp(argv[i], "--Xcodesign")) {
       otherCodesignFlags.push_back(std::string(argv[++i]));
-    }
-
-    if (0 == strcmp(argv[i], "--strip-bitcode")) {
+    } else if (0 == strcmp(argv[i], "--strip-bitcode")) {
       stripBitcode = true;
-    }
-
-    if (0 == strcmp(argv[i], "--resource-destination")) {
+    } else if (0 == strcmp(argv[i], "--resource-destination")) {
       resource_dst_dir = std::string(argv[++i]);
-    }
-    if (0 == strcmp(argv[i], "--resource-library")) {
+    } else if (0 == strcmp(argv[i], "--resource-library")) {
       resourceLibraries.push_back(std::string(argv[++i]));
+    } else {
+      fail("Unknown argument: %s", argv[i]);
     }
   }
 
