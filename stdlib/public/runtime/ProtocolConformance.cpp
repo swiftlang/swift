@@ -1234,8 +1234,7 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
     llvm::ArrayRef<GenericRequirementDescriptor> requirements,
     llvm::SmallVectorImpl<const void *> &extraArguments,
     SubstGenericParameterFn substGenericParam,
-    SubstDependentWitnessTableFn substWitnessTable,
-    bool skipUnknownKinds) {
+    SubstDependentWitnessTableFn substWitnessTable, bool skipUnknownKinds) {
   for (const auto &req : requirements) {
     // Make sure we understand the requirement we're dealing with.
     if (!req.hasKnownKind()) {
@@ -1245,7 +1244,6 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
         return TypeLookupError("unknown kind");
       }
     }
-
 
     // Resolve the subject generic parameter.
     auto result = swift_getTypeByMangledName(

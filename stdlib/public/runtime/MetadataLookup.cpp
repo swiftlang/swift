@@ -2120,7 +2120,8 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
       },
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
-      }, /*skipUnknownKinds=*/true);
+      },
+      /*skipUnknownKinds=*/true);
   // The reason we skip unknown kinds is to avoid reporting missing
   // conformances to Sendable, which cannot be checked at runtime, where we're
   // calling this from 'executeDistributedTarget'.
