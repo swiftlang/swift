@@ -257,6 +257,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'RegexLiteralExpr': 253,
     'PrimaryAssociatedTypeList' : 254,
     'PrimaryAssociatedType' : 255,
+    'PrimaryAssociatedTypeClause' : 256,
 }
 
 

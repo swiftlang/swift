@@ -1194,6 +1194,8 @@ public:
 
   ParserStatus parsePrimaryAssociatedTypes(
       SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes);
+  ParserStatus parsePrimaryAssociatedTypeList(
+      SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
