@@ -92,3 +92,8 @@ module ClassProtocolNameClash {
   header "class-protocol-name-clash.h"
   requires cplusplus
 }
+
+module DictionaryOfNSStrings {
+  header "dictionary-of-nsstrings.h"
+  requires cplusplus
+}
