@@ -76,6 +76,11 @@ ExpressionTimer::~ExpressionTimer() {
   if (!PrintWarning)
     return;
 
+  const auto WarnLimit = getWarnLimit();
+
+  if (WarnLimit == 0 || elapsedMS < WarnLimit)
+    return;
+
   ASTNode anchor;
   if (auto *locator = Anchor.dyn_cast<ConstraintLocator *>()) {
     anchor = simplifyLocatorToAnchor(locator);
@@ -87,9 +92,7 @@ ExpressionTimer::~ExpressionTimer() {
     anchor = Anchor.get<Expr *>();
   }
 
-  const auto WarnLimit = getWarnLimit();
-  if (WarnLimit != 0 && elapsedMS >= WarnLimit &&
-      anchor.getStartLoc().isValid()) {
+  if (anchor.getStartLoc().isValid()) {
     Context.Diags
         .diagnose(anchor.getStartLoc(), diag::debug_long_expression, elapsedMS,
                   WarnLimit)
@@ -4758,6 +4761,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
         path = path.slice(1);
         continue;
       }
+
+      if (anchor.is<Pattern *>()) {
+        path = path.slice(1);
+        continue;
+      }
+
       break;
 
     case ConstraintLocator::SubscriptMember:
@@ -4811,16 +4820,28 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::Condition: {
-      anchor = castToExpr<IfExpr>(anchor)->getCondExpr();
+      if (auto *condStmt = getAsStmt<LabeledConditionalStmt>(anchor)) {
+        anchor = &condStmt->getCond().front();
+      } else {
+        anchor = castToExpr<IfExpr>(anchor)->getCondExpr();
+      }
+
       path = path.slice(1);
       continue;
     }
 
     case ConstraintLocator::TernaryBranch: {
       auto branch = path[0].castTo<LocatorPathElt::TernaryBranch>();
-      auto *ifExpr = castToExpr<IfExpr>(anchor);
 
-      anchor = branch.forThen() ? ifExpr->getThenExpr() : ifExpr->getElseExpr();
+      if (auto *ifStmt = getAsStmt<IfStmt>(anchor)) {
+        anchor =
+            branch.forThen() ? ifStmt->getThenStmt() : ifStmt->getElseStmt();
+      } else {
+        auto *ifExpr = castToExpr<IfExpr>(anchor);
+        anchor =
+            branch.forThen() ? ifExpr->getThenExpr() : ifExpr->getElseExpr();
+      }
+
       path = path.slice(1);
       continue;
     }
@@ -4851,8 +4872,77 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    default:
-      // FIXME: Lots of other cases to handle.
+    case ConstraintLocator::ClosureBodyElement: {
+      auto bodyElt = path[0].castTo<LocatorPathElt::ClosureBodyElement>();
+      anchor = bodyElt.getElement();
+      path = path.slice(1);
+      continue;
+    }
+
+    case ConstraintLocator::PatternMatch: {
+      auto patternElt = path[0].castTo<LocatorPathElt::PatternMatch>();
+      anchor = patternElt.getPattern();
+      path = path.slice(1);
+      continue;
+    }
+
+    case ConstraintLocator::PackType:
+    case ConstraintLocator::ParentType:
+    case ConstraintLocator::KeyPathType:
+    case ConstraintLocator::InstanceType:
+    case ConstraintLocator::PlaceholderType:
+    case ConstraintLocator::SequenceElementType:
+    case ConstraintLocator::ConstructorMemberType:
+    case ConstraintLocator::ExistentialSuperclassType:
+      break;
+
+    case ConstraintLocator::GenericArgument:
+    case ConstraintLocator::FunctionArgument:
+    case ConstraintLocator::SynthesizedArgument:
+      break;
+
+    case ConstraintLocator::DynamicLookupResult:
+    case ConstraintLocator::KeyPathComponentResult:
+      break;
+
+    case ConstraintLocator::GenericParameter:
+      break;
+
+    case ConstraintLocator::OpenedGeneric:
+    case ConstraintLocator::OpenedOpaqueArchetype:
+      break;
+
+    case ConstraintLocator::KeyPathRoot:
+    case ConstraintLocator::KeyPathValue:
+      break;
+
+    case ConstraintLocator::ProtocolRequirement:
+    case ConstraintLocator::ConditionalRequirement:
+    case ConstraintLocator::ConformanceRequirement:
+    case ConstraintLocator::TypeParameterRequirement:
+      break;
+
+    case ConstraintLocator::PackElement:
+      break;
+
+    case ConstraintLocator::PatternBindingElement: {
+      auto pattern = path[0].castTo<LocatorPathElt::PatternBindingElement>();
+      auto *patternBinding = cast<PatternBindingDecl>(anchor.get<Decl *>());
+      anchor = patternBinding->getInit(pattern.getIndex());
+      // If this pattern is uninitialized, let's use it as anchor.
+      if (!anchor)
+        anchor = patternBinding->getPattern(pattern.getIndex());
+      path = path.slice(1);
+      continue;
+    }
+
+    case ConstraintLocator::ImplicitConversion:
+      break;
+
+    case ConstraintLocator::Witness:
+    case ConstraintLocator::WrappedValue:
+    case ConstraintLocator::OptionalPayload:
+    case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
       break;
     }
 
