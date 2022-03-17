@@ -3811,7 +3811,10 @@ bool MissingMemberFailure::diagnoseForDynamicCallable() const {
 }
 
 bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
-  auto *expr = castToExpr(getAnchor());
+  auto *expr = getAsExpr(getAnchor());
+  if (!expr)
+    return false;
+
   auto *parentExpr = findParentExpr(expr);
   auto &solution = getSolution();
 
@@ -5920,8 +5923,11 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     return (type == params.end()) ? Type() : type->second;
   };
 
+  auto baseType = anchor.dyn_cast<TypeRepr *>();
+  if (!baseType)
+    return;
+
   SmallString<64> paramsAsString;
-  auto baseType = anchor.get<TypeRepr *>();
   if (TypeChecker::getDefaultGenericArgumentsString(paramsAsString, GTD,
                                                     getPreferredType)) {
     auto diagnostic = emitDiagnosticAt(
