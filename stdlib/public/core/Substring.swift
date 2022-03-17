@@ -109,7 +109,7 @@ public struct Substring: Sendable {
     _invariantCheck()
   }
 
-  @usableFromInline
+  @usableFromInline // This used to be @inlinable before 5.7
   @available(*, deprecated) // Use `init(_unchecked:)` in new code.
   internal init(_ slice: Slice<String>) {
     let r = slice.base._guts.validateScalarRange(
@@ -133,10 +133,10 @@ public struct Substring: Sendable {
 extension Substring {
   /// Returns the underlying string from which this substring was derived.
   @_alwaysEmitIntoClient
-  public var base: String { return _slice.base }
+  public var base: String { return _slice._base }
 
   @inlinable @inline(__always)
-  internal var _wholeGuts: _StringGuts { return base._guts }
+  internal var _wholeGuts: _StringGuts { return _slice._base._guts }
 
   @inlinable @inline(__always)
   internal var _offsetRange: Range<Int> {
@@ -149,14 +149,14 @@ extension Substring {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    _internalInvariant(_slice.endIndex <= base._guts.endIndex)
+    _internalInvariant(_slice.endIndex <= _wholeGuts.endIndex)
     _internalInvariant(
-      base._guts.hasMatchingEncoding(_slice.startIndex) &&
-      base._guts.hasMatchingEncoding(_slice.endIndex))
+      _wholeGuts.hasMatchingEncoding(_slice.startIndex) &&
+      _wholeGuts.hasMatchingEncoding(_slice.endIndex))
     // Indices are always scalar aligned
     _internalInvariant(
-      _slice.startIndex == base._guts.scalarAlign(_slice.startIndex) &&
-      _slice.endIndex == base._guts.scalarAlign(_slice.endIndex))
+      _slice.startIndex == _wholeGuts.scalarAlign(_slice.startIndex) &&
+      _slice.endIndex == _wholeGuts.scalarAlign(_slice.endIndex))
 
     self.base._invariantCheck()
   }
@@ -166,23 +166,21 @@ extension Substring {
 extension Substring {
   @inline(__always)
   internal func _validateScalarIndex(_ i: String.Index) -> String.Index {
-    _slice._base._guts.validateScalarIndex(i, from: startIndex, to: endIndex)
+    _wholeGuts.validateScalarIndex(i, from: startIndex, to: endIndex)
   }
 
   @inline(__always)
   internal func _validateInclusiveScalarIndex(
     _ i: String.Index
   ) -> String.Index {
-    _slice._base._guts.validateInclusiveScalarIndex(
-      i, from: startIndex, to: endIndex)
+    _wholeGuts.validateInclusiveScalarIndex(i, from: startIndex, to: endIndex)
   }
 
   @inline(__always)
   internal func _validateScalarRange(
     _ range: Range<String.Index>
   ) -> Range<String.Index> {
-    _slice._base._guts.validateScalarRange(
-      range, from: startIndex, to: endIndex)
+    _wholeGuts.validateScalarRange(range, from: startIndex, to: endIndex)
   }
 
   @inline(__always)
@@ -198,10 +196,10 @@ extension Substring: StringProtocol {
   public typealias SubSequence = Substring
 
   @inlinable @inline(__always)
-  public var startIndex: Index { return _slice.startIndex }
+  public var startIndex: Index { _slice._startIndex }
 
   @inlinable @inline(__always)
-  public var endIndex: Index { return _slice.endIndex }
+  public var endIndex: Index { _slice._endIndex }
 
   public func index(after i: Index) -> Index {
     // Note: in Swift 5.6 and below, this method used to be inlinable,
@@ -213,7 +211,7 @@ extension Substring: StringProtocol {
 
     let i = _roundDownToNearestCharacter(_validateScalarIndex(i))
     let r = _uncheckedIndex(after: i)
-    return _slice.base._guts.internalMarkEncoding(r)
+    return _wholeGuts.internalMarkEncoding(r)
   }
 
   /// A version of `index(after:)` that assumes that the given index:
@@ -271,7 +269,7 @@ extension Substring: StringProtocol {
     _precondition(i > startIndex, "Substring index is out of bounds")
 
     let r = _uncheckedIndex(before: i)
-    return _slice.base._guts.internalMarkEncoding(r)
+    return _wholeGuts.internalMarkEncoding(r)
   }
 
   /// A version of `index(before:)` that assumes that the given index:
@@ -333,7 +331,7 @@ extension Substring: StringProtocol {
         i = _uncheckedIndex(before: i)
       }
     }
-    return _slice.base._guts.internalMarkEncoding(i)
+    return _wholeGuts.internalMarkEncoding(i)
   }
 
   public func index(
@@ -352,7 +350,7 @@ extension Substring: StringProtocol {
 
     // Note: `limit` is intentionally not scalar aligned to ensure our behavior
     // exactly matches the documentation.
-    let limit = _slice.base._guts.ensureMatchingEncoding(limit)
+    let limit = _wholeGuts.ensureMatchingEncoding(limit)
 
     var i = _validateInclusiveScalarIndex(i)
     let start = i
@@ -371,7 +369,7 @@ extension Substring: StringProtocol {
       }
       guard limit > start || i >= limit else { return nil }
     }
-    return _slice.base._guts.internalMarkEncoding(i)
+    return _wholeGuts.internalMarkEncoding(i)
   }
 
   public func distance(from start: Index, to end: Index) -> Int {
@@ -418,7 +416,7 @@ extension Substring: StringProtocol {
     // `Character` boundary.
     let i = _validateScalarIndex(i)
     let distance = _characterStride(startingAt: i)
-    return _slice.base._guts.errorCorrectedCharacter(
+    return _wholeGuts.errorCorrectedCharacter(
       startingAt: i._encodedOffset, endingAt: i._encodedOffset &+ distance)
   }
 
@@ -462,7 +460,7 @@ extension Substring: StringProtocol {
     // calculations to Unicode scalars (or below). In this implementation, we
     // are measuring things in UTF-8 code units, for efficiency.
 
-    if _slowPath(_slice._base._guts.isKnownUTF16) {
+    if _slowPath(_wholeGuts.isKnownUTF16) {
       // UTF-16 (i.e., foreign) string. The mutation will convert this to the
       // native UTF-8 encoding, so we need to do some extra work to preserve our
       // bounds.
@@ -476,15 +474,15 @@ extension Substring: StringProtocol {
 
       let newUTF8Subrange = _slice._base._guts.replaceSubrange(
         subrange, with: newElements)
-      _internalInvariant(!_slice._base._guts.isKnownUTF16)
+      _internalInvariant(!_wholeGuts.isKnownUTF16)
 
       let newUTF8Count = oldUTF8Count + newUTF8Subrange.count - oldSubrangeCount
 
       // Get the character stride in the entire string, not just the substring.
       // (Characters in a substring may end beyond the bounds of it.)
-      let newStride = _slice.base._guts._opaqueCharacterStride(
+      let newStride = _wholeGuts._opaqueCharacterStride(
         startingAt: utf8StartOffset,
-        in: utf8StartOffset ..< _slice._base._guts.count)
+        in: utf8StartOffset ..< _wholeGuts.count)
 
       _slice._startIndex = String.Index(
         encodedOffset: utf8StartOffset,
@@ -521,9 +519,9 @@ extension Substring: StringProtocol {
     {
       // Get the character stride in the entire string, not just the substring.
       // (Characters in a substring may end beyond the bounds of it.)
-      let newStride = _slice.base._guts._opaqueCharacterStride(
+      let newStride = _wholeGuts._opaqueCharacterStride(
         startingAt: newOffsetBounds.lowerBound,
-        in: newOffsetBounds.lowerBound ..< _slice._base._guts.count)
+        in: newOffsetBounds.lowerBound ..< _wholeGuts.count)
       _slice._startIndex = String.Index(
         encodedOffset: startIndex._encodedOffset,
         transcodedOffset: 0,
@@ -679,7 +677,7 @@ extension Substring {
 
     if i == startIndex { return 0 }
 
-    return _slice.base._guts._opaqueCharacterStride(
+    return _wholeGuts._opaqueCharacterStride(
       endingAt: i._encodedOffset, in: _encodedOffsetRange)
   }
 }
@@ -832,7 +830,7 @@ extension Substring {
   /// - Complexity: O(1)
   public init(_ content: UTF8View) {
     self = String(
-      content._slice.base._guts
+      content._slice._base._guts
     )[content.startIndex..<content.endIndex]
   }
 }
@@ -845,7 +843,7 @@ extension String {
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
   public init?(_ codeUnits: Substring.UTF8View) {
-    let guts = codeUnits._slice.base._guts
+    let guts = codeUnits._slice._base._guts
     guard guts.isOnUnicodeScalarBoundary(codeUnits._slice.startIndex),
           guts.isOnUnicodeScalarBoundary(codeUnits._slice.endIndex) else {
       return nil
@@ -977,7 +975,7 @@ extension Substring {
   /// - Complexity: O(1)
   public init(_ content: UTF16View) {
     self = String(
-      content._slice.base._guts
+      content._slice._base._guts
     )[content.startIndex..<content.endIndex]
   }
 }
@@ -990,7 +988,7 @@ extension String {
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
   public init?(_ codeUnits: Substring.UTF16View) {
-    let guts = codeUnits._slice.base._guts
+    let guts = codeUnits._slice._base._guts
     guard guts.isOnUnicodeScalarBoundary(codeUnits._slice.startIndex),
           guts.isOnUnicodeScalarBoundary(codeUnits._slice.endIndex) else {
       return nil
@@ -1106,7 +1104,7 @@ extension Substring.UnicodeScalarView: BidirectionalCollection {
   public subscript(r: Range<Index>) -> Substring.UnicodeScalarView {
     // TODO(lorentey): Review index validation
     _failEarlyRangeCheck(r, bounds: startIndex..<endIndex)
-    return Substring.UnicodeScalarView(_slice.base, _bounds: r)
+    return Substring.UnicodeScalarView(_slice._base, _bounds: r)
   }
 }
 
@@ -1126,7 +1124,7 @@ extension Substring {
   /// - Complexity: O(1)
   public init(_ content: UnicodeScalarView) {
     self = String(
-      content._slice.base._guts
+      content._slice._base._guts
     )[content.startIndex..<content.endIndex]
   }
 }
@@ -1150,7 +1148,7 @@ extension Substring.UnicodeScalarView: RangeReplaceableCollection {
     _ subrange: Range<Index>, with replacement: C
   ) where C.Element == Element {
     // TODO(lorentey): Review index validation
-    let subrange = _slice.base._guts.validateScalarRange(
+    let subrange = _slice._base._guts.validateScalarRange(
       subrange, from: startIndex, to: endIndex)
     _slice.replaceSubrange(subrange, with: replacement)
   }
