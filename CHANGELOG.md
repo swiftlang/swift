@@ -5,6 +5,12 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0326][]:
+
+Parameter and result types can now be inferred from from the body of multi-statement closures.
+
+Use of multi-statement closures (or simply closures) becomes less cumbersome by removing the need to constantly specify explicit closure types which sometimes could be pretty large e.g. when there are multiple parameters or a complex tuple result type.
+
 * [SE-0343][]:
 
 Top-level scripts support asynchronous calls.
@@ -9075,6 +9081,7 @@ Swift 1.0
 [SE-0322]: <https://github.com/apple/swift-evolution/blob/main/proposals/0322-temporary-buffers.md>
 [SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
 [SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
+[SE-0326]: <https://github.com/apple/swift-evolution/blob/main/proposals/0326-extending-multi-statement-closure-inference.md>
 [SE-0327]: <https://github.com/apple/swift-evolution/blob/main/proposals/0327-actor-initializers.md>
 [SE-0328]: <https://github.com/apple/swift-evolution/blob/main/proposals/0328-structural-opaque-result-types.md>
 [SE-0331]: <https://github.com/apple/swift-evolution/blob/main/proposals/0331-remove-sendable-from-unsafepointer.md>
