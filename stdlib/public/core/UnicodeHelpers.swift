@@ -122,16 +122,6 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
   return (~x).leadingZeroBitCount
 }
 
-@inline(__always)
-internal func _utf16LengthOfScalar(
-  _ readPtr: inout UnsafeRawPointer
-) -> Int {
-  let byte = readPtr.load(as: UInt8.self)
-  let len = _utf8ScalarLength(byte)
-  readPtr += len
-  return len == 4 ? 2 : 1
-}
-
 @inlinable @inline(__always)
 internal func _utf8ScalarLength(
   _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
