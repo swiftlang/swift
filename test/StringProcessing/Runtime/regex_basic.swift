@@ -11,7 +11,7 @@ extension String {
     _ regex: Regex<T>,
     file: String = #file,
     line: UInt = #line
-  ) -> RegexMatch<T> {
+  ) -> MatchResult<T> {
     guard let result = match(regex) else {
       expectUnreachable("Failed match", file: file, line: line)
       fatalError()
