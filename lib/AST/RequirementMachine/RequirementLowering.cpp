@@ -168,13 +168,13 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
       errors.push_back(RequirementError::forRedundantRequirement(
           {RequirementKind::Conformance, subjectType, constraintType}, loc));
 
-      assert(conformance.isConcrete());
-      auto *concrete = conformance.getConcrete();
-
-      // Introduce conditional requirements if the subject type is concrete.
-      for (auto req : concrete->getConditionalRequirements()) {
-        desugarRequirement(req, result, errors);
+      if (conformance.isConcrete()) {
+        // Introduce conditional requirements if the conformance is concrete.
+        for (auto req : conformance.getConcrete()->getConditionalRequirements()) {
+          desugarRequirement(req, result, errors);
+        }
       }
+
       return;
     }
 

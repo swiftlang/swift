@@ -235,19 +235,10 @@ Optional<Type> ConcreteContraction::substTypeParameter(
                     ->substBaseType(module, *substBaseType);
   }
 
-  auto *decl = (*substBaseType)->getAnyNominal();
-  if (decl == nullptr) {
-    if (Debug) {
-      llvm::dbgs() << "@@@ Not a nominal type: " << *substBaseType << "\n";
-    }
-
-    return None;
-  }
-
   // An unresolved DependentMemberType stores an identifier. Handle this
   // by performing a name lookup into the base type.
   SmallVector<TypeDecl *> concreteDecls;
-  lookupConcreteNestedType(decl, memberType->getName(), concreteDecls);
+  lookupConcreteNestedType(*substBaseType, memberType->getName(), concreteDecls);
 
   auto *typeDecl = findBestConcreteNestedType(concreteDecls);
   if (typeDecl == nullptr) {
@@ -261,8 +252,9 @@ Optional<Type> ConcreteContraction::substTypeParameter(
   }
 
   // Substitute the base type into the member type.
+  auto *dc = typeDecl->getDeclContext();
   auto subMap = (*substBaseType)->getContextSubstitutionMap(
-      decl->getParentModule(), typeDecl->getDeclContext());
+      dc->getParentModule(), dc);
   return typeDecl->getDeclaredInterfaceType().subst(subMap);
 }
 

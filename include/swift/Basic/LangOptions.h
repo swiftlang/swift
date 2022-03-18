@@ -549,6 +549,11 @@ namespace swift {
     /// if you have a testcase which requires this, please submit a bug report.
     bool EnableRequirementMachineLoopNormalization = false;
 
+    /// Enable experimental, more correct support for opaque result types as
+    /// concrete types. This will sometimes fail to produce a convergent
+    /// rewrite system.
+    bool EnableRequirementMachineOpaqueArchetypes = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 

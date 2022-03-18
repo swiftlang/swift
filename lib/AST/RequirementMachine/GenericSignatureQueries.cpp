@@ -17,6 +17,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include <vector>
@@ -659,8 +660,7 @@ RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
       typeToSearch = props->getSuperclassBound();
 
     if (typeToSearch)
-      if (auto *decl = typeToSearch->getAnyNominal())
-        lookupConcreteNestedType(decl, name, concreteDecls);
+      lookupConcreteNestedType(typeToSearch, name, concreteDecls);
   }
 
   if (bestAssocType) {

@@ -19,9 +19,15 @@ namespace swift {
 
 class Identifier;
 class NominalTypeDecl;
+class Type;
 class TypeDecl;
 
 namespace rewriting {
+
+void lookupConcreteNestedType(
+    Type baseType,
+    Identifier name,
+    llvm::SmallVectorImpl<TypeDecl *> &concreteDecls);
 
 void lookupConcreteNestedType(
     NominalTypeDecl *decl,
