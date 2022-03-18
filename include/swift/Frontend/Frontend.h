@@ -392,7 +392,8 @@ public:
 
   std::string getOutputFilenameForAtMostOnePrimary() const;
   std::string getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
-  std::string getClangHeaderOutputPathForAtMostOnePrimary() const;
+  std::string getObjCHeaderOutputPathForAtMostOnePrimary() const;
+  std::string getCxxHeaderOutputPathForAtMostOnePrimary() const;
   std::string getModuleOutputPathForAtMostOnePrimary() const;
   std::string
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;

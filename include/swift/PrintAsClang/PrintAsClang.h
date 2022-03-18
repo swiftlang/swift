@@ -21,18 +21,16 @@ namespace swift {
   class ModuleDecl;
   class ValueDecl;
 
-  /// Print the exposed declarations in a module into a Clang header.
-  ///
-  /// The Objective-C compatible declarations are printed into a block that
-  /// ensures that those declarations are only usable when the header is
-  /// compiled in Objective-C mode.
-  ///  The C++ compatible declarations are printed into a block that ensures
-  ///  that those declarations are only usable when the header is compiled in
-  ///  C++ mode.
+  /// Print the Objective-C-compatible declarations in a module as a Clang
+  /// header.
   ///
   /// Returns true on error.
-  bool printAsClangHeader(raw_ostream &out, ModuleDecl *M,
-                          StringRef bridgingHeader);
+  bool printAsObjC(raw_ostream &out, ModuleDecl *M, StringRef bridgingHeader);
+
+  /// Print the C++-compatible declarations in a module as a Clang header.
+  ///
+  /// Returns true on error.
+  bool printAsCXX(raw_ostream &os, ModuleDecl *M);
 }
 
 #endif

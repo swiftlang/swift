@@ -213,7 +213,7 @@ bool FrontendInputsAndOutputs::shouldTreatAsObjCHeader() const {
   if (hasSingleInput()) {
     StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
     switch (file_types::lookupTypeForExtension(InputExt)) {
-    case file_types::TY_ClangHeader:
+    case file_types::TY_ObjCHeader:
       return true;
     default:
       return false;
@@ -461,10 +461,16 @@ bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
         return outs.ReferenceDependenciesFilePath;
       });
 }
-bool FrontendInputsAndOutputs::hasClangHeaderOutputPath() const {
+bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ClangHeaderOutputPath;
+        return outs.ObjCHeaderOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasCxxHeaderOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.CxxHeaderOutputPath;
       });
 }
 bool FrontendInputsAndOutputs::hasLoadedModuleTracePath() const {
