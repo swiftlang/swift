@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
 // REQUIRES: concurrency
 
 @propertyWrapper
@@ -671,8 +671,12 @@ struct Blah {
 func getTemperature() -> Int { return 0 }
 
 @MainActor
+func getWind() -> Int { return 0 }
+
+@MainActor
 class Polar {
   static var temperature: Int = getTemperature()
+  static let immutableWind: Int = getWind()
 }
 
 
@@ -689,4 +693,30 @@ class Polar {
 // CHECK:        hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 func accessStaticIsolated() async -> Int {
   return await Polar.temperature
+}
+
+// CHECK-LABEL: sil hidden{{.*}} @$s4test23accessStaticIsolatedLetSiyYaF : $@convention(thin) @async () -> Int {
+// CHECK:        [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK:        hop_to_executor [[GENERIC_EXEC]] :
+// CHECK:        [[ADDRESSOR:%[0-9]+]] = function_ref @$s4test5PolarC13immutableWindSivau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK:        hop_to_executor {{%.*}} : $MainActor
+// CHECK-NEXT:   [[RAW_ADDR:%[0-9]+]] = apply [[ADDRESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+// CHECK-NEXT:   hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
+// CHECK:        [[ADDR:%[0-9]+]] = pointer_to_address [[RAW_ADDR]] : $Builtin.RawPointer to [strict] $*Int
+// CHECK:        hop_to_executor {{%.*}} : $MainActor
+// CHECK:        {{%.*}} = load [trivial] {{%.*}} : $*Int
+// CHECK:        hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+func accessStaticIsolatedLet() async -> Int {
+  return await Polar.immutableWind
+}
+
+
+
+@MainActor func someMainFn() -> Int { 0 }
+
+@MainActor let myTopLevelLet = someMainFn()
+
+// CHECK: broken, since there are no hops for this as a let!
+func testGlobalVars() async -> Int {
+    return await myTopLevelLet
 }

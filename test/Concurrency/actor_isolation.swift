@@ -46,7 +46,7 @@ actor MySuperActor {
   }
 }
 
-class Point { // expected-note 5{{class 'Point' does not conform to the 'Sendable' protocol}}
+class Point { // expected-note 9{{class 'Point' does not conform to the 'Sendable' protocol}}
   var x : Int = 0
   var y : Int = 0
 }
@@ -114,6 +114,7 @@ func checkAsyncPropertyAccess() async {
 protocol MainCounter {
   @MainActor var counter: Int { get set }
   @MainActor var ticker: Int { get set }
+  @MainActor static var abacus: Int { get }
 }
 
 struct InferredFromConformance: MainCounter {
@@ -122,6 +123,7 @@ struct InferredFromConformance: MainCounter {
     get { 1 }
     set {}
   }
+  static let abacus = 0
 }
 
 @MainActor
@@ -137,7 +139,9 @@ struct InferredFromContext {
 
   subscript(_ i: Int) -> Int { return i }
 
-  static var stuff: [Int] = []
+  static var stuff: [Point] = []
+
+  static let immutableStuff: [Point] = []
 }
 
 func checkIsolationValueType(_ formance: InferredFromConformance,
@@ -154,8 +158,14 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   _ = await ext[1]
   _ = await formance.ticker
   _ = await ext.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated property 'polygon' cannot cross actor boundary}}
-  _ = await InferredFromContext.stuff
+
+  _ = await InferredFromContext.stuff // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated static property 'stuff' cannot cross actor boundary}}
+
+  _ = await InferredFromContext.immutableStuff // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated static property 'immutableStuff' cannot cross actor boundary}}
+
   _ = await NoGlobalActorValueType.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated static property 'polygon' cannot cross actor boundary}}
+
+  _ = await InferredFromConformance.abacus
 }
 
 // check for instance members that do not need global-actor protection
@@ -1002,6 +1012,7 @@ func testCrossModuleLets(actor: OtherModuleActor) async {
   // expected-warning@-2{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
   _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
   _ = await actor.d // okay
+  _ = await OtherModuleGAIT.A // okay
 }
 
 func testCrossModuleAsIsolated(actor: isolated OtherModuleActor) {
@@ -1487,4 +1498,16 @@ extension MyActor {
       }
     }
   }
+}
+
+/// globals with parse-as-library enabled
+@MainActor func someMainFn() -> Point {}
+
+@MainActor let myGlobalLet = someMainFn()
+@MainActor var myGlobalVar = someMainFn()
+
+func testGlobalVars() async -> Int {
+    _ = await myGlobalLet // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated let 'myGlobalLet' cannot cross actor boundary}}
+
+    _ = await myGlobalVar // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated var 'myGlobalVar' cannot cross actor boundary}}
 }
