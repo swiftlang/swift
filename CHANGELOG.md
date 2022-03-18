@@ -7,7 +7,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 * [SE-0326][]:
 
-Parameter and result types can now be inferred from from the body of multi-statement closures.
+Parameter and result types can now be inferred from the body of multi-statement closures.
 
 Use of multi-statement closures (or simply closures) becomes less cumbersome by removing the need to constantly specify explicit closure types which sometimes could be pretty large e.g. when there are multiple parameters or a complex tuple result type.
 
