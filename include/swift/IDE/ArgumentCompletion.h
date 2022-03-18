@@ -16,7 +16,7 @@
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/PossibleParamInfo.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 
 namespace swift {
 namespace ide {
