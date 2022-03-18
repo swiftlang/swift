@@ -125,7 +125,7 @@ Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
   if (fallback)
     return fallback;
 
-  if (getCompletionExpr()->getBase() && getCompletionExpr() != InitialExpr)
+  if (getCompletionExpr() != InitialExpr)
     return Fallback{getCompletionExpr(), fallbackDC, separatePrecheck};
   return None;
 }

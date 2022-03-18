@@ -804,8 +804,13 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   assert(!Name.empty() && "name should not be empty");
 
   Type VarType;
-  if (VD->hasInterfaceType())
+  auto SolutionSpecificType = SolutionSpecificVarTypes.find(VD);
+  if (SolutionSpecificType != SolutionSpecificVarTypes.end()) {
+    assert(!VarType && "Type recorded in the AST and is also solution-specific?");
+    VarType = SolutionSpecificType->second;
+  } else if (VD->hasInterfaceType()) {
     VarType = getTypeOfMember(VD, dynamicLookupInfo);
+  }
 
   Optional<ContextualNotRecommendedReason> NotRecommended;
   // "not recommended" in its own getter.

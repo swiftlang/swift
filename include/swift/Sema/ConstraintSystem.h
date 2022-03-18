@@ -978,6 +978,7 @@ public:
     tombstone,
     stmtCondElement,
     expr,
+    closure,
     stmt,
     pattern,
     patternBindingEntry,
@@ -1020,6 +1021,11 @@ public:
     storage.expr = expr;
   }
 
+  SolutionApplicationTargetsKey(const ClosureExpr *closure) {
+    kind = Kind::closure;
+    storage.expr = closure;
+  }
+
   SolutionApplicationTargetsKey(const Stmt *stmt) {
     kind = Kind::stmt;
     storage.stmt = stmt;
@@ -1056,6 +1062,7 @@ public:
       return lhs.storage.stmtCondElement == rhs.storage.stmtCondElement;
 
     case Kind::expr:
+    case Kind::closure:
       return lhs.storage.expr == rhs.storage.expr;
 
     case Kind::stmt:
@@ -1096,6 +1103,7 @@ public:
           DenseMapInfo<void *>::getHashValue(storage.stmtCondElement));
 
     case Kind::expr:
+    case Kind::closure:
       return hash_combine(
           DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
           DenseMapInfo<void *>::getHashValue(storage.expr));
@@ -1623,6 +1631,7 @@ class SolutionApplicationTarget {
 public:
   enum class Kind {
     expression,
+    closure,
     function,
     stmtCondition,
     caseLabelItem,
@@ -1685,6 +1694,14 @@ private:
     } expression;
 
     struct {
+      /// The closure expression being type-checked.
+      ClosureExpr *closure;
+
+      /// The type to which the expression should be converted.
+      Type convertType;
+    } closure;
+
+    struct {
       AnyFunctionRef function;
       BraceStmt *body;
     } function;
@@ -1733,6 +1750,12 @@ public:
       : SolutionApplicationTarget(expr, dc, CTP_ExprPattern, patternType,
                                   /*isDiscarded=*/false) {
     setPattern(pattern);
+  }
+
+  SolutionApplicationTarget(ClosureExpr *closure, Type convertType) {
+    kind = Kind::closure;
+    this->closure.closure = closure;
+    this->closure.convertType = convertType;
   }
 
   SolutionApplicationTarget(AnyFunctionRef fn)
@@ -1831,6 +1854,7 @@ public:
     case Kind::expression:
       return expression.expression;
 
+    case Kind::closure:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
@@ -1845,6 +1869,9 @@ public:
     switch (kind) {
     case Kind::expression:
       return expression.dc;
+
+    case Kind::closure:
+      return closure.closure;
 
     case Kind::function:
       return function.function.getAsDeclContext();
@@ -1932,6 +1959,11 @@ public:
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_ExprPattern);
     return cast<ExprPattern>(expression.pattern);
+  }
+
+  Type getClosureContextualType() const {
+    assert(kind == Kind::closure);
+    return closure.convertType;
   }
 
   /// For a pattern initialization target, retrieve the contextual pattern.
@@ -2062,6 +2094,7 @@ public:
   Optional<AnyFunctionRef> getAsFunction() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::closure:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
@@ -2077,6 +2110,7 @@ public:
   Optional<StmtCondition> getAsStmtCondition() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::closure:
     case Kind::function:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
@@ -2092,6 +2126,7 @@ public:
   Optional<CaseLabelItem *> getAsCaseLabelItem() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::closure:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::patternBinding:
@@ -2107,6 +2142,7 @@ public:
   PatternBindingDecl *getAsPatternBinding() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::closure:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
@@ -2122,6 +2158,7 @@ public:
   VarDecl *getAsUninitializedWrappedVar() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::closure:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
@@ -2137,6 +2174,7 @@ public:
   Pattern *getAsUninitializedVar() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::closure:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
@@ -2152,6 +2190,7 @@ public:
   Type getTypeOfUninitializedVar() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::closure:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
@@ -2167,6 +2206,7 @@ public:
   PatternBindingDecl *getPatternBindingOfUninitializedVar() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::closure:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
@@ -2182,6 +2222,7 @@ public:
   unsigned getIndexOfUninitializedVar() const {
     switch (kind) {
     case Kind::expression:
+    case Kind::closure:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
@@ -2209,6 +2250,9 @@ public:
     switch (kind) {
     case Kind::expression:
       return expression.expression->getSourceRange();
+
+    case Kind::closure:
+      return closure.closure->getSourceRange();
 
     case Kind::function:
       return function.body->getSourceRange();
@@ -2239,6 +2283,9 @@ public:
     switch (kind) {
     case Kind::expression:
       return expression.expression->getLoc();
+
+    case Kind::closure:
+      return closure.closure->getLoc();
 
     case Kind::function:
       return function.function.getLoc();

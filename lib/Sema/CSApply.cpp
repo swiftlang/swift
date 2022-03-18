@@ -9017,6 +9017,9 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
     return result;
   }
 
+  case Kind::closure:
+    return *this;
+
   case Kind::function:
     return SolutionApplicationTarget(
         *getAsFunction(),

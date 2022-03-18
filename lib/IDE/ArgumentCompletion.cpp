@@ -106,7 +106,9 @@ void ArgumentTypeCheckCompletionCallback::sawSolution(const Solution &S) {
   }
 
   if (!ParentCall || ParentCall == CompletionExpr) {
-    assert(false && "no containing call?");
+    // We might not have a call that contains the code completion expression if
+    // we type-checked the fallback code completion expression that only
+    // contains the code completion token, but not the surrounding call.
     return;
   }
 
