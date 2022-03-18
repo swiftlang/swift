@@ -528,17 +528,17 @@ namespace swift {
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.
     RequirementMachineMode RequirementMachineProtocolSignatures =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Verify;
 
     /// Enable the new experimental generic signature minimization algorithm
     /// for abstract generic signatures.
     RequirementMachineMode RequirementMachineAbstractSignatures =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Verify;
 
     /// Enable the new experimental generic signature minimization algorithm
     /// for user-written generic signatures.
     RequirementMachineMode RequirementMachineInferredSignatures =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Verify;
 
     /// Disable preprocessing pass to eliminate conformance requirements
     /// on generic parameters which are made concrete. Usually you want this
