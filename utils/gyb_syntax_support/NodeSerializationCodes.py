@@ -258,6 +258,9 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'PrimaryAssociatedTypeList' : 254,
     'PrimaryAssociatedType' : 255,
     'PrimaryAssociatedTypeClause' : 256,
+    'BackDeployAttributeSpecList' : 257,
+    'BackDeployVersionList' : 258,
+    'BackDeployVersionArgument' : 259,
 }
 
 

@@ -1061,14 +1061,72 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
   }
 }
 
+static bool tokIsStringInterpolationEOF(Token &Tok, tok RightK) {
+  return Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren;
+}
+
+Parser::ParseListItemResult
+Parser::parseListItem(ParserStatus &Status, tok RightK, SourceLoc LeftLoc,
+                      SourceLoc &RightLoc, bool AllowSepAfterLast,
+                      SyntaxKind ElementKind,
+                      llvm::function_ref<ParserStatus()> callback) {
+  while (Tok.is(tok::comma)) {
+    diagnose(Tok, diag::unexpected_separator, ",").fixItRemove(Tok.getLoc());
+    consumeToken();
+  }
+  SourceLoc StartLoc = Tok.getLoc();
+
+  SyntaxParsingContext ElementContext(SyntaxContext, ElementKind);
+  if (ElementKind == SyntaxKind::Unknown)
+    ElementContext.setTransparent();
+  Status |= callback();
+  if (Tok.is(RightK))
+    return ParseListItemResult::Finished;
+
+  // If the lexer stopped with an EOF token whose spelling is ")", then this
+  // is actually the tuple that is a string literal interpolation context.
+  // Just accept the ")" and build the tuple as we usually do.
+  if (tokIsStringInterpolationEOF(Tok, RightK)) {
+    RightLoc = Tok.getLoc();
+    return ParseListItemResult::FinishedInStringInterpolation;
+  }
+  // If we haven't made progress, or seeing any error, skip ahead.
+  if (Tok.getLoc() == StartLoc || Status.isErrorOrHasCompletion()) {
+    assert(Status.isErrorOrHasCompletion() && "no progress without error");
+    skipListUntilDeclRBrace(LeftLoc, RightK, tok::comma);
+    if (Tok.is(RightK) || Tok.isNot(tok::comma))
+      return ParseListItemResult::Finished;
+  }
+  if (consumeIf(tok::comma)) {
+    if (Tok.isNot(RightK))
+      return ParseListItemResult::Continue;
+    if (!AllowSepAfterLast) {
+      diagnose(Tok, diag::unexpected_separator, ",").fixItRemove(PreviousLoc);
+    }
+    return ParseListItemResult::Finished;
+  }
+  // If we're in a comma-separated list, the next token is at the
+  // beginning of a new line and can never start an element, break.
+  if (Tok.isAtStartOfLine() &&
+      (Tok.is(tok::r_brace) || isStartOfSwiftDecl() || isStartOfStmt())) {
+    return ParseListItemResult::Finished;
+  }
+  // If we found EOF or such, bailout.
+  if (Tok.isAny(tok::eof, tok::pound_endif)) {
+    IsInputIncomplete = true;
+    return ParseListItemResult::Finished;
+  }
+
+  diagnose(Tok, diag::expected_separator, ",")
+      .fixItInsertAfter(PreviousLoc, ",");
+  Status.setIsParseError();
+  return ParseListItemResult::Continue;
+}
+
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
                   llvm::function_ref<ParserStatus()> callback) {
-  auto TokIsStringInterpolationEOF = [&]() -> bool {
-    return Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren;
-  };
-  
   llvm::Optional<SyntaxParsingContext> ListContext;
   ListContext.emplace(SyntaxContext, Kind);
   if (Kind == SyntaxKind::Unknown)
@@ -1081,64 +1139,20 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     RightLoc = consumeToken(RightK);
     return makeParserSuccess();
   }
-  if (TokIsStringInterpolationEOF()) {
+  if (tokIsStringInterpolationEOF(Tok, RightK)) {
     RightLoc = Tok.getLoc();
     return makeParserSuccess();
   }
 
   ParserStatus Status;
-  while (true) {
-    while (Tok.is(tok::comma)) {
-      diagnose(Tok, diag::unexpected_separator, ",")
-        .fixItRemove(Tok.getLoc());
-      consumeToken();
-    }
-    SourceLoc StartLoc = Tok.getLoc();
+  ParseListItemResult Result;
+  do {
+    Result = parseListItem(Status, RightK, LeftLoc, RightLoc, AllowSepAfterLast,
+                           ElementKind, callback);
+  } while (Result == ParseListItemResult::Continue);
 
-    SyntaxParsingContext ElementContext(SyntaxContext, ElementKind);
-    if (ElementKind == SyntaxKind::Unknown)
-      ElementContext.setTransparent();
-    Status |= callback();
-    if (Tok.is(RightK))
-      break;
-    // If the lexer stopped with an EOF token whose spelling is ")", then this
-    // is actually the tuple that is a string literal interpolation context.
-    // Just accept the ")" and build the tuple as we usually do.
-    if (TokIsStringInterpolationEOF()) {
-      RightLoc = Tok.getLoc();
-      return Status;
-    }
-    // If we haven't made progress, or seeing any error, skip ahead.
-    if (Tok.getLoc() == StartLoc || Status.isErrorOrHasCompletion()) {
-      assert(Status.isErrorOrHasCompletion() && "no progress without error");
-      skipListUntilDeclRBrace(LeftLoc, RightK, tok::comma);
-      if (Tok.is(RightK) || Tok.isNot(tok::comma))
-        break;
-    }
-    if (consumeIf(tok::comma)) {
-      if (Tok.isNot(RightK))
-        continue;
-      if (!AllowSepAfterLast) {
-        diagnose(Tok, diag::unexpected_separator, ",")
-          .fixItRemove(PreviousLoc);
-      }
-      break;
-    }
-    // If we're in a comma-separated list, the next token is at the
-    // beginning of a new line and can never start an element, break.
-    if (Tok.isAtStartOfLine() &&
-        (Tok.is(tok::r_brace) || isStartOfSwiftDecl() || isStartOfStmt())) {
-      break;
-    }
-    // If we found EOF or such, bailout.
-    if (Tok.isAny(tok::eof, tok::pound_endif)) {
-      IsInputIncomplete = true;
-      break;
-    }
-
-    diagnose(Tok, diag::expected_separator, ",")
-      .fixItInsertAfter(PreviousLoc, ",");
-    Status.setIsParseError();
+  if (Result == ParseListItemResult::FinishedInStringInterpolation) {
+    return Status;
   }
 
   ListContext.reset();
