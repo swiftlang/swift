@@ -7,60 +7,60 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 * [SE-0326][]:
 
-Parameter and result types can now be inferred from the body of multi-statement closures.
+  Parameter and result types can now be inferred from the body of multi-statement closures.
 
-Use of multi-statement closures (or simply closures) becomes less cumbersome by removing the need to constantly specify explicit closure types which sometimes could be pretty large e.g. when there are multiple parameters or a complex tuple result type.
+  Use of multi-statement closures (or simply closures) becomes less cumbersome by removing the need to constantly specify explicit closure types which sometimes could be pretty large e.g. when there are multiple parameters or a complex tuple result type.
 
 * [SE-0343][]:
 
-Top-level scripts support asynchronous calls.
+  Top-level scripts support asynchronous calls.
 
-Using an `await` by calling an asynchronous function or accessing an isolated
-variable transitions the top-level to an asynchronous context. As an
-asynchronous context, top-level variables are `@MainActor`-isolated and the
-top-level is run on the `@MainActor`.
+  Using an `await` by calling an asynchronous function or accessing an isolated
+  variable transitions the top-level to an asynchronous context. As an
+  asynchronous context, top-level variables are `@MainActor`-isolated and the
+  top-level is run on the `@MainActor`.
 
-Note that the transition affects function overload resolution and starts an
-implicit run loop to drive the concurrency machinery.
+  Note that the transition affects function overload resolution and starts an
+  implicit run loop to drive the concurrency machinery.
 
-Unmodified scripts are not affected by this change unless `-warn-concurrency` is
-passed to the compiler invocation. With `-warn-concurrency`, variables in the
-top-level are isolated to the main actor and the top-level context is isolated
-to the main actor, but is not an asynchronous context.
+  Unmodified scripts are not affected by this change unless `-warn-concurrency` is
+  passed to the compiler invocation. With `-warn-concurrency`, variables in the
+  top-level are isolated to the main actor and the top-level context is isolated
+  to the main actor, but is not an asynchronous context.
 
 * [SE-0336][]:
 
-It is now possible to declare `distributed actor` and `distributed func`s inside of them.
+  It is now possible to declare `distributed actor` and `distributed func`s inside of them.
 
-Distributed actors provide stronger isolation guarantees than "local" actors, and enable additional checks to be made on return types and parameters of distributed methods, e.g. checking if they conform to `Codable`. Distributed methods can be called on "remote" references of distributed actors, turning those invocations into remote procedure calls, by means of pluggable and user extensible distributed actor system implementations. 
+  Distributed actors provide stronger isolation guarantees than "local" actors, and enable additional checks to be made on return types and parameters of distributed methods, e.g. checking if they conform to `Codable`. Distributed methods can be called on "remote" references of distributed actors, turning those invocations into remote procedure calls, by means of pluggable and user extensible distributed actor system implementations. 
 
-Swift does not provide any specific distributed actor system by itself, however, packages in the ecosystem fulfil the role of providing those implementations.
+  Swift does not provide any specific distributed actor system by itself, however, packages in the ecosystem fulfil the role of providing those implementations.
 
-```swift
-distributed actor Greeter { 
-  var greetingsSent = 0
-  
-  distributed func greet(name: String) -> String {
-    greetingsSent += 1
-    return "Hello, \(name)!"
+  ```swift
+  distributed actor Greeter { 
+    var greetingsSent = 0
+    
+    distributed func greet(name: String) -> String {
+      greetingsSent += 1
+      return "Hello, \(name)!"
+    }
   }
-}
 
-func talkTo(greeter: Greeter) async throws {
-  // isolation of distributed actors is stronger, it is impossible to refer to
-  // any stored properties of distributed actors from outside of them:
-  greeter.greetingsSent // distributed actor-isolated property 'name' can not be accessed from a non-isolated context
-  
-  // remote calls are implicitly throwing and async, 
-  // to account for the potential networking involved:
-  let greeting = try await greeter.greet(name: "Alice")
-  print(greeting) // Hello, Alice!
-}
-```
+  func talkTo(greeter: Greeter) async throws {
+    // isolation of distributed actors is stronger, it is impossible to refer to
+    // any stored properties of distributed actors from outside of them:
+    greeter.greetingsSent // distributed actor-isolated property 'name' can not be accessed from a non-isolated context
+    
+    // remote calls are implicitly throwing and async, 
+    // to account for the potential networking involved:
+    let greeting = try await greeter.greet(name: "Alice")
+    print(greeting) // Hello, Alice!
+  }
+  ```
 
 * The compiler now emits a warning when a non-final class conforms to a protocol that imposes a same-type requirement between `Self` and an associated type. This is because such a requirement makes the conformance unsound for subclasses.
 
-For example, Swift 5.6 would allow the following code, which at runtime would construct an instanec of `C` and not `SubC` as expected:
+  For example, Swift 5.6 would allow the following code, which at runtime would construct an instanec of `C` and not `SubC` as expected:
 
   ```swift
   protocol P {
@@ -168,24 +168,24 @@ Swift 5.6
 
 * [SE-0327][]:
 
-In Swift 5 mode, a warning is now emitted if the default-value expression of an
-instance-member property requires global-actor isolation. For example:
+  In Swift 5 mode, a warning is now emitted if the default-value expression of an
+  instance-member property requires global-actor isolation. For example:
 
-```swift
-@MainActor
-func partyGenerator() -> [PartyMember] { fatalError("todo") }
+  ```swift
+  @MainActor
+  func partyGenerator() -> [PartyMember] { fatalError("todo") }
 
-class Party {
-  @MainActor var members: [PartyMember] = partyGenerator()
-  //                                      ^~~~~~~~~~~~~~~~
-  // warning: expression requiring global actor 'MainActor' cannot
-  //          appear in default-value expression of property 'members'
-}
-```
+  class Party {
+    @MainActor var members: [PartyMember] = partyGenerator()
+    //                                      ^~~~~~~~~~~~~~~~
+    // warning: expression requiring global actor 'MainActor' cannot
+    //          appear in default-value expression of property 'members'
+  }
+  ```
 
-Previously, the isolation granted by the type checker matched the isolation of
-the property itself, but at runtime that is not guaranteed. In Swift 6, 
-such default-value expressions will become an error if they require isolation.
+  Previously, the isolation granted by the type checker matched the isolation of
+  the property itself, but at runtime that is not guaranteed. In Swift 6, 
+  such default-value expressions will become an error if they require isolation.
 
 * Actor isolation checking now understands that `defer` bodies share the isolation of their enclosing function.
 
@@ -2010,7 +2010,6 @@ Swift 4.2
   needs to have any `init`s from protocols be `required`, which means they need
   to be in the class definition.
 
-
 * [SE-0054][]
 
   `ImplicitlyUnwrappedOptional<T>` is now an unavailable typealias of `Optional<T>`.
@@ -2024,71 +2023,71 @@ Swift 4.2
 
 * [SE-0206][]
 
-    The standard library now uses a high-quality, randomly seeded, universal
-    hash function, represented by the new public `Hasher` struct.
+  The standard library now uses a high-quality, randomly seeded, universal
+  hash function, represented by the new public `Hasher` struct.
+
+  “Random seeding” varies the result of `hashValue` on each execution of a
+  Swift program, improving the reliability of the standard library's hashed
+  collections such as `Set` and `Dictionary`. In particular, random seeding
+  enables better protection against (accidental or deliberate) hash-flooding
+  attacks.
+
+  This change fulfills a long-standing prophecy in Hashable's documentation:
+
+  > Hash values are not guaranteed to be equal across different executions of
+  > your program. Do not save hash values to use during a future execution.
   
-    “Random seeding” varies the result of `hashValue` on each execution of a
-    Swift program, improving the reliability of the standard library's hashed
-    collections such as `Set` and `Dictionary`. In particular, random seeding
-    enables better protection against (accidental or deliberate) hash-flooding
-    attacks.
-    
-    This change fulfills a long-standing prophecy in Hashable's documentation:
+  As a consequence of random seeding, the elements in `Set` and `Dictionary`
+  values may have a different order on each execution. This may expose some
+  bugs in existing code that accidentally relies on repeatable ordering.
 
-    > Hash values are not guaranteed to be equal across different executions of
-    > your program. Do not save hash values to use during a future execution.
+  Additionally, the `Hashable` protocol now includes an extra function
+  requirement, `hash(into:)`. The new requirement is designed to be much
+  easier to implement than the old `hashValue` property, and it generally
+  provides better hashing. To implement `hash(into:)`, simply feed the exact
+  same components of your type that you compare in `Equatable`'s `==`
+  implementation to the supplied `Hasher`:
+  
+  ```swift
+  struct Foo: Hashable {
+    var a: String?
+    var b: [Int]
+    var c: [String: Int]
     
-    As a consequence of random seeding, the elements in `Set` and `Dictionary`
-    values may have a different order on each execution. This may expose some
-    bugs in existing code that accidentally relies on repeatable ordering.
-
-    Additionally, the `Hashable` protocol now includes an extra function
-    requirement, `hash(into:)`. The new requirement is designed to be much
-    easier to implement than the old `hashValue` property, and it generally
-    provides better hashing. To implement `hash(into:)`, simply feed the exact
-    same components of your type that you compare in `Equatable`'s `==`
-    implementation to the supplied `Hasher`:
-    
-    ```swift
-    struct Foo: Hashable {
-      var a: String?
-      var b: [Int]
-      var c: [String: Int]
-      
-      static func ==(lhs: Foo, rhs: Foo) -> Bool {
-        return lhs.a == rhs.a && lhs.b == rhs.b && lhs.c == rhs.c
-      }
-      
-      func hash(into hasher: inout Hasher) {
-        hasher.combine(a)
-        hasher.combine(b)
-        hasher.combine(c)
-      }
+    static func ==(lhs: Foo, rhs: Foo) -> Bool {
+      return lhs.a == rhs.a && lhs.b == rhs.b && lhs.c == rhs.c
     }
-    ```
     
-    Automatic synthesis for `Hashable` ([SE-0185]) has been updated to generate
-    `hash(into:)` implementations. For example, the `==` and `hash(into:)`
-    implementations above are equivalent to the ones synthesized by the
-    compiler, and can be removed without changing the meaning of the code.
-    
-    Synthesis has also been extended to support deriving `hashValue` from
-    `hash(into:)`, and vice versa. Therefore, code that only implements
-    `hashValue` continues to work in Swift 4.2. This new compiler functionality
-    works for all types that can implement `Hashable`, including classes.
-    
-    Note that these changes don't affect Foundation's hashing interface. Classes
-    that subclass `NSObject` should override the `hash` property, like before.
-
-    In certain controlled environments, such as while running particular tests,
-    it may be helpful to selectively disable hash seed randomization, so that
-    hash values and the order of elements in `Set`/`Dictionary` values remain
-    consistent across executions. You can disable hash seed randomization by
-    defining the environment variable `SWIFT_DETERMINISTIC_HASHING` with the
-    value of `1`. The Swift runtime looks at this variable during process
-    startup and, if it is defined, replaces the random seed with a constant
-    value.
+    func hash(into hasher: inout Hasher) {
+      hasher.combine(a)
+      hasher.combine(b)
+      hasher.combine(c)
+    }
+  }
+  ```
   
+  Automatic synthesis for `Hashable` ([SE-0185]) has been updated to generate
+  `hash(into:)` implementations. For example, the `==` and `hash(into:)`
+  implementations above are equivalent to the ones synthesized by the
+  compiler, and can be removed without changing the meaning of the code.
+  
+  Synthesis has also been extended to support deriving `hashValue` from
+  `hash(into:)`, and vice versa. Therefore, code that only implements
+  `hashValue` continues to work in Swift 4.2. This new compiler functionality
+  works for all types that can implement `Hashable`, including classes.
+  
+  Note that these changes don't affect Foundation's hashing interface. Classes
+  that subclass `NSObject` should override the `hash` property, like before.
+
+  In certain controlled environments, such as while running particular tests,
+  it may be helpful to selectively disable hash seed randomization, so that
+  hash values and the order of elements in `Set`/`Dictionary` values remain
+  consistent across executions. You can disable hash seed randomization by
+  defining the environment variable `SWIFT_DETERMINISTIC_HASHING` with the
+  value of `1`. The Swift runtime looks at this variable during process
+  startup and, if it is defined, replaces the random seed with a constant
+  value.
+
 * [SR-106][]
 
   The behavior of `.description` and `.debugDescription` for floating-point
