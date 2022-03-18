@@ -323,7 +323,7 @@ fileprivate class ConcurrencyDumper {
       print("warning: unable to decode is-running state of target tasks, running state and async backtraces will not be printed")
     }
 
-    let taskToThread: [swift_addr_t: swift_reflection_ptr_t] =
+    let taskToThread: [swift_addr_t: UInt64] =
         Dictionary(threadCurrentTasks.map{ ($1, $0) }, uniquingKeysWith: { $1 })
 
     var lastChilds: [Bool] = []
@@ -364,7 +364,7 @@ fileprivate class ConcurrencyDumper {
       let flags = decodeTaskFlags(task)
 
       output("Task \(hex: task.id) - flags=\(flags) enqueuePriority=\(hex: task.enqueuePriority) maxPriority=\(hex: task.maxPriority) address=\(hex: task.address)")
-      if let thread = taskToThread[task.address] {
+      if let thread = taskToThread[swift_addr_t(task.address)] {
         output("current task on thread \(hex: thread)")
       }
       if let parent = task.parent {
