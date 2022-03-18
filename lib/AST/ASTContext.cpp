@@ -35,14 +35,15 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/ModuleSearchPath.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -479,6 +480,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
     ForeignRepresentableCache;
 
+  // TODO: Move into ModuleSearchPathLookup
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
 
   /// The permanent arena.
@@ -620,18 +622,20 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
 #include "swift/AST/TypeNodes.def"
-    TheIEEE32Type(new (*this, AllocationArena::Permanent)
-                    BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
-    TheIEEE64Type(new (*this, AllocationArena::Permanent)
-                    BuiltinFloatType(BuiltinFloatType::IEEE64,*this)),
-    TheIEEE16Type(new (*this, AllocationArena::Permanent)
-                    BuiltinFloatType(BuiltinFloatType::IEEE16,*this)),
-    TheIEEE80Type(new (*this, AllocationArena::Permanent)
-                    BuiltinFloatType(BuiltinFloatType::IEEE80,*this)),
-    TheIEEE128Type(new (*this, AllocationArena::Permanent)
-                    BuiltinFloatType(BuiltinFloatType::IEEE128, *this)),
-    ThePPC128Type(new (*this, AllocationArena::Permanent)
-                    BuiltinFloatType(BuiltinFloatType::PPC128, *this)) {
+      TheIEEE32Type(new (*this, AllocationArena::Permanent)
+                        BuiltinFloatType(BuiltinFloatType::IEEE32, *this)),
+      TheIEEE64Type(new (*this, AllocationArena::Permanent)
+                        BuiltinFloatType(BuiltinFloatType::IEEE64, *this)),
+      TheIEEE16Type(new (*this, AllocationArena::Permanent)
+                        BuiltinFloatType(BuiltinFloatType::IEEE16, *this)),
+      TheIEEE80Type(new (*this, AllocationArena::Permanent)
+                        BuiltinFloatType(BuiltinFloatType::IEEE80, *this)),
+      TheIEEE128Type(new (*this, AllocationArena::Permanent)
+                         BuiltinFloatType(BuiltinFloatType::IEEE128, *this)),
+      ThePPC128Type(new (*this, AllocationArena::Permanent)
+                        BuiltinFloatType(BuiltinFloatType::PPC128, *this)),
+      ModuleLookup(*SourceMgr.getFileSystem(), SearchPathOpts,
+                   LangOpts.Target.isOSDarwin()) {
 
   // Initialize all of the known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Id_##Name = getIdentifier(IdStr);
@@ -1707,6 +1711,8 @@ static AllocationArena getArena(RecursiveTypeProperties properties) {
 
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
                                bool isSystem) {
+  // TODO: Move all this to ModuleSearchPathLookup (except for the module
+  // loader part).
   OptionSet<SearchPathKind> &loaded = getImpl().SearchPathsSet[searchPath];
   auto kind = isFramework ? SearchPathKind::Framework : SearchPathKind::Import;
   if (loaded.contains(kind))
@@ -1714,11 +1720,15 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
   loaded |= kind;
 
   if (isFramework) {
-    SearchPathOpts.addFrameworkSearchPath({searchPath, isSystem},
-                                          SourceMgr.getFileSystem().get());
+    SearchPathOpts.FrameworkSearchPaths.emplace_back(searchPath, isSystem);
+    ModuleLookup.addSearchPath(searchPath, ModuleSearchPathKind::Framework,
+                               isSystem,
+                               SearchPathOpts.getFrameworkSearchPaths().size());
   } else {
-    SearchPathOpts.addImportSearchPath(searchPath,
-                                       SourceMgr.getFileSystem().get());
+    SearchPathOpts.ImportSearchPaths.emplace_back(searchPath);
+    ModuleLookup.addSearchPath(searchPath, ModuleSearchPathKind::Framework,
+                               /*isSystem=*/false,
+                               SearchPathOpts.getImportSearchPaths().size());
   }
 
   if (auto *clangLoader = getClangModuleLoader())
@@ -5580,4 +5590,9 @@ bool ASTContext::isASCIIString(StringRef s) const {
     }
   }
   return true;
+}
+
+SmallVector<ModuleSearchPath, 4>
+ASTContext::moduleSearchPathsContainingFile(ArrayRef<std::string> Filenames) {
+  return ModuleLookup.searchPathsContainingFile(Filenames);
 }

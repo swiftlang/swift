@@ -22,6 +22,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/ModuleSearchPath.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
@@ -1369,6 +1370,15 @@ public:
   /// Find `decodeNextArgument<T>(type: T.Type) -> T` method associated with
   /// invocation decoder of the given distributed actor.
   FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
+
+private:
+  ModuleSearchPathLookup ModuleLookup;
+
+public:
+  /// Return all module search paths that (non-recursively) contain a file whose
+  /// name is in \p Filenames.
+  SmallVector<ModuleSearchPath, 4>
+  moduleSearchPathsContainingFile(ArrayRef<std::string> Filenames);
 
 private:
   friend Decl;

@@ -604,14 +604,12 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       genericBaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile),
       genericBaseName.getName(file_types::TY_SwiftModuleFile)};
 
-  auto searchPaths = Ctx.SearchPathOpts.moduleSearchPathsContainingFile(
-      InterestingFilenames, Ctx.SourceMgr.getFileSystem().get(),
-      Ctx.LangOpts.Target.isOSDarwin());
+  auto searchPaths = Ctx.moduleSearchPathsContainingFile(InterestingFilenames);
   for (const auto &searchPath : searchPaths) {
-    currPath = searchPath->getPath();
-    isSystemModule = searchPath->isSystem();
+    currPath = searchPath.Path;
+    isSystemModule = searchPath.IsSystem;
 
-    switch (searchPath->getKind()) {
+    switch (searchPath.Kind) {
     case ModuleSearchPathKind::Import:
     case ModuleSearchPathKind::RuntimeLibrary: {
       isFramework = false;
@@ -621,7 +619,7 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       // This was not always true on non-Apple platforms, and in order to
       // ease the transition, check both layouts.
       bool checkTargetSpecificModule = true;
-      if (searchPath->getKind() != ModuleSearchPathKind::RuntimeLibrary ||
+      if (searchPath.Kind != ModuleSearchPathKind::RuntimeLibrary ||
           !Ctx.LangOpts.Target.isOSDarwin()) {
         auto modulePath = currPath;
         llvm::sys::path::append(modulePath, genericModuleFileName);

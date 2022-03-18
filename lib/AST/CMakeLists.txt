@@ -66,6 +66,7 @@ add_swift_host_library(swiftAST STATIC
   ModuleDependencies.cpp
   ModuleLoader.cpp
   ModuleNameLookup.cpp
+  ModuleSearchPathLookup.cpp
   NameLookup.cpp
   NameLookupRequests.cpp
   OperatorNameLookup.cpp
@@ -101,7 +102,6 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/Symbol.cpp
   RequirementMachine/Term.cpp
   RequirementMachine/TypeDifference.cpp
-  SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp
   SubstitutionMap.cpp
