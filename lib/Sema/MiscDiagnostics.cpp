@@ -1579,19 +1579,16 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
                   ->isSelfParameter();
       };
 
-      SourceLoc memberLoc = SourceLoc();
-      Identifier memberName;
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
         if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase(), ACE)) {
-          auto baseName = MRE->getMember().getDecl()->getBaseName();
-          memberLoc = MRE->getLoc();
-          memberName = baseName.getIdentifier();
+          auto memberDecl = MRE->getMember().getDecl();
+          auto memberName = memberDecl->getBaseName().getIdentifier();
           Diags
-              .diagnose(memberLoc,
+              .diagnose(MRE->getLoc(),
                         diag::property_use_in_closure_without_explicit_self,
                         memberName)
               .warnUntilSwiftVersionIf(shouldOnlyWarn(MRE->getBase()), 6);
-          emitFixIts(Diags, memberName, memberLoc, /*isProperty*/ true, ACE);
+          emitFixIts(Diags, memberDecl, MRE, ACE);
           return {false, E};
         }
 
@@ -1600,14 +1597,14 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase(), ACE) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto methodExpr = cast<DeclRefExpr>(DSCE->getFn());
-          memberLoc = DSCE->getLoc();
-          memberName = methodExpr->getDecl()->getBaseIdentifier();
+          auto methodDecl = methodExpr->getDecl();
+          auto methodName = methodDecl->getBaseIdentifier();
           Diags
-              .diagnose(memberLoc,
+              .diagnose(DSCE->getLoc(),
                         diag::method_call_in_closure_without_explicit_self,
-                        memberName)
+                        methodName)
               .warnUntilSwiftVersionIf(shouldOnlyWarn(DSCE->getBase()), 6);
-          emitFixIts(Diags, memberName, memberLoc, /*isProperty*/ false, ACE);
+          emitFixIts(Diags, methodDecl, DSCE, ACE);
           return {false, E};
         }
 
@@ -1631,9 +1628,9 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     }
 
     /// Emit any fix-its for this error.
-    void emitFixIts(DiagnosticEngine &Diags, Identifier memberName,
-                    SourceLoc memberLoc, bool isProperty,
-                    const AbstractClosureExpr *ACE) {
+    void emitFixIts(DiagnosticEngine &Diags, const ValueDecl *memberDecl,
+                    const Expr *memberUse, const AbstractClosureExpr *ACE) {
+      SourceLoc memberLoc = memberUse->getLoc();
       // This error can be fixed by either capturing self explicitly (if in an
       // explicit closure), or referencing self explicitly.
       if (auto *CE = dyn_cast<const ClosureExpr>(ACE)) {
@@ -1646,8 +1643,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           return;
         }
         emitFixItsForExplicitClosure(Diags, memberLoc, CE);
-        emitFixItsForExplicitCaptures(Diags, memberName, memberLoc, isProperty,
-                                      CE);
+        emitFixItsForExplicitCaptures(Diags, memberDecl, memberUse, CE);
       } else {
         // If this wasn't an explicit closure, just offer the fix-it to
         // reference self explicitly.
@@ -1680,12 +1676,40 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
     /// Emit fix-its to explicitly capture members
     void emitFixItsForExplicitCaptures(DiagnosticEngine &Diags,
-                                       Identifier memberName,
-                                       SourceLoc memberLoc, bool isProperty,
+                                       const ValueDecl *capturedDecl,
+                                       const Expr *declUse,
                                        const ClosureExpr *closureExpr) {
+      enum MemberCaptureType {
+        Call = 0,      // Are we capturing so that we can call
+        Value = 1,     // Are we capturing a value
+        Reference = 2, // Are we capturing a reference
+      };
+      Identifier memberName;
+      MemberCaptureType memberCaptureType = MemberCaptureType::Call;
+      if (const auto *declCall = dyn_cast<DotSyntaxCallExpr>(declUse)) {
+        // Cast is safe because this is checked in walkToExprPre
+        auto methodDecl = cast<DeclRefExpr>(declCall->getFn());
+        memberName = methodDecl->getDecl()->getBaseIdentifier();
+        memberCaptureType = MemberCaptureType::Call;
+      } else if (const auto *memberRef = dyn_cast<MemberRefExpr>(declUse)) {
+        memberName =
+            memberRef->getMember().getDecl()->getBaseName().getIdentifier();
+        if (capturedDecl->getInterfaceType()
+                ->getCanonicalType()
+                .hasReferenceSemantics()) {
+          memberCaptureType = MemberCaptureType::Reference;
+        } else {
+          memberCaptureType = MemberCaptureType::Value;
+        }
+      } else {
+        assert(false &&
+               "emitFixItsForExplicitCaptures is only implemented to handle "
+               "MemberRefExpr and DotSyntaxCallExpr expressions");
+      }
+
       auto diag = Diags.diagnose(closureExpr->getLoc(),
                                  diag::note_capture_name_explicitly, memberName,
-                                 isProperty);
+                                 memberCaptureType);
       // There are four different potential fix-its to offer based on the
       // closure signature:
       //   1. There is an existing capture list which already has some
