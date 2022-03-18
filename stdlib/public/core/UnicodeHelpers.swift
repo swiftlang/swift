@@ -242,6 +242,7 @@ extension _StringGuts {
   @usableFromInline
   @_effects(releasenone)
   internal func isOnUnicodeScalarBoundary(_ i: String.Index) -> Bool {
+    _internalInvariant(i._encodedOffset <= count)
     // TODO(String micro-performance): check isASCII
 
     // Beginning and end are always scalar aligned; mid-scalar never is

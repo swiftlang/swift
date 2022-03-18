@@ -363,8 +363,11 @@ extension String.UnicodeScalarIndex {
     _ sourcePosition: String.Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
-    // TODO(lorentey): Review index validation
-    guard unicodeScalars._guts.isOnUnicodeScalarBoundary(sourcePosition) else {
+    guard
+      unicodeScalars._guts.hasMatchingEncoding(sourcePosition),
+      sourcePosition._encodedOffset <= unicodeScalars._guts.count,
+      unicodeScalars._guts.isOnUnicodeScalarBoundary(sourcePosition)
+    else {
       return nil
     }
     self = sourcePosition
@@ -391,7 +394,6 @@ extension String.UnicodeScalarIndex {
   ///   an attempt to convert the position of a UTF-8 continuation byte
   ///   returns `nil`.
   public func samePosition(in characters: String) -> String.Index? {
-    // TODO(lorentey): Review index validation
     return String.Index(self, within: characters)
   }
 }

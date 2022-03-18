@@ -332,13 +332,16 @@ extension String.UTF8View.Index {
   /// - Parameters:
   ///   - sourcePosition: A position in a `String` or one of its views.
   ///   - target: The `UTF8View` in which to find the new position.
-  @inlinable
   public init?(_ idx: String.Index, within target: String.UTF8View) {
+    // Note: This method used to be inlinable until Swift 5.7.
+
+    guard target._guts.hasMatchingEncoding(idx) else { return nil }
+    guard idx._encodedOffset <= target._guts.count else { return nil }
     if _slowPath(target._guts.isForeign) {
       guard idx._foreignIsWithin(target) else { return nil }
     } else {
-      // All indices, except sub-scalar UTF-16 indices pointing at trailing
-      // surrogates, are valid.
+      // All indices that are in range are valid, except sub-scalar UTF-16
+      // indices pointing at trailing surrogates.
       guard idx.transcodedOffset == 0 else { return nil }
     }
 

@@ -371,6 +371,8 @@ extension String.UTF16View.Index {
   public init?(
     _ idx: String.Index, within target: String.UTF16View
   ) {
+    guard target._guts.hasMatchingEncoding(idx) else { return nil }
+    guard idx._encodedOffset <= target._guts.count else { return nil }
     if _slowPath(target._guts.isForeign) {
       guard idx._foreignIsWithin(target) else { return nil }
     } else {

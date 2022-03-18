@@ -11,18 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 extension String.Index {
-  private init?<S: StringProtocol>(
-    _ idx: String.Index, _genericWithin target: S
-  ) {
-    guard target._wholeGuts.isOnGraphemeClusterBoundary(idx),
-          idx >= target.startIndex && idx <= target.endIndex
-    else {
-      return nil
-    }
-
-    self = idx
-  }
-
   /// Creates an index in the given string that corresponds exactly to the
   /// specified position.
   ///
@@ -62,7 +50,8 @@ extension String.Index {
   ///     of `target`.
   ///   - target: The string referenced by the resulting index.
   public init?(_ sourcePosition: String.Index, within target: String) {
-    self.init(sourcePosition, _genericWithin: target)
+    guard target._isValidIndex(sourcePosition) else { return nil }
+    self = sourcePosition._characterAligned
   }
 
   /// Creates an index in the given string that corresponds exactly to the
@@ -107,7 +96,16 @@ extension String.Index {
   public init?<S: StringProtocol>(
     _ sourcePosition: String.Index, within target: S
   ) {
-    self.init(sourcePosition, _genericWithin: target)
+    if let str = target as? String {
+      self.init(sourcePosition, within: str)
+      return
+    }
+    if let str = target as? Substring {
+      guard str._isValidIndex(sourcePosition) else { return nil }
+      self = sourcePosition
+      return
+    }
+    self.init(sourcePosition, within: String(target))
   }
 
   /// Returns the position in the given UTF-8 view that corresponds exactly to

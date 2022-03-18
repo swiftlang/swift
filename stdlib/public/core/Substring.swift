@@ -189,6 +189,23 @@ extension Substring {
   ) -> String.Index {
     _wholeGuts.roundDownToNearestCharacter(i, from: startIndex, to: endIndex)
   }
+
+  /// Return true if and only if `i` is a valid index in this substring,
+  /// that is to say, it exactly addresses one of the `Character`s in it.
+  ///
+  /// Note that if the start of the substring isn't `Character`-aligned in its
+  /// base string, then the substring and the base may not share valid indices.
+  internal func _isValidIndex(_ i: Index) -> Bool {
+    guard
+      _wholeGuts.hasMatchingEncoding(i),
+      i >= startIndex,
+      i <= endIndex,
+      _wholeGuts.isOnUnicodeScalarBoundary(i)
+    else {
+      return false
+    }
+    return i == _roundDownToNearestCharacter(i)
+  }
 }
 
 extension Substring: StringProtocol {

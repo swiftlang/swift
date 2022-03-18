@@ -43,6 +43,15 @@ extension String: BidirectionalCollection {
     return distance(from: startIndex, to: endIndex)
   }
 
+  /// Return true if and only if `i` is a valid index in this substring,
+  /// that is to say, it exactly addresses one of the `Character`s in it.
+  internal func _isValidIndex(_ i: Index) -> Bool {
+    return (
+      _guts.hasMatchingEncoding(i)
+      && i._encodedOffset <= _guts.count
+      && _guts.isOnGraphemeClusterBoundary(i))
+  }
+
   /// Returns the position immediately after the given index.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
