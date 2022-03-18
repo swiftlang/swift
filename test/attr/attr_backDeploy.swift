@@ -309,23 +309,23 @@ public func knownAndUnknownMacroVersionned() {}
 public func emptyAttributeFunc() {}
 
 @available(macOS 11.0, *)
-@_backDeploy(macOS 12.0) // expected-error {{expected 'before:' in '@_backDeploy' attribute}}
+@_backDeploy(macOS 12.0) // expected-error {{expected 'before:' in '@_backDeploy' attribute}} {{14-14=before:}}
 public func missingBeforeFunc() {}
 
-@_backDeploy(before) // expected-error {{expected ':' after 'before' in '@_backDeploy' attribute}}
+@_backDeploy(before) // expected-error {{expected ':' after 'before' in '@_backDeploy' attribute}} {{20-20=:}}
 // expected-error@-1 {{expected at least one platform version in '@_backDeploy' attribute}}
 public func missingColonAfterBeforeFunc() {}
 
 @available(macOS 11.0, *)
-@_backDeploy(before macOS 12.0) // expected-error {{expected ':' after 'before' in '@_backDeploy' attribute}}
+@_backDeploy(before macOS 12.0) // expected-error {{expected ':' after 'before' in '@_backDeploy' attribute}} {{20-20=:}}
 public func missingColonBetweenBeforeAndPlatformFunc() {}
 
 @available(macOS 11.0, *)
-@_backDeploy(before: macOS 12.0,) // expected-error {{unexpected ',' separator}}
+@_backDeploy(before: macOS 12.0,) // expected-error {{unexpected ',' separator}} {{32-33=}}
 public func unexpectedTrailingCommaFunc() {}
 
 @available(macOS 11.0, iOS 14.0, *)
-@_backDeploy(before: macOS 12.0,, iOS 15.0) // expected-error {{unexpected ',' separator}}
+@_backDeploy(before: macOS 12.0,, iOS 15.0) // expected-error {{unexpected ',' separator}} {{33-34=}}
 public func extraCommaFunc() {}
 
 @_backDeploy(before:) // expected-error {{expected at least one platform version in '@_backDeploy' attribute}}

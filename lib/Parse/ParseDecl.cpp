@@ -1848,9 +1848,11 @@ bool Parser::parseBackDeployAttribute(DeclAttributes &Attributes,
     if (Tok.is(tok::identifier) && Tok.getText() == "before") {
       consumeToken();
       if (!consumeIf(tok::colon))
-        diagnose(Tok, diag::attr_back_deploy_expected_colon_after_before);
+        diagnose(Tok, diag::attr_back_deploy_expected_colon_after_before)
+            .fixItInsertAfter(PreviousLoc, ":");
     } else {
-      diagnose(Tok, diag::attr_back_deploy_expected_before_label);
+      diagnose(Tok, diag::attr_back_deploy_expected_before_label)
+          .fixItInsertAfter(PreviousLoc, "before:");
     }
 
     // Parse the version list.
