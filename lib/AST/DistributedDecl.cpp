@@ -581,6 +581,11 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
   auto &C = getASTContext();
   auto module = getParentModule();
 
+  auto func = dyn_cast<FuncDecl>(this);
+  if (!func) {
+    return false;
+  }
+
   // === Check base name
   if (getBaseIdentifier() != C.Id_recordArgument) {
     return false;
@@ -614,6 +619,12 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
       return false;
     }
 
+    // --- must be mutating, if it is defined in a struct
+    if (isa<StructDecl>(getDeclContext()) &&
+        !func->isMutating()) {
+      return false;
+    }
+
     // --- Check number of generic parameters
     auto genericParams = getGenericParams();
     unsigned int expectedGenericParamNum = 1;
@@ -639,56 +650,60 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
       return false;
     }
 
-    // --- Check parameter: _ argument
-  auto argumentParam = params->get(0);
-  if (!argumentParam->getArgumentName().is("")) {
-    return false;
-  }
-
-  // === Check generic parameters in detail
-  // --- Check: Argument: SerializationRequirement
   GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
 
-  auto sig = getGenericSignature();
-  auto requirements = sig.getRequirements();
-
-  if (requirements.size() != expectedRequirementsNum) {
-    return false;
-  }
-
-  // --- Check the expected requirements
-  // --- all the Argument requirements ---
-  // conforms_to: Argument Decodable
-  // conforms_to: Argument Encodable
-  // ...
-
-  auto func = dyn_cast<FuncDecl>(this);
-  if (!func) {
-    return false;
-  }
-
-  auto resultType = func->mapTypeIntoContext(argumentParam->getInterfaceType())
-                        ->getDesugaredType();
-  auto resultParamType = func->mapTypeIntoContext(
-      ArgumentParam->getInterfaceType()->getMetatypeInstanceType());
-  // The result of the function must be the `Res` generic argument.
-  if (!resultType->isEqual(resultParamType)) {
-    return false;
-  }
-
-  for (auto requirementProto : requirementProtos) {
-    auto conformance = module->lookupConformance(resultType, requirementProto);
-    if (conformance.isInvalid()) {
+    // --- Check parameter: _ argument
+    auto argumentParam = params->get(0);
+    if (!argumentParam->getArgumentName().empty()) {
       return false;
     }
-  }
 
-  // === Check result type: Void
-  if (!func->getResultInterfaceType()->isVoid()) {
-    return false;
-  }
+    auto argumentTy = argumentParam->getInterfaceType();
+    auto argumentInContextTy = mapTypeIntoContext(argumentTy);
+    if (argumentInContextTy->getAnyNominal() == C.getRemoteCallArgumentDecl()) {
+      auto argGenericParams = argumentInContextTy->getStructOrBoundGenericStruct()
+          ->getGenericParams()->getParams();
+      if (argGenericParams.size() != 1) {
+        return false;
+      }
 
-  return true;
+      // the <Value> of the RemoteCallArgument<Value>
+      auto remoteCallArgValueGenericTy =
+          mapTypeIntoContext(argGenericParams[0]->getInterfaceType())
+              ->getDesugaredType()
+              ->getMetatypeInstanceType();
+      // expected (the <Value> from the recordArgument<Value>)
+      auto expectedGenericParamTy = mapTypeIntoContext(
+          ArgumentParam->getInterfaceType()->getMetatypeInstanceType());
+
+      if (!remoteCallArgValueGenericTy->isEqual(expectedGenericParamTy)) {
+            return false;
+          }
+    } else {
+      return false;
+    }
+
+
+    auto sig = getGenericSignature();
+    auto requirements = sig.getRequirements();
+
+    if (requirements.size() != expectedRequirementsNum) {
+      return false;
+    }
+
+    // --- Check the expected requirements
+    // --- all the Argument requirements ---
+    // e.g.
+    // conforms_to: Argument Decodable
+    // conforms_to: Argument Encodable
+    // ...
+
+    // === Check result type: Void
+    if (!func->getResultInterfaceType()->isVoid()) {
+      return false;
+    }
+
+    return true;
 }
 
 bool
@@ -879,8 +894,8 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     }
 
     // --- Check parameter: _ errorType
-    auto argumentParam = params->get(0);
-    if (!argumentParam->getArgumentName().is("")) {
+    auto errorTypeParam = params->get(0);
+    if (!errorTypeParam->getArgumentName().is("")) {
       return false;
     }
 
@@ -1138,6 +1153,14 @@ NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
       GetDistributedRemoteCallTargetInitFunctionRequest(mutableThis), nullptr);
+}
+
+ConstructorDecl *
+NominalTypeDecl::getDistributedRemoteCallArgumentInitFunction() const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedRemoteCallArgumentInitFunctionRequest(mutableThis), nullptr);
 }
 
 AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(

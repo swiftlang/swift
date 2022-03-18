@@ -57,8 +57,8 @@ struct ActorAddress: Sendable, Hashable, Codable {
 final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
   typealias ActorID = ActorAddress
   typealias SerializationRequirement = Codable
-  typealias InvocationDecoder = FakeDistributedInvocation
-  typealias InvocationEncoder = FakeDistributedInvocation
+  typealias InvocationDecoder = FakeDistributedInvocationEncoder
+  typealias InvocationEncoder = FakeDistributedInvocationEncoder
 
   var n = 0
 
@@ -119,11 +119,11 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
   }
 }
 
-class FakeDistributedInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+class FakeDistributedInvocationEncoder: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
   func recordGenericSubstitution<T>(_ type: T.Type) throws { }
-  func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws { }
+  func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws { }
   func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws { }
   func recordErrorType<E: Error>(_ type: E.Type) throws { }
   func doneRecording() throws { }

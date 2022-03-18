@@ -269,13 +269,67 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       auto recordArgumentDeclRef = UnresolvedDeclRefExpr::createImplicit(
           C, recordArgumentDecl->getName());
 
-      auto recordArgArgsList = ArgumentList::forImplicitCallTo(
-          recordArgumentDeclRef->getName(),
+      auto argumentName = param->getArgumentName().str();
+      LiteralExpr *argumentLabelArg;
+      if (argumentName.empty()) {
+        argumentLabelArg = new (C) NilLiteralExpr(sloc, implicit);
+      } else {
+        argumentLabelArg =
+            new (C) StringLiteralExpr(argumentName, SourceRange(), implicit);
+      }
+      auto parameterName = param->getParameterName().str();
+
+
+      // --- Prepare the RemoteCallArgument<Value> for the argument
+      auto argumentVarName = C.getIdentifier("_" + parameterName.str());
+      StructDecl *RCA = C.getRemoteCallArgumentDecl();
+      VarDecl *callArgVar =
+          new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
+                          argumentVarName, thunk);
+      callArgVar->setImplicit();
+      callArgVar->setSynthesized();
+
+      Pattern *callArgPattern = NamedPattern::createImplicit(C, callArgVar);
+
+      auto remoteCallArgumentInitDecl =
+          RCA->getDistributedRemoteCallArgumentInitFunction();
+      auto boundRCAType = BoundGenericType::get(
+          RCA, Type(), {thunk->mapTypeIntoContext(param->getInterfaceType())});
+      auto remoteCallArgumentInitDeclRef =
+          TypeExpr::createImplicit(boundRCAType, C);
+
+      auto initCallArgArgs = ArgumentList::forImplicitCallTo(
+          DeclNameRef(remoteCallArgumentInitDecl->getEffectiveFullName()),
           {
-            new (C) DeclRefExpr(
+           // label:
+           argumentLabelArg,
+           // name:
+           new (C) StringLiteralExpr(parameterName, SourceRange(), implicit),
+           // _ argument:
+           new (C) DeclRefExpr(
                ConcreteDeclRef(param), dloc, implicit,
                AccessSemantics::Ordinary,
                thunk->mapTypeIntoContext(param->getInterfaceType()))
+          },
+          C);
+
+      auto initCallArgCallExpr =
+          CallExpr::createImplicit(C, remoteCallArgumentInitDeclRef, initCallArgArgs);
+      initCallArgCallExpr->setImplicit();
+
+      auto callArgPB = PatternBindingDecl::createImplicit(
+          C, StaticSpellingKind::None, callArgPattern, initCallArgCallExpr, thunk);
+
+      remoteBranchStmts.push_back(callArgPB);
+      remoteBranchStmts.push_back(callArgVar);
+
+      /// --- Pass the argumentRepr to the recordArgument function
+      auto recordArgArgsList = ArgumentList::forImplicitCallTo(
+          recordArgumentDeclRef->getName(),
+          {
+              new (C) DeclRefExpr(
+                  ConcreteDeclRef(callArgVar), dloc, implicit,
+                  AccessSemantics::Ordinary)
           }, C);
 
       auto tryRecordArgExpr = TryExpr::createImplicit(C, sloc,

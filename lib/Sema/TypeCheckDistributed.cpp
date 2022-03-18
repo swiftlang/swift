@@ -305,7 +305,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
                      decl->getName(), identifier,
-                     "mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws\n");
+                     "mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws\n");
       anyMissingAdHocRequirements = true;
     }
     if (checkAdHocRequirementAccessControl(decl, Proto, recordArgumentDecl))
@@ -726,6 +726,48 @@ GetDistributedRemoteCallTargetInitFunctionRequest::evaluate(
       return ctor;
 
     return nullptr;
+  }
+
+  return nullptr;
+}
+
+ConstructorDecl*
+GetDistributedRemoteCallArgumentInitFunctionRequest::evaluate(
+    Evaluator &evaluator,
+    NominalTypeDecl *nominal) const {
+  auto &C = nominal->getASTContext();
+
+  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+  // we won't be emitting the offending decl after all.
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return nullptr;
+
+  if (!nominal->getDeclaredInterfaceType()->isEqual(
+          C.getRemoteCallArgumentType()))
+    return nullptr;
+
+  for (auto value : nominal->getMembers()) {
+    auto ctor = dyn_cast<ConstructorDecl>(value);
+    if (!ctor)
+      continue;
+
+    auto params = ctor->getParameters();
+    if (params->size() != 3)
+      return nullptr;
+
+    // --- param: label
+    if (!params->get(0)->getArgumentName().is("label"))
+      return nullptr;
+
+    // --- param: name
+    if (!params->get(1)->getArgumentName().is("name"))
+      return nullptr;
+
+    // --- param: value
+    if (params->get(2)->getArgumentName() != C.Id_value)
+      return nullptr;
+
+    return ctor;
   }
 
   return nullptr;

@@ -46,7 +46,7 @@ func test() async throws {
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   let reply = try await ref.echo(name: "Caplin")
-  // CHECK: > encode argument: Caplin
+  // CHECK: > encode argument name:name, value: Caplin
   // CHECK-NOT: > encode error type
   // CHECK: > encode return type: Swift.String
   // CHECK: > done recording

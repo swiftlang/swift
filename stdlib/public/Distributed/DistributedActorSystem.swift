@@ -12,6 +12,7 @@
 import Swift
 import _Concurrency
 
+/// A distributed actor system
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedActorSystem: Sendable {
   /// The identity used by actors that communicate via this transport
@@ -340,7 +341,7 @@ extension DistributedActorSystem {
 /// The string representation will attempt to pretty print the target identifier,
 /// however its exact format is not specified and may change in future versions.
 @available(SwiftStdlib 5.7, *)
-public struct RemoteCallTarget: CustomStringConvertible {
+public struct RemoteCallTarget: CustomStringConvertible, Hashable {
   private let _identifier: String
 
   public init(_ identifier: String) {
@@ -407,6 +408,7 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 /// Note that the decoding will be provided the specific types that the sending side used to preform the call,
 /// so decoding can rely on simply invoking e.g. `Codable` (if that is the `SerializationRequirement`) decoding
 /// entry points on the provided types.
+@available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationEncoder {
   associatedtype SerializationRequirement
 
@@ -418,8 +420,9 @@ public protocol DistributedTargetInvocationEncoder {
 //  ///
 //  /// Record an argument of `Argument` type.
 //  /// This will be invoked for every argument of the target, in declaration order.
-//  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws
-  // TODO(distributed): offer recordArgument(label:type:)
+//  mutating func recordArgument<Value: SerializationRequirement>(
+//    _ argument: DistributedTargetArgument<Value>
+//  ) throws
 
   /// Record the error type of the distributed method.
   /// This method will not be invoked if the target is not throwing.
@@ -434,8 +437,51 @@ public protocol DistributedTargetInvocationEncoder {
   mutating func doneRecording() throws
 }
 
+/// Represents an argument passed to a distributed call target.
+@available(SwiftStdlib 5.7, *)
+public struct RemoteCallArgument<Value> {
+  /// The "argument label" of the argument.
+  /// The label is the name visible name used in external calls made to this
+  /// target, e.g. for `func hello(label name: String)` it is `label`.
+  ///
+  /// If no label is specified (i.e. `func hi(name: String)`), the `label`,
+  /// value is empty, however `effectiveLabel` is equal to the `name`.
+  ///
+  /// In most situations, using `effectiveLabel` is more useful to identify
+  /// the user-visible name of this argument.
+  public let label: String?
+
+  /// The effective label of this argument, i.e. if no explicit `label` was set
+  /// this defaults to the `name`. This reflects the semantics of call sites of
+  /// function declarations without explicit label definitions in Swift.
+  public var effectiveLabel: String {
+    return label ?? name
+  }
+
+  /// The internal name of parameter this argument is accessible as in the
+  /// function body. It is not part of the functions API and may change without
+  /// breaking the target identifier.
+  ///
+  /// If the method did not declare an explicit `label`, it is used as the
+  /// `effectiveLabel`.
+  public let name: String
+
+  /// The value of the argument being passed to the call.
+  /// As `RemoteCallArgument` is always used in conjunction with
+  /// `recordArgument` and populated by the compiler, this Value will generally
+  /// conform to a distributed actor system's `SerializationRequirement`.
+  public let value: Value
+
+  public init(label: String?, name: String, value: Value) {
+    self.label = label
+    self.name = name
+    self.value = value
+  }
+}
+
 /// Decoder that must be provided to `executeDistributedTarget` and is used
 /// by the Swift runtime to decode arguments of the invocation.
+@available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationDecoder {
   associatedtype SerializationRequirement
 
