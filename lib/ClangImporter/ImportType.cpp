@@ -454,6 +454,9 @@ namespace {
                 ImportHint::OtherPointer};
       }
 
+      if (pointeeQualType->isDependentType())
+        return Type();
+
       // All other C pointers to concrete types map to
       // UnsafeMutablePointer<T> or OpaquePointer.
 

@@ -17,6 +17,7 @@
 // CHECK: func defaultedTemplateReferenceTypeParam<T>(_ t: inout T)
 // The following types aren't imported correctly, but that does not have to do
 // with the fact that the template type paramaters are defaulted.
-// CHECK: func defaultedTemplatePointerTypeParam<T>(_ t: UnsafeMutablePointer<T>)
-// CHECK: func defaultedTemplatePointerReferenceTypeParam<T>(_ t: inout OpaquePointer!)
-// CHECK: func defaultedTemplatePointerPointerTypeParam<T>(_ t: UnsafeMutablePointer<OpaquePointer?>!)
+// TODO: reenable the following checks: (rdar://90587703)
+// TODO-CHECK: func defaultedTemplatePointerTypeParam<T>(_ t: UnsafeMutablePointer<T>)
+// TODO-CHECK: func defaultedTemplatePointerReferenceTypeParam<T>(_ t: inout OpaquePointer!)
+// TODO-CHECK: func defaultedTemplatePointerPointerTypeParam<T>(_ t: UnsafeMutablePointer<OpaquePointer?>!)
