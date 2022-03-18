@@ -2703,10 +2703,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_Custom: {
       auto abbrCode = S.DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
       auto theAttr = cast<CustomAttr>(DA);
+      auto typeID = S.addTypeRef(theAttr->getType());
+      if (!typeID && !S.allowCompilerErrors()) {
+        llvm::PrettyStackTraceString message("CustomAttr has no type");
+        abort();
+      }
       CustomDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                        theAttr->isImplicit(),
-                                       S.addTypeRef(theAttr->getType()),
-                                       theAttr->isArgUnsafe());
+                                       typeID, theAttr->isArgUnsafe());
       return;
     }
 
