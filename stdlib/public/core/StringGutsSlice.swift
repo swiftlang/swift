@@ -36,31 +36,26 @@ internal struct _StringGutsSlice {
     self._offsetRange = offsetRange
   }
 
-  @inlinable
   internal var start: Int {
     @inline(__always) get { return _offsetRange.lowerBound }
   }
-  @inlinable
+
   internal var end: Int {
     @inline(__always) get { return _offsetRange.upperBound }
   }
 
-  @inlinable
   internal var count: Int {
     @inline(__always) get { return _offsetRange.count }
   }
 
-  @inlinable
   internal var isNFCFastUTF8: Bool {
     @inline(__always) get { return _guts.isNFCFastUTF8 }
   }
 
-  @inlinable
   internal var isASCII: Bool {
     @inline(__always) get { return _guts.isASCII }
   }
 
-  @inlinable
   internal var isFastUTF8: Bool {
     @inline(__always) get { return _guts.isFastUTF8 }
   }
@@ -74,7 +69,6 @@ internal struct _StringGutsSlice {
     }
   }
 
-  @inlinable
   internal var range: Range<String.Index> {
     @inline(__always) get {
       let lower = String.Index(_encodedOffset: _offsetRange.lowerBound)
