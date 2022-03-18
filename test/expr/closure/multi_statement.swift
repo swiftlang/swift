@@ -249,3 +249,26 @@ func test_taps_type_checked_with_correct_decl_context() {
     return false
   }
 }
+
+// rdar://90347159 - in pattern matching context `case` should be preferred over static declarations
+func test_pattern_matches_only_cases() {
+  enum ParsingError : Error {
+    case ok(Int)
+    case failed([Error], Int)
+
+    static var ok: Int { 42 }
+    static func failed(_: [Error], at: Any) -> Self { fatalError() }
+  }
+
+  let _: (ParsingError) -> Void = {
+    switch $0 {
+    case let ParsingError.failed(errors, _): print(errors) // Ok
+    default: break
+    }
+
+    switch $0 {
+    case let ParsingError.ok(result): print(result) // Ok
+    default: break
+    }
+  }
+}

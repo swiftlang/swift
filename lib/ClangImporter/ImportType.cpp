@@ -3076,7 +3076,7 @@ Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
   lookupResult.setAllowHidden(true);
-  if (!sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
+  if (!sema.LookupName(lookupResult, /*Scope=*/sema.TUScope)) {
     return nullptr;
   }
 
