@@ -350,12 +350,12 @@ exit:
 
 // Hoist a destroy_addr of an @in argument over a load from an alloc_stack.
 //
-// CHECK-LABEL: sil [ossa] @test_hoist_over_load_from_stack : {{.*}} {
+// CHECK-LABEL: sil [ossa] @hoist_over_load_from_stack : {{.*}} {
 // CHECK:         apply
 // CHECK:         destroy_addr
 // CHECK:         load [take]
-// CHECK-LABEL: } // end sil function 'test_hoist_over_load_from_stack'
-sil [ossa] @test_hoist_over_load_from_stack : $@convention(thin) (@in X) -> @owned X {
+// CHECK-LABEL: } // end sil function 'hoist_over_load_from_stack'
+sil [ossa] @hoist_over_load_from_stack : $@convention(thin) (@in X) -> @owned X {
 entry(%in_addr : $*X):
   %stack_addr = alloc_stack $X
   copy_addr %in_addr to [initialization] %stack_addr : $*X
