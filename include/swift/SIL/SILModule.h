@@ -345,6 +345,10 @@ private:
   /// The options passed into this SILModule.
   const SILOptions &Options;
 
+  /// The number of functions created in this module, which will be the index of
+  /// the next function.
+  unsigned nextFunctionIndex = 0;
+
   /// Set if the SILModule was serialized already. It is used
   /// to ensure that the module is serialized only once.
   bool serialized;
@@ -448,6 +452,12 @@ public:
 
   /// Called after an instruction is moved from one function to another.
   void notifyMovedInstruction(SILInstruction *inst, SILFunction *fromFunction);
+
+  unsigned getNewFunctionIndex() { return nextFunctionIndex++; }
+
+  // This may be larger that the number of live functions in the 'functions'
+  // linked list because it includes the indices of zombie functions.
+  unsigned getNumFunctionIndices() const { return nextFunctionIndex; }
 
   /// Set a serialization action.
   void setSerializeSILAction(ActionCallback SerializeSILAction);
