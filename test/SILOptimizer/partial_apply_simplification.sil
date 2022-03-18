@@ -189,3 +189,24 @@ entry(%x : $Int, %y : $Int, %z : $Int):
   %r = apply %f(%x, %y, %z) : $@convention(thin) (Int, Int, Int) -> Int
   return %r : $Int
 }
+
+// CHECK-LABEL: sil private @closure_nonescaping_convention_change
+// CHECK-SAME:    : $@convention(method) (Int, @in_guaranteed Int) -> Int {
+sil private @closure_nonescaping_convention_change : $@convention(thin) (Int, @in_guaranteed Int) -> Int {
+entry(%x : $Int, %y : $*Int):
+  %f = function_ref @add : $@convention(thin) (Int, Int) -> Int
+  %z = load %y : $*Int
+  %r = apply %f(%x, %z) : $@convention(thin) (Int, Int) -> Int
+  return %r : $Int
+}
+
+sil @closure_nonescaping_convention_change_user : $@convention(thin) (Int, @in_guaranteed Int) -> Int {
+entry(%x : $Int, %y : $*Int):
+  %f = function_ref @closure_nonescaping_convention_change : $@convention(thin) (Int, @in_guaranteed Int) -> Int
+  %c = partial_apply [callee_guaranteed] [on_stack] %f(%y) : $@convention(thin) (Int, @in_guaranteed Int) -> Int
+  %g = function_ref @closure_nonescaping_consumer : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int, Int) -> Int
+  %r = apply %g(%c, %x) : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int, Int) -> Int
+  dealloc_stack %c : $@noescape @callee_guaranteed (Int) -> Int
+  return %r : $Int
+}
+
