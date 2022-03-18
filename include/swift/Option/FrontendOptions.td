@@ -362,6 +362,9 @@ def disable_requirement_machine_concrete_contraction : Flag<["-"], "disable-requ
 def enable_requirement_machine_loop_normalization : Flag<["-"], "enable-requirement-machine-loop-normalization">,
   HelpText<"Enable stronger minimization algorithm, for debugging only">;
 
+def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
+  HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
+
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 

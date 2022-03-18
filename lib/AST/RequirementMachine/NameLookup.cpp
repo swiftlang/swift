@@ -12,12 +12,32 @@
 
 #include "NameLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/SmallVector.h"
 #include <algorithm>
 
 using namespace swift;
 using namespace rewriting;
+
+void
+swift::rewriting::lookupConcreteNestedType(
+    Type baseType,
+    Identifier name,
+    SmallVectorImpl<TypeDecl *> &concreteDecls) {
+  if (auto *decl = baseType->getAnyNominal())
+    lookupConcreteNestedType(decl, name, concreteDecls);
+  else if (auto *archetype = baseType->getAs<OpaqueTypeArchetypeType>()) {
+    // If our concrete type is an opaque result archetype, look into its
+    // generic environment recursively.
+    auto *genericEnv = archetype->getGenericEnvironment();
+    auto genericSig = genericEnv->getGenericSignature();
+
+    concreteDecls.push_back(
+        genericSig->lookupNestedType(archetype->getInterfaceType(), name));
+  }
+}
 
 void
 swift::rewriting::lookupConcreteNestedType(
