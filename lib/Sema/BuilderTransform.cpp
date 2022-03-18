@@ -1744,6 +1744,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     for (const auto &solution : solutions) {
       cs.getASTContext().CompletionCallback->sawSolution(solution);
     }
+    return nullptr;
   }
 
   if (solvingFailed || solutions.size() != 1) {
