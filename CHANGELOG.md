@@ -1861,7 +1861,7 @@ Swift 5.0
   The `DictionaryLiteral` type has been renamed to `KeyValuePairs`.
   A typealias preserves the old name for compatibility.
 
-* [SR-2608][]
+* [SR-2608][]:
 
   Default arguments are now printed in SourceKit-generated interfaces for Swift
   modules, instead of just using a placeholder `default`.
@@ -1877,7 +1877,7 @@ Swift 5.0
 * Complex recursive type definitions involving classes and generics that would
   previously cause deadlocks at run time are now fully supported.
 
-* [SR-419][]
+* [SR-419][]:
 
   In Swift 5 mode, when setting a property from within its own `didSet` or
   `willSet` observer, the observer will now only avoid being recursively called
@@ -1912,7 +1912,7 @@ Swift 4.2
 
 ### 2018-09-17 (Xcode 10.0)
 
-* [SE-0202][]
+* [SE-0202][]:
 
   The standard library now provides a unified set of randomization functionality.
   Integer types, floating point types, and Bool all introduce a new static
@@ -1951,7 +1951,7 @@ Swift 4.2
   let diceRoll = Int.random(in: 1 ... 6, using: &mt)
   ```
 
-* [SE-0194][]
+* [SE-0194][]:
 
   The new CaseIterable protocol describes types which have a static
   “allCases” property that is used to describe all of the cases of the
@@ -1969,7 +1969,7 @@ Swift 4.2
   print(Suit.allCases) // prints [Suit.heart, Suit.club, Suit.diamond, Suit.spade]
   ```
 
-* [SE-0185][]
+* [SE-0185][]:
 
   Protocol conformances are now able to be synthesized in extensions in the same
   file as the type definition, allowing automatic synthesis of conditional
@@ -2010,7 +2010,7 @@ Swift 4.2
   needs to have any `init`s from protocols be `required`, which means they need
   to be in the class definition.
 
-* [SE-0054][]
+* [SE-0054][]:
 
   `ImplicitlyUnwrappedOptional<T>` is now an unavailable typealias of `Optional<T>`.
   Declarations annotated with `!` have the type `Optional<T>`. If an
@@ -2021,7 +2021,7 @@ Swift 4.2
   need to be adjusted. Please see [this blog post](https://swift.org/blog/iuo/)
   for more information.
 
-* [SE-0206][]
+* [SE-0206][]:
 
   The standard library now uses a high-quality, randomly seeded, universal
   hash function, represented by the new public `Hasher` struct.
@@ -2088,7 +2088,7 @@ Swift 4.2
   startup and, if it is defined, replaces the random seed with a constant
   value.
 
-* [SR-106][]
+* [SR-106][]:
 
   The behavior of `.description` and `.debugDescription` for floating-point
   numbers has been changed. Previously these unconditionally printed a fixed
@@ -2097,7 +2097,7 @@ Swift 4.2
   convert back to the original source value, and no more. For more details,
   see the original bug report and the linked pull request.
 
-* [SE-0193][]
+* [SE-0193][]:
 
   Various function-like declarations can now be marked as `@inlinable`,
   making their bodies available for optimizations from other modules.
@@ -2115,7 +2115,7 @@ Swift 4.2
   functions have been made generic over `[Binary]FloatingPoint` so that they
   will automatically be available for any conforming type.
 
-* [SE-0143][]
+* [SE-0143][]:
 
   The standard library types `Optional`, `Array`, `ArraySlice`,
   `ContiguousArray`, `Dictionary`, `Range`, and `ClosedRange` now conform to the
@@ -2123,7 +2123,7 @@ Swift 4.2
   conform to `Hashable`.  This makes synthesized `Hashable` implementations
   available for types that include stored properties of these types.
 
-* [SE-0196][]
+* [SE-0196][]:
 
   Custom compile-time warnings or error messages can be emitted using the
   `#warning(_:)` and `#error(_:)` directives.
@@ -2148,7 +2148,7 @@ Swift 4.2
   circumstances with very simple values, so this is unlikely to affect
   real-world code.)
 
-* [SE-0143][]
+* [SE-0143][]:
 
   Runtime query of conditional conformances is now implemented. Therefore,
   a dynamic cast such as `value as? P`, where the dynamic type of `value`
@@ -2160,7 +2160,7 @@ Swift 4.1
 
 ### 2018-03-29 (Xcode 9.3)
 
-* [SE-0075][]
+* [SE-0075][]:
 
   Compile-time testing for the existence and importability of modules is now
   implemented as a build configuration test.  The `canImport` test allows
@@ -2179,7 +2179,7 @@ Swift 4.1
   #endif
   ```
 
-* [SE-0189][]
+* [SE-0189][]:
 
   If an initializer is declared in a different module from a struct, it must
   use `self.init(…)` or `self = …` before returning or accessing `self`.
@@ -2196,14 +2196,14 @@ Swift 4.1
   per-member basis should explicitly declare a public memberwise initializer
   for clients in other modules to use.
 
-* [SE-0166][] / [SE-0143][]
+* [SE-0166][] / [SE-0143][]:
 
   The standard library now defines the conformances of `Optional`,
   `Array`, `Dictionary`, and `Set` to `Encodable` and `Decodable` as
   conditional conformances, available only when their type parameters
   conform to `Encodable` or `Decodable`, respectively.
 
-* [SE-0188][]
+* [SE-0188][]:
 
   Index types for most standard library collections now conform to `Hashable`.
   These indices can now be used in key-path subscripts and hashed collections:
@@ -2255,7 +2255,7 @@ Swift 4.1
 * [SE-0161][] is fully implemented. KeyPaths now support subscript, optional
   chaining, and optional force-unwrapping components.
 
-* [SE-0186][]
+* [SE-0186][]:
 
   It is no longer valid to use the ownership keywords `weak` and `unowned` for property declarations in protocols. These keywords are meaningless and misleading when used in a protocol as they don't have any effect.
 
@@ -2270,7 +2270,7 @@ Swift 4.1
   }
   ```
 
-* [SE-0185][]
+* [SE-0185][]:
 
   Structs and enums that declare a conformance to `Equatable`/`Hashable` now get an automatically synthesized implementation of `==`/`hashValue`. For structs, all stored properties must be `Equatable`/`Hashable`. For enums, all enum cases with associated values must be `Equatable`/`Hashable`.
 
@@ -2307,7 +2307,7 @@ Swift 4.0
 
 ### 2017-09-19 (Xcode 9.0)
 
-* [SE-0165][] and [SE-0154][]
+* [SE-0165][] and [SE-0154][]:
 
   The standard library's `Dictionary` and `Set` types have some new features. You can now create a new dictionary from a sequence of keys and values, and merge keys and values into an existing dictionary.
 
@@ -2377,7 +2377,7 @@ Swift 4.0
   `#if swift(>=3.2)` to restrict the extension to Swift 3.1 and below.
   ([SR-2388][])
 
-* [SE-0156][]
+* [SE-0156][]:
 
   Protocol composition types can now contain one or more class type terms,
   forming a class-constrained protocol composition.
@@ -2441,7 +2441,7 @@ Swift 4.0
   These missing aspects of the proposal can be introduced in a future
   release without breaking source compatibility with existing code.
 
-* [SE-0142][]
+* [SE-0142][]:
 
   Protocols and associated types can now contain `where` clauses that
   provide additional restrictions on associated types. For example:
@@ -2456,7 +2456,7 @@ Swift 4.0
     }
     ```
 
-* [SE-0160][]
+* [SE-0160][]:
 
   In Swift 4 mode, a declaration is inferred to be `@objc` where it is required for semantic consistency of the programming model. Specifically, it is inferred when:
 
@@ -2607,7 +2607,7 @@ Swift 3.1
   side effects, leading to bugs when Swift code attempted to override
   `initialize`.
 
-* [SR-2394][]
+* [SR-2394][]:
 
   C functions that "return twice" are no longer imported into Swift. Instead,
   they are explicitly made unavailable, so attempting to reference them will
@@ -2684,7 +2684,7 @@ Swift 3.1
   is not guaranteed to work in future versions of Swift, and will
   now raise a warning.
 
-* [SR-1446][]
+* [SR-1446][]:
 
   Nested types may now appear inside generic types, and nested types may have their own generic parameters:
 
@@ -3289,11 +3289,11 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * The "none" members of imported NS_OPTIONS option sets are marked as unavailable when they are imported.  Use `[]` to make an empty option set, instead of a None member.
 
-* [SE-0043][]
+* [SE-0043][]:
 
   Adds the ability to declare variables in multiple patterns in cases.
 
-* [SE-0005][]
+* [SE-0005][]:
 
   Allows the Clang importer to import ObjC symbols using substantially different Swift-like naming paradigms:
 
@@ -3304,7 +3304,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   * Non-type values, including enumerators, are lowercased.
   * Classes that implement `compare(_:) -> NSComparisonResult` automatically import as `Comparable`.
 
-* [SE-0040][]
+* [SE-0040][]:
 
   Attributes change from using `=` in parameters lists
   to using `:`, aligning with function call syntax.
@@ -3317,7 +3317,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   @available(*, unavailable, renamed: "MyRenamedProtocol")
   ```
 
-* [SE-0048][]
+* [SE-0048][]:
 
   Generic typealiases are now supported. For example:
 
@@ -3330,7 +3330,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
   etc.
 
-* [SE-0049][]
+* [SE-0049][]:
 
   The `@noescape` attribute is extended to be a more general type attribute. You can now declare values of `@noescape` function type, e.g. in manually curried function signatures.  You can now also declare local variables of `@noescape` type, and use `@noescape` in `typealiases`.  For example, this is now valid code:
 
@@ -3341,12 +3341,12 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   }
   ```
 
-* [SE-0034][]
+* [SE-0034][]:
 
   The `#line` directive (which resets the logical
   source location for diagnostics and debug information) is renamed to `#sourceLocation`.
 
-* [SE-0002][]
+* [SE-0002][]:
 
   Curried function syntax (with successive parenthesized groups of arguments) is removed, and now produces a compile-time error. Use chained functional return types instead.
 
