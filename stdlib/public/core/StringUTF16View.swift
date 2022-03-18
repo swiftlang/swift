@@ -137,7 +137,7 @@ extension String.UTF16View: BidirectionalCollection {
   /// In an empty UTF-16 view, `endIndex` is equal to `startIndex`.
   @inlinable @inline(__always)
   public var endIndex: Index { return _guts.endIndex }
-
+  
   @inlinable @inline(__always)
   public func index(after idx: Index) -> Index {
     if _slowPath(_guts.isForeign) { return _foreignIndex(after: idx) }
@@ -149,6 +149,7 @@ extension String.UTF16View: BidirectionalCollection {
     // TODO: If transcoded is 1, can we just skip ahead 4?
 
     let idx = _utf16AlignNativeIndex(idx)
+
     let len = _guts.fastUTF8ScalarLength(startingAt: idx._encodedOffset)
     if len == 4 && idx.transcodedOffset == 0 {
       return idx.nextTranscoded
@@ -518,6 +519,105 @@ extension _StringGuts {
 }
 
 extension String.UTF16View {
+  
+  @inline(__always)
+  internal func _utf16Length<U: SIMD, S: SIMD>(
+    readPtr: inout UnsafeRawPointer,
+    endPtr: UnsafeRawPointer,
+    unsignedSIMDType: U.Type,
+    signedSIMDType: S.Type
+  ) -> Int where U.Scalar == UInt8, S.Scalar == Int8 {
+    var utf16Count = 0
+    
+    while readPtr + MemoryLayout<U>.stride < endPtr {
+      //Find the number of continuations (0b10xxxxxx)
+      let sValue = Builtin.loadRaw(readPtr._rawValue) as S
+      let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
+      let continuationCount = Int(continuations.wrappedSum())
+            
+      //Find the number of 4 byte code points (0b11110xxx)
+      let uValue = Builtin.loadRaw(readPtr._rawValue) as U
+      let fourBytes = U.zero.replacing(with: U.one, where: uValue .>= 0b11110000)
+      let fourByteCount = Int(fourBytes.wrappedSum())
+            
+      utf16Count &+= (U.scalarCount - continuationCount) + fourByteCount
+            
+      readPtr += MemoryLayout<U>.stride
+    }
+    
+    return utf16Count
+  }
+  
+  @inline(__always)
+  internal func _utf16Distance(from start: Index, to end: Index) -> Int {
+    _internalInvariant(end.transcodedOffset == 0 || end.transcodedOffset == 1)
+        
+    return (end.transcodedOffset - start.transcodedOffset) + _guts.withFastUTF8(
+      range: start._encodedOffset ..< end._encodedOffset
+    ) { utf8 in
+      let rawBuffer = UnsafeRawBufferPointer(utf8)
+      guard rawBuffer.count > 0 else { return 0 }
+      
+      var utf16Count = 0
+      var readPtr = rawBuffer.baseAddress.unsafelyUnwrapped
+      let initialReadPtr = readPtr
+      let endPtr = readPtr + rawBuffer.count
+      
+      //eat leading continuations
+      while readPtr < endPtr {
+        let byte = readPtr.load(as: UInt8.self)
+        if !UTF8.isContinuation(byte) {
+          break
+        }
+        readPtr += 1
+      }
+
+      // TODO: Currently, using SIMD sizes above SIMD8 is slower
+      // Once that's fixed we should go up to SIMD64 here
+      
+      utf16Count &+= _utf16Length(
+        readPtr: &readPtr,
+        endPtr: endPtr,
+        unsignedSIMDType: SIMD8<UInt8>.self,
+        signedSIMDType: SIMD8<Int8>.self
+      )
+   
+      //TO CONSIDER: SIMD widths <8 here
+      
+      //back up to the start of the current scalar if we may have a trailing
+      //incomplete scalar
+      if utf16Count > 0 && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
+        while readPtr > initialReadPtr && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
+          readPtr -= 1
+        }
+        
+        //The trailing scalar may be incomplete, subtract it out and check below
+        let byte = readPtr.load(as: UInt8.self)
+        let len = _utf8ScalarLength(byte)
+        utf16Count &-= len == 4 ? 2 : 1
+        if readPtr == initialReadPtr {
+          //if we backed up all the way and didn't hit a non-continuation, then
+          //we don't have any complete scalars, and we should bail.
+          return 0
+        }
+      }
+
+      //trailing bytes
+      while readPtr < endPtr {
+        let byte = readPtr.load(as: UInt8.self)
+        let len = _utf8ScalarLength(byte)
+        // if we don't have enough bytes left, we don't have a complete scalar,
+        // so don't add it to the count.
+        if readPtr + len <= endPtr {
+          utf16Count &+= len == 4 ? 2 : 1
+        }
+        readPtr += len
+      }
+
+      return utf16Count
+    }
+  }
+  
   @usableFromInline
   @_effects(releasenone)
   internal func _nativeGetOffset(for idx: Index) -> Int {
@@ -532,9 +632,7 @@ extension String.UTF16View {
     let idx = _utf16AlignNativeIndex(idx)
 
     guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
-      // TODO: Generic _distance is still very slow. We should be able to
-      // skip over ASCII substrings quickly
-      return _distance(from: startIndex, to: idx)
+      return _utf16Distance(from: startIndex, to: idx)
     }
 
     // Simple and common: endIndex aka `length`.
@@ -544,7 +642,8 @@ extension String.UTF16View {
     // Otherwise, find the nearest lower-bound breadcrumb and count from there
     let (crumb, crumbOffset) = breadcrumbsPtr.pointee.getBreadcrumb(
       forIndex: idx)
-    return crumbOffset + _distance(from: crumb, to: idx)
+    
+    return crumbOffset + _utf16Distance(from: crumb, to: idx)
   }
 
   @usableFromInline
