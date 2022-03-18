@@ -210,7 +210,7 @@ public:
   // sure not to hoist a destroy_addr into an access scope and by doing so cause
   // a deinit which had previously executed outside an access scope to start
   // executing within it--that could violate exclusivity.
-  llvm::SmallPtrSet<BeginAccessInst *, 8> barrierAccessScopes;
+  SmallPtrSet<BeginAccessInst *, 8> barrierAccessScopes;
 
   explicit DeinitBarriers(bool ignoreDeinitBarriers,
                           const KnownStorageUses &knownUses,

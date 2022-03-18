@@ -67,7 +67,7 @@ llvm::cl::opt<bool> SILDisableLateOMEByDefault(
         "Disable late OME for non-transparent functions by default"));
 
 llvm::cl::opt<bool>
-    EnableDestroyHoisting("enable-destroy-hoisting", llvm::cl::init(true),
+    EnableDestroyHoisting("enable-destroy-hoisting", llvm::cl::init(false),
                           llvm::cl::desc("Enable the DestroyHoisting pass."));
 
 //===----------------------------------------------------------------------===//
