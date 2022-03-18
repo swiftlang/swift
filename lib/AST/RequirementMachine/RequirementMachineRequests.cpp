@@ -243,6 +243,59 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
   return true;
 }
 
+/// Hack for GenericSignatureBuilder compatibility. We might end up with a
+/// same-type requirement between type parameters where one of them has an
+/// implied concrete type requirement. In this case, split it up into two
+/// concrete type requirements.
+static bool shouldSplitConcreteEquivalenceClass(Requirement req,
+                                                GenericSignature sig) {
+  return (req.getKind() == RequirementKind::SameType &&
+          req.getSecondType()->isTypeParameter() &&
+          sig->isConcreteType(req.getSecondType()));
+}
+
+static bool shouldSplitConcreteEquivalenceClasses(GenericSignature sig) {
+  for (auto req : sig.getRequirements()) {
+    if (shouldSplitConcreteEquivalenceClass(req, sig))
+      return true;
+  }
+
+  return false;
+}
+
+static GenericSignature splitConcreteEquivalenceClasses(
+    GenericSignature sig, ASTContext &ctx) {
+  SmallVector<Requirement, 2> reqs;
+
+  for (auto req : sig.getRequirements()) {
+    if (shouldSplitConcreteEquivalenceClass(req, sig)) {
+      auto canType = sig->getSugaredType(
+        sig.getCanonicalTypeInContext(
+          req.getSecondType()));
+
+      reqs.emplace_back(RequirementKind::SameType,
+                        req.getFirstType(),
+                        canType);
+      reqs.emplace_back(RequirementKind::SameType,
+                        req.getSecondType(),
+                        canType);
+    } else {
+      reqs.push_back(req);
+    }
+  }
+
+  SmallVector<GenericTypeParamType *, 2> genericParams;
+  genericParams.append(sig.getGenericParams().begin(),
+                       sig.getGenericParams().end());
+
+  return evaluateOrDefault(
+      ctx.evaluator,
+      AbstractGenericSignatureRequestRQM{
+        /*baseSignature=*/nullptr,
+        genericParams, reqs},
+      GenericSignatureWithError()).getPointer();
+}
+
 GenericSignatureWithError
 AbstractGenericSignatureRequestRQM::evaluate(
          Evaluator &evaluator,
@@ -391,8 +444,13 @@ AbstractGenericSignatureRequestRQM::evaluate(
   auto result = GenericSignature::get(genericParams, minimalRequirements);
   auto errorFlags = machine->getErrors();
 
-  if (!errorFlags)
+  if (!errorFlags) {
+    if (shouldSplitConcreteEquivalenceClasses(result))
+      result = splitConcreteEquivalenceClasses(result, ctx);
+
+    // Check invariants.
     result.verify();
+  }
 
   return GenericSignatureWithError(result, errorFlags);
 }
@@ -543,9 +601,13 @@ InferredGenericSignatureRequestRQM::evaluate(
 
   // FIXME: Handle allowConcreteGenericParams
 
-  // Check invariants.
-  if (!errorFlags)
+  if (!errorFlags) {
+    if (shouldSplitConcreteEquivalenceClasses(result))
+      result = splitConcreteEquivalenceClasses(result, ctx);
+
+    // Check invariants.
     result.verify();
+  }
 
   return GenericSignatureWithError(result, errorFlags);
 }
