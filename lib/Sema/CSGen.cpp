@@ -2627,8 +2627,7 @@ namespace {
               parentMetaType, enumPattern->getName(), memberType, CurDC,
               functionRefKind, {},
               CS.getConstraintLocator(locator,
-                                      {LocatorPathElt::PatternMatch(pattern),
-                                       ConstraintLocator::Member}));
+                                      LocatorPathElt::PatternMatch(pattern)));
 
           // Parent type needs to be convertible to the pattern type; this
           // accounts for cases where the pattern type is existential.
