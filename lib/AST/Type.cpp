@@ -4308,11 +4308,11 @@ operator()(CanType dependentType, Type conformingReplacementType,
 ProtocolConformanceRef MakeAbstractConformanceForGenericType::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
-  assert((conformingReplacementType->is<ErrorType>()
-          || conformingReplacementType->is<SubstitutableType>()
-          || conformingReplacementType->is<DependentMemberType>()
-          || conformingReplacementType->is<TypeVariableType>())
-         && "replacement requires looking up a concrete conformance");
+  assert((conformingReplacementType->is<ErrorType>() ||
+          conformingReplacementType->is<SubstitutableType>() ||
+          conformingReplacementType->is<DependentMemberType>() ||
+          conformingReplacementType->hasTypeVariable()) &&
+         "replacement requires looking up a concrete conformance");
   // A class-constrained archetype might conform to the protocol
   // concretely.
   if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {

@@ -38,6 +38,11 @@ void ExprTypeCheckCompletionCallback::sawSolutionImpl(
 
   Results.push_back(
       {ExpectedTy, ImplicitReturn, IsAsync, SolutionSpecificVarTypes});
+
+  if (auto PatternMatchType = getPatternMatchType(S, CompletionExpr)) {
+    Results.push_back(
+        {PatternMatchType, ImplicitReturn, IsAsync, SolutionSpecificVarTypes});
+  }
 }
 
 void ExprTypeCheckCompletionCallback::deliverResults(
@@ -46,9 +51,14 @@ void ExprTypeCheckCompletionCallback::deliverResults(
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
+  Lookup.shouldCheckForDuplicates(Results.size() > 1);
 
+  SmallVector<Type, 2> ExpectedTypes;
   for (auto &Result : Results) {
-    Lookup.setExpectedTypes(Result.ExpectedType,
+    ExpectedTypes.push_back(Result.ExpectedType);
+  }
+  for (auto &Result : Results) {
+    Lookup.setExpectedTypes(ExpectedTypes,
                             Result.IsImplicitSingleExpressionReturn);
     Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
     Lookup.setSolutionSpecificVarTypes(Result.SolutionSpecificVarTypes);

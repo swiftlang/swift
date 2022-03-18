@@ -67,7 +67,13 @@ public:
 
 // MARK: - Utility functions for subclasses of TypeCheckCompletionCallback
 
-Type getTypeForCompletion(const constraints::Solution &S, Expr *E);
+Type getTypeForCompletion(const constraints::Solution &S, ASTNode Node);
+
+/// If \p E occurs in a pattern matching position, returns the type that it is
+/// being pattern-matched against.
+/// If that type is an enum, it allows us to suggest the enum cases for the code
+/// completion expression \p E.
+Type getPatternMatchType(const constraints::Solution &S, Expr *E);
 
 /// Whether the given completion expression is the only expression in its
 /// containing closure or function body and its value is implicitly returned.

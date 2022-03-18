@@ -1396,7 +1396,9 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
                           CurDeclContext, CompletionContext, Consumer);
     return true;
   }
-  case CompletionKind::StmtOrExpr: {
+  case CompletionKind::StmtOrExpr:
+  case CompletionKind::ForEachSequence:
+  case CompletionKind::PostfixExprBeginning: {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
@@ -1539,17 +1541,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::KeyPathExprSwift:
   case CompletionKind::CallArg:
   case CompletionKind::StmtOrExpr:
+  case CompletionKind::ForEachSequence:
+  case CompletionKind::PostfixExprBeginning:
     llvm_unreachable("should be already handled");
     return;
-
-  case CompletionKind::ForEachSequence:
-  case CompletionKind::PostfixExprBeginning: {
-    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isImplicitSingleExpressionReturn());
-    DoPostfixExprBeginning();
-    break;
-  }
 
   case CompletionKind::PostfixExpr: {
     Lookup.setHaveLeadingSpace(HasSpace);

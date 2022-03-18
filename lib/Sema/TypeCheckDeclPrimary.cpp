@@ -1039,7 +1039,10 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   auto *initExpr = param->getStructuralDefaultExpr();
   assert(initExpr);
 
-  if (paramTy->hasError())
+  // If the param has an error type, there's no point type checking the default
+  // expression, unless we are type checking for code completion, in which case
+  // the default expression might contain the code completion token.
+  if (paramTy->hasError() && !ctx.CompletionCallback)
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
 
   auto *dc = param->getDefaultArgumentInitContext();

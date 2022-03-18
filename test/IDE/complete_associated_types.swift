@@ -341,9 +341,7 @@ struct A<T>: MyProto {
     }
 }
 // BROKEN_CONFORMANCE_UNASSIGNABLE: Begin completions
-// BROKEN_CONFORMANCE_UNASSIGNABLE-NOT: TypeRelation
 // BROKEN_CONFORMANCE_UNASSIGNABLE: Decl[InstanceMethod]/Super:         first()[#MyProto.Element#]; name=first()
-// BROKEN_CONFORMANCE_UNASSIGNABLE-NOT: TypeRelation
 // BROKEN_CONFORMANCE_UNASSIGNABLE: End completions
 
 // BROKEN_CONFORMANCE_ASSIGNABLE: Begin completions
