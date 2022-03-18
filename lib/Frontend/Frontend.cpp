@@ -92,9 +92,14 @@ CompilerInvocation::getMainInputFilenameForDebugInfoForAtMostOnePrimary()
       .MainInputFilenameForDebugInfo;
 }
 std::string
-CompilerInvocation::getClangHeaderOutputPathForAtMostOnePrimary() const {
+CompilerInvocation::getObjCHeaderOutputPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.ClangHeaderOutputPath;
+      .SupplementaryOutputs.ObjCHeaderOutputPath;
+}
+std::string
+CompilerInvocation::getCxxHeaderOutputPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.CxxHeaderOutputPath;
 }
 std::string CompilerInvocation::getModuleOutputPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()

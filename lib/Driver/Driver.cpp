@@ -1981,7 +1981,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
-        if (Ty == file_types::TY_ClangHeader) {
+        if (Ty == file_types::TY_ObjCHeader ||
+            Ty == file_types::TY_CXXHeader) {
           auto *HeaderInput = C.createAction<InputAction>(*A, Ty);
           StringRef PersistentPCHDir;
           if (const Arg *A = Args.getLastArg(options::OPT_pch_output_dir)) {
@@ -2064,7 +2065,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_LLVM_IR:
       case file_types::TY_LLVM_BC:
       case file_types::TY_SerializedDiagnostics:
-      case file_types::TY_ClangHeader:
+      case file_types::TY_ObjCHeader:
+      case file_types::TY_CXXHeader:
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:
       case file_types::TY_ExternalSwiftDeps:
@@ -3478,12 +3480,12 @@ void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
                                               StringRef workingDirectory,
                                               CommandOutput *Output) const {
 
-  if (hasExistingAdditionalOutput(*Output, file_types::TY_ClangHeader))
+  if (hasExistingAdditionalOutput(*Output, file_types::TY_ObjCHeader))
     return;
 
   StringRef ObjCHeaderPath;
   if (OutputMap) {
-    auto iter = OutputMap->find(file_types::TY_ClangHeader);
+    auto iter = OutputMap->find(file_types::TY_ObjCHeader);
     if (iter != OutputMap->end())
       ObjCHeaderPath = iter->second;
   }
@@ -3493,13 +3495,13 @@ void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
       ObjCHeaderPath = A->getValue();
 
   if (!ObjCHeaderPath.empty()) {
-    Output->setAdditionalOutputForType(file_types::TY_ClangHeader,
+    Output->setAdditionalOutputForType(file_types::TY_ObjCHeader,
                                        ObjCHeaderPath);
   } else {
     // Put the header next to the primary output file.
     // FIXME: That's not correct if the user /just/ passed -emit-header
     // and not -emit-module.
-    addAuxiliaryOutput(C, *Output, file_types::TY_ClangHeader,
+    addAuxiliaryOutput(C, *Output, file_types::TY_ObjCHeader,
                        /*output file map*/ nullptr, workingDirectory);
   }
 }
