@@ -914,6 +914,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         return CDeclA->Name.str();
       }
 
+    if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
+      return mangler.mangleDistributedThunk(cast<FuncDecl>(getDecl()));
+    }
+
     // Otherwise, fall through into the 'other decl' case.
     LLVM_FALLTHROUGH;
 
