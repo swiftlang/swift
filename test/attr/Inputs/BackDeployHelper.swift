@@ -31,63 +31,58 @@ public func v2APIsAreStripped() -> Bool {
 #endif // STRIP_V2_APIS
 }
 
+/// Describes types that can be appended to.
+public protocol Appendable {
+  associatedtype Element
+  mutating func append(_ x: Element)
+}
+
+/// Describes types that can be counted.
+public protocol Countable {
+  var count: Int { get }
+}
+
 public enum BadError: Error, Equatable {
   /// Indicates badness
   case bad
 }
 
-/// A totally unnecessary wrapper for `Int` that adds mutability.
-public struct MutableInt {
+
+/// A totally unnecessary array type for `Int` elements.
+public struct IntArray {
   @usableFromInline
-  internal var _value: Int
+  internal var _values: [Int]
 
-  public init(_ value: Int) { _value = value }
+  public init(_ values: [Int]) { _values = values }
 }
 
-/// A totally unnecessary wrapper for `Int` that provides reference semantics.
-public class ReferenceInt {
+extension IntArray: Appendable {
+  public mutating func append(_ x: Int) {
+    _values.append(x)
+  }
+}
+
+extension IntArray: Countable {
+  public var count: Int { _values.count }
+}
+
+
+/// A totally unnecessary array type for `Int` elements with reference semantics.
+public class ReferenceIntArray {
   @usableFromInline
-  internal var _value: Int
+  internal var _values: [Int]
 
-  public init(_ value: Int) { _value = value }
+  public init(_ values: [Int]) { _values = values }
 }
 
-/// Describes types that can be incremented.
-public protocol Incrementable {
-  associatedtype Operand
-
-  mutating func incrementByOne() -> String
-  mutating func increment(by amount: Operand) -> Operand
-}
-
-extension MutableInt: Incrementable {
-  public mutating func incrementByOne() -> String {
-    _value += 1
-    return String(_value)
-  }
-
-  public mutating func increment(by amount: Int) -> Int {
-    _value += amount
-    return _value
+extension ReferenceIntArray: Appendable {
+  public func append(_ x: Int) {
+    _values.append(x)
   }
 }
 
-extension ReferenceInt: Incrementable {
-  public func incrementByOne() -> String {
-    _value += 1
-    return String(_value)
-  }
-
-  public func increment(by amount: Int) -> Int {
-    _value += amount
-    return _value
-  }
-}
-
-extension Int {
-  @usableFromInline internal func byte(at index: Int) -> UInt8 {
-    UInt8(truncatingIfNeeded: self >> (index * 8))
-  }
+extension ReferenceIntArray: Countable {
+  public var count: Int { _values.count }
 }
 
 // MARK: - Back deployed APIs
@@ -109,87 +104,79 @@ public func pleaseThrow(_ shouldThrow: Bool) throws -> Bool {
 
 @available(BackDeploy 1.0, *)
 @_backDeploy(before: BackDeploy 2.0)
-public func genericIncrement<T: Incrementable>(
-  _ x: inout T,
-  by amount: T.Operand
-) -> T.Operand {
-  return x.increment(by: amount)
+public func genericAppend<T: Appendable>(
+  _ a: inout T,
+  _ x: T.Element
+) {
+  return a.append(x)
 }
 
 @available(BackDeploy 1.0, *)
 @_backDeploy(before: BackDeploy 2.0)
-public func existentialIncrementByOne(_ x: inout any Incrementable) {
-  testPrint(handle: #dsohandle, x.incrementByOne())
+public func existentialCount(_ c: any Countable) -> Int {
+  c.count
 }
 
-extension MutableInt {
+extension IntArray {
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
-  public var value: Int { _value }
+  public var values: [Int] { _values }
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
   public func print() {
-    // Tests recursive @_backDeploy since `value` is also @_backDeploy
-    testPrint(handle: #dsohandle, String(value))
+    // Tests recursive @_backDeploy since `values` is also @_backDeploy
+    testPrint(handle: #dsohandle, values.description)
   }
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
-  public static var zero: Self { MutableInt(0) }
+  public static var empty: Self { IntArray([]) }
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
-  public mutating func decrement(by amount: Int) -> Int {
-    _value -= amount
-    return _value
+  public func toCountable() -> any Countable { self }
+
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public subscript(_ i: Int) -> Int {
+    get { _values[i] }
+    _modify { yield &_values[i] }
   }
-
-  @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
-  public func toIncrementable() -> any Incrementable { self }
-
-  @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
-  public subscript(byteAt index: Int) -> UInt8 { _value.byte(at: index) }
 }
 
-extension ReferenceInt {
+extension ReferenceIntArray {
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
-  public final var value: Int { _value }
+  public final var values: [Int] { _values }
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
   public final func print() {
-    // Tests recursive use of back deployed APIs, since `value` is also
-    testPrint(handle: #dsohandle, String(value))
+    // Tests recursive @_backDeploy since `values` is also @_backDeploy
+    testPrint(handle: #dsohandle, values.description)
   }
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
-  public final func copy() -> ReferenceInt {
-    return ReferenceInt(value)
+  public final func copy() -> ReferenceIntArray {
+    return ReferenceIntArray(values)
   }
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
-  public final class var zero: ReferenceInt { ReferenceInt(0) }
+  public final class var empty: ReferenceIntArray { ReferenceIntArray([]) }
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
-  public final func decrement(by amount: Int) -> Int {
-    _value -= amount
-    return _value
+  public final func toCountable() -> any Countable { self }
+
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public final subscript(_ i: Int) -> Int {
+    get { _values[i] }
+    _modify { yield &_values[i] }
   }
-
-  @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
-  public final func toIncrementable() -> any Incrementable { self }
-
-  @available(BackDeploy 1.0, *)
-  @_backDeploy(before: BackDeploy 2.0)
-  public final subscript(byteAt index: Int) -> UInt8 { _value.byte(at: index) }
 }
 
 #endif // !STRIP_V2_APIS
