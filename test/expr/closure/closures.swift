@@ -341,6 +341,7 @@ class SomeClass {
   var field : SomeClass?
   var `class` : SomeClass?
   var `in`: Int = 0
+  var classRef: SomeClass = SomeClass()
   func foo() -> Int {}
 }
 
@@ -411,6 +412,13 @@ extension SomeClass {
 
     // expected-warning @+1 {{variable 'self' was written to, but never read}}
     doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
+
+    doStuff { classRef.foo() } // expected-error {{reference to property 'classRef' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-1{{reference 'self.' explicitly}} {{15-15=self.}}
+    // expected-note@-2{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
+    // expected-note@-3{{explicitly capture 'classRef' to capture reference in this closure}}{{14-14= [classRef] in}}
+  }
+
   func strong_in_capture_list() {
     // <rdar://problem/18819742> QOI: "[strong self]" in capture list generates unhelpful error message
     _ = {[strong self] () -> () in return }  // expected-error {{expected 'weak', 'unowned', or no specifier in capture list}}
