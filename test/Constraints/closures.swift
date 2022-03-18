@@ -443,6 +443,7 @@ class C_SR_2505 : P_SR_2505 {
     // Note: the diagnostic about capturing 'self', indicates that we have
     // selected test(_) rather than test(it:)
     return c.test { o in test(o) } // expected-error{{call to method 'test' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} expected-note{{reference 'self.' explicitly}}
+    //expected-note@-1{{explicitly capture 'test' to call method in this closure}}{{20-20= [test]}}
   }
 }
 
