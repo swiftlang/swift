@@ -182,8 +182,8 @@ struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
     substitutions.append(type)
   }
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
-    arguments.append(argument)
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {
+    arguments.append(argument.value)
   }
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
     self.errorType = type
@@ -343,8 +343,8 @@ func test() async throws {
   // CHECK: RETURN: bar
 
   var echoInvocation = system.makeInvocationEncoder()
-  try echoInvocation.recordArgument("Caplin")
-  try echoInvocation.recordArgument(42)
+  try echoInvocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: "Caplin"))
+  try echoInvocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
   try echoInvocation.doneRecording()
 
   var echoDecoder = echoInvocation.makeDecoder()
@@ -359,7 +359,7 @@ func test() async throws {
   var generic1Invocation = system.makeInvocationEncoder()
 
   try generic1Invocation.recordGenericSubstitution(Int.self)
-  try generic1Invocation.recordArgument(42)
+  try generic1Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
   try generic1Invocation.doneRecording()
 
   var generic1Decoder = generic1Invocation.makeDecoder()
@@ -376,8 +376,8 @@ func test() async throws {
 
   try generic2Invocation.recordGenericSubstitution(Int.self)
   try generic2Invocation.recordGenericSubstitution(String.self)
-  try generic2Invocation.recordArgument(42)
-  try generic2Invocation.recordArgument("Ultimate Question!")
+  try generic2Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
+  try generic2Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: "Ultimate Question!"))
   try generic2Invocation.doneRecording()
 
   var generic2Decoder = generic2Invocation.makeDecoder()
@@ -396,9 +396,9 @@ func test() async throws {
   try generic3Invocation.recordGenericSubstitution(Int.self)
   try generic3Invocation.recordGenericSubstitution(String.self)
   try generic3Invocation.recordGenericSubstitution(S<Int>.self)
-  try generic3Invocation.recordArgument(42)
-  try generic3Invocation.recordArgument(["a", "b", "c"])
-  try generic3Invocation.recordArgument(S(data: 42))
+  try generic3Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
+  try generic3Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: ["a", "b", "c"]))
+  try generic3Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: S(data: 42)))
   try generic3Invocation.doneRecording()
 
   var generic3Decoder = generic3Invocation.makeDecoder()
@@ -418,9 +418,9 @@ func test() async throws {
   try generic4Invocation.recordGenericSubstitution(Int.self)
   try generic4Invocation.recordGenericSubstitution(Int.self)
   try generic4Invocation.recordGenericSubstitution(String.self)
-  try generic4Invocation.recordArgument(42)
-  try generic4Invocation.recordArgument(S(data: 42))
-  try generic4Invocation.recordArgument(["a", "b", "c"])
+  try generic4Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
+  try generic4Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: S(data: 42)))
+  try generic4Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: ["a", "b", "c"]))
   try generic4Invocation.doneRecording()
 
   var generic4Decoder = generic4Invocation.makeDecoder()
@@ -441,10 +441,10 @@ func test() async throws {
   try generic5Invocation.recordGenericSubstitution(Int.self)
   try generic5Invocation.recordGenericSubstitution(String.self)
   try generic5Invocation.recordGenericSubstitution([Int].self)
-  try generic5Invocation.recordArgument(42)
-  try generic5Invocation.recordArgument(S(data: 42))
-  try generic5Invocation.recordArgument("Hello, World!")
-  try generic5Invocation.recordArgument([0, 42])
+  try generic5Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
+  try generic5Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: S(data: 42)))
+  try generic5Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: "Hello, World!"))
+  try generic5Invocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: [0, 42]))
   try generic5Invocation.doneRecording()
 
   var generic5Decoder = generic5Invocation.makeDecoder()
@@ -467,7 +467,7 @@ func test() async throws {
   var genericOptInvocation = system.makeInvocationEncoder()
 
   try genericOptInvocation.recordGenericSubstitution([Int].self)
-  try genericOptInvocation.recordArgument([0, 42])
+  try genericOptInvocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: [0, 42]))
   try genericOptInvocation.doneRecording()
 
   var genericOptDecoder = genericOptInvocation.makeDecoder()
@@ -482,7 +482,7 @@ func test() async throws {
 
   var decodeErrInvocation = system.makeInvocationEncoder()
 
-  try decodeErrInvocation.recordArgument(42)
+  try decodeErrInvocation.recordArgument(RemoteCallArgument(label: "argument-name", name: "argument-name", value: 42))
   try decodeErrInvocation.doneRecording()
 
   var decodeErrDecoder = decodeErrInvocation.makeDecoder()

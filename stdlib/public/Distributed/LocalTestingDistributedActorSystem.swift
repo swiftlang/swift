@@ -151,7 +151,7 @@ public struct LocalTestingInvocationEncoder: DistributedTargetInvocationEncoder 
     fatalError("Attempted to call encoder method in a local-only actor system")
   }
 
-  public mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
+  public mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {
     fatalError("Attempted to call encoder method in a local-only actor system")
   }
 

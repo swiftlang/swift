@@ -40,7 +40,7 @@ func test() async throws {
 
   let r1 = try await ref.generic("Caplin")
   // CHECK: > encode generic sub: Swift.String
-  // CHECK: > encode argument: Caplin
+  // CHECK: > encode argument name:_, value: Caplin
   // CHECK: > encode return type: Swift.String
   // CHECK: > done recording
   // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.generic(_:), invocation:FakeInvocationEncoder(genericSubs: [Swift.String], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
@@ -54,9 +54,9 @@ func test() async throws {
   )
   // CHECK: > encode generic sub: Swift.String
   // CHECK: > encode generic sub: Swift.Int
-  // CHECK: > encode argument: 2.0
-  // CHECK: > encode argument: Caplin
-  // CHECK: > encode argument: [1, 2, 3]
+  // CHECK: > encode argument name:strict, value: 2.0
+  // CHECK: > encode argument name:_, value: Caplin
+  // CHECK: > encode argument name:_, value: [1, 2, 3]
   // CHECK: > encode return type: Swift.String
   // CHECK: > done recording
   // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.generic2(strict:_:_:), invocation:FakeInvocationEncoder(genericSubs: [Swift.String, Swift.Int], arguments: [2.0, "Caplin", [1, 2, 3]], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String

@@ -101,11 +101,11 @@ final class FakeActorSystem: DistributedActorSystem {
 
 }
 
-class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+final class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
   func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   func recordErrorType<E: Error>(_ type: E.Type) throws {}
   func doneRecording() throws {}

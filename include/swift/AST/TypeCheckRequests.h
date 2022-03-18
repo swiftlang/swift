@@ -1210,9 +1210,28 @@ public:
     bool isCached() const { return true; }
 };
 
-/// Obtain the constructor of the RemoteCallTarget type.
+/// Obtain the constructor of the 'RemoteCallTarget' type.
 class GetDistributedRemoteCallTargetInitFunctionRequest :
     public SimpleRequest<GetDistributedRemoteCallTargetInitFunctionRequest,
+                         ConstructorDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ConstructorDecl *evaluate(Evaluator &evaluator,
+                            NominalTypeDecl *nominal) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the constructor of the 'RemoteCallArgument' type.
+class GetDistributedRemoteCallArgumentInitFunctionRequest :
+    public SimpleRequest<GetDistributedRemoteCallArgumentInitFunctionRequest,
                          ConstructorDecl *(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:
