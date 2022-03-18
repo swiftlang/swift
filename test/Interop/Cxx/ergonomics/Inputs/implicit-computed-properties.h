@@ -39,15 +39,15 @@ struct LongNameAllUpper {
 };
 
 struct UpperCaseMix {
-    mutable int value = 42;
-    int getFoo() const { return value; }
-    void SetFoo(int v) { value = v; }
+  mutable int value = 42;
+  int getFoo() const { return value; }
+  void SetFoo(int v) { value = v; }
 };
 
 struct UpperCaseGetterSetter {
-    mutable int value = 42;
-    int GetFoo() const { return value; }
-    void SetFoo(int v) { value = v; }
+  mutable int value = 42;
+  int GetFoo() const { return value; }
+  void SetFoo(int v) { value = v; }
 };
 
 struct GetterOnly {
@@ -189,6 +189,18 @@ class PrivatePropertyWithSameName {
 public:
   int getValue() const;
   void setValue(int i);
+};
+
+struct SnakeCaseGetterSetter {
+  mutable int value;
+  int get_foo() const { return value; }
+  void set_foo(int v) { value = v; }
+};
+
+struct SnakeCaseUTF8Str {
+  mutable int value;
+  int get_utf8_string() const { return value; }
+  void set_utf8_string(int v) { value = v; }
 };
 
 #endif // SWIFT_IMPLICIT_COMPUTED_PROPERTIES_H

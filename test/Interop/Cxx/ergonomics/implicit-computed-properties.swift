@@ -79,4 +79,18 @@ ImplicitComputedPropertiesTestSuite.test("non trivial") {
     expectEqual(Object.x.value, 20)
 }
 
+ImplicitComputedPropertiesTestSuite.test("SnakeCaseGetterSetter") {
+    var object = SnakeCaseGetterSetter()
+    expectEqual(object.foo, 42)
+    object.foo = 32
+    expectEqual(object.foo, 32)
+}
+
+ImplicitComputedPropertiesTestSuite.test("SnakeCaseUTF8Str") {
+    var object = SnakeCaseUTF8Str()
+    expectEqual(object.utf8string, 42)
+    object.utf8string = 32
+    expectEqual(object.utf8string, 32)
+}
+
 runAllTests()
