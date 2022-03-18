@@ -47,6 +47,8 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S, Expr *E) {
 
   auto &CS = S.getConstraintSystem();
 
+  Type Result;
+
   // To aid code completion, we need to attempt to convert type placeholders
   // back into underlying generic parameters if possible, since type
   // of the code completion expression is used as "expected" (or contextual)
@@ -70,7 +72,7 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S, Expr *E) {
       return type;
     });
 
-    return S.simplifyType(completionTy.transform([&](Type type) {
+    Result = S.simplifyType(completionTy.transform([&](Type type) {
       if (auto *placeholder = type->getAs<PlaceholderType>()) {
         if (auto *typeVar =
                 placeholder->getOriginator().dyn_cast<TypeVariableType *>()) {
@@ -88,9 +90,17 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S, Expr *E) {
 
       return type;
     }));
+  } else {
+    Result = S.getResolvedType(E);
   }
 
-  return S.getResolvedType(E);
+  if (!Result || Result->is<UnresolvedType>()) {
+    Result = CS.getContextualType(E, /*forConstraint=*/false);
+  }
+  if (Result && Result->is<UnresolvedType>()) {
+    Result = Type();
+  }
+  return Result;
 }
 
 bool swift::ide::isImplicitSingleExpressionReturn(ConstraintSystem &CS,

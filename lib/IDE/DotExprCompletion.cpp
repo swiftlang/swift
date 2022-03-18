@@ -55,7 +55,7 @@ void DotExprTypeCheckCompletionCallback::sawSolution(
   // If base type couldn't be determined (e.g. because base expression
   // is an invalid reference), let's not attempt to do a lookup since
   // it wouldn't produce any useful results anyway.
-  if (!BaseTy || BaseTy->getRValueType()->is<UnresolvedType>())
+  if (!BaseTy)
     return;
 
   auto *Locator = CS.getConstraintLocator(SemanticExpr);

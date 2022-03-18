@@ -89,7 +89,7 @@ void UnresolvedMemberTypeCheckCompletionCallback::sawSolution(
   // If the type couldn't be determined (e.g. because there isn't any context
   // to derive it from), let's not attempt to do a lookup since it wouldn't
   // produce any useful results anyway.
-  if (ExpectedTy && !ExpectedTy->is<UnresolvedType>()) {
+  if (ExpectedTy) {
     // If ExpectedTy is a duplicate of any other result, ignore this solution.
     if (!llvm::any_of(ExprResults, [&](const ExprResult &R) {
           return R.ExpectedTy->isEqual(ExpectedTy);

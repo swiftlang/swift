@@ -25,18 +25,7 @@ void ExprTypeCheckCompletionCallback::sawSolution(
 
   auto &CS = S.getConstraintSystem();
 
-  // Prefer to get the expected type as the completion expression's contextual
-  // type. If that fails (because there is no explicit contextual type spelled
-  // out in the source), the code completion expression will have been
-  // type-checked to its expected contextual type.
-  Type ExpectedTy =
-      CS.getContextualType(CompletionExpr, /*forConstraint=*/false);
-  if (!ExpectedTy) {
-    ExpectedTy = S.getResolvedType(CompletionExpr);
-  }
-  if (ExpectedTy->hasUnresolvedType()) {
-    ExpectedTy = Type();
-  }
+  Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
   bool ImplicitReturn = isImplicitSingleExpressionReturn(CS, CompletionExpr);
 

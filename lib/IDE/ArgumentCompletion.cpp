@@ -94,9 +94,6 @@ void ArgumentTypeCheckCompletionCallback::sawSolution(const Solution &S) {
   TypeCheckCompletionCallback::sawSolution(S);
 
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
-  if (!ExpectedTy) {
-    return;
-  }
 
   auto &CS = S.getConstraintSystem();
 
