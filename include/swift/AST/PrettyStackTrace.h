@@ -69,6 +69,19 @@ public:
   virtual void print(llvm::raw_ostream &OS) const override;
 };
 
+/// PrettyStackTraceDecl - Observe that we are processing a specific
+/// declaration with a given substitution map.
+class PrettyStackTraceDeclAndSubst : public llvm::PrettyStackTraceEntry {
+  const Decl *decl;
+  SubstitutionMap subst;
+  const char *action;
+public:
+  PrettyStackTraceDeclAndSubst(const char *action, SubstitutionMap subst,
+                       const Decl *decl)
+      : decl(decl), subst(subst), action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const override;
+};
+
 /// PrettyStackTraceAnyFunctionRef - Observe that we are processing a specific
 /// function or closure literal.
 class PrettyStackTraceAnyFunctionRef : public llvm::PrettyStackTraceEntry {

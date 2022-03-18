@@ -8,6 +8,51 @@ This document provides an overview of the status of the Swift and C++ interopera
 Swift has the experimental ability to import a large subset of C++.
 This section of the document describes which C++ language and standard library features can be imported and used from Swift in an experimental manner.
 
+### Example
+The following example demonstrates several interop features. It compiles and runs on main.
+
+```C++
+// cxx-types.h (mapped to CxxTypes module in module.modulemap)
+#include <algorithm>
+#include <vector>
+
+using V = std::vector<long>;
+```
+
+```Swift
+// main.swift
+import CxxTypes
+import std.vector
+import std.algorithm
+
+// We can extend C++ types in Swift.
+extension V : RandomAccessCollection {
+  public var startIndex: Int { 0 }
+  public var endIndex: Int { size() }
+}
+
+// Create a vector with some data.
+var numbers = V(4)
+std.fill(numbers.beginMutating(), numbers.endMutating(), 41)
+
+// Transform it using C++.
+std.transform(numbers.beginMutating(), numbers.endMutating(),
+              numbers.beginMutating()) { (element: Int) in
+  return element + 1
+}
+
+// Loop over it in Swift.
+for (index, element) in numbers.enumerated() {
+  print("v[\(index)] = \(element)")
+}
+
+// We can also use anything in RandomAccessCollection, such as map and zip.
+let strings = numbers.map { "\($0)" }
+for (s, n) in zip(strings, numbers) {
+  print("\(s) = \(n)")
+}
+```
+
 ### Importing C++
 
 There are currently two experimental ways to import C++ into Swift:
