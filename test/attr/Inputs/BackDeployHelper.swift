@@ -95,20 +95,20 @@ extension Int {
 #if !STRIP_V2_APIS
 
 @available(BackDeploy 1.0, *)
-@_backDeploy(BackDeploy 2.0)
+@_backDeploy(before: BackDeploy 2.0)
 public func trivial() {
   testPrint(handle: #dsohandle, "trivial")
 }
 
 @available(BackDeploy 1.0, *)
-@_backDeploy(BackDeploy 2.0)
+@_backDeploy(before: BackDeploy 2.0)
 public func pleaseThrow(_ shouldThrow: Bool) throws -> Bool {
   if shouldThrow { throw BadError.bad }
   return !shouldThrow
 }
 
 @available(BackDeploy 1.0, *)
-@_backDeploy(BackDeploy 2.0)
+@_backDeploy(before: BackDeploy 2.0)
 public func genericIncrement<T: Incrementable>(
   _ x: inout T,
   by amount: T.Operand
@@ -117,78 +117,78 @@ public func genericIncrement<T: Incrementable>(
 }
 
 @available(BackDeploy 1.0, *)
-@_backDeploy(BackDeploy 2.0)
+@_backDeploy(before: BackDeploy 2.0)
 public func existentialIncrementByOne(_ x: inout any Incrementable) {
   testPrint(handle: #dsohandle, x.incrementByOne())
 }
 
 extension MutableInt {
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public var value: Int { _value }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public func print() {
     // Tests recursive @_backDeploy since `value` is also @_backDeploy
     testPrint(handle: #dsohandle, String(value))
   }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public static var zero: Self { MutableInt(0) }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public mutating func decrement(by amount: Int) -> Int {
     _value -= amount
     return _value
   }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public func toIncrementable() -> any Incrementable { self }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public subscript(byteAt index: Int) -> UInt8 { _value.byte(at: index) }
 }
 
 extension ReferenceInt {
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public final var value: Int { _value }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public final func print() {
     // Tests recursive use of back deployed APIs, since `value` is also
     testPrint(handle: #dsohandle, String(value))
   }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public final func copy() -> ReferenceInt {
     return ReferenceInt(value)
   }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public final class var zero: ReferenceInt { ReferenceInt(0) }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public final func decrement(by amount: Int) -> Int {
     _value -= amount
     return _value
   }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public final func toIncrementable() -> any Incrementable { self }
 
   @available(BackDeploy 1.0, *)
-  @_backDeploy(BackDeploy 2.0)
+  @_backDeploy(before: BackDeploy 2.0)
   public final subscript(byteAt index: Int) -> UInt8 { _value.byte(at: index) }
 }
 

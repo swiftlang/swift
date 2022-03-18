@@ -39,7 +39,7 @@
 // -- Original definition of genericFunc()
 // CHECK-LABEL: sil [serialized] [available 10.51] [ossa] @$s11back_deploy11genericFuncyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 @available(macOS 10.51, *)
-@_backDeploy(macOS 10.52)
+@_backDeploy(before: macOS 10.52)
 public func genericFunc<T>(_ t: T) -> T {
   return t
 }

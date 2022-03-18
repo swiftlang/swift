@@ -2660,7 +2660,7 @@ class SR12801 {
 
 public class BackDeployClass {
   @available(macOS 11.0, *)
-  @_backDeploy(macOS 12.0)
+  @_backDeploy(before: macOS 12.0)
   @objc // expected-error {{'@objc' cannot be applied to a back deployed instance method}}
   final public func objcMethod() {}
 }
