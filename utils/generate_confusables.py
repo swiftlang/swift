@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 # utils/update_confusables.py - Utility to update definitions of unicode
 # confusables

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # utils/apply-fixit-edits.py - Apply edits from .remap files -*- python -*-
 #
 # This source file is part of the Swift.org open source project

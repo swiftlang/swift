@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # make-old.py - /bin/touch that writes a constant "old" timestamp.
 #

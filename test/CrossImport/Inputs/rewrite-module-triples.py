@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Renames files or directories with "module-triple-here" in their names to use
 the indicated module triples instead.
