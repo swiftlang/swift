@@ -429,11 +429,10 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   {
     // --- Mangle the thunk name
     Mangle::ASTMangler mangler;
-    auto symbolKind = swift::Mangle::ASTMangler::SymbolKind::DistributedThunk;
-    auto mangled = C.AllocateCopy(mangler.mangleEntity(thunk, symbolKind));
-    StringRef mangledTargetStringRef = StringRef(mangled);
-    auto mangledTargetStringLiteral = new (C)
-        StringLiteralExpr(mangledTargetStringRef, SourceRange(), implicit);
+    auto mangled =
+        C.AllocateCopy(mangler.mangleDistributedThunk(cast<FuncDecl>(thunk)));
+    auto mangledTargetStringLiteral =
+        new (C) StringLiteralExpr(mangled, SourceRange(), implicit);
 
     // --- let target = RemoteCallTarget(<mangled name>)
     targetVar->setInterfaceType(remoteCallTargetTy);

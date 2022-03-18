@@ -122,6 +122,10 @@ public:
                               ArrayRef<Requirement> requirements,
                               bool isKnownCanonical = false);
 
+  /// Produce a new generic signature which drops all of the marker
+  /// protocol conformance requirements associated with this one.
+  GenericSignature withoutMarkerProtocols() const;
+
 public:
   static ASTContext &getASTContext(TypeArrayView<GenericTypeParamType> params,
                                    ArrayRef<Requirement> requirements);

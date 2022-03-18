@@ -19,6 +19,9 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
+protocol SomeProtocol {}
+extension String: SomeProtocol {}
+
 distributed actor Greeter {
   distributed func noParams() {}
   distributed func noParamsThrows() throws {}
@@ -28,9 +31,9 @@ distributed actor Greeter {
   distributed func oneLabel(value: String, _ value2: String, _ value3: String) {}
   distributed func parameterSingle(first: String) {}
   distributed func parameterPair(first: String, second: Int) {}
-  // FIXME(distributed): rdar://90293494 fails to get
-//  distributed func generic<A: Codable & Sendable>(first: A) {}
-//  distributed func genericNoLabel<A: Codable & Sendable>(_ first: A) {}
+  distributed func generic<A: Codable & Sendable>(first: A) {}
+  distributed func genericThree<A: Codable & Sendable & SomeProtocol>(first: A) {}
+  distributed func genericThreeTwo<A: Codable & Sendable, B: Codable & SomeProtocol>(first: A, second: B) {}
 }
 extension Greeter {
   distributed func parameterTriple(first: String, second: Int, third: Double) {}
@@ -65,9 +68,14 @@ func test() async throws {
   _ = try await greeter.parameterTriple(first: "X", second: 2, third: 3.0)
   // CHECK: >> remoteCallVoid: on:main.Greeter, target:main.Greeter.parameterTriple(first:second:third:)
 
-  // FIXME: rdar://90293494 seems to fail getting the substitutions?
-//  _ = try await greeter.generic(first: "X")
-//  // TODO: >> remoteCallVoid: on:main.Greeter, target:main.Greeter.parameterTriple(first:second:third:)
+  _ = try await greeter.generic(first: "X")
+  // CHECK: >> remoteCallVoid: on:main.Greeter, target:main.Greeter.generic(first:)
+
+  _ = try await greeter.genericThree(first: "X")
+  // CHECK: >> remoteCallVoid: on:main.Greeter, target:main.Greeter.genericThree(first:)
+
+  _ = try await greeter.genericThreeTwo(first: "X", second: "SecondValue")
+  // CHECK: >> remoteCallVoid: on:main.Greeter, target:main.Greeter.genericThreeTwo(first:second:)
 
   print("done")
   // CHECK: done
@@ -75,6 +83,10 @@ func test() async throws {
 
 @main struct Main {
   static func main() async {
-    try! await test()
+    do {
+      try await test()
+    } catch {
+      print("ERROR: \(error)")
+    }
   }
 }
