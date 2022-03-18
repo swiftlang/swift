@@ -788,8 +788,7 @@ namespace {
       CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (CS.isArgumentIgnoredForCodeCompletion(
-              CS.getConstraintLocator(expr))) {
+      if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         return {false, expr};
       }
 
@@ -3648,8 +3647,7 @@ namespace {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       auto &CS = CG.getConstraintSystem();
 
-      if (CS.isArgumentIgnoredForCodeCompletion(
-              CS.getConstraintLocator(expr))) {
+      if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         CG.setTypeForArgumentIgnoredForCompletion(expr);
         return {false, expr};
       }
@@ -3724,8 +3722,7 @@ namespace {
         SmallVector<Expr *, 2> ignoredArgs;
         getArgumentsAfterCodeCompletionToken(expr, CS, ignoredArgs);
         for (auto ignoredArg : ignoredArgs) {
-          CS.markArgumentIgnoredForCodeCompletion(
-              CS.getConstraintLocator(ignoredArg));
+          CS.markArgumentIgnoredForCodeCompletion(ignoredArg);
         }
       }
 
