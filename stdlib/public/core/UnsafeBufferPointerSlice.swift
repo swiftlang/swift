@@ -11,29 +11,6 @@
 
 extension Slice where Base == UnsafeMutableRawBufferPointer {
 
-  /// Copies the bytes from the given buffer to this buffer slice's memory.
-  ///
-  /// If the `source.count` bytes of memory referenced by this buffer are bound
-  /// to a type `T`, then `T` must be a trivial type, the underlying pointer
-  /// must be properly aligned for accessing `T`, and `source.count` must be a
-  /// multiple of `MemoryLayout<T>.stride`.
-  ///
-  /// The memory referenced by `source` may overlap with the memory referenced
-  /// by this buffer.
-  ///
-  /// After calling `copyMemory(from:)`, the first `source.count` bytes of
-  /// memory referenced by this buffer are initialized to raw bytes. If the
-  /// memory is bound to type `T`, then it contains values of type `T`.
-  ///
-  /// - Parameter source: A buffer of raw bytes. `source.count` must
-  ///   be less than or equal to this buffer slice's `count`.
-  @inlinable
-  @_alwaysEmitIntoClient
-  func copyMemory(from source: UnsafeRawBufferPointer) {
-    let buffer = Base(rebasing: self)
-    buffer.copyMemory(from: source)
-  }
-
   /// Copies from a collection of `UInt8` into this buffer slice's memory.
   ///
   /// If the `source.count` bytes of memory referenced by this buffer are bound
