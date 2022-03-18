@@ -259,7 +259,10 @@ public:
   StackAllocator() : firstSlab(nullptr), firstSlabIsPreallocated(false) { }
 
   /// Construct a StackAllocator with a pre-allocated first slab.
-  StackAllocator(void *firstSlabBuffer, size_t bufferCapacity) {
+  StackAllocator(void *firstSlabBuffer, size_t bufferCapacity) : StackAllocator() {
+    // If the pre-allocated buffer can't hold a slab header, ignore it.
+    if (bufferCapacity <= Slab::headerSize())
+      return;
     char *start = (char *)llvm::alignAddr(firstSlabBuffer,
                                           llvm::Align(alignment));
     char *end = (char *)firstSlabBuffer + bufferCapacity;
