@@ -4255,6 +4255,7 @@ public:
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
+                           proto->getExistentialType(),
                            /*isAlias=*/false)
             .limitBehavior(DiagnosticBehavior::Warning)
             .fixItReplace(replaceRepr->getSourceRange(), fix);
@@ -4274,6 +4275,7 @@ public:
           Ctx.Diags.diagnose(comp->getNameLoc(),
                              diag::existential_requires_any,
                              alias->getDeclaredInterfaceType(),
+                             ExistentialType::get(alias->getDeclaredInterfaceType()),
                              /*isAlias=*/true)
               .limitBehavior(DiagnosticBehavior::Warning)
               .fixItReplace(replaceRepr->getSourceRange(), fix);

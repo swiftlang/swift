@@ -805,7 +805,7 @@ do {
     let _: any Class<Struct<Bool>.Inner> & ConcreteAssocTypes =
       arg[
         // FIXME: Sema thinks (any ConcreteAssocTypes).self is a function ref.
-        // expected-warning@+1 {{protocol 'ConcreteAssocTypes' as a type must be explicitly marked as 'any'}}
+        // expected-warning@+1 {{use of protocol 'ConcreteAssocTypes' as a type must be written 'any ConcreteAssocTypes'}}
         subscript4: Struct<Bool>(), ConcreteAssocTypes.self, { true }
       ]
   }
