@@ -552,7 +552,7 @@ func f270_convOptAnyStruct(_ a1: @escaping (AnyStruct?) -> AnyStruct) {
 
 // f270_convOptAnyStruct continued Test: reabstraction thunk helper
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$ss9AnyStructVSgABIegnr_A2CIegnr_TR : $@convention(thin) (@in_guaranteed Optional<AnyStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct> {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss9AnyStructVSgABIegnr_A2CIegnr_TR : $@convention(thin) (@in_guaranteed Optional<AnyStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct> {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Optional<AnyStruct>, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct):
 // HECK:   [[APPLYARG:%.*]] = apply [[ARG1]]([[ARG0]]) : $@callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct
 // HECK:   [[RETVAL:%.*]] = enum $Optional<AnyStruct>, #Optional.some!enumelt, [[APPLYARG]] : $AnyStruct
@@ -575,7 +575,7 @@ func f280_convExistTrivial(_ s: @escaping (P) -> TrivialStruct) {
 
 // part of f280_convExistTrivial: conversion between existential types - reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$ss1P_ps13TrivialStructVIegnd_s2P2_psAD_pIegnr_TR : $@convention(thin) (@in_guaranteed P2, @guaranteed @callee_guaranteed (@in_guaranteed P) -> TrivialStruct) -> @out P2 {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss1P_ps13TrivialStructVIegnd_s2P2_psAD_pIegnr_TR : $@convention(thin) (@in_guaranteed P2, @guaranteed @callee_guaranteed (@in_guaranteed P) -> TrivialStruct) -> @out P2 {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $P2, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed P) -> TrivialStruct):
 // HECK:   [[OPENED_ARG:%.*]] = open_existential_value [[ARG]] : $P2 to $@opened({{.*}}) P2
 // HECK:   [[COPIED_VAL:%.*]] = copy_value [[OPENED_ARG]]
@@ -604,7 +604,7 @@ func f290_convOptExistTriv(_ s: @escaping (P?) -> TrivialStruct) {
 
 // part of f290_convOptExistTriv: conversion between existential types - reabstraction thunk - optionals case
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$ss1P_pSgs13TrivialStructVIegnd_ADSgs2P2_pIegyr_TR : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<P>) -> TrivialStruct) -> @out P2 {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss1P_pSgs13TrivialStructVIegnd_ADSgs2P2_pIegyr_TR : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<P>) -> TrivialStruct) -> @out P2 {
 // CHECK: bb0([[ARG0:%.*]] : $Optional<TrivialStruct>, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Optional<P>) -> TrivialStruct):
 // HECK:   switch_enum [[ARG0]] : $Optional<TrivialStruct>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // HECK: bb1:
@@ -637,7 +637,7 @@ func f300_convETupleToAny(_ t: @escaping () -> ()) {
 
 // f300_convETupleToAny continued Test: reabstraction of () to Any
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sIeg_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out Any {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIeg_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed () -> ()):
 // HECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // HECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $()
@@ -663,7 +663,7 @@ func f310_convnIntTupleAny(_ t: @escaping () -> (Builtin.Int64, Builtin.Int64)) 
 
 // f310_convIntTupleAny continued Test: reabstraction of non-empty tuple to Any
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sBi64_Bi64_Iegdd_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Builtin.Int64, Builtin.Int64)) -> @out Any {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBi64_Bi64_Iegdd_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Builtin.Int64, Builtin.Int64)) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed () -> (Builtin.Int64, Builtin.Int64)):
 // HECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // HECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Builtin.Int64, Builtin.Int64)
@@ -696,7 +696,7 @@ func f320_transImplodeAny(_ t: @escaping (Any) -> ()) {
 
 // f320_transImplodeAny continued Test: reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sypIegn_Bi64_Bi64_Iegyy_TR : $@convention(thin) (Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in_guaranteed Any) -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sypIegn_Bi64_Bi64_Iegyy_TR : $@convention(thin) (Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in_guaranteed Any) -> ()) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $Builtin.Int64, [[ARG1:%.*]] : $Builtin.Int64, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Any) -> ()):
 // HECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // HECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Builtin.Int64, Builtin.Int64)
