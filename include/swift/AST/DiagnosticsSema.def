@@ -4733,8 +4733,8 @@ ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))
 ERROR(existential_requires_any,none,
-      "%select{protocol |}1%0 as a type must be explicitly marked as 'any'",
-      (Type, bool))
+      "use of %select{protocol |}2%0 as a type must be written %1",
+      (Type, Type, bool))
 
 ERROR(nonisolated_let,none,
       "'nonisolated' is meaningless on 'let' declarations because "

@@ -433,7 +433,8 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
         if (isa<AssociatedTypeDecl>(typeDecl) ||
             (isa<TypeAliasDecl>(typeDecl) &&
-             !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
+             !cast<TypeAliasDecl>(typeDecl)->isGeneric() &&
+             !isSpecialized)) {
           if (getStage() == TypeResolutionStage::Structural) {
             return DependentMemberType::get(selfType, typeDecl->getName());
           } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
@@ -4254,6 +4255,7 @@ public:
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
+                           proto->getExistentialType(),
                            /*isAlias=*/false)
             .limitBehavior(DiagnosticBehavior::Warning)
             .fixItReplace(replaceRepr->getSourceRange(), fix);
@@ -4273,6 +4275,7 @@ public:
           Ctx.Diags.diagnose(comp->getNameLoc(),
                              diag::existential_requires_any,
                              alias->getDeclaredInterfaceType(),
+                             ExistentialType::get(alias->getDeclaredInterfaceType()),
                              /*isAlias=*/true)
               .limitBehavior(DiagnosticBehavior::Warning)
               .fixItReplace(replaceRepr->getSourceRange(), fix);
