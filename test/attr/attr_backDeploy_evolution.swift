@@ -32,6 +32,9 @@
 // REQUIRES: executable_test
 // REQUIRES: VENDOR=apple
 
+// rdar://90525337
+// UNSUPPORTED: swift_test_mode_optimize
+
 // ---- (0) Prepare SDK
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/SDK_ABI)
