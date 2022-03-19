@@ -5466,7 +5466,12 @@ public:
 
   bool shouldPrintWithAny() const { return PrintWithAny; }
 
-  void forcePrintWithAny(bool value) { PrintWithAny = value; }
+  void forcePrintWithAny(llvm::function_ref<void(Type)> print) {
+    bool oldValue = PrintWithAny;
+    PrintWithAny = true;
+    print(this);
+    PrintWithAny = oldValue;
+  }
 
   bool requiresClass() const {
     if (auto protocol = ConstraintType->getAs<ProtocolType>())

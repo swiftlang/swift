@@ -5632,38 +5632,30 @@ public:
     }
 
     Type instanceType = T->getInstanceType();
-    bool didPrintInstanceType = false;
-    if (Options.PrintExplicitAny) {
-      if (T->is<ExistentialMetatypeType>()) {
-        Printer << "any ";
+    if (Options.PrintExplicitAny && T->is<ExistentialMetatypeType>()) {
+      Printer << "any ";
 
-        // FIXME: We need to replace nested existential metatypes so that
-        // we don't print duplicate 'any'. This will be unnecessary once
-        // ExistentialMetatypeType is split into ExistentialType(MetatypeType).
-        instanceType = Type(instanceType).transform([](Type type) -> Type {
-          if (auto existential = type->getAs<ExistentialMetatypeType>())
-            return MetatypeType::get(existential->getInstanceType());
+      // FIXME: We need to replace nested existential metatypes so that
+      // we don't print duplicate 'any'. This will be unnecessary once
+      // ExistentialMetatypeType is split into ExistentialType(MetatypeType).
+      printWithParensIfNotSimple(instanceType.transform([](Type type) -> Type {
+        if (auto existential = type->getAs<ExistentialMetatypeType>())
+          return MetatypeType::get(existential->getInstanceType());
 
-          return type;
-        });
-      } else if (auto existential = instanceType->getAs<ExistentialType>()) {
-        // The 'any' keyword is needed to distinguish between existential
-        // metatypes and singleton metatypes. However, 'any' usually isn't
-        // printed for Any and AnyObject, because it's unnecessary to write
-        // 'any' with these specific constraints. Set a bit on the existential
-        // type to force printing with 'any' for metatypes. This bit doesn't
-        // matter for anything other than printing.
-        if (!existential->shouldPrintWithAny()) {
-          existential->forcePrintWithAny(true);
-          printWithParensIfNotSimple(existential);
-          existential->forcePrintWithAny(false);
-          didPrintInstanceType = true;
-        }
-      }
-    }
-
-    if (!didPrintInstanceType)
+        return type;
+      }));
+    } else if (T->is<MetatypeType>() && instanceType->is<ExistentialType>()) {
+      // The 'any' keyword is needed to distinguish between existential
+      // metatypes and singleton metatypes. However, 'any' usually isn't
+      // printed for Any and AnyObject, because it's unnecessary to write
+      // 'any' with these specific constraints. Force printing with 'any'
+      // for the existential instance type in this case.
+      instanceType->getAs<ExistentialType>()->forcePrintWithAny([&](Type ty) {
+        printWithParensIfNotSimple(ty);
+      });
+    } else {
       printWithParensIfNotSimple(instanceType);
+    }
 
     // We spell normal metatypes of existential types as .Protocol.
     if (isa<MetatypeType>(T) &&
