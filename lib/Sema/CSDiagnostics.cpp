@@ -421,7 +421,7 @@ bool RequirementFailure::diagnoseAsNote() {
   // Layout requirement doesn't have a second type, let's always
   // `AnyObject`.
   auto requirementTy = req.getKind() == RequirementKind::Layout
-                           ? getASTContext().getAnyObjectType()
+                           ? getASTContext().getAnyObjectConstraint()
                            : req.getSecondType();
 
   emitDiagnosticAt(reqDC->getAsDecl(), getDiagnosticAsNote(), getLHS(),

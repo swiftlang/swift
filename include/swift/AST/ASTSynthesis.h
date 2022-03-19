@@ -54,7 +54,7 @@ enum SingletonTypeSynthesizer {
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
   switch (kind) {
-  case _any: return SC.Context.TheAnyType;
+  case _any: return SC.Context.getAnyExistentialType();
   case _bridgeObject: return SC.Context.TheBridgeObjectType;
   case _error: return SC.Context.getErrorExistentialType();
   case _executor: return SC.Context.TheExecutorType;

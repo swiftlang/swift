@@ -3233,7 +3233,7 @@ public:
     }
     case SILFunctionType::Representation::Block:
       // All block types look like AnyObject.
-      return C.getAnyObjectType();
+      return C.getAnyObjectConstraint();
     }
 
     llvm_unreachable("Not a valid SILFunctionType.");
@@ -3354,7 +3354,7 @@ namespace {
           || t == C.TheNativeObjectType
           || t == C.TheBridgeObjectType
           || t == C.TheRawPointerType
-          || t == C.getAnyObjectType())
+          || t == C.getAnyObjectConstraint())
         return true;
       if (auto intTy = dyn_cast<BuiltinIntegerType>(t)) {
         auto width = intTy->getWidth();
@@ -3436,7 +3436,7 @@ namespace {
       }
       case SILFunctionType::Representation::Block:
         // All block types look like AnyObject.
-        return emitFromValueWitnessTable(C.getAnyObjectType());
+        return emitFromValueWitnessTable(C.getAnyObjectConstraint());
       }
 
       llvm_unreachable("Not a valid SILFunctionType.");
@@ -3479,7 +3479,7 @@ namespace {
       case ReferenceCounting::ObjC:
       case ReferenceCounting::Block:
       case ReferenceCounting::Unknown:
-        return emitFromValueWitnessTable(IGF.IGM.Context.getAnyObjectType());
+        return emitFromValueWitnessTable(IGF.IGM.Context.getAnyObjectConstraint());
 
       case ReferenceCounting::Bridge:
       case ReferenceCounting::Error:

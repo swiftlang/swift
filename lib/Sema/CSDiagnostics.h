@@ -1806,8 +1806,7 @@ public:
                                       ConstraintLocator *locator)
       : ContextualFailure(solution, type, protocolType, locator),
         Context(context) {
-    assert(protocolType->is<ProtocolType>() ||
-           protocolType->is<ProtocolCompositionType>());
+    assert(protocolType->isExistentialType());
   }
 
   bool diagnoseAsError() override;

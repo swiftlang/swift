@@ -956,7 +956,11 @@ ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
   llvm_unreachable("bad pointer kind");
 }
 
-CanType ASTContext::getAnyObjectType() const {
+CanType ASTContext::getAnyExistentialType() const {
+  return ExistentialType::get(TheAnyType)->getCanonicalType();
+}
+
+CanType ASTContext::getAnyObjectConstraint() const {
   if (getImpl().AnyObjectType) {
     return getImpl().AnyObjectType;
   }
@@ -965,6 +969,11 @@ CanType ASTContext::getAnyObjectType() const {
     ProtocolCompositionType::get(
       *this, {}, /*HasExplicitAnyObject=*/true));
   return getImpl().AnyObjectType;
+}
+
+CanType ASTContext::getAnyObjectType() const {
+  return ExistentialType::get(getAnyObjectConstraint())
+      ->getCanonicalType();
 }
 
 #define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECLTYPE, GENERIC_ARGS) \
@@ -4242,19 +4251,17 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
                            RecursiveTypeProperties properties)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
 
-Type ExistentialType::get(Type constraint, bool forceExistential) {
+Type ExistentialType::get(Type constraint) {
   auto &C = constraint->getASTContext();
-  if (!forceExistential) {
-    // FIXME: Any and AnyObject don't yet use ExistentialType.
-    if (constraint->isAny() || constraint->isAnyObject())
-      return constraint;
-
-    // ExistentialMetatypeType is already an existential type.
-    if (constraint->is<ExistentialMetatypeType>())
-      return constraint;
-  }
+  // ExistentialMetatypeType is already an existential type.
+  if (constraint->is<ExistentialMetatypeType>())
+    return constraint;
 
   assert(constraint->isConstraintType());
+
+  bool printWithAny = true;
+  if (constraint->isEqual(C.TheAnyType) || constraint->isAnyObject())
+    printWithAny = false;
 
   auto properties = constraint->getRecursiveProperties();
   if (constraint->is<ParameterizedProtocolType>())
@@ -4266,7 +4273,7 @@ Type ExistentialType::get(Type constraint, bool forceExistential) {
     return entry;
 
   const ASTContext *canonicalContext = constraint->isCanonical() ? &C : nullptr;
-  return entry = new (C, arena) ExistentialType(constraint,
+  return entry = new (C, arena) ExistentialType(constraint, printWithAny,
                                                 canonicalContext,
                                                 properties);
 }
