@@ -162,10 +162,20 @@ extension MyClass {
   @MyGlobalActor func testInNestedSingleExpressionClosure() {
     takeClosure {
       takeClosure {
-        otherInstanceOfMyClass.#^IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT?check=IN_FUNC_ON_GLOBAL_ACTOR_SELF_DOT^#
+        otherInstanceOfMyClass.#^IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT^#
       }
     }
   }
+// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT: Begin completions
+// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   funcOnGlobalActor()[#Int#]; name=funcOnGlobalActor()
+// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal: funcOnOtherGlobalActor()[' async'][#Int#]; name=funcOnOtherGlobalActor()
+// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   funcSync()[#Int#]; name=funcSync()
+// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   nonSenableFuncOnGlobalActor({#arg: MyNonSendable#})[#Int#]; name=nonSenableFuncOnGlobalActor(arg:)
+// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceMethod]/CurrNominal: nonSenableFuncOnOtherGlobalActor({#arg: MyNonSendable#})[' async'][#Int#]; name=nonSenableFuncOnOtherGlobalActor(arg:)
+// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceVar]/CurrNominal:      varOnGlobalActor[#Int#]; name=varOnGlobalActor
+// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceVar]/CurrNominal: varOnOtherGlobalActor[#Int#][' async']; name=varOnOtherGlobalActor
+// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT-DAG: Decl[InstanceVar]/CurrNominal:      varSync[#Int#]; name=varSync
+// IN_NESTED_SINGLE_EXPRESSION_CLOSURE_ON_GLBOAL_ACTOR_OTHER_DOT: End completions
 }
 
 actor ActorTests {

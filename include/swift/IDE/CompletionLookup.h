@@ -76,6 +76,9 @@ bool isCodeCompletionAtTopLevel(const DeclContext *DC);
 ///     }
 bool isCompletionDeclContextLocalContext(DeclContext *DC);
 
+/// Returns \c true if \p DC can handles async call.
+bool canDeclContextHandleAsync(const DeclContext *DC);
+
 /// Return \c true if the completion happens at top-level of a library file.
 bool isCodeCompletionAtTopLevelOfLibraryFile(const DeclContext *DC);
 

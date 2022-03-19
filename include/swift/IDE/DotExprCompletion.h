@@ -31,15 +31,22 @@ class DotExprTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     bool ExpectsNonVoid;
     bool BaseIsStaticMetaType;
     bool IsImplicitSingleExpressionReturn;
+
+    /// Whether the surrounding context is async and thus calling async
+    /// functions is supported.
+    bool IsInAsyncContext;
   };
 
   CodeCompletionExpr *CompletionExpr;
+  DeclContext *DC;
+
   SmallVector<Result, 4> Results;
   llvm::DenseMap<std::pair<Type, Decl *>, size_t> BaseToSolutionIdx;
 
 public:
-  DotExprTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr)
-      : CompletionExpr(CompletionExpr) {}
+  DotExprTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
+                                     DeclContext *DC)
+      : CompletionExpr(CompletionExpr), DC(DC) {}
 
   /// Typecheck the code completion expression in isolation, calling
   /// \c sawSolution for each solution formed.

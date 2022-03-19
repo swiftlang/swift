@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/TypeCheckCompletionCallback.h"
+#include "swift/IDE/CompletionLookup.h"
 #include "swift/Sema/CompletionContextFinder.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -117,4 +118,33 @@ bool swift::ide::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
     }
   }
   return false;
+}
+
+bool swift::ide::isContextAsync(const constraints::Solution &S,
+                                DeclContext *DC) {
+  // We are in an async context if
+  //  - the decl context is async
+  if (S.getConstraintSystem().isAsynchronousContext(DC)) {
+    return true;
+  }
+
+  //  - the decl context is sync but it's used in a context that expectes an
+  //    async function. This happens if the code completion token is in a
+  //    closure that doesn't contain any async calles. Thus the closure is
+  //    type-checked as non-async, but it might get converted to an async
+  //    closure based on its contextual type
+  auto target = S.solutionApplicationTargets.find(dyn_cast<ClosureExpr>(DC));
+  if (target != S.solutionApplicationTargets.end()) {
+    if (auto ContextTy = target->second.getClosureContextualType()) {
+      if (auto ContextFuncTy =
+              S.simplifyType(ContextTy)->getAs<AnyFunctionType>()) {
+        return ContextFuncTy->isAsync();
+      }
+    }
+  }
+
+  //  - we did not record any information about async-ness of the context in the
+  //    solution, but the type information recorded AST declares the context as
+  //    async.
+  return canDeclContextHandleAsync(DC);
 }

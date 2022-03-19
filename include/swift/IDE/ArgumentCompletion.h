@@ -45,9 +45,14 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     Type BaseType;
     /// True if an argument label precedes the completion location.
     bool HasLabel;
+    /// Whether the surrounding context is async and thus calling async
+    /// functions is supported.
+    bool IsInAsyncContext;
   };
 
   CodeCompletionExpr *CompletionExpr;
+  DeclContext *DC;
+
   SmallVector<Result, 4> Results;
 
   /// Populates a vector of parameters to suggest along with a vector of types
@@ -59,8 +64,9 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
                          SmallVectorImpl<Type> &Types);
 
 public:
-  ArgumentTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr)
-      : CompletionExpr(CompletionExpr) {}
+  ArgumentTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
+                                      DeclContext *DC)
+      : CompletionExpr(CompletionExpr), DC(DC) {}
 
   void sawSolution(const constraints::Solution &solution) override;
 

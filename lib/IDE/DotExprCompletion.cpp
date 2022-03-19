@@ -69,6 +69,8 @@ void DotExprTypeCheckCompletionCallback::sawSolution(
   if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator))
     ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
 
+  bool IsAsync = isContextAsync(S, DC);
+
   auto Key = std::make_pair(BaseTy, ReferencedDecl);
   auto Ret = BaseToSolutionIdx.insert({Key, Results.size()});
   if (Ret.second) {
@@ -79,15 +81,19 @@ void DotExprTypeCheckCompletionCallback::sawSolution(
                             : !ParentExpr && CS.getContextualTypePurpose(
                                                  CompletionExpr) != CTP_Unused;
 
-    Results.push_back(
-        {BaseTy, ReferencedDecl, {}, DisallowVoid, ISDMT, ImplicitReturn});
-    if (ExpectedTy)
+    Results.push_back({BaseTy, ReferencedDecl,
+                       /*ExpectedTypes=*/{}, DisallowVoid, ISDMT,
+                       ImplicitReturn, IsAsync});
+    if (ExpectedTy) {
       Results.back().ExpectedTypes.push_back(ExpectedTy);
+    }
   } else if (ExpectedTy) {
-    auto &ExpectedTys = Results[Ret.first->getSecond()].ExpectedTypes;
+    auto &ExistingResult = Results[Ret.first->getSecond()];
+    ExistingResult.IsInAsyncContext |= IsAsync;
     auto IsEqual = [&](Type Ty) { return ExpectedTy->isEqual(Ty); };
-    if (!llvm::any_of(ExpectedTys, IsEqual))
-      ExpectedTys.push_back(ExpectedTy);
+    if (!llvm::any_of(ExistingResult.ExpectedTypes, IsEqual)) {
+      ExistingResult.ExpectedTypes.push_back(ExpectedTy);
+    }
   }
 }
 
@@ -116,6 +122,7 @@ void DotExprTypeCheckCompletionCallback::deliverResults(
 
   Lookup.shouldCheckForDuplicates(Results.size() > 1);
   for (auto &Result : Results) {
+    Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
     Lookup.setIsStaticMetatype(Result.BaseIsStaticMetaType);
     Lookup.getPostfixKeywordCompletions(Result.BaseTy, BaseExpr);
     Lookup.setExpectedTypes(Result.ExpectedTypes,

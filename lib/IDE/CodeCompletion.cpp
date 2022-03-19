@@ -1327,7 +1327,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
-    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
+    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
+                                              CurDeclContext);
     llvm::SaveAndRestore<TypeCheckCompletionCallback*>
       CompletionCollector(Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
@@ -1351,7 +1352,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
-    UnresolvedMemberTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
+    UnresolvedMemberTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
+                                                       CurDeclContext);
     llvm::SaveAndRestore<TypeCheckCompletionCallback*>
       CompletionCollector(Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
@@ -1380,7 +1382,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   case CompletionKind::CallArg: {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
-    ArgumentTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
+    ArgumentTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
+                                               CurDeclContext);
     llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
         Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);

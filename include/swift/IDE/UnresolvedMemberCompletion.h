@@ -25,19 +25,25 @@ namespace ide {
 /// formed during expression type-checking.
 class UnresolvedMemberTypeCheckCompletionCallback
     : public TypeCheckCompletionCallback {
-  struct ExprResult {
+  struct Result {
     Type ExpectedTy;
     bool IsImplicitSingleExpressionReturn;
+
+    /// Whether the surrounding context is async and thus calling async
+    /// functions is supported.
+    bool IsInAsyncContext;
   };
 
   CodeCompletionExpr *CompletionExpr;
-  SmallVector<ExprResult, 4> ExprResults;
-  SmallVector<Type, 1> EnumPatternTypes;
+  DeclContext *DC;
+
+  SmallVector<Result, 4> ExprResults;
+  SmallVector<Result, 1> EnumPatternTypes;
 
 public:
   UnresolvedMemberTypeCheckCompletionCallback(
-      CodeCompletionExpr *CompletionExpr)
-      : CompletionExpr(CompletionExpr) {}
+      CodeCompletionExpr *CompletionExpr, DeclContext *DC)
+      : CompletionExpr(CompletionExpr), DC(DC) {}
 
   void sawSolution(const constraints::Solution &solution) override;
 

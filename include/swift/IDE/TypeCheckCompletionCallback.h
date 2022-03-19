@@ -75,6 +75,9 @@ Type getTypeForCompletion(const constraints::Solution &S, Expr *E);
 bool isImplicitSingleExpressionReturn(constraints::ConstraintSystem &CS,
                                       Expr *CompletionExpr);
 
+/// Returns \c true iff the decl context \p DC allows calling async functions.
+bool isContextAsync(const constraints::Solution &S, DeclContext *DC);
+
 } // namespace ide
 } // namespace swift
 

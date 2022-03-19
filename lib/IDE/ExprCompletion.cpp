@@ -29,25 +29,7 @@ void ExprTypeCheckCompletionCallback::sawSolution(
 
   bool ImplicitReturn = isImplicitSingleExpressionReturn(CS, CompletionExpr);
 
-  // We are in an async context if
-  //  - the decl context is async or
-  //  - the decl context is sync but it's used in a context that expectes an
-  //    async function. This happens if the code completion token is in a
-  //    closure that doesn't contain any async calles. Thus the closure is
-  //    type-checked as non-async, but it might get converted to an async
-  //    closure based on its contextual type.
-  bool isAsync = CS.isAsynchronousContext(DC);
-  if (!isAsync) {
-    auto target = S.solutionApplicationTargets.find(dyn_cast<ClosureExpr>(DC));
-    if (target != S.solutionApplicationTargets.end()) {
-      if (auto ContextTy = target->second.getClosureContextualType()) {
-        if (auto ContextFuncTy =
-                S.simplifyType(ContextTy)->getAs<AnyFunctionType>()) {
-          isAsync = ContextFuncTy->isAsync();
-        }
-      }
-    }
-  }
+  bool IsAsync = isContextAsync(S, DC);
 
   llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
   for (auto NT : S.nodeTypes) {
@@ -57,7 +39,7 @@ void ExprTypeCheckCompletionCallback::sawSolution(
   }
 
   Results.push_back(
-      {ExpectedTy, ImplicitReturn, isAsync, SolutionSpecificVarTypes});
+      {ExpectedTy, ImplicitReturn, IsAsync, SolutionSpecificVarTypes});
 }
 
 void ExprTypeCheckCompletionCallback::deliverResults(
