@@ -2415,7 +2415,7 @@ private:
 
   /// Arguments after the code completion token that were thus ignored (i.e.
   /// assigned fresh type variables) for type checking.
-  llvm::SetVector<ConstraintLocator *> IgnoredArguments;
+  llvm::SetVector<Expr *> IgnoredArguments;
 
   /// Maps node types used within all portions of the constraint
   /// system, instead of directly using the types on the
@@ -3187,18 +3187,25 @@ public:
   bool containsCodeCompletionLoc(ASTNode node) const;
   bool containsCodeCompletionLoc(const ArgumentList *args) const;
 
-  /// Marks the argument with the \p ArgLoc locator as being ignored because it
-  /// occurs after the code completion token. This assumes that the argument is
-  /// not type checked (by assigning it a fresh type variable) and prevents
-  /// fixes from being generated for this argument.
-  void markArgumentIgnoredForCodeCompletion(ConstraintLocator *ArgLoc) {
-    IgnoredArguments.insert(ArgLoc);
+  /// Marks the argument \p Arg as being ignored because it occurs after the
+  /// code completion token. This assumes that the argument is not type checked
+  /// (by assigning it a fresh type variable) and prevents fixes from being
+  /// generated for this argument.
+  void markArgumentIgnoredForCodeCompletion(Expr *Arg) {
+    IgnoredArguments.insert(Arg);
   }
 
-  /// Whether the argument with the \p ArgLoc locator occurs after the code
-  /// completion tokena and thus should be ignored and not generate any fixes.
-  bool isArgumentIgnoredForCodeCompletion(ConstraintLocator *ArgLoc) {
-    return IgnoredArguments.count(ArgLoc) > 0;
+  /// Whether the argument \p Arg occurs after the code completion token and
+  /// thus should be ignored and not generate any fixes.
+  bool isArgumentIgnoredForCodeCompletion(Expr *Arg) const {
+    return IgnoredArguments.count(Arg) > 0;
+  }
+
+  /// Whether the constraint system has ignored any arguments for code
+  /// completion, i.e. whether there is an expression for which
+  /// \c isArgumentIgnoredForCodeCompletion returns \c true.
+  bool hasArgumentsIgnoredForCodeCompletion() const {
+    return !IgnoredArguments.empty();
   }
 
   void setClosureType(const ClosureExpr *closure, FunctionType *type) {

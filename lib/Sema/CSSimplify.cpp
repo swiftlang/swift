@@ -12470,9 +12470,14 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
     log << ")\n";
   }
 
-  if (isArgumentIgnoredForCodeCompletion(fix->getLocator())) {
-    // The argument was ignored. Don't record any fixes for it.
-    return false;
+  if (hasArgumentsIgnoredForCodeCompletion()) {
+    // Avoid simplifying the locator if the constraint system didn't ignore any
+    // arguments.
+    auto argExpr = simplifyLocatorToAnchor(fix->getLocator());
+    if (isArgumentIgnoredForCodeCompletion(getAsExpr<Expr>(argExpr))) {
+      // The argument was ignored. Don't record any fixes for it.
+      return false;
+    }
   }
 
   // Record the fix.

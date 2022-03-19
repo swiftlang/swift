@@ -2024,9 +2024,13 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
         return false;
 
       // Don't penailze solutions that have holes for ignored arguments.
-      if (cs.isArgumentIgnoredForCodeCompletion(
-              TypeVar->getImpl().getLocator())) {
-        return false;
+      if (cs.hasArgumentsIgnoredForCodeCompletion()) {
+        // Avoid simplifying the locator if the constriant system didn't ignore
+        // any arguments.
+        auto argExpr = simplifyLocatorToAnchor(TypeVar->getImpl().getLocator());
+        if (cs.isArgumentIgnoredForCodeCompletion(argExpr.dyn_cast<Expr *>())) {
+          return false;
+        }
       }
     }
     // Reflect in the score that this type variable couldn't be
