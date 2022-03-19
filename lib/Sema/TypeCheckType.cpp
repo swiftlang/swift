@@ -433,7 +433,8 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
         if (isa<AssociatedTypeDecl>(typeDecl) ||
             (isa<TypeAliasDecl>(typeDecl) &&
-             !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
+             !cast<TypeAliasDecl>(typeDecl)->isGeneric() &&
+             !isSpecialized)) {
           if (getStage() == TypeResolutionStage::Structural) {
             return DependentMemberType::get(selfType, typeDecl->getName());
           } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
