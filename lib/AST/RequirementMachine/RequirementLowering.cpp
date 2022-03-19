@@ -705,7 +705,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     // underlying type of the typealias.
     if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
       if (!typeAliasDecl->isGeneric()) {
-        // Ignore the typealias if we have an associated type with the same anme
+        // Ignore the typealias if we have an associated type with the same name
         // in the same protocol. This is invalid anyway, but it's just here to
         // ensure that we produce the same requirement signature on some tests
         // with -requirement-machine-protocol-signatures=verify.
@@ -713,6 +713,8 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
           continue;
 
         auto underlyingType = typeAliasDecl->getStructuralType();
+        if (underlyingType->is<UnboundGenericType>())
+          continue;
 
         auto subjectType = DependentMemberType::get(
             selfTy, typeAliasDecl->getName());
@@ -752,21 +754,6 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     (ctx.LangOpts.RequirementMachineProtocolSignatures ==
      RequirementMachineMode::Enabled);
 
-  // Collect all typealiases from inherited protocols recursively.
-  llvm::MapVector<Identifier, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
-  for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
-    for (auto req : inheritedProto->getMembers()) {
-      if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
-        // Ignore generic types.
-        if (auto genReq = dyn_cast<GenericTypeDecl>(req))
-          if (genReq->getGenericParams())
-            continue;
-
-        inheritedTypeDecls[typeReq->getName()].push_back(typeReq);
-      }
-    }
-  }
-
   auto getStructuralType = [](TypeDecl *typeDecl) -> Type {
     if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
       if (typealias->getUnderlyingTypeRepr() != nullptr) {
@@ -780,6 +767,27 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
 
     return typeDecl->getDeclaredInterfaceType();
   };
+
+  // Collect all typealiases from inherited protocols recursively.
+  llvm::MapVector<Identifier, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
+  for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
+    for (auto req : inheritedProto->getMembers()) {
+      if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
+        // Ignore generic types.
+        if (auto genReq = dyn_cast<GenericTypeDecl>(req))
+          if (genReq->getGenericParams())
+            continue;
+
+        // Ignore typealiases with UnboundGenericType, since they
+        // are like generic typealiases.
+        if (auto *typeAlias = dyn_cast<TypeAliasDecl>(req))
+          if (getStructuralType(typeAlias)->is<UnboundGenericType>())
+            continue;
+
+        inheritedTypeDecls[typeReq->getName()].push_back(typeReq);
+      }
+    }
+  }
 
   // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
