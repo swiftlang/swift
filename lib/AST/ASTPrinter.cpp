@@ -5196,7 +5196,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
         llvm_unreachable("bad opaque-return-type printing mode");
       }
     } else if (auto existential = dyn_cast<ExistentialType>(T.getPointer())) {
-      if (!Options.PrintExplicitAny)
+      if (!Options.PrintExplicitAny || !existential->shouldPrintWithAny())
         return isSimpleUnderPrintOptions(existential->getConstraintType());
     } else if (auto existential = dyn_cast<ExistentialMetatypeType>(T.getPointer())) {
       if (!Options.PrintExplicitAny)
@@ -5632,6 +5632,7 @@ public:
     }
 
     Type instanceType = T->getInstanceType();
+    bool didPrintInstanceType = false;
     if (Options.PrintExplicitAny) {
       if (T->is<ExistentialMetatypeType>()) {
         Printer << "any ";
@@ -5645,18 +5646,24 @@ public:
 
           return type;
         });
-      } else if (instanceType->isAny() || instanceType->isAnyObject()) {
-        // FIXME: 'any' is needed to distinguish between '(any Any).Type'
-        // and 'any Any.Type'. However, this combined with the above hack
-        // to replace nested existential metatypes with metatypes causes
-        // a bug in printing nested existential metatypes for Any and AnyObject,
-        // e.g. 'any (any Any).Type.Type'. This will be fixed by using
-        // ExistentialType for Any and AnyObject.
-        instanceType = ExistentialType::get(instanceType, /*forceExistential=*/true);
+      } else if (auto existential = instanceType->getAs<ExistentialType>()) {
+        // The 'any' keyword is needed to distinguish between existential
+        // metatypes and singleton metatypes. However, 'any' usually isn't
+        // printed for Any and AnyObject, because it's unnecessary to write
+        // 'any' with these specific constraints. Set a bit on the existential
+        // type to force printing with 'any' for metatypes. This bit doesn't
+        // matter for anything other than printing.
+        if (!existential->shouldPrintWithAny()) {
+          existential->forcePrintWithAny(true);
+          printWithParensIfNotSimple(existential);
+          existential->forcePrintWithAny(false);
+          didPrintInstanceType = true;
+        }
       }
     }
 
-    printWithParensIfNotSimple(instanceType);
+    if (!didPrintInstanceType)
+      printWithParensIfNotSimple(instanceType);
 
     // We spell normal metatypes of existential types as .Protocol.
     if (isa<MetatypeType>(T) &&
@@ -6278,7 +6285,7 @@ public:
   }
 
   void visitExistentialType(ExistentialType *T) {
-    if (Options.PrintExplicitAny)
+    if (Options.PrintExplicitAny && T->shouldPrintWithAny())
       Printer << "any ";
 
     // FIXME: The desugared type is used here only to support

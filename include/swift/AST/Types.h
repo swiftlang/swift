@@ -5444,16 +5444,29 @@ struct ExistentialTypeGeneralization {
 class ExistentialType final : public TypeBase {
   Type ConstraintType;
 
+  /// Whether to print this existential type with the 'any' keyword,
+  /// e.g. in diagnostics.
+  ///
+  /// Any and AnyObject need not use 'any', and they are printed
+  /// in diagnostics without 'any' unless wrapped in MetatypeType.
+  /// This field should only be used by TypePrinter.
+  bool PrintWithAny;
+
   ExistentialType(Type constraintType,
+                  bool printWithAny,
                   const ASTContext *canonicalContext,
                   RecursiveTypeProperties properties)
       : TypeBase(TypeKind::Existential, canonicalContext, properties),
-        ConstraintType(constraintType) {}
+        ConstraintType(constraintType), PrintWithAny(printWithAny) {}
 
 public:
-  static Type get(Type constraint, bool forceExistential = false);
+  static Type get(Type constraint);
 
   Type getConstraintType() const { return ConstraintType; }
+
+  bool shouldPrintWithAny() const { return PrintWithAny; }
+
+  void forcePrintWithAny(bool value) { PrintWithAny = value; }
 
   bool requiresClass() const {
     if (auto protocol = ConstraintType->getAs<ProtocolType>())
