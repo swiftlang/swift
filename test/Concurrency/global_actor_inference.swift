@@ -623,9 +623,9 @@ func replacesDynamicOnMainActor() {
 // ----------------------------------------------------------------------
 
 class Cutter {
-  @MainActor var x = useFooInADefer() // expected-warning {{expression requiring global actor 'MainActor' cannot appear in default-value expression of property 'x'; this is an error in Swift 6}}
+  @MainActor var x = useFooInADefer()
   @MainActor var y = { () -> Bool in
-      var z = statefulThingy // expected-warning {{expression requiring global actor 'MainActor' cannot appear in default-value expression of property 'y'; this is an error in Swift 6}}
+      var z = statefulThingy
       return z
     }()
 }
@@ -637,7 +637,7 @@ class Butter {
   nonisolated let b = statefulThingy // expected-error {{var 'statefulThingy' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
 
   var c: Int = {
-    return getGlobal7() // expected-warning {{expression requiring global actor 'SomeGlobalActor' cannot appear in default-value expression of property 'c'; this is an error in Swift 6}}
+    return getGlobal7()
   }()
 
   lazy var d: Int = getGlobal7()
