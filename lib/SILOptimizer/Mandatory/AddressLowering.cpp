@@ -1089,9 +1089,8 @@ bool OpaqueStorageAllocation::findProjectionIntoUseImpl(
   return false;
 }
 
-bool OpaqueStorageAllocation::
-checkStorageDominates(AllocStackInst *allocInst,
-                      ArrayRef<SILValue> incomingValues) {
+bool OpaqueStorageAllocation::checkStorageDominates(
+    AllocStackInst *allocInst, ArrayRef<SILValue> incomingValues) {
 
   for (SILValue incomingValue : incomingValues) {
     if (auto *defInst = incomingValue->getDefiningInstruction()) {
@@ -1102,8 +1101,8 @@ checkStorageDominates(AllocStackInst *allocInst,
     // Handle both phis and terminator results.
     auto *bbArg = cast<SILPhiArgument>(incomingValue);
     // The storage block must strictly dominate the phi.
-    if (!pass.domInfo->properlyDominates(
-          allocInst->getParent(), bbArg->getParent())) {
+    if (!pass.domInfo->properlyDominates(allocInst->getParent(),
+                                         bbArg->getParent())) {
       return false;
     }
   }
@@ -1157,9 +1156,8 @@ void OpaqueStorageAllocation::removeAllocation(SILValue value) {
 // Any value that may be used by a return instruction must be deallocated
 // immediately before the return. This allows the return to be rewritten by
 // loading from storage.
-AllocStackInst *OpaqueStorageAllocation::
-createStackAllocation(SILValue value) {
-  assert(value.getOwnershipKind() != OwnershipKind::Guaranteed && 
+AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
+  assert(value.getOwnershipKind() != OwnershipKind::Guaranteed &&
          "creating storage for a guaranteed value implies a copy");
 
   // Instructions that produce an opened type never reach here because they
@@ -1354,7 +1352,7 @@ SILValue AddressMaterialization::recursivelyMaterializeStorage(
     SILValue useVal = useStorage.value;
     if (auto *defInst = useVal->getDefiningInstruction()) {
       Operand *useOper =
-        &defInst->getAllOperands()[storage.projectedOperandNum];
+          &defInst->getAllOperands()[storage.projectedOperandNum];
       return recordAddress(
           materializeProjectionIntoUse(useOper, intoPhiOperand));
     }
@@ -1368,8 +1366,8 @@ SILValue AddressMaterialization::recursivelyMaterializeStorage(
         pass.valueStorageMap.getProjectedStorage(storage).storage,
         /*intoPhiOperand*/ true));
   }
-  assert(!storage.isProjection()
-         && "a composing user may not also be a def projection");
+  assert(!storage.isProjection() &&
+         "a composing user may not also be a def projection");
   return storage.storageAddress;
 }
 
@@ -1468,9 +1466,9 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
     auto canTy = initExistentialValue->getFormalConcreteType();
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     auto &concreteTL = pass.function->getTypeLowering(opaque, canTy);
-    return B.createInitExistentialAddr(
-      pass.genLoc(), containerAddr, canTy,
-      concreteTL.getLoweredType(), initExistentialValue->getConformances());
+    return B.createInitExistentialAddr(pass.genLoc(), containerAddr, canTy,
+                                       concreteTL.getLoweredType(),
+                                       initExistentialValue->getConformances());
   }
   case SILInstructionKind::StructInst: {
     auto *structInst = cast<StructInst>(user);
@@ -1480,8 +1478,8 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
 
     SILValue structAddr = materializeComposingUser(structInst, intoPhiOperand);
     return B.createStructElementAddr(
-      pass.genLoc(), structAddr, *fieldIter,
-      operand->get()->getType().getAddressType());
+        pass.genLoc(), structAddr, *fieldIter,
+        operand->get()->getType().getAddressType());
   }
   case SILInstructionKind::TupleInst: {
     auto *tupleInst = cast<TupleInst>(user);
@@ -1584,8 +1582,8 @@ void PhiRewriter::materializeOperand(PhiOperand phiOper) {
   auto &operStorage =
       pass.valueStorageMap.getStorage(phiOper.getOperand()->get());
   if (operStorage.isPhiProjection()) {
-    if (operStorage.projectedStorageID
-        == pass.valueStorageMap.getOrdinal(phiOper.getValue())) {
+    if (operStorage.projectedStorageID ==
+        pass.valueStorageMap.getOrdinal(phiOper.getValue())) {
       // This operand was coalesced with this particular phi. No move needed.
       return;
     }
@@ -1646,8 +1644,8 @@ PhiRewriter::MovePosition PhiRewriter::findPhiMovePosition(PhiOperand phiOper) {
     if (!phiMove || !phiMoves.contains(phiMove))
       break;
 
-    if (!foundEarliestInsertPoint
-        && getAccessBase(phiMove->getSrc()) == phiBaseAddress) {
+    if (!foundEarliestInsertPoint &&
+        getAccessBase(phiMove->getSrc()) == phiBaseAddress) {
       // Anti-dependence from the phi move to the phi value. Do not move into
       // the phi storage before this point.
       foundEarliestInsertPoint = true;
@@ -1698,8 +1696,8 @@ bool CallArgRewriter::rewriteArguments() {
   bool changed = false;
 
   auto origConv = apply.getSubstCalleeConv();
-  assert(apply.getNumArguments() == origConv.getNumParameters()
-         && "results should not yet be rewritten");
+  assert(apply.getNumArguments() == origConv.getNumParameters() &&
+         "results should not yet be rewritten");
 
   for (unsigned argIdx = apply.getCalleeArgIndexOfFirstAppliedArg(),
                 endArgIdx = argIdx + apply.getNumArguments();
@@ -1968,8 +1966,8 @@ void ApplyRewriter::makeIndirectArgs(MutableArrayRef<SILValue> newCallArgs) {
       loweredCalleeConv.getSILArgIndexOfFirstIndirectResult();
 
   auto visitCallResult = [&](SILValue result, SILResultInfo resultInfo) {
-    assert(!opaqueCalleeConv.isSILIndirect(resultInfo)
-           && "canonical call results are always direct");
+    assert(!opaqueCalleeConv.isSILIndirect(resultInfo) &&
+           "canonical call results are always direct");
 
     if (loweredCalleeConv.isSILIndirect(resultInfo)) {
       SILValue indirectResultAddr = materializeIndirectResultAddress(
@@ -2048,8 +2046,8 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   auto *oldCall = cast<ApplyInst>(apply.getInstruction());
 
   auto *newCall = argBuilder.createApply(
-    callLoc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
-    oldCall->getApplyOptions(), oldCall->getSpecializationInfo());
+      callLoc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
+      oldCall->getApplyOptions(), oldCall->getSpecializationInfo());
 
   this->apply = FullApplySite(newCall);
 
@@ -2134,9 +2132,8 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
 
   auto replaceTermResult = [&](SILValue newResultVal) {
     SILType resultTy = loweredCalleeConv.getSILResultType(typeCtx);
-    auto ownership = resultTy.isTrivial(*pass.function)
-                         ? OwnershipKind::None
-                         : OwnershipKind::Owned;
+    auto ownership = resultTy.isTrivial(*pass.function) ? OwnershipKind::None
+                                                        : OwnershipKind::Owned;
 
     resultArg->replaceAllUsesWith(newResultVal);
     assert(resultArg->getIndex() == 0);
@@ -2209,8 +2206,8 @@ void ApplyRewriter::replaceDirectResults(DestructureTupleInst *oldDestructure) {
   unsigned newDirectResultIdx = 0;
 
   auto visitOldCallResult = [&](SILValue result, SILResultInfo resultInfo) {
-    assert(!opaqueCalleeConv.isSILIndirect(resultInfo)
-           && "canonical call results are always direct");
+    assert(!opaqueCalleeConv.isSILIndirect(resultInfo) &&
+           "canonical call results are always direct");
 
     if (loweredCalleeConv.isSILIndirect(resultInfo)) {
       if (result->getType().isAddressOnly(*pass.function)) {
@@ -2283,8 +2280,8 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
 
   // Find the point before allocated storage has been deallocated.
   auto insertPt = SILBasicBlock::iterator(returnInst);
-  for (auto bbStart = returnInst->getParent()->begin();
-       insertPt != bbStart; --insertPt) {
+  for (auto bbStart = returnInst->getParent()->begin(); insertPt != bbStart;
+       --insertPt) {
     if (!isa<DeallocStackInst>(*std::prev(insertPt)))
       break;
   }
@@ -2308,23 +2305,22 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
       pass.loweredFnConv.getSILArgIndexOfFirstIndirectResult();
 
   // Initialize the indirect result arguments and populate newDirectResults.
-  for_each(
-    pass.function->getLoweredFunctionType()->getResults(), oldResults,
-    [&](SILResultInfo resultInfo, SILValue oldResult) {
-      // Assume that all original results are direct in SIL.
-      assert(!opaqueFnConv.isSILIndirect(resultInfo));
-      if (!pass.loweredFnConv.isSILIndirect(resultInfo)) {
-        newDirectResults.push_back(oldResult);
-        return;
-      }
-      SILArgument *newResultArg =
-        pass.function->getArgument(newResultArgIdx);
-      rewriteElement(oldResult, newResultArg, returnBuilder);
-      ++newResultArgIdx;
-    });
+  for_each(pass.function->getLoweredFunctionType()->getResults(), oldResults,
+           [&](SILResultInfo resultInfo, SILValue oldResult) {
+             // Assume that all original results are direct in SIL.
+             assert(!opaqueFnConv.isSILIndirect(resultInfo));
+             if (!pass.loweredFnConv.isSILIndirect(resultInfo)) {
+               newDirectResults.push_back(oldResult);
+               return;
+             }
+             SILArgument *newResultArg =
+                 pass.function->getArgument(newResultArgIdx);
+             rewriteElement(oldResult, newResultArg, returnBuilder);
+             ++newResultArgIdx;
+           });
 
-  assert(newDirectResults.size()
-         == pass.loweredFnConv.getNumDirectSILResults());
+  assert(newDirectResults.size() ==
+         pass.loweredFnConv.getNumDirectSILResults());
   assert(newResultArgIdx == pass.loweredFnConv.getSILArgIndexOfFirstParam());
 
   // Generate a new return_inst for the new direct results.
@@ -2335,9 +2331,9 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
   } else if (newDirectResults.size() == 1) {
     newReturnVal = newDirectResults[0];
   } else {
-    newReturnVal = returnBuilder.createTuple(pass.genLoc(),
-                                 pass.loweredFnConv.getSILResultType(typeCtx),
-                                 newDirectResults);
+    newReturnVal = returnBuilder.createTuple(
+        pass.genLoc(), pass.loweredFnConv.getSILResultType(typeCtx),
+        newDirectResults);
   }
   // Rewrite the returned value.
   SILValue origFullResult = returnInst->getOperand();
