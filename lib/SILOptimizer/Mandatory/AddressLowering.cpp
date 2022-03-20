@@ -792,9 +792,16 @@ static Operand *getProjectedDefOperand(SILValue value) {
 
 /// If \p value is a an existential or enum, then return the existential or enum
 /// operand. These operations are always rewritten by the UseRewriter and always
-/// destructively reuse the same storage as their operand. Note that if the
-/// operation's result is address-only, then the operand must be address-only
-/// and therefore must mapped to ValueStorage.
+/// reuse the same storage as their operand. Note that if the operation's result
+/// is address-only, then the operand must be address-only and therefore must
+/// mapped to ValueStorage.
+///
+/// open_existential_value must reuse storage because the boxed value is shared
+/// with other instances of the existential. An explicit copy is needed to
+/// obtain an owned value.
+///
+/// unchecked_enum_data and switch_enum must reuse storage because extracting
+/// the payload destroys the enum value.
 static Operand *getReusedStorageOperand(SILValue value) {
   switch (value->getKind()) {
   default:
@@ -1180,15 +1187,18 @@ createStackAllocation(SILValue value) {
 
       auto *openingInst = openingVal->getDefiningInstruction();
       assert(openingVal && "all opened archetypes should be resolved");
-      if (latestOpeningInst
-          && pass.domInfo->dominates(openingInst, latestOpeningInst)) {
-        return;
+      if (latestOpeningInst) {
+        if (pass.domInfo->dominates(openingInst, latestOpeningInst))
+          return;
+
+        assert(pass.domInfo->dominates(latestOpeningInst, openingInst) &&
+               "opened archetypes must dominate their uses");
       }
       latestOpeningInst = openingInst;
     }
   });
   auto allocPt = latestOpeningInst ? std::next(latestOpeningInst->getIterator())
-    : pass.function->begin()->begin();
+                                   : pass.function->begin()->begin();
   auto allocBuilder = pass.getBuilder(allocPt);
   AllocStackInst *alloc = allocBuilder.createAllocStack(pass.genLoc(), allocTy);
 
