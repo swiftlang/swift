@@ -934,7 +934,7 @@ bb0(%0 : @owned $P):
   %9 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P, #P.foo, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   %cpy = copy_value %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
   end_borrow %b : $P
-  // This optional is an aggregate that contains an opened exsitential. May sure it's allocated after open_existential_addr.
+  // This optional is an aggregate that contains an opened existential. Make sure it is allocated after open_existential_addr.
   %opt = enum $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt, %cpy : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
   %some = unchecked_enum_data %opt : $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt
   %11 = apply %9<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>(%some) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
