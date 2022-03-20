@@ -277,8 +277,23 @@ sil [ossa] @f044_indirectGuaranteed : $@convention(thin) <T>(@in_guaranteed T) -
 // CHECK:   apply %{{.*}}<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   destroy_addr %0 : $*T
 // CHECK-LABEL: } // end sil function 'f045_indirectGuaranteedArg'
-sil [ossa] @f045_indirectGuaranteedArg : $@convention(thin) <T>(@in T) -> () {
+sil [ossa] @f045_indirectGuaranteedCallArg : $@convention(thin) <T>(@in T) -> () {
 bb0(%0 : @owned $T):
+  %1 = function_ref @f044_indirectGuaranteed : $@convention(thin) <τ_0_0>(@in_guaranteed τ_0_0) -> ()
+  %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0>(@in_guaranteed τ_0_0) -> ()
+  destroy_value %0 : $T
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f046_indirectGuaranteedFunctionArg : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK: bb0(%0 : $*T):
+// CHECK-NOT: load
+// CHECK: apply %{{.*}}<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NOT: end_borrow
+// CHECK-LABEL: } // end sil function 'f046_indirectGuaranteedFunctionArg'
+sil [ossa] @f046_indirectGuaranteedFunctionArg : $@convention(thin) <T>(@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
   %1 = function_ref @f044_indirectGuaranteed : $@convention(thin) <τ_0_0>(@in_guaranteed τ_0_0) -> ()
   %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0>(@in_guaranteed τ_0_0) -> ()
   destroy_value %0 : $T

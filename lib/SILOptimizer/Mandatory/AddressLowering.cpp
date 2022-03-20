@@ -425,7 +425,12 @@ struct AddressLoweringState {
 
   AddressLoweringState(SILFunction *function, DominanceInfo *domInfo)
       : function(function), loweredFnConv(getLoweredFnConv(function)),
-        domInfo(domInfo) {}
+        domInfo(domInfo) {
+    for (auto &block : *function) {
+      if (block.getTerminator()->isFunctionExiting())
+        exitingInsts.push_back(block.getTerminator());
+    }
+  }
 
   SILModule *getModule() const { return &function->getModule(); }
 
@@ -489,28 +494,39 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
     if (param.isFormalIndirect() && !fnConv.isSILIndirect(param)) {
       SILArgument *arg = pass.function->getArgument(argIdx);
       SILType addrType = arg->getType().getAddressType();
-      LoadInst *loadArg = argBuilder.createTrivialLoadOr(
-          SILValue(arg).getLoc(), SILUndef::get(addrType, *pass.function),
-          LoadOwnershipQualifier::Take);
-
-      arg->replaceAllUsesWith(loadArg);
+      auto loc = SILValue(arg).getLoc();
+      SILValue undefAddress = SILUndef::get(addrType, *pass.function);
+      SingleValueInstruction *load;
+      if (param.isConsumed()) {
+        load = argBuilder.createTrivialLoadOr(loc, undefAddress,
+                                              LoadOwnershipQualifier::Take);
+      } else {
+        load = cast<SingleValueInstruction>(
+            argBuilder.emitLoadBorrowOperation(loc, undefAddress));
+        for (SILInstruction *termInst : pass.exitingInsts) {
+          pass.getBuilder(termInst->getIterator())
+              .createEndBorrow(pass.genLoc(), load);
+        }
+      }
+      arg->replaceAllUsesWith(load);
       assert(!pass.valueStorageMap.contains(arg));
 
       arg = arg->getParent()->replaceFunctionArgument(
           arg->getIndex(), addrType, OwnershipKind::None, arg->getDecl());
 
-      loadArg->setOperand(arg);
+      assert(isa<LoadInst>(load) || isa<LoadBorrowInst>(load));
+      load->setOperand(0, arg);
 
       // Indirect calling convention may be used for loadable types. In that
       // case, generating the argument loads is sufficient.
       if (addrType.isAddressOnly(*pass.function)) {
-        pass.valueStorageMap.insertValue(loadArg, arg);
+        pass.valueStorageMap.insertValue(load, arg);
       }
     }
     ++argIdx;
   }
-  assert(argIdx
-         == fnConv.getSILArgIndexOfFirstParam() + fnConv.getNumSILArguments());
+  assert(argIdx ==
+         fnConv.getSILArgIndexOfFirstParam() + fnConv.getNumSILArguments());
 }
 
 /// Before populating the ValueStorageMap, insert function arguments for any
@@ -575,9 +591,6 @@ protected:
 /// to valueStorageMap in RPO.
 void OpaqueValueVisitor::mapValueStorage() {
   for (auto *block : postorderInfo.getReversePostOrder()) {
-    if (block->getTerminator()->isFunctionExiting())
-      pass.exitingInsts.push_back(block->getTerminator());
-
     // Opaque function arguments have already been replaced.
     if (block != pass.function->getEntryBlock()) {
       for (auto *arg : block->getArguments()) {
