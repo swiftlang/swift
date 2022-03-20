@@ -96,7 +96,7 @@ For example, Swift 5.6 would allow the following code, which at runtime would co
 
 * [SE-0341][]:
 
-  Opaque types can now be used in the parameters of functions and subscripts, wher they provide a shorthand syntax for the introduction of a generic parameter. For example, the following:
+  Opaque types can now be used in the parameters of functions and subscripts, when they provide a shorthand syntax for the introduction of a generic parameter. For example, the following:
 
   ```swift
   func horizontal(_ v1: some View, _ v2: some View) -> some View {
