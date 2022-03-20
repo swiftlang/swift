@@ -807,6 +807,28 @@ bb0(%0 : @owned $(AnyObject, T)):
   return %tuple : $(AnyObject, T)
 }
 
+// CHECK-LABEL: sil [ossa] @f126_testDestructureAndBorrow : $@convention(method) <Element> (@in (SI<Element>, I)) -> (@out Element, @out I) {
+// CHECK: bb0(%0 : $*Element, %1 : $*I, %2 : $*(SI<Element>, I)):
+// CHECK:   [[SI:%.*]] = tuple_element_addr %2 : $*(SI<Element>, I), 0
+// CHECK:   [[I:%.*]] = tuple_element_addr %2 : $*(SI<Element>, I), 1
+// CHECK:   [[LD:%.*]] = load [trivial] [[I]] : $*I
+// CHECK:   [[E:%.*]] = struct_element_addr [[SI]] : $*SI<Element>, #SI.element
+// CHECK:   copy_addr [[E]] to [initialization] %0 : $*Element
+// CHECK:   destroy_addr [[SI]] : $*SI<Element>
+// CHECK:   store [[LD]] to [trivial] %1 : $*I
+// CHECK-LABEL: } // end sil function 'f126_testDestructureAndBorrow'
+sil [ossa] @f126_testDestructureAndBorrow : $@convention(method) <Element> (@in (SI<Element>, I)) -> (@out Element, @out I) {
+bb0(%0 : @owned $(SI<Element>, I)):
+  (%si, %i) = destructure_tuple %0 : $(SI<Element>, I)
+  %borrow = begin_borrow %si : $SI<Element>
+  %element = struct_extract %borrow : $SI<Element>, #SI.element
+  %copy = copy_value %element : $Element
+  end_borrow %borrow : $SI<Element>
+  destroy_value %si : $SI<Element>
+  %tuple = tuple(%copy : $Element, %i : $I)
+  return %tuple : $(Element, I)
+}
+
 // CHECK-LABEL: sil [ossa] @f130_testReleaseValue : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0(%0 : $*T):
 // CHECK:   destroy_addr %0 : $*T
