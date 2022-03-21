@@ -275,7 +275,19 @@ static bool shouldSplitConcreteEquivalenceClasses(GenericSignature sig) {
 static void splitConcreteEquivalenceClasses(
     ASTContext &ctx,
     GenericSignature sig,
-    SmallVectorImpl<StructuralRequirement> &requirements) {
+    SmallVectorImpl<StructuralRequirement> &requirements,
+    unsigned &attempt) {
+  unsigned maxAttempts =
+      ctx.LangOpts.RequirementMachineMaxSplitConcreteEquivClassAttempts;
+
+  ++attempt;
+  if (attempt >= maxAttempts) {
+    llvm::errs() << "Splitting concrete equivalence classes did not "
+                 << "reach fixed point after " << attempt << " attempts.\n";
+    llvm::errs() << "Last result: " << sig << "\n";
+    abort();
+  }
+
   requirements.clear();
 
   for (auto req : sig.getRequirements()) {
@@ -428,6 +440,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
     }
   }
 
+  unsigned attempt = 0;
   for (;;) {
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
@@ -448,7 +461,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
 
     if (!errorFlags) {
       if (shouldSplitConcreteEquivalenceClasses(result)) {
-        splitConcreteEquivalenceClasses(ctx, result, requirements);
+        splitConcreteEquivalenceClasses(ctx, result, requirements, attempt);
         continue;
       }
 
@@ -568,6 +581,7 @@ InferredGenericSignatureRequestRQM::evaluate(
     }
   }
 
+  unsigned attempt = 0;
   for (;;) {
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
@@ -599,7 +613,8 @@ InferredGenericSignatureRequestRQM::evaluate(
     auto result = GenericSignature::get(genericParams, minimalRequirements);
     auto errorFlags = machine->getErrors();
 
-    if (ctx.LangOpts.RequirementMachineInferredSignatures ==
+    if (attempt == 0 &&
+        ctx.LangOpts.RequirementMachineInferredSignatures ==
         RequirementMachineMode::Enabled) {
       machine->System.computeRedundantRequirementDiagnostics(errors);
       diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
@@ -608,8 +623,9 @@ InferredGenericSignatureRequestRQM::evaluate(
     // FIXME: Handle allowConcreteGenericParams
 
     if (!errorFlags) {
+      // Check if we need to rebuild the signature.
       if (shouldSplitConcreteEquivalenceClasses(result)) {
-        splitConcreteEquivalenceClasses(ctx, result, requirements);
+        splitConcreteEquivalenceClasses(ctx, result, requirements, attempt);
         continue;
       }
 
