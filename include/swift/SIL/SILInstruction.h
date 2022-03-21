@@ -1112,16 +1112,18 @@ public:
 /// initializes the kind field on our object is run before our constructor runs.
 class OwnershipForwardingMixin {
   ValueOwnershipKind ownershipKind;
-  bool directlyForwards;
+  bool preservesOwnershipFlag;
 
 protected:
   OwnershipForwardingMixin(SILInstructionKind kind,
                            ValueOwnershipKind ownershipKind,
-                           bool isDirectlyForwarding = true)
-      : ownershipKind(ownershipKind), directlyForwards(isDirectlyForwarding) {
+                           bool preservesOwnership = true)
+      : ownershipKind(ownershipKind),
+        preservesOwnershipFlag(preservesOwnership) {
     assert(isa(kind) && "Invalid subclass?!");
     assert(ownershipKind && "invalid forwarding ownership");
-    assert((directlyForwards || ownershipKind != OwnershipKind::Guaranteed) &&
+    assert((preservesOwnershipFlag
+            || ownershipKind != OwnershipKind::Guaranteed) &&
            "Non directly forwarding instructions can not forward guaranteed "
            "ownership");
   }
@@ -1160,7 +1162,7 @@ public:
     return ownershipKind;
   }
   void setForwardingOwnershipKind(ValueOwnershipKind newKind) {
-    assert((isDirectlyForwarding() || newKind != OwnershipKind::Guaranteed) &&
+    assert((preservesOwnership() || newKind != OwnershipKind::Guaranteed) &&
            "Non directly forwarding instructions can not forward guaranteed "
            "ownership");
     ownershipKind = newKind;
@@ -8083,9 +8085,9 @@ protected:
   OwnershipForwardingTermInst(SILInstructionKind kind,
                               SILDebugLocation debugLoc,
                               ValueOwnershipKind ownershipKind,
-                              bool isDirectlyForwarding = true)
+                              bool preservesOwnership = true)
       : TermInst(kind, debugLoc),
-        OwnershipForwardingMixin(kind, ownershipKind, isDirectlyForwarding) {
+        OwnershipForwardingMixin(kind, ownershipKind, preservesOwnership) {
     assert(classof(kind));
   }
 
