@@ -198,3 +198,106 @@ func inferred6<T : P11>(_: T) where T.Y : Hashable, T.Z == Set<T.X>, T.X == T.Y 
 func typeMatcherSugar<T>(_: T) where Array<Int> == Array<T>, Array<Int> == Array<T> {}
 // expected-warning@-1 2{{redundant same-type constraint 'Array<Int>' == 'Array<T>'}}
 // expected-warning@-2{{redundant same-type constraint 'T' == 'Int'}}
+
+// MARK: - Conflict diagnostics
+
+protocol ProtoAlias1 {
+  typealias A1 = Int
+}
+
+protocol ProtoAlias2 {
+  typealias A2 = String
+}
+
+func basicConflict<T: ProtoAlias1 & ProtoAlias2>(_:T) where T.A1 == T.A2 {}
+// expected-error@-1{{generic signature requires types 'Int' and 'String' to be the same}}
+
+protocol RequiresAnyObject {
+  associatedtype A: AnyObject
+}
+
+protocol RequiresConformance {
+  associatedtype A: P
+}
+
+class Super {}
+protocol RequiresSuperclass {
+  associatedtype A: Super
+}
+
+func testMissingRequirements() {
+  struct S {}
+  func conflict1<T: RequiresAnyObject>(_: T) where T.A == S {}
+  // expected-error@-1{{same-type constraint type 'S' does not conform to required protocol 'AnyObject'}}
+
+  func conflict2<T: RequiresConformance>(_: T) where T.A == C {}
+  // expected-error@-1{{same-type constraint type 'C' does not conform to required protocol 'P'}}
+
+  // FIXME: Diagnose conflicting superclass requirements on T.A
+  class C {}
+  func conflict3<T: RequiresSuperclass>(_: T) where T.A == C {}
+  func conflict4<T: RequiresSuperclass>(_: T) where T.A: C {}
+}
+
+protocol Fooable {
+  associatedtype Foo
+
+  var foo: Foo { get }
+}
+
+protocol Barrable {
+  associatedtype Bar: Fooable
+  var bar: Bar { get }
+}
+
+func sameTypeConflicts() {
+
+  struct X {}
+  struct Y: Fooable {
+    typealias Foo = X
+    var foo: X { return X() }
+  }
+  struct Z: Barrable {
+    typealias Bar = Y
+    var bar: Y { return Y() }
+  }
+
+  // expected-error@+1{{generic signature requires types 'Y' and 'X' to be the same}}
+  func fail1<
+    T: Fooable, U: Fooable
+  >(_ t: T, u: U) -> (X, Y)
+    where T.Foo == X, U.Foo == Y, T.Foo == U.Foo {
+    fatalError()
+  }
+
+  // expected-error@+1{{generic signature requires types 'X' and 'Y' to be the same}}
+  func fail2<
+    T: Fooable, U: Fooable
+  >(_ t: T, u: U) -> (X, Y)
+    where T.Foo == U.Foo, T.Foo == X, U.Foo == Y {
+    fatalError()
+  }
+
+  // expected-error@+1{{same-type constraint type 'X' does not conform to required protocol 'Fooable'}}
+  func fail3<T: Barrable>(_ t: T) -> X
+    where T.Bar == X {
+    fatalError()
+  }
+
+  // expected-error@+1{{generic signature requires types 'Z' and 'X' to be the same}}
+  func fail4<T: Barrable>(_ t: T) -> (Y, Z)
+    where
+    T.Bar == Y,
+    T.Bar.Foo == Z {
+    fatalError()
+  }
+
+  // expected-error@+1{{generic signature requires types 'Z' and 'X' to be the same}}
+  func fail5<T: Barrable>(_ t: T) -> (Y, Z)
+    where
+    T.Bar.Foo == Z,
+    T.Bar == Y {
+    fatalError()
+  }
+
+}

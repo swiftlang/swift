@@ -411,6 +411,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
         RequirementMachineMode::Enabled) {
       SmallVector<RequirementError, 4> errors;
       machine->System.computeRedundantRequirementDiagnostics(errors);
+      machine->System.computeConflictDiagnostics(errors, proto->getLoc());
       diagnoseRequirementErrors(ctx, errors,
                                 /*allowConcreteGenericParams=*/false);
     }
@@ -844,6 +845,7 @@ InferredGenericSignatureRequestRQM::evaluate(
         ctx.LangOpts.RequirementMachineInferredSignatures ==
         RequirementMachineMode::Enabled) {
       machine->System.computeRedundantRequirementDiagnostics(errors);
+      machine->System.computeConflictDiagnostics(errors, loc);
       diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
     }
 

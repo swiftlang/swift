@@ -229,6 +229,9 @@ public:
 
   void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
 
+  void computeConflictDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                  SourceLoc signatureLoc);
+
 private:
   struct CriticalPair {
     MutableTerm LHS;

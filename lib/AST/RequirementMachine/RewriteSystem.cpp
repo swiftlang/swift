@@ -752,6 +752,73 @@ void RewriteSystem::freeze() {
   ConflictingRules.clear();
 }
 
+void RewriteSystem::computeConflictDiagnostics(
+    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc) {
+  for (auto pair : ConflictingRules) {
+    auto *firstRule = &getRule(pair.first);
+    auto *secondRule = &getRule(pair.second);
+
+    auto firstProperty = firstRule->isPropertyRule();
+    auto secondProperty = secondRule->isPropertyRule();
+    if (!firstProperty || !secondProperty)
+      continue;
+
+    auto recordError = [&](Symbol subject, Symbol constraint) {
+      auto subjectType = subject.getConcreteType();
+      switch (constraint.getKind()) {
+      case Symbol::Kind::ConcreteType:
+        errors.push_back(RequirementError::forConcreteTypeMismatch(
+            subjectType, constraint.getConcreteType(), signatureLoc));
+        return;
+
+      case Symbol::Kind::Superclass:
+        errors.push_back(RequirementError::forSameTypeMissingRequirement(
+            {RequirementKind::Superclass, subjectType, constraint.getConcreteType()},
+            signatureLoc));
+        return;
+
+      case Symbol::Kind::Protocol:
+        errors.push_back(RequirementError::forSameTypeMissingRequirement(
+            {RequirementKind::Conformance, subjectType,
+             constraint.getProtocol()->getDeclaredInterfaceType()},
+            signatureLoc));
+        return;
+
+      case Symbol::Kind::Layout:
+        errors.push_back(RequirementError::forSameTypeMissingRequirement(
+            {RequirementKind::Layout, subjectType, constraint.getLayoutConstraint()},
+            signatureLoc));
+        return;
+
+      case Symbol::Kind::ConcreteConformance:
+      case Symbol::Kind::AssociatedType:
+      case Symbol::Kind::GenericParam:
+      case Symbol::Kind::Name:
+        return;
+      }
+    };
+
+    if (firstProperty->getKind() == Symbol::Kind::ConcreteType) {
+      recordError(*firstProperty, *secondProperty);
+    } else if (secondProperty->getKind() == Symbol::Kind::ConcreteType) {
+      recordError(*secondProperty, *firstProperty);
+    } else {
+      // FIXME: This can happen when there are conflicting requirements
+      // on a type parameter, e.g. conflicting superclass requirements:
+      //
+      //   class C1 {}
+      //   class C2 {}
+      //   protocol P { associatedtype A: C1 }
+      //   func conflict<T: P>(_: T) where T.A: C2 {}
+      //
+      // In this case, we want to compute the type `T.A` from
+      // its corresponding term. For this, we need the property map
+      // from the RequirementMachine.
+      continue;
+    }
+  }
+}
+
 void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "Rewrite system: {\n";
   for (const auto &rule : Rules) {
