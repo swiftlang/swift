@@ -156,7 +156,7 @@ An expected diagnostic is denoted by a comment which begins with `expected-error
   
   * Insertions are represented by identical start and end locations: `{{3-3=@objc }}`. Deletions are represented by empty replacement text: `{{3-9=}}`.
   
-  * Line offsets are also permitted; for instance, `{{-1:12-+1:42=}}` would specify a fix-it that deleted everything between column 12 on the previous line and column 42 on the next line. (The second location could just be written as `1:42` and would mean the same thing.)
+  * Line offsets are also permitted; for instance, `{{-1:12-+1:42=}}` would specify a fix-it that deleted everything between column 12 on the previous line and column 42 on the next line. (If the sign is omitted, it specifies an absolute line number, not an offset.)
   
   * By default, the verifier ignores any fix-its that are *not* expected; the special `{{none}}` specifier tells it to verify that the diagnostic it's attached to has *only* the fix-its specified and no others.
 
