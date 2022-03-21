@@ -254,6 +254,10 @@ static bool shouldSplitConcreteEquivalenceClass(Requirement req,
           sig->isConcreteType(req.getSecondType()));
 }
 
+/// Returns true if this generic signature contains abstract same-type
+/// requirements between concrete type parameters. In this case, we split
+/// the abstract same-type requirements into pairs of concrete type
+/// requirements, and minimize the signature again.
 static bool shouldSplitConcreteEquivalenceClasses(GenericSignature sig) {
   for (auto req : sig.getRequirements()) {
     if (shouldSplitConcreteEquivalenceClass(req, sig))
@@ -263,9 +267,16 @@ static bool shouldSplitConcreteEquivalenceClasses(GenericSignature sig) {
   return false;
 }
 
-static GenericSignature splitConcreteEquivalenceClasses(
-    GenericSignature sig, ASTContext &ctx) {
-  SmallVector<Requirement, 2> reqs;
+/// Replace each same-type requirement 'T == U' where 'T' (and therefore 'U')
+/// is known to equal a concrete type 'C' with a pair of requirements
+/// 'T == C' and 'U == C'. We build the signature again in this case, since
+/// one of the two requirements will be redundant, but we don't know which
+/// ahead of time.
+static void splitConcreteEquivalenceClasses(
+    ASTContext &ctx,
+    GenericSignature sig,
+    SmallVectorImpl<StructuralRequirement> &requirements) {
+  requirements.clear();
 
   for (auto req : sig.getRequirements()) {
     if (shouldSplitConcreteEquivalenceClass(req, sig)) {
@@ -273,27 +284,17 @@ static GenericSignature splitConcreteEquivalenceClasses(
         sig.getCanonicalTypeInContext(
           req.getSecondType()));
 
-      reqs.emplace_back(RequirementKind::SameType,
-                        req.getFirstType(),
-                        canType);
-      reqs.emplace_back(RequirementKind::SameType,
-                        req.getSecondType(),
-                        canType);
-    } else {
-      reqs.push_back(req);
+      Requirement firstReq(RequirementKind::SameType,
+                           req.getFirstType(), canType);
+      Requirement secondReq(RequirementKind::SameType,
+                            req.getSecondType(), canType);
+      requirements.push_back({firstReq, SourceLoc(), /*inferred=*/false});
+      requirements.push_back({secondReq, SourceLoc(), /*inferred=*/false});
+      continue;
     }
+
+    requirements.push_back({req, SourceLoc(), /*inferred=*/false});
   }
-
-  SmallVector<GenericTypeParamType *, 2> genericParams;
-  genericParams.append(sig.getGenericParams().begin(),
-                       sig.getGenericParams().end());
-
-  return evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequestRQM{
-        /*baseSignature=*/nullptr,
-        genericParams, reqs},
-      GenericSignatureWithError()).getPointer();
 }
 
 GenericSignatureWithError
@@ -427,32 +428,36 @@ AbstractGenericSignatureRequestRQM::evaluate(
     }
   }
 
-  // Heap-allocate the requirement machine to save stack space.
-  std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
-      ctx.getRewriteContext()));
+  for (;;) {
+    // Heap-allocate the requirement machine to save stack space.
+    std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
+        ctx.getRewriteContext()));
 
-  auto status =
-      machine->initWithWrittenRequirements(genericParams, requirements);
-  machine->checkCompletionResult(status.first);
+    auto status =
+        machine->initWithWrittenRequirements(genericParams, requirements);
+    machine->checkCompletionResult(status.first);
 
-  // We pass reconstituteSugar=false to ensure that if the original
-  // requirements were canonical, the final signature remains canonical.
-  auto minimalRequirements =
-    machine->computeMinimalGenericSignatureRequirements(
-        /*reconstituteSugar=*/false);
+    // We pass reconstituteSugar=false to ensure that if the original
+    // requirements were canonical, the final signature remains canonical.
+    auto minimalRequirements =
+      machine->computeMinimalGenericSignatureRequirements(
+          /*reconstituteSugar=*/false);
 
-  auto result = GenericSignature::get(genericParams, minimalRequirements);
-  auto errorFlags = machine->getErrors();
+    auto result = GenericSignature::get(genericParams, minimalRequirements);
+    auto errorFlags = machine->getErrors();
 
-  if (!errorFlags) {
-    if (shouldSplitConcreteEquivalenceClasses(result))
-      result = splitConcreteEquivalenceClasses(result, ctx);
+    if (!errorFlags) {
+      if (shouldSplitConcreteEquivalenceClasses(result)) {
+        splitConcreteEquivalenceClasses(ctx, result, requirements);
+        continue;
+      }
 
-    // Check invariants.
-    result.verify();
+      // Check invariants.
+      result.verify();
+    }
+
+    return GenericSignatureWithError(result, errorFlags);
   }
-
-  return GenericSignatureWithError(result, errorFlags);
 }
 
 GenericSignatureWithError
@@ -563,51 +568,55 @@ InferredGenericSignatureRequestRQM::evaluate(
     }
   }
 
-  // Heap-allocate the requirement machine to save stack space.
-  std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
-      ctx.getRewriteContext()));
+  for (;;) {
+    // Heap-allocate the requirement machine to save stack space.
+    std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
+        ctx.getRewriteContext()));
 
-  auto status =
-      machine->initWithWrittenRequirements(genericParams, requirements);
-  if (status.first != CompletionResult::Success) {
-    ctx.Diags.diagnose(loc,
-                       diag::requirement_machine_completion_failed,
-                       /*protocol=*/0,
-                       unsigned(status.first));
+    auto status =
+        machine->initWithWrittenRequirements(genericParams, requirements);
+    if (status.first != CompletionResult::Success) {
+      ctx.Diags.diagnose(loc,
+                         diag::requirement_machine_completion_failed,
+                         /*protocol=*/0,
+                         unsigned(status.first));
 
-    auto rule = machine->getRuleAsStringForDiagnostics(status.second);
-    ctx.Diags.diagnose(loc,
-                       diag::requirement_machine_completion_rule,
-                       rule);
+      auto rule = machine->getRuleAsStringForDiagnostics(status.second);
+      ctx.Diags.diagnose(loc,
+                         diag::requirement_machine_completion_rule,
+                         rule);
 
-    auto result = GenericSignature::get(genericParams,
-                                        parentSig.getRequirements());
-    return GenericSignatureWithError(
-        result, GenericSignatureErrorFlags::CompletionFailed);
+      auto result = GenericSignature::get(genericParams,
+                                          parentSig.getRequirements());
+      return GenericSignatureWithError(
+          result, GenericSignatureErrorFlags::CompletionFailed);
+    }
+
+    auto minimalRequirements =
+      machine->computeMinimalGenericSignatureRequirements(
+          /*reconstituteSugar=*/true);
+
+    auto result = GenericSignature::get(genericParams, minimalRequirements);
+    auto errorFlags = machine->getErrors();
+
+    if (ctx.LangOpts.RequirementMachineInferredSignatures ==
+        RequirementMachineMode::Enabled) {
+      machine->System.computeRedundantRequirementDiagnostics(errors);
+      diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
+    }
+
+    // FIXME: Handle allowConcreteGenericParams
+
+    if (!errorFlags) {
+      if (shouldSplitConcreteEquivalenceClasses(result)) {
+        splitConcreteEquivalenceClasses(ctx, result, requirements);
+        continue;
+      }
+
+      // Check invariants.
+      result.verify();
+    }
+
+    return GenericSignatureWithError(result, errorFlags);
   }
-
-  auto minimalRequirements =
-    machine->computeMinimalGenericSignatureRequirements(
-        /*reconstituteSugar=*/true);
-
-  auto result = GenericSignature::get(genericParams, minimalRequirements);
-  auto errorFlags = machine->getErrors();
-
-  if (ctx.LangOpts.RequirementMachineInferredSignatures ==
-      RequirementMachineMode::Enabled) {
-    machine->System.computeRedundantRequirementDiagnostics(errors);
-    diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
-  }
-
-  // FIXME: Handle allowConcreteGenericParams
-
-  if (!errorFlags) {
-    if (shouldSplitConcreteEquivalenceClasses(result))
-      result = splitConcreteEquivalenceClasses(result, ctx);
-
-    // Check invariants.
-    result.verify();
-  }
-
-  return GenericSignatureWithError(result, errorFlags);
 }
