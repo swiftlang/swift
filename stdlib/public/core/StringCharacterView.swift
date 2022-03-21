@@ -210,10 +210,10 @@ extension String: BidirectionalCollection {
     // Fast path ASCII grapheme breaking.
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 {
-        let scalar1 = $0[0]
+        let scalar1 = $0[_unchecked: i._encodedOffset]
 
-        if scalar1 == 0xD, $0.count > 1 {
-          let scalar2 = $0[1]
+        if scalar1 == 0xD, i._encodedOffset &+ 1 < $0.count {
+          let scalar2 = $0[_unchecked: i._encodedOffset &+ 1]
 
           return scalar2 == 0xA ? 2 : 1
         }
@@ -230,6 +230,21 @@ extension String: BidirectionalCollection {
     _internalInvariant_5_1(i._isScalarAligned)
 
     if i == startIndex { return 0 }
+
+    // Fast path ASCII grapheme breaking.
+    if _fastPath(_guts.isFastASCII) {
+      return _guts.withFastUTF8 {
+        let scalar2 = $0[_unchecked: i._encodedOffset &- 1]
+
+        if scalar2 == 0xA, 0 < i._encodedOffset &- 1 {
+          let scalar1 = $0[_unchecked: i._encodedOffset &- 2]
+
+          return scalar1 == 0xD ? 2 : 1
+        }
+
+        return 1
+      }
+    }
 
     return _guts._opaqueCharacterStride(endingAt: i._encodedOffset)
   }
