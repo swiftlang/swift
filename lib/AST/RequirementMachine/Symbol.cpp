@@ -78,6 +78,7 @@ struct Symbol::Storage final
   Storage(Symbol::Kind kind, CanType type, ArrayRef<Term> substitutions) {
     assert(kind == Symbol::Kind::Superclass ||
            kind == Symbol::Kind::ConcreteType);
+    assert(!type->hasUnboundGenericType());
     assert(!type->hasTypeVariable());
     assert(type->hasTypeParameter() != substitutions.empty());
 
