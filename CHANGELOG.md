@@ -54,7 +54,7 @@ func talkTo(greeter: Greeter) async throws {
 
 * The compiler now emits a warning when a non-final class conforms to a protocol that imposes a same-type requirement between `Self` and an associated type. This is because such a requirement makes the conformance unsound for subclasses.
 
-For example, Swift 5.6 would allow the following code, which at runtime would construct an instanec of `C` and not `SubC` as expected:
+For example, Swift 5.6 would allow the following code, which at runtime would construct an instance of `C` and not `SubC` as expected:
 
   ```swift
   protocol P {
