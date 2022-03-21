@@ -675,8 +675,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_Dependencies:
   case file_types::TY_SwiftModuleDocFile:
   case file_types::TY_SerializedDiagnostics:
-  case file_types::TY_ObjCHeader:
-  case file_types::TY_CXXHeader:
+  case file_types::TY_ClangHeader:
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
   case file_types::TY_ExternalSwiftDeps:
@@ -815,7 +814,7 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
 
-  if (addOutputsOfType(arguments, Output, Args, file_types::ID::TY_ObjCHeader,
+  if (addOutputsOfType(arguments, Output, Args, file_types::ID::TY_ClangHeader,
                        "-emit-objc-header-path")) {
     assert(OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
            "The Swift tool should only emit an Obj-C header in single compile"
@@ -936,8 +935,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_Dependencies:
     case file_types::TY_SwiftModuleDocFile:
     case file_types::TY_SerializedDiagnostics:
-    case file_types::TY_ObjCHeader:
-    case file_types::TY_CXXHeader:
+    case file_types::TY_ClangHeader:
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:
     case file_types::TY_ExternalSwiftDeps:
@@ -1100,7 +1098,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
-                   file_types::TY_ObjCHeader, "-emit-objc-header-path");
+                   file_types::TY_ClangHeader, "-emit-objc-header-path");
   addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
                    "-emit-tbd-path");
 
@@ -1309,7 +1307,7 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
 
-  addInputsOfType(Arguments, context.InputActions, file_types::TY_ObjCHeader);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_ClangHeader);
   context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
 
   if (job.isPersistentPCH()) {

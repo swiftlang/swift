@@ -1031,4 +1031,9 @@ def skip_import_in_public_interface:
   HelpText<"Skip the import statement corresponding to a module name "
            "when printing the public interface.">;
 
+def clang_header_expose_public_decls:
+  Flag<["-"], "clang-header-expose-public-decls">,
+  HelpText<"Expose all public declarations in the generated clang header">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
