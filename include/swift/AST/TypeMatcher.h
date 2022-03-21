@@ -419,9 +419,8 @@ class TypeMatcher {
 
     bool visitBoundGenericType(CanBoundGenericType firstBGT,
                                Type secondType, Type sugaredFirstType) {
-      auto _secondBGT = secondType->getCanonicalType();
-      if (firstBGT->getKind() == _secondBGT->getKind()) {
-        auto secondBGT = cast<BoundGenericType>(_secondBGT);
+      if (firstBGT->getKind() == secondType->getDesugaredType()->getKind()) {
+        auto secondBGT = secondType->castTo<BoundGenericType>();
         if (firstBGT->getDecl() != secondBGT->getDecl())
           return mismatch(firstBGT.getPointer(), secondBGT, sugaredFirstType);
 

@@ -194,3 +194,7 @@ func inferred3<T : P11>(_: T) where T.X : Hashable, T.Z == Set<T.Y>, T.X == T.Y 
 func inferred4<T : P11>(_: T) where T.Z == Set<T.Y>, T.X : Hashable, T.X == T.Y {}
 func inferred5<T : P11>(_: T) where T.Z == Set<T.X>, T.Y : Hashable, T.X == T.Y {}
 func inferred6<T : P11>(_: T) where T.Y : Hashable, T.Z == Set<T.X>, T.X == T.Y {}
+
+func typeMatcherSugar<T>(_: T) where Array<Int> == Array<T>, Array<Int> == Array<T> {}
+// expected-warning@-1 2{{redundant same-type constraint 'Array<Int>' == 'Array<T>'}}
+// expected-warning@-2{{redundant same-type constraint 'T' == 'Int'}}
