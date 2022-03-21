@@ -458,7 +458,8 @@ static std::string getModuleContentsCxxString(ModuleDecl &M) {
 }
 
 bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
-                               StringRef bridgingHeader) {
+                               StringRef bridgingHeader,
+                               bool ExposePublicDeclsInClangHeader) {
   llvm::PrettyStackTraceString trace("While generating Clang header");
 
   SmallPtrSet<ImportModuleTy, 8> imports;
@@ -472,7 +473,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   emitObjCConditional(os, [&] { os << objcModuleContents.str(); });
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
-    if (M->getASTContext().LangOpts.EnableCXXInterop) {
+    if (ExposePublicDeclsInClangHeader) {
       os << getModuleContentsCxxString(*M);
     }
   });

@@ -26,13 +26,14 @@ namespace swift {
   /// The Objective-C compatible declarations are printed into a block that
   /// ensures that those declarations are only usable when the header is
   /// compiled in Objective-C mode.
-  ///  The C++ compatible declarations are printed into a block that ensures
-  ///  that those declarations are only usable when the header is compiled in
-  ///  C++ mode.
+  /// The C++ compatible declarations are printed into a block that ensures
+  /// that those declarations are only usable when the header is compiled in
+  /// C++ mode.
   ///
   /// Returns true on error.
   bool printAsClangHeader(raw_ostream &out, ModuleDecl *M,
-                          StringRef bridgingHeader);
+                          StringRef bridgingHeader,
+                          bool ExposePublicDeclsInClangHeader);
 }
 
 #endif
