@@ -237,7 +237,7 @@ Optional<Type> ConcreteContraction::substTypeParameter(
 
   // An unresolved DependentMemberType stores an identifier. Handle this
   // by performing a name lookup into the base type.
-  SmallVector<TypeDecl *> concreteDecls;
+  SmallVector<TypeDecl *, 2> concreteDecls;
   lookupConcreteNestedType(*substBaseType, memberType->getName(), concreteDecls);
 
   auto *typeDecl = findBestConcreteNestedType(concreteDecls);
