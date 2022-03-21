@@ -174,6 +174,7 @@ struct ActiveActorStatusWithoutEscalation {
 template <typename Runtime, typename ActiveActorStatus>
 struct DefaultActorImpl {
   HeapObject<Runtime> HeapObject;
+  Job<Runtime> JobStorage;
   ActiveActorStatus Status;
 };
 
