@@ -532,13 +532,11 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
          SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
-def emit_cxx_header : Flag<["-"], "emit-cxx-header">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
-  HelpText<"Emit a C++ header file">;
-def emit_cxx_header_path : Separate<["-"], "emit-cxx-header-path">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput]>,
-  MetaVarName<"<path>">, HelpText<"Emit a C++ header file to <path>">;
+  HelpText<"Emit an Objective-C and C++ header file to <path>">,
+  Alias<emit_objc_header_path>;
 
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,

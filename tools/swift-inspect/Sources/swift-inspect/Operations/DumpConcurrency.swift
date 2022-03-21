@@ -54,6 +54,7 @@ fileprivate class ConcurrencyDumper {
     var hasIsRunning: Bool
     var isRunning: Bool
     var isEnqueued: Bool
+    var threadPort: UInt32?
     var id: UInt64
     var runJob: swift_reflection_ptr_t
     var allocatorSlabPtr: swift_reflection_ptr_t
@@ -100,7 +101,7 @@ fileprivate class ConcurrencyDumper {
 
   func gatherHeapInfo() -> HeapInfo {
     var result = HeapInfo()
-    
+
     process.iterateHeap { (pointer, size) in
       let metadata = swift_reflection_ptr_t(swift_reflection_metadataForObject(context, UInt(pointer)))
       if metadata == jobMetadata {
@@ -198,17 +199,20 @@ fileprivate class ConcurrencyDumper {
       address: task,
       kind: reflectionInfo.Kind,
       enqueuePriority: reflectionInfo.EnqueuePriority,
-      isChildTask: reflectionInfo.IsChildTask != 0,
-      isFuture: reflectionInfo.IsFuture != 0,
-      isGroupChildTask: reflectionInfo.IsGroupChildTask != 0,
-      isAsyncLetTask: reflectionInfo.IsAsyncLetTask != 0,
+      isChildTask: reflectionInfo.IsChildTask,
+      isFuture: reflectionInfo.IsFuture,
+      isGroupChildTask: reflectionInfo.IsGroupChildTask,
+      isAsyncLetTask: reflectionInfo.IsAsyncLetTask,
       maxPriority: reflectionInfo.MaxPriority,
-      isCancelled: reflectionInfo.IsCancelled != 0,
-      isStatusRecordLocked: reflectionInfo.IsStatusRecordLocked != 0,
-      isEscalated: reflectionInfo.IsEscalated != 0,
-      hasIsRunning: reflectionInfo.HasIsRunning != 0,
-      isRunning: reflectionInfo.IsRunning != 0,
-      isEnqueued: reflectionInfo.IsEnqueued != 0,
+      isCancelled: reflectionInfo.IsCancelled,
+      isStatusRecordLocked: reflectionInfo.IsStatusRecordLocked,
+      isEscalated: reflectionInfo.IsEscalated,
+      hasIsRunning: reflectionInfo.HasIsRunning,
+      isRunning: reflectionInfo.IsRunning,
+      isEnqueued: reflectionInfo.IsEnqueued,
+      threadPort: reflectionInfo.HasThreadPort
+                ? reflectionInfo.ThreadPort
+                : nil,
       id: reflectionInfo.Id,
       runJob: reflectionInfo.RunJob,
       allocatorSlabPtr: reflectionInfo.AllocatorSlabPtr,
@@ -257,22 +261,6 @@ fileprivate class ConcurrencyDumper {
     return remove(from: name, upTo: " resume partial function for ")
   }
 
-  func flagsStrings<T: BinaryInteger>(flags: T, strings: [T: String]) -> [String] {
-    return strings.sorted{ $0.key < $1.key }
-                  .filter({ ($0.key & flags) != 0})
-                  .map{ $0.value }
-  }
-
-  func flagsString<T: BinaryInteger>(flags: T, strings: [T: String]) -> String {
-    let flagStrs = flagsStrings(flags: flags, strings: strings)
-    if flagStrs.isEmpty {
-      return "0"
-    }
-
-    let flagsStr = flagStrs.joined(separator: "|")
-    return flagsStr
-  }
-
   func decodeTaskFlags(_ info: TaskInfo) -> String {
     var flags: [String] = []
     if info.isChildTask { flags.append("childTask") }
@@ -289,29 +277,28 @@ fileprivate class ConcurrencyDumper {
     return flagsStr
   }
 
-  func decodeActorFlags(_ flags: UInt64) -> (
-    status: String,
+  func decodeActorFlags(_ info: swift_actor_info_t) -> (
+    state: String,
     flags: String,
-    maxPriority: UInt64
+    maxPriority: UInt8
   ) {
-    let statuses: [UInt64: String] = [
+    let states: [UInt8: String] = [
       0: "idle",
       1: "scheduled",
       2: "running",
       3: "zombie-latching",
       4: "zombie-ready-for-deallocation"
     ]
-    let flagsString = flagsString(flags: flags, strings: [
-      1 << 3: "hasActiveInlineJob",
-      1 << 4: "isDistributedRemote"
-    ])
 
-    let status = flags & 0x7
-    let maxPriority = (flags >> 8) & 0xff
+    var flags: [String] = []
+    if info.IsPriorityEscalated { flags.append("priorityEscalated") }
+    if info.IsDistributedRemote { flags.append("distributedRemote") }
+    let flagsStr = flags.isEmpty ? "0" : flags.joined(separator: "|")
+
     return (
-      status: statuses[status] ?? "unknown(\(status))",
-      flags: flagsString,
-      maxPriority: maxPriority
+      state: states[info.State] ?? "unknown(\(info.State))",
+      flags: flagsStr,
+      maxPriority: info.MaxPriority
     )
   }
 
@@ -370,6 +357,11 @@ fileprivate class ConcurrencyDumper {
       if let parent = task.parent {
         output("parent: \(hex: parent)")
       }
+      if let threadPort = task.threadPort, threadPort != 0 {
+        if let threadID = process.getThreadID(remotePort: threadPort) {
+          output("waiting on thread: port=\(hex: threadPort) id=\(hex: threadID)")
+        }
+      }
 
       if let first = symbolicatedBacktrace.first {
         output("async backtrace: \(first)")
@@ -400,11 +392,22 @@ fileprivate class ConcurrencyDumper {
     for actor in actors {
       let metadata = swift_reflection_metadataForObject(context, UInt(actor))
       let metadataName = name(metadata: swift_reflection_ptr_t(metadata)) ?? "<unknown class name>"
-      let info = swift_reflection_actorInfo(context, actor);
+      let info = swift_reflection_actorInfo(context, actor)
+      if let error = info.Error {
+        print(String(utf8String: error) ?? "<unknown error>")
+        continue
+      }
 
-      let flags = decodeActorFlags(info.Flags)
+      let flags = decodeActorFlags(info)
 
-      print("  \(hex: actor) \(metadataName) status=\(flags.status) flags=\(flags.flags) maxPriority=\(hex: flags.maxPriority)")
+      print("  \(hex: actor) \(metadataName) state=\(flags.state) flags=\(flags.flags) maxPriority=\(hex: flags.maxPriority)")
+      if info.HasThreadPort && info.ThreadPort != 0 {
+        if let threadID = process.getThreadID(remotePort: info.ThreadPort) {
+          print("    waiting on thread: port=\(hex: info.ThreadPort) id=\(hex: threadID)")
+        } else {
+          print("    waiting on thread: port=\(hex: info.ThreadPort) (unknown thread ID)")
+        }
+      }
 
       func jobStr(_ job: swift_reflection_ptr_t) -> String {
         if let task = tasks[job] {
@@ -425,7 +428,7 @@ fileprivate class ConcurrencyDumper {
           }
         }
       }
-        print("")
+      print("")
     }
   }
 

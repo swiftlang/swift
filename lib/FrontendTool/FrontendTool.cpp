@@ -170,36 +170,24 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 
 /// Prints the Objective-C "generated header" interface for \p M to \p
 /// outputPath.
-///
-/// ...unless \p outputPath is empty, in which case it does nothing.
-///
-/// \returns true if there were any errors
-///
-/// \see swift::printAsObjC
-static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
-                                StringRef bridgingHeader) {
-  if (outputPath.empty())
-    return false;
-  return withOutputFile(M->getDiags(), outputPath,
-                        [&](raw_ostream &out) -> bool {
-    return printAsObjC(out, M, bridgingHeader);
-  });
-}
-
-/// Prints the C++  "generated header" interface for \p M to \p
+/// Print the exposed "generated header" interface for \p M to \p
 /// outputPath.
 ///
 /// ...unless \p outputPath is empty, in which case it does nothing.
 ///
 /// \returns true if there were any errors
 ///
-/// \see swift::printAsCXX
-static bool printAsCxxIfNeeded(StringRef outputPath, ModuleDecl *M) {
+/// \see swift::printAsClangHeader
+static bool printAsClangHeaderIfNeeded(StringRef outputPath, ModuleDecl *M,
+                                       StringRef bridgingHeader,
+                                       bool ExposePublicDeclsInClangHeader) {
   if (outputPath.empty())
     return false;
   return withOutputFile(
-      M->getDiags(), outputPath,
-      [&](raw_ostream &os) -> bool { return printAsCXX(os, M); });
+      M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
+        return printAsClangHeader(out, M, bridgingHeader,
+                                  ExposePublicDeclsInClangHeader);
+      });
 }
 
 /// Prints the stable module interface for \p M to \p outputPath.
@@ -824,7 +812,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   bool hadAnyError = false;
 
   if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
-      opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+      opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
     std::string BridgingHeaderPathForPrint;
     if (!opts.ImplicitObjCHeaderPath.empty()) {
       if (opts.BridgingHeaderDirForPrint.hasValue()) {
@@ -838,15 +826,10 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         BridgingHeaderPathForPrint = opts.ImplicitObjCHeaderPath;
       }
     }
-    hadAnyError |= printAsObjCIfNeeded(
-        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), BridgingHeaderPathForPrint);
-  }
-  if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
-      opts.InputsAndOutputs.hasCxxHeaderOutputPath()) {
-    hadAnyError |= printAsCxxIfNeeded(
-        Invocation.getCxxHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule());
+    hadAnyError |= printAsClangHeaderIfNeeded(
+        Invocation.getClangHeaderOutputPathForAtMostOnePrimary(),
+        Instance.getMainModule(), BridgingHeaderPathForPrint,
+        opts.ExposePublicDeclsInClangHeader);
   }
 
   // Only want the header if there's been any errors, ie. there's not much

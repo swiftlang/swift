@@ -124,13 +124,15 @@ class ModuleWriter {
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
   DeclAndTypePrinter printer;
+  OutputLanguageMode outputLangMode;
 
 public:
   ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
                llvm::SmallPtrSetImpl<ImportModuleTy> &imports, ModuleDecl &mod,
                AccessLevel access, OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
-        printer(M, os, prologueOS, delayedMembers, access, outputLang) {}
+        printer(M, os, prologueOS, delayedMembers, access, outputLang),
+        outputLangMode(outputLang) {}
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -576,7 +578,11 @@ public:
       const Decl *D = declsToWrite.back();
       bool success = true;
 
-      if (isa<ValueDecl>(D)) {
+      if (outputLangMode == OutputLanguageMode::Cxx) {
+        if (auto FD = dyn_cast<FuncDecl>(D))
+          success = writeFunc(FD);
+        // FIXME: Warn on unsupported exported decl.
+      } else if (isa<ValueDecl>(D)) {
         if (auto CD = dyn_cast<ClassDecl>(D))
           success = writeClass(CD);
         else if (auto PD = dyn_cast<ProtocolDecl>(D))
