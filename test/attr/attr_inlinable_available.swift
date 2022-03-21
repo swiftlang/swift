@@ -428,7 +428,7 @@ internal func fn() {
 // @_backDeploy acts like @inlinable.
 
 @available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
-@_backDeploy(macOS 999.0, iOS 999.0, tvOS 999.0, watchOS 999.0)
+@_backDeploy(before: macOS 999.0, iOS 999.0, tvOS 999.0, watchOS 999.0)
 public func backDeployedToInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,

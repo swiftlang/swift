@@ -87,7 +87,7 @@ public func forbidMacrosInInlinableCode1() {
 }
 
 @available(_iOS8Aligned, *)
-@_backDeploy(_iOS9Aligned)
+@_backDeploy(before: _iOS9Aligned)
 public func forbidMacrosInInlinableCode2() {
   if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
   if #available(_iOS9, _macOS10_11, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
