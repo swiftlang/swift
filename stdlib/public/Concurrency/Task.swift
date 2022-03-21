@@ -834,7 +834,9 @@ internal func _asyncMainDrainQueue() -> Never
 internal func _getMainExecutor() -> Builtin.Executor
 
 @available(SwiftStdlib 5.1, *)
-public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
+@usableFromInline
+@preconcurrency
+internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
   Task.detached {
     do {
 #if !os(Windows)
