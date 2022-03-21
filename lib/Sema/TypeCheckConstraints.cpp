@@ -313,6 +313,7 @@ void constraints::performSyntacticDiagnosticsForTarget(
     target.getFunctionBody()->walk(walker);
     return;
   }
+  case SolutionApplicationTarget::Kind::closure:
   case SolutionApplicationTarget::Kind::stmtCondition:
   case SolutionApplicationTarget::Kind::caseLabelItem:
   case SolutionApplicationTarget::Kind::patternBinding:

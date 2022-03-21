@@ -4098,6 +4098,7 @@ bool ConstraintSystem::generateConstraints(
   case SolutionApplicationTarget::Kind::expression:
     llvm_unreachable("Handled above");
 
+  case SolutionApplicationTarget::Kind::closure:
   case SolutionApplicationTarget::Kind::caseLabelItem:
   case SolutionApplicationTarget::Kind::function:
   case SolutionApplicationTarget::Kind::stmtCondition:
