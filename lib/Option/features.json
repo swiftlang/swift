@@ -17,6 +17,9 @@
     },
     {
       "name": "no-warn-superfluous-index-unit-path"
+    },
+    {
+      "name": "empty-abi-descriptor"
     }
   ]
 }
