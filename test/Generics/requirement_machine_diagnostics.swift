@@ -19,7 +19,7 @@ typealias NotAnInt = Double
 
 protocol X {}
 
-// expected-error@+1{{generic signature requires types 'Double' and 'Int' to be the same}}
+// expected-error@+1{{generic signature requires types 'NotAnInt' (aka 'Double') and 'Int' to be the same}}
 extension X where NotAnInt == Int {}
 
 protocol EqualComparable {
