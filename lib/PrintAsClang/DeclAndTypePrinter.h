@@ -25,6 +25,8 @@ namespace clang {
 
 namespace swift {
 
+class PrimitiveTypeMapping;
+
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be
 /// included in a Swift module's ObjC compatibility header.
 class DeclAndTypePrinter {
@@ -39,21 +41,9 @@ private:
   raw_ostream &os;
   raw_ostream &prologueOS;
   const DelayedMemberSet &delayedMembers;
+  PrimitiveTypeMapping &typeMapping;
   AccessLevel minRequiredAccess;
   OutputLanguageMode outputLang;
-
-  struct CTypeInfo {
-    StringRef name;
-    bool canBeNullable;
-  };
-
-  /// A map from {Module, TypeName} pairs to {C name, C nullability} pairs.
-  ///
-  /// This is populated on first use with a list of known Swift types that are
-  /// translated directly by the ObjC printer instead of structurally, allowing
-  /// it to do things like map 'Int' to 'NSInteger' and 'Float' to 'float'.
-  /// In some sense it's the reverse of the ClangImporter's MappedTypes.def.
-  llvm::DenseMap<std::pair<Identifier, Identifier>, CTypeInfo> specialNames;
 
   /// The name 'CFTypeRef'.
   ///
@@ -64,10 +54,12 @@ private:
 
 public:
   DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out, raw_ostream &prologueOS,
-                     DelayedMemberSet &delayed, AccessLevel access,
+                     DelayedMemberSet &delayed,
+                     PrimitiveTypeMapping &typeMapping, AccessLevel access,
                      OutputLanguageMode outputLang)
       : M(mod), os(out), prologueOS(prologueOS), delayedMembers(delayed),
-        minRequiredAccess(access), outputLang(outputLang) {}
+        typeMapping(typeMapping), minRequiredAccess(access),
+        outputLang(outputLang) {}
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.
