@@ -78,6 +78,15 @@ static bool canClassOrSuperclassesHaveUnknownSubclasses(ClassDecl *CD,
   return false;
 }
 
+static CanType unwrapExistential(CanType e) {
+  assert(e.isExistentialType());
+
+  if (auto et = dyn_cast<ExistentialType>(e))
+    return et.getConstraintType();
+
+  return e;
+}
+
 /// Try to classify a conversion from non-existential type
 /// into an existential type by performing a static check
 /// of protocol conformances if it is possible.
@@ -92,6 +101,14 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
 
   auto *TargetProtocol = cast_or_null<ProtocolDecl>(target.getAnyNominal());
   if (!TargetProtocol)
+    return DynamicCastFeasibility::MaySucceed;
+
+  // If the target is a parameterized protocol type, conformsToProtocol
+  // is insufficient to prove the feasibility of the cast as it does not
+  // check the additional requirements.
+  // FIXME: This is a weak predicate that doesn't take into account
+  // class compositions - since any C & P<T> doesn't work yet anyways.
+  if (isa<ParameterizedProtocolType>(unwrapExistential(target)))
     return DynamicCastFeasibility::MaySucceed;
 
   // If conformsToProtocol returns a valid conformance, then all requirements
