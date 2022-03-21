@@ -104,7 +104,7 @@ struct NestedStructWithClosureMember1 {
 struct StructWithClosureMemberAndLocal {
   var c = {
     var x = 0
-    #^DELAYED_10?check=WITH_GLOBAL_DECLS_AND_LOCAL1^#
+    #^DELAYED_10?check=WITH_GLOBAL_DECLS_AND_LOCAL1;xfail=sr16012^#
   }
 }
 

@@ -9917,6 +9917,9 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
+  SolutionApplicationTarget target(closure, contextualType);
+  setSolutionApplicationTarget(closure, target);
+
   // Generate constraints from the body of this closure.
   return !generateConstraints(closure);
 }

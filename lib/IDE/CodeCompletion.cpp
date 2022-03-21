@@ -40,6 +40,7 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/CompletionOverrideLookup.h"
 #include "swift/IDE/DotExprCompletion.h"
+#include "swift/IDE/ExprCompletion.h"
 #include "swift/IDE/KeyPathCompletion.h"
 #include "swift/IDE/UnresolvedMemberCompletion.h"
 #include "swift/IDE/Utils.h"
@@ -1392,6 +1393,26 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
                           CurDeclContext, CompletionContext, Consumer);
     return true;
   }
+  case CompletionKind::StmtOrExpr: {
+    assert(CodeCompleteTokenExpr);
+    assert(CurDeclContext);
+
+    ExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
+                                           CurDeclContext);
+    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+        Context.CompletionCallback, &Lookup);
+    typeCheckContextAt(CurDeclContext, CompletionLoc);
+
+    if (!Lookup.gotCallback()) {
+      Lookup.fallbackTypeCheck(CurDeclContext);
+    }
+
+    addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
+
+    SourceLoc CCLoc = P.Context.SourceMgr.getCodeCompletionLoc();
+    Lookup.deliverResults(CCLoc, CompletionContext, Consumer);
+    return true;
+  }
   default:
     return false;
   }
@@ -1514,10 +1535,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::UnresolvedMember:
   case CompletionKind::KeyPathExprSwift:
   case CompletionKind::CallArg:
+  case CompletionKind::StmtOrExpr:
     llvm_unreachable("should be already handled");
     return;
 
-  case CompletionKind::StmtOrExpr:
   case CompletionKind::ForEachSequence:
   case CompletionKind::PostfixExprBeginning: {
     ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
