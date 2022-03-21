@@ -73,13 +73,13 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
 
       if (secondType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
-                            secondType, firstType);
+                            secondType, sugaredFirstType);
         recordedRequirements = true;
         return true;
       }
 
       errors.push_back(
-          RequirementError::forConcreteTypeMismatch(firstType,
+          RequirementError::forConcreteTypeMismatch(sugaredFirstType,
                                                     secondType,
                                                     loc));
       recordedErrors = true;
