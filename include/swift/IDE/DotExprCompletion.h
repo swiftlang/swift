@@ -43,6 +43,8 @@ class DotExprTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
   SmallVector<Result, 4> Results;
   llvm::DenseMap<std::pair<Type, Decl *>, size_t> BaseToSolutionIdx;
 
+  void sawSolutionImpl(const constraints::Solution &solution) override;
+
 public:
   DotExprTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
                                      DeclContext *DC)
@@ -51,8 +53,6 @@ public:
   /// Typecheck the code completion expression in isolation, calling
   /// \c sawSolution for each solution formed.
   void fallbackTypeCheck(DeclContext *DC) override;
-
-  void sawSolution(const constraints::Solution &solution) override;
 
   void deliverResults(Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc,
                       bool IsInSelector, CodeCompletionContext &CompletionCtx,

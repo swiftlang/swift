@@ -44,9 +44,8 @@ void DotExprTypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
                              [&](const Solution &S) { sawSolution(S); });
 }
 
-void DotExprTypeCheckCompletionCallback::sawSolution(
+void DotExprTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
-  TypeCheckCompletionCallback::sawSolution(S);
   auto &CS = S.getConstraintSystem();
   auto *ParsedExpr = CompletionExpr->getBase();
   auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();

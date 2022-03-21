@@ -80,10 +80,8 @@ static VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
   }
 }
 
-void UnresolvedMemberTypeCheckCompletionCallback::sawSolution(
+void UnresolvedMemberTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
-  TypeCheckCompletionCallback::sawSolution(S);
-
   auto &CS = S.getConstraintSystem();
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 

@@ -41,13 +41,19 @@ namespace ide {
 class TypeCheckCompletionCallback {
   bool GotCallback = false;
 
+protected:
+  /// Subclasses of \c TypeCheckCompletionCallback handle solutions discovered
+  /// by the constraint system in this function
+  virtual void sawSolutionImpl(const constraints::Solution &solution) = 0;
+
 public:
   virtual ~TypeCheckCompletionCallback() {}
 
   /// Called for each solution produced while type-checking an expression
   /// that the code completion expression participates in.
-  virtual void sawSolution(const constraints::Solution &solution) {
+  void sawSolution(const constraints::Solution &solution) {
     GotCallback = true;
+    sawSolutionImpl(solution);
   };
 
   /// True if at least one solution was passed via the \c sawSolution

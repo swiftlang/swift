@@ -90,9 +90,7 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
   return ShowGlobalCompletions;
 }
 
-void ArgumentTypeCheckCompletionCallback::sawSolution(const Solution &S) {
-  TypeCheckCompletionCallback::sawSolution(S);
-
+void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
   auto &CS = S.getConstraintSystem();

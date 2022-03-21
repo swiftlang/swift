@@ -40,12 +40,12 @@ class UnresolvedMemberTypeCheckCompletionCallback
   SmallVector<Result, 4> ExprResults;
   SmallVector<Result, 1> EnumPatternTypes;
 
+  void sawSolutionImpl(const constraints::Solution &solution) override;
+
 public:
   UnresolvedMemberTypeCheckCompletionCallback(
       CodeCompletionExpr *CompletionExpr, DeclContext *DC)
       : CompletionExpr(CompletionExpr), DC(DC) {}
-
-  void sawSolution(const constraints::Solution &solution) override;
 
   void deliverResults(DeclContext *DC, SourceLoc DotLoc,
                       ide::CodeCompletionContext &CompletionCtx,

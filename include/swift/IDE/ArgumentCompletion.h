@@ -63,12 +63,12 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
                          SmallVectorImpl<PossibleParamInfo> &Params,
                          SmallVectorImpl<Type> &Types);
 
+  void sawSolutionImpl(const constraints::Solution &solution) override;
+
 public:
   ArgumentTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
                                       DeclContext *DC)
       : CompletionExpr(CompletionExpr), DC(DC) {}
-
-  void sawSolution(const constraints::Solution &solution) override;
 
   /// \param IncludeSignature Whether to include a suggestion for the entire
   /// function signature instead of suggesting individual labels. Used when

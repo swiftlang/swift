@@ -19,10 +19,8 @@ using namespace swift;
 using namespace swift::ide;
 using namespace swift::constraints;
 
-void ExprTypeCheckCompletionCallback::sawSolution(
+void ExprTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
-  TypeCheckCompletionCallback::sawSolution(S);
-
   auto &CS = S.getConstraintSystem();
 
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
