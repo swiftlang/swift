@@ -207,6 +207,21 @@ extension String: BidirectionalCollection {
 
     if i == endIndex { return 0 }
 
+    // Fast path ASCII grapheme breaking.
+    if _fastPath(_guts.isFastASCII) {
+      return _guts.withFastUTF8 {
+        let scalar1 = $0[0]
+
+        if scalar1 == 0xD, $0.count > 1 {
+          let scalar2 = $0[1]
+
+          return scalar2 == 0xA ? 2 : 1
+        }
+
+        return 1
+      }
+    }
+
     return _guts._opaqueCharacterStride(startingAt: i._encodedOffset)
   }
 
