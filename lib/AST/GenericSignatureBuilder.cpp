@@ -8664,20 +8664,31 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
                      ArrayRef<Requirement> gsbResult) {
     if (rqmResult.size() > gsbResult.size())
       return false;
+
+    SmallVector<Requirement, 2> rqmNonSameType;
+    SmallVector<Requirement, 2> gsbNonSameType;
+
+    for (auto req : rqmResult) {
+      if (req.getKind() != RequirementKind::SameType)
+        rqmNonSameType.push_back(req);
+    }
+
+    for (auto req : gsbResult) {
+      if (req.getKind() != RequirementKind::SameType)
+        gsbNonSameType.push_back(req);
+    }
+
+    if (rqmNonSameType.size() != gsbNonSameType.size())
+      return false;
     
-    if (!std::equal(rqmResult.begin(),
-                    rqmResult.end(),
-                    gsbResult.begin(),
+    if (!std::equal(rqmNonSameType.begin(),
+                    rqmNonSameType.end(),
+                    gsbNonSameType.begin(),
                     [](const Requirement &lhs,
                        const Requirement &rhs) {
                       return lhs.getCanonical() == rhs.getCanonical();
                     }))
       return false;
-
-    for (auto req : gsbResult.slice(rqmResult.size())) {
-      if (req.getKind() != RequirementKind::SameType)
-        return false;
-    }
 
     return true;
   };
