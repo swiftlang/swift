@@ -234,6 +234,26 @@ func test_local_function_capturing_vars() {
   }
 }
 
+func test_pattern_ambiguity_doesnot_crash_compiler() {
+  enum E {
+  case hello(result: Int) // expected-note 2 {{found this candidate}}
+  case hello(status: Int) // expected-note 2 {{found this candidate}}
+  }
+
+  let _: (E) -> Void = {
+    switch $0 {
+    case .hello(_): break // expected-error {{ambiguous use of 'hello'}}
+    }
+  }
+
+  let _: (E) -> Void = {
+    switch $0 {
+    case let E.hello(x): print(x) // expected-error {{ambiguous use of 'hello'}}
+    default: break
+    }
+  }
+}
+
 func test_taps_type_checked_with_correct_decl_context() {
   struct Path {
     func contains<T>(_: T) -> Bool where T: StringProtocol { return false }

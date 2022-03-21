@@ -4557,7 +4557,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
     auto &overload = diff.overloads[i];
     auto *locator = overload.locator;
 
-    Expr *anchor = nullptr;
+    ASTNode anchor;
 
     // Simplification of member locator would produce a base expression,
     // this is what we want for diagnostics but not for comparisons here
@@ -4567,25 +4567,33 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
     // than simplification of `count` would produce `[x]` which is incorrect.
     if (locator->isLastElement<LocatorPathElt::Member>() ||
         locator->isLastElement<LocatorPathElt::ConstructorMember>()) {
-      anchor = getAsExpr(locator->getAnchor());
+      anchor = locator->getAnchor();
     } else {
-      anchor = getAsExpr(simplifyLocatorToAnchor(overload.locator));
+      anchor = simplifyLocatorToAnchor(overload.locator);
     }
 
-    // If we can't resolve the locator to an anchor expression with no path,
+    // If we can't resolve the locator to an anchor with no path,
     // we can't diagnose this well.
     if (!anchor)
       continue;
 
-    auto it = indexMap.find(anchor);
-    if (it == indexMap.end())
-      continue;
-    unsigned index = it->second;
+    // Index and Depth is only applicable to expressions.
+    unsigned index = 0;
+    unsigned depth = 0;
 
-    auto optDepth = getExprDepth(anchor);
-    if (!optDepth)
-      continue;
-    unsigned depth = *optDepth;
+    if (auto *expr = getAsExpr(anchor)) {
+      auto it = indexMap.find(expr);
+      if (it == indexMap.end())
+        continue;
+
+      index = it->second;
+
+      auto optDepth = getExprDepth(expr);
+      if (!optDepth)
+        continue;
+
+      depth = *optDepth;
+    }
 
     // If we don't have a name to hang on to, it'll be hard to diagnose this
     // overload.

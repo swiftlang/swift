@@ -1746,7 +1746,12 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
 }
 
 bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
-  auto *anchor = castToExpr(getAnchor());
+  auto *anchor = getAsExpr(getAnchor());
+  // This diagnostic is used opportunistically in `diagnoseAmbiguity`,
+  // which means it cannot assume that anchor is always an expression.
+  if (!anchor)
+    return false;
+
   const auto *expr = findParentExpr(anchor);
   auto *callExpr = dyn_cast_or_null<CallExpr>(expr);
   if (!callExpr)
