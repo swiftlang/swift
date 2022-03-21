@@ -736,6 +736,35 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
+    case RequirementError::Kind::SameTypeMissingRequirement: {
+      auto requirement = error.requirement;
+      switch (requirement.getKind()) {
+      case RequirementKind::SameType:
+        // FIXME: This case should be diagnosed through `ConcreteTypeMismatch`.
+        break;
+      case RequirementKind::Conformance:
+        ctx.Diags.diagnose(loc, diag::requires_generic_param_same_type_does_not_conform,
+                           requirement.getFirstType(),
+                           requirement.getProtocolDecl()->getName());
+        diagnosedError = true;
+        break;
+      case RequirementKind::Superclass:
+        ctx.Diags.diagnose(loc, diag::same_type_does_not_inherit,
+                           requirement.getFirstType(),
+                           requirement.getSecondType());
+        diagnosedError = true;
+        break;
+      case RequirementKind::Layout:
+        ctx.Diags.diagnose(loc, diag::requires_generic_param_same_type_does_not_conform,
+                           requirement.getFirstType(),
+                           ctx.getIdentifier(requirement.getLayoutConstraint()->getName()));
+        diagnosedError = true;
+        break;
+      }
+
+      break;
+    }
+
     case RequirementError::Kind::RedundantRequirement: {
       auto requirement = error.requirement;
       switch (requirement.getKind()) {

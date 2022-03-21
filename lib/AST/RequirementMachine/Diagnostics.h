@@ -34,6 +34,8 @@ struct RequirementError {
     ConcreteTypeMismatch,
     /// A requirement proven to be false, e.g. Bool: Collection
     ConflictingRequirement,
+    /// A missing requirement on a concrete type in a same-type requirement.
+    SameTypeMissingRequirement,
     /// A redundant requirement, e.g. T == T.
     RedundantRequirement,
   } kind;
@@ -65,6 +67,11 @@ public:
   static RequirementError forConflictingRequirement(Requirement req,
                                                     SourceLoc loc) {
     return {Kind::ConflictingRequirement, req, loc};
+  }
+
+  static RequirementError forSameTypeMissingRequirement(Requirement req,
+                                                        SourceLoc loc) {
+    return {Kind::SameTypeMissingRequirement, req, loc};
   }
 
   static RequirementError forRedundantRequirement(Requirement req,
