@@ -243,8 +243,8 @@ public:
   std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
   /// A selector that is used by two different declarations in the same class.
-  /// Fields: classDecl, selector, isInstanceMethod.
-  using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
+  /// Fields: typeDecl, selector, isInstanceMethod.
+  using ObjCMethodConflict = std::tuple<NominalTypeDecl *, ObjCSelector, bool>;
 
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
