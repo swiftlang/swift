@@ -471,7 +471,12 @@ namespace {
       // If the pointed-to type is unrepresentable in Swift, or its C
       // alignment is greater than the maximum Swift alignment, import as
       // OpaquePointer.
-      if (!pointeeType || Impl.isOverAligned(pointeeQualType)) {
+      if (!pointeeType ||
+          // Dependent types will always be specialized before the SIL level so
+          // the alignment doesn't matter, we'll handle that in the
+          // specialization.
+          (!pointeeQualType->isDependentType() &&
+           Impl.isOverAligned(pointeeQualType))) {
         return importOverAlignedFunctionPointerLikeType(*type, Impl);
       }
 

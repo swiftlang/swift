@@ -20,6 +20,9 @@ struct M {
 
   template<class U>
   U memberDependentParamType(M<U> a) const { return a.value; }
+
+  template<class U>
+  U memberPointerToDependentParamType(M<U> *a) const { return a->value; }
 };
 
 template<class T, class U>
@@ -63,6 +66,9 @@ T &dependentToRef(M<T> a) { return a.value; }
 // TODO: We can't convert inout types in a thunk: rdar://89034440
 template<class T>
 M<T> dependentRef(M<T> &a) { return {a.value}; }
+
+template<class T>
+M<T> *dependentPointer(M<T> *a) { return a; }
 
 template<class T>
 M<T> dependentRefAndRefInferred(const M<T> &a, T &b) { return {a.value + b}; }
