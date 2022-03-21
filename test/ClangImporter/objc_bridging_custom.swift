@@ -159,8 +159,9 @@ protocol TestProto {
   @objc optional func testUnmigrated(a: NSRuncingMode, b: Refrigerator, c: NSCoding) // expected-note {{here}} {{none}}
   @objc optional func testPartialMigrated(a: NSRuncingMode, b: Refrigerator) // expected-note {{here}} {{none}}
 
-  @objc optional subscript(a a: Refrigerator) -> Refrigerator? { get } // expected-note {{here}} {{none}}
+  @objc optional subscript(a a: Refrigerator) -> Refrigerator? { get } // expected-note 2 {{here}} {{none}}
   @objc optional subscript(generic a: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? { get } // expected-note {{here}} {{none}}
+  // expected-warning@-1 {{subscript getter with Objective-C selector 'objectForKeyedSubscript:' conflicts with previous declaration with the same Objective-C selector; this is an error in Swift 6}}
 
   @objc optional var prop: Refrigerator? { get } // expected-note {{here}} {{none}}
   @objc optional var propGeneric: ManufacturerInfo<NSString>? { get } // expected-note {{here}} {{none}}

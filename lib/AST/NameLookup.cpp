@@ -1125,10 +1125,10 @@ namespace {
 
 /// Class member lookup table, which is a member lookup table with a second
 /// table for lookup based on Objective-C selector.
-class ClassDecl::ObjCMethodLookupTable
+class swift::ObjCMethodLookupTable
         : public llvm::DenseMap<std::pair<ObjCSelector, char>,
                                 StoredObjCMethods>,
-          public ASTAllocated<ClassDecl::ObjCMethodLookupTable>
+          public ASTAllocated<ObjCMethodLookupTable>
 {};
 
 MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
@@ -1483,23 +1483,27 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
                                       includeAttrImplements);
 }
 
-void ClassDecl::createObjCMethodLookup() {
+bool NominalTypeDecl::createObjCMethodLookup() {
   assert(!ObjCMethodLookup && "Already have an Objective-C member table");
+
+  // Most types cannot have ObjC methods.
+  if (!(isa<ClassDecl>(this) || isa<ProtocolDecl>(this)))
+    return false;
+
   auto &ctx = getASTContext();
   ObjCMethodLookup = new (ctx) ObjCMethodLookupTable();
 
   // Register a cleanup with the ASTContext to call the lookup table
   // destructor.
-  ctx.addCleanup([this]() {
-    this->ObjCMethodLookup->~ObjCMethodLookupTable();
-  });
+  ctx.addDestructorCleanup(*ObjCMethodLookup);
+
+  return true;
 }
 
 TinyPtrVector<AbstractFunctionDecl *>
-ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
-  if (!ObjCMethodLookup) {
-    createObjCMethodLookup();
-  }
+NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
+  if (!ObjCMethodLookup && !createObjCMethodLookup())
+    return {};
 
   // If any modules have been loaded since we did the search last (or if we
   // hadn't searched before), look in those modules, too.
@@ -1514,11 +1518,10 @@ ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
-void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
-                                 ObjCSelector selector) {
-  if (!ObjCMethodLookup) {
-    createObjCMethodLookup();
-  }
+void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
+                                       ObjCSelector selector) {
+  if (!ObjCMethodLookup && !createObjCMethodLookup())
+    return;
 
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
