@@ -21,3 +21,11 @@ _ = re're\r\e\'\\'
 _ = (#/[*/#, #/+]/#, #/.]/#)
 // expected-error@-1 {{cannot parse regular expression: quantifier '+' must appear after expression}}
 // expected-error@-2 {{cannot parse regular expression: expected ']'}}
+
+// Make sure we can skip over `'` characters in the regex body.
+_ = re'(?'xA0_-y1'x)'
+_ = re'(?('xA0_')\')'
+_ = re'\'(?('-20'))'
+_ = re'\k'+2-1'\''
+_ = re'\g'xA0_''
+_ = re'(?C'9,3, pg(')'
