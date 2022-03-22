@@ -530,6 +530,12 @@ void RequirementMachine::freeze() {
   System.freeze();
 }
 
+void RequirementMachine::computeRequirementDiagnostics(
+    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc) {
+  System.computeRedundantRequirementDiagnostics(errors);
+  System.computeConflictDiagnostics(errors, signatureLoc);
+}
+
 std::string RequirementMachine::getRuleAsStringForDiagnostics(
     unsigned ruleID) const {
   const auto &rule = System.getRule(ruleID);

@@ -18,6 +18,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
 
+#include "Diagnostics.h"
 #include "PropertyMap.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
@@ -114,6 +115,9 @@ class RequirementMachine final {
   computeCompletion(RewriteSystem::ValidityPolicy policy);
 
   void freeze();
+
+  void computeRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                     SourceLoc signatureLoc);
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
