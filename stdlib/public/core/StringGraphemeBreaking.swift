@@ -158,7 +158,7 @@ extension _StringGuts {
 
     guard isOnUnicodeScalarBoundary(i) else { return false }
 
-    let nearest = roundDownToNearestCharacter(i)
+    let nearest = roundDownToNearestCharacter(i._scalarAligned)
     return i == nearest
   }
 }

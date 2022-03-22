@@ -204,7 +204,7 @@ extension Substring {
     else {
       return false
     }
-    return i == _roundDownToNearestCharacter(i)
+    return i == _roundDownToNearestCharacter(i._scalarAligned)
   }
 }
 
