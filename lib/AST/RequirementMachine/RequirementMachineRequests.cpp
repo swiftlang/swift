@@ -36,6 +36,72 @@
 using namespace swift;
 using namespace rewriting;
 
+/// Hack for GenericSignatureBuilder compatibility. We might end up with a
+/// same-type requirement between type parameters where one of them has an
+/// implied concrete type requirement. In this case, split it up into two
+/// concrete type requirements.
+static bool shouldSplitConcreteEquivalenceClass(Requirement req,
+                                                GenericSignature sig) {
+  return (req.getKind() == RequirementKind::SameType &&
+          req.getSecondType()->isTypeParameter() &&
+          sig->isConcreteType(req.getSecondType()));
+}
+
+/// Returns true if this generic signature contains abstract same-type
+/// requirements between concrete type parameters. In this case, we split
+/// the abstract same-type requirements into pairs of concrete type
+/// requirements, and minimize the signature again.
+static bool shouldSplitConcreteEquivalenceClasses(GenericSignature sig) {
+  for (auto req : sig.getRequirements()) {
+    if (shouldSplitConcreteEquivalenceClass(req, sig))
+      return true;
+  }
+
+  return false;
+}
+
+/// Replace each same-type requirement 'T == U' where 'T' (and therefore 'U')
+/// is known to equal a concrete type 'C' with a pair of requirements
+/// 'T == C' and 'U == C'. We build the signature again in this case, since
+/// one of the two requirements will be redundant, but we don't know which
+/// ahead of time.
+static void splitConcreteEquivalenceClasses(
+    ASTContext &ctx,
+    GenericSignature sig,
+    SmallVectorImpl<StructuralRequirement> &requirements,
+    unsigned &attempt) {
+  unsigned maxAttempts =
+      ctx.LangOpts.RequirementMachineMaxSplitConcreteEquivClassAttempts;
+
+  ++attempt;
+  if (attempt >= maxAttempts) {
+    llvm::errs() << "Splitting concrete equivalence classes did not "
+                 << "reach fixed point after " << attempt << " attempts.\n";
+    llvm::errs() << "Last result: " << sig << "\n";
+    abort();
+  }
+
+  requirements.clear();
+
+  for (auto req : sig.getRequirements()) {
+    if (shouldSplitConcreteEquivalenceClass(req, sig)) {
+      auto canType = sig->getSugaredType(
+        sig.getCanonicalTypeInContext(
+          req.getSecondType()));
+
+      Requirement firstReq(RequirementKind::SameType,
+                           req.getFirstType(), canType);
+      Requirement secondReq(RequirementKind::SameType,
+                            req.getSecondType(), canType);
+      requirements.push_back({firstReq, SourceLoc(), /*inferred=*/false});
+      requirements.push_back({secondReq, SourceLoc(), /*inferred=*/false});
+      continue;
+    }
+
+    requirements.push_back({req, SourceLoc(), /*inferred=*/false});
+  }
+}
+
 /// Builds the requirement signatures for each protocol in this strongly
 /// connected component.
 llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
@@ -241,72 +307,6 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
   }
 
   return true;
-}
-
-/// Hack for GenericSignatureBuilder compatibility. We might end up with a
-/// same-type requirement between type parameters where one of them has an
-/// implied concrete type requirement. In this case, split it up into two
-/// concrete type requirements.
-static bool shouldSplitConcreteEquivalenceClass(Requirement req,
-                                                GenericSignature sig) {
-  return (req.getKind() == RequirementKind::SameType &&
-          req.getSecondType()->isTypeParameter() &&
-          sig->isConcreteType(req.getSecondType()));
-}
-
-/// Returns true if this generic signature contains abstract same-type
-/// requirements between concrete type parameters. In this case, we split
-/// the abstract same-type requirements into pairs of concrete type
-/// requirements, and minimize the signature again.
-static bool shouldSplitConcreteEquivalenceClasses(GenericSignature sig) {
-  for (auto req : sig.getRequirements()) {
-    if (shouldSplitConcreteEquivalenceClass(req, sig))
-      return true;
-  }
-
-  return false;
-}
-
-/// Replace each same-type requirement 'T == U' where 'T' (and therefore 'U')
-/// is known to equal a concrete type 'C' with a pair of requirements
-/// 'T == C' and 'U == C'. We build the signature again in this case, since
-/// one of the two requirements will be redundant, but we don't know which
-/// ahead of time.
-static void splitConcreteEquivalenceClasses(
-    ASTContext &ctx,
-    GenericSignature sig,
-    SmallVectorImpl<StructuralRequirement> &requirements,
-    unsigned &attempt) {
-  unsigned maxAttempts =
-      ctx.LangOpts.RequirementMachineMaxSplitConcreteEquivClassAttempts;
-
-  ++attempt;
-  if (attempt >= maxAttempts) {
-    llvm::errs() << "Splitting concrete equivalence classes did not "
-                 << "reach fixed point after " << attempt << " attempts.\n";
-    llvm::errs() << "Last result: " << sig << "\n";
-    abort();
-  }
-
-  requirements.clear();
-
-  for (auto req : sig.getRequirements()) {
-    if (shouldSplitConcreteEquivalenceClass(req, sig)) {
-      auto canType = sig->getSugaredType(
-        sig.getCanonicalTypeInContext(
-          req.getSecondType()));
-
-      Requirement firstReq(RequirementKind::SameType,
-                           req.getFirstType(), canType);
-      Requirement secondReq(RequirementKind::SameType,
-                            req.getSecondType(), canType);
-      requirements.push_back({firstReq, SourceLoc(), /*inferred=*/false});
-      requirements.push_back({secondReq, SourceLoc(), /*inferred=*/false});
-      continue;
-    }
-
-    requirements.push_back({req, SourceLoc(), /*inferred=*/false});
-  }
 }
 
 GenericSignatureWithError
