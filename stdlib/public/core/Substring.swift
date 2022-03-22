@@ -669,7 +669,7 @@ extension Substring {
       // substring's end index. This can happen if the substring's end isn't
       // also `Character` aligned, and someone passes us an index that comes
       // from the base string.
-      return Swift.min(d, _wholeGuts.count &- i._encodedOffset)
+      return Swift.min(d, endIndex._encodedOffset &- i._encodedOffset)
     }
 
     if i._encodedOffset == endIndex._encodedOffset { return 0 }
