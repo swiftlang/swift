@@ -85,14 +85,12 @@ static void splitConcreteEquivalenceClasses(
 
   for (auto req : sig.getRequirements()) {
     if (shouldSplitConcreteEquivalenceClass(req, sig)) {
-      auto canType = sig->getSugaredType(
-        sig.getCanonicalTypeInContext(
-          req.getSecondType()));
+      auto concreteType = sig->getConcreteType(req.getSecondType());
 
       Requirement firstReq(RequirementKind::SameType,
-                           req.getFirstType(), canType);
+                           req.getFirstType(), concreteType);
       Requirement secondReq(RequirementKind::SameType,
-                            req.getSecondType(), canType);
+                            req.getSecondType(), concreteType);
       requirements.push_back({firstReq, SourceLoc(), /*inferred=*/false});
       requirements.push_back({secondReq, SourceLoc(), /*inferred=*/false});
       continue;
