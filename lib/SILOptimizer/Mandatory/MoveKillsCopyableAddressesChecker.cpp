@@ -1399,13 +1399,14 @@ struct DataflowState {
         closureConsumes(closureConsumes) {}
   void init();
   bool process(
-      SILValue address,
+      SILValue address, DebugVarCarryingInst addressDebugInst,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
   bool handleSingleBlockClosure(SILArgument *address,
                                 ClosureOperandState &state);
   bool cleanupAllDestroyAddr(
-      SILValue address, SILFunction *fn, SmallBitVector &destroyIndices,
-      SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
+      SILValue address, DebugVarCarryingInst addressDebugInst, SILFunction *fn,
+      SmallBitVector &destroyIndices, SmallBitVector &reinitIndices,
+      SmallBitVector &consumingClosureIndices,
       BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
       BasicBlockSet &blocksWithMovesThatAreNowTakes,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
@@ -1423,15 +1424,14 @@ struct DataflowState {
 } // namespace
 
 bool DataflowState::cleanupAllDestroyAddr(
-    SILValue address, SILFunction *fn, SmallBitVector &destroyIndices,
-    SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
+    SILValue address, DebugVarCarryingInst addressDebugInst, SILFunction *fn,
+    SmallBitVector &destroyIndices, SmallBitVector &reinitIndices,
+    SmallBitVector &consumingClosureIndices,
     BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
     BasicBlockSet &blocksWithMovesThatAreNowTakes,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
   bool madeChange = false;
   BasicBlockWorklist worklist(fn);
-
-  auto debugVarInst = DebugVarCarryingInst::getFromValue(address);
 
   LLVM_DEBUG(llvm::dbgs() << "Cleanup up destroy addr!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Visiting destroys!\n");
@@ -1537,12 +1537,13 @@ bool DataflowState::cleanupAllDestroyAddr(
     convertMemoryReinitToInitForm(*reinit);
 
     // Make sure to create a new debug_value for the reinit value.
-    if (debugVarInst) {
-      if (auto varInfo = debugVarInst.getVarInfo()) {
+    if (addressDebugInst) {
+      if (auto varInfo = addressDebugInst.getVarInfo()) {
         SILBuilderWithScope reinitBuilder(*reinit);
-        reinitBuilder.setCurrentDebugScope(debugVarInst->getDebugScope());
-        reinitBuilder.createDebugValue(debugVarInst.inst->getLoc(), address,
-                                       *varInfo, false, /*was moved*/ true);
+        reinitBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
+        reinitBuilder.createDebugValue(
+            addressDebugInst.inst->getLoc(), address, *varInfo, false,
+            /*was moved*/ true);
       }
     }
     madeChange = true;
@@ -1583,7 +1584,7 @@ bool DataflowState::cleanupAllDestroyAddr(
 }
 
 bool DataflowState::process(
-    SILValue address,
+    SILValue address, DebugVarCarryingInst addressDebugInst,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
   SILFunction *fn = address->getFunction();
   assert(fn);
@@ -1612,6 +1613,7 @@ bool DataflowState::process(
   BasicBlockSet blocksVisitedWhenProcessingNewTakes(fn);
   BasicBlockSet blocksWithMovesThatAreNowTakes(fn);
   bool convertedMarkMoveToTake = false;
+
   for (auto *mvi : markMovesThatPropagateDownwards) {
     bool emittedSingleDiagnostic = false;
 
@@ -1777,13 +1779,13 @@ bool DataflowState::process(
 
       // Now that we have processed all of our mark_moves, eliminate all of the
       // destroy_addr and set our debug value as being moved.
-      if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
-        debug.markAsMoved();
-        if (auto varInfo = debug.getVarInfo()) {
+      if (addressDebugInst) {
+        addressDebugInst.markAsMoved();
+        if (auto varInfo = addressDebugInst.getVarInfo()) {
           SILBuilderWithScope undefBuilder(builder);
-          undefBuilder.setCurrentDebugScope(debug->getDebugScope());
+          undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
           undefBuilder.createDebugValue(
-              debug->getLoc(),
+              addressDebugInst->getLoc(),
               SILUndef::get(address->getType(), builder.getModule()), *varInfo,
               false /*poison*/, true /*was moved*/);
         }
@@ -1806,8 +1808,8 @@ bool DataflowState::process(
   // Now that we have processed all of our mark_moves, eliminate all of the
   // destroy_addr.
   madeChange |= cleanupAllDestroyAddr(
-      address, fn, getIndicesOfPairedDestroys(), getIndicesOfPairedReinits(),
-      getIndicesOfPairedConsumingClosureUses(),
+      address, addressDebugInst, fn, getIndicesOfPairedDestroys(),
+      getIndicesOfPairedReinits(), getIndicesOfPairedConsumingClosureUses(),
       blocksVisitedWhenProcessingNewTakes, blocksWithMovesThatAreNowTakes,
       postDominatingConsumingUsers);
 
@@ -1932,6 +1934,7 @@ struct MoveKillsCopyableAddressesChecker {
   void emitDiagnosticForMove(SILValue borrowedValue,
                              StringRef borrowedValueName, MoveValueInst *mvi);
   bool performSingleBasicBlockAnalysis(SILValue address,
+                                       DebugVarCarryingInst addressDebugInst,
                                        MarkUnresolvedMoveAddrInst *mvi);
 
   ASTContext &getASTContext() const { return fn->getASTContext(); }
@@ -2049,7 +2052,8 @@ bool MoveKillsCopyableAddressesChecker::performClosureDataflow(
 // case. Returns false if we visited all of the uses and seeded the UseState
 // struct with the information needed to perform our interprocedural dataflow.
 bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
-    SILValue address, MarkUnresolvedMoveAddrInst *mvi) {
+    SILValue address, DebugVarCarryingInst addressDebugInst,
+    MarkUnresolvedMoveAddrInst *mvi) {
   // First scan downwards to make sure we are move out of this block.
   auto &useState = dataflowState.useState;
   auto &applySiteToPromotedArgIndices =
@@ -2075,17 +2079,17 @@ bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
                            IsInitialization);
     // Also, mark the alloc_stack as being moved at some point.
-    if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
-      if (auto varInfo = debug.getVarInfo()) {
+    if (addressDebugInst) {
+      if (auto varInfo = addressDebugInst.getVarInfo()) {
         SILBuilderWithScope undefBuilder(builder);
-        undefBuilder.setCurrentDebugScope(debug->getDebugScope());
+        undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
         undefBuilder.createDebugValue(
-            debug->getLoc(),
+            addressDebugInst->getLoc(),
             SILUndef::get(address->getType(), builder.getModule()), *varInfo,
             false,
             /*was moved*/ true);
       }
-      debug.markAsMoved();
+      addressDebugInst.markAsMoved();
     }
 
     useState.destroys.erase(dvi);
@@ -2185,29 +2189,29 @@ bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     SILBuilderWithScope builder(mvi);
     builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
                            IsInitialization);
-    if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
-      if (auto varInfo = debug.getVarInfo()) {
+    if (addressDebugInst) {
+      if (auto varInfo = addressDebugInst.getVarInfo()) {
         {
           SILBuilderWithScope undefBuilder(builder);
-          undefBuilder.setCurrentDebugScope(debug->getDebugScope());
+          undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
           undefBuilder.createDebugValue(
-              debug->getLoc(),
+              addressDebugInst->getLoc(),
               SILUndef::get(address->getType(), builder.getModule()), *varInfo,
               false,
-            /*was moved*/ true);
+              /*was moved*/ true);
         }
         {
           // Make sure at the reinit point to create a new debug value after the
           // reinit instruction so we reshow the variable.
           auto *next = interestingUser->getNextInstruction();
           SILBuilderWithScope reinitBuilder(next);
-          reinitBuilder.setCurrentDebugScope(debug->getDebugScope());
-          reinitBuilder.createDebugValue(debug->getLoc(), address, *varInfo,
-                                         false,
+          reinitBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
+          reinitBuilder.createDebugValue(addressDebugInst->getLoc(),
+                                         address, *varInfo, false,
                                          /*was moved*/ true);
         }
       }
-      debug.markAsMoved();
+      addressDebugInst.markAsMoved();
     }
     mvi->eraseFromParent();
     return false;
@@ -2238,17 +2242,17 @@ bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     LLVM_DEBUG(llvm::dbgs() << "Found apply site to clone: " << **fas);
     LLVM_DEBUG(llvm::dbgs() << "BitVector: ";
                dumpBitVector(llvm::dbgs(), bitVector); llvm::dbgs() << '\n');
-    if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
-      if (auto varInfo = debug.getVarInfo()) {
+    if (addressDebugInst) {
+      if (auto varInfo = addressDebugInst.getVarInfo()) {
         SILBuilderWithScope undefBuilder(builder);
-        undefBuilder.setCurrentDebugScope(debug->getDebugScope());
+        undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
         undefBuilder.createDebugValue(
-            debug->getLoc(),
+            addressDebugInst->getLoc(),
             SILUndef::get(address->getType(), builder.getModule()), *varInfo,
             false,
             /*was moved*/ true);
       }
-      debug.markAsMoved();
+      addressDebugInst.markAsMoved();
     }
     mvi->eraseFromParent();
     return false;
@@ -2337,9 +2341,21 @@ bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   // routine also prepares the pass for running the multi-basic block
   // diagnostic.
   bool emittedSingleBBDiagnostic = false;
+
+  // Before we process any moves, gather the debug inst associated with our
+  // address.
+  //
+  // NOTE: The reason why we do this early is that we rely on our address
+  // initially having a single DebugValueCarryingInst (either an alloc_stack
+  // itself or a debug_value associated with an argument). If we do this while
+  // processing, as we insert additional debug info we will cause this condition
+  // to begin failing.
+  auto addressDebugInst = DebugVarCarryingInst::getFromValue(address);
+
   for (auto *mvi : useState.markMoves) {
     LLVM_DEBUG(llvm::dbgs() << "Performing single block analysis on: " << *mvi);
-    emittedSingleBBDiagnostic |= performSingleBasicBlockAnalysis(address, mvi);
+    emittedSingleBBDiagnostic |=
+        performSingleBasicBlockAnalysis(address, addressDebugInst, mvi);
   }
 
   if (emittedSingleBBDiagnostic) {
@@ -2359,7 +2375,8 @@ bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   // Ok, we need to perform global dataflow for one of our moves. Initialize our
   // dataflow state engine and then run the dataflow itself.
   dataflowState.init();
-  bool result = dataflowState.process(address, closureConsumes);
+  bool result = dataflowState.process(
+      address, addressDebugInst, closureConsumes);
   return result;
 }
 
