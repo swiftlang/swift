@@ -140,6 +140,9 @@ public:
   /// If this is disabled we do not serialize in OSSA form when optimizing.
   bool EnableOSSAModules = false;
 
+  /// If set to true, compile with the SIL Opaque Values enabled.
+  bool EnableSILOpaqueValues = false;
+
   // The kind of function bodies to skip emitting.
   FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
 
