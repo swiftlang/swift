@@ -9863,6 +9863,19 @@ private:
   void createNode(const SILInstruction &);
 };
 
+template <>
+struct DenseMapInfo<swift::SILDebugVariable> {
+  using KeyTy = swift::SILDebugVariable;
+  static inline KeyTy getEmptyKey() {
+    return KeyTy(KeyTy::IsDenseMapSingleton::IsEmpty);
+  }
+  static inline KeyTy getTombstoneKey() {
+    return KeyTy(KeyTy::IsDenseMapSingleton::IsTombstone);
+  }
+  static unsigned getHashValue(const KeyTy &Val) { return hash_value(Val); }
+  static bool isEqual(const KeyTy &LHS, const KeyTy &RHS) { return LHS == RHS; }
+};
+
 } // end llvm namespace
 
 #endif

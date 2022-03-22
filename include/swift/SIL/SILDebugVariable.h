@@ -26,11 +26,20 @@ class AllocationInst;
 /// Holds common debug information about local variables and function
 /// arguments that are needed by DebugValueInst, AllocStackInst,
 /// and AllocBoxInst.
+struct SILDebugVariable;
+inline llvm::hash_code hash_value(const SILDebugVariable &P);
+
+/// Holds common debug information about local variables and function
+/// arguments that are needed by DebugValueInst, AllocStackInst,
+/// and AllocBoxInst.
 struct SILDebugVariable {
+  friend llvm::hash_code hash_value(const SILDebugVariable &P);
+
   StringRef Name;
   unsigned ArgNo : 16;
   unsigned Constant : 1;
   unsigned Implicit : 1;
+  unsigned isDenseMapSingleton : 2;
   Optional<SILType> Type;
   Optional<SILLocation> Loc;
   const SILDebugScope *Scope;
@@ -40,26 +49,41 @@ struct SILDebugVariable {
   SILDebugVariable(const SILDebugVariable &) = default;
   SILDebugVariable &operator=(const SILDebugVariable &) = default;
 
+  enum class IsDenseMapSingleton { No, IsEmpty, IsTombstone };
+  SILDebugVariable(IsDenseMapSingleton inputIsDenseMapSingleton)
+      : SILDebugVariable() {
+    assert(inputIsDenseMapSingleton != IsDenseMapSingleton::No &&
+           "Should only pass IsEmpty or IsTombstone");
+    isDenseMapSingleton = unsigned(inputIsDenseMapSingleton);
+  }
+
   SILDebugVariable()
-      : ArgNo(0), Constant(false), Implicit(false), Scope(nullptr) {}
+      : ArgNo(0), Constant(false), Implicit(false), isDenseMapSingleton(0),
+        Scope(nullptr) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
-      : ArgNo(ArgNo), Constant(Constant), Implicit(false), Scope(nullptr) {}
+      : ArgNo(ArgNo), Constant(Constant), Implicit(false),
+        isDenseMapSingleton(0), Scope(nullptr) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo,
                    bool IsImplicit = false, Optional<SILType> AuxType = {},
                    Optional<SILLocation> DeclLoc = {},
                    const SILDebugScope *DeclScope = nullptr,
                    llvm::ArrayRef<SILDIExprElement> ExprElements = {})
       : Name(Name), ArgNo(ArgNo), Constant(Constant), Implicit(IsImplicit),
-        Type(AuxType), Loc(DeclLoc), Scope(DeclScope), DIExpr(ExprElements) {}
+        isDenseMapSingleton(0), Type(AuxType), Loc(DeclLoc), Scope(DeclScope),
+        DIExpr(ExprElements) {}
 
   /// Created from either AllocStack or AllocBox instruction
   static Optional<SILDebugVariable>
   createFromAllocation(const AllocationInst *AI);
 
-  bool operator==(const SILDebugVariable &V) {
+  // We're not comparing DIExpr here because strictly speaking,
+  // DIExpr is not part of the debug variable. We simply piggyback
+  // it in this class so that's it's easier to carry DIExpr around.
+  bool operator==(const SILDebugVariable &V) const {
     return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name &&
            Implicit == V.Implicit && Type == V.Type && Loc == V.Loc &&
-           Scope == V.Scope && DIExpr == V.DIExpr;
+           Scope == V.Scope && isDenseMapSingleton == V.isDenseMapSingleton &&
+           DIExpr == V.DIExpr;
   }
 
   SILDebugVariable withoutDIExpr() const {
@@ -72,6 +96,13 @@ struct SILDebugVariable {
 
   bool isVar() const { return Name.size() && !Constant; }
 };
+
+/// Returns the hashcode for the new projection path.
+inline llvm::hash_code hash_value(const SILDebugVariable &P) {
+  return llvm::hash_combine(P.ArgNo, P.Constant, P.Name, P.Implicit,
+                            P.isDenseMapSingleton, P.Type, P.Loc, P.Scope,
+                            P.DIExpr);
+}
 
 } // namespace swift
 

@@ -6,6 +6,7 @@ target_sources(swiftSILOptimizer PRIVATE
   ClosureLifetimeFixup.cpp
   PhiStorageOptimizer.cpp
   ConstantPropagation.cpp
+  DebugInfoCanonicalizer.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
