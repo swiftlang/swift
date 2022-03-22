@@ -1,7 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=off
-// RUN: not %target-swift-frontend -typecheck -dump-type-witness-systems %s -requirement-machine-protocol-signatures=off 2>&1 | %FileCheck %s
-
-// TODO: Get this to pass with  -requirement-machine-protocol-signatures=on.
+// RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck -dump-type-witness-systems %s 2>&1 | %FileCheck %s
 
 protocol P1 where A == Never {
   associatedtype A
@@ -572,7 +570,7 @@ protocol P32e where A == B {
 }
 protocol Q32: P32e, P32a, P32b, P32c, P32d {}
 // expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
-// expected-error@-2 {{'Self.B' cannot be equal to both 'Void' and 'Int'}}
+// expected-error@-2 {{'Self.B' cannot be equal to both '()' and 'Int'}}
 // expected-error@-3 {{'Self.A' cannot be equal to both 'Bool' and 'Int'}}
 // expected-note@-4 3 {{same-type constraint 'Self.A' == 'Int' implied here}}
 do {

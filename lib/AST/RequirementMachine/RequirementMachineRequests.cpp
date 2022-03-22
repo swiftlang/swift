@@ -42,10 +42,11 @@ using namespace rewriting;
 /// concrete type requirements.
 static bool shouldSplitConcreteEquivalenceClass(
     Requirement req,
+    const ProtocolDecl *proto,
     const RequirementMachine *machine) {
   return (req.getKind() == RequirementKind::SameType &&
           req.getSecondType()->isTypeParameter() &&
-          machine->isConcreteType(req.getSecondType()));
+          machine->isConcreteType(req.getSecondType(), proto));
 }
 
 /// Returns true if this generic signature contains abstract same-type
@@ -54,9 +55,24 @@ static bool shouldSplitConcreteEquivalenceClass(
 /// requirements, and minimize the signature again.
 static bool shouldSplitConcreteEquivalenceClasses(
     ArrayRef<Requirement> requirements,
+    const ProtocolDecl *proto,
     const RequirementMachine *machine) {
   for (auto req : requirements) {
-    if (shouldSplitConcreteEquivalenceClass(req, machine))
+    if (shouldSplitConcreteEquivalenceClass(req, proto, machine))
+      return true;
+  }
+
+  return false;
+}
+
+/// Same as the above, but with the requirements of a protocol connected
+/// component.
+static bool shouldSplitConcreteEquivalenceClasses(
+    const llvm::DenseMap<const ProtocolDecl *, RequirementSignature> &protos,
+    const RequirementMachine *machine) {
+  for (const auto &pair : protos) {
+    if (shouldSplitConcreteEquivalenceClasses(pair.second.getRequirements(),
+                                              pair.first, machine))
       return true;
   }
 
@@ -71,6 +87,7 @@ static bool shouldSplitConcreteEquivalenceClasses(
 static void splitConcreteEquivalenceClasses(
     ASTContext &ctx,
     ArrayRef<Requirement> requirements,
+    const ProtocolDecl *proto,
     const RequirementMachine *machine,
     TypeArrayView<GenericTypeParamType> genericParams,
     SmallVectorImpl<StructuralRequirement> &splitRequirements,
@@ -78,7 +95,6 @@ static void splitConcreteEquivalenceClasses(
   unsigned maxAttempts =
       ctx.LangOpts.RequirementMachineMaxSplitConcreteEquivClassAttempts;
 
-  ++attempt;
   if (attempt >= maxAttempts) {
     llvm::errs() << "Splitting concrete equivalence classes did not "
                  << "reach fixed point after " << attempt << " attempts.\n";
@@ -94,9 +110,9 @@ static void splitConcreteEquivalenceClasses(
   splitRequirements.clear();
 
   for (auto req : requirements) {
-    if (shouldSplitConcreteEquivalenceClass(req, machine)) {
+    if (shouldSplitConcreteEquivalenceClass(req, proto, machine)) {
       auto concreteType = machine->getConcreteType(
-          req.getSecondType(), genericParams);
+          req.getSecondType(), genericParams, proto);
 
       Requirement firstReq(RequirementKind::SameType,
                            req.getFirstType(), concreteType);
@@ -108,6 +124,25 @@ static void splitConcreteEquivalenceClasses(
     }
 
     splitRequirements.push_back({req, SourceLoc(), /*inferred=*/false});
+  }
+}
+
+/// Same as the above, but with the requirements of a protocol connected
+/// component.
+static void splitConcreteEquivalenceClasses(
+    ASTContext &ctx,
+    const llvm::DenseMap<const ProtocolDecl *, RequirementSignature> &protos,
+    const RequirementMachine *machine,
+    llvm::DenseMap<const ProtocolDecl *,
+                   SmallVector<StructuralRequirement, 4>> &splitProtos,
+    unsigned &attempt) {
+  for (const auto &pair : protos) {
+    const auto *proto = pair.first;
+    auto genericParams = proto->getGenericSignature().getGenericParams();
+    splitConcreteEquivalenceClasses(ctx, pair.second.getRequirements(),
+                                    proto, machine, genericParams,
+                                    splitProtos[proto],
+                                    attempt);
   }
 }
 
@@ -195,87 +230,99 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       requirements.push_back({req, SourceLoc(), /*inferred=*/false});
   }
 
-  // Heap-allocate the requirement machine to save stack space.
-  std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
-      ctx.getRewriteContext()));
+  unsigned attempt = 0;
+  for (;;) {
+    // Heap-allocate the requirement machine to save stack space.
+    std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
+        ctx.getRewriteContext()));
 
-  auto status = machine->initWithProtocolWrittenRequirements(component, protos);
-  if (status.first != CompletionResult::Success) {
-    // All we can do at this point is diagnose and give each protocol an empty
-    // requirement signature.
-    for (const auto *otherProto : component) {
-      ctx.Diags.diagnose(otherProto->getLoc(),
-                         diag::requirement_machine_completion_failed,
-                         /*protocol=*/1,
-                         unsigned(status.first));
+    auto status = machine->initWithProtocolWrittenRequirements(component, protos);
+    if (status.first != CompletionResult::Success) {
+      // All we can do at this point is diagnose and give each protocol an empty
+      // requirement signature.
+      for (const auto *otherProto : component) {
+        ctx.Diags.diagnose(otherProto->getLoc(),
+                           diag::requirement_machine_completion_failed,
+                           /*protocol=*/1,
+                           unsigned(status.first));
 
-      auto rule = machine->getRuleAsStringForDiagnostics(status.second);
-      ctx.Diags.diagnose(otherProto->getLoc(),
-                         diag::requirement_machine_completion_rule,
-                         rule);
+        auto rule = machine->getRuleAsStringForDiagnostics(status.second);
+        ctx.Diags.diagnose(otherProto->getLoc(),
+                           diag::requirement_machine_completion_rule,
+                           rule);
 
-      if (otherProto != proto) {
-        ctx.evaluator.cacheOutput(
-          RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
-          RequirementSignature(GenericSignatureErrorFlags::CompletionFailed));
+        if (otherProto != proto) {
+          ctx.evaluator.cacheOutput(
+            RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
+            RequirementSignature(GenericSignatureErrorFlags::CompletionFailed));
+        }
+      }
+
+      return RequirementSignature(GenericSignatureErrorFlags::CompletionFailed);
+    }
+
+    auto minimalRequirements = machine->computeMinimalProtocolRequirements();
+
+    if (!machine->getErrors()) {
+      if (shouldSplitConcreteEquivalenceClasses(minimalRequirements, machine.get())) {
+        ++attempt;
+        splitConcreteEquivalenceClasses(ctx, minimalRequirements,
+                                        machine.get(), protos, attempt);
+        continue;
       }
     }
 
-    return RequirementSignature(GenericSignatureErrorFlags::CompletionFailed);
-  }
+    bool debug = machine->getDebugOptions().contains(DebugFlags::Minimization);
 
-  auto minimalRequirements = machine->computeMinimalProtocolRequirements();
+    // The requirement signature for the actual protocol that the result
+    // was kicked off with.
+    Optional<RequirementSignature> result;
 
-  bool debug = machine->getDebugOptions().contains(DebugFlags::Minimization);
-
-  // The requirement signature for the actual protocol that the result
-  // was kicked off with.
-  Optional<RequirementSignature> result;
-
-  if (debug) {
-    llvm::dbgs() << "\nRequirement signatures:\n";
-  }
-
-  for (const auto &pair : minimalRequirements) {
-    auto *otherProto = pair.first;
-    const auto &reqs = pair.second;
-
-    // Dump the result if requested.
     if (debug) {
-      llvm::dbgs() << "- Protocol " << otherProto->getName() << ": ";
-
-      auto sig = GenericSignature::get(
-          otherProto->getGenericSignature().getGenericParams(),
-          reqs.getRequirements());
-
-      PrintOptions opts;
-      opts.ProtocolQualifiedDependentMemberTypes = true;
-      sig.print(llvm::dbgs(), opts);
-      llvm::dbgs() << "\n";
+      llvm::dbgs() << "\nRequirement signatures:\n";
     }
 
-    // Don't call setRequirementSignature() on the original proto; the
-    // request evaluator will do it for us.
-    if (otherProto == proto)
-      result = reqs;
-    else {
-      auto temp = reqs;
-      ctx.evaluator.cacheOutput(
-        RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
-        std::move(temp));
+    for (const auto &pair : minimalRequirements) {
+      auto *otherProto = pair.first;
+      const auto &reqs = pair.second;
+
+      // Dump the result if requested.
+      if (debug) {
+        llvm::dbgs() << "- Protocol " << otherProto->getName() << ": ";
+
+        auto sig = GenericSignature::get(
+            otherProto->getGenericSignature().getGenericParams(),
+            reqs.getRequirements());
+
+        PrintOptions opts;
+        opts.ProtocolQualifiedDependentMemberTypes = true;
+        sig.print(llvm::dbgs(), opts);
+        llvm::dbgs() << "\n";
+      }
+
+      // Don't call setRequirementSignature() on the original proto; the
+      // request evaluator will do it for us.
+      if (otherProto == proto)
+        result = reqs;
+      else {
+        auto temp = reqs;
+        ctx.evaluator.cacheOutput(
+          RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
+          std::move(temp));
+      }
     }
-  }
 
-  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
-      RequirementMachineMode::Enabled) {
-    SmallVector<RequirementError, 4> errors;
-    machine->System.computeRedundantRequirementDiagnostics(errors);
-    diagnoseRequirementErrors(ctx, errors,
-                              /*allowConcreteGenericParams=*/false);
-  }
+    if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
+        RequirementMachineMode::Enabled) {
+      SmallVector<RequirementError, 4> errors;
+      machine->System.computeRedundantRequirementDiagnostics(errors);
+      diagnoseRequirementErrors(ctx, errors,
+                                /*allowConcreteGenericParams=*/false);
+    }
 
-  // Return the result for the specific protocol this request was kicked off on.
-  return *result;
+    // Return the result for the specific protocol this request was kicked off on.
+    return *result;
+  }
 }
 
 /// Builds the top-level generic signature requirements for this rewrite system.
@@ -479,9 +526,12 @@ AbstractGenericSignatureRequestRQM::evaluate(
 
     if (!errorFlags) {
       if (shouldSplitConcreteEquivalenceClasses(result.getRequirements(),
+                                                /*proto=*/nullptr,
                                                 machine.get())) {
+        ++attempt;
         splitConcreteEquivalenceClasses(ctx, result.getRequirements(),
-                                        machine.get(), result.getGenericParams(),
+                                        /*proto=*/nullptr, machine.get(),
+                                        result.getGenericParams(),
                                         requirements, attempt);
         continue;
       }
@@ -646,9 +696,12 @@ InferredGenericSignatureRequestRQM::evaluate(
     if (!errorFlags) {
       // Check if we need to rebuild the signature.
       if (shouldSplitConcreteEquivalenceClasses(result.getRequirements(),
+                                                /*proto=*/nullptr,
                                                 machine.get())) {
+        ++attempt;
         splitConcreteEquivalenceClasses(ctx, result.getRequirements(),
-                                        machine.get(), result.getGenericParams(),
+                                        /*proto=*/nullptr, machine.get(),
+                                        result.getGenericParams(),
                                         requirements, attempt);
         continue;
       }
