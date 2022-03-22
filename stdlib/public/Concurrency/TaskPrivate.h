@@ -295,6 +295,10 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
 #endif
   };
 
+  // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
+  // ActiveTaskStatusWithoutEscalation in
+  // include/swift/Reflection/RuntimeInternals.h. Any changes to the layout here
+  // must also be made there.
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;
   dispatch_lock_t ExecutionLock;
@@ -507,7 +511,9 @@ public:
   }
 
   void traceStatusChanged(AsyncTask *task) {
-    concurrency::trace::task_status_changed(task, Flags);
+    concurrency::trace::task_status_changed(
+        task, static_cast<uint8_t>(getStoredPriority()), isCancelled(),
+        isStoredPriorityEscalated(), isRunning(), isEnqueued());
   }
 };
 
@@ -771,7 +777,10 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
 
   // Set up task for enqueue to next location by setting the Job priority field
   Flags.setPriority(newStatus.getStoredPriority());
-  concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
+  concurrency::trace::task_flags_changed(
+      this, static_cast<uint8_t>(Flags.getPriority()), Flags.task_isChildTask(),
+      Flags.task_isFuture(), Flags.task_isGroupChildTask(),
+      Flags.task_isAsyncLetTask());
 
   swift_task_enqueue(this, newExecutor);
 }

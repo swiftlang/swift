@@ -78,7 +78,7 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   static func buildDo<T>(_ value: T) -> T { return value }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note {{in call to function 'tuplify(_:body:)'}}
   print(body(cond))
 }
 
@@ -307,21 +307,6 @@ struct MyTuplifiedStruct {
   }
 }
 
-func test_invalid_return_type_in_body() {
-  tuplify(true) { _ -> (Void, Int) in
-    tuplify(false) { condition in
-      if condition {
-        return 42 // expected-error {{cannot use explicit 'return' statement in the body of result builder 'TupleBuilder'}}
-        // expected-note@-1 {{remove 'return' statements to apply the result builder}} {{9-16=}}
-      } else {
-        1
-      }
-    }
-
-    42
-  }
-}
-
 // Check that we're performing syntactic use diagnostics.
 func acceptMetatype<T>(_: T.Type) -> Bool { true }
 
@@ -481,7 +466,7 @@ struct TestConstraintGenerationErrors {
   func buildTupleClosure() {
     tuplify(true) { _ in
       let a = nothing // expected-error {{cannot find 'nothing' in scope}}
-      String(nothing)
+      String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
   }
 }
@@ -522,7 +507,7 @@ enum E3 {
 }
 
 func testCaseMutabilityMismatches(e: E3) {
-    tuplify(true) { c in
+   tuplify(true) { c in // expected-error {{generic parameter 'T' could not be inferred}}
     "testSwitch"
     switch e {
     case .a(let x, var y),
@@ -824,5 +809,32 @@ func test_redeclations() {
 
   tuplify(true) { c in
     let (foo, foo) = (5, 6) // expected-error {{invalid redeclaration of 'foo'}} expected-note {{'foo' previously declared here}}
+  }
+}
+
+func test_rdar89742267() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ t: T) -> T { t }
+    static func buildEither<T>(first: T) -> T { first }
+    static func buildEither<T>(second: T) -> T { second }
+  }
+
+  struct S {}
+
+  enum Hey {
+    case listen
+  }
+
+  struct MyView {
+    var entry: Hey
+
+    @Builder var body: S {
+      switch entry {
+      case .listen: S()
+      case nil: S() // expected-warning {{type 'Hey' is not optional, value can never be nil; this is an error in Swift 6}}
+      default: S()
+      }
+    }
   }
 }

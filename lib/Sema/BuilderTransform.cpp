@@ -1736,7 +1736,18 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 
   // Solve the constraint system.
   SmallVector<Solution, 4> solutions;
-  if (cs.solve(solutions) || solutions.size() != 1) {
+  bool solvingFailed = cs.solve(solutions);
+
+  if (cs.getASTContext().CompletionCallback) {
+    CompletionContextFinder analyzer(func, func->getDeclContext());
+    filterSolutionsForCodeCompletion(solutions, analyzer);
+    for (const auto &solution : solutions) {
+      cs.getASTContext().CompletionCallback->sawSolution(solution);
+    }
+    return nullptr;
+  }
+
+  if (solvingFailed || solutions.size() != 1) {
     // Try to fix the system or provide a decent diagnostic.
     auto salvagedResult = cs.salvage();
     switch (salvagedResult.getKind()) {
@@ -1863,6 +1874,13 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     if (auto unhandledNode = visitor.check(fn.getBody())) {
       // If we aren't supposed to attempt fixes, fail.
       if (!shouldAttemptFixes()) {
+        return getTypeMatchFailure(locator);
+      }
+
+      // If we're solving for code completion and the body contains the code
+      // completion location, skipping it won't get us to a useful solution so
+      // just bail.
+      if (isForCodeCompletion() && containsCodeCompletionLoc(fn.getBody())) {
         return getTypeMatchFailure(locator);
       }
 

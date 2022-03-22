@@ -4534,7 +4534,7 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "non-isolated context",
       (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
-      "'_Distributed' module not imported, required for 'distributed actor'",
+      "'Distributed' module not imported, required for 'distributed actor'",
       ())
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"
@@ -4555,10 +4555,6 @@ ERROR(global_actor_from_nonactor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
       " from %select{this|a non-isolated}3%select{| synchronous}5 context",
       (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
-ERROR(global_actor_from_initializing_expr,none,
-      "expression requiring global actor %0 cannot appear in "
-        "default-value expression of %1 %2",
-      (Type, DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_call,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))
@@ -4737,8 +4733,8 @@ ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))
 ERROR(existential_requires_any,none,
-      "%select{protocol |}1%0 as a type must be explicitly marked as 'any'",
-      (Type, bool))
+      "use of %select{protocol |}2%0 as a type must be written %1",
+      (Type, Type, bool))
 
 ERROR(nonisolated_let,none,
       "'nonisolated' is meaningless on 'let' declarations because "
@@ -5631,10 +5627,6 @@ WARNING(public_decl_needs_availability, none,
         "public declarations should have an availability attribute when building "
         "with -require-explicit-availability", ())
 
-ERROR(availability_macro_in_inlinable, none,
-      "availability macro cannot be used in inlinable %0",
-      (DescriptiveDeclKind))
-
 ERROR(attr_requires_decl_availability_for_platform,none,
       "'%0' requires that %1 have explicit availability for %2",
       (DeclAttribute, DeclName, StringRef))
@@ -5731,7 +5723,8 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "an '@inlinable' function|" \
   "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
-  "a property initializer in a '@frozen' type}"
+  "a property initializer in a '@frozen' type|" \
+  "a '@_backDeploy' function'}"
 
 #define DECL_OR_ACCESSOR "%select{%0|%0 for}"
 
@@ -5755,6 +5748,10 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "it is an SPI imported from %3|"
       "it is SPI}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
+
+ERROR(availability_macro_in_inlinable, none,
+      "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
+      (unsigned))
 
 #undef FRAGILE_FUNC_KIND
 

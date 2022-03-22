@@ -804,8 +804,13 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   assert(!Name.empty() && "name should not be empty");
 
   Type VarType;
-  if (VD->hasInterfaceType())
+  auto SolutionSpecificType = SolutionSpecificVarTypes.find(VD);
+  if (SolutionSpecificType != SolutionSpecificVarTypes.end()) {
+    assert(!VarType && "Type recorded in the AST and is also solution-specific?");
+    VarType = SolutionSpecificType->second;
+  } else if (VD->hasInterfaceType()) {
     VarType = getTypeOfMember(VD, dynamicLookupInfo);
+  }
 
   Optional<ContextualNotRecommendedReason> NotRecommended;
   // "not recommended" in its own getter.
@@ -2633,22 +2638,6 @@ void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
   RequestedCachedResults.push_back(
       RequestedResultsTy::toplevelResults().withModuleQualifier(
           ModuleQualifier));
-
-  // Manually add any expected nominal types from imported modules so that
-  // they get their expected type relation. Don't include protocols, since
-  // they can't be initialized from the type name.
-  // FIXME: this does not include types that conform to an expected protocol.
-  // FIXME: this creates duplicate results.
-  for (auto T : expectedTypeContext.getPossibleTypes()) {
-    if (auto NT = T->getAs<NominalType>()) {
-      if (auto NTD = NT->getDecl()) {
-        if (!isa<ProtocolDecl>(NTD) && NTD->getModuleContext() != CurrModule) {
-          addNominalTypeRef(NT->getDecl(),
-                            DeclVisibilityKind::VisibleAtTopLevel, {});
-        }
-      }
-    }
-  }
 
   if (CompletionContext) {
     // FIXME: this is an awful simplification that says all and only enums can

@@ -12,6 +12,7 @@
 import Swift
 import _Concurrency
 
+/// A distributed actor system
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedActorSystem: Sendable {
   /// The identity used by actors that communicate via this transport
@@ -78,7 +79,7 @@ public protocol DistributedActorSystem: Sendable {
   ///
   /// The `actor.id` of the passed actor must be an `ActorID` that this system previously has assigned.
   ///
-  /// If the `actorReady` gets called with some unknown ID, it should crash immediately as it signifies some
+  /// If `actorReady` gets called with some unknown ID, it should crash immediately as it signifies some
   /// very unexpected use of the system.
   ///
   /// - Parameter actor: reference to the (local) actor that was just fully initialized.
@@ -93,7 +94,7 @@ public protocol DistributedActorSystem: Sendable {
   /// and not re-cycled by the system), i.e. if it is called during a failure to initialize completely,
   /// the call from the actor's deinitalizer will not happen (as under these circumstances, `deinit` will be run).
   ///
-  /// If the `actorReady` gets called with some unknown ID, it should crash immediately as it signifies some
+  /// If `resignID` gets called with some unknown ID, it should crash immediately as it signifies some
   /// very unexpected use of the system.
   ///
   /// - Parameter id: the id of an actor managed by this system that has begun its `deinit`.
@@ -172,23 +173,21 @@ extension DistributedActorSystem {
   /// latency sensitive-use-cases.
   public func executeDistributedTarget<Act, ResultHandler>(
     on actor: Act,
-    mangledTargetName: String,
+    target: RemoteCallTarget,
     invocationDecoder: inout InvocationDecoder,
     handler: ResultHandler
   ) async throws where Act: DistributedActor,
                        // Act.ID == ActorID, // FIXME(distributed): can we bring this back?
                        ResultHandler: DistributedTargetInvocationResultHandler {
-    // NOTE: this implementation is not the most efficient, nor final, version of this func
-    // we end up demangling the name multiple times, perform more heap allocations than
-    // we truly need to etc. We'll eventually move this implementation to a specialized one
-    // avoiding these issues.
-    guard mangledTargetName.count > 0 && mangledTargetName.first == "$" else {
-      throw ExecuteDistributedTargetError(
-        message: "Illegal mangledTargetName detected, must start with '$'")
-    }
+    // NOTE: Implementation could be made more efficient because we still risk
+    // demangling a RemoteCallTarget identity (if it is a mangled name) multiple
+    // times. We would prefer to store if it is a mangled name, demangle, and
+    // always refer to that demangled repr perhaps? We do cache the resulting
+    // pretty formatted name of the call target, but perhaps we can do better.
 
     // Get the expected parameter count of the func
-    let nameUTF8 = Array(mangledTargetName.utf8)
+    let targetName = target.identifier
+    let nameUTF8 = Array(targetName.utf8)
 
     // Gen the generic environment (if any) associated with the target.
     let genericEnv = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
@@ -207,7 +206,9 @@ extension DistributedActorSystem {
 
     if let genericEnv = genericEnv {
       let subs = try invocationDecoder.decodeGenericSubstitutions()
-
+      for item in subs {
+        print("SUB: \(item)")
+      }
       if subs.isEmpty {
         throw ExecuteDistributedTargetError(
           message: "Cannot call generic method without generic argument substitutions")
@@ -224,7 +225,7 @@ extension DistributedActorSystem {
                                                                      genericArguments: substitutionsBuffer!)
       if numWitnessTables < 0 {
         throw ExecuteDistributedTargetError(
-          message: "Generic substitutions \(subs) do not satisfy generic requirements of \(mangledTargetName)")
+          message: "Generic substitutions \(subs) do not satisfy generic requirements of \(target) (\(targetName))")
       }
     }
 
@@ -237,7 +238,7 @@ extension DistributedActorSystem {
         message: """
                  Failed to decode distributed invocation target expected parameter count,
                  error code: \(paramCount)
-                 mangled name: \(mangledTargetName)
+                 mangled name: \(targetName)
                  """)
     }
 
@@ -262,7 +263,7 @@ extension DistributedActorSystem {
         message: """
                  Failed to decode the expected number of params of distributed invocation target, error code: \(decodedNum)
                  (decoded: \(decodedNum), expected params: \(paramCount)
-                 mangled name: \(mangledTargetName)
+                 mangled name: \(targetName)
                  """)
     }
 
@@ -280,7 +281,7 @@ extension DistributedActorSystem {
       return UnsafeRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
     }
 
-    guard let returnTypeFromTypeInfo: Any.Type = _getReturnTypeInfo(mangledMethodName: mangledTargetName,
+    guard let returnTypeFromTypeInfo: Any.Type = _getReturnTypeInfo(mangledMethodName: targetName,
                                                                     genericEnv: genericEnv,
                                                                     genericArguments: substitutionsBuffer) else {
       throw ExecuteDistributedTargetError(
@@ -307,7 +308,7 @@ extension DistributedActorSystem {
       // Execute the target!
       try await _executeDistributedTarget(
         on: actor,
-        mangledTargetName, UInt(mangledTargetName.count),
+        targetName, UInt(targetName.count),
         argumentDecoder: &invocationDecoder,
         argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
         resultBuffer: resultBuffer._rawValue,
@@ -326,6 +327,43 @@ extension DistributedActorSystem {
   }
 }
 
+/// Represents a 'target' of a distributed call, such as a `distributed func` or
+/// `distributed` computed property. Identification schemes may vary between
+/// systems, and are subject to evolution.
+///
+/// Actor systems generally should treat the `identifier` as an opaque string,
+/// and pass it along to the remote system for in their `remoteCall`
+/// implementation. Alternative approaches are possible, where the identifiers
+/// are either compressed, cached, or represented in other ways, as long as the
+/// recipient system is able to determine which target was intended to be
+/// invoked.
+///
+/// The string representation will attempt to pretty print the target identifier,
+/// however its exact format is not specified and may change in future versions.
+@available(SwiftStdlib 5.7, *)
+public struct RemoteCallTarget: CustomStringConvertible, Hashable {
+  private let _identifier: String
+
+  public init(_ identifier: String) {
+    self._identifier = identifier
+  }
+
+  /// The underlying identifier of the target, returned as-is.
+  public var identifier: String {
+    return _identifier
+  }
+
+  /// Attempts to pretty format the underlying target identifier.
+  /// If unable to, returns the raw underlying identifier.
+  public var description: String {
+    if let name = _getFunctionFullNameFromMangledName(mangledName: _identifier) {
+      return name
+    } else {
+      return "\(_identifier)"
+    }
+  }
+}
+
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_execute_target")
 func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
@@ -338,29 +376,6 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
   witnessTables: UnsafeRawPointer?,
   numWitnessTables: UInt
 ) async throws
-
-// ==== ----------------------------------------------------------------------------------------------------------------
-// MARK: Support types
-/// A distributed 'target' can be a `distributed func` or `distributed` computed property.
-@available(SwiftStdlib 5.7, *)
-public struct RemoteCallTarget { // TODO: ship this around always; make printing nice
-  let _mangledName: String // TODO: StaticString would be better here; no arc, codesize of cleanups
-
-  // Only intended to be created by the _Distributed library.
-  // TODO(distributed): make this internal and only allow calling by the synthesized code?
-  public init(_mangledName: String) {
-    self._mangledName = _mangledName
-  }
-
-  public var mangledName: String {
-    _mangledName
-  }
-
-  // <module>.Base.hello(hi:)
-  public var fullName: String { // TODO: make description
-    fatalError("NOT IMPLEMENTED YET: \(#function)")
-  }
-}
 
 /// Used to encode an invocation of a distributed target (method or computed property).
 ///
@@ -393,6 +408,7 @@ public struct RemoteCallTarget { // TODO: ship this around always; make printing
 /// Note that the decoding will be provided the specific types that the sending side used to preform the call,
 /// so decoding can rely on simply invoking e.g. `Codable` (if that is the `SerializationRequirement`) decoding
 /// entry points on the provided types.
+@available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationEncoder {
   associatedtype SerializationRequirement
 
@@ -404,14 +420,13 @@ public protocol DistributedTargetInvocationEncoder {
 //  ///
 //  /// Record an argument of `Argument` type.
 //  /// This will be invoked for every argument of the target, in declaration order.
-//  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws
-  // TODO(distributed): offer recordArgument(label:type:)
+//  mutating func recordArgument<Value: SerializationRequirement>(
+//    _ argument: DistributedTargetArgument<Value>
+//  ) throws
 
-//  /// Ad-hoc requirement
-//  ///
-//  /// Record the error type of the distributed method.
-//  /// This method will not be invoked if the target is not throwing.
-//  mutating func recordErrorType<E: Error>(_ type: E.Type) throws // TODO: make not adhoc
+  /// Record the error type of the distributed method.
+  /// This method will not be invoked if the target is not throwing.
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 
 //  /// Ad-hoc requirement
 //  ///
@@ -422,8 +437,51 @@ public protocol DistributedTargetInvocationEncoder {
   mutating func doneRecording() throws
 }
 
+/// Represents an argument passed to a distributed call target.
+@available(SwiftStdlib 5.7, *)
+public struct RemoteCallArgument<Value> {
+  /// The "argument label" of the argument.
+  /// The label is the name visible name used in external calls made to this
+  /// target, e.g. for `func hello(label name: String)` it is `label`.
+  ///
+  /// If no label is specified (i.e. `func hi(name: String)`), the `label`,
+  /// value is empty, however `effectiveLabel` is equal to the `name`.
+  ///
+  /// In most situations, using `effectiveLabel` is more useful to identify
+  /// the user-visible name of this argument.
+  public let label: String?
+
+  /// The effective label of this argument, i.e. if no explicit `label` was set
+  /// this defaults to the `name`. This reflects the semantics of call sites of
+  /// function declarations without explicit label definitions in Swift.
+  public var effectiveLabel: String {
+    return label ?? name
+  }
+
+  /// The internal name of parameter this argument is accessible as in the
+  /// function body. It is not part of the functions API and may change without
+  /// breaking the target identifier.
+  ///
+  /// If the method did not declare an explicit `label`, it is used as the
+  /// `effectiveLabel`.
+  public let name: String
+
+  /// The value of the argument being passed to the call.
+  /// As `RemoteCallArgument` is always used in conjunction with
+  /// `recordArgument` and populated by the compiler, this Value will generally
+  /// conform to a distributed actor system's `SerializationRequirement`.
+  public let value: Value
+
+  public init(label: String?, name: String, value: Value) {
+    self.label = label
+    self.name = name
+    self.value = value
+  }
+}
+
 /// Decoder that must be provided to `executeDistributedTarget` and is used
 /// by the Swift runtime to decode arguments of the invocation.
+@available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationDecoder {
   associatedtype SerializationRequirement
 

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name CdeclFunctions -emit-cxx-header-path %t/cdecl.h
+// RUN: %target-swift-frontend %s -typecheck -module-name CdeclFunctions -clang-header-expose-public-decls -emit-clang-header-path %t/cdecl.h
 // RUN: %FileCheck %s < %t/cdecl.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/cdecl.h)
@@ -7,7 +7,7 @@
 // CHECK-LABEL: namespace CdeclFunctions {
 
 // CHECK: namespace _impl {
-// CHECK: extern "C" int cfuncPassTwo(int x, int y) noexcept;
+// CHECK: SWIFT_EXTERN int cfuncPassTwo(int x, int y) SWIFT_NOEXCEPT;
 // CHECK: }
 
 @_cdecl("cfuncPassTwo")

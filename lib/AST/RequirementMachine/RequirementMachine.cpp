@@ -17,6 +17,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Requirement.h"
 #include "RequirementLowering.h"
+#include "RuleBuilder.h"
 
 using namespace swift;
 using namespace rewriting;
@@ -63,6 +64,47 @@ void RequirementMachine::checkCompletionResult(CompletionResult result) const {
   }
 }
 
+/// Build a requirement machine for the previously-computed requirement
+/// signatures connected component of protocols.
+///
+/// This must only be called exactly once, before any other operations are
+/// performed on this requirement machine.
+///
+/// Used by RewriteContext::getRequirementMachine(const ProtocolDecl *).
+///
+/// Returns failure if completion fails within the configured number of steps.
+std::pair<CompletionResult, unsigned>
+RequirementMachine::initWithProtocolSignatureRequirements(
+    ArrayRef<const ProtocolDecl *> protos) {
+  FrontendStatsTracer tracer(Stats, "build-rewrite-system");
+
+  if (Dump) {
+    llvm::dbgs() << "Adding protocols";
+    for (auto *proto : protos) {
+      llvm::dbgs() << " " << proto->getName();
+    }
+    llvm::dbgs() << " {\n";
+  }
+
+  RuleBuilder builder(Context, System.getReferencedProtocols());
+  builder.initWithProtocolSignatureRequirements(protos);
+
+  // Add the initial set of rewrite rules to the rewrite system.
+  System.initialize(/*recordLoops=*/true, protos,
+                    std::move(builder.WrittenRequirements),
+                    std::move(builder.ImportedRules),
+                    std::move(builder.PermanentRules),
+                    std::move(builder.RequirementRules));
+
+  auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+
+  if (Dump) {
+    llvm::dbgs() << "}\n";
+  }
+
+  return result;
+}
+
 /// Build a requirement machine for the requirements of a generic signature.
 ///
 /// In this mode, minimization is not going to be performed, so rewrite loops
@@ -90,13 +132,14 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RuleBuilder builder(Context, System.getProtocolMap());
-  builder.addRequirements(sig.getRequirements());
+  RuleBuilder builder(Context, System.getReferencedProtocols());
+  builder.initWithGenericSignatureRequirements(sig.getRequirements());
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
                     std::move(builder.WrittenRequirements),
+                    std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
@@ -109,12 +152,12 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   return result;
 }
 
-/// Build a requirement machine for the structural requirements of a set
-/// of protocols, which are understood to form a strongly-connected component
-/// (SCC) of the protocol dependency graph.
+/// Build a requirement machine for the user-written requirements of connected
+/// component of protocols.
 ///
-/// In this mode, minimization will be performed, so rewrite loops are recorded
-/// during completion.
+/// This is used when actually building the requirement signatures of these
+/// protocols. In this mode, minimization will be performed, so rewrite loops
+/// are recorded during completion.
 ///
 /// This must only be called exactly once, before any other operations are
 /// performed on this requirement machine.
@@ -123,7 +166,8 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 ///
 /// Returns failure if completion fails within the configured number of steps.
 std::pair<CompletionResult, unsigned>
-RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
+RequirementMachine::initWithProtocolWrittenRequirements(
+    ArrayRef<const ProtocolDecl *> protos) {
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
   if (Dump) {
@@ -134,12 +178,13 @@ RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
     llvm::dbgs() << " {\n";
   }
 
-  RuleBuilder builder(Context, System.getProtocolMap());
-  builder.addProtocols(protos);
+  RuleBuilder builder(Context, System.getReferencedProtocols());
+  builder.initWithProtocolWrittenRequirements(protos);
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true, protos,
                     std::move(builder.WrittenRequirements),
+                    std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
@@ -181,13 +226,14 @@ RequirementMachine::initWithWrittenRequirements(
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RuleBuilder builder(Context, System.getProtocolMap());
-  builder.addRequirements(requirements);
+  RuleBuilder builder(Context, System.getReferencedProtocols());
+  builder.initWithWrittenRequirements(requirements);
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
                     std::move(builder.WrittenRequirements),
+                    std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
@@ -259,7 +305,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
         }
       }
 
-      if (System.getRules().size() > MaxRuleCount) {
+      if (System.getLocalRules().size() > MaxRuleCount) {
         return std::make_pair(CompletionResult::MaxRuleCount,
                               System.getRules().size() - 1);
       }
@@ -290,14 +336,17 @@ std::string RequirementMachine::getRuleAsStringForDiagnostics(
   return out.str();
 }
 
+ArrayRef<Rule> RequirementMachine::getLocalRules() const {
+  return System.getLocalRules();
+}
+
 bool RequirementMachine::isComplete() const {
   return Complete;
 }
 
-bool RequirementMachine::hadError() const {
-  // FIXME: Implement other checks here
-  // FIXME: Assert if hadError() is true but we didn't emit any diagnostics?
-  return System.hadError();
+GenericSignatureErrors RequirementMachine::getErrors() const {
+  // FIXME: Assert if we had errors but we didn't emit any diagnostics?
+  return System.getErrors();
 }
 
 void RequirementMachine::dump(llvm::raw_ostream &out) const {

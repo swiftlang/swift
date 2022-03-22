@@ -1746,7 +1746,12 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
 }
 
 bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
-  auto *anchor = castToExpr(getAnchor());
+  auto *anchor = getAsExpr(getAnchor());
+  // This diagnostic is used opportunistically in `diagnoseAmbiguity`,
+  // which means it cannot assume that anchor is always an expression.
+  if (!anchor)
+    return false;
+
   const auto *expr = findParentExpr(anchor);
   auto *callExpr = dyn_cast_or_null<CallExpr>(expr);
   if (!callExpr)
@@ -2351,7 +2356,9 @@ bool ContextualFailure::diagnoseAsError() {
     if (isExpr<OptionalTryExpr>(anchor) ||
         isExpr<OptionalEvaluationExpr>(anchor)) {
       auto objectType = fromType->getOptionalObjectType();
-      if (objectType->isEqual(toType)) {
+      // Cannot assume that `fromType` is always optional here since
+      // it could assume a type from context.
+      if (objectType && objectType->isEqual(toType)) {
         MissingOptionalUnwrapFailure failure(getSolution(), getType(anchor),
                                              toType,
                                              getConstraintLocator(anchor));
@@ -3809,7 +3816,10 @@ bool MissingMemberFailure::diagnoseForDynamicCallable() const {
 }
 
 bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
-  auto *expr = castToExpr(getAnchor());
+  auto *expr = getAsExpr(getAnchor());
+  if (!expr)
+    return false;
+
   auto *parentExpr = findParentExpr(expr);
   auto &solution = getSolution();
 
@@ -5918,8 +5928,11 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     return (type == params.end()) ? Type() : type->second;
   };
 
+  auto baseType = anchor.dyn_cast<TypeRepr *>();
+  if (!baseType)
+    return;
+
   SmallString<64> paramsAsString;
-  auto baseType = anchor.get<TypeRepr *>();
   if (TypeChecker::getDefaultGenericArgumentsString(paramsAsString, GTD,
                                                     getPreferredType)) {
     auto diagnostic = emitDiagnosticAt(

@@ -3,17 +3,21 @@
 
 // REQUIRES: asserts
 
-@MainActor
-func mainActorFn() -> Int { return 0 } // expected-note 2 {{calls to global function 'mainActorFn()' from outside of its actor context are implicitly asynchronous}}
-
-@MainActor
-class C {
-  var x: Int = mainActorFn() // expected-error {{call to main actor-isolated global function 'mainActorFn()' in a synchronous nonisolated context}}
-
-  lazy var y: Int = mainActorFn()
-
-  static var z: Int = mainActorFn()
+@globalActor
+actor GlobalActor {
+    static let shared = GlobalActor()
 }
 
-@MainActor
-var x: Int = mainActorFn() // expected-error {{call to main actor-isolated global function 'mainActorFn()' in a synchronous nonisolated context}}
+@GlobalActor
+func globalActorFn() -> Int { return 0 } // expected-note {{calls to global function 'globalActorFn()' from outside of its actor context are implicitly asynchronous}}
+
+@GlobalActor
+class C {
+  var x: Int = globalActorFn()
+
+  lazy var y: Int = globalActorFn()
+
+  static var z: Int = globalActorFn()
+}
+
+var x: Int = globalActorFn() // expected-error {{call to global actor 'GlobalActor'-isolated global function 'globalActorFn()' in a synchronous main actor-isolated context}}

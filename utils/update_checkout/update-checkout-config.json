@@ -164,7 +164,7 @@
                 "swift-cmark-gfm": "gfm",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
-                "swift-experimental-string-processing": "dev/8"
+                "swift-experimental-string-processing": "swift/main"
             }
         },
         "rebranch": {
@@ -198,7 +198,7 @@
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
                 "swift-installer-scripts": "main",
-                "swift-experimental-string-processing": "dev/8"
+                "swift-experimental-string-processing": "swift/main"
             }
         },
         "release/5.6": {
@@ -349,7 +349,7 @@
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
                 "swift-installer-scripts": "main",
-                "swift-experimental-string-processing": "dev/8"
+                "swift-experimental-string-processing": "swift/main"
             }
         },
         "release/5.4": {

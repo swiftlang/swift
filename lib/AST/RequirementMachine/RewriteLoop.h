@@ -219,11 +219,11 @@ struct RewriteStep {
 
   /// The size of the left whisker, which is the position within the term where
   /// the rule is being applied. In A.(X => Y).B, this is |A|=1.
-  unsigned StartOffset : 16;
+  unsigned StartOffset : 13;
 
   /// The size of the right whisker, which is the length of the remaining suffix
   /// after the rule is applied. In A.(X => Y).B, this is |B|=1.
-  unsigned EndOffset : 16;
+  unsigned EndOffset : 13;
 
   /// If Kind is Rule, the index of the rule in the rewrite system.
   ///
@@ -407,6 +407,8 @@ public:
 
   RewritePath splitCycleAtRule(unsigned ruleID) const;
 
+  bool replaceRulesWithPaths(llvm::function_ref<const RewritePath *(unsigned)> fn);
+
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
   SmallVector<unsigned, 1> getRulesInEmptyContext(const MutableTerm &term,
@@ -421,7 +423,7 @@ public:
 
   bool computeLeftCanonicalForm(const RewriteSystem &system);
 
-  void computeNormalForm(const RewriteSystem &system);
+  bool computeNormalForm(const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out,
             MutableTerm term,

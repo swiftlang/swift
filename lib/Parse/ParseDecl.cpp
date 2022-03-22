@@ -1824,6 +1824,78 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   return makeParserSuccess();
 }
 
+bool Parser::parseBackDeployAttribute(DeclAttributes &Attributes,
+                                      StringRef AttrName, SourceLoc AtLoc,
+                                      SourceLoc Loc) {
+  std::string AtAttrName = (llvm::Twine("@") + AttrName).str();
+  auto LeftLoc = Tok.getLoc();
+  if (!consumeIf(tok::l_paren)) {
+    diagnose(Loc, diag::attr_expected_lparen, AtAttrName,
+             DeclAttribute::isDeclModifier(DAK_BackDeploy));
+    return false;
+  }
+
+  SourceLoc RightLoc;
+  ParserStatus Status;
+  bool SuppressLaterDiags = false;
+  llvm::SmallVector<PlatformAndVersion, 4> PlatformAndVersions;
+
+  {
+    SyntaxParsingContext SpecListListContext(
+        SyntaxContext, SyntaxKind::BackDeployAttributeSpecList);
+
+    // Parse 'before' ':'.
+    if (Tok.is(tok::identifier) && Tok.getText() == "before") {
+      consumeToken();
+      if (!consumeIf(tok::colon))
+        diagnose(Tok, diag::attr_back_deploy_expected_colon_after_before)
+            .fixItInsertAfter(PreviousLoc, ":");
+    } else {
+      diagnose(Tok, diag::attr_back_deploy_expected_before_label)
+          .fixItInsertAfter(PreviousLoc, "before:");
+    }
+
+    // Parse the version list.
+    if (!Tok.is(tok::r_paren)) {
+      SyntaxParsingContext VersionListContext(
+          SyntaxContext, SyntaxKind::BackDeployVersionList);
+
+      ParseListItemResult Result;
+      do {
+        Result = parseListItem(Status, tok::r_paren, LeftLoc, RightLoc,
+                               /*AllowSepAfterLast=*/false,
+                               SyntaxKind::BackDeployVersionArgument,
+                               [&]() -> ParserStatus {
+                                 return parsePlatformVersionInList(
+                                     AtAttrName, PlatformAndVersions);
+                               });
+      } while (Result == ParseListItemResult::Continue);
+    }
+  }
+
+  if (parseMatchingToken(tok::r_paren, RightLoc,
+                         diag::attr_back_deploy_missing_rparen, LeftLoc))
+    return false;
+
+  if (Status.isErrorOrHasCompletion() || SuppressLaterDiags) {
+    return false;
+  }
+
+  if (PlatformAndVersions.empty()) {
+    diagnose(Loc, diag::attr_availability_need_platform_version, AtAttrName);
+    return false;
+  }
+
+  assert(!PlatformAndVersions.empty());
+  auto AttrRange = SourceRange(Loc, Tok.getLoc());
+  for (auto &Item : PlatformAndVersions) {
+    Attributes.add(new (Context)
+                       BackDeployAttr(AtLoc, AttrRange, Item.first, Item.second,
+                                      /*IsImplicit*/ false));
+  }
+  return true;
+}
+
 /// Processes a parsed option name by attempting to match it to a list of
 /// alternative name/value pairs provided by a chain of \c when() calls, ending
 /// in either \c whenOmitted() if omitting the option is allowed, or
@@ -2802,8 +2874,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
   case DAK_TypeSequence: {
-    auto range = SourceRange(Loc, Tok.getRange().getStart());
-    Attributes.add(TypeSequenceAttr::create(Context, AtLoc, range));
+    if (Context.LangOpts.EnableExperimentalVariadicGenerics) {
+      auto range = SourceRange(Loc, Tok.getRange().getStart());
+      Attributes.add(TypeSequenceAttr::create(Context, AtLoc, range));
+    } else {
+      DiscardAttribute = true;
+    }
     break;
   }
 
@@ -2854,45 +2930,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
   case DAK_BackDeploy: {
-    auto LeftLoc = Tok.getLoc();
-    if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
+    if (!parseBackDeployAttribute(Attributes, AttrName, AtLoc, Loc))
       return false;
-    }
-
-    bool SuppressLaterDiags = false;
-    SourceLoc RightLoc;
-    llvm::SmallVector<PlatformAndVersion, 4> PlatformAndVersions;
-    StringRef AttrName = "@_backDeploy";
-    ParserStatus Status = parseList(tok::r_paren, LeftLoc, RightLoc, false,
-                                    diag::attr_back_deploy_missing_rparen,
-                                    SyntaxKind::AvailabilitySpecList,
-                                    [&]() -> ParserStatus {
-      ParserStatus ListItemStatus =
-          parsePlatformVersionInList(AttrName, PlatformAndVersions);
-      if (ListItemStatus.isErrorOrHasCompletion())
-        SuppressLaterDiags = true;
-      return ListItemStatus;
-    });
-
-    if (Status.isErrorOrHasCompletion() || SuppressLaterDiags) {
-      return false;
-    }
-
-    if (PlatformAndVersions.empty()) {
-      diagnose(Loc, diag::attr_availability_need_platform_version, AttrName);
-      return false;
-    }
-    
-    assert(!PlatformAndVersions.empty());
-    AttrRange = SourceRange(Loc, Tok.getLoc());
-    for (auto &Item: PlatformAndVersions) {
-      Attributes.add(new (Context) BackDeployAttr(AtLoc, AttrRange,
-                                                  Item.first,
-                                                  Item.second,
-                                                  /*IsImplicit*/false));
-    }
     break;
   }
   }
@@ -7905,8 +7944,30 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
 ParserStatus Parser::parsePrimaryAssociatedTypes(
     SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes) {
+  SyntaxParsingContext GPSContext(SyntaxContext,
+                                  SyntaxKind::PrimaryAssociatedTypeClause);
+
   SourceLoc LAngleLoc = consumeStartingLess();
 
+  auto Result = parsePrimaryAssociatedTypeList(AssocTypes);
+
+  // Parse the closing '>'.
+  SourceLoc RAngleLoc;
+  if (startsWithGreater(Tok)) {
+    RAngleLoc = consumeStartingGreater();
+  } else {
+    diagnose(Tok, diag::expected_rangle_primary_associated_type_list);
+    diagnose(LAngleLoc, diag::opening_angle);
+
+    // Skip until we hit the '>'.
+    RAngleLoc = skipUntilGreaterInTypeList();
+  }
+
+  return Result;
+}
+
+ParserStatus Parser::parsePrimaryAssociatedTypeList(
+    SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes) {
   ParserStatus Result;
   SyntaxParsingContext PATContext(SyntaxContext,
                                   SyntaxKind::PrimaryAssociatedTypeList);
@@ -7987,18 +8048,6 @@ ParserStatus Parser::parsePrimaryAssociatedTypes(
     // Parse the comma, if the list continues.
     HasNextParam = consumeIf(tok::comma);
   } while (HasNextParam);
-
-  // Parse the closing '>'.
-  SourceLoc RAngleLoc;
-  if (startsWithGreater(Tok)) {
-    RAngleLoc = consumeStartingGreater();
-  } else {
-    diagnose(Tok, diag::expected_rangle_primary_associated_type_list);
-    diagnose(LAngleLoc, diag::opening_angle);
-
-    // Skip until we hit the '>'.
-    RAngleLoc = skipUntilGreaterInTypeList();
-  }
 
   return Result;
 }

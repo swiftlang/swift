@@ -456,6 +456,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                  OPT_disable_experimental_opened_existential_types,
                  false);
 
+  Opts.EnableExperimentalVariadicGenerics |=
+    Args.hasArg(OPT_enable_experimental_variadic_generics);
+
   // SwiftOnoneSupport produces different symbols when opening existentials,
   // so disable it.
   if (FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT)
@@ -487,16 +490,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
 
-  Opts.EnableExperimentalAsyncTopLevel |=
-    Args.hasArg(OPT_enable_experimental_async_top_level);
-
   /// experimental distributed also implicitly enables experimental concurrency
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_distributed);
-  Opts.EnableExperimentalConcurrency |=
-    Args.hasArg(OPT_enable_experimental_async_top_level);
+
+  if (Args.hasArg(OPT_enable_experimental_async_top_level))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-enable-experimental-async-top-level");
 
   Opts.DiagnoseInvalidEphemeralnessAsError |=
       Args.hasArg(OPT_enable_invalid_ephemeralness_as_error);
@@ -803,15 +805,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // First, set up default minimum inlining target versions.
   auto getDefaultMinimumInliningTargetVersion =
       [&](const llvm::Triple &triple) -> llvm::VersionTuple {
-#if SWIFT_DEFAULT_TARGET_MIN_INLINING_VERSION_TO_ABI
-    // In ABI-stable modules, default to the version where the target's ABI
-    // was first frozen; older versions will use that one's backwards
-    // compatibility libraries.
+#if SWIFT_DEFAULT_TARGET_MIN_INLINING_VERSION_TO_MIN
+    // In ABI-stable modules, default to the version when Swift first became
+    // available.
     if (FrontendOpts.EnableLibraryEvolution)
-      if (auto abiStability = minimumABIStableOSVersionForTriple(triple))
-        // FIXME: Should we raise it to the minimum supported OS version for
-        //        architectures which were born ABI-stable?
-        return *abiStability;
+      if (auto minTriple = minimumAvailableOSVersionForTriple(triple))
+        return minTriple;
 #endif
 
     // In ABI-unstable modules, we will never have to interoperate with
@@ -834,10 +833,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (!A)
       return None;
 
+    if (StringRef(A->getValue()) == "min")
+      return minimumAvailableOSVersionForTriple(Opts.Target);
     if (StringRef(A->getValue()) == "target")
       return Opts.getMinPlatformVersion();
-    if (StringRef(A->getValue()) == "abi")
-      return minimumABIStableOSVersionForTriple(Opts.Target);
 
     if (auto vers = version::Version::parseVersionString(A->getValue(),
                                                          SourceLoc(), &Diags))
@@ -912,9 +911,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableSubstSILFunctionTypes =
       Args.hasArg(OPT_disable_subst_sil_function_types);
-
-  Opts.RequirementMachineProtocolSignatures = RequirementMachineMode::Verify;
-  Opts.RequirementMachineAbstractSignatures = RequirementMachineMode::Verify;
 
   if (auto A = Args.getLastArg(OPT_requirement_machine_protocol_signatures_EQ)) {
     auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
@@ -1007,6 +1003,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_requirement_machine_loop_normalization))
     Opts.EnableRequirementMachineLoopNormalization = true;
+
+  if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
+    Opts.EnableRequirementMachineOpaqueArchetypes = true;
 
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 

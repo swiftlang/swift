@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -emit-cxx-header-path %t/functions.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-public-decls -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
@@ -8,11 +8,11 @@
 
 // CHECK-LABEL: namespace _impl {
 
-// CHECK: extern "C" void $s9Functions17passIntReturnVoid1xys5Int32V_tF(int x) noexcept SWIFT_CALL; // passIntReturnVoid(x:)
-// CHECK: extern "C" int $s9Functions016passTwoIntReturnD01x1ys5Int32VAF_AFtF(int x, int y) noexcept SWIFT_CALL; // passTwoIntReturnInt(x:y:)
-// CHECK: extern "C" int $s9Functions016passTwoIntReturnD10NoArgLabelys5Int32VAD_ADtF(int, int) noexcept SWIFT_CALL; // passTwoIntReturnIntNoArgLabel(_:_:)
-// CHECK: extern "C" int $s9Functions016passTwoIntReturnD19NoArgLabelParamNameys5Int32VAD_ADtF(int x2, int y2) noexcept SWIFT_CALL; // passTwoIntReturnIntNoArgLabelParamName(_:_:)
-// CHECK: extern "C" void $s9Functions014passVoidReturnC0yyF(void) noexcept SWIFT_CALL; // passVoidReturnVoid()
+// CHECK: SWIFT_EXTERN void $s9Functions17passIntReturnVoid1xys5Int32V_tF(int x) SWIFT_NOEXCEPT SWIFT_CALL; // passIntReturnVoid(x:)
+// CHECK: SWIFT_EXTERN int $s9Functions016passTwoIntReturnD01x1ys5Int32VAF_AFtF(int x, int y) SWIFT_NOEXCEPT SWIFT_CALL; // passTwoIntReturnInt(x:y:)
+// CHECK: SWIFT_EXTERN int $s9Functions016passTwoIntReturnD10NoArgLabelys5Int32VAD_ADtF(int, int) SWIFT_NOEXCEPT SWIFT_CALL; // passTwoIntReturnIntNoArgLabel(_:_:)
+// CHECK: SWIFT_EXTERN int $s9Functions016passTwoIntReturnD19NoArgLabelParamNameys5Int32VAD_ADtF(int x2, int y2) SWIFT_NOEXCEPT SWIFT_CALL; // passTwoIntReturnIntNoArgLabelParamName(_:_:)
+// CHECK: SWIFT_EXTERN void $s9Functions014passVoidReturnC0yyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // passVoidReturnVoid()
 
 // CHECK: }
 

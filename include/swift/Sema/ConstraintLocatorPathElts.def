@@ -232,6 +232,9 @@ SIMPLE_LOCATOR_PATH_ELT(ImplicitDynamicMemberSubscript)
 /// The element of the closure body e.g. statement, declaration, or expression.
 CUSTOM_LOCATOR_PATH_ELT(ClosureBodyElement)
 
+/// The element of the pattern binding declaration.
+CUSTOM_LOCATOR_PATH_ELT(PatternBindingElement)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT

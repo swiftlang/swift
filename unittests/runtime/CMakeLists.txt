@@ -93,7 +93,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 #      DistributedActor.cpp
 #      )
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
-      swift_Distributed${SWIFT_PRIMARY_VARIANT_SUFFIX}
+      swiftDistributed${SWIFT_PRIMARY_VARIANT_SUFFIX}
       )
   endif()
 

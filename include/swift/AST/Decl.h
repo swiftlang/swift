@@ -3277,6 +3277,7 @@ public:
 };
 
 class MemberLookupTable;
+class ObjCMethodLookupTable;
 class ConformanceLookupTable;
   
 // Kinds of pointer types.
@@ -3381,6 +3382,12 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   ArrayRef<ValueDecl *>
     getSatisfiedProtocolRequirementsForMember(const ValueDecl *Member,
                                               bool Sorted) const;
+
+  ObjCMethodLookupTable *ObjCMethodLookup = nullptr;
+
+  /// Create the Objective-C method lookup table, or return \c false if this
+  /// kind of type cannot have Objective-C methods.
+  bool createObjCMethodLookup();
 
   friend class ASTContext;
   friend class MemberLookupTable;
@@ -3493,8 +3500,11 @@ public:
   /// Find, or potentially synthesize, the implicit 'id' property of this actor.
   VarDecl *getDistributedActorIDProperty() const;
 
-  /// Find the 'RemoteCallTarget.init(_mangledName:)' initializer function
+  /// Find the 'RemoteCallTarget.init(_:)' initializer function
   ConstructorDecl* getDistributedRemoteCallTargetInitFunction() const;
+
+  /// Find the 'RemoteCallArgument(label:name:value:)' initializer function
+  ConstructorDecl* getDistributedRemoteCallArgumentInitFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -3530,6 +3540,24 @@ public:
                                    bool synthesized = false);
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
+
+  /// Look in this type and its extensions (but not any of its protocols or
+  /// superclasses) for declarations with a given Objective-C selector.
+  ///
+  /// Note that this can find methods, initializers, deinitializers,
+  /// getters, and setters.
+  ///
+  /// \param selector The Objective-C selector of the method we're
+  /// looking for.
+  ///
+  /// \param isInstance Whether we are looking for an instance method
+  /// (vs. a class method).
+  TinyPtrVector<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
+                                                     bool isInstance);
+
+  /// Record the presence of an @objc method with the given selector. No-op if
+  /// the type is of a kind which cannot contain @objc methods.
+  void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
 
   /// Is this the decl for Optional<T>?
   bool isOptionalDecl() const;
@@ -3954,13 +3982,7 @@ using AncestryOptions = OptionSet<AncestryFlags>;
 /// The type of the decl itself is a MetatypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
 class ClassDecl final : public NominalTypeDecl {
-  class ObjCMethodLookupTable;
-
   SourceLoc ClassLoc;
-  ObjCMethodLookupTable *ObjCMethodLookup = nullptr;
-
-  /// Create the Objective-C member lookup table.
-  void createObjCMethodLookup();
 
   struct {
     /// The superclass decl and a bit to indicate whether the
@@ -4225,25 +4247,6 @@ public:
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
 
-  using NominalTypeDecl::lookupDirect;
-
-  /// Look in this class and its extensions (but not any of its protocols or
-  /// superclasses) for declarations with a given Objective-C selector.
-  ///
-  /// Note that this can find methods, initializers, deinitializers,
-  /// getters, and setters.
-  ///
-  /// \param selector The Objective-C selector of the method we're
-  /// looking for.
-  ///
-  /// \param isInstance Whether we are looking for an instance method
-  /// (vs. a class method).
-  TinyPtrVector<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
-                                                     bool isInstance);
-
-  /// Record the presence of an @objc method with the given selector.
-  void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Class;
@@ -4389,6 +4392,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ProtocolDependenciesRequest;
   friend class RequirementSignatureRequest;
   friend class RequirementSignatureRequestRQM;
+  friend class RequirementSignatureRequestGSB;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
   friend class ExistentialRequiresAnyRequest;
@@ -5059,6 +5063,13 @@ protected:
           SourceLoc nameLoc, Identifier name, DeclContext *dc,
           StorageIsMutable_t supportsMutation);
 
+protected:
+  // Only \c ParamDecl::setSpecifier is allowed to flip this - and it's also
+  // on the way out of that business.
+  void setIntroducer(Introducer value) {
+    Bits.VarDecl.Introducer = uint8_t(value);
+  }
+
 public:
   VarDecl(bool isStatic, Introducer introducer,
           SourceLoc nameLoc, Identifier name, DeclContext *dc)
@@ -5240,9 +5251,8 @@ public:
   
   /// Is this an immutable 'let' property?
   ///
-  /// If this is a ParamDecl, isLet() is true iff
-  /// getSpecifier() == Specifier::Default.
-  bool isLet() const { return getIntroducer() == Introducer::Let; }
+  /// For \c ParamDecl instances, using \c isImmutable is preferred.
+  bool isLet() const;
 
   /// Is this an "async let" property?
   bool isAsyncLet() const;
@@ -5260,10 +5270,6 @@ public:
 
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
-  }
-
-  void setIntroducer(Introducer value) {
-    Bits.VarDecl.Introducer = uint8_t(value);
   }
 
   CaptureListExpr *getParentCaptureList() const {

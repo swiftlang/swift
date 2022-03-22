@@ -124,3 +124,20 @@ import _Concurrency
 // CHECK: func doSomethingConcurrently(_ block: @Sendable () -> Void)
 
 // CHECK: @MainActor @objc protocol TripleMainActor {
+
+// CHECK-LABEL: class NXSender :
+// CHECK-NEXT: func sendAny(_ obj: Sendable)
+// CHECK-NEXT: func sendOptionalAny(_ obj: Sendable?)
+// CHECK-NEXT: func sendSendable(_ sendable: SendableClass & Sendable)
+// CHECK-NEXT: func sendSendableSubclasses(_ sendableSubclass: NonSendableClass & Sendable)
+// CHECK-NEXT: func sendProto(_ obj: LabellyProtocol & Sendable)
+// CHECK-NEXT: func sendProtos(_ obj: LabellyProtocol & ObjCClub & Sendable)
+// CHECK-NEXT: func sendAnyArray(_ array: [Sendable])
+// CHECK-NEXT: func sendGeneric(_ generic: GenericObject<SendableClass> & Sendable)
+// CHECK-NEXT: func sendPtr(_ val: UnsafeMutableRawPointer)
+// CHECK-NEXT: func sendStringArray(_ obj: [String])
+// CHECK-NEXT: func sendAnyTypedef(_ obj: Sendable)
+// CHECK-NEXT: func sendAnyTypedefs(_ objs: [Sendable])
+// CHECK-NEXT: func sendBlockTypedef(_ block: @escaping @Sendable (Any) -> Void)
+// CHECK-NEXT: func sendBlockTypedefs(_ blocks: [@Sendable @convention(block) (Any) -> Void])
+// CHECK-NEXT: func sendUnbound(_ array: [Sendable])

@@ -1,4 +1,4 @@
-//===--- RequirementLowering.cpp - Building rules from requirements -------===//
+//===--- RequirementLowering.cpp - Requirement inference and desugaring ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,15 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements logic for lowering generic requirements to rewrite rules
-// in the requirement machine.
-//
-// This includes generic requirements from canonical generic signatures and
-// protocol requirement signatures, as well as user-written requirements in
-// protocols ("structural requirements") and the 'where' clauses of generic
-// declarations.
-//
-// There is some additional desugaring logic for user-written requirements.
+// This file implements logic for desugaring requirements, for example breaking
+// down 'T : P & Q' into 'T : P' and 'T : Q', as well as requirement inference,
+// where an occurrence of 'Set<T>' in a function signature introduces the
+// requirement 'T : Hashable' from the generic signature of 'struct Set'.
 //
 //===----------------------------------------------------------------------===//
 
@@ -26,30 +21,17 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "RewriteContext.h"
-#include "RewriteSystem.h"
-#include "Symbol.h"
-#include "Term.h"
 
 using namespace swift;
 using namespace rewriting;
-
-//
-// Requirement desugaring -- used in two places:
-//
-// 1) AbstractGenericSignatureRequest, where the added requirements might have
-// substitutions applied.
-//
-// 2) StructuralRequirementsRequest, which performs further processing to wrap
-// desugared requirements with source location information.
-//
 
 /// Desugar a same-type requirement that possibly has concrete types on either
 /// side into a series of same-type and concrete-type requirements where the
@@ -91,22 +73,19 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
 
       if (secondType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
-                            secondType, firstType);
+                            secondType, sugaredFirstType);
         recordedRequirements = true;
         return true;
       }
 
       errors.push_back(
-          RequirementError::forConcreteTypeMismatch(firstType,
+          RequirementError::forConcreteTypeMismatch(sugaredFirstType,
                                                     secondType,
                                                     loc));
       recordedErrors = true;
       return true;
     }
   } matcher(loc, result, errors);
-
-  if (lhs->hasError() || rhs->hasError())
-    return;
 
   (void) matcher.match(lhs, rhs);
 
@@ -189,13 +168,13 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
       errors.push_back(RequirementError::forRedundantRequirement(
           {RequirementKind::Conformance, subjectType, constraintType}, loc));
 
-      assert(conformance.isConcrete());
-      auto *concrete = conformance.getConcrete();
-
-      // Introduce conditional requirements if the subject type is concrete.
-      for (auto req : concrete->getConditionalRequirements()) {
-        desugarRequirement(req, result, errors);
+      if (conformance.isConcrete()) {
+        // Introduce conditional requirements if the conformance is concrete.
+        for (auto req : conformance.getConcrete()->getConditionalRequirements()) {
+          desugarRequirement(req, result, errors);
+        }
       }
+
       return;
     }
 
@@ -504,9 +483,37 @@ void swift::rewriting::realizeInheritedRequirements(
     Type inheritedType
       = evaluateOrDefault(ctx.evaluator,
                           InheritedTypeRequest{decl, index,
-                            TypeResolutionStage::Structural},
+                          TypeResolutionStage::Structural},
                           Type());
     if (!inheritedType) continue;
+
+    // The GenericSignatureBuilder allowed an associated type's inheritance
+    // clause to reference a protocol typealias whose underlying type was a
+    // protocol or class.
+    //
+    // Since protocol typealiases resolve to DependentMemberTypes in
+    // ::Structural mode, this relied on the GSB's "delayed requirements"
+    // mechanism.
+    //
+    // The RequirementMachine does not have an equivalent, and cannot really
+    // support that because we need to collect the protocols mentioned on
+    // the right hand sides of conformance requirements ahead of time.
+    //
+    // However, we can support it in simple cases where the typealias is
+    // defined in the protocol itself and is accessed as a member of 'Self'.
+    if (auto *assocTypeDecl = dyn_cast<AssociatedTypeDecl>(decl)) {
+      if (auto memberType = inheritedType->getAs<DependentMemberType>()) {
+        if (memberType->getBase()->isEqual(
+            assocTypeDecl->getProtocol()->getSelfInterfaceType())) {
+          inheritedType
+            = evaluateOrDefault(ctx.evaluator,
+                                InheritedTypeRequest{decl, index,
+                                TypeResolutionStage::Interface},
+                                Type());
+          if (!inheritedType) continue;
+        }
+      }
+    }
 
     auto *typeRepr = inheritedTypes[index].getTypeRepr();
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
@@ -698,7 +705,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     // underlying type of the typealias.
     if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
       if (!typeAliasDecl->isGeneric()) {
-        // Ignore the typealias if we have an associated type with the same anme
+        // Ignore the typealias if we have an associated type with the same name
         // in the same protocol. This is invalid anyway, but it's just here to
         // ensure that we produce the same requirement signature on some tests
         // with -requirement-machine-protocol-signatures=verify.
@@ -706,6 +713,8 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
           continue;
 
         auto underlyingType = typeAliasDecl->getStructuralType();
+        if (underlyingType->is<UnboundGenericType>())
+          continue;
 
         auto subjectType = DependentMemberType::get(
             selfTy, typeAliasDecl->getName());
@@ -745,21 +754,6 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     (ctx.LangOpts.RequirementMachineProtocolSignatures ==
      RequirementMachineMode::Enabled);
 
-  // Collect all typealiases from inherited protocols recursively.
-  llvm::MapVector<Identifier, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
-  for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
-    for (auto req : inheritedProto->getMembers()) {
-      if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
-        // Ignore generic types.
-        if (auto genReq = dyn_cast<GenericTypeDecl>(req))
-          if (genReq->getGenericParams())
-            continue;
-
-        inheritedTypeDecls[typeReq->getName()].push_back(typeReq);
-      }
-    }
-  }
-
   auto getStructuralType = [](TypeDecl *typeDecl) -> Type {
     if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
       if (typealias->getUnderlyingTypeRepr() != nullptr) {
@@ -773,6 +767,27 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
 
     return typeDecl->getDeclaredInterfaceType();
   };
+
+  // Collect all typealiases from inherited protocols recursively.
+  llvm::MapVector<Identifier, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
+  for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
+    for (auto req : inheritedProto->getMembers()) {
+      if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
+        // Ignore generic types.
+        if (auto genReq = dyn_cast<GenericTypeDecl>(req))
+          if (genReq->getGenericParams())
+            continue;
+
+        // Ignore typealiases with UnboundGenericType, since they
+        // are like generic typealiases.
+        if (auto *typeAlias = dyn_cast<TypeAliasDecl>(req))
+          if (getStructuralType(typeAlias)->is<UnboundGenericType>())
+            continue;
+
+        inheritedTypeDecls[typeReq->getName()].push_back(typeReq);
+      }
+    }
+  }
 
   // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
@@ -988,7 +1003,7 @@ ArrayRef<ProtocolDecl *>
 ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *proto) const {
   auto &ctx = proto->getASTContext();
-  SmallVector<ProtocolDecl *, 4> result;
+  SmallSetVector<ProtocolDecl *, 4> result;
 
   // If we have a serialized requirement signature, deserialize it and
   // look at conformance requirements.
@@ -1000,7 +1015,7 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
         == RequirementMachineMode::Disabled)) {
     for (auto req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
-        result.push_back(req.getProtocolDecl());
+        result.insert(req.getProtocolDecl());
       }
     }
 
@@ -1012,302 +1027,8 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
   // signature. Look at the structural requirements instead.
   for (auto req : proto->getStructuralRequirements()) {
     if (req.req.getKind() == RequirementKind::Conformance)
-      result.push_back(req.req.getProtocolDecl());
+      result.insert(req.req.getProtocolDecl());
   }
 
   return ctx.AllocateCopy(result);
-}
-
-//
-// Building rewrite rules from desugared requirements.
-//
-
-void RuleBuilder::addRequirements(ArrayRef<Requirement> requirements) {
-  // Collect all protocols transitively referenced from these requirements.
-  for (auto req : requirements) {
-    if (req.getKind() == RequirementKind::Conformance) {
-      addProtocol(req.getProtocolDecl(), /*initialComponent=*/false);
-    }
-  }
-
-  collectRulesFromReferencedProtocols();
-
-  // Add rewrite rules for all top-level requirements.
-  for (const auto &req : requirements)
-    addRequirement(req, /*proto=*/nullptr, /*requirementID=*/None);
-}
-
-void RuleBuilder::addRequirements(ArrayRef<StructuralRequirement> requirements) {
-  // Collect all protocols transitively referenced from these requirements.
-  for (auto req : requirements) {
-    if (req.req.getKind() == RequirementKind::Conformance) {
-      addProtocol(req.req.getProtocolDecl(), /*initialComponent=*/false);
-    }
-  }
-
-  collectRulesFromReferencedProtocols();
-
-  // Add rewrite rules for all top-level requirements.
-  for (const auto &req : requirements)
-    addRequirement(req, /*proto=*/nullptr);
-}
-
-void RuleBuilder::addProtocols(ArrayRef<const ProtocolDecl *> protos) {
-  // Collect all protocols transitively referenced from this connected component
-  // of the protocol dependency graph.
-  for (auto proto : protos) {
-    addProtocol(proto, /*initialComponent=*/true);
-  }
-
-  collectRulesFromReferencedProtocols();
-}
-
-/// For an associated type T in a protocol P, we add a rewrite rule:
-///
-///   [P].T => [P:T]
-///
-/// Intuitively, this means "if a type conforms to P, it has a nested type
-/// named T".
-void RuleBuilder::addAssociatedType(const AssociatedTypeDecl *type,
-                                    const ProtocolDecl *proto) {
-  MutableTerm lhs;
-  lhs.add(Symbol::forProtocol(proto, Context));
-  lhs.add(Symbol::forName(type->getName(), Context));
-
-  MutableTerm rhs;
-  rhs.add(Symbol::forAssociatedType(proto, type->getName(), Context));
-
-  PermanentRules.emplace_back(lhs, rhs);
-}
-
-/// Lowers a desugared generic requirement to a rewrite rule.
-///
-/// If \p proto is null, this is a generic requirement from the top-level
-/// generic signature. The added rewrite rule will be rooted in a generic
-/// parameter symbol.
-///
-/// If \p proto is non-null, this is a generic requirement in the protocol's
-/// requirement signature. The added rewrite rule will be rooted in a
-/// protocol symbol.
-std::pair<MutableTerm, MutableTerm>
-swift::rewriting::getRuleForRequirement(const Requirement &req,
-                                        const ProtocolDecl *proto,
-                                        Optional<ArrayRef<Term>> substitutions,
-                                        RewriteContext &ctx) {
-  assert(!substitutions.hasValue() || proto == nullptr && "Can't have both");
-
-  // Compute the left hand side.
-  auto subjectType = CanType(req.getFirstType());
-  auto subjectTerm = (substitutions
-                      ? ctx.getRelativeTermForType(
-                          subjectType, *substitutions)
-                      : ctx.getMutableTermForType(
-                          subjectType, proto));
-
-  // Compute the right hand side.
-  MutableTerm constraintTerm;
-
-  switch (req.getKind()) {
-  case RequirementKind::Conformance: {
-    // A conformance requirement T : P becomes a rewrite rule
-    //
-    //   T.[P] == T
-    //
-    // Intuitively, this means "any type ending with T conforms to P".
-    auto *proto = req.getProtocolDecl();
-
-    constraintTerm = subjectTerm;
-    constraintTerm.add(Symbol::forProtocol(proto, ctx));
-    break;
-  }
-
-  case RequirementKind::Superclass: {
-    // A superclass requirement T : C<X, Y> becomes a rewrite rule
-    //
-    //   T.[superclass: C<X, Y>] => T
-    auto otherType = CanType(req.getSecondType());
-
-    // Build the symbol [superclass: C<X, Y>].
-    SmallVector<Term, 1> result;
-    otherType = (substitutions
-                 ? ctx.getRelativeSubstitutionSchemaFromType(
-                    otherType, *substitutions, result)
-                 : ctx.getSubstitutionSchemaFromType(
-                    otherType, proto, result));
-    auto superclassSymbol = Symbol::forSuperclass(otherType, result, ctx);
-
-    // Build the term T.[superclass: C<X, Y>].
-    constraintTerm = subjectTerm;
-    constraintTerm.add(superclassSymbol);
-    break;
-  }
-
-  case RequirementKind::Layout: {
-    // A layout requirement T : L becomes a rewrite rule
-    //
-    //   T.[layout: L] == T
-    constraintTerm = subjectTerm;
-    constraintTerm.add(Symbol::forLayout(req.getLayoutConstraint(), ctx));
-    break;
-  }
-
-  case RequirementKind::SameType: {
-    auto otherType = CanType(req.getSecondType());
-
-    if (!otherType->isTypeParameter()) {
-      // A concrete same-type requirement T == C<X, Y> becomes a
-      // rewrite rule
-      //
-      //   T.[concrete: C<X, Y>] => T
-      SmallVector<Term, 1> result;
-      otherType = (substitutions
-                   ? ctx.getRelativeSubstitutionSchemaFromType(
-                        otherType, *substitutions, result)
-                   : ctx.getSubstitutionSchemaFromType(
-                        otherType, proto, result));
-
-      constraintTerm = subjectTerm;
-      constraintTerm.add(Symbol::forConcreteType(otherType, result, ctx));
-      break;
-    }
-
-    constraintTerm = (substitutions
-                      ? ctx.getRelativeTermForType(
-                            otherType, *substitutions)
-                      : ctx.getMutableTermForType(
-                            otherType, proto));
-    break;
-  }
-  }
-
-  return std::make_pair(subjectTerm, constraintTerm);
-}
-
-void RuleBuilder::addRequirement(const Requirement &req,
-                                 const ProtocolDecl *proto,
-                                 Optional<unsigned> requirementID) {
-  if (Dump) {
-    llvm::dbgs() << "+ ";
-    req.dump(llvm::dbgs());
-    llvm::dbgs() << "\n";
-  }
-
-  auto rule =
-      getRuleForRequirement(req, proto, /*substitutions=*/None,
-                            Context);
-  RequirementRules.push_back(
-      std::make_tuple(rule.first, rule.second, requirementID));
-}
-
-void RuleBuilder::addRequirement(const StructuralRequirement &req,
-                                 const ProtocolDecl *proto) {
-  WrittenRequirements.push_back(req);
-  unsigned requirementID = WrittenRequirements.size() - 1;
-  addRequirement(req.req.getCanonical(), proto, requirementID);
-}
-
-/// Lowers a protocol typealias to a rewrite rule.
-void RuleBuilder::addTypeAlias(const ProtocolTypeAlias &alias,
-                               const ProtocolDecl *proto) {
-  // Build the term [P].T, where P is the protocol and T is a name symbol.
-  MutableTerm subjectTerm;
-  subjectTerm.add(Symbol::forProtocol(proto, Context));
-  subjectTerm.add(Symbol::forName(alias.getName(), Context));
-
-  auto constraintType = alias.getUnderlyingType()->getCanonicalType();
-  MutableTerm constraintTerm;
-
-  if (constraintType->isTypeParameter()) {
-    // If the underlying type of the typealias is a type parameter X, build
-    // a rule [P].T => X, where X,
-    constraintTerm = Context.getMutableTermForType(
-        constraintType, proto);
-  } else {
-    // If the underlying type of the typealias is a concrete type C, build
-    // a rule [P].T.[concrete: C] => [P].T.
-    constraintTerm = subjectTerm;
-
-    SmallVector<Term, 1> result;
-    auto concreteType =
-        Context.getSubstitutionSchemaFromType(
-            constraintType, proto, result);
-
-    constraintTerm.add(Symbol::forConcreteType(concreteType, result, Context));
-  }
-
-  RequirementRules.emplace_back(subjectTerm, constraintTerm,
-                                /*requirementID=*/None);
-}
-
-/// Record information about a protocol if we have no seen it yet.
-void RuleBuilder::addProtocol(const ProtocolDecl *proto,
-                              bool initialComponent) {
-  if (ProtocolMap.count(proto) > 0)
-    return;
-
-  ProtocolMap[proto] = initialComponent;
-  Protocols.push_back(proto);
-}
-
-/// Compute the transitive closure of the set of all protocols referenced from
-/// the right hand sides of conformance requirements, and convert their
-/// requirements to rewrite rules.
-void RuleBuilder::collectRulesFromReferencedProtocols() {
-  unsigned i = 0;
-  while (i < Protocols.size()) {
-    auto *proto = Protocols[i++];
-    for (auto *depProto : proto->getProtocolDependencies()) {
-      addProtocol(depProto, /*initialComponent=*/false);
-    }
-  }
-
-  // Add rewrite rules for each protocol.
-  for (auto *proto : Protocols) {
-    if (Dump) {
-      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
-    }
-
-    // Add the identity conformance rule [P].[P] => [P].
-    MutableTerm lhs;
-    lhs.add(Symbol::forProtocol(proto, Context));
-    lhs.add(Symbol::forProtocol(proto, Context));
-
-    MutableTerm rhs;
-    rhs.add(Symbol::forProtocol(proto, Context));
-
-    PermanentRules.emplace_back(lhs, rhs);
-
-    for (auto *assocType : proto->getAssociatedTypeMembers())
-      addAssociatedType(assocType, proto);
-
-    for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
-      for (auto *assocType : inheritedProto->getAssociatedTypeMembers())
-        addAssociatedType(assocType, proto);
-    }
-
-    // If this protocol is part of the initial connected component, we're
-    // building requirement signatures for all protocols in this component,
-    // and so we must start with the structural requirements.
-    //
-    // Otherwise, we should either already have a requirement signature, or
-    // we can trigger the computation of the requirement signatures of the
-    // next component recursively.
-    if (ProtocolMap[proto]) {
-      for (auto req : proto->getStructuralRequirements())
-        addRequirement(req, proto);
-
-      for (auto req : proto->getTypeAliasRequirements())
-        addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
-    } else {
-      auto reqs = proto->getRequirementSignature();
-      for (auto req : reqs.getRequirements())
-        addRequirement(req.getCanonical(), proto, /*requirementID=*/None);
-      for (auto alias : reqs.getTypeAliases())
-        addTypeAlias(alias, proto);
-    }
-
-    if (Dump) {
-      llvm::dbgs() << "}\n";
-    }
-  }
 }

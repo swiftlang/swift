@@ -224,6 +224,10 @@ private:
   /// For details see BasicBlockBitfield::bitfieldID;
   unsigned currentBitfieldID = 1;
 
+  /// Unique identifier for vector indexing and deterministic sorting.
+  /// May be reused when zombie functions are recovered.
+  unsigned index;
+
   /// The function's set of semantics attributes.
   ///
   /// TODO: Why is this using a std::string? Why don't we use uniqued
@@ -445,6 +449,8 @@ public:
     auto fnType = getLoweredFunctionTypeInContext(getTypeExpansionContext());
     return SILFunctionConventions(fnType, getModule());
   }
+
+  unsigned getIndex() const { return index; }
 
   SILProfiler *getProfiler() const { return Profiler; }
 

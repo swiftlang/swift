@@ -362,6 +362,9 @@ def disable_requirement_machine_concrete_contraction : Flag<["-"], "disable-requ
 def enable_requirement_machine_loop_normalization : Flag<["-"], "enable-requirement-machine-loop-normalization">,
   HelpText<"Enable stronger minimization algorithm, for debugging only">;
 
+def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
+  HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
+
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 
@@ -408,7 +411,7 @@ def disable_implicit_concurrency_module_import : Flag<["-"],
 
 def disable_implicit_distributed_module_import : Flag<["-"],
   "disable-implicit-distributed-module-import">,
-  HelpText<"Disable the implicit import of the _Distributed module.">;
+  HelpText<"Disable the implicit import of the Distributed module.">;
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
@@ -545,6 +548,10 @@ def disable_deserialization_recovery :
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
+
+def enable_experimental_variadic_generics :
+  Flag<["-"], "enable-experimental-variadic-generics">,
+  HelpText<"Enable experimental support for variadic generic types">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
@@ -1023,5 +1030,10 @@ def skip_import_in_public_interface:
   Separate<["-"], "skip-import-in-public-interface">,
   HelpText<"Skip the import statement corresponding to a module name "
            "when printing the public interface.">;
+
+def clang_header_expose_public_decls:
+  Flag<["-"], "clang-header-expose-public-decls">,
+  HelpText<"Expose all public declarations in the generated clang header">,
+  Flags<[FrontendOption, HelpHidden]>;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

@@ -12,6 +12,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 
 #ifndef SWIFT_RQM_SYMBOL_H

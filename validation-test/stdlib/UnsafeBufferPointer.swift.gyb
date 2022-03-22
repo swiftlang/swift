@@ -179,6 +179,30 @@ ${SelfName}TestSuite.test("nilBaseAddress") {
   expectEqualSequence([], emptyBuffer)
 }
 
+% if IsMutable:
+${SelfName}TestSuite.test("copyFromEmptyBuffer") {
+% if IsRaw:
+  var memory: UnsafeMutableRawPointer
+  let empty = UnsafeRawBufferPointer(start: nil, count: 0)
+% else:
+  var memory: UnsafeMutablePointer<Float>
+  let empty = UnsafeBufferPointer<Float>(start: nil, count: 0)
+% end
+
+  let count = 4
+  memory = allocateFor${Raw}Buffer(count: count)
+  defer { deallocateFor${Raw}Buffer(memory, count: count) }
+
+  let buffer = UnsafeMutable${Raw}BufferPointer(start: memory, count: count)
+
+% if IsRaw:
+  buffer.copyMemory(from: empty)
+% else:
+  _ = buffer.initialize(from: empty)
+% end
+}
+% end
+
 ${SelfName}TestSuite.test("nonNilButEmpty") {
   let emptyAllocated = UnsafeMutablePointer<Float>.allocate(capacity: 0)
   defer { emptyAllocated.deallocate() }

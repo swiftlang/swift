@@ -130,6 +130,10 @@ bool TypeVariableType::Implementation::isTypeSequence() const {
       && locator->getGenericParameter()->isTypeSequence();
 }
 
+bool TypeVariableType::Implementation::isCodeCompletionToken() const {
+  return locator && locator->directlyAt<CodeCompletionExpr>();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
@@ -309,6 +313,7 @@ void constraints::performSyntacticDiagnosticsForTarget(
     target.getFunctionBody()->walk(walker);
     return;
   }
+  case SolutionApplicationTarget::Kind::closure:
   case SolutionApplicationTarget::Kind::stmtCondition:
   case SolutionApplicationTarget::Kind::caseLabelItem:
   case SolutionApplicationTarget::Kind::patternBinding:

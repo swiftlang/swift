@@ -17,10 +17,10 @@ extension P where Self : Derived {
 // CHECK-NEXT: Rewrite system: {
 // CHECK-NEXT: - [P].[P] => [P] [permanent]
 // CHECK-NEXT: - [P].[superclass: Base] => [P]
+// CHECK-NEXT: - [P].[layout: _NativeClass] => [P]
 // CHECK-NEXT: - τ_0_0.[superclass: Derived] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[P] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[superclass: Base] => τ_0_0
-// CHECK-NEXT: - [P].[layout: _NativeClass] => [P]
 // CHECK-NEXT: - τ_0_0.[layout: _NativeClass] => τ_0_0
 // CHECK-NEXT: }
 // CHECK: Property map: {

@@ -680,6 +680,24 @@ public:
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
                                   CleanupLocation cleanupLoc);
 
+  /// Generates code to destroy linearly recursive data structures, without
+  /// building up the call stack.
+  ///
+  /// E.x.: In the following we want to deinit next without recursing into next.
+  ///
+  /// class Node<A> {
+  ///   let value: A
+  ///   let next: Node<A>?
+  /// }
+  ///
+  /// \param selfValue The 'self' value.
+  /// \param cd The class declaration whose members are being destroyed.
+  /// \param recursiveLink The property that forms the recursive structure.
+  void emitRecursiveChainDestruction(ManagedValue selfValue,
+                                ClassDecl *cd,
+                                VarDecl* recursiveLink,
+                                CleanupLocation cleanupLoc);
+
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to foreign conventions.

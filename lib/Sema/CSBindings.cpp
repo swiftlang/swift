@@ -2016,11 +2016,22 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       // Don't penalize solutions with unresolved generics.
       if (TypeVar->getImpl().getGenericParameter())
         return false;
+
       // Don't penalize solutions with holes due to missing arguments after the
       // code completion position.
       auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
       if (argLoc && argLoc->isAfterCodeCompletionLoc())
         return false;
+
+      // Don't penailze solutions that have holes for ignored arguments.
+      if (cs.hasArgumentsIgnoredForCodeCompletion()) {
+        // Avoid simplifying the locator if the constriant system didn't ignore
+        // any arguments.
+        auto argExpr = simplifyLocatorToAnchor(TypeVar->getImpl().getLocator());
+        if (cs.isArgumentIgnoredForCodeCompletion(argExpr.dyn_cast<Expr *>())) {
+          return false;
+        }
+      }
     }
     // Reflect in the score that this type variable couldn't be
     // resolved and had to be bound to a placeholder "hole" type.

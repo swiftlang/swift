@@ -14,7 +14,7 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
@@ -32,7 +32,7 @@ func test() async throws {
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   let response = try await ref.hello()
-  // CHECK: >> remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC5helloSSyYaKFTE"), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.hello(), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
 
   print("response: \(response)")
   // CHECK: response: Hello, World!

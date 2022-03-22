@@ -43,8 +43,6 @@ using namespace Lowering;
 ///          or the subsequent cast to VarDecl failed.
 static VarDecl* lookupProperty(NominalTypeDecl *decl, DeclName name) {
   assert(decl && "decl was null");
-  auto &C = decl->getASTContext();
-  
   if (auto clazz = dyn_cast<ClassDecl>(decl)) {
     auto refs = decl->lookupDirect(name);
     if (refs.size() != 1)
@@ -117,7 +115,7 @@ static void emitDistributedIfRemoteBranch(SILGenFunction &SGF, SILLocation Loc,
 
   FuncDecl *isRemoteFn = ctx.getIsRemoteDistributedActor();
   assert(isRemoteFn && "Could not find 'is remote' function, is the "
-                       "'_Distributed' module available?");
+                       "'Distributed' module available?");
 
   ManagedValue selfAnyObject = B.createInitExistentialRef(
       Loc, SGF.getLoweredType(ctx.getAnyObjectType()), CanType(selfTy),

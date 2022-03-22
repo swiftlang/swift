@@ -352,6 +352,9 @@ namespace swift {
     /// Enable experimental pairwise `buildBlock` for result builders.
     bool EnableExperimentalPairwiseBuildBlock = false;
 
+    /// Enable variadic generics.
+    bool EnableExperimentalVariadicGenerics = false;
+
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;
@@ -406,9 +409,6 @@ namespace swift {
     /// Diagnose switches over non-frozen enums that do not have catch-all
     /// cases.
     bool EnableNonFrozenEnumExhaustivityDiagnostics = false;
-
-    /// Enable making top-level code support concurrency
-    bool EnableExperimentalAsyncTopLevel = false;
 
     /// Regex for the passes that should report passed and missed optimizations.
     ///
@@ -528,17 +528,17 @@ namespace swift {
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.
     RequirementMachineMode RequirementMachineProtocolSignatures =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Verify;
 
     /// Enable the new experimental generic signature minimization algorithm
     /// for abstract generic signatures.
     RequirementMachineMode RequirementMachineAbstractSignatures =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Verify;
 
     /// Enable the new experimental generic signature minimization algorithm
     /// for user-written generic signatures.
     RequirementMachineMode RequirementMachineInferredSignatures =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Verify;
 
     /// Disable preprocessing pass to eliminate conformance requirements
     /// on generic parameters which are made concrete. Usually you want this
@@ -548,6 +548,11 @@ namespace swift {
     /// Enable the stronger minimization algorithm. This is just for debugging;
     /// if you have a testcase which requires this, please submit a bug report.
     bool EnableRequirementMachineLoopNormalization = false;
+
+    /// Enable experimental, more correct support for opaque result types as
+    /// concrete types. This will sometimes fail to produce a convergent
+    /// rewrite system.
+    bool EnableRequirementMachineOpaqueArchetypes = false;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
@@ -735,7 +740,7 @@ namespace swift {
 
     /// Enable experimental support for type inference through multi-statement
     /// closures.
-    bool EnableMultiStatementClosureInference = false;
+    bool EnableMultiStatementClosureInference = true;
 
     /// Enable experimental support for generic parameter inference in
     /// parameter positions from associated default expressions.

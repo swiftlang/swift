@@ -344,14 +344,14 @@ GlobalActorAttributeRequest::evaluate(
     if (auto var = dyn_cast<VarDecl>(storage)) {
 
       // ... but not if it's an async-context top-level global
-      if (var->getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
-          var->isTopLevelGlobal() && (var->getDeclContext()->isAsyncContext()
-            || var->getASTContext().LangOpts.WarnConcurrency)) {
+      if (var->isTopLevelGlobal() &&
+          (var->getDeclContext()->isAsyncContext() ||
+           var->getASTContext().LangOpts.WarnConcurrency)) {
         var->diagnose(diag::global_actor_top_level_var)
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
       }
-      
+
       // ... and not if it's local property
       if (var->getDeclContext()->isLocalContext()) {
         var->diagnose(diag::global_actor_on_local_variable, var->getName())
@@ -1396,57 +1396,6 @@ namespace {
       return getDeclContext()->getParentModule();
     }
 
-    /// In Swift 6, global-actor isolation is not carried-over to the
-    /// initializing expressions of non-static instance properties.
-    /// The actual change happens in \c getActorIsolationOfContext ,
-    /// but this function exists to warn users of Swift 5 about this
-    /// isolation change, so that they can prepare ahead-of-time.
-    void warnAboutGlobalActorIsoChangeInSwift6(const ActorIsolation &reqIso,
-                                               const Expr *user) {
-      if (ctx.isSwiftVersionAtLeast(6))
-        return;
-
-      // Check our context stack for a PatternBindingInitializer environment.
-      DeclContext const* withinDC = nullptr;
-      for (auto dc = contextStack.rbegin(); dc != contextStack.rend(); dc++) {
-        if (isa<PatternBindingInitializer>(*dc)) {
-          withinDC = *dc;
-          break;
-        }
-      }
-
-      // Not within a relevant decl context.
-      if (!withinDC)
-        return;
-
-      // Check if this PatternBindingInitializer's isolation would change
-      // in Swift 6+
-      if (auto *var = withinDC->getNonLocalVarDecl()) {
-        if (var->isInstanceMember() &&
-            !var->getAttrs().hasAttribute<LazyAttr>()) {
-          // At this point, we know the isolation will change in Swift 6.
-          // So, let's check if that change will cause an error.
-
-          auto dcIso = getActorIsolationOfContext(
-                         const_cast<DeclContext*>(withinDC));
-
-          // If the isolation granted in Swift 5 is for a global actor, and
-          // the expression requires that global actor's isolation, then it will
-          // become an error in Swift 6.
-          if (dcIso.isGlobalActor() && dcIso == reqIso) {
-            ctx.Diags.diagnose(user->getLoc(),
-                               diag::global_actor_from_initializing_expr,
-                               reqIso.getGlobalActor(),
-                               var->getDescriptiveKind(), var->getName())
-            .highlight(user->getSourceRange())
-            // make it a warning and attach the "this will become an error..."
-            // to the message. The error in Swift 6 will not be this diagnostic.
-            .warnUntilSwiftVersion(6);
-          }
-        }
-      }
-    }
-
     /// Determine whether code in the given use context might execute
     /// concurrently with code in the definition context.
     bool mayExecuteConcurrentlyWith(
@@ -2341,12 +2290,8 @@ namespace {
       // we are within that global actor already.
       Optional<ActorIsolation> unsatisfiedIsolation;
       if (Type globalActor = fnType->getGlobalActor()) {
-        if (getContextIsolation().isGlobalActor() &&
-            getContextIsolation().getGlobalActor()->isEqual(globalActor)) {
-          warnAboutGlobalActorIsoChangeInSwift6(
-              ActorIsolation::forGlobalActor(globalActor, false),
-              apply);
-        } else {
+        if (!(getContextIsolation().isGlobalActor() &&
+            getContextIsolation().getGlobalActor()->isEqual(globalActor))) {
           unsatisfiedIsolation = ActorIsolation::forGlobalActor(
               globalActor, /*unsafe=*/false);
         }
@@ -2483,8 +2428,6 @@ namespace {
       auto contextIsolation = getInnermostIsolatedContext(declContext);
       if (contextIsolation.isGlobalActor() &&
           contextIsolation.getGlobalActor()->isEqual(globalActor)) {
-
-        warnAboutGlobalActorIsoChangeInSwift6(contextIsolation, context);
         return false;
       }
 
@@ -3869,8 +3812,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
-    if (var->getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
-        var->isTopLevelGlobal() &&
+    if (var->isTopLevelGlobal() &&
         (var->getASTContext().LangOpts.WarnConcurrency ||
          var->getDeclContext()->isAsyncContext())) {
       if (Type mainActor = var->getASTContext().getMainActorType())

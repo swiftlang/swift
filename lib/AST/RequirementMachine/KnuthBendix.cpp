@@ -301,7 +301,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
     ruleCount = Rules.size();
 
     // For every rule, looking for other rules that overlap with this rule.
-    for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
+    for (unsigned i = FirstLocalRule, e = Rules.size(); i < e; ++i) {
       const auto &lhs = getRule(i);
       if (lhs.isLHSSimplified() ||
           lhs.isRHSSimplified() ||
@@ -391,7 +391,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
 
     for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.
-      if (Rules.size() > maxRuleCount)
+      if (getLocalRules().size() > maxRuleCount)
         return std::make_pair(CompletionResult::MaxRuleCount, Rules.size() - 1);
 
       if (!addRule(pair.LHS, pair.RHS, &pair.Path))

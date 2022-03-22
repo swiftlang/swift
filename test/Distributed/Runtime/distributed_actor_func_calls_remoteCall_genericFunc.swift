@@ -14,7 +14,7 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
@@ -40,10 +40,10 @@ func test() async throws {
 
   let r1 = try await ref.generic("Caplin")
   // CHECK: > encode generic sub: Swift.String
-  // CHECK: > encode argument: Caplin
+  // CHECK: > encode argument name:_, value: Caplin
   // CHECK: > encode return type: Swift.String
   // CHECK: > done recording
-  // CHECK: >> remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC7genericySSxYaKSeRzSERzlFTE"), invocation:FakeInvocationEncoder(genericSubs: [Swift.String], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.generic(_:), invocation:FakeInvocationEncoder(genericSubs: [Swift.String], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
   print("reply: \(r1)")
   // CHECK: reply: Caplin
 
@@ -54,12 +54,12 @@ func test() async throws {
   )
   // CHECK: > encode generic sub: Swift.String
   // CHECK: > encode generic sub: Swift.Int
-  // CHECK: > encode argument: 2.0
-  // CHECK: > encode argument: Caplin
-  // CHECK: > encode argument: [1, 2, 3]
+  // CHECK: > encode argument name:strict, value: 2.0
+  // CHECK: > encode argument name:_, value: Caplin
+  // CHECK: > encode argument name:_, value: [1, 2, 3]
   // CHECK: > encode return type: Swift.String
   // CHECK: > done recording
-  // CHECK: >> remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC8generic26strict__SSSd_xSayq_GtYaKSeRzSERzSeR_SER_r0_lFTE"), invocation:FakeInvocationEncoder(genericSubs: [Swift.String, Swift.Int], arguments: [2.0, "Caplin", [1, 2, 3]], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.generic2(strict:_:_:), invocation:FakeInvocationEncoder(genericSubs: [Swift.String, Swift.Int], arguments: [2.0, "Caplin", [1, 2, 3]], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
   print("reply: \(r2)")
   // CHECK: reply: Caplin
 }

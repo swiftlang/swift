@@ -4,7 +4,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 distributed actor DA {
   // expected-error@-1{{distributed actor 'DA' does not declare ActorSystem it can be used with.}}

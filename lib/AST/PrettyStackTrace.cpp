@@ -42,6 +42,19 @@ void PrettyStackTraceDecl::print(llvm::raw_ostream &out) const {
   printDeclDescription(out, TheDecl, TheDecl->getASTContext());
 }
 
+void PrettyStackTraceDeclAndSubst::print(llvm::raw_ostream &out) const {
+  out << "While " << action << ' ';
+  if (!decl) {
+    out << "NULL declaration!\n";
+    return;
+  }
+  printDeclDescription(out, decl, decl->getASTContext());
+
+  out << "with substitution map: ";
+  subst.dump(out);
+}
+
+
 void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
                                  const ASTContext &Context, bool addNewline) {
   SourceLoc loc = D->getStartLoc();
