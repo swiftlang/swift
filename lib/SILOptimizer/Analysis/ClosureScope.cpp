@@ -215,9 +215,9 @@ void ClosureGraph::finalize() {
 
 #ifndef NDEBUG
 static void dumpFunctionName(SILFunction *function) {
-  llvm::dbgs() << Demangle::demangleSymbolAsString(
-    function->getName(),
-    Demangle::DemangleOptions::SimplifiedUIDemangleOptions())
+  auto opts = Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
+  opts.ShowAsyncResumePartial = true;
+  llvm::dbgs() << Demangle::demangleSymbolAsString(function->getName(), opts)
                << " '" << function->getName() << "'\n";
 }
 
