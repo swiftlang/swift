@@ -13,6 +13,7 @@
 #include "DeclAndTypePrinter.h"
 #include "CxxSynthesis.h"
 #include "PrimitiveTypeMapping.h"
+#include "PrintClangFunction.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -77,6 +78,29 @@ static bool isClangKeyword(Identifier name) {
   if (name.empty())
     return false;
   return isClangKeyword(name.str());
+}
+
+bool DeclAndTypePrinter::isStrClangKeyword(StringRef name) {
+  return ::isClangKeyword(name);
+}
+
+// For a given Decl and Type, if the type is not an optional return
+// the type and OTK_None as the optionality. If the type is
+// optional, return the underlying object type, and an optionality
+// that is based on the type but overridden by the return value of
+// isImplicitlyUnwrappedOptional().
+std::pair<Type, OptionalTypeKind>
+DeclAndTypePrinter::getObjectTypeAndOptionality(const ValueDecl *D, Type ty) {
+  OptionalTypeKind kind;
+  if (auto objTy = ty->getReferenceStorageReferent()->getOptionalObjectType()) {
+    kind = OTK_Optional;
+    if (D->isImplicitlyUnwrappedOptional())
+      kind = OTK_ImplicitlyUnwrappedOptional;
+
+    return {objTy, kind};
+  }
+
+  return {ty, OTK_None};
 }
 
 namespace {
@@ -285,17 +309,7 @@ private:
   // isImplicitlyUnwrappedOptional().
   static std::pair<Type, OptionalTypeKind>
   getObjectTypeAndOptionality(const ValueDecl *D, Type ty) {
-    OptionalTypeKind kind;
-    if (auto objTy =
-            ty->getReferenceStorageReferent()->getOptionalObjectType()) {
-      kind = OTK_Optional;
-      if (D->isImplicitlyUnwrappedOptional())
-        kind = OTK_ImplicitlyUnwrappedOptional;
-
-      return {objTy, kind};
-    }
-
-    return {ty, OTK_None};
+    return DeclAndTypePrinter::getObjectTypeAndOptionality(D, ty);
   }
 
   // Ignore other declarations.
@@ -845,7 +859,10 @@ private:
     FuncionSwiftABIInformation funcABI(FD, mangler);
 
     os << "SWIFT_EXTERN ";
-    printFunctionDeclAsCFunctionDecl(FD, funcABI.getSymbolName(), resultTy);
+
+    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
+    funcPrinter.printFunctionDeclAsCFunctionDecl(FD, funcABI.getSymbolName(),
+                                                 resultTy);
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
