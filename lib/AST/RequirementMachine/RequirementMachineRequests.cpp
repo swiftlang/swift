@@ -40,20 +40,23 @@ using namespace rewriting;
 /// same-type requirement between type parameters where one of them has an
 /// implied concrete type requirement. In this case, split it up into two
 /// concrete type requirements.
-static bool shouldSplitConcreteEquivalenceClass(Requirement req,
-                                                GenericSignature sig) {
+static bool shouldSplitConcreteEquivalenceClass(
+    Requirement req,
+    const RequirementMachine *machine) {
   return (req.getKind() == RequirementKind::SameType &&
           req.getSecondType()->isTypeParameter() &&
-          sig->isConcreteType(req.getSecondType()));
+          machine->isConcreteType(req.getSecondType()));
 }
 
 /// Returns true if this generic signature contains abstract same-type
 /// requirements between concrete type parameters. In this case, we split
 /// the abstract same-type requirements into pairs of concrete type
 /// requirements, and minimize the signature again.
-static bool shouldSplitConcreteEquivalenceClasses(GenericSignature sig) {
-  for (auto req : sig.getRequirements()) {
-    if (shouldSplitConcreteEquivalenceClass(req, sig))
+static bool shouldSplitConcreteEquivalenceClasses(
+    ArrayRef<Requirement> requirements,
+    const RequirementMachine *machine) {
+  for (auto req : requirements) {
+    if (shouldSplitConcreteEquivalenceClass(req, machine))
       return true;
   }
 
@@ -67,8 +70,10 @@ static bool shouldSplitConcreteEquivalenceClasses(GenericSignature sig) {
 /// ahead of time.
 static void splitConcreteEquivalenceClasses(
     ASTContext &ctx,
-    GenericSignature sig,
-    SmallVectorImpl<StructuralRequirement> &requirements,
+    ArrayRef<Requirement> requirements,
+    const RequirementMachine *machine,
+    TypeArrayView<GenericTypeParamType> genericParams,
+    SmallVectorImpl<StructuralRequirement> &splitRequirements,
     unsigned &attempt) {
   unsigned maxAttempts =
       ctx.LangOpts.RequirementMachineMaxSplitConcreteEquivClassAttempts;
@@ -77,26 +82,32 @@ static void splitConcreteEquivalenceClasses(
   if (attempt >= maxAttempts) {
     llvm::errs() << "Splitting concrete equivalence classes did not "
                  << "reach fixed point after " << attempt << " attempts.\n";
-    llvm::errs() << "Last result: " << sig << "\n";
+    llvm::errs() << "Last attempt produced these requirements:\n";
+    for (auto req : requirements) {
+      req.dump(llvm::errs());
+      llvm::errs() << "\n";
+    }
+    machine->dump(llvm::errs());
     abort();
   }
 
-  requirements.clear();
+  splitRequirements.clear();
 
-  for (auto req : sig.getRequirements()) {
-    if (shouldSplitConcreteEquivalenceClass(req, sig)) {
-      auto concreteType = sig->getConcreteType(req.getSecondType());
+  for (auto req : requirements) {
+    if (shouldSplitConcreteEquivalenceClass(req, machine)) {
+      auto concreteType = machine->getConcreteType(
+          req.getSecondType(), genericParams);
 
       Requirement firstReq(RequirementKind::SameType,
                            req.getFirstType(), concreteType);
       Requirement secondReq(RequirementKind::SameType,
                             req.getSecondType(), concreteType);
-      requirements.push_back({firstReq, SourceLoc(), /*inferred=*/false});
-      requirements.push_back({secondReq, SourceLoc(), /*inferred=*/false});
+      splitRequirements.push_back({firstReq, SourceLoc(), /*inferred=*/false});
+      splitRequirements.push_back({secondReq, SourceLoc(), /*inferred=*/false});
       continue;
     }
 
-    requirements.push_back({req, SourceLoc(), /*inferred=*/false});
+    splitRequirements.push_back({req, SourceLoc(), /*inferred=*/false});
   }
 }
 
@@ -458,8 +469,11 @@ AbstractGenericSignatureRequestRQM::evaluate(
     auto errorFlags = machine->getErrors();
 
     if (!errorFlags) {
-      if (shouldSplitConcreteEquivalenceClasses(result)) {
-        splitConcreteEquivalenceClasses(ctx, result, requirements, attempt);
+      if (shouldSplitConcreteEquivalenceClasses(result.getRequirements(),
+                                                machine.get())) {
+        splitConcreteEquivalenceClasses(ctx, result.getRequirements(),
+                                        machine.get(), result.getGenericParams(),
+                                        requirements, attempt);
         continue;
       }
 
@@ -622,8 +636,11 @@ InferredGenericSignatureRequestRQM::evaluate(
 
     if (!errorFlags) {
       // Check if we need to rebuild the signature.
-      if (shouldSplitConcreteEquivalenceClasses(result)) {
-        splitConcreteEquivalenceClasses(ctx, result, requirements, attempt);
+      if (shouldSplitConcreteEquivalenceClasses(result.getRequirements(),
+                                                machine.get())) {
+        splitConcreteEquivalenceClasses(ctx, result.getRequirements(),
+                                        machine.get(), result.getGenericParams(),
+                                        requirements, attempt);
         continue;
       }
 
