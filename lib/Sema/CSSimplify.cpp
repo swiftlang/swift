@@ -10774,8 +10774,12 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
   // Don't attempt to filter overloads when solving for code completion
   // because presence of code completion token means that any call
   // could be malformed e.g. missing arguments e.g. `foo([.#^MEMBER^#`
-  if (isForCodeCompletion())
-    return false;
+  if (isForCodeCompletion()) {
+    bool ArgContainsCCTypeVar = Type(argFnType).findIf(isCodeCompletionTypeVar);
+    if (ArgContainsCCTypeVar || isCodeCompletionTypeVar(fnTypeVar)) {
+      return false;
+    }
+  }
 
   if (shouldAttemptFixes()) {
     auto arguments = argFnType->getParams();
