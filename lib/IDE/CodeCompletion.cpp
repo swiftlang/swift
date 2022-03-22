@@ -42,10 +42,10 @@
 #include "swift/IDE/DotExprCompletion.h"
 #include "swift/IDE/ExprCompletion.h"
 #include "swift/IDE/KeyPathCompletion.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/IDE/UnresolvedMemberCompletion.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -1327,7 +1327,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
-    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
+    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
+                                              CurDeclContext);
     llvm::SaveAndRestore<TypeCheckCompletionCallback*>
       CompletionCollector(Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
@@ -1351,7 +1352,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
-    UnresolvedMemberTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
+    UnresolvedMemberTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
+                                                       CurDeclContext);
     llvm::SaveAndRestore<TypeCheckCompletionCallback*>
       CompletionCollector(Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);
@@ -1380,7 +1382,8 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   case CompletionKind::CallArg: {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
-    ArgumentTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr);
+    ArgumentTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
+                                               CurDeclContext);
     llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
         Context.CompletionCallback, &Lookup);
     typeCheckContextAt(CurDeclContext, CompletionLoc);

@@ -159,20 +159,6 @@ namespace swift {
       constraints::SolutionApplicationTarget &target, bool needsPrecheck,
       llvm::function_ref<void(const constraints::Solution &)> callback);
 
-  Type getTypeForCompletion(const constraints::Solution &S, Expr *E);
-
-  /// Whether the given completion expression is the only expression in its
-  /// containing closure or function body and its value is implicitly returned.
-  ///
-  /// If these conditions are met, code completion needs to avoid penalizing
-  /// completion results that don't match the expected return type when
-  /// computing type relations, as since no return statement was explicitly
-  /// written by the user, it's possible they intend the single expression not
-  /// as the return value but merely the first entry in a multi-statement body
-  /// they just haven't finished writing yet.
-  bool isImplicitSingleExpressionReturn(constraints::ConstraintSystem &CS,
-                                        Expr *CompletionExpr);
-
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
 

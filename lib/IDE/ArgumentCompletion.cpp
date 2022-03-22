@@ -90,13 +90,8 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
   return ShowGlobalCompletions;
 }
 
-void ArgumentTypeCheckCompletionCallback::sawSolution(const Solution &S) {
-  TypeCheckCompletionCallback::sawSolution(S);
-
+void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
-  if (!ExpectedTy) {
-    return;
-  }
 
   auto &CS = S.getConstraintSystem();
 
@@ -198,6 +193,8 @@ void ArgumentTypeCheckCompletionCallback::sawSolution(const Solution &S) {
     }
   }
 
+  bool IsAsync = isContextAsync(S, DC);
+
   // If this is a duplicate of any other result, ignore this solution.
   if (llvm::any_of(Results, [&](const Result &R) {
         return R.FuncD == FuncD && nullableTypesEqual(R.FuncTy, FuncTy) &&
@@ -210,7 +207,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolution(const Solution &S) {
 
   Results.push_back({ExpectedTy, isa<SubscriptExpr>(ParentCall), FuncD, FuncTy,
                      ArgIdx, ParamIdx, std::move(ClaimedParams),
-                     IsNoninitialVariadic, CallBaseTy, HasLabel});
+                     IsNoninitialVariadic, CallBaseTy, HasLabel, IsAsync});
 }
 
 void ArgumentTypeCheckCompletionCallback::deliverResults(
@@ -275,6 +272,9 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
       ExpectedTypes.push_back(Result.ExpectedType);
     }
     Lookup.setExpectedTypes(ExpectedTypes, false);
+    bool IsInAsyncContext = llvm::any_of(
+        Results, [](const Result &Res) { return Res.IsInAsyncContext; });
+    Lookup.setCanCurrDeclContextHandleAsync(IsInAsyncContext);
     Lookup.getValueCompletionsInDeclContext(Loc);
     Lookup.getSelfTypeCompletionInDeclContext(Loc, /*isForDeclResult=*/false);
 
