@@ -77,5 +77,5 @@ protocol HasRecursiveP {
 
 extension HasRecursiveP where T == DefinesRecursiveP.T {}
 // expected-error@-1 {{cannot build rewrite system for generic signature; rule length limit exceeded}}
-// expected-note@-2 {{failed rewrite rule is τ_0_0.[HasRecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[concrete: ((((((((((some RecursiveP).T).T).T).T).T).T).T).T).T).T] => τ_0_0.[HasRecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T]}}
+// expected-note@-2 {{failed rewrite rule is τ_0_0.[HasRecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[concrete: (((((((((@_opaqueReturnTypeOf("$s37opaque_archetype_concrete_requirement17DefinesRecursivePV1tQrvp", 0) __.T).T).T).T).T).T).T).T).T).T] => τ_0_0.[HasRecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T]}}
 

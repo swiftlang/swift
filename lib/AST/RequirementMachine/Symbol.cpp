@@ -658,6 +658,8 @@ void Symbol::dump(llvm::raw_ostream &out) const {
 
   PrintOptions opts;
   opts.AlternativeTypeNames = &substitutionNames;
+  opts.OpaqueReturnTypePrinting =
+      PrintOptions::OpaqueReturnTypePrintingMode::StableReference;
 
   switch (getKind()) {
   case Kind::Name:
