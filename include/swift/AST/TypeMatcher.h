@@ -181,9 +181,8 @@ class TypeMatcher {
 
     bool visitReferenceStorageType(CanReferenceStorageType firstStorage,
                                    Type secondType, Type sugaredFirstType) {
-      auto _secondStorage = secondType->getCanonicalType();
-      if (firstStorage->getKind() == _secondStorage->getKind()) {
-        auto secondStorage = cast<ReferenceStorageType>(_secondStorage);
+      if (firstStorage->getKind() == secondType->getDesugaredType()->getKind()) {
+        auto secondStorage = secondType->castTo<ReferenceStorageType>();
         return this->visit(firstStorage.getReferentType(),
                            secondStorage->getReferentType(),
                            sugaredFirstType->castTo<ReferenceStorageType>()
@@ -195,9 +194,8 @@ class TypeMatcher {
 
     bool visitNominalType(CanNominalType firstNominal,
                           Type secondType, Type sugaredFirstType) {
-      auto _secondNominal = secondType->getCanonicalType();
-      if (firstNominal->getKind() == _secondNominal->getKind()) {
-        auto secondNominal = cast<NominalType>(_secondNominal);
+      if (firstNominal->getKind() == secondType->getDesugaredType()->getKind()) {
+        auto secondNominal = secondType->castTo<NominalType>();
         if (firstNominal->getDecl() != secondNominal->getDecl())
           return mismatch(firstNominal.getPointer(), secondNominal,
                           sugaredFirstType);
@@ -216,9 +214,8 @@ class TypeMatcher {
 
     bool visitAnyMetatypeType(CanAnyMetatypeType firstMeta,
                               Type secondType, Type sugaredFirstType) {
-      auto _secondMeta = secondType->getCanonicalType();
-      if (firstMeta->getKind() == _secondMeta->getKind()) {
-        auto secondMeta = cast<AnyMetatypeType>(_secondMeta);
+      if (firstMeta->getKind() == secondType->getDesugaredType()->getKind()) {
+        auto secondMeta = secondType->castTo<AnyMetatypeType>();
         return this->visit(firstMeta.getInstanceType(),
                            secondMeta->getInstanceType(),
                            sugaredFirstType->castTo<AnyMetatypeType>()
