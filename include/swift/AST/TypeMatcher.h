@@ -229,7 +229,41 @@ class TypeMatcher {
     }
 
     TRIVIAL_CASE(ModuleType)
-    TRIVIAL_CASE(ArchetypeType)
+
+    bool visitArchetypeType(CanArchetypeType firstArchetype,
+                            Type secondType,
+                            Type sugaredFirstType) {
+      if (auto firstOpaqueArchetype = dyn_cast<OpaqueTypeArchetypeType>(firstArchetype)) {
+        if (auto secondOpaqueArchetype = secondType->getAs<OpaqueTypeArchetypeType>()) {
+          if (firstOpaqueArchetype->getDecl() == secondOpaqueArchetype->getDecl()) {
+            auto firstSubMap = firstOpaqueArchetype->getSubstitutions();
+            auto secondSubMap = secondOpaqueArchetype->getSubstitutions();
+            assert(firstSubMap.getReplacementTypes().size() ==
+                   secondSubMap.getReplacementTypes().size());
+
+            for (unsigned i : indices(firstSubMap.getReplacementTypes())) {
+              auto firstSubstType = firstSubMap.getReplacementTypes()[i];
+              auto secondSubstType = secondSubMap.getReplacementTypes()[i];
+
+              if (!this->visit(firstSubstType->getCanonicalType(),
+                               secondSubstType, firstSubstType))
+                return false;
+            }
+
+            return true;
+          }
+        }
+      }
+
+      // FIXME: Once OpenedArchetypeType stores substitutions, do something
+      // similar to the above.
+
+      if (firstArchetype->isEqual(secondType))
+        return true;
+
+
+      return mismatch(firstArchetype.getPointer(), secondType, sugaredFirstType);
+    }
 
     bool visitDynamicSelfType(CanDynamicSelfType firstDynamicSelf,
                               Type secondType,
