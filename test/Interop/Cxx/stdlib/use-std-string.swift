@@ -2,12 +2,17 @@
 //
 // REQUIRES: executable_test
 //
-// Enable this everywhere once we have a solution for modularizing libstdc++: rdar://87654514
-// REQUIRES: OS=macosx
+// Enable this everywhere once we have a solution for modularizing other C++ stdlibs: rdar://87654514
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 import StdlibUnittest
 import StdString
+#if os(Linux)
+import std
+// FIXME: import std.string once libstdc++ is split into submodules.
+#else
 import std.string
+#endif
 
 var StdStringTestSuite = TestSuite("StdString")
 

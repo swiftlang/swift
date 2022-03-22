@@ -2,13 +2,8 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=std.iosfwd -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-IOSFWD
 // RUN: %target-swift-ide-test -print-module -module-to-print=std.string -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STRING
 
-// Clang driver on Windows doesn't support -stdlib=libc++
-// UNSUPPORTED: OS=windows-msvc
-
-// libstdc++ cannot currently be imported
-// UNSUPPORTED: OS=linux-gnu
-// UNSUPPORTED: OS=linux-androideabi
-// UNSUPPORTED: OS=linux-android
+// This test is specific to libc++ and therefore only runs on Darwin platforms.
+// REQUIRES: OS=macosx || OS=ios
 
 // REQUIRES: rdar84036022
 
