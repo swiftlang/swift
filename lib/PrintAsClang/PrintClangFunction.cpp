@@ -34,7 +34,7 @@ public:
 
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               Optional<OptionalTypeKind> optionalKind) {
-    auto knownTypeInfo = typeMapping.getKnownObjCTypeInfo(typeDecl);
+    auto knownTypeInfo = typeMapping.getKnownCTypeInfo(typeDecl);
     if (!knownTypeInfo)
       return false;
     os << knownTypeInfo->name;
