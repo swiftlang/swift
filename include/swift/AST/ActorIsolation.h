@@ -112,6 +112,7 @@ public:
   bool isActorIsolated() const {
     switch (getKind()) {
     case ActorInstance:
+    case DistributedActorInstance:
     case GlobalActor:
     case GlobalActorUnsafe:
       return true;
