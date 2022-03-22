@@ -256,7 +256,7 @@ public:
   std::string getOutlinedFunctionName() override;
 
 private:
-  bool matchMethodCall(SILBasicBlock::iterator);
+  bool matchMethodCall(SILBasicBlock::iterator, LoadInst *);
   CanSILFunctionType getOutlinedFunctionType(SILModule &M);
   void clearState();
 };
@@ -546,7 +546,8 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
   return true;
 }
 
-bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It) {
+bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It,
+                                      LoadInst *Load) {
   // Matches:
   //    %33 = objc_method %31 : $UITextField, #UITextField.text!getter.foreign : (UITextField) -> () -> String?, $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
   //    %34 = apply %33(%31) : $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
@@ -589,6 +590,44 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It) {
       PropApply->getNumArguments() != 1 ||
       PropApply->getArgument(0) != Instance || !PropApply->hasOneUse())
     return false;
+
+  if (Load) {
+    // In OSSA, there will be a destroy_value matching the earlier load [copy].
+    // In non-ossa, there will be a release matching the earlier retain. The
+    // only user of the retained value is the unowned objective-c method
+    // consumer.
+    unsigned NumUses = 0;
+    Release = nullptr;
+    bool hasOwnership = Load->getFunction()->hasOwnership();
+    for (auto *Use : Load->getUses()) {
+      ++NumUses;
+      SILInstruction *R;
+      if (hasOwnership) {
+        R = dyn_cast<DestroyValueInst>(Use->getUser());
+      } else {
+        R = dyn_cast<StrongReleaseInst>(Use->getUser());
+      }
+      if (R) {
+        if (!Release) {
+          Release = R;
+        } else {
+          Release = nullptr;
+          break;
+        }
+      }
+    }
+    if (!Release)
+      return false;
+    if (hasOwnership) {
+      if (NumUses != 3)
+        return false;
+    } else {
+      if (NumUses != 4)
+        return false;
+    }
+    ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
+    assert(Release == &*It);
+  }
 
   // switch_enum %34 : $Optional<NSString>, case #Optional.some!enumelt: bb8, case #Optional.none!enumelt: bb9
   ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
@@ -653,44 +692,9 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
     }
   }
 
-  if (!matchMethodCall(It))
+  if (!matchMethodCall(It, Load))
     return false;
 
-  if (Load) {
-    // In OSSA, there will be a destroy_value matching the earlier load [copy].
-    // In non-ossa, there will be a release matching the earlier retain. The
-    // only user of the retained value is the unowned objective-c method
-    // consumer.
-    unsigned NumUses = 0;
-    Release = nullptr;
-    bool hasOwnership = Load->getFunction()->hasOwnership();
-    for (auto *Use : Load->getUses()) {
-      ++NumUses;
-      SILInstruction *R;
-      if (hasOwnership) {
-        R = dyn_cast<DestroyValueInst>(Use->getUser());
-      } else {
-        R = dyn_cast<StrongReleaseInst>(Use->getUser());
-      }
-      if (R) {
-        if (!Release) {
-          Release = R;
-        } else {
-          Release = nullptr;
-          break;
-        }
-      }
-    }
-    if (!Release)
-      return false;
-    if (hasOwnership) {
-      if (NumUses != 3)
-        return false;
-    } else {
-      if (NumUses != 4)
-        return false;
-    }
-  }
   return true;
 }
 
