@@ -507,9 +507,6 @@ def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier
 def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-swap">,
   HelpText<"Suppress static violations of exclusive access with swap()">;
 
-def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
-  HelpText<"Enable SIL Opaque Values">;
-  
 def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
@@ -1021,6 +1018,9 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
 def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
   HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
            "when optimizing ownership will be lowered before serializing SIL">;
+
+def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
+  HelpText<"Enable SIL Opaque Values">;
 
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,

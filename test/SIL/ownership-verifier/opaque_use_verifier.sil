@@ -5,7 +5,7 @@
 // incorrectly. This is important to ensure that the verifier does not
 // regress. It should only deal with use matching of opaque types.
 
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 

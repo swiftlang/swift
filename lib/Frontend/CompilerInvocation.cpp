@@ -770,7 +770,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());
-  Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
@@ -1678,6 +1677,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
+  Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.EnableActorDataRaceChecks |= Args.hasFlag(
       OPT_enable_actor_data_race_checks,

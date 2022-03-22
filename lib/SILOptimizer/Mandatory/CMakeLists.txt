@@ -4,6 +4,7 @@ target_sources(swiftSILOptimizer PRIVATE
   AddressLowering.cpp
   CapturePromotion.cpp
   ClosureLifetimeFixup.cpp
+  PhiStorageOptimizer.cpp
   ConstantPropagation.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp

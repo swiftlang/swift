@@ -1008,6 +1008,13 @@ public:
       auto *TI = predBB->getTerminator();
       if (F.hasOwnership()) {
         require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
+
+        // Address-only values are potentially unmovable when borrowed. See also
+        // checkOwnershipForwardingInst. A phi implies a move of its arguments
+        // because they can't necessarilly all reuse the same storage.
+        require((!arg->getType().isAddressOnly(F)
+                 || arg->getOwnershipKind() != OwnershipKind::Guaranteed),
+                "Guaranteed address-only phi not allowed--implies a copy");
       } else {
         // FIXME: when critical edges are removed and cond_br arguments are
         // disallowed, only allow BranchInst.
@@ -1269,10 +1276,11 @@ public:
       checkOwnershipForwardingTermInst(term);
     }
 
-    // Address-only values are potentially move-only, and unmovable if they are
-    // borrowed. Ensure that guaranteed address-only values are forwarded with
-    // the same representation. Non-destructive projection is
-    // allowed. Aggregation and destructive disaggregation is not allowed.
+    // Address-only values are potentially unmovable when borrowed. Ensure that
+    // guaranteed address-only values are forwarded with the same
+    // representation. Non-destructive projection is allowed. Aggregation and
+    // destructive disaggregation is not allowed. See SIL.rst, Forwarding
+    // Addres-Only Values.
     if (ownership == OwnershipKind::Guaranteed
         && OwnershipForwardingMixin::isAddressOnly(i)) {
       require(OwnershipForwardingMixin::hasSameRepresentation(i),

@@ -1605,10 +1605,6 @@ namespace {
   };
 
   /// Lower address only types as opaque values.
-  ///
-  /// Opaque values behave like loadable leaf types in SIL.
-  ///
-  /// FIXME: When you remove an unreachable, just delete the method.
   class OpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
     OpaqueValueTypeLowering(SILType type, RecursiveProperties properties,
@@ -1620,6 +1616,20 @@ namespace {
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
       llvm_unreachable("copy into");
+    }
+
+    // OpaqueValue store cannot be decoupled from a destroy because it is not
+    // bitwise-movable.
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      B.createStore(loc, value, addr, qual);
+    }
+
+    // OpaqueValue load cannot be decoupled from a copy because it is not
+    // bitwise-movable.
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      return B.createLoad(loc, addr, qual);
     }
 
     // --- Same as LeafLoadableTypeLowering.
@@ -1683,7 +1693,7 @@ namespace {
 
     TypeLowering *handleAddressOnly(CanType type,
                                     RecursiveProperties properties) {
-      if (!TC.Context.LangOpts.EnableSILOpaqueValues) {
+      if (!TC.Context.SILOpts.EnableSILOpaqueValues) {
         auto silType = SILType::getPrimitiveAddressType(type);
         return new (TC) AddressOnlyTypeLowering(silType, properties,
                                                            Expansion);
