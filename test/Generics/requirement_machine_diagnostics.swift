@@ -233,10 +233,12 @@ func testMissingRequirements() {
   func conflict2<T: RequiresConformance>(_: T) where T.A == C {}
   // expected-error@-1{{same-type constraint type 'C' does not conform to required protocol 'P'}}
 
-  // FIXME: Diagnose conflicting superclass requirements on T.A
   class C {}
   func conflict3<T: RequiresSuperclass>(_: T) where T.A == C {}
+  // expected-error@-1{{type 'T.A' cannot be a subclass of both 'Super' and 'C'}}
+
   func conflict4<T: RequiresSuperclass>(_: T) where T.A: C {}
+  // expected-error@-1{{type 'T.A' cannot be a subclass of both 'Super' and 'C'}}
 }
 
 protocol Fooable {
@@ -262,7 +264,7 @@ func sameTypeConflicts() {
     var bar: Y { return Y() }
   }
 
-  // expected-error@+1{{generic signature requires types 'Y' and 'X' to be the same}}
+  // expected-error@+1{{generic parameter 'T.Foo' cannot be equal to both 'Y' and 'X'}}
   func fail1<
     T: Fooable, U: Fooable
   >(_ t: T, u: U) -> (X, Y)
@@ -270,7 +272,7 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{generic signature requires types 'X' and 'Y' to be the same}}
+  // expected-error@+1{{generic parameter 'T.Foo' cannot be equal to both 'X' and 'Y'}}
   func fail2<
     T: Fooable, U: Fooable
   >(_ t: T, u: U) -> (X, Y)
@@ -284,7 +286,7 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{generic signature requires types 'Z' and 'X' to be the same}}
+  // expected-error@+1{{generic parameter 'T.Bar.Foo' cannot be equal to both 'Z' and 'X'}}
   func fail4<T: Barrable>(_ t: T) -> (Y, Z)
     where
     T.Bar == Y,
@@ -292,7 +294,7 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{generic signature requires types 'Z' and 'X' to be the same}}
+  // expected-error@+1{{generic parameter 'T.Bar.Foo' cannot be equal to both 'Z' and 'X'}}
   func fail5<T: Barrable>(_ t: T) -> (Y, Z)
     where
     T.Bar.Foo == Z,

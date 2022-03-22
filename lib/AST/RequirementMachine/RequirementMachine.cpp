@@ -533,7 +533,8 @@ void RequirementMachine::freeze() {
 void RequirementMachine::computeRequirementDiagnostics(
     SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc) {
   System.computeRedundantRequirementDiagnostics(errors);
-  System.computeConflictDiagnostics(errors, signatureLoc);
+  System.computeConflictDiagnostics(errors, signatureLoc, Map,
+                                    getGenericParams());
 }
 
 std::string RequirementMachine::getRuleAsStringForDiagnostics(

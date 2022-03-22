@@ -230,7 +230,9 @@ public:
   void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
 
   void computeConflictDiagnostics(SmallVectorImpl<RequirementError> &errors,
-                                  SourceLoc signatureLoc);
+                                  SourceLoc signatureLoc,
+                                  const PropertyMap &map,
+                                  TypeArrayView<GenericTypeParamType> genericParams);
 
 private:
   struct CriticalPair {

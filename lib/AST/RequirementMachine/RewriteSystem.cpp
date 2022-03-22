@@ -15,6 +15,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <vector>
+#include "PropertyMap.h"
 #include "RewriteContext.h"
 #include "RewriteLoop.h"
 #include "RewriteSystem.h"
@@ -753,7 +754,9 @@ void RewriteSystem::freeze() {
 }
 
 void RewriteSystem::computeConflictDiagnostics(
-    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc) {
+    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc,
+    const PropertyMap &propertyMap,
+    TypeArrayView<GenericTypeParamType> genericParams) {
   for (auto pair : ConflictingRules) {
     auto *firstRule = &getRule(pair.first);
     auto *secondRule = &getRule(pair.second);
@@ -762,6 +765,48 @@ void RewriteSystem::computeConflictDiagnostics(
     auto secondProperty = secondRule->isPropertyRule();
     if (!firstProperty || !secondProperty)
       continue;
+
+    MutableTerm firstTerm(
+        firstRule->getLHS().begin(), firstRule->getLHS().end() - 1);
+    MutableTerm secondTerm(
+        secondRule->getLHS().begin(), secondRule->getLHS().end() - 1);
+
+    auto firstSubject = propertyMap.getTypeForTerm(firstTerm, genericParams);
+    auto secondSubject = propertyMap.getTypeForTerm(secondTerm, genericParams);
+    assert(firstSubject && secondSubject);
+
+    // Record conflicting requirements on a type parameter, e.g.
+    // conflicting superclass requirements:
+    //
+    //   class C1 {}
+    //   class C2 {}
+    //   protocol P { associatedtype A: C1 }
+    //   func conflict<T: P>(_: T) where T.A: C2 {}
+    if (firstProperty->getKind() == secondProperty->getKind() &&
+        firstTerm.back().getKind() != Symbol::Kind::Name &&
+        firstSubject->isEqual(secondSubject)) {
+      switch (firstProperty->getKind()) {
+      case Symbol::Kind::ConcreteType:
+        errors.push_back(RequirementError::forConflictingRequirement(firstSubject,
+            {RequirementKind::SameType, firstProperty->getConcreteType(),
+             secondProperty->getConcreteType()},
+            signatureLoc));
+        continue;
+
+      case Symbol::Kind::Superclass:
+        // FIXME: shoving the conflicting superclass types into a superclass
+        // requiement is a little gross.
+        errors.push_back(RequirementError::forConflictingRequirement(firstSubject,
+            {RequirementKind::Superclass, firstProperty->getConcreteType(),
+             secondProperty->getConcreteType()},
+            signatureLoc));
+        continue;
+
+      // FIXME: Conflicting layout requirements?
+      default:
+        continue;
+      }
+    }
 
     auto recordError = [&](Symbol subject, Symbol constraint) {
       auto subjectType = subject.getConcreteType();
@@ -802,19 +847,6 @@ void RewriteSystem::computeConflictDiagnostics(
       recordError(*firstProperty, *secondProperty);
     } else if (secondProperty->getKind() == Symbol::Kind::ConcreteType) {
       recordError(*secondProperty, *firstProperty);
-    } else {
-      // FIXME: This can happen when there are conflicting requirements
-      // on a type parameter, e.g. conflicting superclass requirements:
-      //
-      //   class C1 {}
-      //   class C2 {}
-      //   protocol P { associatedtype A: C1 }
-      //   func conflict<T: P>(_: T) where T.A: C2 {}
-      //
-      // In this case, we want to compute the type `T.A` from
-      // its corresponding term. For this, we need the property map
-      // from the RequirementMachine.
-      continue;
     }
   }
 }

@@ -726,6 +726,24 @@ bool swift::rewriting::diagnoseRequirementErrors(
     }
 
     case RequirementError::Kind::ConflictingRequirement: {
+      // FIXME: Unify this case with SameTypeMissingRequirement.
+      if (auto subjectType = error.typeParameter) {
+        auto firstType = error.requirement.getFirstType();
+        auto secondType = error.requirement.getSecondType();
+
+        if (error.requirement.getKind() == RequirementKind::SameType) {
+          ctx.Diags.diagnose(loc, diag::same_type_conflict,
+                             false, subjectType, firstType, secondType);
+        } else {
+          assert(error.requirement.getKind() == RequirementKind::Superclass);
+          ctx.Diags.diagnose(loc, diag::conflicting_superclass_constraints,
+                             subjectType, firstType, secondType);
+
+        }
+        diagnosedError = true;
+        break;
+      }
+
       auto subjectType = error.requirement.getFirstType();
       if (subjectType->hasError())
         break;
