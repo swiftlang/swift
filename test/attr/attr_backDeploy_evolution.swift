@@ -32,9 +32,6 @@
 // REQUIRES: executable_test
 // REQUIRES: VENDOR=apple
 
-// rdar://90525337
-// UNSUPPORTED: swift_test_mode_optimize
-
 // ---- (0) Prepare SDK
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/SDK_ABI)
@@ -119,24 +116,24 @@ testPrint(handle: #dsohandle, "check")
 testPrint(handle: libraryHandle(), "check")
 
 if isV2OrLater() {
-  assert(!v2APIsAreStripped())
+  precondition(!v2APIsAreStripped())
 }
 
 // CHECK-ABI: library: trivial
 // CHECK-BD: client: trivial
 trivial()
 
-assert(try! pleaseThrow(false))
+precondition(try! pleaseThrow(false))
 do {
   _ = try pleaseThrow(true)
   fatalError("Should have thrown")
 } catch {
-  assert(error as? BadError == BadError.bad)
+  precondition(error as? BadError == BadError.bad)
 }
 
 do {
   let zero = MutableInt.zero
-  assert(zero.value == 0)
+  precondition(zero.value == 0)
 
   var int = MutableInt(5)
 
@@ -144,9 +141,9 @@ do {
   // CHECK-BD: client: 5
   int.print()
 
-  assert(int.increment(by: 2) == 7)
-  assert(genericIncrement(&int, by: 3) == 10)
-  assert(int.decrement(by: 1) == 9)
+  precondition(int.increment(by: 2) == 7)
+  precondition(genericIncrement(&int, by: 3) == 10)
+  precondition(int.decrement(by: 1) == 9)
 
   var incrementable: any Incrementable = int.toIncrementable()
 
@@ -156,13 +153,13 @@ do {
 
   let int2 = MutableInt(0x7BB7914B)
   for (i, expectedByte) in [0x4B, 0x91, 0xB7, 0x7B].enumerated() {
-    assert(int2[byteAt: i] == expectedByte)
+    precondition(int2[byteAt: i] == expectedByte)
   }
 }
 
 do {
   let zero = ReferenceInt.zero
-  assert(zero.value == 0)
+  precondition(zero.value == 0)
 
   var int = ReferenceInt(42)
 
@@ -172,13 +169,13 @@ do {
 
   do {
     let copy = int.copy()
-    assert(int !== copy)
-    assert(copy.value == 42)
+    precondition(int !== copy)
+    precondition(copy.value == 42)
   }
 
-  assert(int.increment(by: 2) == 44)
-  assert(genericIncrement(&int, by: 3) == 47)
-  assert(int.decrement(by: 46) == 1)
+  precondition(int.increment(by: 2) == 44)
+  precondition(genericIncrement(&int, by: 3) == 47)
+  precondition(int.decrement(by: 46) == 1)
 
   var incrementable: any Incrementable = int.toIncrementable()
 
@@ -188,6 +185,6 @@ do {
 
   let int2 = MutableInt(0x08AFAB76)
   for (i, expectedByte) in [0x76, 0xAB, 0xAF, 0x08].enumerated() {
-    assert(int2[byteAt: i] == expectedByte)
+    precondition(int2[byteAt: i] == expectedByte)
   }
 }
