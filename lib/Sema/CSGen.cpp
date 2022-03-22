@@ -2969,18 +2969,27 @@ namespace {
       return typeVar;
     }
 
+    Type getTypeForCast(ExplicitCastExpr *E) {
+      if (auto *const repr = E->getCastTypeRepr()) {
+        // Validate the resulting type.
+        return resolveTypeReferenceInExpression(
+            repr, TypeResolverContext::ExplicitCastExpr,
+            CS.getConstraintLocator(E));
+      }
+      assert(E->isImplicit());
+      return E->getCastType();
+    }
+
     Type visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       auto fromExpr = expr->getSubExpr();
       if (!fromExpr) // Either wasn't constructed correctly or wasn't folded.
         return nullptr;
 
-      auto *const repr = expr->getCastTypeRepr();
-      // Validate the resulting type.
-      const auto toType = resolveTypeReferenceInExpression(
-          repr, TypeResolverContext::ExplicitCastExpr,
-          CS.getConstraintLocator(expr));
+      auto toType = getTypeForCast(expr);
       if (!toType)
-        return nullptr;
+        return Type();
+
+      auto *const repr = expr->getCastTypeRepr();
 
       // Cache the type we're casting to.
       if (repr) CS.setType(repr, toType);
@@ -3001,12 +3010,11 @@ namespace {
 
     Type visitCoerceExpr(CoerceExpr *expr) {
       // Validate the resulting type.
-      auto *const repr = expr->getCastTypeRepr();
-      const auto toType = resolveTypeReferenceInExpression(
-          repr, TypeResolverContext::ExplicitCastExpr,
-          CS.getConstraintLocator(expr));
+      auto toType = getTypeForCast(expr);
       if (!toType)
         return nullptr;
+
+      auto *const repr = expr->getCastTypeRepr();
 
       // Cache the type we're casting to.
       if (repr) CS.setType(repr, toType);
@@ -3033,12 +3041,11 @@ namespace {
         return nullptr;
 
       // Validate the resulting type.
-      auto *const repr = expr->getCastTypeRepr();
-      const auto toType = resolveTypeReferenceInExpression(
-          repr, TypeResolverContext::ExplicitCastExpr,
-          CS.getConstraintLocator(expr));
+      const auto toType = getTypeForCast(expr);
       if (!toType)
         return nullptr;
+
+      auto *const repr = expr->getCastTypeRepr();
 
       // Cache the type we're casting to.
       if (repr) CS.setType(repr, toType);
@@ -3058,17 +3065,14 @@ namespace {
     }
 
     Type visitIsExpr(IsExpr *expr) {
-      // Validate the type.
-      // FIXME: Locator for the cast type?
-      auto &ctx = CS.getASTContext();
-      const auto toType = resolveTypeReferenceInExpression(
-          expr->getCastTypeRepr(), TypeResolverContext::ExplicitCastExpr,
-          CS.getConstraintLocator(expr));
+      auto toType = getTypeForCast(expr);
       if (!toType)
         return nullptr;
 
+      auto *const repr = expr->getCastTypeRepr();
       // Cache the type we're checking.
-      CS.setType(expr->getCastTypeRepr(), toType);
+      if (repr)
+        CS.setType(repr, toType);
 
       // Add a checked cast constraint.
       auto fromType = CS.getType(expr->getSubExpr());
@@ -3076,6 +3080,7 @@ namespace {
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType,
                        CS.getConstraintLocator(expr));
 
+      auto &ctx = CS.getASTContext();
       // The result is Bool.
       auto boolDecl = ctx.getBoolDecl();
 
