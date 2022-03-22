@@ -614,7 +614,7 @@ void AccessEnforcementSelection::run() {
   closureOrder.compute();
 
   dynamicCaptures = std::make_unique<DynamicCaptures>(closureOrder);
-  SWIFT_DEFER { dynamicCaptures.release(); };
+  SWIFT_DEFER { dynamicCaptures.reset(); };
 
   for (SILFunction *function : closureOrder.getTopDownFunctions()) {
     this->processFunction(function);
