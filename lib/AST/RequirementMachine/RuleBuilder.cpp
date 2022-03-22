@@ -123,28 +123,31 @@ void RuleBuilder::initWithProtocolSignatureRequirements(
 /// user-written requirements. Used when actually building requirement
 /// signatures.
 void RuleBuilder::initWithProtocolWrittenRequirements(
-    ArrayRef<const ProtocolDecl *> protos) {
+    ArrayRef<const ProtocolDecl *> component,
+    const llvm::DenseMap<const ProtocolDecl *,
+                         SmallVector<StructuralRequirement, 4>> protos) {
   assert(!Initialized);
   Initialized = 1;
 
   // Add all protocols to the referenced set, so that subsequent calls
   // to addReferencedProtocol() with one of these protocols don't add
   // them to the import list.
-  for (auto *proto : protos) {
+  for (const auto *proto : component)
     ReferencedProtocols.insert(proto);
-  }
 
-  for (auto *proto : protos) {
+  for (const auto *proto : component) {
+    auto found = protos.find(proto);
+    assert(found != protos.end());
+    const auto &reqs = found->second;
+
     if (Dump) {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
     }
 
     addPermanentProtocolRules(proto);
 
-    for (auto req : proto->getStructuralRequirements())
+    for (auto req : reqs)
       addRequirement(req, proto);
-    for (auto req : proto->getTypeAliasRequirements())
-      addRequirement(req.getCanonical(), proto);
 
     for (auto *otherProto : proto->getProtocolDependencies())
       addReferencedProtocol(otherProto);

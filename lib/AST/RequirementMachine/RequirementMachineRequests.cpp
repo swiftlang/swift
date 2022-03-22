@@ -185,13 +185,23 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
   // component at the same time.
   auto component = ctx.getRewriteContext().getProtocolComponent(proto);
 
+  // Collect user-written requirements from the protocols in this connected
+  // component.
+  llvm::DenseMap<const ProtocolDecl *,
+                 SmallVector<StructuralRequirement, 4>> protos;
+  for (const auto *proto : component) {
+    auto &requirements = protos[proto];
+    for (auto req : proto->getStructuralRequirements())
+      requirements.push_back(req);
+    for (auto req : proto->getTypeAliasRequirements())
+      requirements.push_back({req, SourceLoc(), /*inferred=*/false});
+  }
+
   // Heap-allocate the requirement machine to save stack space.
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
       ctx.getRewriteContext()));
 
-  SmallVector<RequirementError, 4> errors;
-
-  auto status = machine->initWithProtocolWrittenRequirements(component);
+  auto status = machine->initWithProtocolWrittenRequirements(component, protos);
   if (status.first != CompletionResult::Success) {
     // All we can do at this point is diagnose and give each protocol an empty
     // requirement signature.
@@ -260,6 +270,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
   if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
       RequirementMachineMode::Enabled) {
+    SmallVector<RequirementError, 4> errors;
     machine->System.computeRedundantRequirementDiagnostics(errors);
     diagnoseRequirementErrors(ctx, errors,
                               /*allowConcreteGenericParams=*/false);

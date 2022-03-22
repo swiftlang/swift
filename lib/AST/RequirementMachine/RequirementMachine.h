@@ -99,7 +99,9 @@ class RequirementMachine final {
 
   std::pair<CompletionResult, unsigned>
   initWithProtocolWrittenRequirements(
-      ArrayRef<const ProtocolDecl *> protos);
+      ArrayRef<const ProtocolDecl *> component,
+      const llvm::DenseMap<const ProtocolDecl *,
+                           SmallVector<StructuralRequirement, 4>> protos);
 
   std::pair<CompletionResult, unsigned>
   initWithWrittenRequirements(
