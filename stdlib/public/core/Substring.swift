@@ -140,8 +140,9 @@ extension Substring {
 
   @inlinable @inline(__always)
   internal var _offsetRange: Range<Int> {
-    return Range(
-      _uncheckedBounds: (startIndex._encodedOffset, endIndex._encodedOffset))
+    let lower = _slice._startIndex._encodedOffset
+    let upper = _slice._endIndex._encodedOffset
+    return Range(_uncheckedBounds: (lower, upper))
   }
 
   #if !INTERNAL_CHECKS_ENABLED
@@ -652,12 +653,6 @@ extension Substring {
   internal var _endIsCharacterAligned: Bool {
     endIndex._isCharacterAligned
   }
-
-  internal var _encodedOffsetRange: Range<Int> {
-    let lower = _slice._startIndex._encodedOffset
-    let upper = _slice._endIndex._encodedOffset
-    return Range(_uncheckedBounds: (lower, upper))
-  }
 }
 
 extension Substring {
@@ -682,7 +677,7 @@ extension Substring {
     // I we don't have cached information, we can simply invoke the forward-only
     // grapheme breaking algorithm.
     return _wholeGuts._opaqueCharacterStride(
-      startingAt: i._encodedOffset, in: _encodedOffsetRange)
+      startingAt: i._encodedOffset, in: _offsetRange)
   }
 
   internal func _characterStride(endingAt i: Index) -> Int {
@@ -695,7 +690,7 @@ extension Substring {
     if i == startIndex { return 0 }
 
     return _wholeGuts._opaqueCharacterStride(
-      endingAt: i._encodedOffset, in: _encodedOffsetRange)
+      endingAt: i._encodedOffset, in: _offsetRange)
   }
 }
 
