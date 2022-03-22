@@ -23,7 +23,7 @@ struct DumpConcurrency: ParsableCommand {
   var options: UniversalOptions
 
   func run() throws {
-    try inspect(process: options.nameOrPid) { process in
+    try inspect(options: options) { process in
       let dumper = ConcurrencyDumper(context: process.context,
                                      process: process as! DarwinRemoteProcess)
       dumper.dumpTasks()
