@@ -4517,17 +4517,13 @@ NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
       "explicitly defined", ())
-ERROR(actor_isolated_from_decl,none,
-      "actor-isolated %0 %1 can not be referenced from a non-isolated "
-      "%select{deinit|autoclosure|closure}2",
-      (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can not be "
         "%select{referenced|mutated|used 'inout'}2 "
         "%select{on a non-isolated actor instance|"
         "from a Sendable function|from a Sendable closure|"
         "from an 'async let' initializer|from global actor %4|"
-        "from the main actor|from a non-isolated context}3",
+        "from the main actor|from a non-isolated context|from a non-isolated autoclosure}3",
         (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %0 %1 can not be accessed from a "

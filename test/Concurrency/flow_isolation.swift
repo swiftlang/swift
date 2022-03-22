@@ -584,7 +584,7 @@ actor EscapeArtist {
 actor Ahmad {
   nonisolated func f() {}
   var prop: Int = 0
-  var computedProp: Int { 10 }
+  var computedProp: Int { 10 } // expected-note {{property declared here}}
 
   init(v1: Void) {
     Task.detached { self.f() } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
@@ -598,8 +598,20 @@ actor Ahmad {
     prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer; this is an error in Swift 6}}
   }
 
+  nonisolated init(v3: Void) async {
+    prop = 10
+    f()       // expected-note {{after calling instance method 'f()', only non-isolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+
+  @MainActor init(v4: Void) async {
+    prop = 10
+    f()       // expected-note {{after calling instance method 'f()', only non-isolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+
   deinit {
-    // expected-warning@+2 {{actor-isolated property 'computedProp' can not be referenced from a non-isolated deinit; this is an error in Swift 6}}
+    // expected-warning@+2 {{actor-isolated property 'computedProp' can not be referenced from a non-isolated context; this is an error in Swift 6}}
     // expected-note@+1 {{after accessing property 'computedProp', only non-isolated properties of 'self' can be accessed from a deinit}}
     let x = computedProp
 
@@ -641,12 +653,12 @@ actor Rain {
 actor DeinitExceptionForSwift5 {
   var x: Int = 0
 
-  func cleanup() {
+  func cleanup() { // expected-note {{calls to instance method 'cleanup()' from outside of its actor context are implicitly asynchronous}}
     x = 0
   }
 
   deinit {
-    // expected-warning@+2 {{actor-isolated instance method 'cleanup()' can not be referenced from a non-isolated deinit; this is an error in Swift 6}}
+    // expected-warning@+2 {{actor-isolated instance method 'cleanup()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
     // expected-note@+1 {{after calling instance method 'cleanup()', only non-isolated properties of 'self' can be accessed from a deinit}}
     cleanup()
 
