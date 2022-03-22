@@ -2970,10 +2970,58 @@ TargetContextDescriptor<Runtime>::getModuleContext() const {
 
 template<typename Runtime>
 struct TargetGenericContextDescriptorHeader {
-  uint16_t NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
+  /// The number of (source-written) generic parameters, and thus
+  /// the number of GenericParamDescriptors associated with this
+  /// context.  The parameter descriptors appear in the order in
+  /// which they were given in the source.
+  ///
+  /// A GenericParamDescriptor corresponds to a type metadata pointer
+  /// in the arguments layout when isKeyArgument() is true.
+  /// isKeyArgument() will be false if the parameter has been unified
+  /// unified with a different parameter or an associated type.
+  uint16_t NumParams;
+
+  /// The number of GenericRequirementDescriptors in this generic
+  /// signature.
+  ///
+  /// A GenericRequirementDescriptor of kind Protocol corresponds
+  /// to a witness table pointer in the arguments layout when
+  /// isKeyArgument() is true.  isKeyArgument() will be false if
+  /// the protocol is an Objective-C protocol.  (Unlike generic
+  /// parameters, redundant conformance requirements can simply be
+  /// eliminated, and so that case is not impossible.)
+  uint16_t NumRequirements;
+
+  /// The size of the "key" area of the argument layout, in words.
+  /// Key arguments include generic parameters and conformance
+  /// requirements which are part of the identity of the context.
+  ///
+  /// The key area of the argument layout considers of a sequence
+  /// of type metadata pointers (in the same order as the parameter
+  /// descriptors, for those parameters which satisfy hasKeyArgument())
+  /// followed by a sequence of witness table pointers (in the same
+  /// order as the requirements, for those requirements which satisfy
+  /// hasKeyArgument()).
+  uint16_t NumKeyArguments;
+
+  /// In principle, the size of the "extra" area of the argument
+  /// layout, in words.  The idea was that extra arguments would
+  /// include generic parameters and conformances that are not part
+  /// of the identity of the context; however, it's unclear why we
+  /// would ever want such a thing.  As a result, this section is
+  /// unused, and this field is always zero.  It can be repurposed
+  /// as long as it remains zero in code which must be compatible
+  /// with existing Swift runtimes.
+  uint16_t NumExtraArguments;
   
   uint32_t getNumArguments() const {
     return NumKeyArguments + NumExtraArguments;
+  }
+
+  /// Return the total size of the argument layout, in words.
+  /// The alignment of the argument layout is the word alignment.
+  uint32_t getArgumentLayoutSizeInWords() const {
+    return getNumArguments();
   }
 
   bool hasArguments() const {
