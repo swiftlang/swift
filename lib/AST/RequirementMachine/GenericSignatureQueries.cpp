@@ -683,9 +683,11 @@ void RequirementMachine::verify(const MutableTerm &term) const {
   if (term.begin()->getKind() == Symbol::Kind::GenericParam) {
     auto *genericParam = term.begin()->getGenericParam();
     TypeArrayView<GenericTypeParamType> genericParams = getGenericParams();
-    auto found = std::find(genericParams.begin(),
-                           genericParams.end(),
-                           genericParam);
+    auto found = std::find_if(genericParams.begin(),
+                              genericParams.end(),
+                              [&](GenericTypeParamType *otherType) {
+                                return genericParam->isEqual(otherType);
+                              });
     if (found == genericParams.end()) {
       llvm::errs() << "Bad generic parameter in " << term << "\n";
       dump(llvm::errs());
