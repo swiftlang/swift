@@ -300,6 +300,10 @@ function(_add_target_variant_swift_compile_flags
   if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
     list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_UNICODE_DATA")
   endif()
+  
+  if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
+    list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_VECTOR_TYPES")
+  endif()
 
   if(SWIFT_STDLIB_HAS_COMMANDLINE)
     list(APPEND result "-D" "SWIFT_STDLIB_HAS_COMMANDLINE")
