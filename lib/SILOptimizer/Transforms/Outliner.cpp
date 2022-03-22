@@ -642,6 +642,7 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
     if (Load->getFunction()->hasOwnership()) {
       if (Load->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
         return false;
+      ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
     } else {
       // strong_retain %31 : $UITextField
       ADVANCE_ITERATOR_OR_RETURN_FALSE(It);

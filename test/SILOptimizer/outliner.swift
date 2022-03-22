@@ -15,9 +15,10 @@ public class MyGizmo {
   }
 
    // CHECK-LABEL: sil {{.*}}@$s8outliner7MyGizmoC11usePropertyyyF :
-   // CHECK: [[P_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTepb_
-   // CHECK: apply [[P_FUN]]({{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
+   // CHECK: [[A_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTeab_
+   // CHECK: apply [[A_FUN]]({{.*}}) : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
    // CHECK-NOT: return
+   // CHECK: [[P_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTepb_
    // CHECK: apply [[P_FUN]]({{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
    // CHECK: return
    // CHECK: } // end sil function '$s8outliner7MyGizmoC11usePropertyyyF'
@@ -64,6 +65,26 @@ public func testOutlining() {
 // CHECK:  [[RES:%.*]] = apply [[METH]]([[OBJ]]) : $@convention(objc_method)
 // CHECK:  switch_enum [[RES]]
 // CHECK: } // end sil function '$s8outliner9dontCrash1ayyp_tF'
+
+// CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvgToTeab_ : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
+// CHECK: bb0(%0 : $*Gizmo):
+// CHECK:   %1 = load %0 : $*Gizmo
+// CHECK:   %2 = objc_method %1 : $Gizmo, #Gizmo.stringProperty!getter.foreign : (Gizmo) -> () -> String?
+// CHECK:   %3 = apply %2(%1) : $@convention(objc_method) (Gizmo) -> @autoreleased Optional<NSString>
+// CHECK:   switch_enum %3 : $Optional<NSString>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+// CHECK: bb1(%5 : $NSString):
+// CHECK:   %6 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+// CHECK:   %7 = metatype $@thin String.Type
+// CHECK:   %8 = apply %6(%3, %7) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+// CHECK:   release_value %3 : $Optional<NSString>
+// CHECK:   %10 = enum $Optional<String>, #Optional.some!enumelt, %8 : $String
+// CHECK:   br bb3(%10 : $Optional<String>)
+// CHECK: bb2:
+// CHECK:   %12 = enum $Optional<String>, #Optional.none!enumelt
+// CHECK:   br bb3(%12 : $Optional<String>)
+// CHECK: bb3(%14 : $Optional<String>):
+// CHECK:   return %14 : $Optional<String>
+// CHECK: } // end sil function '$sSo5GizmoC14stringPropertySSSgvgToTeab_'
 
 // CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvgToTepb_ : $@convention(thin) (Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $Gizmo):
