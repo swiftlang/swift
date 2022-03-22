@@ -19,46 +19,15 @@ using namespace swift;
 using namespace swift::ide;
 using namespace swift::constraints;
 
-void ExprTypeCheckCompletionCallback::sawSolution(
+void ExprTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
-  TypeCheckCompletionCallback::sawSolution(S);
-
   auto &CS = S.getConstraintSystem();
 
-  // Prefer to get the expected type as the completion expression's contextual
-  // type. If that fails (because there is no explicit contextual type spelled
-  // out in the source), the code completion expression will have been
-  // type-checked to its expected contextual type.
-  Type ExpectedTy =
-      CS.getContextualType(CompletionExpr, /*forConstraint=*/false);
-  if (!ExpectedTy) {
-    ExpectedTy = S.getResolvedType(CompletionExpr);
-  }
-  if (ExpectedTy->hasUnresolvedType()) {
-    ExpectedTy = Type();
-  }
+  Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
   bool ImplicitReturn = isImplicitSingleExpressionReturn(CS, CompletionExpr);
 
-  // We are in an async context if
-  //  - the decl context is async or
-  //  - the decl context is sync but it's used in a context that expectes an
-  //    async function. This happens if the code completion token is in a
-  //    closure that doesn't contain any async calles. Thus the closure is
-  //    type-checked as non-async, but it might get converted to an async
-  //    closure based on its contextual type.
-  bool isAsync = CS.isAsynchronousContext(DC);
-  if (!isAsync) {
-    auto target = S.solutionApplicationTargets.find(dyn_cast<ClosureExpr>(DC));
-    if (target != S.solutionApplicationTargets.end()) {
-      if (auto ContextTy = target->second.getClosureContextualType()) {
-        if (auto ContextFuncTy =
-                S.simplifyType(ContextTy)->getAs<AnyFunctionType>()) {
-          isAsync = ContextFuncTy->isAsync();
-        }
-      }
-    }
-  }
+  bool IsAsync = isContextAsync(S, DC);
 
   llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
   for (auto NT : S.nodeTypes) {
@@ -68,7 +37,7 @@ void ExprTypeCheckCompletionCallback::sawSolution(
   }
 
   Results.push_back(
-      {ExpectedTy, ImplicitReturn, isAsync, SolutionSpecificVarTypes});
+      {ExpectedTy, ImplicitReturn, IsAsync, SolutionSpecificVarTypes});
 }
 
 void ExprTypeCheckCompletionCallback::deliverResults(

@@ -15,7 +15,7 @@
 
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 
 namespace swift {
 namespace ide {
@@ -46,13 +46,13 @@ private:
 
   SmallVector<Result, 4> Results;
 
+  void sawSolutionImpl(const constraints::Solution &solution) override;
+
 public:
   /// \param DC The decl context in which the \p CompletionExpr occurs.
   ExprTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
                                   DeclContext *DC)
       : CompletionExpr(CompletionExpr), DC(DC) {}
-
-  void sawSolution(const constraints::Solution &solution) override;
 
   /// \param CCLoc The location of the code completion token.
   void deliverResults(SourceLoc CCLoc,

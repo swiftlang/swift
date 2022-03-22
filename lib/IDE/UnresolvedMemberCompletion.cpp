@@ -80,23 +80,25 @@ static VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
   }
 }
 
-void UnresolvedMemberTypeCheckCompletionCallback::sawSolution(
+void UnresolvedMemberTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
-  TypeCheckCompletionCallback::sawSolution(S);
-
   auto &CS = S.getConstraintSystem();
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
+
+  bool IsAsync = isContextAsync(S, DC);
+
   // If the type couldn't be determined (e.g. because there isn't any context
   // to derive it from), let's not attempt to do a lookup since it wouldn't
   // produce any useful results anyway.
-  if (ExpectedTy && !ExpectedTy->is<UnresolvedType>()) {
+  if (ExpectedTy) {
     // If ExpectedTy is a duplicate of any other result, ignore this solution.
-    if (!llvm::any_of(ExprResults, [&](const ExprResult &R) {
-          return R.ExpectedTy->isEqual(ExpectedTy);
-        })) {
+    auto IsEqual = [&](const Result &R) {
+      return R.ExpectedTy->isEqual(ExpectedTy);
+    };
+    if (!llvm::any_of(ExprResults, IsEqual)) {
       bool SingleExprBody =
           isImplicitSingleExpressionReturn(CS, CompletionExpr);
-      ExprResults.push_back({ExpectedTy, SingleExprBody});
+      ExprResults.push_back({ExpectedTy, SingleExprBody, IsAsync});
     }
   }
 
@@ -110,10 +112,13 @@ void UnresolvedMemberTypeCheckCompletionCallback::sawSolution(
       MatchVarType = S.getResolvedType(MatchVar);
     }
     if (MatchVarType && !MatchVarType->is<UnresolvedType>()) {
-      if (!llvm::any_of(EnumPatternTypes, [&](const Type &R) {
-            return R->isEqual(MatchVarType);
-          })) {
-        EnumPatternTypes.push_back(MatchVarType);
+      auto IsEqual = [&](const Result &R) {
+        return R.ExpectedTy->isEqual(MatchVarType);
+      };
+      if (!llvm::any_of(EnumPatternTypes, IsEqual)) {
+        EnumPatternTypes.push_back({MatchVarType,
+                                    /*IsImplicitSingleExpressionReturn=*/false,
+                                    IsAsync});
       }
     }
   }
@@ -142,6 +147,7 @@ void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
                             Result.IsImplicitSingleExpressionReturn,
                             /*expectsNonVoid*/ true);
     Lookup.setIdealExpectedType(Result.ExpectedTy);
+    Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
 
     // For optional types, also get members of the unwrapped type if it's not
     // already equivalent to one of the top-level types. Handling it via the top
@@ -157,10 +163,12 @@ void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
 
   // Offer completions when interpreting the pattern match as an
   // EnumElementPattern.
-  for (auto &Ty : EnumPatternTypes) {
+  for (auto &Result : EnumPatternTypes) {
+    Type Ty = Result.ExpectedTy;
     Lookup.setExpectedTypes({Ty}, /*IsImplicitSingleExpressionReturn=*/false,
                             /*expectsNonVoid=*/true);
     Lookup.setIdealExpectedType(Ty);
+    Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
 
     // We can pattern match MyEnum against Optional<MyEnum>
     if (Ty->getOptionalObjectType()) {
