@@ -156,9 +156,14 @@ getSuperclassBound(Type depType,
   return props->getSuperclassBound(genericParams, term, Map);
 }
 
-bool RequirementMachine::isConcreteType(Type depType) const {
+/// Unlike the other queries, we have occasion to call this on a requirement
+/// machine for a protocol connected component as well as a top-level
+/// generic signature, so plumb through the protocol to use for the root
+/// `Self` generic parameter here.
+bool RequirementMachine::isConcreteType(Type depType,
+                                        const ProtocolDecl *proto) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
-                                            /*proto=*/nullptr);
+                                            proto);
   System.simplify(term);
   verify(term);
 
@@ -169,11 +174,16 @@ bool RequirementMachine::isConcreteType(Type depType) const {
   return props->isConcreteType();
 }
 
+/// Unlike the other queries, we have occasion to call this on a requirement
+/// machine for a protocol connected component as well as a top-level
+/// generic signature, so plumb through the protocol to use for the root
+/// `Self` generic parameter here.
 Type RequirementMachine::
 getConcreteType(Type depType,
-                TypeArrayView<GenericTypeParamType> genericParams) const {
+                TypeArrayView<GenericTypeParamType> genericParams,
+                const ProtocolDecl *proto) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
-                                            /*proto=*/nullptr);
+                                            proto);
   System.simplify(term);
   verify(term);
 

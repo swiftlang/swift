@@ -172,6 +172,10 @@ RequirementMachine::initWithProtocolWrittenRequirements(
                          SmallVector<StructuralRequirement, 4>> protos) {
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
+  // For RequirementMachine::verify() when called by generic signature queries;
+  // We have a single valid generic parameter at depth 0, index 0.
+  Params.push_back(component[0]->getSelfInterfaceType()->getCanonicalType());
+
   if (Dump) {
     llvm::dbgs() << "Adding protocols";
     for (auto *proto : component) {

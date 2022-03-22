@@ -119,8 +119,6 @@ RequirementMachine::computeMinimalProtocolRequirements() {
 
   assert(protos.size() > 0 &&
          "Not a protocol connected component rewrite system");
-  assert(Params.empty() &&
-         "Not a protocol connected component rewrite system");
 
   System.minimizeRewriteSystem();
 
