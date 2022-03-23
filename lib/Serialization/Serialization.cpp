@@ -2580,6 +2580,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isImplicit(),
           theAttr->isUnconditionallyUnavailable(),
           theAttr->isUnconditionallyDeprecated(),
+          theAttr->isNoAsync(),
           theAttr->isPackageDescriptionVersionSpecific(),
           theAttr->IsSPI,
           LIST_VER_TUPLE_PIECES(Introduced),

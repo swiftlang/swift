@@ -76,6 +76,7 @@ LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes, 0, "Primary associated types", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef LANGUAGE_FEATURE

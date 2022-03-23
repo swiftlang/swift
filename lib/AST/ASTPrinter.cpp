@@ -3015,6 +3015,18 @@ suppressingFeatureUnavailableFromAsync(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
+static bool usesFeatureNoAsyncAvailability(Decl *decl) {
+   return decl->getAttrs().getNoAsync(decl->getASTContext()) != nullptr;
+}
+
+static void
+suppressingFeatureNoAsyncAvailability(PrintOptions &options,
+                                      llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<PrintOptions> orignalOptions(options);
+  options.SuppressNoAsyncAvailabilityAttr = true;
+  action();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
