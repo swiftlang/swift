@@ -529,6 +529,12 @@ public:
   }
 };
 
+/// TODO (rokhinip): The layout of the ActiveActorStatus seems to be broken in
+/// arm64_32 with priority escalation support, disable this for now.
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
+#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0
+#endif
+
 /// Similar to the ActiveTaskStatus, this denotes the ActiveActorState for
 /// tracking the atomic state of the actor
 ///
