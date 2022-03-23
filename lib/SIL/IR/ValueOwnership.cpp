@@ -179,7 +179,6 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)
 // be borrowed sub-objects of the parent CoW box.
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, OpenExistentialValue)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, OpenExistentialBoxValue)
-CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
 
 // Given an owned value, mark_uninitialized always forwards an owned value since
 // we want to make sure that all destroys of that value must come through the

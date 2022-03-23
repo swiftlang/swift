@@ -1707,24 +1707,6 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitUnconditionalCheckedCastValueInst(
-    UnconditionalCheckedCastValueInst *Inst) {
-  SILLocation OpLoc = getOpLocation(Inst->getLoc());
-  SILValue OpValue = getOpValue(Inst->getOperand());
-  CanType SrcFormalType = getOpASTType(Inst->getSourceFormalType());
-  SILType OpLoweredType = getOpType(Inst->getTargetLoweredType());
-  CanType OpFormalType = getOpASTType(Inst->getTargetFormalType());
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst,
-      getBuilder().createUnconditionalCheckedCastValue(OpLoc,
-                                                       OpValue,
-                                                       SrcFormalType,
-                                                       OpLoweredType,
-                                                       OpFormalType));
-}
-
-template <typename ImplClass>
 void SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -2735,22 +2717,6 @@ SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                 getOpType(Inst->getTargetLoweredType()),
                 getOpASTType(Inst->getTargetFormalType()), OpSuccBB, OpFailBB,
                 Inst->getForwardingOwnershipKind(), TrueCount, FalseCount));
-}
-
-template <typename ImplClass>
-void SILCloner<ImplClass>::visitCheckedCastValueBranchInst(
-    CheckedCastValueBranchInst *Inst) {
-  SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
-  SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createCheckedCastValueBranch(
-                getOpLocation(Inst->getLoc()),
-                getOpValue(Inst->getOperand()),
-                getOpASTType(Inst->getSourceFormalType()),
-                getOpType(Inst->getTargetLoweredType()),
-                getOpASTType(Inst->getTargetFormalType()),
-                OpSuccBB, OpFailBB));
 }
 
 template<typename ImplClass>

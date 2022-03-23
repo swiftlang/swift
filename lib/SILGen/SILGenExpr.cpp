@@ -4726,7 +4726,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
 
   // If optValue was loadable, we emitted a switch_enum. In such a case, return
   // the argument from hasValueBB.
-  if (optValue.getType().isLoadable(F)) {
+  if (optValue.getType().isLoadable(F) || !silConv.useLoweredAddresses()) {
     return emitManagedRValueWithCleanup(hasValueBB->getArgument(0));
   }
 

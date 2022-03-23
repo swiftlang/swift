@@ -260,8 +260,6 @@ OPERAND_OWNERSHIP(DestroyingConsume, EndCOWMutation)
 OPERAND_OWNERSHIP(DestroyingConsume, MoveValue)
 
 // Instructions that move an owned value.
-OPERAND_OWNERSHIP(ForwardingConsume, CheckedCastValueBranch)
-OPERAND_OWNERSHIP(ForwardingConsume, UnconditionalCheckedCastValue)
 OPERAND_OWNERSHIP(ForwardingConsume, InitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, DeinitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, MarkUninitialized)
