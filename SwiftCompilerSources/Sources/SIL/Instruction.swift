@@ -409,12 +409,6 @@ class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public
-class UnconditionalCheckedCastValueInst : SingleValueInstruction,
-                                          UnaryInstruction {
-  public override var mayTrap: Bool { true }
-}
-
-final public
 class ConvertFunctionInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
@@ -624,7 +618,3 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
 
 final public class CheckedCastAddrBranchInst : TermInst, UnaryInstruction {
 }
-
-final public class CheckedCastValueBranchInst : TermInst, UnaryInstruction {
-}
-

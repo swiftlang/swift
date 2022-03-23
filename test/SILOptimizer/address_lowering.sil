@@ -272,16 +272,30 @@ bb0(%0 : @owned $C):
 
 sil [ossa] @f044_indirectGuaranteed : $@convention(thin) <T>(@in_guaranteed T) -> ()
 
-// CHECK-LABEL: sil [ossa] @f045_indirectGuaranteedArg : $@convention(thin) <T> (@in T) -> () {
+// CHECK-LABEL: sil [ossa] @f045_indirectGuaranteedCallArg : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0(%0 : $*T):
 // CHECK:   apply %{{.*}}<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   destroy_addr %0 : $*T
-// CHECK-LABEL: } // end sil function 'f045_indirectGuaranteedArg'
-sil [ossa] @f045_indirectGuaranteedArg : $@convention(thin) <T>(@in T) -> () {
+// CHECK-LABEL: } // end sil function 'f045_indirectGuaranteedCallArg'
+sil [ossa] @f045_indirectGuaranteedCallArg : $@convention(thin) <T>(@in T) -> () {
 bb0(%0 : @owned $T):
   %1 = function_ref @f044_indirectGuaranteed : $@convention(thin) <τ_0_0>(@in_guaranteed τ_0_0) -> ()
   %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0>(@in_guaranteed τ_0_0) -> ()
   destroy_value %0 : $T
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f046_indirectGuaranteedFunctionArg : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK: bb0(%0 : $*T):
+// CHECK-NOT: load
+// CHECK: apply %{{.*}}<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NOT: end_borrow
+// CHECK-LABEL: } // end sil function 'f046_indirectGuaranteedFunctionArg'
+sil [ossa] @f046_indirectGuaranteedFunctionArg : $@convention(thin) <T>(@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %1 = function_ref @f044_indirectGuaranteed : $@convention(thin) <τ_0_0>(@in_guaranteed τ_0_0) -> ()
+  %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0>(@in_guaranteed τ_0_0) -> ()
   %6 = tuple ()
   return %6 : $()
 }
@@ -792,6 +806,28 @@ bb0(%0 : @owned $(AnyObject, T)):
   return %tuple : $(AnyObject, T)
 }
 
+// CHECK-LABEL: sil [ossa] @f126_testDestructureAndBorrow : $@convention(method) <Element> (@in (SI<Element>, I)) -> (@out Element, @out I) {
+// CHECK: bb0(%0 : $*Element, %1 : $*I, %2 : $*(SI<Element>, I)):
+// CHECK:   [[SI:%.*]] = tuple_element_addr %2 : $*(SI<Element>, I), 0
+// CHECK:   [[I:%.*]] = tuple_element_addr %2 : $*(SI<Element>, I), 1
+// CHECK:   [[LD:%.*]] = load [trivial] [[I]] : $*I
+// CHECK:   [[E:%.*]] = struct_element_addr [[SI]] : $*SI<Element>, #SI.element
+// CHECK:   copy_addr [[E]] to [initialization] %0 : $*Element
+// CHECK:   destroy_addr [[SI]] : $*SI<Element>
+// CHECK:   store [[LD]] to [trivial] %1 : $*I
+// CHECK-LABEL: } // end sil function 'f126_testDestructureAndBorrow'
+sil [ossa] @f126_testDestructureAndBorrow : $@convention(method) <Element> (@in (SI<Element>, I)) -> (@out Element, @out I) {
+bb0(%0 : @owned $(SI<Element>, I)):
+  (%si, %i) = destructure_tuple %0 : $(SI<Element>, I)
+  %borrow = begin_borrow %si : $SI<Element>
+  %element = struct_extract %borrow : $SI<Element>, #SI.element
+  %copy = copy_value %element : $Element
+  end_borrow %borrow : $SI<Element>
+  destroy_value %si : $SI<Element>
+  %tuple = tuple(%copy : $Element, %i : $I)
+  return %tuple : $(Element, I)
+}
+
 // CHECK-LABEL: sil [ossa] @f130_testReleaseValue : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0(%0 : $*T):
 // CHECK:   destroy_addr %0 : $*T
@@ -919,7 +955,7 @@ bb0(%0 : @owned $P):
   %9 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P, #P.foo, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   %cpy = copy_value %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
   end_borrow %b : $P
-  // This optional is an aggregate that contains an opened exsitential. May sure it's allocated after open_existential_addr.
+  // This optional is an aggregate that contains an opened existential. Make sure it is allocated after open_existential_addr.
   %opt = enum $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt, %cpy : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P
   %some = unchecked_enum_data %opt : $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>, #Optional.some!enumelt
   %11 = apply %9<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541") P>(%some) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
