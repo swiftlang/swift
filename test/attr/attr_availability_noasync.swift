@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 // REQUIRES: concurrency
-
+// REQUIRES: IGNORE
 
 @available(*, noasync)
 func basicNoAsync() { }
