@@ -30,12 +30,11 @@ struct RequirementError {
   enum class Kind {
     /// A constraint to a non-protocol, non-class type, e.g. T: Int.
     InvalidTypeRequirement,
-    /// A type mismatch, e.g. Int == String.
-    ConcreteTypeMismatch,
-    /// A requirement proven to be false, e.g. Bool: Collection
+    /// A type requirement on a trivially invalid subject type,
+    /// e.g. Bool: Collection.
+    InvalidRequirementSubject,
+    /// A pair of conflicting requirements, T == Int, T == String
     ConflictingRequirement,
-    /// A missing requirement on a concrete type in a same-type requirement.
-    SameTypeMissingRequirement,
     /// A redundant requirement, e.g. T == T.
     RedundantRequirement,
   } kind;
@@ -69,11 +68,9 @@ public:
     return {Kind::InvalidTypeRequirement, requirement, loc};
   }
 
-  static RequirementError forConcreteTypeMismatch(Type type1,
-                                                  Type type2,
-                                                  SourceLoc loc) {
-    Requirement requirement(RequirementKind::SameType, type1, type2);
-    return {Kind::ConcreteTypeMismatch, requirement, loc};
+  static RequirementError forInvalidRequirementSubject(Requirement req,
+                                                       SourceLoc loc) {
+    return {Kind::InvalidRequirementSubject, req, loc};
   }
 
   static RequirementError forConflictingRequirement(Requirement req,
@@ -85,11 +82,6 @@ public:
                                                     Requirement req,
                                                     SourceLoc loc) {
     return {Kind::ConflictingRequirement, typeParameter, req, loc};
-  }
-
-  static RequirementError forSameTypeMissingRequirement(Requirement req,
-                                                        SourceLoc loc) {
-    return {Kind::SameTypeMissingRequirement, req, loc};
   }
 
   static RequirementError forRedundantRequirement(Requirement req,

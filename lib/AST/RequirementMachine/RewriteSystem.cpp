@@ -812,25 +812,26 @@ void RewriteSystem::computeConflictDiagnostics(
       auto subjectType = subject.getConcreteType();
       switch (constraint.getKind()) {
       case Symbol::Kind::ConcreteType:
-        errors.push_back(RequirementError::forConcreteTypeMismatch(
-            subjectType, constraint.getConcreteType(), signatureLoc));
+        errors.push_back(RequirementError::forConflictingRequirement(
+            {RequirementKind::SameType, subjectType, constraint.getConcreteType()},
+            signatureLoc));
         return;
 
       case Symbol::Kind::Superclass:
-        errors.push_back(RequirementError::forSameTypeMissingRequirement(
+        errors.push_back(RequirementError::forConflictingRequirement(
             {RequirementKind::Superclass, subjectType, constraint.getConcreteType()},
             signatureLoc));
         return;
 
       case Symbol::Kind::Protocol:
-        errors.push_back(RequirementError::forSameTypeMissingRequirement(
+        errors.push_back(RequirementError::forConflictingRequirement(
             {RequirementKind::Conformance, subjectType,
              constraint.getProtocol()->getDeclaredInterfaceType()},
             signatureLoc));
         return;
 
       case Symbol::Kind::Layout:
-        errors.push_back(RequirementError::forSameTypeMissingRequirement(
+        errors.push_back(RequirementError::forConflictingRequirement(
             {RequirementKind::Layout, subjectType, constraint.getLayoutConstraint()},
             signatureLoc));
         return;
