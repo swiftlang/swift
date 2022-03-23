@@ -366,25 +366,10 @@ namespace {
   class GenericMetadataCache :
     public MetadataCache<GenericCacheEntry, GenericMetadataCacheTag> {
   public:
-    uint16_t NumKeyParameters;
-    uint16_t NumWitnessTables;
+    GenericSignatureLayout SigLayout;
 
     GenericMetadataCache(const TargetGenericContext<InProcess> &genericContext)
-        : NumKeyParameters(0), NumWitnessTables(0) {
-      // Count up the # of key parameters and # of witness tables.
-
-      // Find key generic parameters.
-      for (const auto &gp : genericContext.getGenericParams()) {
-        if (gp.hasKeyArgument())
-          ++NumKeyParameters;
-      }
-
-      // Find witness tables.
-      for (const auto &req : genericContext.getGenericRequirements()) {
-        if (req.Flags.hasKeyArgument() &&
-            req.getKind() == GenericRequirementKind::Protocol)
-          ++NumWitnessTables;
-      }
+      : SigLayout(genericContext.getGenericSignature()) {
     }
   };
 
@@ -759,7 +744,7 @@ _cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
   auto request =
       MetadataRequest(MetadataState::Complete, /*isNonBlocking*/ true);
   assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
-         cache.NumKeyParameters + cache.NumWitnessTables);
+         cache.SigLayout.sizeInWords());
   if (auto *classDescription = dyn_cast<ClassDescriptor>(description)) {
     auto canonicalMetadataAccessors = classDescription->getCanonicalMetadataPrespecializationAccessors();
     for (auto &canonicalMetadataAccessorPtr : canonicalMetadataAccessors) {
@@ -768,8 +753,7 @@ _cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
       auto *canonicalMetadata = response.Value;
       const void *const *arguments =
           reinterpret_cast<const void *const *>(canonicalMetadata->getGenericArgs());
-      auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
-                                  arguments);
+      auto key = MetadataCacheKey(cache.SigLayout, arguments);
       auto result = cache.getOrInsert(key, MetadataRequest(MetadataState::Complete, /*isNonBlocking*/true), canonicalMetadata);
       (void)result;
       assert(result.second.Value == canonicalMetadata);
@@ -780,8 +764,7 @@ _cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
       Metadata *canonicalMetadata = canonicalMetadataPtr.get();
       const void *const *arguments =
           reinterpret_cast<const void *const *>(canonicalMetadata->getGenericArgs());
-      auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
-                                  arguments);
+      auto key = MetadataCacheKey(cache.SigLayout, arguments);
       auto result = cache.getOrInsert(key, MetadataRequest(MetadataState::Complete, /*isNonBlocking*/true), canonicalMetadata);
       (void)result;
       assert(result.second.Value == canonicalMetadata);
@@ -828,8 +811,7 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
   const void *const *arguments =
       reinterpret_cast<const void *const *>(candidate->getGenericArgs());
   auto &cache = getCache(*description);
-  auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
-                              arguments);
+  auto key = MetadataCacheKey(cache.SigLayout, arguments);
   auto result = cache.getOrInsert(key, request, candidate);
 
   cachedMetadataAddr->store(result.second.Value, std::memory_order_release);
@@ -843,9 +825,8 @@ _swift_getGenericMetadata(MetadataRequest request, const void *const *arguments,
                           const TypeContextDescriptor *description) {
   auto &cache = getCache(*description);
   assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
-         cache.NumKeyParameters + cache.NumWitnessTables);
-  auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
-                              arguments);
+         cache.SigLayout.sizeInWords());
+  auto key = MetadataCacheKey(cache.SigLayout, arguments);
   auto result = cache.getOrInsert(key, request, description, arguments);
 
   return result.second;
@@ -5488,11 +5469,8 @@ static Result performOnMetadataCache(const Metadata *metadata,
     reinterpret_cast<const void * const *>(
                                     description->getGenericArguments(metadata));
   auto &cache = getCache(*description);
-  size_t numGenericArgs = generics.Base.NumKeyArguments;
-  assert(numGenericArgs == cache.NumKeyParameters + cache.NumWitnessTables);
-  (void)numGenericArgs;
-  auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
-                              genericArgs);
+  assert(generics.Base.NumKeyArguments == cache.SigLayout.sizeInWords());
+  auto key = MetadataCacheKey(cache.SigLayout, genericArgs);
 
   return std::move(callbacks).forGenericMetadata(metadata, description,
                                                  cache, key);
