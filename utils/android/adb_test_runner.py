@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # adb_test_runner.py - Calls adb_test_runner.main -*- python -*-
 #
 # This source file is part of the Swift.org open source project

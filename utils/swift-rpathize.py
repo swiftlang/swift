@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # On Darwin, dynamic libraries have an install name.  At link time, the
 # linker can work with a dylib anywhere in the filesystem, but it will

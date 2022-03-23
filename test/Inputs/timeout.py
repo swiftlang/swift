@@ -1,4 +1,4 @@
-#!/uar/bin/env python
+#!/uar/bin/env python3
 
 import subprocess
 import sys

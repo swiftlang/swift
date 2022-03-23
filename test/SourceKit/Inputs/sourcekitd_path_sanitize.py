@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # sourcekitd_path_sanitize.py - Cleans up paths from sourcekitd-test output
 #
 # This source file is part of the Swift.org open source project

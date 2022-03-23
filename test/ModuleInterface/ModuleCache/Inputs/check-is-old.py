@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # check-is-old.py - a more-legible way to read a timestamp test than test(1)
 #
