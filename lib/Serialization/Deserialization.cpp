@@ -4361,6 +4361,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   bool isImplicit;
   bool isUnavailable;
   bool isDeprecated;
+  bool isNoAsync;
   bool isPackageDescriptionVersionSpecific;
   bool isSPI;
   DEF_VER_TUPLE_PIECES(Introduced);
@@ -4371,7 +4372,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
 
   // Decode the record, pulling the version tuple information.
   serialization::decls_block::AvailableDeclAttrLayout::readRecord(
-      scratch, isImplicit, isUnavailable, isDeprecated,
+      scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync,
       isPackageDescriptionVersionSpecific, isSPI, LIST_VER_TUPLE_PIECES(Introduced),
       LIST_VER_TUPLE_PIECES(Deprecated), LIST_VER_TUPLE_PIECES(Obsoleted),
       platform, renameDeclID, messageSize, renameSize);
@@ -4394,6 +4395,8 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
   else if (isDeprecated)
     platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
+  else if (isNoAsync)
+    platformAgnostic = PlatformAgnosticAvailabilityKind::NoAsync;
   else if (((PlatformKind)platform) == PlatformKind::none &&
            (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()))
     platformAgnostic =

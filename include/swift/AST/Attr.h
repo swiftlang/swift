@@ -614,6 +614,8 @@ enum class PlatformAgnosticAvailabilityKind {
   PackageDescriptionVersionSpecific,
   /// The declaration is unavailable for other reasons.
   Unavailable,
+  /// The declaration is unavailable from asynchronous contexts
+  NoAsync,
 };
 
 /// Defines the @available attribute.
@@ -701,6 +703,9 @@ public:
 
   /// Whether this is an unconditionally deprecated entity.
   bool isUnconditionallyDeprecated() const;
+
+  /// Whether this is a noasync attribute.
+  bool isNoAsync() const;
 
   /// Returns the platform-agnostic availability.
   PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {
@@ -2260,6 +2265,11 @@ public:
   /// Returns the first @available attribute that indicates
   /// a declaration will be deprecated in the future, or null otherwise.
   const AvailableAttr *getSoftDeprecated(const ASTContext &ctx) const;
+
+  /// Returns the first @available attribute that indicates
+  /// a declaration is unavailable from asynchronous contexts, or null
+  /// otherwise.
+  const AvailableAttr *getNoAsync(const ASTContext &ctx) const;
 
   SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,

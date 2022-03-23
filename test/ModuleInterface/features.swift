@@ -185,4 +185,13 @@ public func multipleSuppressible<T>(value: T) async {}
 @_unavailableFromAsync(message: "Test")
 public func unavailableFromAsyncFunc() { }
 
+// CHECK:      #if compiler(>=5.3) && $NoAsyncAvailability
+// CHECK-NEXT: @available(*, noasync, message: "Test")
+// CHECK-NEXT: public func noAsyncFunc()
+// CHECK-NEXT: #else
+// CHECK-NEXT: public func noAsyncFunc()
+// CHECK-NEXT: #endif
+@available(*, noasync, message: "Test")
+public func noAsyncFunc() { }
+
 // CHECK-NOT: extension FeatureTest.MyActor : Swift.Sendable
