@@ -71,20 +71,32 @@ private func tryDevirtualizeReleaseOfObject(
   _ deallocStackRef: DeallocStackRefInst
 ) {
   let allocRefInstruction = deallocStackRef.allocRef
-  var root = release.operands[0].value
-  while let newRoot = stripRCIdentityPreservingInsts(root) {
-    root = newRoot
-  }
-
-  if root != allocRefInstruction {
-    return
-  }
-
   let type = allocRefInstruction.type
-
-  guard let dealloc = context.calleeAnalysis.getDestructor(ofExactType: type) else {
+  let calleeAnalysis = context.calleeAnalysis
+  
+  guard let dealloc = calleeAnalysis.getDestructor(ofExactType: type) else {
     return
   }
+
+  guard let uniqueReference = getUniqueReference(of: release.operand) else {
+    return
+  }
+
+  var escapeInfo = EscapeInfo(calleeAnalysis: calleeAnalysis)
+  var found = false
+  if escapeInfo.isEscaping(object: uniqueReference,
+      visitUse: { op, path, _ in
+        if op.value === allocRefInstruction {
+          if !path.isEmpty { return .markEscaping }
+          found = true
+          return .ignore
+        }
+        if op.value is Allocation { return .markEscaping }
+        return .continueWalking
+      }) {
+    return
+  }
+  assert(found, "value must come from an allocation")
 
   let builder = Builder(at: release, location: release.location, context)
 
@@ -106,119 +118,31 @@ private func tryDevirtualizeReleaseOfObject(
   context.erase(instruction: release)
 }
 
-private func stripRCIdentityPreservingInsts(_ value: Value) -> Value? {
-  guard let inst = value as? Instruction else { return nil }
+private func getUniqueReference(of value: Value) -> Value? {
+  let function = value.function
+  var val = value
+  while true {
+    if val.type.isClass {
+      return val
+    }
+    switch val {
+      case let ei as EnumInst where !ei.operands.isEmpty:
+        val = ei.operand
+      case is StructInst, is TupleInst:
+        var uniqueNonTrivialOperand: Value?
 
-  switch inst {
-  // First strip off RC identity preserving casts.
-  case is UpcastInst,
-       is UncheckedRefCastInst,
-       is InitExistentialRefInst,
-       is OpenExistentialRefInst,
-       is RefToBridgeObjectInst,
-       is BridgeObjectToRefInst,
-       is ConvertFunctionInst,
-       is UncheckedEnumDataInst:
-    return inst.operands[0].value
-
-  // Then if we have a struct_extract that is extracting a non-trivial member
-  // from a struct with no other non-trivial members, a ref count operation on
-  // the struct is equivalent to a ref count operation on the extracted
-  // member. Strip off the extract.
-  case let sei as StructExtractInst where sei.isFieldOnlyNonTrivialField:
-    return sei.operand
-
-  // If we have a struct or tuple instruction with only one non-trivial operand, the
-  // only reference count that can be modified is the non-trivial operand. Return
-  // the non-trivial operand.
-  case is StructInst, is TupleInst:
-    return inst.uniqueNonTrivialOperand
-
-  // If we have an enum instruction with a payload, strip off the enum to
-  // expose the enum's payload.
-  case let ei as EnumInst where !ei.operands.isEmpty:
-    return ei.operand
-
-  // If we have a tuple_extract that is extracting the only non trivial member
-  // of a tuple, a retain_value on the tuple is equivalent to a retain_value on
-  // the extracted value.
-  case let tei as TupleExtractInst where tei.isEltOnlyNonTrivialElt:
-    return tei.operand
-
-  default:
-    return nil
-  }
-}
-
-private extension Instruction {
-  /// Search the operands of this tuple for a unique non-trivial elt. If we find
-  /// it, return it. Otherwise return `nil`.
-  var uniqueNonTrivialOperand: Value? {
-    var candidateElt: Value?
-    let function = self.function
-
-    for op in operands {
-      if !op.value.type.isTrivial(in: function) {
-        if candidateElt == nil {
-          candidateElt = op.value
-          continue
+        for op in (val as! SingleValueInstruction).operands {
+          if !op.value.type.isTrivial(in: function) {
+            if let _ = uniqueNonTrivialOperand {
+              return nil
+            }
+            uniqueNonTrivialOperand = op.value
+          }
         }
-
-        // Otherwise, we have two values that are non-trivial. Bail.
+        guard let uniqueOp = uniqueNonTrivialOperand  else { return nil }
+        val = uniqueOp
+      default:
         return nil
-      }
     }
-
-    return candidateElt
-  }
-}
-
-private extension TupleExtractInst {
-  var isEltOnlyNonTrivialElt: Bool {
-    let function = self.function
-
-    if type.isTrivial(in: function) {
-      return false
-    }
-
-    let opType = operand.type
-
-    var nonTrivialEltsCount = 0
-    for elt in opType.tupleElements {
-      if elt.isTrivial(in: function) {
-        nonTrivialEltsCount += 1
-      }
-
-      if nonTrivialEltsCount > 1 {
-        return false
-      }
-    }
-
-    return true
-  }
-}
-
-private extension StructExtractInst {
-  var isFieldOnlyNonTrivialField: Bool {
-    let function = self.function
-
-    if type.isTrivial(in: function) {
-      return false
-    }
-
-    let structType = operand.type
-
-    var nonTrivialFieldsCount = 0
-    for field in structType.getNominalFields(in: function) {
-      if field.isTrivial(in: function) {
-        nonTrivialFieldsCount += 1
-      }
-
-      if nonTrivialFieldsCount > 1 {
-        return false
-      }
-    }
-
-    return true
   }
 }
