@@ -977,8 +977,10 @@ public:
   substOpaqueTypesWithUnderlyingTypes(CanType type,
                                       ProtocolConformanceRef conformance);
 
-  bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
-  bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion);
+  bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion,
+                   ClassDecl *asViewedFromRootClass = nullptr);
+  bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion,
+                            ClassDecl *asViewedFromRootClass = nullptr);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
