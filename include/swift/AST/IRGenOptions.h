@@ -320,6 +320,10 @@ public:
   unsigned LazyInitializeProtocolConformances : 1;
   unsigned IndirectAsyncFunctionPointer : 1;
 
+  /// Force relative function pointer to be indirect
+  /// Used on harvard architectures like WebAssembly
+  unsigned IndirectRelativeFunctionPointer : 1;
+
   /// Normally if the -read-legacy-type-info flag is not specified, we look for
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
   /// Passing this flag completely disables this behavior.

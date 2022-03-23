@@ -337,6 +337,19 @@ IRGenFunction::emitLoadOfRelativePointer(Address addr, bool isFar,
   return pointer.getAddress();
 }
 
+llvm::Value *IRGenFunction::emitLoadOfRelativeFunctionPointer(
+    Address addr, bool isFar, llvm::PointerType *expectedType,
+    const llvm::Twine &name) {
+  if (IGM.getOptions().IndirectRelativeFunctionPointer) {
+    llvm::Value *value = emitLoadOfRelativePointer(
+        Address(addr.getAddress(), IGM.getPointerAlignment()), isFar,
+        expectedType->getPointerTo(), name);
+    return Builder.CreateLoad(value, addr.getAlignment());
+  } else {
+    return emitLoadOfRelativePointer(addr, isFar, expectedType, name);
+  }
+}
+
 llvm::Value *
 IRGenFunction::emitLoadOfRelativeIndirectablePointer(Address addr,
                                                 bool isFar,

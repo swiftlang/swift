@@ -1118,6 +1118,7 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> IndirectAsyncFunctionPointers;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
+  llvm::DenseMap<llvm::Function *, llvm::Constant *> IndirectRelativeFunctionPointers;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     GlobalStrings;
@@ -1293,6 +1294,8 @@ public:
   /// Produce an associated type witness that refers to the given type.
   llvm::Constant *getAssociatedTypeWitness(Type type, GenericSignature sig,
                                            bool inProtocolContext);
+
+  llvm::Constant *getAddrOfIndirectFunctionPointer(llvm::Function *fn);
 
   void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
   void emitFieldDescriptor(const NominalTypeDecl *Decl);

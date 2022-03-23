@@ -14,6 +14,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/IRGenOptions.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -81,6 +82,27 @@ public:
 
   void addSize(Size size) { addInt(IGM().SizeTy, size.getValue()); }
 
+  void addRelativeFunctionAddressOrNull(llvm::Function *function) {
+    if (function) {
+      addRelativeFunctionAddress(function);
+    } else {
+      addInt(IGM().RelativeAddressTy, 0);
+    }
+  }
+
+  /// Add a relative function reference to the given function. The relative
+  /// address is direct when the address spaces of the code and the building
+  /// constant are the same. Otherwise, on harvard architectures, the relative
+  /// offset between the field and the referent function cannot be computed,
+  /// so the relative address is indirect.
+  void addRelativeFunctionAddress(llvm::Function *function) {
+    if (IGM().getOptions().IndirectRelativeFunctionPointer) {
+      addRelativeAddress(IGM().getAddrOfIndirectFunctionPointer(function));
+    } else {
+      addRelativeOffset(IGM().RelativeAddressTy, function);
+    }
+  }
+
   void addRelativeAddressOrNull(llvm::Constant *target) {
     if (target) {
       addRelativeAddress(target);
@@ -91,6 +113,9 @@ public:
 
   void addRelativeAddress(llvm::Constant *target) {
     assert(!isa<llvm::ConstantPointerNull>(target));
+    assert((!IGM().getOptions().IndirectRelativeFunctionPointer ||
+            !isa<llvm::Function>(target)) &&
+           "use addRelativeFunctionAddress");
     addRelativeOffset(IGM().RelativeAddressTy, target);
   }
 

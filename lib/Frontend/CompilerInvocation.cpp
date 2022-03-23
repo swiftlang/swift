@@ -2161,6 +2161,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // AsyncFunctionPointer access.
   Opts.IndirectAsyncFunctionPointer = Triple.isOSBinFormatCOFF();
 
+  // Harvard architectures cannot make direct relative function pointer
+  // because the referent function and the metadata are in different
+  // address spaces, and the relative offset between them is not representable.
+  // So we always use indirect relative function pointer for those.
+  Opts.IndirectRelativeFunctionPointer = Triple.isOSBinFormatWasm();
+
   if (Args.hasArg(OPT_disable_legacy_type_info)) {
     Opts.DisableLegacyTypeInfo = true;
   }

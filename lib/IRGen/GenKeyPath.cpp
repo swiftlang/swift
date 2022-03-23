@@ -268,7 +268,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   return accessorThunk;
 }
 
-static llvm::Constant *
+static llvm::Function *
 getLayoutFunctionForComputedComponent(IRGenModule &IGM,
                                     const KeyPathPatternComponent &component,
                                     GenericEnvironment *genericEnv,
@@ -548,7 +548,7 @@ struct KeyPathIndexOperand {
   const KeyPathPatternComponent *LastUser;
 };
 
-static llvm::Constant *
+static llvm::Function *
 getInitializerForComputedComponent(IRGenModule &IGM,
            const KeyPathPatternComponent &component,
            ArrayRef<KeyPathIndexOperand> operands,
@@ -948,13 +948,22 @@ emitKeyPathComponent(IRGenModule &IGM,
       // FIXME: Does this need to be signed?
       auto idRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
         LinkEntity::forSILFunction(id.getFunction()));
-      
-      idValue = idRef.getValue();
-      // If we got an indirect reference, we'll need to resolve it at
-      // instantiation time.
-      idResolution = idRef.isIndirect()
-        ? KeyPathComponentHeader::IndirectPointer
-        : KeyPathComponentHeader::Resolved;
+
+      if (IGM.getOptions().IndirectRelativeFunctionPointer &&
+          !idRef.isIndirect()) {
+        // Force the function pointer to be indirect for harvard architecture
+        // even though it can be referenceable directly.
+        idValue = IGM.getAddrOfIndirectFunctionPointer(
+            IGM.getAddrOfSILFunction(id.getFunction(), NotForDefinition));
+        idResolution = KeyPathComponentHeader::IndirectPointer;
+      } else {
+        idValue = idRef.getValue();
+        // If we got an indirect reference, we'll need to resolve it at
+        // instantiation time.
+        idResolution = idRef.isIndirect()
+          ? KeyPathComponentHeader::IndirectPointer
+          : KeyPathComponentHeader::Resolved;
+      }
       break;
     }
     case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
@@ -1101,12 +1110,12 @@ emitKeyPathComponent(IRGenModule &IGM,
     }
 
     // Push the accessors, possibly thunked to marshal generic environment.
-    fields.addRelativeAddress(
+    fields.addRelativeFunctionAddress(
       getAccessorForComputedComponent(IGM, component, Getter,
                                       genericEnv, requirements,
                                       hasSubscriptIndices));
     if (settable)
-      fields.addRelativeAddress(
+      fields.addRelativeFunctionAddress(
         getAccessorForComputedComponent(IGM, component, Setter,
                                         genericEnv, requirements,
                                         hasSubscriptIndices));
@@ -1116,7 +1125,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       // arguments in the component. Thunk the SIL-level accessors to give the
       // runtime implementation a polymorphically-callable interface.
 
-      fields.addRelativeAddress(
+      fields.addRelativeFunctionAddress(
         getLayoutFunctionForComputedComponent(IGM, component,
                                               genericEnv, requirements));
       
@@ -1136,7 +1145,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       
       // Add an initializer function that copies generic arguments out of the
       // pattern argument buffer into the instantiated object.
-      fields.addRelativeAddress(
+      fields.addRelativeFunctionAddress(
         getInitializerForComputedComponent(IGM, component, operands,
                                            genericEnv, requirements));
     }
