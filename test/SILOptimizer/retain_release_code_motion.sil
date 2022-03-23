@@ -842,11 +842,13 @@ bb3(%24 : $Optional<fuzz>):
   return %24 : $Optional<fuzz>
 }
 
-// CHECK-LABEL: sil @dontMoveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<P>
-// CHECK:    strong_retain %0
+// CHECK-LABEL: sil @moveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<P>
 // CHECK:    checked_cast_br %0
-// CHECK:  } // end sil function 'dontMoveOverClassToExistentialCast'
-sil @dontMoveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<P> {
+// CHECK:    enum $Optional<P>, #Optional.some!enumelt
+// CHECK:    strong_retain %0
+// CHECK-NOT: release
+// CHECK:  } // end sil function 'moveOverClassToExistentialCast'
+sil @moveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<P> {
 bb0(%0 : $fuzz):
   strong_retain %0 : $fuzz
   checked_cast_br %0 : $fuzz to P, bb1, bb2
