@@ -743,7 +743,7 @@ actor LocalFunctionIsolatedActor {
 
   func b2() -> Bool {
     @Sendable func c() -> Bool {
-      return true && a() // expected-error{{actor-isolated instance method 'a()' can not be referenced from a non-isolated context}}
+      return true && a() // expected-error{{actor-isolated instance method 'a()' can not be referenced from a non-isolated autoclosure}}
     }
     return c()
   }
@@ -811,7 +811,9 @@ extension SomeClassInActor.ID {
 // ----------------------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 actor SomeActorWithInits {
-  var mutableState: Int = 17 // expected-note 2 {{mutation of this property is only permitted within the actor}}
+  // expected-note@+2 2 {{property declared here}}
+  // expected-note@+1 3 {{mutation of this property is only permitted within the actor}}
+  var mutableState: Int = 17
   var otherMutableState: Int
   let nonSendable: SomeClass
 
@@ -825,26 +827,26 @@ actor SomeActorWithInits {
     self.mutableState = 42
     self.otherMutableState = 17
 
-    self.isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+    self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
     self.nonisolated()
 
     defer {
-      isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
-      mutableState += 1 // okay
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+      mutableState += 1 // okay through typechecking, since flow-isolation will verify it.
       nonisolated()
     }
 
     func local() {
-      isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
-      mutableState += 1 // expected-error{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context}}
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+      mutableState += 1 // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in Swift 6}}
       nonisolated()
     }
     local()
 
     let _ = {
       defer {
-        isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
-        mutableState += 1  // expected-error{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context}}
+        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in Swift 6}}
         nonisolated()
       }
       nonisolated()
@@ -861,12 +863,14 @@ actor SomeActorWithInits {
 
   convenience init(i3: Bool) {
     self.init(i1: i3)
+    _ = mutableState    // expected-error{{actor-isolated property 'mutableState' can not be referenced from a non-isolated context}}
     self.isolated()     // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
     self.nonisolated()
   }
 
   convenience init(i4: Bool) async {
     self.init(i1: i4)
+    _ = mutableState
     self.isolated()
     self.nonisolated()
   }
@@ -876,7 +880,7 @@ actor SomeActorWithInits {
     self.otherMutableState = 17
     self.nonSendable = x
 
-    self.isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from the main actor}}
+    self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from the main actor; this is an error in Swift 6}}
     self.nonisolated()
   }
 
@@ -886,33 +890,47 @@ actor SomeActorWithInits {
 
     await self.isolated()
     self.nonisolated()
+
+    _ = mutableState // will be caught by flow-isolation
   }
 
   @MainActor convenience init(i7: Bool) {
     self.init(i1: i7)
+    _ = mutableState    // expected-error{{actor-isolated property 'mutableState' can not be referenced from the main actor}}
     self.isolated()     // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from the main actor}}
     self.nonisolated()
   }
 
   @MainActor convenience init(i8: Bool) async {
     self.init(i1: i8)
+    _ = await mutableState
     await self.isolated()
     self.nonisolated()
+  }
+
+  nonisolated init(i9: Bool) async {
+    self.mutableState = 0
+    self.otherMutableState = 1
+
+    await self.isolated()
+    self.nonisolated()
+
+    _ = mutableState  // will be caught by flow-isolation
   }
 
   deinit {
     let _ = self.nonSendable // OK only through typechecking, not SIL.
 
     defer {
-      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated deinit; this is an error in Swift 6}}
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
       mutableState += 1 // okay
       nonisolated()
     }
 
     let _ = {
       defer {
-        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated closure; this is an error in Swift 6}}
-        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be referenced from a non-isolated closure; this is an error in Swift 6}}
+        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in Swift 6}}
         nonisolated()
       }
       nonisolated()
@@ -920,7 +938,7 @@ actor SomeActorWithInits {
   }
 
 
-  func isolated() { } // expected-note 7 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
+  func isolated() { } // expected-note 9 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func nonisolated() {}
 }
 
@@ -1217,11 +1235,11 @@ actor Counter {
   }
 
   init() {
-    _ = self.next() // expected-error {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context}}
-    defer { _ = self.next() } // expected-error {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context}}
+    _ = self.next() // expected-warning {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+    defer { _ = self.next() } // expected-warning {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
 
-    _ = computedProp  // expected-error {{actor-isolated property 'computedProp' can not be referenced from a non-isolated context}}
-    computedProp = 1  // expected-error {{actor-isolated property 'computedProp' can not be mutated from a non-isolated context}}
+    _ = computedProp  // expected-warning {{actor-isolated property 'computedProp' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+    computedProp = 1  // expected-warning {{actor-isolated property 'computedProp' can not be mutated from a non-isolated context; this is an error in Swift 6}}
 
   }
 
@@ -1375,7 +1393,7 @@ final class MainActorInit: Sendable {
 
 actor DunkTracker {
   private var lebron: Int?
-  private var curry: Int?
+  private var curry: Int? // expected-note {{property declared here}}
 
   deinit {
     // expected-warning@+1 {{actor-isolated property 'curry' can not be referenced from a non-isolated autoclosure; this is an error in Swift 6}}
