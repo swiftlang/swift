@@ -18,8 +18,6 @@ import functools
 import re
 import shlex
 
-import six
-
 from .. import shell
 from ..versions import Version
 
@@ -61,7 +59,7 @@ def _prepend_sdk_and_toolchain(func):
 
     @functools.wraps(func)
     def wrapper(self, args, sdk=None, toolchain=None, **kwargs):
-        if isinstance(args, six.string_types):
+        if isinstance(args, (str,)):
             args = shlex.split(args)
         if toolchain:
             args = ['--toolchain', toolchain] + args
