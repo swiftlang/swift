@@ -167,22 +167,28 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 /// Returns failure if completion fails within the configured number of steps.
 std::pair<CompletionResult, unsigned>
 RequirementMachine::initWithProtocolWrittenRequirements(
-    ArrayRef<const ProtocolDecl *> protos) {
+    ArrayRef<const ProtocolDecl *> component,
+    const llvm::DenseMap<const ProtocolDecl *,
+                         SmallVector<StructuralRequirement, 4>> protos) {
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
+
+  // For RequirementMachine::verify() when called by generic signature queries;
+  // We have a single valid generic parameter at depth 0, index 0.
+  Params.push_back(component[0]->getSelfInterfaceType()->getCanonicalType());
 
   if (Dump) {
     llvm::dbgs() << "Adding protocols";
-    for (auto *proto : protos) {
+    for (auto *proto : component) {
       llvm::dbgs() << " " << proto->getName();
     }
     llvm::dbgs() << " {\n";
   }
 
   RuleBuilder builder(Context, System.getReferencedProtocols());
-  builder.initWithProtocolWrittenRequirements(protos);
+  builder.initWithProtocolWrittenRequirements(component, protos);
 
   // Add the initial set of rewrite rules to the rewrite system.
-  System.initialize(/*recordLoops=*/true, protos,
+  System.initialize(/*recordLoops=*/true, component,
                     std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),

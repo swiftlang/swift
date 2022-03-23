@@ -995,6 +995,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_split_concrete_equiv_class_attempts)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineMaxSplitConcreteEquivClassAttempts = limit;
+    }
+  }
+
   if (Args.hasArg(OPT_disable_requirement_machine_concrete_contraction))
     Opts.EnableRequirementMachineConcreteContraction = false;
 
