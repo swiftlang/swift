@@ -12,20 +12,20 @@ func messageNoAsync() { }
 @available(*, noasync, renamed: "asyncReplacement()")
 func renamedNoAsync(_ completion: @escaping (Int) -> Void) -> Void { }
 
-@available(macOS 11, iOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.5, *)
 func asyncReplacement() async -> Int { }
 
 @available(*, noasync, renamed: "IOActor.readString()")
 func readStringFromIO() -> String {}
 
-@available(macOS 11, iOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.5, *)
 actor IOActor {
     func readString() -> String {
         return readStringFromIO()
     }
 }
 
-@available(macOS 11, iOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.5, *)
 func asyncFunc() async {
     // expected-error@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts}}
     basicNoAsync()
@@ -41,12 +41,12 @@ func asyncFunc() async {
 }
 
 // expected-error@+3{{asynchronous global function 'unavailableAsyncFunc()' must be available from asynchronous contexts}}
-@available(macOS 11, iOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.5, *)
 @available(*, noasync)
 func unavailableAsyncFunc() async {
 }
 
-@available(macOS 11, iOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.5, *)
 protocol BadSyncable {
     // expected-error@+2{{asynchronous property 'isSyncd' must be available from asynchronous contexts}}
     @available(*, noasync)
