@@ -4258,6 +4258,12 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
 
   auto currArgIdx =
       locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>().getArgIdx();
+
+  // Argument is extraneous and has been re-ordered to match one
+  // of two parameter types.
+  if (currArgIdx >= 2)
+    return false;
+
   auto otherArgIdx = currArgIdx == 0 ? 1 : 0;
 
   auto argType = cs.getType(argument);
