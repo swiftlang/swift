@@ -12,20 +12,33 @@
 
 #include "SemaFixture.h"
 #include "swift/AST/Expr.h"
+#include "llvm/Support/Casting.h"
 
 using namespace swift;
 using namespace swift::unittest;
 using namespace swift::constraints;
+
+static Expr *applySolution(ConstraintSystem &cs, Expr *expr,
+                           Solution &solution) {
+  SolutionApplicationTarget target(expr, cs.DC, CTP_Unused, Type(),
+                                   /*isDiscarded=*/false);
+  auto result = cs.applySolution(solution, target);
+  return result ? result->getAsExpr() : nullptr;
+}
+
+static Type getTypeOfCoercedExpr(ExplicitCastExpr *castExpr) {
+  return castExpr->getSubExpr()->getType();
+}
 
 TEST_F(SemaTest, TestImplicitForceCastConstraintGeneration) {
   ConstraintSystem cs(DC, ConstraintSystemOptions());
 
   auto *literal = IntegerLiteralExpr::createFromUnsigned(Context, 42);
 
-  auto *cast = ForcedCheckedCastExpr::createImplicit(Context, literal,
-                                                     getStdlibType("Double"));
+  auto *castExpr = ForcedCheckedCastExpr::createImplicit(Context, literal,
+                                                         Context.TheAnyType);
 
-  auto *expr = cs.generateConstraints(cast, DC, /*isInputExpression=*/true);
+  auto *expr = cs.generateConstraints(castExpr, DC, /*isInputExpression=*/true);
 
   ASSERT_NE(expr, nullptr);
 
@@ -37,7 +50,12 @@ TEST_F(SemaTest, TestImplicitForceCastConstraintGeneration) {
   auto &solution = solutions.front();
 
   ASSERT_TRUE(solution.getResolvedType(literal)->isEqual(getStdlibType("Int")));
-  ASSERT_TRUE(solution.getResolvedType(cast)->isEqual(getStdlibType("Double")));
+  ASSERT_TRUE(solution.getResolvedType(castExpr)->isEqual(Context.TheAnyType));
+
+  auto *resultExpr = applySolution(cs, expr, solution);
+  ASSERT_NE(resultExpr, nullptr);
+  ASSERT_TRUE(getTypeOfCoercedExpr(cast<ForcedCheckedCastExpr>(resultExpr))
+                  ->isEqual(getStdlibType("Int")));
 }
 
 TEST_F(SemaTest, TestImplicitCoercionConstraintGeneration) {
@@ -45,10 +63,10 @@ TEST_F(SemaTest, TestImplicitCoercionConstraintGeneration) {
 
   auto *literal = IntegerLiteralExpr::createFromUnsigned(Context, 42);
 
-  auto *cast = CoerceExpr::createImplicit(Context, literal,
-                                          getStdlibType("Double"));
+  auto *castExpr = CoerceExpr::createImplicit(Context, literal,
+                                              getStdlibType("Double"));
 
-  auto *expr = cs.generateConstraints(cast, DC, /*isInputExpression=*/true);
+  auto *expr = cs.generateConstraints(castExpr, DC, /*isInputExpression=*/true);
 
   ASSERT_NE(expr, nullptr);
 
@@ -60,7 +78,13 @@ TEST_F(SemaTest, TestImplicitCoercionConstraintGeneration) {
   auto &solution = solutions.front();
 
   ASSERT_TRUE(solution.getResolvedType(literal)->isEqual(getStdlibType("Double")));
-  ASSERT_TRUE(solution.getResolvedType(cast)->isEqual(getStdlibType("Double")));
+  ASSERT_TRUE(
+      solution.getResolvedType(castExpr)->isEqual(getStdlibType("Double")));
+
+  auto *resultExpr = applySolution(cs, expr, solution);
+  ASSERT_NE(resultExpr, nullptr);
+  ASSERT_TRUE(getTypeOfCoercedExpr(cast<CoerceExpr>(resultExpr))
+                  ->isEqual(getStdlibType("Double")));
 }
 
 TEST_F(SemaTest, TestImplicitConditionalCastConstraintGeneration) {
@@ -68,10 +92,10 @@ TEST_F(SemaTest, TestImplicitConditionalCastConstraintGeneration) {
 
   auto *literal = IntegerLiteralExpr::createFromUnsigned(Context, 42);
 
-  auto *cast = ConditionalCheckedCastExpr::createImplicit(
+  auto *castExpr = ConditionalCheckedCastExpr::createImplicit(
       Context, literal, getStdlibType("Double"));
 
-  auto *expr = cs.generateConstraints(cast, DC, /*isInputExpression=*/true);
+  auto *expr = cs.generateConstraints(castExpr, DC, /*isInputExpression=*/true);
 
   ASSERT_NE(expr, nullptr);
 
@@ -83,6 +107,11 @@ TEST_F(SemaTest, TestImplicitConditionalCastConstraintGeneration) {
   auto &solution = solutions.front();
 
   ASSERT_TRUE(solution.getResolvedType(literal)->isEqual(getStdlibType("Int")));
-  ASSERT_TRUE(solution.getResolvedType(cast)->isEqual(
+  ASSERT_TRUE(solution.getResolvedType(castExpr)->isEqual(
       OptionalType::get(getStdlibType("Double"))));
+
+  auto *resultExpr = applySolution(cs, expr, solution);
+  ASSERT_NE(resultExpr, nullptr);
+  ASSERT_TRUE(getTypeOfCoercedExpr(cast<ConditionalCheckedCastExpr>(resultExpr))
+              ->isEqual(getStdlibType("Int")));
 }

@@ -3924,15 +3924,22 @@ namespace {
     }
 
     Expr *visitCoerceExprImpl(CoerceExpr *expr) {
-      // Simplify and update the type we're coercing to.
-      assert(expr->getCastTypeRepr());
-      const auto toType = simplifyType(cs.getType(expr->getCastTypeRepr()));
-      expr->setCastType(toType);
-      cs.setType(expr->getCastTypeRepr(), toType);
+      if (auto *castTypeRepr = expr->getCastTypeRepr()) {
+        // Simplify and update the type we're coercing to.
+        auto toType = simplifyType(cs.getType(castTypeRepr));
+        expr->setCastType(toType);
+        cs.setType(castTypeRepr, toType);
+      } else {
+        assert(expr->isImplicit());
+        assert(expr->getCastType());
+      }
+
+      cs.setType(expr, expr->getCastType());
 
       // If this is a literal that got converted into constructor call
       // lets put proper source information in place.
       if (expr->isLiteralInit()) {
+        auto toType = expr->getCastType();
         auto *literalInit = expr->getSubExpr();
         if (auto *call = dyn_cast<CallExpr>(literalInit)) {
           cs.forEachExpr(call->getFn(), [&](Expr *subExpr) -> Expr * {
@@ -3958,7 +3965,6 @@ namespace {
           literalInit->setImplicit(false);
         }
 
-        cs.setType(expr, toType);
         // Keep the coercion around, because it contains the source range
         // for the original constructor call.
         return expr;
@@ -3980,12 +3986,12 @@ namespace {
         // Convert the subexpression.
         Expr *sub = expr->getSubExpr();
 
-        sub = solution.coerceToType(sub, toType, cs.getConstraintLocator(sub));
+        sub = solution.coerceToType(sub, expr->getCastType(),
+                                    cs.getConstraintLocator(sub));
         if (!sub)
           return nullptr;
 
         expr->setSubExpr(sub);
-        cs.setType(expr, toType);
         return expr;
       }
 
@@ -3993,15 +3999,17 @@ namespace {
       assert(choice == 1 && "should be bridging");
 
       // Handle optional bindings.
-      Expr *sub = handleOptionalBindings(expr->getSubExpr(), toType,
-                                         OptionalBindingsCastKind::Bridged,
-                                         [&](Expr *sub, Type toInstanceType) {
-        return buildObjCBridgeExpr(sub, toInstanceType, locator);
-      });
+      Expr *sub = handleOptionalBindings(
+          expr->getSubExpr(), expr->getCastType(),
+          OptionalBindingsCastKind::Bridged,
+          [&](Expr *sub, Type toInstanceType) {
+            return buildObjCBridgeExpr(sub, toInstanceType, locator);
+          });
 
-      if (!sub) return nullptr;
+      if (!sub)
+        return nullptr;
+
       expr->setSubExpr(sub);
-      cs.setType(expr, toType);
       return expr;
     }
 
@@ -4011,24 +4019,35 @@ namespace {
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
-      // Simplify and update the type we're casting to.
-      auto *const castTypeRepr = expr->getCastTypeRepr();
-
       const auto fromType = cs.getType(sub);
-      auto toType = simplifyType(cs.getType(castTypeRepr));
+
+      Type toType;
+      SourceRange castTypeRange;
+
+      // Simplify and update the type we're casting to.
+      if (auto *const castTypeRepr = expr->getCastTypeRepr()) {
+        toType = simplifyType(cs.getType(castTypeRepr));
+        castTypeRange = castTypeRepr->getSourceRange();
+
+        cs.setType(castTypeRepr, toType);
+        expr->setCastType(toType);
+      } else {
+        assert(expr->isImplicit());
+        assert(expr->getCastType());
+
+        toType = expr->getCastType();
+      }
+
       if (hasForcedOptionalResult(expr))
         toType = toType->getOptionalObjectType();
 
-      expr->setCastType(toType);
-      cs.setType(castTypeRepr, toType);
-
-      auto castContextKind =
-          SuppressDiagnostics ? CheckedCastContextKind::None
-                              : CheckedCastContextKind::ForcedCast;
+      auto castContextKind = SuppressDiagnostics || expr->isImplicit()
+                                 ? CheckedCastContextKind::None
+                                 : CheckedCastContextKind::ForcedCast;
 
       const auto castKind = TypeChecker::typeCheckCheckedCast(
-          fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
-          castTypeRepr->getSourceRange());
+          fromType, toType, castContextKind, dc, expr->getLoc(), sub,
+          castTypeRange);
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -4048,16 +4067,30 @@ namespace {
         expr->setCastKind(castKind);
         break;
       }
-      
+
       return handleOptionalBindingsForCast(expr, simplifyType(cs.getType(expr)),
                                            OptionalBindingsCastKind::Forced);
     }
 
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
-      // Simplify and update the type we're casting to.
       auto *const castTypeRepr = expr->getCastTypeRepr();
+
+      // If there is no type repr, it means this is implicit cast which
+      // should have a type set.
+      if (!castTypeRepr) {
+        assert(expr->isImplicit());
+        assert(expr->getCastType());
+
+        auto sub = cs.coerceToRValue(expr->getSubExpr());
+        expr->setSubExpr(sub);
+
+        return expr;
+      }
+
+      // Simplify and update the type we're casting to.
       const auto toType = simplifyType(cs.getType(castTypeRepr));
       expr->setCastType(toType);
+
       cs.setType(castTypeRepr, toType);
 
       // If we need to insert a force-unwrap for coercions of the form
@@ -4094,7 +4127,7 @@ namespace {
               : CheckedCastContextKind::ConditionalCast;
 
       auto castKind = TypeChecker::typeCheckCheckedCast(
-          fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
+          fromType, toType, castContextKind, dc, expr->getLoc(), sub,
           castTypeRepr->getSourceRange());
       switch (castKind) {
       // Invalid cast.
@@ -4107,7 +4140,7 @@ namespace {
           // Special handle for literals conditional checked cast when they can
           // be statically coerced to the cast type.
           if (protocol && TypeChecker::conformsToProtocol(
-                              toType, protocol, cs.DC->getParentModule())) {
+                              toType, protocol, dc->getParentModule())) {
             ctx.Diags
                 .diagnose(expr->getLoc(),
                           diag::literal_conditional_downcast_to_coercion,
