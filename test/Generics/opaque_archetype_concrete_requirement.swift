@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -disable-availability-checking -debug-generic-signatures -requirement-machine-inferred-signatures=on -enable-requirement-machine-opaque-archetypes 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -disable-availability-checking -requirement-machine-inferred-signatures=on -enable-requirement-machine-opaque-archetypes
 
 protocol P1 {
   associatedtype T : P2
@@ -51,31 +52,3 @@ extension HasP where T == DefinesOpaqueP1.T, U == G<T.T> {
   func checkSameType1(_ t: T.T) -> DefinesOpaqueP1.T.T { return t }
   func checkSameType2(_ u: T.U) -> DefinesOpaqueP1.T.U { return u }
 }
-
-// FIXME: This does not work with -enable-requirement-machine-opaque-archetypes.
-// See opaque_archetype_concrete_requirement_recursive.swift for a demonstration
-// that it works without the flag (but more involved examples like the above
-// won't work).
-
-protocol RecursiveP {
-  associatedtype T : RecursiveP
-}
-
-struct S_RecursiveP : RecursiveP {
-  typealias T = S_RecursiveP
-}
-
-struct DefinesRecursiveP : P {
-  var t: some RecursiveP {
-    return S_RecursiveP()
-  }
-}
-
-protocol HasRecursiveP {
-  associatedtype T : RecursiveP
-}
-
-extension HasRecursiveP where T == DefinesRecursiveP.T {}
-// expected-error@-1 {{cannot build rewrite system for generic signature; rule length limit exceeded}}
-// expected-note@-2 {{failed rewrite rule is τ_0_0.[HasRecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[concrete: (((((((((@_opaqueReturnTypeOf("$s37opaque_archetype_concrete_requirement17DefinesRecursivePV1tQrvp", 0) __.T).T).T).T).T).T).T).T).T).T] => τ_0_0.[HasRecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T].[RecursiveP:T]}}
-
