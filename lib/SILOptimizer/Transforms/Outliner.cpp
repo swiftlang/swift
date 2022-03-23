@@ -50,6 +50,7 @@ class OutlinerMangler : public Mangle::ASTMangler {
   /// The kind of method bridged.
   enum MethodKind : unsigned {
     BridgedProperty,
+    BridgedProperty_Consuming,
     BridgedPropertyAddress,
     BridgedMethod,
   };
@@ -69,10 +70,12 @@ public:
         Kind(BridgedMethod), IsReturnBridged(ReturnBridged) {}
 
   /// Create an mangler for an outlined bridged property.
-  OutlinerMangler(SILDeclRef Method, bool IsAddress)
+  OutlinerMangler(SILDeclRef Method, bool IsAddress, bool ConsumesValue)
       : IsParameterBridged(nullptr), IsParameterGuaranteed(nullptr),
         MethodDecl(Method),
-        Kind(IsAddress ? BridgedPropertyAddress : BridgedProperty),
+        Kind(IsAddress ? BridgedPropertyAddress
+                       : (ConsumesValue ? BridgedProperty_Consuming
+                                        : BridgedProperty)),
         IsReturnBridged(true) {}
 
   std::string mangle();
@@ -82,6 +85,8 @@ private:
     switch (Kind) {
     case BridgedProperty:
       return 'p';
+    case BridgedProperty_Consuming:
+      return 'o';
     case BridgedPropertyAddress:
       return 'a';
     case BridgedMethod:
@@ -234,6 +239,9 @@ class BridgedProperty : public OutlinePattern {
   ObjCMethodInst *ObjCMethod;
   SILInstruction *Release;
   ApplyInst *PropApply;
+  SILInstruction *UnpairedRelease; // A release_value | destroy_value following
+                                   // the apply which isn't paired to
+                                   // load [copy] | strong_retain first value.
 
 public:
   bool matchInstSequence(SILBasicBlock::iterator I) override;
@@ -269,12 +277,14 @@ void BridgedProperty::clearState() {
     ObjCMethod = nullptr;
     Release = nullptr;
     PropApply = nullptr;
+    UnpairedRelease = nullptr;
     OutlinedName.clear();
 }
 
 std::string BridgedProperty::getOutlinedFunctionName() {
   if (OutlinedName.empty()) {
-    OutlinerMangler Mangler(ObjCMethod->getMember(), isa<LoadInst>(FirstInst));
+    OutlinerMangler Mangler(ObjCMethod->getMember(), isa<LoadInst>(FirstInst),
+                            UnpairedRelease);
     OutlinedName = Mangler.mangle();
   }
   return OutlinedName;
@@ -297,11 +307,10 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
       SILParameterInfo(Load->getType().getASTType(),
                        ParameterConvention::Indirect_In_Guaranteed));
   else
-    Parameters.push_back(SILParameterInfo(cast<ObjCMethodInst>(FirstInst)
-                                              ->getOperand()
-                                              ->getType()
-                                              .getASTType(),
-                                          ParameterConvention::Direct_Unowned));
+    Parameters.push_back(SILParameterInfo(
+        cast<ObjCMethodInst>(FirstInst)->getOperand()->getType().getASTType(),
+        UnpairedRelease ? ParameterConvention::Direct_Owned
+                        : ParameterConvention::Direct_Unowned));
   SmallVector<SILResultInfo, 4> Results;
 
   Results.push_back(SILResultInfo(
@@ -415,6 +424,8 @@ BridgedProperty::outline(SILModule &M) {
         FirstInst->getOperand(0)->getType());
     auto *Arg = OutlinedEntryBB->getArgument(0);
     FirstInst->setOperand(0, Arg);
+    if (UnpairedRelease)
+      UnpairedRelease->setOperand(0, Arg);
     PropApply->setArgument(0, Arg);
   }
   Builder.setInsertionPoint(OldMergeBB);
@@ -625,12 +636,22 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It,
     assert(Release == &*It);
   }
 
+  ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
+  if (auto *dvi = dyn_cast<DestroyValueInst>(*&It)) {
+    if (Load)
+      return false;
+    if (dvi->getOperand() != Instance)
+      return false;
+    UnpairedRelease = dvi;
+    ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
+  }
+
   // Don't outline in the outlined function.
   if (ObjCMethod->getFunction()->getName().equals(getOutlinedFunctionName()))
     return false;
 
-  // switch_enum %34 : $Optional<NSString>, case #Optional.some!enumelt: bb8, case #Optional.none!enumelt: bb9
-  ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
+  // switch_enum %34 : $Optional<NSString>, case #Optional.some!enumelt: bb8,
+  // case #Optional.none!enumelt: bb9
   return matchSwitch(switchInfo, &*It, PropApply);
 }
 

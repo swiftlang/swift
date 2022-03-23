@@ -2800,7 +2800,7 @@ std::string Demangler::demangleBridgedMethodParams() {
   switch (kind) {
   default:
     return std::string();
-  case 'p': case 'a': case 'm':
+  case 'o': case 'p': case 'a': case 'm':
     Str.push_back(kind);
   }
 
