@@ -1279,8 +1279,6 @@ namespace {
 class OutlinePatterns {
   BridgedProperty BridgedPropertyPattern;
   ObjCMethodCall ObjCMethodCallPattern;
-  llvm::DenseMap<CanType, SILDeclRef> BridgeToObjectiveCCache;
-  llvm::DenseMap<CanType, SILDeclRef> BridgeFromObjectiveCache;
 
 public:
   /// Try matching an outlineable pattern from the current instruction.
