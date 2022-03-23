@@ -579,10 +579,6 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It,
       ObjCMethod->getType().castTo<SILFunctionType>()->hasOpenedExistential())
     return false;
 
-  // Don't outline in the outlined function.
-  if (ObjCMethod->getFunction()->getName().equals(getOutlinedFunctionName()))
-    return false;
-
   // %34 = apply %33(%31) : $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
   ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
   PropApply = dyn_cast<ApplyInst>(It);
@@ -628,6 +624,10 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It,
     ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
     assert(Release == &*It);
   }
+
+  // Don't outline in the outlined function.
+  if (ObjCMethod->getFunction()->getName().equals(getOutlinedFunctionName()))
+    return false;
 
   // switch_enum %34 : $Optional<NSString>, case #Optional.some!enumelt: bb8, case #Optional.none!enumelt: bb9
   ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
