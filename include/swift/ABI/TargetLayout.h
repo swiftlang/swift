@@ -31,6 +31,7 @@
 
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/RelativePointer.h"
+#include "swift/ABI/CompactFunctionPointer.h"
 
 namespace swift {
 
@@ -100,6 +101,14 @@ struct InProcess {
 
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = RelativeDirectPointer<T, Nullable>;
+
+  template <typename T, bool Nullable = true, typename Offset = int32_t>
+#if SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
+  using CompactFunctionPointer = AbsoluteFunctionPointer<T>;
+#else
+  using CompactFunctionPointer =
+      swift::RelativeDirectPointer<T, Nullable, Offset>;
+#endif
 };
 
 /// Represents a pointer in another address space.
@@ -157,6 +166,9 @@ struct External {
 
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = int32_t;
+
+  template <typename T, bool Nullable = true, typename Offset = int32_t>
+  using CompactFunctionPointer = int32_t;
 };
 
 template <typename Runtime, typename T>
@@ -181,6 +193,12 @@ using TargetRelativeDirectPointer
 template <typename Runtime, typename Pointee, bool Nullable = true>
 using TargetRelativeIndirectablePointer
   = typename Runtime::template RelativeIndirectablePointer<Pointee,Nullable>;
+
+template <typename Runtime, typename Pointee, bool Nullable = true,
+          typename Offset = int32_t>
+using TargetCompactFunctionPointer =
+    typename Runtime::template CompactFunctionPointer<Pointee, Nullable,
+                                                      Offset>;
 
 } // end namespace swift
 

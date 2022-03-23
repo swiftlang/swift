@@ -2768,7 +2768,7 @@ static void initClassVTable(ClassMetadata *self) {
     for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
       auto &methodDescription = descriptors[i];
       swift_ptrauth_init_code_or_data(
-          &classWords[vtableOffset + i], methodDescription.Impl.get(),
+          &classWords[vtableOffset + i], methodDescription.getImpl(),
           methodDescription.Flags.getExtraDiscriminator(),
           !methodDescription.Flags.isAsync());
     }
@@ -2808,9 +2808,8 @@ static void initClassVTable(ClassMetadata *self) {
       auto baseVTable = baseClass->getVTableDescriptor();
       auto offset = (baseVTable->getVTableOffset(baseClass) +
                      (baseMethod - baseClassMethods.data()));
-
       swift_ptrauth_init_code_or_data(&classWords[offset],
-                                      descriptor.Impl.get(),
+                                      descriptor.getImpl(),
                                       baseMethod->Flags.getExtraDiscriminator(),
                                       !baseMethod->Flags.isAsync());
     }
@@ -4869,7 +4868,7 @@ static void initializeResilientWitnessTable(
 
     auto &reqt = requirements[reqDescriptor - requirements.begin()];
     // This is an unsigned pointer formed from a relative address.
-    void *impl = witness.Witness.get();
+    void *impl = witness.getWitness(reqt.Flags);
     initProtocolWitness(&table[witnessIndex], impl, reqt);
   }
 
@@ -4883,7 +4882,7 @@ static void initializeResilientWitnessTable(
     auto &reqt = requirements[i];
     if (!table[witnessIndex]) {
       // This is an unsigned pointer formed from a relative address.
-      void *impl = reqt.DefaultImplementation.get();
+      void *impl = reqt.getDefaultImplementation();
       initProtocolWitness(&table[witnessIndex], impl, reqt);
     }
 
@@ -5352,7 +5351,7 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
     // Resolve the relative reference to the witness function.
     int32_t offset;
     memcpy(&offset, mangledName.data() + 1, 4);
-    uintptr_t ptr = detail::applyRelativeOffset(mangledName.data() + 1, offset);
+    void *ptr = TargetCompactFunctionPointer<InProcess, void>::resolve(mangledName.data() + 1, offset);
 
     // Call the witness function.
     AssociatedWitnessTableAccessFunction *witnessFn;

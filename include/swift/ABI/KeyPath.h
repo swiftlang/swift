@@ -192,6 +192,7 @@ public:
   
   enum ComputedPropertyIDResolution {
     Resolved,
+    ResolvedAbsolute,
     IndirectPointer,
     FunctionCall,
   };
@@ -214,6 +215,7 @@ public:
            ? _SwiftKeyPathComponentHeader_ComputedIDByVTableOffsetFlag : 0)
       | (hasArguments ? _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag : 0)
       | (resolution == Resolved ? _SwiftKeyPathComponentHeader_ComputedIDResolved
+       : resolution == ResolvedAbsolute ? _SwiftKeyPathComponentHeader_ComputedIDResolvedAbsolute
        : resolution == IndirectPointer ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
        : resolution == FunctionCall ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFunctionCall
        : (assert(false && "invalid resolution"), 0)));
