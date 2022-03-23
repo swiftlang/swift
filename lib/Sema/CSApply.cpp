@@ -1478,7 +1478,7 @@ namespace {
 
       const bool isUnboundInstanceMember =
           (!baseIsInstance && member->isInstanceMember());
-      const bool isPartialApplication =
+      const bool needsCurryThunk =
           shouldBuildCurryThunk(choice, baseIsInstance);
 
       // The formal type of the 'self' value for the member's declaration.
@@ -1511,7 +1511,7 @@ namespace {
         // the thunk to accept a class to avoid potential abstraction, so the
         // existential base must be opened eagerly in order to be upcast to the
         // appropriate class reference type before it is passed to the thunk.
-        if (!isPartialApplication ||
+        if (!needsCurryThunk ||
             (!member->getDeclContext()->getSelfProtocolDecl() &&
              !isUnboundInstanceMember)) {
           // Open the existential before performing the member reference.
@@ -1590,7 +1590,7 @@ namespace {
       }
 
       // Handle dynamic references.
-      if (isDynamic || (!isPartialApplication &&
+      if (isDynamic || (!needsCurryThunk &&
                         member->getAttrs().hasAttribute<OptionalAttr>())) {
         base = cs.coerceToRValue(base);
         Expr *ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
@@ -1690,12 +1690,12 @@ namespace {
       // very specific shape, we only emit a single closure here and
       // capture the original SuperRefExpr, since its evaluation does not
       // have side effects, instead of abstracting out a 'self' parameter.
-      const auto isSuperPartialApplication = isPartialApplication && isSuper;
+      const auto isSuperPartialApplication = needsCurryThunk && isSuper;
       if (isSuperPartialApplication) {
         ref = buildSingleCurryThunk(base, declRefExpr,
                                     cast<AbstractFunctionDecl>(member),
                                     memberLocator);
-      } else if (isPartialApplication) {
+      } else if (needsCurryThunk) {
         // Another case where we want to build a single closure is when
         // we have a partial application of a constructor on a statically-
         // derived metatype value. Again, there are no order of evaluation
