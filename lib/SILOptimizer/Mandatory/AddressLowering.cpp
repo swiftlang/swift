@@ -366,6 +366,7 @@ void ValueStorageMap::replaceValue(SILValue oldValue, SILValue newValue) {
   valueVector[ordinal].value = newValue;
 }
 
+#ifndef NDEBUG
 void ValueStorageMap::dump() {
   llvm::dbgs() << "ValueStorageMap:\n";
   for (unsigned ordinal : indices(valueVector)) {
@@ -388,6 +389,7 @@ void ValueStorageMap::dump() {
     }
   }
 }
+#endif
 
 //===----------------------------------------------------------------------===//
 //                            AddressLoweringState
