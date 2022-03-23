@@ -20,18 +20,6 @@ using namespace swift;
 using namespace swift::ide;
 using namespace swift::constraints;
 
-/// Returns true if both types are null or if they are equal.
-static bool nullableTypesEqual(Type LHS, Type RHS) {
-  if (LHS.isNull() && RHS.isNull()) {
-    return true;
-  } else if (LHS.isNull() || RHS.isNull()) {
-    // One type is null but the other is not.
-    return false;
-  } else {
-    return LHS->isEqual(RHS);
-  }
-}
-
 bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
     const ArgumentTypeCheckCompletionCallback::Result &Res,
     SmallVectorImpl<PossibleParamInfo> &Params, SmallVectorImpl<Type> &Types) {

@@ -90,6 +90,9 @@ bool isImplicitSingleExpressionReturn(constraints::ConstraintSystem &CS,
 /// Returns \c true iff the decl context \p DC allows calling async functions.
 bool isContextAsync(const constraints::Solution &S, DeclContext *DC);
 
+/// Returns true if both types are null or if they are equal.
+bool nullableTypesEqual(Type LHS, Type RHS);
+
 } // namespace ide
 } // namespace swift
 

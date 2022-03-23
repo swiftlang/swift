@@ -208,3 +208,14 @@ bool swift::ide::isContextAsync(const constraints::Solution &S,
   //    async.
   return canDeclContextHandleAsync(DC);
 }
+
+bool swift::ide::nullableTypesEqual(Type LHS, Type RHS) {
+  if (LHS.isNull() && RHS.isNull()) {
+    return true;
+  } else if (LHS.isNull() || RHS.isNull()) {
+    // One type is null but the other is not.
+    return false;
+  } else {
+    return LHS->isEqual(RHS);
+  }
+}
