@@ -34,8 +34,10 @@ swift::rewriting::lookupConcreteNestedType(
     auto *genericEnv = archetype->getGenericEnvironment();
     auto genericSig = genericEnv->getGenericSignature();
 
-    concreteDecls.push_back(
-        genericSig->lookupNestedType(archetype->getInterfaceType(), name));
+    auto *typeDecl =
+        genericSig->lookupNestedType(archetype->getInterfaceType(), name);
+    if (typeDecl != nullptr)
+      concreteDecls.push_back(typeDecl);
   }
 }
 
