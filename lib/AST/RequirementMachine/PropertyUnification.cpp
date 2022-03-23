@@ -491,9 +491,9 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       continue;
     }
 
-    // FIXME: Maybe this can happen if the concrete type is an
-    // opaque result type?
-    assert(!conformance.isAbstract());
+    // This can happen if the concrete type is an opaque result type.
+    if (conformance.isAbstract())
+      continue;
 
     auto *concrete = conformance.getConcrete();
 
