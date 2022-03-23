@@ -243,7 +243,6 @@ func testMissingRequirements() {
 
 protocol Fooable {
   associatedtype Foo
-
   var foo: Foo { get }
 }
 
@@ -251,6 +250,8 @@ protocol Barrable {
   associatedtype Bar: Fooable
   var bar: Bar { get }
 }
+
+protocol Concrete { associatedtype X where X == Int }
 
 func sameTypeConflicts() {
 
@@ -302,4 +303,6 @@ func sameTypeConflicts() {
     fatalError()
   }
 
+  // expected-error@+1{{generic parameter 'T.X' cannot be equal to both 'Int' and 'String'}}
+  func fail6<U, T: Concrete>(_: U, _: T) where T.X == String {}
 }

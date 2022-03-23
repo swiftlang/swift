@@ -763,17 +763,19 @@ void RewriteSystem::computeConflictDiagnostics(
 
     auto firstProperty = firstRule->isPropertyRule();
     auto secondProperty = secondRule->isPropertyRule();
-    if (!firstProperty || !secondProperty)
+    assert(firstProperty && secondProperty);
+
+    auto firstTerm = firstRule->getRHS();
+    auto secondTerm = secondRule->getRHS();
+    auto subjectTerm =
+        firstTerm.size() > secondTerm.size() ? firstTerm : secondTerm;
+
+    // If the root protocol of the subject term isn't in this minimization
+    // domain, the conflict was already diagnosed.
+    if (!isInMinimizationDomain(subjectTerm[0].getRootProtocol()))
       continue;
 
-    MutableTerm firstTerm(
-        firstRule->getLHS().begin(), firstRule->getLHS().end() - 1);
-    MutableTerm secondTerm(
-        secondRule->getLHS().begin(), secondRule->getLHS().end() - 1);
-
-    auto firstSubject = propertyMap.getTypeForTerm(firstTerm, genericParams);
-    auto secondSubject = propertyMap.getTypeForTerm(secondTerm, genericParams);
-    assert(firstSubject && secondSubject);
+    Type subject = propertyMap.getTypeForTerm(subjectTerm, genericParams);
 
     // Record conflicting requirements on a type parameter, e.g.
     // conflicting superclass requirements:
@@ -783,11 +785,10 @@ void RewriteSystem::computeConflictDiagnostics(
     //   protocol P { associatedtype A: C1 }
     //   func conflict<T: P>(_: T) where T.A: C2 {}
     if (firstProperty->getKind() == secondProperty->getKind() &&
-        firstTerm.back().getKind() != Symbol::Kind::Name &&
-        firstSubject->isEqual(secondSubject)) {
+        firstTerm.back().getKind() != Symbol::Kind::Name) {
       switch (firstProperty->getKind()) {
       case Symbol::Kind::ConcreteType:
-        errors.push_back(RequirementError::forConflictingRequirement(firstSubject,
+        errors.push_back(RequirementError::forConflictingRequirement(subject,
             {RequirementKind::SameType, firstProperty->getConcreteType(),
              secondProperty->getConcreteType()},
             signatureLoc));
@@ -796,7 +797,7 @@ void RewriteSystem::computeConflictDiagnostics(
       case Symbol::Kind::Superclass:
         // FIXME: shoving the conflicting superclass types into a superclass
         // requiement is a little gross.
-        errors.push_back(RequirementError::forConflictingRequirement(firstSubject,
+        errors.push_back(RequirementError::forConflictingRequirement(subject,
             {RequirementKind::Superclass, firstProperty->getConcreteType(),
              secondProperty->getConcreteType()},
             signatureLoc));
