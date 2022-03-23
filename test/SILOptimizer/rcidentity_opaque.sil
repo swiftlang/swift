@@ -1,0 +1,404 @@
+// RUN: %target-sil-opt -rc-id-dumper -enable-sil-opaque-values -module-name Swift %s -o /dev/null | %FileCheck %s
+
+import Builtin
+
+typealias AnyObject = Builtin.AnyObject
+
+struct STrivial {}
+
+class Base {}
+
+class Sub : Base {}
+
+protocol P {}
+
+protocol PClass : AnyObject {}
+
+protocol PBase : Base {}
+
+// Test dynamic casts that preserve ownership. See DynamicCasts.cpp
+// swift::doesCastPreserveOwnershipForTypes.
+//
+// Non-ownership-preserving casts fall into these categories:
+//
+//   (A) one type is a bridged value and the other is an object:
+//      (A1) Boxing: <trivial> as! Object
+//      (A2) Unboxing: Object as! <trivial>
+//
+//   (B) one type is transparently wrapped in __SwiftValue, while the other is
+//       unwrapped. Given:
+//
+//     class C : Hashable {}
+//     let a = AnyHashable(C())
+//
+//     (B1) The substituted source type is AnyHashable and the
+//          substituted destination type is AnyObject
+//
+//          // instantiates __SwiftValue
+//          let b = a as! AnyObject
+//        or
+//          let b = a as! T where T.self == AnyObject.self
+//
+//     (B2) The substituted source type is Any or AnyObject, and the
+//          substituted destination type is not Any or AnyObject
+//
+//          let c = b as! C // releases __SwiftValue
+//
+// With opaque values, ownership preserving casts are emitted as
+// scalar casts. Non-ownership preserving casts are emitted as indirect casts.
+
+// =============================================================================
+// (A1) Potential boxing.
+
+// CHECK-LABEL: @testStructToAnyObjectIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testStructToAnyObjectIsBridged : $@convention(thin) (STrivial) -> @owned AnyObject {
+bb0(%0 : $STrivial):
+  %1 = unconditional_checked_cast %0 : $STrivial to AnyObject
+  return %1 : $AnyObject
+}
+
+// CHECK-LABEL: @testStructToClassIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testStructToClassIsBridged : $@convention(thin) (STrivial) -> @owned Sub {
+bb0(%0 : $STrivial):
+  %1 = unconditional_checked_cast %0 : $STrivial to Sub
+  return %1 : $Sub
+}
+
+// CHECK-LABEL: @testStructToClassExistentialIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testStructToClassExistentialIsBridged : $@convention(thin) (STrivial) -> @owned PClass {
+bb0(%0 : $STrivial):
+  %1 = unconditional_checked_cast %0 : $STrivial to PClass
+  return %1 : $PClass
+}
+
+// CHECK-LABEL: @testStructToClassArchetypeIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testStructToClassArchetypeIsBridged : $@convention(thin) <T : AnyObject>(STrivial) -> @owned T {
+bb0(%0 : $STrivial):
+  %1 = unconditional_checked_cast %0 : $STrivial to T
+  return %1 : $T
+}
+
+// CHECK-LABEL: @testArchetypeToAnyObjectIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testArchetypeToAnyObjectIsBridged : $@convention(thin) <T>(@owned T) -> @owned AnyObject {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 : $T to AnyObject
+  return %1 : $AnyObject
+}
+
+// CHECK-LABEL: @testArchetypeToClassIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testArchetypeToClassIsBridged : $@convention(thin) <T>(@owned T) -> @owned Sub {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 : $T to Sub
+  return %1 : $Sub
+}
+
+// CHECK-LABEL: @testArchetypeToClassExistentialIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testArchetypeToClassExistentialIsBridged : $@convention(thin) <T>(@owned T) -> @owned PClass {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 : $T to PClass
+  return %1 : $PClass
+}
+
+// CHECK-LABEL: @testArchetypeToClassArchetypeIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testArchetypeToClassArchetypeIsBridged : $@convention(thin) <T, U : AnyObject>(@owned T) -> @owned U {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 : $T to U
+  return %1 : $U
+}
+
+// CHECK-LABEL: @testExistentialToAnyObjectIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testExistentialToAnyObjectIsBridged : $@convention(thin) (@owned P) -> @owned AnyObject {
+bb0(%0 : @owned $P):
+  %1 = unconditional_checked_cast %0 : $P to AnyObject
+  return %1 : $AnyObject
+}
+
+// CHECK-LABEL: @testExistentialToClassIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testExistentialToClassIsBridged : $@convention(thin) (@owned P) -> @owned Sub {
+bb0(%0 : @owned $P):
+  %1 = unconditional_checked_cast %0 : $P to Sub
+  return %1 : $Sub
+}
+
+// CHECK-LABEL: @testExistentialToClassExistentialIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testExistentialToClassExistentialIsBridged : $@convention(thin) (@owned P) -> @owned PClass {
+bb0(%0 : @owned $P):
+  %1 = unconditional_checked_cast %0 : $P to PClass
+  return %1 : $PClass
+}
+
+// CHECK-LABEL: @testExistentialToClassArchetypeIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testExistentialToClassArchetypeIsBridged : $@convention(thin) <U : AnyObject>(@owned P) -> @owned U {
+bb0(%0 : @owned $P):
+  %1 = unconditional_checked_cast %0 : $P to U
+  return %1 : $U
+}
+
+// =============================================================================
+// (A2) Potential unboxing.
+
+// CHECK-LABEL: @testAnyObjectToStructIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testAnyObjectToStructIsBridged : $@convention(thin) (@owned AnyObject) -> @owned STrivial {
+bb0(%0 : @owned $AnyObject):
+  %1 = unconditional_checked_cast %0 : $AnyObject to STrivial
+  return %1 : $STrivial
+}
+
+// CHECK-LABEL: @testClassToStructIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassToStructIsBridged : $@convention(thin) (@owned Sub) -> @owned STrivial {
+bb0(%0 : @owned $Sub):
+  %1 = unconditional_checked_cast %0 : $Sub to STrivial
+  return %1 : $STrivial
+}
+
+// CHECK-LABEL: @testClassExistentialToStructIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassExistentialToStructIsBridged : $@convention(thin) (@owned PClass) -> @owned STrivial {
+bb0(%0 : @owned $PClass):
+  %1 = unconditional_checked_cast %0 : $PClass to STrivial
+  return %1 : $STrivial
+}
+
+// CHECK-LABEL: @testClassArchetypeToStructIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassArchetypeToStructIsBridged : $@convention(thin) <T : AnyObject>(@owned T) -> @owned STrivial {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 : $T to STrivial
+  return %1 : $STrivial
+}
+
+// CHECK-LABEL: @testAnyObjectToExistentialIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testAnyObjectToExistentialIsBridged : $@convention(thin) (@owned AnyObject) -> @owned P {
+bb0(%0 : @owned $AnyObject):
+  %1 = unconditional_checked_cast %0 : $AnyObject to P
+  return %1 : $P
+}
+
+// CHECK-LABEL: @testClassToExistentialIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassToExistentialIsBridged : $@convention(thin) (@owned Sub) -> @owned P {
+bb0(%0 : @owned $Sub):
+  %1 = unconditional_checked_cast %0 : $Sub to P
+  return %1 : $P
+}
+
+// CHECK-LABEL: @testClassExistentialToExistentialIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassExistentialToExistentialIsBridged : $@convention(thin) (@owned PClass) -> @owned P {
+bb0(%0 : @owned $PClass):
+  %1 = unconditional_checked_cast %0 : $PClass to P
+  return %1 : $P
+}
+
+// CHECK-LABEL: @testClassArchetypeToExistentialIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassArchetypeToExistentialIsBridged : $@convention(thin) <T : AnyObject>(@owned T) -> @owned P {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 : $T to P
+  return %1 : $P
+}
+
+// CHECK-LABEL: @testAnyObjectToArchetypeIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testAnyObjectToArchetypeIsBridged : $@convention(thin) <U>(@owned AnyObject) -> @owned U {
+bb0(%0 : @owned $AnyObject):
+  %1 = unconditional_checked_cast %0 : $AnyObject to U
+  return %1 : $U
+}
+
+// CHECK-LABEL: @testClassToArchetypeIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassToArchetypeIsBridged : $@convention(thin) <U>(@owned Sub) -> @owned U {
+bb0(%0 : @owned $Sub):
+  %1 = unconditional_checked_cast %0 : $Sub to U
+  return %1 : $U
+}
+
+// CHECK-LABEL: @testClassExistentialToArchetypeIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassExistentialToArchetypeIsBridged : $@convention(thin) <U>(@owned PClass) -> @owned U {
+bb0(%0 : @owned $PClass):
+  %1 = unconditional_checked_cast %0 : $PClass to U
+  return %1 : $U
+}
+
+// CHECK-LABEL: @testClassArchetypeToArchetypeIsBridged
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassArchetypeToArchetypeIsBridged : $@convention(thin) <T : AnyObject, U>(@owned T) -> @owned U {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 : $T to U
+  return %1 : $U
+}
+
+// =============================================================================
+// (B1) Wrapped casts - may forward through a wrapper object
+//
+// Note: the AnyHashable-to-AnyObject cases are currently covered
+// by the potentially bridged casts.
+
+// TODO: The compiler could recognize this case as forwarded. Casting
+// *from* a class to AnyObject will not wrap the class.
+//
+// CHECK-LABEL: @testClassToClassArchetypeIsWrapped
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassToClassArchetypeIsWrapped : $@convention(thin) <U : AnyObject>(@owned Base) -> @owned U {
+bb0(%0 : @owned $Base):
+  %1 = unconditional_checked_cast %0 : $Base to U
+  return %1 : $U
+}
+
+// =============================================================================
+// (B2) Wrapped casts - may forward through a wrapper object
+//
+// Note: (B1) the AnyHashable-to-AnyObject cases are currently covered
+// by the potentially bridged casts.
+//
+// TODO: In the future, when the runtime stops wrapping nontrivial types inside
+// __SwiftValue, cases (B1) and (B2) above will no longer apply. At that time,
+// expand ownership preserving cast types to AnyObject. Then remove the
+// isPotentiallyAnyObject() check.
+
+// CHECK-LABEL: @testAnyObjectToClassIsWrapped
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testAnyObjectToClassIsWrapped : $@convention(thin) (@owned AnyObject) -> @owned Sub {
+bb0(%0 : @owned $AnyObject):
+  %1 = unconditional_checked_cast %0 : $AnyObject to Sub
+  return %1 : $Sub
+}
+
+// CHECK-LABEL: @testClassArchetypeToClassIsWrapped
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testClassArchetypeToClassIsWrapped : $@convention(thin) <U : AnyObject>(@owned U) -> @owned Sub {
+bb0(%0 : @owned $U):
+  %1 = unconditional_checked_cast %0 : $U to Sub
+  return %1 : $Sub
+}
+
+// =============================================================================
+// Constrained exisentials and generics are not wrapped
+
+// CHECK-LABEL: @testClassExistentialToClassIsForwarded
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+sil [ossa] @testClassExistentialToClassIsForwarded : $@convention(thin) (@owned PClass) -> @owned Sub {
+bb0(%0 : @owned $PClass):
+  %1 = unconditional_checked_cast %0 : $PClass to Sub
+  return %1 : $Sub
+}
+
+// CHECK-LABEL: @testClassToClassExistentialIsForwarded
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+sil [ossa] @testClassToClassExistentialIsForwarded : $@convention(thin) (@owned Base) -> @owned PClass {
+bb0(%0 : @owned $Base):
+  %1 = unconditional_checked_cast %0 : $Base to PClass
+  return %1 : $PClass
+}
+
+// CHECK-LABEL: @testConstrainedExistentialToClassIsForwarded
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+sil [ossa] @testConstrainedExistentialToClassIsForwarded : $@convention(thin) (@owned PBase) -> @owned Sub {
+bb0(%0 : @owned $PBase):
+  %1 = unconditional_checked_cast %0 : $PBase to Sub
+  return %1 : $Sub
+}
+
+// CHECK-LABEL: @testClassToConstrainedExistentialIsForwarded
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+sil [ossa] @testClassToConstrainedExistentialIsForwarded : $@convention(thin) <U : Base>(@owned Base) -> @owned U {
+bb0(%0 : @owned $Base):
+  %1 = unconditional_checked_cast %0 : $Base to U
+  return %1 : $U
+}
+
+// CHECK-LABEL: @testClassConstrainedArchetypeToClassIsForwarded
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+sil [ossa] @testClassConstrainedArchetypeToClassIsForwarded : $@convention(thin) <T : Base>(@owned T) -> @owned Sub {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 : $T to Sub
+  return %1 : $Sub
+}
+
+// CHECK-LABEL: @testClassToClassConstrainedArchetypeIsForwarded
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+sil [ossa] @testClassToClassConstrainedArchetypeIsForwarded : $@convention(thin) <U : Sub>(@owned Base) -> @owned U {
+bb0(%0 : @owned $Base):
+  %1 = unconditional_checked_cast %0 : $Base to U
+  return %1 : $U
+}
+
+// CHECK-LABEL: @testProtocolConstrainedArchetypeToClassIsForwarded
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+sil [ossa] @testProtocolConstrainedArchetypeToClassIsForwarded : $@convention(thin) <T : Base>(@owned T) -> @owned Sub {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 : $T to Sub
+  return %1 : $Sub
+}
+
+// CHECK-LABEL: @testClassToProtocolConstrainedArchetypeIsForwarded
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+sil [ossa] @testClassToProtocolConstrainedArchetypeIsForwarded : $@convention(thin) <U : Sub>(@owned Base) -> @owned U {
+bb0(%0 : @owned $Base):
+  %1 = unconditional_checked_cast %0 : $Base to U
+  return %1 : $U
+}
+
+// =============================================================================
+// Directly Forwarding casts
+
+// CHECK-LABEL: @testClassToClassIsForwarded
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+sil [ossa] @testClassToClassIsForwarded : $@convention(thin) (@owned Base) -> @owned Sub {
+bb0(%0 : @owned $Base):
+  %1 = unconditional_checked_cast %0 : $Base to Sub
+  return %1 : $Sub
+}

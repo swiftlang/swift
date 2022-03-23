@@ -1246,6 +1246,10 @@ public:
   /// Whether this is the AnyObject type.
   bool isAnyObject();
 
+  /// Return true if this type is potentially an AnyObject existential after
+  /// substitution.
+  bool isPotentiallyAnyObject();
+
   /// Whether this is an existential composition containing
   /// Error.
   bool isExistentialWithError();

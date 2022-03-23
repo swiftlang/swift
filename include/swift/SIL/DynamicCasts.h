@@ -35,6 +35,11 @@ class SILType;
 enum class CastConsumptionKind : uint8_t;
 struct SILDynamicCastInst;
 
+/// Returns true if the ownership of all references in this type are preserved
+/// (without unbalanced retains or releases) during dynamic casting.
+bool doesCastPreserveOwnershipForTypes(SILModule &module, CanType sourceType,
+                                       CanType targetType);
+
 enum class DynamicCastFeasibility {
   /// The cast will always succeed.
   WillSucceed,
@@ -82,10 +87,17 @@ bool emitSuccessfulIndirectUnconditionalCast(
 bool emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, SILLocation loc,
                                              SILDynamicCastInst dynamicCast);
 
+/// Can the given cast be performed by the scalar checked-cast instructions in
+/// the current SIL stage, or do we need to use the indirect instructions?
+bool canSILUseScalarCheckedCastInstructions(SILModule &M,
+                                            CanType sourceType,
+                                            CanType targetType);
+
 /// Can the given cast be performed by the scalar checked-cast
-/// instructions, or does we need to use the indirect instructions?
-bool canUseScalarCheckedCastInstructions(SILModule &M,
-                                         CanType sourceType,CanType targetType);
+/// instructions at IRGen, or do we need to use the indirect instructions?
+bool canIRGenUseScalarCheckedCastInstructions(SILModule &M,
+                                              CanType sourceType,
+                                              CanType targetType);
 
 /// Carry out the operations required for an indirect conditional cast
 /// using a scalar cast operation.
@@ -435,8 +447,8 @@ public:
     llvm_unreachable("covered switch");
   }
 
-  bool canUseScalarCheckedCastInstructions() const {
-    return swift::canUseScalarCheckedCastInstructions(
+  bool canSILUseScalarCheckedCastInstructions() const {
+    return swift::canSILUseScalarCheckedCastInstructions(
         getModule(), getSourceFormalType(), getTargetFormalType());
   }
 };
