@@ -181,6 +181,8 @@ func testReturningOpaqueTypes(p: any P) {
 
 // Type-erasing vs. opening for parameters after the opened one.
 func takeValueAndClosure<T: P>(_ value: T, body: (T) -> Void) { }
+func takeValueAndClosureBackwards<T: P>(body: (T) -> Void, _ value: T) { }
+// expected-note@-1{{required by global function 'takeValueAndClosureBackwards(body:_:)' where 'T' = 'any P'}}
 
 func genericFunctionTakingP<T: P>(_: T) { }
 func genericFunctionTakingPQ<T: P & Q>(_: T) { }
@@ -199,4 +201,12 @@ func testTakeValueAndClosure(p: any P) {
   takeValueAndClosure(p, body: genericFunctionTakingP)
   takeValueAndClosure(p, body: overloadedGenericFunctionTakingP)
   takeValueAndClosure(p, body: genericFunctionTakingPQ) // expected-error{{global function 'genericFunctionTakingPQ' requires that 'T' conform to 'Q'}}
+
+  // Do not allow opening if there are any uses of the the type parameter before
+  // the opened parameter. This maintains left-to-right evaluation order.
+  takeValueAndClosureBackwards( // expected-error{{type 'any P' cannot conform to 'P'}}
+    // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+    body: { x in x as Int }, // expected-error{{'any P' is not convertible to 'Int'}}
+    // expected-note@-1{{did you mean to use 'as!' to force downcast?}}
+    p)
 }

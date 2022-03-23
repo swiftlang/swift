@@ -4048,9 +4048,16 @@ GenericParameterReferenceInfo swift::findGenericParameterReferences(
             sig, genericParam, param.getPlainType(), TypePosition::Invariant);
         continue;
       }
+
+      // Parameters are contravariant, but if we're prior to the skipped
+      // parameter treat them as invariant because we're not allowed to
+      // reference the parameter at all.
+      TypePosition position = TypePosition::Contravariant;
+      if (skipParamIndex && paramIdx < *skipParamIndex)
+        position = TypePosition::Invariant;
+
       inputInfo |= ::findGenericParameterReferences(
-          sig, genericParam, param.getParameterType(),
-          TypePosition::Contravariant);
+          sig, genericParam, param.getParameterType(), position);
     }
 
     // A covariant Self result inside a parameter will not be bona fide.
