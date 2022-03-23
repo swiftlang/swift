@@ -903,11 +903,6 @@ namespace {
                                bool baseIsInstance) {
       ValueDecl *member = choice.getDecl();
 
-      // FIXME: We should finish plumbing this through for dynamic
-      // lookup as well.
-      if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic)
-        return false;
-
       // If we're inside a selector expression, don't build the thunk.
       // Were not actually going to emit the member reference, just
       // look at the AST.
@@ -921,9 +916,11 @@ namespace {
       if (!baseIsInstance && member->isInstanceMember())
         return true;
 
-      // Bound optional method references are represented via
-      // DynamicMemberRefExpr instead of a curry thunk.
-      if (member->getAttrs().hasAttribute<OptionalAttr>())
+      // Bound member references that are '@objc optional' or found via dynamic
+      // lookup are always represented via DynamicMemberRefExpr instead of a
+      // curry thunk.
+      if (member->getAttrs().hasAttribute<OptionalAttr>() ||
+          choice.getKind() == OverloadChoiceKind::DeclViaDynamic)
         return false;
 
       // Figure out how many argument lists we need.
@@ -1590,8 +1587,8 @@ namespace {
       }
 
       // Handle dynamic references.
-      if (isDynamic || (!needsCurryThunk &&
-                        member->getAttrs().hasAttribute<OptionalAttr>())) {
+      if (!needsCurryThunk &&
+          (isDynamic || member->getAttrs().hasAttribute<OptionalAttr>())) {
         base = cs.coerceToRValue(base);
         Expr *ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
                                                        memberLoc);
