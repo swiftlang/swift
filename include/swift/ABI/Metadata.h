@@ -27,6 +27,8 @@
 #include "swift/Strings.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Once.h"
+#include "swift/ABI/GenericContext.h"
+#include "swift/ABI/MetadataRef.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
 #include "swift/ABI/TargetLayout.h"
@@ -39,9 +41,6 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Basic/Unreachable.h"
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
-#if SWIFT_OBJC_INTEROP
-#include <objc/runtime.h>
-#endif
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 
@@ -63,37 +62,11 @@ template <typename Runtime> class TargetValueTypeDescriptor;
 template <typename Runtime> class TargetEnumDescriptor;
 template <typename Runtime> class TargetStructDescriptor;
 template <typename Runtime> struct TargetGenericMetadataPattern;
-
-/// Template for branching on native pointer types versus external ones
-template <typename Runtime, template <typename> class Pointee>
-using TargetMetadataPointer
-  = typename Runtime::template Pointer<Pointee<Runtime>>;
-  
-template <typename Runtime, template <typename> class Pointee>
-using ConstTargetMetadataPointer
-  = typename Runtime::template Pointer<const Pointee<Runtime>>;
+template <typename Runtime> struct TargetProtocolConformanceDescriptor;
 
 struct HeapObject;
 class WeakReference;
 struct UnownedReference;
-  
-template <typename Runtime, bool ObjCInterop = Runtime::ObjCInterop>
-struct TargetAnyClassMetadataTypeImpl;
-template <typename Runtime>
-struct TargetAnyClassMetadataTypeImpl<Runtime, /*ObjCInterop*/ true> {
-  using type = TargetAnyClassMetadataObjCInterop<Runtime>;
-};
-template <typename Runtime>
-struct TargetAnyClassMetadataTypeImpl<Runtime, /*ObjCInterop*/ false> {
-  using type = TargetAnyClassMetadata<Runtime>;
-};
-template <typename Runtime>
-using TargetAnyClassMetadataType =
-  typename TargetAnyClassMetadataTypeImpl<Runtime>::type;
-
-template <typename Runtime>
-using TargetClassMetadataType =
-  TargetClassMetadata<Runtime, TargetAnyClassMetadataType<Runtime>>;
 
 /// The result of requesting type metadata.  Generally the return value of
 /// a function.
@@ -141,8 +114,6 @@ struct MetadataDependency {
            Requirement == other.Requirement;
   }
 };
-
-template <typename Runtime> struct TargetProtocolConformanceDescriptor;
 
 /// The header before a metadata object which appears on all type
 /// metadata.  Note that heap metadata are not necessarily type
@@ -572,29 +543,6 @@ public:
   }
 };
 
-template<typename Runtime> struct TargetContextDescriptor;
-
-template<typename Runtime,
-         template<typename _Runtime> class Context = TargetContextDescriptor>
-using TargetSignedContextPointer = TargetSignedPointer<Runtime,
-                          Context<Runtime> * __ptrauth_swift_type_descriptor>;
-
-template<typename Runtime,
-         template<typename _Runtime> class Context = TargetContextDescriptor>
-using TargetRelativeContextPointer =
-  RelativeIndirectablePointer<const Context<Runtime>,
-                              /*nullable*/ true, int32_t,
-                              TargetSignedContextPointer<Runtime, Context>>;
-
-using RelativeContextPointer = TargetRelativeContextPointer<InProcess>;
-
-template<typename Runtime, typename IntTy,
-         template<typename _Runtime> class Context = TargetContextDescriptor>
-using RelativeContextPointerIntPair =
-  RelativeIndirectablePointerIntPair<const Context<Runtime>, IntTy,
-                              /*nullable*/ true, int32_t,
-                              TargetSignedContextPointer<Runtime, Context>>;
-
 template<typename Runtime> struct TargetMethodDescriptor;
 
 template<typename Runtime>
@@ -748,7 +696,9 @@ struct TargetAnyClassMetadataObjCInterop
     : public TargetAnyClassMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
-  using TargetClassMetadataObjCInterop = TargetClassMetadataType<Runtime>;
+  using TargetClassMetadataObjCInterop =
+    // swift:: qualifier works around an MSVC quirk
+    swift::TargetClassMetadata<Runtime, TargetAnyClassMetadataObjCInterop<Runtime>>;
 
   constexpr TargetAnyClassMetadataObjCInterop(
       TargetAnyClassMetadataObjCInterop<Runtime> *isa,
@@ -1077,18 +1027,7 @@ public:
     return metadata->getKind() == MetadataKind::Class;
   }
 };
-#if SWIFT_OBJC_INTEROP
-using ClassMetadata =
-    TargetClassMetadata<InProcess,
-                        TargetAnyClassMetadataObjCInterop<InProcess>>;
-#else
-using ClassMetadata =
-    TargetClassMetadata<InProcess, TargetAnyClassMetadata<InProcess>>;
-#endif
-
-template <typename Runtime>
-using TargetClassMetadataObjCInterop =
-    TargetClassMetadata<Runtime, TargetAnyClassMetadataObjCInterop<Runtime>>;
+using ClassMetadata = TargetClassMetadataType<InProcess>;
 
 /// The structure of class metadata that's compatible with dispatch objects.
 /// This includes Swift heap metadata, followed by the vtable entries that
@@ -1570,161 +1509,6 @@ TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements() -> StoredSize {
 
 template <typename Runtime> struct TargetProtocolDescriptor;
 
-/// Layout of a small prefix of an Objective-C protocol, used only to
-/// directly extract the name of the protocol.
-template <typename Runtime>
-struct TargetObjCProtocolPrefix {
-  /// Unused by the Swift runtime.
-  TargetPointer<Runtime, const void> _ObjC_Isa;
-
-  /// The mangled name of the protocol.
-  TargetPointer<Runtime, const char> Name;
-};
-
-/// A reference to a protocol within the runtime, which may be either
-/// a Swift protocol or (when Objective-C interoperability is enabled) an
-/// Objective-C protocol.
-///
-/// This type always contains a single target pointer, whose lowest bit is
-/// used to distinguish between a Swift protocol referent and an Objective-C
-/// protocol referent.
-template <typename Runtime>
-class TargetProtocolDescriptorRef {
-  using StoredPointer = typename Runtime::StoredPointer;
-  using ProtocolDescriptorPointer =
-    ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>;
-
-  enum : StoredPointer {
-    // The bit used to indicate whether this is an Objective-C protocol.
-    IsObjCBit = 0x1U,
-  };
-
-  /// A direct pointer to a protocol descriptor for either an Objective-C
-  /// protocol (if the low bit is set) or a Swift protocol (if the low bit
-  /// is clear).
-  StoredPointer storage;
-
-public:
-  constexpr TargetProtocolDescriptorRef(StoredPointer storage)
-    : storage(storage) { }
-
-  constexpr TargetProtocolDescriptorRef() : storage() { }
-
-  TargetProtocolDescriptorRef(
-                        ProtocolDescriptorPointer protocol,
-                        ProtocolDispatchStrategy dispatchStrategy) {
-    if (Runtime::ObjCInterop) {
-      storage =
-          reinterpret_cast<StoredPointer>(protocol) |
-          (dispatchStrategy == ProtocolDispatchStrategy::ObjC ? IsObjCBit : 0);
-    } else {
-      assert(dispatchStrategy == ProtocolDispatchStrategy::Swift);
-      storage = reinterpret_cast<StoredPointer>(protocol);
-    }
-  }
-
-  const static TargetProtocolDescriptorRef forSwift(
-                                          ProtocolDescriptorPointer protocol) {
-    return TargetProtocolDescriptorRef{
-        reinterpret_cast<StoredPointer>(protocol)};
-  }
-
-#if SWIFT_OBJC_INTEROP
-  constexpr static TargetProtocolDescriptorRef forObjC(Protocol *objcProtocol) {
-    return TargetProtocolDescriptorRef{
-        reinterpret_cast<StoredPointer>(objcProtocol) | IsObjCBit};
-  }
-#endif
-
-  explicit constexpr operator bool() const {
-    return storage != 0;
-  }
-
-  /// The name of the protocol.
-  TargetPointer<Runtime, const char> getName() const {
-#if SWIFT_OBJC_INTEROP
-    if (isObjC()) {
-      return reinterpret_cast<TargetObjCProtocolPrefix<Runtime> *>(
-          getObjCProtocol())->Name;
-    }
-#endif
-
-    return getSwiftProtocol()->Name;
-  }
-
-  /// Determine what kind of protocol this is, Swift or Objective-C.
-  ProtocolDispatchStrategy getDispatchStrategy() const {
-    if (isObjC()) {
-      return ProtocolDispatchStrategy::ObjC;
-    }
-
-    return ProtocolDispatchStrategy::Swift;
-  }
-
-  /// Determine whether this protocol has a 'class' constraint.
-  ProtocolClassConstraint getClassConstraint() const {
-    if (isObjC()) {
-      return ProtocolClassConstraint::Class;
-    }
-
-    return getSwiftProtocol()->getProtocolContextDescriptorFlags()
-        .getClassConstraint();
-  }
-
-  /// Determine whether this protocol needs a witness table.
-  bool needsWitnessTable() const {
-    if (isObjC()) {
-      return false;
-    }
-
-    return true;
-  }
-
-  SpecialProtocol getSpecialProtocol() const {
-    if (isObjC()) {
-      return SpecialProtocol::None;
-    }
-
-    return getSwiftProtocol()->getProtocolContextDescriptorFlags()
-        .getSpecialProtocol();
-  }
-
-  /// Retrieve the Swift protocol descriptor.
-  ProtocolDescriptorPointer getSwiftProtocol() const {
-    assert(!isObjC());
-
-    // NOTE: we explicitly use a C-style cast here because cl objects to the
-    // reinterpret_cast from a uintptr_t type to an unsigned type which the
-    // Pointer type may be depending on the instantiation.  Using the C-style
-    // cast gives us a single path irrespective of the template type parameters.
-    return (ProtocolDescriptorPointer)(storage & ~IsObjCBit);
-  }
-
-  /// Retrieve the raw stored pointer and discriminator bit.
-  constexpr StoredPointer getRawData() const {
-    return storage;
-  }
-
-  /// Whether this references an Objective-C protocol.
-  bool isObjC() const {
-    if (Runtime::ObjCInterop)
-      return (storage & IsObjCBit) != 0;
-    else
-      return false;
-  }
-
-#if SWIFT_OBJC_INTEROP
-  /// Retrieve the Objective-C protocol.
-  TargetPointer<Runtime, Protocol> getObjCProtocol() const {
-    assert(isObjC());
-    return reinterpret_cast<TargetPointer<Runtime, Protocol> >(
-                                                         storage & ~IsObjCBit);
-  }
-#endif
-};
-
-using ProtocolDescriptorRef = TargetProtocolDescriptorRef<InProcess>;
-
 /// A protocol requirement descriptor. This describes a single protocol
 /// requirement in a protocol descriptor. The index of the requirement in
 /// the descriptor determines the offset of the witness in a witness table
@@ -2174,116 +1958,6 @@ using ProtocolRecord = TargetProtocolRecord<InProcess>;
 
 template<typename Runtime> class TargetGenericRequirementDescriptor;
 
-/// A relative pointer to a protocol descriptor, which provides the relative-
-/// pointer equivalent to \c TargetProtocolDescriptorRef.
-template <typename Runtime>
-class RelativeTargetProtocolDescriptorPointer {
-  union {
-    /// Relative pointer to a Swift protocol descriptor.
-    /// The \c bool value will be false to indicate that the protocol
-    /// is a Swift protocol, or true to indicate that this references
-    /// an Objective-C protocol.
-    RelativeContextPointerIntPair<Runtime, bool, TargetProtocolDescriptor>
-      swiftPointer;
-#if SWIFT_OBJC_INTEROP    
-    /// Relative pointer to an ObjC protocol descriptor.
-    /// The \c bool value will be false to indicate that the protocol
-    /// is a Swift protocol, or true to indicate that this references
-    /// an Objective-C protocol.
-    RelativeIndirectablePointerIntPair<Protocol, bool> objcPointer;
-#endif
-  };
-
-  bool isObjC() const {
-#if SWIFT_OBJC_INTEROP
-    if (Runtime::ObjCInterop)
-      return objcPointer.getInt();
-#endif
-    return false;
-  }
-
-public:
-  /// Retrieve a reference to the protocol.
-  TargetProtocolDescriptorRef<Runtime> getProtocol() const {
-#if SWIFT_OBJC_INTEROP
-    if (isObjC()) {
-      return TargetProtocolDescriptorRef<Runtime>::forObjC(
-          const_cast<Protocol *>(objcPointer.getPointer()));
-    }
-#endif
-
-    return TargetProtocolDescriptorRef<Runtime>::forSwift(
-        reinterpret_cast<
-            ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>>(
-            swiftPointer.getPointer()));
-  }
-
-  operator TargetProtocolDescriptorRef<Runtime>() const {
-    return getProtocol();
-  }
-};
-
-/// A reference to a type.
-template <typename Runtime>
-struct TargetTypeReference {
-  template <typename T>
-  using TargetClassMetadata = TargetClassMetadataType<T>;
-
-  union {
-    /// A direct reference to a TypeContextDescriptor or ProtocolDescriptor.
-    RelativeDirectPointer<TargetContextDescriptor<Runtime>>
-      DirectTypeDescriptor;
-
-    /// An indirect reference to a TypeContextDescriptor or ProtocolDescriptor.
-    RelativeDirectPointer<
-        TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor>>
-      IndirectTypeDescriptor;
-
-    /// An indirect reference to an Objective-C class.
-    RelativeDirectPointer<
-        ConstTargetMetadataPointer<Runtime, TargetClassMetadata>>
-        IndirectObjCClass;
-
-    /// A direct reference to an Objective-C class name.
-    RelativeDirectPointer<const char>
-      DirectObjCClassName;
-  };
-
-  const TargetContextDescriptor<Runtime> *
-  getTypeDescriptor(TypeReferenceKind kind) const {
-    switch (kind) {
-    case TypeReferenceKind::DirectTypeDescriptor:
-      return DirectTypeDescriptor;
-
-    case TypeReferenceKind::IndirectTypeDescriptor:
-      return *IndirectTypeDescriptor;
-
-    case TypeReferenceKind::DirectObjCClassName:
-    case TypeReferenceKind::IndirectObjCClass:
-      return nullptr;
-    }
-
-    return nullptr;
-  }
-
-  /// If this type reference is one of the kinds that supports ObjC
-  /// references,
-  const TargetClassMetadataObjCInterop<Runtime> *
-  getObjCClass(TypeReferenceKind kind) const;
-
-  const TargetClassMetadataObjCInterop<Runtime> * const *
-  getIndirectObjCClass(TypeReferenceKind kind) const {
-    assert(kind == TypeReferenceKind::IndirectObjCClass);
-    return IndirectObjCClass.get();
-  }
-
-  const char *getDirectObjCClassName(TypeReferenceKind kind) const {
-    assert(kind == TypeReferenceKind::DirectObjCClassName);
-    return DirectObjCClassName.get();
-  }
-};
-using TypeReference = TargetTypeReference<InProcess>;
-
 /// Header containing information about the resilient witnesses in a
 /// protocol conformance descriptor.
 template <typename Runtime>
@@ -2497,9 +2171,6 @@ template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize
 using ExternalProtocolConformanceRecord = TargetProtocolConformanceRecord<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 template<typename Runtime>
-struct TargetGenericContext;
-
-template<typename Runtime>
 struct TargetModuleContextDescriptor;
 
 /// Base class for all context descriptors.
@@ -2600,351 +2271,6 @@ TargetContextDescriptor<Runtime>::getModuleContext() const {
       return module;
   }
 }
-
-template<typename Runtime>
-struct TargetGenericContextDescriptorHeader {
-  /// The number of (source-written) generic parameters, and thus
-  /// the number of GenericParamDescriptors associated with this
-  /// context.  The parameter descriptors appear in the order in
-  /// which they were given in the source.
-  ///
-  /// A GenericParamDescriptor corresponds to a type metadata pointer
-  /// in the arguments layout when isKeyArgument() is true.
-  /// isKeyArgument() will be false if the parameter has been unified
-  /// unified with a different parameter or an associated type.
-  uint16_t NumParams;
-
-  /// The number of GenericRequirementDescriptors in this generic
-  /// signature.
-  ///
-  /// A GenericRequirementDescriptor of kind Protocol corresponds
-  /// to a witness table pointer in the arguments layout when
-  /// isKeyArgument() is true.  isKeyArgument() will be false if
-  /// the protocol is an Objective-C protocol.  (Unlike generic
-  /// parameters, redundant conformance requirements can simply be
-  /// eliminated, and so that case is not impossible.)
-  uint16_t NumRequirements;
-
-  /// The size of the "key" area of the argument layout, in words.
-  /// Key arguments include generic parameters and conformance
-  /// requirements which are part of the identity of the context.
-  ///
-  /// The key area of the argument layout considers of a sequence
-  /// of type metadata pointers (in the same order as the parameter
-  /// descriptors, for those parameters which satisfy hasKeyArgument())
-  /// followed by a sequence of witness table pointers (in the same
-  /// order as the requirements, for those requirements which satisfy
-  /// hasKeyArgument()).
-  uint16_t NumKeyArguments;
-
-  /// In principle, the size of the "extra" area of the argument
-  /// layout, in words.  The idea was that extra arguments would
-  /// include generic parameters and conformances that are not part
-  /// of the identity of the context; however, it's unclear why we
-  /// would ever want such a thing.  As a result, this section is
-  /// unused, and this field is always zero.  It can be repurposed
-  /// as long as it remains zero in code which must be compatible
-  /// with existing Swift runtimes.
-  uint16_t NumExtraArguments;
-  
-  uint32_t getNumArguments() const {
-    return NumKeyArguments + NumExtraArguments;
-  }
-
-  /// Return the total size of the argument layout, in words.
-  /// The alignment of the argument layout is the word alignment.
-  uint32_t getArgumentLayoutSizeInWords() const {
-    return getNumArguments();
-  }
-
-  bool hasArguments() const {
-    return getNumArguments() > 0;
-  }
-};
-using GenericContextDescriptorHeader =
-  TargetGenericContextDescriptorHeader<InProcess>;
-
-template<typename Runtime>
-class TargetGenericRequirementDescriptor {
-public:
-  GenericRequirementFlags Flags;
-
-  /// The type that's constrained, described as a mangled name.
-  RelativeDirectPointer<const char, /*nullable*/ false> Param;
-
-  union {
-    /// A mangled representation of the same-type or base class the param is
-    /// constrained to.
-    ///
-    /// Only valid if the requirement has SameType or BaseClass kind.
-    RelativeDirectPointer<const char, /*nullable*/ false> Type;
-    
-    /// The protocol the param is constrained to.
-    ///
-    /// Only valid if the requirement has Protocol kind.
-    RelativeTargetProtocolDescriptorPointer<Runtime> Protocol;
-    
-    /// The conformance the param is constrained to use.
-    ///
-    /// Only valid if the requirement has SameConformance kind.
-    RelativeIndirectablePointer<TargetProtocolConformanceDescriptor<Runtime>,
-                                /*nullable*/ false> Conformance;
-    
-    /// The kind of layout constraint.
-    ///
-    /// Only valid if the requirement has Layout kind.
-    GenericRequirementLayoutKind Layout;
-  };
-
-  constexpr GenericRequirementFlags getFlags() const {
-    return Flags;
-  }
-
-  constexpr GenericRequirementKind getKind() const {
-    return getFlags().getKind();
-  }
-
-  /// Retrieve the generic parameter that is the subject of this requirement,
-  /// as a mangled type name.
-  llvm::StringRef getParam() const {
-    return swift::Demangle::makeSymbolicMangledNameStringRef(Param.get());
-  }
-
-  /// Retrieve the protocol for a Protocol requirement.
-  TargetProtocolDescriptorRef<Runtime> getProtocol() const {
-    assert(getKind() == GenericRequirementKind::Protocol);
-    return Protocol;
-  }
-
-  /// Retrieve the right-hand type for a SameType or BaseClass requirement.
-  llvm::StringRef getMangledTypeName() const {
-    assert(getKind() == GenericRequirementKind::SameType ||
-           getKind() == GenericRequirementKind::BaseClass);
-    return swift::Demangle::makeSymbolicMangledNameStringRef(Type.get());
-  }
-
-  /// Retrieve the protocol conformance record for a SameConformance
-  /// requirement.
-  const TargetProtocolConformanceDescriptor<Runtime> *getConformance() const {
-    assert(getKind() == GenericRequirementKind::SameConformance);
-    return Conformance;
-  }
-
-  /// Retrieve the layout constraint.
-  GenericRequirementLayoutKind getLayout() const {
-    assert(getKind() == GenericRequirementKind::Layout);
-    return Layout;
-  }
-
-  /// Determine whether this generic requirement has a known kind.
-  ///
-  /// \returns \c false for any future generic requirement kinds.
-  bool hasKnownKind() const {
-    switch (getKind()) {
-    case GenericRequirementKind::BaseClass:
-    case GenericRequirementKind::Layout:
-    case GenericRequirementKind::Protocol:
-    case GenericRequirementKind::SameConformance:
-    case GenericRequirementKind::SameType:
-      return true;
-    }
-
-    return false;
-  }
-};
-using GenericRequirementDescriptor =
-  TargetGenericRequirementDescriptor<InProcess>;
-
-template<typename Runtime>
-class TargetGenericEnvironment
-    : public swift::ABI::TrailingObjects<TargetGenericEnvironment<Runtime>,
-               uint16_t, GenericParamDescriptor,
-               TargetGenericRequirementDescriptor<Runtime>> {
-  using GenericRequirementDescriptor =
-    TargetGenericRequirementDescriptor<Runtime>;
-  using TrailingObjects =
-     swift::ABI::TrailingObjects<TargetGenericEnvironment<Runtime>,
-       uint16_t, GenericParamDescriptor, GenericRequirementDescriptor>;
-  friend TrailingObjects;
-
-#if !defined(_MSC_VER) || _MSC_VER >= 1920
-  template<typename T>
-  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
-#else
-// MSVC 2017 trips parsing an using of an using, of a variadic template
-#define OverloadToken typename TrailingObjects::template OverloadToken
-#endif
-
-  size_t numTrailingObjects(OverloadToken<uint16_t>) const {
-    return Flags.getNumGenericParameterLevels();
-  }
-
-  size_t numTrailingObjects(OverloadToken<GenericParamDescriptor>) const {
-    return getGenericParameterCounts().back();
-  }
-
-  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
-    return Flags.getNumGenericRequirements();
-  }
-
-#if defined(_MSC_VER) && _MSC_VER < 1920
-#undef OverloadToken
-#endif
-
-  GenericEnvironmentFlags Flags;
-
-public:
-  /// Retrieve the cumulative generic parameter counts at each level of genericity.
-  llvm::ArrayRef<uint16_t> getGenericParameterCounts() const {
-    return llvm::makeArrayRef(this->template getTrailingObjects<uint16_t>(),
-                              Flags.getNumGenericParameterLevels());
-  }
-
-  /// Retrieve the generic parameters descriptors.
-  llvm::ArrayRef<GenericParamDescriptor> getGenericParameters() const {
-    return llvm::makeArrayRef(
-        this->template getTrailingObjects<GenericParamDescriptor>(),
-        getGenericParameterCounts().back());
-  }
-
-  /// Retrieve the generic requirements.
-  llvm::ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
-    return llvm::makeArrayRef(
-        this->template getTrailingObjects<GenericRequirementDescriptor>(),
-        Flags.getNumGenericRequirements());
-  }
-};
-
-using GenericEnvironmentDescriptor = TargetGenericEnvironment<InProcess>;
-
-/// CRTP class for a context descriptor that includes trailing generic
-/// context description.
-template<class Self,
-         template <typename> class TargetGenericContextHeaderType =
-           TargetGenericContextDescriptorHeader,
-         typename... FollowingTrailingObjects>
-class TrailingGenericContextObjects;
-
-// This oddity with partial specialization is necessary to get
-// reasonable-looking code while also working around various kinds of
-// compiler bad behavior with injected class names.
-template<class Runtime,
-         template <typename> class TargetSelf,
-         template <typename> class TargetGenericContextHeaderType,
-         typename... FollowingTrailingObjects>
-class TrailingGenericContextObjects<TargetSelf<Runtime>,
-                                    TargetGenericContextHeaderType,
-                                    FollowingTrailingObjects...> :
-  protected swift::ABI::TrailingObjects<TargetSelf<Runtime>,
-      TargetGenericContextHeaderType<Runtime>,
-      GenericParamDescriptor,
-      TargetGenericRequirementDescriptor<Runtime>,
-      FollowingTrailingObjects...>
-{
-protected:
-  using Self = TargetSelf<Runtime>;
-  using GenericContextHeaderType = TargetGenericContextHeaderType<Runtime>;
-  using GenericRequirementDescriptor =
-    TargetGenericRequirementDescriptor<Runtime>;
-
-  using TrailingObjects = swift::ABI::TrailingObjects<Self,
-    GenericContextHeaderType,
-    GenericParamDescriptor,
-    GenericRequirementDescriptor,
-    FollowingTrailingObjects...>;
-  friend TrailingObjects;
-
-#if !defined(_MSC_VER) || _MSC_VER >= 1920
-  template<typename T>
-  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
-#else
-// MSVC 2017 trips parsing an using of an using, of a variadic template
-#define OverloadToken typename TrailingObjects::template OverloadToken
-#endif
-  
-  const Self *asSelf() const {
-    return static_cast<const Self *>(this);
-  }
-public:
-  using StoredSize = typename Runtime::StoredSize;
-  using StoredPointer = typename Runtime::StoredPointer;
-
-  const GenericContextHeaderType &getFullGenericContextHeader() const {
-    assert(asSelf()->isGeneric());
-    return *this->template getTrailingObjects<GenericContextHeaderType>();
-  }
-
-  const TargetGenericContextDescriptorHeader<Runtime> &
-  getGenericContextHeader() const {
-    /// HeaderType ought to be convertible to GenericContextDescriptorHeader.
-    return getFullGenericContextHeader();
-  }
-  
-  const TargetGenericContext<Runtime> *getGenericContext() const {
-    if (!asSelf()->isGeneric())
-      return nullptr;
-    // The generic context header should always be immediately followed in
-    // memory by trailing parameter and requirement descriptors.
-    auto *header = reinterpret_cast<const char *>(&getGenericContextHeader());
-    return reinterpret_cast<const TargetGenericContext<Runtime> *>(
-      header - sizeof(TargetGenericContext<Runtime>));
-  }
-
-  llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const {
-    if (!asSelf()->isGeneric())
-      return {};
-
-    return {this->template getTrailingObjects<GenericParamDescriptor>(),
-            getGenericContextHeader().NumParams};
-  }
-  
-  llvm::ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
-    if (!asSelf()->isGeneric())
-      return {};
-    return {this->template getTrailingObjects<GenericRequirementDescriptor>(),
-            getGenericContextHeader().NumRequirements};
-  }
-
-  /// Return the amount of space that the generic arguments take up in
-  /// metadata of this type.
-  StoredSize getGenericArgumentsStorageSize() const {
-    return StoredSize(getGenericContextHeader().getNumArguments())
-             * sizeof(StoredPointer);
-  }
-
-protected:
-  size_t numTrailingObjects(OverloadToken<GenericContextHeaderType>) const {
-    return asSelf()->isGeneric() ? 1 : 0;
-  }
-  
-  size_t numTrailingObjects(OverloadToken<GenericParamDescriptor>) const {
-    return asSelf()->isGeneric() ? getGenericContextHeader().NumParams : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
-    return asSelf()->isGeneric() ? getGenericContextHeader().NumRequirements : 0;
-  }
-
-#if defined(_MSC_VER) && _MSC_VER < 1920
-#undef OverloadToken
-#endif
-
-};
-
-/// Reference to a generic context.
-template<typename Runtime>
-struct TargetGenericContext final
-  : TrailingGenericContextObjects<TargetGenericContext<Runtime>,
-                                  TargetGenericContextDescriptorHeader>
-{
-  // This struct is supposed to be empty, but TrailingObjects respects the
-  // unique-address-per-object C++ rule, so even if this type is empty, the
-  // trailing objects will come after one byte of padding. This dummy field
-  // takes up space to make the offset of the trailing objects portable.
-  unsigned _dummy;
-
-  bool isGeneric() const { return true; }
-};
 
 /// Descriptor for an extension context.
 template<typename Runtime>
