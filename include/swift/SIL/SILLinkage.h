@@ -135,7 +135,7 @@ enum IsSerialized_t : unsigned char {
   ///
   /// This flag is only valid for Public, PublicNonABI, PublicExternal,
   /// HiddenExternal and Shared functions.
-  /// Functions with external linkage (PublicExternl, HiddenExternal) will not
+  /// Functions with external linkage (PublicExternal, HiddenExternal) will not
   /// be serialized, because they are available in a different module (from which
   /// they were de-serialized).
   ///

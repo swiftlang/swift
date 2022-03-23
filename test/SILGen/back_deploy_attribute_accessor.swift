@@ -36,7 +36,7 @@ public struct TopLevelStruct {
   // CHECK:   return [[RETURN_BB_ARG]] : $TopLevelStruct
 
   // -- Original definition of TopLevelStruct.property.getter
-  // CHECK-LABEL: sil [serialized] [available 10.51] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvg : $@convention(method) (TopLevelStruct) -> TopLevelStruct
+  // CHECK-LABEL: sil [available 10.51] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvg : $@convention(method) (TopLevelStruct) -> TopLevelStruct
   @available(macOS 10.51, *)
   @_backDeploy(before: macOS 10.52)
   public var property: TopLevelStruct { self }
