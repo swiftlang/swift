@@ -56,7 +56,23 @@ func tuple_test() -> Int {
 
 class CheckCompilerInitAttr {
   @_compilerInitialized let poster: Int
-  init() {
+  var whatever: Int // expected-note {{'self.whatever' not initialized}}
+
+  init(v1: Void) {
+    whatever = 0
     poster = 10 // expected-error {{illegal assignment to '@_compilerInitialized' storage}}
   }
+
+  // NB: this case is testing whether we only get a note for `whatever` and not `poster`
+  init(v2: Void) {} // expected-error {{return from initializer without initializing all stored properties}}
+}
+
+class AgainCheckCompilerInitAttr {
+  @_compilerInitialized let cleanup: Int // expected-note {{'self.cleanup' not initialized}}
+  var whenever: Int
+
+  // NB: this case ensures we still get a note for `cleanup` because no other properties are uninitialized
+  init() {
+    whenever = 0
+  } // expected-error {{return from initializer without initializing all stored properties}}
 }

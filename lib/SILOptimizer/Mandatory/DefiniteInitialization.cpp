@@ -689,6 +689,9 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
   AvailabilitySet Liveness =
     getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
 
+  SmallVector<std::function<void()>, 2> delayedNotes;
+  bool emittedNote = false;
+
   for (unsigned i = Use.FirstElement, e = Use.FirstElement+Use.NumElements;
        i != e; ++i) {
     if (Liveness.get(i) == DIKind::Yes) continue;
@@ -701,13 +704,34 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
     auto *Decl = TheMemory.getPathStringToElement(i, Name);
     SILLocation Loc = Use.Inst->getLoc();
 
-    // If we found a non-implicit declaration, use its source location.
-    if (Decl && !Decl->isImplicit())
-      Loc = SILLocation(Decl);
+    if (Decl) {
+      // If we found a non-implicit declaration, use its source location.
+      if (!Decl->isImplicit())
+        Loc = SILLocation(Decl);
+
+      // If it's marked @_compilerInitialized, delay emission of the note.
+      if (Decl->getAttrs().hasAttribute<CompilerInitializedAttr>()) {
+        delayedNotes.push_back([=](){
+          diagnose(Module, Loc, diag::stored_property_not_initialized,
+             StringRef(Name));
+        });
+        continue;
+      }
+    }
 
     diagnose(Module, Loc, diag::stored_property_not_initialized,
              StringRef(Name));
+    emittedNote = true;
   }
+
+  // Drop the notes for @_compilerInitialized decls if we emitted a note for
+  // other ones that do not have that attr.
+  if (emittedNote)
+    return;
+
+  // otherwise, emit delayed notes.
+  for (auto &emitter : delayedNotes)
+    emitter();
 }
 
 /// Given a use that has at least one uninitialized element in it, produce a
