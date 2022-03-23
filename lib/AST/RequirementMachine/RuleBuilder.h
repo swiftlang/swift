@@ -98,7 +98,10 @@ struct RuleBuilder {
   void initWithGenericSignatureRequirements(ArrayRef<Requirement> requirements);
   void initWithWrittenRequirements(ArrayRef<StructuralRequirement> requirements);
   void initWithProtocolSignatureRequirements(ArrayRef<const ProtocolDecl *> proto);
-  void initWithProtocolWrittenRequirements(ArrayRef<const ProtocolDecl *> proto);
+  void initWithProtocolWrittenRequirements(
+      ArrayRef<const ProtocolDecl *> component,
+      const llvm::DenseMap<const ProtocolDecl *,
+                           SmallVector<StructuralRequirement, 4>> protos);
   void initWithConditionalRequirements(ArrayRef<Requirement> requirements,
                                        ArrayRef<Term> substitutions);
   void addReferencedProtocol(const ProtocolDecl *proto);

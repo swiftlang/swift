@@ -520,6 +520,10 @@ namespace swift {
     /// algorithm.
     unsigned RequirementMachineMaxConcreteNesting = 30;
 
+    /// Maximum number of attempts to make when splitting concrete equivalence
+    /// classes.
+    unsigned RequirementMachineMaxSplitConcreteEquivClassAttempts = 2;
+
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.
     RequirementMachineMode RequirementMachineProtocolSignatures =
