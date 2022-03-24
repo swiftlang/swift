@@ -246,8 +246,9 @@ public:
   ///
   /// \param nominal The nominal type for which we would like to diagnose
   /// derivation failures
-  static void tryDiagnoseFailedDistributedActorSystemDerivation(
-      DeclContext *DC, NominalTypeDecl *nominal);
+  static void
+  tryDiagnoseFailedDistributedActorSystemDerivation(DeclContext *DC,
+                                                    NominalTypeDecl *nominal);
 
   /// Determine if an Equatable requirement can be derived for a type.
   ///

@@ -21,6 +21,9 @@ public protocol DistributedActorSystem: Sendable {
   associatedtype InvocationEncoder: DistributedTargetInvocationEncoder
   associatedtype InvocationDecoder: DistributedTargetInvocationDecoder
 
+  /// The type of the result handler which will be offered the results
+  /// returned by a distributed function invocation called via
+  /// `executeDistributedTarget`.
   associatedtype ResultHandler: DistributedTargetInvocationResultHandler
 
   /// The serialization requirement that will be applied to all distributed targets used with this system.
@@ -208,9 +211,7 @@ extension DistributedActorSystem {
     target: RemoteCallTarget,
     invocationDecoder: inout InvocationDecoder,
     handler: Self.ResultHandler
-  ) async throws where Act: DistributedActor
-                       // Act.ID == ActorID, // FIXME(distributed): can we bring this back?
-                       {
+  ) async throws where Act: DistributedActor {
     // NOTE: Implementation could be made more efficient because we still risk
     // demangling a RemoteCallTarget identity (if it is a mangled name) multiple
     // times. We would prefer to store if it is a mangled name, demangle, and

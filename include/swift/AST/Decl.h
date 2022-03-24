@@ -3509,7 +3509,7 @@ public:
   /// Find the
   /// 'DistributedActorSystem.invokeHandlerOnReturn(handler:value:metatype:)
   /// function.
-  FuncDecl* getDistributedActorSystemInvokeHandlerOnReturnFunction() const;
+  FuncDecl *getDistributedActorSystemInvokeHandlerOnReturnFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -5602,15 +5602,12 @@ public:
   createImplicit(ASTContext &Context, SourceLoc specifierLoc,
                  SourceLoc argumentNameLoc, Identifier argumentName,
                  SourceLoc parameterNameLoc, Identifier parameterName,
-                 Type interfaceType,
-                 DeclContext *Parent,
+                 Type interfaceType, DeclContext *Parent,
                  ParamSpecifier specifier = ParamSpecifier::Default);
 
-  static ParamDecl*
-  createImplicit(ASTContext &Context,
-                 Identifier argumentName,
-                 Identifier parameterName,
-                 Type interfaceType,
+  static ParamDecl *
+  createImplicit(ASTContext &Context, Identifier argumentName,
+                 Identifier parameterName, Type interfaceType,
                  DeclContext *Parent,
                  ParamSpecifier specifier = ParamSpecifier::Default);
 

@@ -6094,7 +6094,6 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
     // If no one could find a problem with this expression or constraint system,
     // then it must be well-formed... but is ambiguous.  Handle this by
     // diagnostic various cases that come up.
-    expr->dump(); // FIXME: remove this
     DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
         .highlight(expr->getSourceRange());
   } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {

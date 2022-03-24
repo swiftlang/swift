@@ -131,7 +131,8 @@ Type swift::getDistributedActorSystemActorIDType(NominalTypeDecl *system) {
   return conformance.getTypeWitnessByName(selfType, ctx.Id_ActorID);
 }
 
-Type swift::getDistributedActorSystemResultHandlerType(NominalTypeDecl *system) {
+Type swift::getDistributedActorSystemResultHandlerType(
+    NominalTypeDecl *system) {
   assert(!system->isDistributedActor());
   auto &ctx = system->getASTContext();
 
@@ -143,7 +144,8 @@ Type swift::getDistributedActorSystemResultHandlerType(NominalTypeDecl *system) 
   auto module = system->getParentModule();
   Type selfType = system->getSelfInterfaceType();
   auto conformance = module->lookupConformance(selfType, DAS);
-  auto witness = conformance.getTypeWitnessByName(selfType, ctx.Id_ResultHandler);
+  auto witness =
+      conformance.getTypeWitnessByName(selfType, ctx.Id_ResultHandler);
   if (auto alias = dyn_cast<TypeAliasType>(witness.getPointer())) {
     return alias->getDecl()->getUnderlyingType();
   } else {
@@ -514,8 +516,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   if (actorIdReq.getKind() != RequirementKind::SameType) {
     return false;
   }
-  auto expectedActorIdTy =
-      getDistributedActorSystemActorIDType(systemNominal);
+  auto expectedActorIdTy = getDistributedActorSystemActorIDType(systemNominal);
   if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy)) {
     return false;
   }
@@ -1103,9 +1104,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     }
 
     // === Get the SerializationRequirement
-    SmallPtrSet<ProtocolDecl*, 2> requirementProtos;
-    if (!getDistributedSerializationRequirements(
-            decoderNominal, decoderProto, requirementProtos)) {
+    SmallPtrSet<ProtocolDecl *, 2> requirementProtos;
+    if (!getDistributedSerializationRequirements(decoderNominal, decoderProto,
+                                                 requirementProtos)) {
       return false;
     }
 
@@ -1219,7 +1220,8 @@ NominalTypeDecl::getDistributedRemoteCallArgumentInitFunction() const {
 }
 
 FuncDecl *
-NominalTypeDecl::getDistributedActorSystemInvokeHandlerOnReturnFunction() const {
+NominalTypeDecl::getDistributedActorSystemInvokeHandlerOnReturnFunction()
+    const {
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(
       getASTContext().evaluator,

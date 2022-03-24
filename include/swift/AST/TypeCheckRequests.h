@@ -1271,10 +1271,10 @@ public:
 
 /// Synthesize and return the 'invokeHandlerOnReturn' method for a concrete
 /// actor system.
-class GetDistributedActorSystemInvokeHandlerOnReturnRequest :
-    public SimpleRequest<GetDistributedActorSystemInvokeHandlerOnReturnRequest,
-                         FuncDecl *(NominalTypeDecl *),
-                         RequestFlags::Cached> {
+class GetDistributedActorSystemInvokeHandlerOnReturnRequest
+    : public SimpleRequest<
+          GetDistributedActorSystemInvokeHandlerOnReturnRequest,
+          FuncDecl *(NominalTypeDecl *), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 

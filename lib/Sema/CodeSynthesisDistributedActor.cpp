@@ -795,8 +795,7 @@ FuncDecl *GetDistributedActorSystemInvokeHandlerOnReturnRequest::evaluate(
 }
 
 NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
-    Evaluator &evaluator,
-    NominalTypeDecl *nominal,
+    Evaluator &evaluator, NominalTypeDecl *nominal,
     KnownProtocolKind protoKind) const {
   assert(nominal->isDistributedActor());
   assert(protoKind == KnownProtocolKind::Encodable ||

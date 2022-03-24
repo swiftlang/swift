@@ -2881,7 +2881,6 @@ static void emitDeclaredHereIfNeeded(DiagnosticEngine &diags,
     return;
   if (mainDiagLoc == value->getLoc())
     return;
-  value->dump();
   diags.diagnose(value, diag::decl_declared_here, value->getName());
 }
 

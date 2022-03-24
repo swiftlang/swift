@@ -5822,7 +5822,6 @@ bool MissingGenericArgumentsFailure::diagnoseForAnchor(
     if (isa<ConstructorDecl>(AFD)) {
       emitDiagnosticAt(AFD, diag::note_call_to_initializer);
     } else {
-      anchor.dump();
       emitDiagnosticAt(AFD,
                        AFD->isOperator() ? diag::note_call_to_operator
                                          : diag::note_call_to_func,
@@ -7718,8 +7717,6 @@ bool ReferenceToInvalidDeclaration::diagnoseAsError() {
   // If no errors have been emitted yet, let's emit one
   // about reference to an invalid declaration.
 
-  fprintf(stderr, "[%s:%d] (%s) decl\n", __FILE__, __LINE__, __FUNCTION__);
-  decl->dump();
   emitDiagnostic(diag::reference_to_invalid_decl, decl->getName());
   emitDiagnosticAt(decl, diag::decl_declared_here, decl->getName());
   return true;

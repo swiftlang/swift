@@ -101,20 +101,19 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
 }
 
 /******************************************************************************/
-/*************** INVOKE HANDLER ON-RETURN FUNCTION *****************************/
+/*************** INVOKE HANDLER ON-RETURN FUNCTION ****************************/
 /******************************************************************************/
 
 namespace {
 struct DoInvokeOnReturnContext {
-  ParamDecl* handlerParam;
+  ParamDecl *handlerParam;
   ParamDecl *resultBufferParam;
 };
-}
+} // namespace
 
 static std::pair<BraceStmt *, bool>
 deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
   auto &C = afd->getASTContext();
-  auto DC = afd->getDeclContext();
   auto *context = static_cast<DoInvokeOnReturnContext *>(arg);
 
   // mock locations, we're a thunk and don't really need detailed locations
@@ -133,25 +132,21 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
         C,
         UnresolvedDotExpr::createImplicit(
             C,
-            /*base=*/new (C) DeclRefExpr(
-                ConcreteDeclRef(context->resultBufferParam), dloc, implicit),
+            /*base=*/
+            new (C) DeclRefExpr(ConcreteDeclRef(context->resultBufferParam),
+                                dloc, implicit),
             /*baseName=*/DeclBaseName(C.getIdentifier("load")),
-            /*argLabels=*/{
-                C.getIdentifier("fromByteOffset"),
-                C.getIdentifier("as")
-            }),
-        ArgumentList::createImplicit(C, {
-                   Argument(sloc, C.getIdentifier("as"),
-                         new (C) DeclRefExpr(
-                             ConcreteDeclRef(returnTypeParam), dloc, implicit))
-               }));
+            /*argLabels=*/
+            {C.getIdentifier("fromByteOffset"), C.getIdentifier("as")}),
+        ArgumentList::createImplicit(
+            C, {Argument(sloc, C.getIdentifier("as"),
+                         new (C) DeclRefExpr(ConcreteDeclRef(returnTypeParam),
+                                             dloc, implicit))}));
 
     auto resultPattern = NamedPattern::createImplicit(C, resultVar);
     auto resultPB = PatternBindingDecl::createImplicit(
-        C, swift::StaticSpellingKind::None,
-        resultPattern,
-        /*expr=*/resultLoadCall,
-        afd);
+        C, swift::StaticSpellingKind::None, resultPattern,
+        /*expr=*/resultLoadCall, afd);
 
     stmts.push_back(resultPB);
     stmts.push_back(resultVar);
@@ -159,22 +154,24 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
 
   // call the ad-hoc `handler.onReturn`
   {
-    auto onReturnDecl = C.getOnReturnOnDistributedTargetInvocationResultHandler(
+    // Find the ad-hoc requirement ensured function on the concrete handler:
+    auto onReturnFunc = C.getOnReturnOnDistributedTargetInvocationResultHandler(
         context->handlerParam->getInterfaceType()->getAnyNominal());
-    assert(onReturnDecl && "did not find ad-hoc requirement witness!");
+    assert(onReturnFunc && "did not find ad-hoc requirement witness!");
 
     Expr *callExpr = CallExpr::createImplicit(
         C,
         UnresolvedDotExpr::createImplicit(
             C,
-            /*base=*/new (C) DeclRefExpr(ConcreteDeclRef(context->handlerParam), dloc, implicit),
-            /*baseName=*/onReturnDecl->getBaseName(),
-            /*paramList=*/onReturnDecl->getParameters()),
+            /*base=*/
+            new (C) DeclRefExpr(ConcreteDeclRef(context->handlerParam), dloc,
+                                implicit),
+            /*baseName=*/onReturnFunc->getBaseName(),
+            /*paramList=*/onReturnFunc->getParameters()),
         ArgumentList::forImplicitCallTo(
-            DeclNameRef(onReturnDecl->getName()),
-            {
-                new (C) DeclRefExpr(ConcreteDeclRef(resultVar), dloc, implicit)
-            }, C));
+            DeclNameRef(onReturnFunc->getName()),
+            {new (C) DeclRefExpr(ConcreteDeclRef(resultVar), dloc, implicit)},
+            C));
     callExpr = TryExpr::createImplicit(C, sloc, callExpr);
     callExpr = AwaitExpr::createImplicit(C, sloc, callExpr);
 
@@ -185,8 +182,82 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
   return {body, /*isTypeChecked=*/false};
 }
 
+// Create local function:
+//    func invokeOnReturn<R: Self.SerializationRequirement>(
+//        _ returnType: R.Type
+//    ) async throws {
+//      let value = resultBuffer.load(as: returnType)
+//      try await handler.onReturn(value: value)
+//    }
+static FuncDecl* createLocalFunc_doInvokeOnReturn(
+    ASTContext& C, FuncDecl* parentFunc,
+    NominalTypeDecl* systemNominal,
+    ParamDecl* handlerParam,
+    ParamDecl* resultBufParam) {
+  auto DC = parentFunc;
+  auto DAS = C.getDistributedActorSystemDecl();
+  auto doInvokeLocalFuncIdent = C.getIdentifier("doInvokeOnReturn");
+
+  // mock locations, we're a synthesized func and don't need real locations
+  const SourceLoc sloc = SourceLoc();
+
+  // <R: Self.SerializationRequirement>
+  // We create the generic param at invalid depth, which means it'll be filled
+  // by semantic analysis.
+  auto resultGenericParamDecl = GenericTypeParamDecl::create(
+      parentFunc, C.getIdentifier("R"), sloc, /*isTypeSequence=*/false,
+      /*depth=*/0, /*index=*/0,
+      /*isOpaqueType=*/false,
+      /*opaqueTypeRepr=*/nullptr);
+  GenericParamList *doInvokeGenericParamList =
+      GenericParamList::create(C, sloc, {resultGenericParamDecl}, sloc);
+
+  auto returnTypeIdent = C.getIdentifier("returnType");
+  auto resultTyParamDecl =
+      ParamDecl::createImplicit(C,
+                                /*argument=*/returnTypeIdent,
+                                /*parameter=*/returnTypeIdent,
+                                resultGenericParamDecl->getInterfaceType(), DC);
+  ParameterList *doInvokeParamsList =
+      ParameterList::create(C, {resultTyParamDecl});
+
+  SmallVector<Requirement, 2> requirements;
+  for (auto p : getDistributedSerializationRequirementProtocols(systemNominal, DAS)) {
+    auto requirement =
+        Requirement(RequirementKind::Conformance,
+                    resultGenericParamDecl->getDeclaredInterfaceType(),
+                    p->getInterfaceType()->getMetatypeInstanceType());
+    requirements.push_back(requirement);
+  }
+  GenericSignature doInvokeGenSig =
+      buildGenericSignature(C, parentFunc->getGenericSignature(),
+                            {resultGenericParamDecl->getDeclaredInterfaceType()
+                                 ->castTo<GenericTypeParamType>()},
+                            std::move(requirements));
+
+  FuncDecl *doInvokeOnReturnFunc = FuncDecl::createImplicit(
+      C, swift::StaticSpellingKind::None,
+      DeclName(C, doInvokeLocalFuncIdent, doInvokeParamsList),
+      sloc,
+      /*async=*/true,
+      /*throws=*/true, doInvokeGenericParamList, doInvokeParamsList,
+      /*returnType=*/C.TheEmptyTupleType, parentFunc);
+  doInvokeOnReturnFunc->setImplicit();
+  doInvokeOnReturnFunc->setSynthesized();
+  doInvokeOnReturnFunc->setGenericSignature(doInvokeGenSig);
+
+  auto *doInvokeContext = C.Allocate<DoInvokeOnReturnContext>();
+  doInvokeContext->handlerParam = handlerParam;
+  doInvokeContext->resultBufferParam = resultBufParam;
+  doInvokeOnReturnFunc->setBodySynthesizer(
+      deriveBodyDistributed_doInvokeOnReturn, doInvokeContext);
+
+  return doInvokeOnReturnFunc;
+}
+
 static std::pair<BraceStmt *, bool>
-deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd, void *context) {
+deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd,
+                                            void *context) {
   auto implicit = true;
   ASTContext &C = afd->getASTContext();
   auto DC = afd->getDeclContext();
@@ -226,146 +297,58 @@ deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd, void *con
     metatypeVar->setImplicit();
     metatypeVar->setSynthesized();
 
-    // metatype as! SerializationRequirement.Type
-    auto metatypeRef = new (C) DeclRefExpr(ConcreteDeclRef(metatypeParam), dloc, implicit);
+    // metatype as! <<concrete SerializationRequirement.Type>>
+    auto metatypeRef =
+        new (C) DeclRefExpr(ConcreteDeclRef(metatypeParam), dloc, implicit);
     auto metatypeSRCastExpr = ForcedCheckedCastExpr::createImplicit(
         C, metatypeRef, serializationRequirementMetaTypeTy);
 
-
     auto metatypePattern = NamedPattern::createImplicit(C, metatypeVar);
     auto metatypePB = PatternBindingDecl::createImplicit(
-        C, swift::StaticSpellingKind::None,
-        metatypePattern,
-        /*expr=*/metatypeSRCastExpr,
-        func);
+        C, swift::StaticSpellingKind::None, metatypePattern,
+        /*expr=*/metatypeSRCastExpr, func);
 
     stmts.push_back(metatypePB);
     stmts.push_back(metatypeVar);
   }
 
-  // The local function:
-  //    func invokeOnReturn<R: Self.SerializationRequirement>(_ returnType: R.Type) async throws {
-  //      let value = resultBuffer.load(as: returnType)
-  //      try await handler.onReturn(value: value)
-  //    }
-
-  // <R: Self.SerializationRequirement>
-  // We create the generic param at invalid depth, which means it'll be filled
-  // by semantic analysis.
-  auto resultGenericParamDecl = GenericTypeParamDecl::create(
-      func, C.getIdentifier("R"), sloc, /*isTypeSequence=*/false,
-      /*depth=*/0, /*index=*/0,
-      /*isOpaqueType=*/false,
-      /*opaqueTypeRepr=*/nullptr);
-  GenericParamList *doInvokeGenericParamList =
-      GenericParamList::create(C, sloc, {resultGenericParamDecl}, sloc);
-
-  auto resultTyParamDecl =
-      ParamDecl::createImplicit(C,
-                                /*argument=*/C.getIdentifier("returnType"),
-                                /*parameter=*/C.getIdentifier("returnType"),
-                                resultGenericParamDecl->getInterfaceType(),
-                                DC);
-  ParameterList *doInvokeParamsList = ParameterList::create(
-      C, {resultTyParamDecl});
-
-  SmallVector<Requirement, 2> requirements;
-  for (auto p : getDistributedSerializationRequirementProtocols(nominal, DAS)) {
-    auto requirement =
-        Requirement(RequirementKind::Conformance,
-                    resultGenericParamDecl->getDeclaredInterfaceType(),
-                    p->getInterfaceType()->getMetatypeInstanceType());
-    requirements.push_back(requirement);
-  }
-  GenericSignature doInvokeGenSig = buildGenericSignature(
-      C, func->getGenericSignature(),
-      {resultGenericParamDecl->getDeclaredInterfaceType()->castTo<GenericTypeParamType>()},
-      std::move(requirements));
-
-  FuncDecl *doInvokeOnReturnFunc = FuncDecl::createImplicit(
-      C, swift::StaticSpellingKind::None,
-      DeclName(C, C.getIdentifier("doInvokeOnReturn"),
-               doInvokeParamsList),
-      sloc,
-      /*async=*/true,
-      /*throws=*/true,
-      doInvokeGenericParamList,
-      doInvokeParamsList,
-      /*returnType=*/C.TheEmptyTupleType,
-      func);
-  doInvokeOnReturnFunc->setImplicit();
-  doInvokeOnReturnFunc->setSynthesized();
-  doInvokeOnReturnFunc->setGenericSignature(doInvokeGenSig);
-
-
-  auto *doInvokeContext = C.Allocate<DoInvokeOnReturnContext>();
-  doInvokeContext->handlerParam = handlerParam;
-  doInvokeContext->resultBufferParam = resultBufParam;
-  doInvokeOnReturnFunc->setBodySynthesizer(
-      deriveBodyDistributed_doInvokeOnReturn, doInvokeContext);
+  // --- Declare the local function `doInvokeOnReturn`...
+  FuncDecl *doInvokeOnReturnFunc = createLocalFunc_doInvokeOnReturn(
+      C, func,
+      nominal, handlerParam, resultBufParam);
   stmts.push_back(doInvokeOnReturnFunc);
 
-  // --- try await _openExistential(metatype, do: doInvokeOnReturn)
-  //
-  // <ExistentialType, ContainedType, ResultType>
-  // - ExistentialType = metatype
-  // - ContainedType = <R: SerializationRequirement> from the target func
-  // - ResultType = Void
+  // --- try await _openExistential(metatypeVar, do: <<doInvokeLocalFunc>>)
+  {
+    auto openExistentialBaseIdent = C.getIdentifier("_openExistential");
+    auto doIdent = C.getIdentifier("do");
 
-  //         (try_expr type='<null>'
-  //          (call_expr type='<null>'
-  //            (unresolved_decl_ref_expr type='<null>' name=_openExistential function_ref=unapplied) (argument_list labels=_:do:
-  //              (argument
-  //                (unresolved_decl_ref_expr type='<null>' name=metatype function_ref=unapplied))
-  //              (argument label=do
-  //                (unresolved_decl_ref_expr type='<null>' name=invokeOnReturn function_ref=unapplied))
-  //            ))))))
-  DeclName openExistentialName =
-      DeclName(C, C.getIdentifier("_openExistential"),
-               {Identifier(), C.getIdentifier("do")});
-//  Expr *tryAwaitDoOpenExistential = CallExpr::createImplicit(
-//      C, UnresolvedDeclRefExpr::createImplicit(C, openExistentialName),
-//      ArgumentList::forImplicitCallTo(
-//          // DeclNameRef(openExistentialName),
-//          ParameterList::create(
-//              C, {ParamDecl::createImplicit(C, Identifier(),
-//                                            C.getIdentifier("existential"), DC),
-//                  ParamDecl::createImplicit(C, C.getIdentifier("do"),
-//                                            C.getIdentifier("body"), DC)}),
-//          {
-//              // open the already cast-ed metatype:
-//               new (C) DeclRefExpr(ConcreteDeclRef(metatypeVar), dloc,
-//               implicit, AccessSemantics::Ordinary, metatypeVar->getInterfaceType()),
-////              UnresolvedDeclRefExpr::createImplicit(
-////                  C, C.getIdentifier(metatypeVar->getNameStr())),
-//
-//              // and execute the doInvoke function:
-//                  new (C) DeclRefExpr(ConcreteDeclRef(doInvokeOnReturnFunc),
-//                                      dloc, implicit)
-//  //              UnresolvedDeclRefExpr::createImplicit(
-////                  C, doInvokeOnReturnFunc->getBaseName().getIdentifier()),
-//          },
-//          C));
+    DeclName openExistentialName =
+        DeclName(C, openExistentialBaseIdent,
+                 {Identifier(), doIdent});
 
-  // COMPLETELY UNRESOLVED
-  auto openExArgs = ArgumentList::createImplicit(
-      C, {
-              Argument(sloc, Identifier(),
-                       new (C) DeclRefExpr(ConcreteDeclRef(metatypeVar), dloc,
-                                           implicit)),
-              Argument(sloc, C.getIdentifier("do"),
-                      new (C) DeclRefExpr(ConcreteDeclRef(doInvokeOnReturnFunc), dloc, implicit)),
-         });
-  Expr *tryAwaitDoOpenExistential = CallExpr::createImplicit(
-      C, UnresolvedDeclRefExpr::createImplicit(C, C.getIdentifier("_openExistential")),
-      openExArgs);
+    auto openExArgs = ArgumentList::createImplicit(
+        C, {
+               Argument(sloc, Identifier(),
+                        new (C) DeclRefExpr(ConcreteDeclRef(metatypeVar), dloc,
+                                            implicit)),
+               Argument(sloc, doIdent,
+                        new (C) DeclRefExpr(ConcreteDeclRef(doInvokeOnReturnFunc),
+                                            dloc, implicit)),
+           });
+    Expr *tryAwaitDoOpenExistential =
+        CallExpr::createImplicit(C,
+                                 UnresolvedDeclRefExpr::createImplicit(
+                                     C, openExistentialBaseIdent),
+                                 openExArgs);
 
-  tryAwaitDoOpenExistential =
-      AwaitExpr::createImplicit(C, sloc, tryAwaitDoOpenExistential);
-  tryAwaitDoOpenExistential =
-      TryExpr::createImplicit(C, sloc, tryAwaitDoOpenExistential);
+    tryAwaitDoOpenExistential =
+        AwaitExpr::createImplicit(C, sloc, tryAwaitDoOpenExistential);
+    tryAwaitDoOpenExistential =
+        TryExpr::createImplicit(C, sloc, tryAwaitDoOpenExistential);
 
-  stmts.push_back(tryAwaitDoOpenExistential);
+    stmts.push_back(tryAwaitDoOpenExistential);
+  }
 
   auto body = BraceStmt::create(C, sloc, {stmts}, sloc, implicit);
   return {body, /*isTypeChecked=*/false};
@@ -385,9 +368,9 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
   auto system = derived.Nominal;
   auto &C = system->getASTContext();
 
-  auto mkParam = [&](Identifier argName, Identifier paramName, Type ty) -> ParamDecl* {
-    auto *param = new (C) ParamDecl(SourceLoc(),
-                                    SourceLoc(), argName,
+  auto mkParam = [&](Identifier argName, Identifier paramName,
+                     Type ty) -> ParamDecl * {
+    auto *param = new (C) ParamDecl(SourceLoc(), SourceLoc(), argName,
                                     SourceLoc(), paramName, system);
     param->setImplicit();
     param->setSpecifier(ParamSpecifier::Default);
@@ -400,7 +383,8 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
   auto unsafeRawPointerType = C.getUnsafeRawPointerType();
   auto anyTypeType = ExistentialMetatypeType::get(C.TheAnyType); // Any.Type
 
-//  auto serializationRequirementType = getDistributedSerializationRequirementType(system, DAS);
+  //  auto serializationRequirementType =
+  //  getDistributedSerializationRequirementType(system, DAS);
 
   // params:
   // - handler: Self.ResultHandler
@@ -409,26 +393,24 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
   auto *params = ParameterList::create(
       C,
       /*LParenLoc=*/SourceLoc(),
-      /*params=*/{ mkParam(C.Id_handler, C.Id_handler, system->mapTypeIntoContext(resultHandlerType)),
-                   mkParam(C.Id_resultBuffer, C.Id_resultBuffer, unsafeRawPointerType),
-                   mkParam(C.Id_metatype, C.Id_metatype, anyTypeType)
-      },
-      /*RParenLoc=*/SourceLoc()
-  );
+      /*params=*/
+      {mkParam(C.Id_handler, C.Id_handler,
+               system->mapTypeIntoContext(resultHandlerType)),
+       mkParam(C.Id_resultBuffer, C.Id_resultBuffer, unsafeRawPointerType),
+       mkParam(C.Id_metatype, C.Id_metatype, anyTypeType)},
+      /*RParenLoc=*/SourceLoc());
 
   // Func name: invokeHandlerOnReturn(handler:resultBuffer:metatype)
   DeclName name(C, C.Id_invokeHandlerOnReturn, params);
 
-  // Expected type: (Self.ResultHandler, UnsafeRawPointer, any Any.Type) async throws -> ()
+  // Expected type: (Self.ResultHandler, UnsafeRawPointer, any Any.Type) async
+  // throws -> ()
   auto *funcDecl =
-      FuncDecl::createImplicit(C, StaticSpellingKind::None,
-                               name, SourceLoc(),
+      FuncDecl::createImplicit(C, StaticSpellingKind::None, name, SourceLoc(),
                                /*async=*/true,
                                /*throws=*/true,
-                               /*genericParams=*/nullptr,
-                               params,
-                               /*returnType*/TupleType::getEmpty(C),
-                               system);
+                               /*genericParams=*/nullptr, params,
+                               /*returnType*/ TupleType::getEmpty(C), system);
   funcDecl->setSynthesized(true);
   funcDecl->copyFormalAccessFrom(system, /*sourceIsParentContext=*/true);
   funcDecl->setBodySynthesizer(deriveBodyDistributed_invokeHandlerOnReturn);
@@ -575,7 +557,8 @@ std::pair<Type, TypeDecl *> DerivedConformance::deriveDistributedActor(
   return std::make_pair(Type(), nullptr);
 }
 
-ValueDecl *DerivedConformance::deriveDistributedActorSystem(ValueDecl *requirement) {
+ValueDecl *
+DerivedConformance::deriveDistributedActorSystem(ValueDecl *requirement) {
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
     // just a simple name check is enough here,
     // if we are invoked here we know for sure it is for the "right" function
@@ -597,6 +580,6 @@ void DerivedConformance::tryDiagnoseFailedDistributedActorDerivation(
 }
 
 void DerivedConformance::tryDiagnoseFailedDistributedActorSystemDerivation(
-        DeclContext *DC, NominalTypeDecl *nominal) {
+    DeclContext *DC, NominalTypeDecl *nominal) {
   // TODO: offer better diagnosis for error scenarios here
 }

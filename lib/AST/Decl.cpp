@@ -6826,15 +6826,14 @@ ParamDecl *ParamDecl::clone(const ASTContext &Ctx, ParamDecl *PD) {
 }
 
 ParamDecl *
-ParamDecl::createImplicit(ASTContext &Context,
-                          SourceLoc specifierLoc, SourceLoc argumentNameLoc,
-                          Identifier argumentName, SourceLoc parameterNameLoc,
-                          Identifier parameterName,
-                          Type interfaceType,
-                          DeclContext *Parent,
+ParamDecl::createImplicit(ASTContext &Context, SourceLoc specifierLoc,
+                          SourceLoc argumentNameLoc, Identifier argumentName,
+                          SourceLoc parameterNameLoc, Identifier parameterName,
+                          Type interfaceType, DeclContext *Parent,
                           ParamSpecifier specifier) {
-  auto decl = new (Context) ParamDecl(specifierLoc, argumentNameLoc, argumentName,
-                                parameterNameLoc, parameterName, Parent);
+  auto decl =
+      new (Context) ParamDecl(specifierLoc, argumentNameLoc, argumentName,
+                              parameterNameLoc, parameterName, Parent);
   decl->setImplicit();
   // implicit ParamDecls must have a specifier set
   decl->setSpecifier(specifier);
@@ -6845,14 +6844,11 @@ ParamDecl::createImplicit(ASTContext &Context,
 ParamDecl *ParamDecl::createImplicit(ASTContext &Context,
                                      Identifier argumentName,
                                      Identifier parameterName,
-                                     Type interfaceType,
-                                     DeclContext *Parent,
+                                     Type interfaceType, DeclContext *Parent,
                                      ParamSpecifier specifier) {
-  return ParamDecl::createImplicit(Context, SourceLoc(),
-                                   SourceLoc(), argumentName,
-                                   SourceLoc(), parameterName,
-                                   interfaceType,
-                                   Parent, specifier);
+  return ParamDecl::createImplicit(Context, SourceLoc(), SourceLoc(),
+                                   argumentName, SourceLoc(), parameterName,
+                                   interfaceType, Parent, specifier);
 }
 
 /// Retrieve the type of 'self' for the given context.

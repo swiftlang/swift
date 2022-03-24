@@ -490,8 +490,6 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   // among referencedGenericParams.
   for (auto *genParam : genericSig.getGenericParams()) {
     auto *paramDecl = genParam->getDecl();
-//    if (!paramDecl)
-//      continue;
     if (paramDecl->getDepth() != fnGenericParamsDepth)
       continue;
     if (!referencedGenericParams.count(genParam->getCanonicalType())) {

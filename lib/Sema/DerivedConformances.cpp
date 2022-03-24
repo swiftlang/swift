@@ -381,7 +381,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     }
 
     // DistributedActor.actorSystem
-    if(name.isCompoundName() && name.getBaseName() == ctx.Id_invokeHandlerOnReturn)
+    if (name.isCompoundName() &&
+        name.getBaseName() == ctx.Id_invokeHandlerOnReturn)
       return getRequirement(KnownProtocolKind::DistributedActorSystem);
 
     return nullptr;
