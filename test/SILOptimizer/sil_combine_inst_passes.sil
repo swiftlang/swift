@@ -104,3 +104,26 @@ bb0:
   return %t : $(Builtin.Int1, Builtin.BridgeObject)
 }
 
+sil_global private @outlined_global : $_ContiguousArrayStorage<Int>
+
+// CHECK-LABEL: sil @remove_arc_of_global_value
+// CHECK-NOT:   retain
+// CHECK-NOT:   release
+// CHECK-NOT:   fix_lifetime
+// CHECK-NOT:   debug_value
+// CHECK:     } // end sil function 'remove_arc_of_global_value'
+sil @remove_arc_of_global_value : $@convention(thin) () -> Int {
+bb0:
+  %0 = global_value @outlined_global : $_ContiguousArrayStorage<Int>
+  strong_retain %0 : $_ContiguousArrayStorage<Int>
+  debug_value %0 : $_ContiguousArrayStorage<Int>, let, name "x"
+  %2 = upcast %0 : $_ContiguousArrayStorage<Int> to $__ContiguousArrayStorageBase
+  strong_retain %2 : $__ContiguousArrayStorageBase
+  %13 = ref_tail_addr [immutable] %2 : $__ContiguousArrayStorageBase, $Int
+  %16 = load %13 : $*Int
+  fix_lifetime %0 : $_ContiguousArrayStorage<Int>
+  strong_release %2 : $__ContiguousArrayStorageBase
+  strong_release %0 : $_ContiguousArrayStorage<Int>
+  return %16 : $Int
+}
+
