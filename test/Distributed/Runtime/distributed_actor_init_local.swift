@@ -79,6 +79,17 @@ distributed actor MaybeSystem {
   }
 }
 
+distributed actor MaybeAfterAssign {
+  var x: Int
+  init?(fail: Bool) {
+    actorSystem = FakeActorSystem()
+    if fail {
+      return nil
+    }
+    x = 100
+  }
+}
+
 // ==== Fake Transport ---------------------------------------------------------
 
 struct ActorAddress: Sendable, Hashable, Codable {
@@ -222,10 +233,12 @@ func test() async {
   test.append(try? Throwy(system: system, doThrow: true))
   // CHECK: assign type:Throwy, id:ActorAddress(address: "[[ID4:.*]]")
   // CHECK-NOT: ready
+  // CHECK: resign id:ActorAddress(address: "[[ID4]]")
 
   test.append(try? ThrowBeforeFullyInit(system: system, doThrow: true))
   // CHECK: assign type:ThrowBeforeFullyInit, id:ActorAddress(address: "[[ID5:.*]]")
   // CHECK-NOT: ready
+  // CHECK: resign id:ActorAddress(address: "[[ID5]]")
 
   test.append(await PickATransport2(other: 1, thesystem: system))
   // CHECK: assign type:PickATransport2, id:ActorAddress(address: "[[ID6:.*]]")
@@ -240,6 +253,15 @@ func test() async {
   // CHECK: assign type:MaybeSystem, id:ActorAddress(address: "[[ID8:.*]]")
   // CHECK:      ready actor:main.MaybeSystem, id:ActorAddress(address: "[[ID8]]")
 
+  test.append(MaybeAfterAssign(fail: true))
+  // CHECK:      assign type:MaybeAfterAssign, id:ActorAddress(address: "[[ID9:.*]]")
+  // CHECK-NOT:  ready
+  // CHECK-NEXT: resign id:ActorAddress(address: "[[ID9]]")
+
+  test.append(MaybeAfterAssign(fail: false))
+  // CHECK:      assign type:MaybeAfterAssign, id:ActorAddress(address: "[[ID10:.*]]")
+  // CHECK-NEXT: ready actor:main.MaybeAfterAssign, id:ActorAddress(address: "[[ID10]]")
+
   // the following tests fail to initialize the actor's identity.
   print("-- start of no-assign tests --")
   test.append(MaybeSystem(nil))
@@ -249,14 +271,18 @@ func test() async {
   // CHECK-NOT: assign
   // CHECK: -- end of no-assign tests --
 
+
+  // resigns that come out of the deinits:
+
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID1]]")
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID2]]")
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID3]]")
-  // MISSING-CHECK-DAG: resign id:ActorAddress(address: "[[ID4]]") // FIXME: should eventually work (rdar://84533820).
-  // MISSING-CHECK-DAG: resign id:ActorAddress(address: "[[ID5]]") // FIXME: should eventually work (rdar://84533820).
+
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID6]]")
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID7]]")
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID8]]")
+
+  // CHECK-DAG: resign id:ActorAddress(address: "[[ID10]]")
 }
 
 @main struct Main {
