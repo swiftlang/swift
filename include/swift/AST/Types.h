@@ -2088,7 +2088,7 @@ public:
     return value.toRaw() != other.value.toRaw();
   }
 
-  uint8_t toRaw() const { return value.toRaw(); }
+  uint16_t toRaw() const { return value.toRaw(); }
 };
 
 class YieldTypeFlags {
