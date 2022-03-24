@@ -4566,6 +4566,10 @@ ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %1 %2 in "
       "concurrently-executing code",
       (bool, DescriptiveDeclKind, DeclName))
+ERROR(concurrent_access_of_inout_param,none,
+      "mutable capture of 'inout' parameter %0 is not allowed in "
+      "concurrently-executing code",
+      (DeclName))
 ERROR(non_sendable_capture,none,
       "capture of %1 with non-sendable type %0 in a `@Sendable` closure",
       (Type, DeclName))
