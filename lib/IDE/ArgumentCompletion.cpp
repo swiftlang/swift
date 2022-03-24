@@ -104,34 +104,39 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
 
   auto *CallLocator = CS.getConstraintLocator(ParentCall);
   auto *CalleeLocator = S.getCalleeLocator(CallLocator);
-  auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator);
-  if (!SelectedOverload) {
-    return;
-  }
+  ValueDecl *FuncD = nullptr;
+  Type FuncTy;
+  Type CallBaseTy;
+  // If we are calling a closure in-place there is no overload choice, but we
+  // still have all the other required information (like the argument's
+  // expected type) to provide useful code completion results.
+  if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator)) {
 
-  Type CallBaseTy = SelectedOverload->choice.getBaseType();
-  if (CallBaseTy) {
-    CallBaseTy = S.simplifyType(CallBaseTy)->getRValueType();
-  }
+    CallBaseTy = SelectedOverload->choice.getBaseType();
+    if (CallBaseTy) {
+      CallBaseTy = S.simplifyType(CallBaseTy)->getRValueType();
+    }
 
-  ValueDecl *FuncD = SelectedOverload->choice.getDeclOrNull();
-  Type FuncTy = S.simplifyTypeForCodeCompletion(SelectedOverload->openedType);
+    FuncD = SelectedOverload->choice.getDeclOrNull();
+    FuncTy = S.simplifyTypeForCodeCompletion(SelectedOverload->openedType);
 
-  // For completion as the arg in a call to the implicit [keypath: _] subscript
-  // the solver can't know what kind of keypath is expected without an actual
-  // argument (e.g. a KeyPath vs WritableKeyPath) so it ends up as a hole.
-  // Just assume KeyPath so we show the expected keypath's root type to users
-  // rather than '_'.
-  if (SelectedOverload->choice.getKind() ==
-      OverloadChoiceKind::KeyPathApplication) {
-    auto Params = FuncTy->getAs<AnyFunctionType>()->getParams();
-    if (Params.size() == 1 && Params[0].getPlainType()->is<UnresolvedType>()) {
-      auto *KPDecl = CS.getASTContext().getKeyPathDecl();
-      Type KPTy =
-          KPDecl->mapTypeIntoContext(KPDecl->getDeclaredInterfaceType());
-      Type KPValueTy = KPTy->castTo<BoundGenericType>()->getGenericArgs()[1];
-      KPTy = BoundGenericType::get(KPDecl, Type(), {CallBaseTy, KPValueTy});
-      FuncTy = FunctionType::get({Params[0].withType(KPTy)}, KPValueTy);
+    // For completion as the arg in a call to the implicit [keypath: _]
+    // subscript the solver can't know what kind of keypath is expected without
+    // an actual argument (e.g. a KeyPath vs WritableKeyPath) so it ends up as a
+    // hole. Just assume KeyPath so we show the expected keypath's root type to
+    // users rather than '_'.
+    if (SelectedOverload->choice.getKind() ==
+        OverloadChoiceKind::KeyPathApplication) {
+      auto Params = FuncTy->getAs<AnyFunctionType>()->getParams();
+      if (Params.size() == 1 &&
+          Params[0].getPlainType()->is<UnresolvedType>()) {
+        auto *KPDecl = CS.getASTContext().getKeyPathDecl();
+        Type KPTy =
+            KPDecl->mapTypeIntoContext(KPDecl->getDeclaredInterfaceType());
+        Type KPValueTy = KPTy->castTo<BoundGenericType>()->getGenericArgs()[1];
+        KPTy = BoundGenericType::get(KPDecl, Type(), {CallBaseTy, KPValueTy});
+        FuncTy = FunctionType::get({Params[0].withType(KPTy)}, KPValueTy);
+      }
     }
   }
 
@@ -244,15 +249,17 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
           SemanticContext = SemanticContextKind::CurrentModule;
         }
       }
-      if (Result.IsSubscript) {
-        assert(SemanticContext != SemanticContextKind::None);
-        auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
-        Lookup.addSubscriptCallPattern(Result.FuncTy->getAs<AnyFunctionType>(),
-                                       SD, SemanticContext);
-      } else {
-        auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Result.FuncD);
-        Lookup.addFunctionCallPattern(Result.FuncTy->getAs<AnyFunctionType>(),
-                                      FD, SemanticContext);
+      if (Result.FuncTy) {
+        if (Result.IsSubscript) {
+          assert(SemanticContext != SemanticContextKind::None);
+          auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
+          Lookup.addSubscriptCallPattern(
+              Result.FuncTy->getAs<AnyFunctionType>(), SD, SemanticContext);
+        } else {
+          auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Result.FuncD);
+          Lookup.addFunctionCallPattern(Result.FuncTy->getAs<AnyFunctionType>(),
+                                        FD, SemanticContext);
+        }
       }
     }
     Lookup.setHaveLParen(false);
