@@ -111,13 +111,15 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   // still have all the other required information (like the argument's
   // expected type) to provide useful code completion results.
   if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator)) {
-
+    FuncD = SelectedOverload->choice.getDeclOrNull();
+    if (FuncD && FuncD->shouldHideFromEditor()) {
+      return;
+    }
     CallBaseTy = SelectedOverload->choice.getBaseType();
     if (CallBaseTy) {
       CallBaseTy = S.simplifyType(CallBaseTy)->getRValueType();
     }
 
-    FuncD = SelectedOverload->choice.getDeclOrNull();
     FuncTy = S.simplifyTypeForCodeCompletion(SelectedOverload->openedType);
 
     // For completion as the arg in a call to the implicit [keypath: _]
