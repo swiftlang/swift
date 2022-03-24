@@ -360,9 +360,12 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
       decl->diagnose(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), identifier);
-      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     decl->getName(), identifier,
-                     "mutating func onReturn<Res: SerializationRequirement>(_ result: Res) async throws\n");
+      decl->diagnose(
+          diag::
+              note_distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getName(), identifier,
+          "mutating func onReturn<Success: SerializationRequirement>(value: "
+          "Success) async throws\n");
       anyMissingAdHocRequirements = true;
     }
     if (checkAdHocRequirementAccessControl(decl, Proto, onReturnDecl))

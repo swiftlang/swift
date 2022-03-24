@@ -59,6 +59,7 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
   typealias SerializationRequirement = Codable
   typealias InvocationDecoder = FakeDistributedInvocationEncoder
   typealias InvocationEncoder = FakeDistributedInvocationEncoder
+  typealias ResultHandler = FakeResultHandler
 
   var n = 0
 
@@ -141,6 +142,23 @@ class FakeDistributedInvocationEncoder: DistributedTargetInvocationEncoder, Dist
   }
   func decodeErrorType() throws -> Any.Type? {
     nil
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
+
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onReturnVoid() async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onThrow<Err: Error>(error: Err) async throws {
+    fatalError("Not implemented: \(#function)")
   }
 }
 

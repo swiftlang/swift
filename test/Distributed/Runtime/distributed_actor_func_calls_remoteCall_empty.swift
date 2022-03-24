@@ -32,7 +32,7 @@ func test() async throws {
 
   try await ref.empty()
   // CHECK: >> remoteCallVoid: on:main.Greeter, target:main.Greeter.empty(), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: nil, errorType: nil), throwing:Swift.Never
-  // CHECK: << onReturn: ()
+  // CHECK: << onReturnVoid: ()
 }
 
 @main struct Main {

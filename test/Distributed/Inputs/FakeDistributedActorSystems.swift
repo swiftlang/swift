@@ -41,6 +41,7 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
   public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias InvocationEncoder = FakeInvocationEncoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeRoundtripResultHandler
 
   // just so that the struct does not become "trivial"
   let someValue: String = ""
@@ -115,6 +116,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
   public typealias InvocationEncoder = FakeInvocationEncoder
   public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeRoundtripResultHandler
 
   var activeActors: [ActorID: any DistributedActor] = [:]
 
@@ -362,13 +364,13 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
     self.storeError = storeError
   }
 
-  public func onReturn<Res>(value: Res) async throws {
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print(" << onReturn: \(value)")
     storeReturn(value)
   }
 
   public func onReturnVoid() async throws {
-    print(" << onReturnVoid:()")
+    print(" << onReturnVoid: ()")
     storeReturn(())
   }
 

@@ -241,6 +241,15 @@ public:
   static void tryDiagnoseFailedDistributedActorDerivation(DeclContext *DC,
                                                     NominalTypeDecl *nominal);
 
+  /// Diagnose problems, if any, preventing automatic derivation of
+  /// DistributedActor requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void
+  tryDiagnoseFailedDistributedActorSystemDerivation(DeclContext *DC,
+                                                    NominalTypeDecl *nominal);
+
   /// Determine if an Equatable requirement can be derived for a type.
   ///
   /// This is implemented for enums without associated values or all-Equatable
@@ -315,12 +324,22 @@ public:
   ValueDecl *deriveDecodable(ValueDecl *requirement);  
 
   /// Whether we can derive the given DistributedActor requirement in the given context.
-  static bool canDeriveDistributedActor(NominalTypeDecl *nominal, DeclContext *dc);
+  static bool canDeriveDistributedActor(NominalTypeDecl *nominal,
+                                        DeclContext *dc);
 
-  /// Derive a DistributedActor requirement for an distributed actor.
+  /// Whether we can derive the given DistributedActorSystem requirements.
+  static bool canDeriveDistributedActorSystem(NominalTypeDecl *nominal,
+                                              DeclContext *dc);
+
+  /// Derive a 'DistributedActor' requirement for an distributed actor.
   ///
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDistributedActor(ValueDecl *requirement);
+
+  /// Derive a 'DistributedActorSystem' requirement..
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveDistributedActorSystem(ValueDecl *requirement);
 
   /// Derive a DistributedActor associated type for a distributed actor.
   ///

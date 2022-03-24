@@ -44,6 +44,7 @@ final class FakeActorSystem: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocation
   typealias InvocationEncoder = FakeInvocation
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor,
@@ -182,6 +183,23 @@ class TestEncoder: Encoder {
   func encode<Act: DistributedActor>(_ actor: Act) throws -> String where Act.ID: Codable {
     try actor.encode(to: self)
     return self.data!
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
+
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onReturnVoid() async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onThrow<Err: Error>(error: Err) async throws {
+    fatalError("Not implemented: \(#function)")
   }
 }
 

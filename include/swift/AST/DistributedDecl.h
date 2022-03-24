@@ -57,8 +57,12 @@ Type getDistributedSerializationRequirementType(
 /// system.
 Type getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *system);
 
+/// Get the specific 'ResultHandler' type of a specific distributed actor
+/// system.
+Type getDistributedActorSystemResultHandlerType(NominalTypeDecl *system);
+
 /// Get the 'ActorID' type of a specific distributed actor system.
-Type getDistributedActorSystemActorIDRequirementType(NominalTypeDecl *system);
+Type getDistributedActorSystemActorIDType(NominalTypeDecl *system);
 
 /// Get the specific protocols that the `SerializationRequirement` specifies,
 /// and all parameters / return types of distributed targets must conform to.
