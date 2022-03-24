@@ -1162,7 +1162,6 @@ bool SILInstruction::mayRelease() const {
     return true;
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
     return true;
 
@@ -1368,7 +1367,6 @@ bool SILInstruction::mayTrap() const {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
     return true;
   default:
     return false;

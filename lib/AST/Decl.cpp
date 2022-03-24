@@ -7533,9 +7533,10 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
     // rename parameter, falling back to the first with a rename. Note that
     // `getAttrs` is in reverse source order, so the last attribute is the
     // first in source
-    if (!attr->Rename.empty() && (attr->Platform == PlatformKind::none ||
-                                  !avAttr))
+    if (!attr->Rename.empty() &&
+        (attr->Platform == PlatformKind::none || !avAttr) && !attr->isNoAsync()) {
       avAttr = attr;
+    }
   }
 
   auto *renamedDecl = evaluateOrDefault(

@@ -16,8 +16,6 @@ from __future__ import absolute_import, unicode_literals
 
 import functools
 
-import six
-
 
 __all__ = [
     'InvalidVersionError',
@@ -175,7 +173,7 @@ class Version(object):
     __slots__ = ('components', '_str')
 
     def __init__(self, version):
-        version = six.text_type(version)
+        version = str(version)
 
         # Save the version string since it's impossible to reconstruct it from
         # just the parsed components
@@ -189,10 +187,6 @@ class Version(object):
             return NotImplemented
 
         return self.components == other.components
-
-    # NOTE: Python 2 compatibility.
-    def __ne__(self, other):
-        return not self == other
 
     def __lt__(self, other):
         if not isinstance(other, Version):

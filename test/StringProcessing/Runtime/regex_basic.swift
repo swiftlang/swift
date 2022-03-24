@@ -11,7 +11,7 @@ extension String {
     _ regex: Regex<T>,
     file: String = #file,
     line: UInt = #line
-  ) -> RegexMatch<T> {
+  ) -> Regex<T>.Match {
     guard let result = match(regex) else {
       expectUnreachable("Failed match", file: file, line: line)
       fatalError()
@@ -24,20 +24,20 @@ RegexBasicTests.test("Basic") {
   let input = "aabccd"
 
   let match1 = input.expectMatch(#/aabcc./#)
-  expectEqual("aabccd", input[match1.range])
-  expectTrue("aabccd" == match1.match)
+  expectEqual("aabccd", match1.0)
+  expectTrue("aabccd" == match1.output)
 
   let match2 = input.expectMatch(#/a*b.+./#)
-  expectEqual("aabccd", input[match2.range])
-  expectTrue("aabccd" == match2.match)
+  expectEqual("aabccd", match2.0)
+  expectTrue("aabccd" == match2.output)
 }
 
 RegexBasicTests.test("Modern") {
   let input = "aabccd"
 
   let match1 = input.expectMatch(#|a a  bc c /*hello*/ .|#)
-  expectEqual("aabccd", input[match1.range])
-  expectTrue("aabccd" == match1.match)
+  expectEqual("aabccd", match1.0)
+  expectTrue("aabccd" == match1.output)
 }
 
 RegexBasicTests.test("Captures") {
@@ -50,7 +50,7 @@ RegexBasicTests.test("Captures") {
   let _: Regex<(Substring, Substring, Substring?, Substring)>.Type
     = type(of: regex)
   let match1 = input.expectMatch(regex)
-  expectEqual(input[...], input[match1.range])
+  expectEqual(input[...], match1.0)
   expectTrue(input == match1.0)
   expectTrue("A6F0" == match1.1)
   expectTrue("A6F1" == match1.2)

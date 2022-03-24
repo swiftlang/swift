@@ -355,6 +355,12 @@ def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machin
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete type nesting depth before giving up">;
 
+def requirement_machine_max_split_concrete_equiv_class_attempts : Joined<["-"], "requirement-machine-max-split-concrete-equiv-class-attempts=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum concrete number of attempts at splitting "
+           "concrete equivalence classes before giving up. There should "
+           "never be a reason to change this">;
+
 def disable_requirement_machine_concrete_contraction : Flag<["-"], "disable-requirement-machine-concrete-contraction">,
   HelpText<"Disable preprocessing pass to eliminate conformance requirements "
            "on generic parameters which are made concrete">;
@@ -507,9 +513,6 @@ def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier
 def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-swap">,
   HelpText<"Suppress static violations of exclusive access with swap()">;
 
-def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
-  HelpText<"Enable SIL Opaque Values">;
-  
 def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
@@ -1021,6 +1024,9 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
 def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
   HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
            "when optimizing ownership will be lowered before serializing SIL">;
+
+def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
+  HelpText<"Enable SIL Opaque Values">;
 
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,

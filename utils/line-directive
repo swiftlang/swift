@@ -62,10 +62,7 @@ line_pattern = re.compile(
 
 def _make_line_map(target_filename, stream=None):
     """
-    >>> try:
-    ...     from StringIO import StringIO # py2
-    ... except ImportError:
-    ...     from io import StringIO # py3
+    >>> from io import StringIO
     >>> _make_line_map('box',
     ... StringIO('''// ###sourceLocation(file: "foo.bar", line: 3)
     ... line 2

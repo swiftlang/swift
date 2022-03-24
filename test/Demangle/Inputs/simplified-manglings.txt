@@ -211,3 +211,5 @@ _TTSf0os___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> specialized _Legac
 _TTSf2o___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
 _TTSf2do___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
 _TTSf2dos___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_$s4main1fSiyYaFTQ0_ ---> f()
+_$s4main1fSiyYaFTY0_ ---> f()

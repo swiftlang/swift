@@ -876,7 +876,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::CheckedCastBranchInst:
-  case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::CheckedCastAddrBranchInst:
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::ObjCMethodInst:
@@ -946,7 +945,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::BeginCOWMutationInst:

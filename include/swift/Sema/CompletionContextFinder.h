@@ -16,7 +16,7 @@
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 
 namespace swift {
 

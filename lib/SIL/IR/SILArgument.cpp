@@ -253,8 +253,6 @@ getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
         ->getArgForDestBB(parentBlock, argIndex);
   case TermKind::CheckedCastBranchInst:
     return cast<const CheckedCastBranchInst>(predTermInst)->getOperand();
-  case TermKind::CheckedCastValueBranchInst:
-    return cast<const CheckedCastValueBranchInst>(predTermInst)->getOperand();
   case TermKind::SwitchEnumInst:
     return cast<const SwitchEnumInst>(predTermInst)->getOperand();
   }

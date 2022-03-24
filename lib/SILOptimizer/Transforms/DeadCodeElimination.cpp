@@ -367,7 +367,6 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   case TermKind::DynamicMethodBranchInst:
   case TermKind::SwitchEnumInst:
   case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
     assert(ArgIndex == 0 && "Expected a single argument!");
 
     // We do not need to do anything with these. If the resulting
@@ -472,7 +471,6 @@ void DCE::propagateLiveness(SILInstruction *I) {
 
   case TermKind::AwaitAsyncContinuationInst:
   case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::TryApplyInst:
   case TermKind::SwitchValueInst:

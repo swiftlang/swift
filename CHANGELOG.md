@@ -5,6 +5,17 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0340][]:
+
+  It is now possible to make declarations unavailable from use in asynchronous
+  contexts with the `@available(*, noasync)` attribute.
+
+  This is to protect the consumers of an API against undefined behavior that can
+  occur when the API uses thread-local storage, or encourages using thread-local
+  storage, across suspension points, or protect developers against holding locks
+  across suspension points which may lead to undefined behavior, priority
+  inversions, or deadlocks.
+
 * [SE-0343][]:
 
 Top-level scripts support asynchronous calls.
@@ -9083,6 +9094,7 @@ Swift 1.0
 [SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
 [SE-0336]: <https://github.com/apple/swift-evolution/blob/main/proposals/0336-distributed-actor-isolation.md>
 [SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
+[SE-0340]: <https://github.com/apple/swift-evolution/blob/main/proposals/0340-swift-noasync.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

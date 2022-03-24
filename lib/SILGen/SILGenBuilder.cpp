@@ -408,7 +408,8 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
       lowering.emitLoadOfCopy(*this, loc, v.forward(SGF), IsTake);
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(result);
-  assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
+  assert((!lowering.isAddressOnly() || !SGF.silConv.useLoweredAddresses()) &&
+         "cannot retain an unloadable type");
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
@@ -509,16 +510,6 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
-ManagedValue SILGenBuilder::createUnconditionalCheckedCastValue(
-    SILLocation loc, ManagedValue op, CanType srcFormalTy,
-    SILType destLoweredTy, CanType destFormalTy) {
-  SILValue result =
-      createUnconditionalCheckedCastValue(loc, op.forward(SGF),
-                                          srcFormalTy, destLoweredTy,
-                                          destFormalTy);
-  return SGF.emitManagedRValueWithCleanup(result);
-}
-
 ManagedValue SILGenBuilder::createUnconditionalCheckedCast(
     SILLocation loc, ManagedValue op,
     SILType destLoweredTy, CanType destFormalTy) {
@@ -546,18 +537,6 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                           destLoweredTy, destFormalTy,
                           trueBlock, falseBlock,
                           Target1Count, Target2Count);
-}
-
-void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,
-                                                 ManagedValue op,
-                                                 CanType srcFormalTy,
-                                                 SILType destLoweredTy,
-                                                 CanType destFormalTy,
-                                                 SILBasicBlock *trueBlock,
-                                                 SILBasicBlock *falseBlock) {
-  createCheckedCastValueBranch(loc, op.forward(SGF), srcFormalTy,
-                               destLoweredTy, destFormalTy,
-                               trueBlock, falseBlock);
 }
 
 ManagedValue SILGenBuilder::createUpcast(SILLocation loc, ManagedValue original,

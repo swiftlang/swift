@@ -2193,6 +2193,26 @@ parts::
        return %1 : $Klass
      }
 
+Forwarding Address-Only Values
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Address-only values are potentially unmovable when borrowed. This
+means that they cannot be forwarded with guaranteed ownership unless
+the forwarded value has the same representation as in the original
+value and can reuse the same storage. Non-destructive projection is
+allowed, such as `struct_extract`. Aggregation, such as `struct`, and
+destructive disaggregation, such as `switch_enum` is not allowed. This
+is an invariant for OSSA with opaque SIL values for these reasons:
+
+1. To avoid implicit semantic copies. For move-only values, this allows
+complete diagnostics. And in general, it makes it impossible for SIL
+passes to "accidentally" create copies.
+
+2. To reuse borrowed storage. This allows the optimizer to share the same
+storage for multiple exclusive reads of the same variable, avoiding
+copies. It may also be necessary to support native Swift atomics, which
+will be unmovable-when-borrowed.
+
 Borrowed Object based Safe Interior Pointers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

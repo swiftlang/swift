@@ -2768,8 +2768,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
           case TermKind::DynamicMethodBranchInst:
           case TermKind::AwaitAsyncContinuationInst:
           case TermKind::CheckedCastBranchInst:
-          case TermKind::CheckedCastAddrBranchInst:
-          case TermKind::CheckedCastValueBranchInst: {
+          case TermKind::CheckedCastAddrBranchInst: {
             // Otherwise, we insert the destroy_addr /after/ the
             // terminator. All of these are guaranteed to have each successor
             // to have the block as its only predecessor block.

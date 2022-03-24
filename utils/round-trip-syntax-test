@@ -14,21 +14,12 @@ from functools import reduce
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 
 
-# Python 2 `unicode` was renamed `str` in Python 3.  To consistently support
-# both, define `unicode` to be `str` when using Python 3.  Once we can drop
-# Python 2 support, delete this and change all uses of `unicode` to `str`.
-# (Currently, this is only here to avoid a python_lint failure from unicode
-# references below.)
-if sys.version_info[0] >= 3:
-    unicode = str
-
-
 class RoundTripTask(object):
     def __init__(self, input_filename, action, swift_syntax_test,
                  skip_bad_syntax):
         assert action == '-round-trip-parse' or action == '-round-trip-lex'
         if sys.version_info[0] < 3:
-            assert type(input_filename) == unicode
+            assert type(input_filename) == str
         assert type(swift_syntax_test) == str
 
         assert os.path.isfile(input_filename), \

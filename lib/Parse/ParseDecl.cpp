@@ -327,23 +327,48 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     ++ParamIndex;
 
     enum {
-      IsMessage, IsRenamed,
-      IsIntroduced, IsDeprecated, IsObsoleted,
+      IsMessage,
+      IsRenamed,
+      IsIntroduced,
+      IsDeprecated,
+      IsObsoleted,
       IsUnavailable,
+      IsNoAsync,
       IsInvalid
     } ArgumentKind = IsInvalid;
-    
+
     if (Tok.is(tok::identifier)) {
-      ArgumentKind =
-      llvm::StringSwitch<decltype(ArgumentKind)>(ArgumentKindStr)
-      .Case("message", IsMessage)
-      .Case("renamed", IsRenamed)
-      .Case("introduced", IsIntroduced)
-      .Case("deprecated", IsDeprecated)
-      .Case("obsoleted", IsObsoleted)
-      .Case("unavailable", IsUnavailable)
-      .Default(IsInvalid);
+      ArgumentKind = llvm::StringSwitch<decltype(ArgumentKind)>(ArgumentKindStr)
+                         .Case("message", IsMessage)
+                         .Case("renamed", IsRenamed)
+                         .Case("introduced", IsIntroduced)
+                         .Case("deprecated", IsDeprecated)
+                         .Case("obsoleted", IsObsoleted)
+                         .Case("unavailable", IsUnavailable)
+                         .Case("noasync", IsNoAsync)
+                         .Default(IsInvalid);
     }
+
+    auto platformAgnosticKindToStr = [](PlatformAgnosticAvailabilityKind kind) {
+      switch (kind) {
+      case PlatformAgnosticAvailabilityKind::None:
+        return "none";
+      case PlatformAgnosticAvailabilityKind::Deprecated:
+        return "deprecated";
+      case PlatformAgnosticAvailabilityKind::Unavailable:
+        return "unavailable";
+      case PlatformAgnosticAvailabilityKind::NoAsync:
+        return "noasync";
+
+      // These are possible platform agnostic availability kinds.
+      // I'm not sure what their spellings are at the moment, so I'm
+      // crashing instead of handling them.
+      case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+      case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+      case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+        llvm_unreachable("Unknown availability kind for parser");
+      }
+    };
 
     if (ArgumentKind == IsInvalid) {
       diagnose(ArgumentLoc, diag::attr_availability_expected_option, AttrName)
@@ -419,8 +444,8 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     case IsDeprecated:
       if (!findAttrValueDelimiter()) {
         if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
-          diagnose(Tok, diag::attr_availability_unavailable_deprecated,
-                   AttrName);
+          diagnose(Tok, diag::attr_availability_multiple_kinds, AttrName,
+                   "deprecated", platformAgnosticKindToStr(PlatformAgnostic));
         }
 
         PlatformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
@@ -467,10 +492,19 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 
     case IsUnavailable:
       if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
-        diagnose(Tok, diag::attr_availability_unavailable_deprecated, AttrName);
+        diagnose(Tok, diag::attr_availability_multiple_kinds, AttrName,
+                 "unavailable", platformAgnosticKindToStr(PlatformAgnostic));
       }
 
       PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
+      break;
+
+    case IsNoAsync:
+      if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
+        diagnose(Tok, diag::attr_availability_multiple_kinds, AttrName,
+                 "noasync", platformAgnosticKindToStr(PlatformAgnostic));
+      }
+      PlatformAgnostic = PlatformAgnosticAvailabilityKind::NoAsync;
       break;
 
     case IsInvalid:

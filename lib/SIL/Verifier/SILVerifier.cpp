@@ -1008,6 +1008,13 @@ public:
       auto *TI = predBB->getTerminator();
       if (F.hasOwnership()) {
         require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
+
+        // Address-only values are potentially unmovable when borrowed. See also
+        // checkOwnershipForwardingInst. A phi implies a move of its arguments
+        // because they can't necessarilly all reuse the same storage.
+        require((!arg->getType().isAddressOnly(F)
+                 || arg->getOwnershipKind() != OwnershipKind::Guaranteed),
+                "Guaranteed address-only phi not allowed--implies a copy");
       } else {
         // FIXME: when critical edges are removed and cond_br arguments are
         // disallowed, only allow BranchInst.
@@ -1269,10 +1276,11 @@ public:
       checkOwnershipForwardingTermInst(term);
     }
 
-    // Address-only values are potentially move-only, and unmovable if they are
-    // borrowed. Ensure that guaranteed address-only values are forwarded with
-    // the same representation. Non-destructive projection is
-    // allowed. Aggregation and destructive disaggregation is not allowed.
+    // Address-only values are potentially unmovable when borrowed. Ensure that
+    // guaranteed address-only values are forwarded with the same
+    // representation. Non-destructive projection is allowed. Aggregation and
+    // destructive disaggregation is not allowed. See SIL.rst, Forwarding
+    // Addres-Only Values.
     if (ownership == OwnershipKind::Guaranteed
         && OwnershipForwardingMixin::isAddressOnly(i)) {
       require(OwnershipForwardingMixin::hasSameRepresentation(i),
@@ -4017,13 +4025,6 @@ public:
     verifyOpenedArchetype(CI, CI->getType().getASTType());
   }
 
-  void checkUnconditionalCheckedCastValueInst(
-      UnconditionalCheckedCastValueInst *CI) {
-    verifyCheckedCast(/*exact*/ false, CI->getOperand()->getType(),
-                      CI->getType(), true);
-    verifyOpenedArchetype(CI, CI->getType().getASTType());
-  }
-
   // Make sure that opcodes handled by isRCIdentityPreservingCast cannot cast
   // from a trivial to a reference type. Such a cast may dynamically
   // instantiate a new reference-counted object.
@@ -4125,25 +4126,6 @@ public:
               "Failure dest of checked_cast_br must not take any argument in "
               "non-ownership qualified sil");
     }
-  }
-
-  void checkCheckedCastValueBranchInst(CheckedCastValueBranchInst *CBI) {
-    verifyCheckedCast(false,
-                      CBI->getSourceLoweredType(),
-                      CBI->getTargetLoweredType(),
-                      true);
-    verifyOpenedArchetype(CBI, CBI->getTargetFormalType());
-
-    require(CBI->getSuccessBB()->args_size() == 1,
-            "success dest of checked_cast_value_br must take one argument");
-    requireSameType(
-        CBI->getSuccessBB()->args_begin()[0]->getType(),
-        CBI->getTargetLoweredType(),
-        "success dest block argument of checked_cast_value_br must match "
-        "type of cast");
-    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
-            "failure dest of checked_cast_value_br in unqualified ownership "
-            "sil must take no arguments");
   }
 
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {

@@ -14,6 +14,10 @@
 // CHECK:   mutating func test2(_: Int32, _ varargs: Any...)
 // CHECK: }
 
+// TODO: import functions that take a pointer to a dependent type (rdar://90587703).
+// CHECK-NOT: func takesPointerToDependent
+// CHECK-NOT: func takesDeclTypePointer
+
 // CHECK: func lvalueReference<T>(_ ref: inout T)
 // CHECK: func constLvalueReference<T>(_: T)
 // CHECK: func forwardingReference<T>(_: inout T)
