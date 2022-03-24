@@ -187,6 +187,48 @@ enum class ImportTypeKind {
   Enum
 };
 
+/// Flags which are extracted from an imported declaration to influence how its
+/// type is imported. Typically used via \c ImportTypeAttrs to form an option
+/// set.
+///
+/// \warning Do not use this as a random grab bag of flags to \c importType() .
+/// This information is intended to be extracted and applied all at once.
+enum class ImportTypeAttr : uint8_t {
+  /// Type should be imported as though declaration was marked with
+  /// \c __attribute__((noescape)) .
+  NoEscape = 1 << 0,
+
+  /// Type should be imported as though declaration was marked with
+  /// \c __attribute__((swift_attr("@MainActor"))) .
+  MainActor = 1 << 1,
+
+  /// Type should be imported as though declaration was marked with
+  /// \c __attribute__((swift_attr("@Sendable"))) .
+  Sendable = 1 << 2,
+
+  /// Type is in a declaration where it would be imported as Sendable by
+  /// default. This comes directly from the parameters to
+  /// \c getImportTypeAttrs() and merely affects diagnostics.
+  DefaultsToSendable = 1 << 3
+};
+
+/// Attributes which were set on the declaration and affect how its type is
+/// imported.
+///
+/// \seeAlso ImportTypeAttr
+using ImportTypeAttrs = OptionSet<ImportTypeAttr>;
+
+/// Extracts the \c ImportTypeAttrs from a declaration.
+///
+/// \param D The declaration to extract attributes from.
+/// \param isParam Is the declaration a function parameter? If so, additional
+///        attributes will be imported.
+/// \param sendableByDefault If the sendability of the declaration is not
+///        specified, should the \c \@Sendable attribute be added implicitly?
+///        Used for e.g. completion handlers.
+ImportTypeAttrs getImportTypeAttrs(const clang::Decl *D, bool isParam = false,
+                                   bool sendableByDefault = false);
+
 struct ImportDiagnostic {
   ImportDiagnosticTarget target;
   Diagnostic diag;
@@ -955,6 +997,9 @@ public:
 
   Type applyParamAttributes(const clang::ParmVarDecl *param, Type type,
                             bool sendableByDefault);
+
+  Type applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
+                 llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.

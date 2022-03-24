@@ -1948,19 +1948,21 @@ private:
 
 } // anonymous namespace
 
-Type ClangImporter::Implementation::applyParamAttributes(
-    const clang::ParmVarDecl *param, Type type, bool sendableByDefault) {
+ImportTypeAttrs swift::getImportTypeAttrs(const clang::Decl *D, bool isParam,
+                                          bool sendableByDefault) {
+  ImportTypeAttrs attrs;
+
+  if (sendableByDefault)
+    attrs |= ImportTypeAttr::DefaultsToSendable;
+
   bool sendableRequested = sendableByDefault;
   bool sendableDisqualified = false;
 
-  if (param->hasAttrs()) {
-    for (auto attr : param->getAttrs()) {
+  if (D->hasAttrs()) {
+    for (auto attr : D->getAttrs()) {
       // Map __attribute__((noescape)) to @noescape.
-      if (isa<clang::NoEscapeAttr>(attr)) {
-        type = applyToFunctionType(type, [](ASTExtInfo extInfo) {
-          return extInfo.withNoEscape();
-        });
-
+      if (isParam && isa<clang::NoEscapeAttr>(attr)) {
+        attrs |= ImportTypeAttr::NoEscape;
         continue;
       }
 
@@ -1969,14 +1971,9 @@ Type ClangImporter::Implementation::applyParamAttributes(
         continue;
 
       // Map the main-actor attribute.
-      if (isMainActorAttr(swiftAttr)) {
-        if (Type mainActor = SwiftContext.getMainActorType()) {
-          type = applyToFunctionType(type, [&](ASTExtInfo extInfo) {
-            return extInfo.withGlobalActor(mainActor);
-          });
-          sendableDisqualified = true;
-        }
-
+      if (isParam && isMainActorAttr(swiftAttr)) {
+        attrs |= ImportTypeAttr::MainActor;
+        sendableDisqualified = true;
         continue;
       }
 
@@ -1995,22 +1992,51 @@ Type ClangImporter::Implementation::applyParamAttributes(
   }
 
   if (!sendableDisqualified && sendableRequested) {
+    attrs |= ImportTypeAttr::Sendable;
+  }
+
+  return attrs;
+}
+
+Type ClangImporter::Implementation::applyParamAttributes(
+    const clang::ParmVarDecl *param, Type type, bool sendableByDefault) {
+  auto parentDecl = cast<clang::Decl>(param->getDeclContext());
+  ImportDiagnosticAdder addDiag(*this, parentDecl, param->getLocation());
+
+  auto attrs = getImportTypeAttrs(param, /*isParam=*/true, sendableByDefault);
+  return applyImportTypeAttrs(attrs, type, addDiag);
+}
+
+Type ClangImporter::Implementation::
+applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
+                     llvm::function_ref<void(Diagnostic &&)> addDiag) {
+  if (attrs.contains(ImportTypeAttr::NoEscape)) {
+    type = applyToFunctionType(type, [](ASTExtInfo extInfo) {
+      return extInfo.withNoEscape();
+    });
+  }
+
+  if (attrs.contains(ImportTypeAttr::MainActor)) {
+    if (Type mainActor = SwiftContext.getMainActorType()) {
+      type = applyToFunctionType(type, [&](ASTExtInfo extInfo) {
+        return extInfo.withGlobalActor(mainActor);
+      });
+    } else {
+      // If we can't use @MainActor, fall back to at least using @Sendable.
+      attrs |= ImportTypeAttr::Sendable;
+    }
+  }
+
+  if (attrs.contains(ImportTypeAttr::Sendable)) {
     bool changed;
     std::tie(type, changed) = GetSendableType(SwiftContext).convert(type);
 
     // Diagnose if we couldn't find a place to add `Sendable` to the type.
     if (!changed) {
-      auto parentDecl = cast<clang::Decl>(param->getDeclContext());
+      addDiag(Diagnostic(diag::clang_ignored_sendable_attr, type));
 
-      addImportDiagnostic(parentDecl,
-          Diagnostic(diag::clang_param_ignored_sendable_attr,
-                     param->getName(), type),
-          param->getLocation());
-
-      if (sendableByDefault)
-        addImportDiagnostic(parentDecl,
-            Diagnostic(diag::clang_param_should_be_implicitly_sendable),
-            param->getLocation());
+      if (attrs.contains(ImportTypeAttr::DefaultsToSendable))
+        addDiag(Diagnostic(diag::clang_param_should_be_implicitly_sendable));
     }
   }
 
