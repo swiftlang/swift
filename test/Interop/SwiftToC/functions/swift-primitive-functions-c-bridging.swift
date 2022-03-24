@@ -29,14 +29,19 @@
 // CHECK-NEXT: SWIFT_EXTERN int32_t $s9Functions16passThroughInt32ys0D0VADF(int32_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN int64_t $s9Functions16passThroughInt64ys0D0VADF(int64_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN int8_t $s9Functions15passThroughInt8ys0D0VADF(int8_t x) SWIFT_NOEXCEPT SWIFT_CALL;
-// CHECK-NEXT: SWIFT_EXTERN void * $s9Functions24passThroughOpaquePointerys0dE0VADF(void * x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s9Functions24passThroughOpaquePointerys0dE0VADF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN size_t $s9Functions15passThroughUIntyS2uF(size_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN uint16_t $s9Functions17passThroughUInt16ys0D0VADF(uint16_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN uint32_t $s9Functions17passThroughUInt32ys0D0VADF(uint32_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN uint64_t $s9Functions17passThroughUInt64ys0D0VADF(uint64_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN uint8_t $s9Functions16passThroughUInt8ys0D0VADF(uint8_t x) SWIFT_NOEXCEPT SWIFT_CALL;
-// CHECK-NEXT: SWIFT_EXTERN void * $s9Functions34passThroughUnsafeMutableRawPointeryS2vF(void * x) SWIFT_NOEXCEPT SWIFT_CALL;
-// CHECK-NEXT: SWIFT_EXTERN void const * $s9Functions27passThroughUnsafeRawPointeryS2VF(void const * x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s9Functions34passThroughUnsafeMutableRawPointeryS2vF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: SWIFT_EXTERN void const * _Nonnull $s9Functions27passThroughUnsafeRawPointeryS2VF(void const * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: SWIFT_EXTERN void * _Nullable $s9Functions42roundTwoPassThroughUnsafeMutableRawPointerySvSgACF(void * _Nullable x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-EMPTY:
+// CHECK-NEXT: #ifdef __cplusplus
+// CHECK-NEXT: }
+// CHECK-NEXT: }
 
 public func passThroughCBool(_ x: CBool) -> CBool { return x }
 
@@ -82,3 +87,5 @@ public func passThroughBool(_ x: Bool) -> Bool { return x }
 public func passThroughOpaquePointer(_ x: OpaquePointer) -> OpaquePointer { return x }
 public func passThroughUnsafeRawPointer(_ x: UnsafeRawPointer) -> UnsafeRawPointer { return x }
 public func passThroughUnsafeMutableRawPointer(_ x: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer { return x }
+
+public func roundTwoPassThroughUnsafeMutableRawPointer(_ x: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? { return x }

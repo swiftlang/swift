@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "PrintClangFunction.h"
+#include "ClangSyntaxPrinter.h"
 #include "DeclAndTypePrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "swift/AST/Decl.h"
@@ -26,11 +27,12 @@ using namespace swift;
 // native Swift function/method.
 class CFunctionSignatureTypePrinter
     : public TypeVisitor<CFunctionSignatureTypePrinter, void,
-                         Optional<OptionalTypeKind>> {
+                         Optional<OptionalTypeKind>>,
+      private ClangSyntaxPrinter {
 public:
   CFunctionSignatureTypePrinter(raw_ostream &os,
                                 PrimitiveTypeMapping &typeMapping)
-      : os(os), typeMapping(typeMapping) {}
+      : ClangSyntaxPrinter(os), typeMapping(typeMapping) {}
 
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               Optional<OptionalTypeKind> optionalKind) {
@@ -38,9 +40,8 @@ public:
     if (!knownTypeInfo)
       return false;
     os << knownTypeInfo->name;
-    // FIXME:
-    // if (knownTypeInfo->canBeNullable)
-    //   printNullability(optionalKind);
+    if (knownTypeInfo->canBeNullable)
+      printNullability(optionalKind);
     return true;
   }
 
@@ -81,7 +82,6 @@ public:
   }
 
 private:
-  raw_ostream &os;
   PrimitiveTypeMapping &typeMapping;
 };
 
