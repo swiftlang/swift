@@ -1288,6 +1288,24 @@ public:
   /// type variables for their fixed types.
   Type simplifyType(Type type) const;
 
+  // To aid code completion, we need to attempt to convert type placeholders
+  // back into underlying generic parameters if possible, since type
+  // of the code completion expression is used as "expected" (or contextual)
+  // type so it's helpful to know what requirements it has to filter
+  // the list of possible member candidates e.g.
+  //
+  // \code
+  // func test<T: P>(_: [T]) {}
+  //
+  // test(42.#^MEMBERS^#)
+  // \code
+  //
+  // It's impossible to resolve `T` in this case but code completion
+  // expression should still have a type of `[T]` instead of `[<<hole>>]`
+  // because it helps to produce correct contextual member list based on
+  // a conformance requirement associated with generic parameter `T`.
+  Type simplifyTypeForCodeCompletion(Type type) const;
+
   /// Coerce the given expression to the given type.
   ///
   /// This operation cannot fail.

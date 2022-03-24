@@ -115,7 +115,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   }
 
   ValueDecl *FuncD = SelectedOverload->choice.getDeclOrNull();
-  Type FuncTy = S.simplifyType(SelectedOverload->openedType)->getRValueType();
+  Type FuncTy = S.simplifyTypeForCodeCompletion(SelectedOverload->openedType);
 
   // For completion as the arg in a call to the implicit [keypath: _] subscript
   // the solver can't know what kind of keypath is expected without an actual
