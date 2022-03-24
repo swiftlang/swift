@@ -574,7 +574,6 @@ function set_build_options_for_host() {
         watchos-*           | \
         watchsimulator-*)
             swift_cmake_options+=(
-              -DPython2_EXECUTABLE="$(xcrun -f python2.7)"
               -DPython3_EXECUTABLE="$(xcrun -f python3)"
             )
             case ${host} in
