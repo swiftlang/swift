@@ -1275,6 +1275,9 @@ public:
     if (ArgInfo.isBefore(argIdx)) {
       return false;
     }
+    if (argIdx == 0 && ArgInfo.completionIdx == 0) {
+      return false;
+    }
     return ArgumentFailureTracker::extraArgument(argIdx);
   }
 
