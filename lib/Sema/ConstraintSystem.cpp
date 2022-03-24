@@ -1794,8 +1794,9 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
 /// \note If a 'Self'-rooted type parameter is bound to a concrete type, this
 /// routine will recurse into the concrete type.
 static Type
-typeEraseCovariantExistentialSelfReferences(Type refTy, Type baseTy,
-                                            const DeclContext *useDC) {
+typeEraseExistentialSelfReferences(
+    Type refTy, Type baseTy, const DeclContext *useDC,
+    TypePosition outermostPosition) {
   assert(baseTy->isExistentialType());
   if (!refTy->hasTypeParameter()) {
     return refTy;
@@ -1910,12 +1911,12 @@ typeEraseCovariantExistentialSelfReferences(Type refTy, Type baseTy,
     });
   };
 
-  return transformFn(refTy, TypePosition::Covariant);
+  return transformFn(refTy, outermostPosition);
 }
 
 Type constraints::typeEraseOpenedExistentialReference(
     Type type, Type existentialBaseType, TypeVariableType *openedTypeVar,
-    const DeclContext *useDC) {
+    const DeclContext *useDC, TypePosition outermostPosition) {
   Type selfGP = GenericTypeParamType::get(false, 0, 0, type->getASTContext());
 
   // First, temporarily reconstitute the 'Self' generic parameter.
@@ -1932,8 +1933,8 @@ Type constraints::typeEraseOpenedExistentialReference(
   });
 
   // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
-  type = typeEraseCovariantExistentialSelfReferences(type, existentialBaseType,
-                                                     useDC);
+  type = typeEraseExistentialSelfReferences(
+      type, existentialBaseType, useDC, outermostPosition);
 
   // Finally, swap the 'Self'-corresponding type variable back in.
   return type.transformRec([&](TypeBase *t) -> Optional<Type> {
@@ -2260,7 +2261,8 @@ ConstraintSystem::getTypeOfMemberReference(
         outerDC->getSelfInterfaceType()->getCanonicalType());
     auto openedTypeVar = replacements.lookup(selfGP);
     type =
-        typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar, DC);
+        typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar, DC,
+                                            TypePosition::Covariant);
   }
 
   // Construct an idealized parameter type of the initializer associated
@@ -6439,6 +6441,51 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
     if (maybeUnavail.hasValue()) {
       return true;
     }
+  }
+
+  return false;
+}
+
+bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
+  // Only makes sense if the argument type involves type variables somehow.
+  if (!argType->hasTypeVariable())
+    return false;
+
+  // Have we bound an overload for the argument already?
+  if (argExpr) {
+    auto locator = getConstraintLocator(argExpr);
+    auto knownOverloadBinding = ResolvedOverloads.find(locator);
+    if (knownOverloadBinding != ResolvedOverloads.end()) {
+      // If the overload choice is a generic function, then we have a generic
+      // function reference.
+      auto choice = knownOverloadBinding->second;
+      if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
+              choice.choice.getDeclOrNull())) {
+        if (func->isGeneric())
+          return true;
+      }
+
+      return false;
+    }
+  }
+
+  // We might have a type variable referring to an overload set.
+  auto argTypeVar = argType->getAs<TypeVariableType>();
+  if (!argTypeVar)
+    return false;
+
+  auto disjunction = getUnboundBindOverloadDisjunction(argTypeVar);
+  if (!disjunction)
+    return false;
+
+  for (auto constraint : disjunction->getNestedConstraints()) {
+    auto *decl = constraint->getOverloadChoice().getDeclOrNull();
+    if (!decl)
+      continue;
+
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+      if (func->isGeneric())
+        return true;
   }
 
   return false;
