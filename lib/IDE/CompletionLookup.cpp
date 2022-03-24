@@ -977,13 +977,14 @@ void CompletionLookup::addEffectsSpecifiers(
   assert(AFT != nullptr);
 
   // 'async'.
-  if (forceAsync || (AFD && AFD->hasAsync()) || AFT->isAsync())
+  if (forceAsync || (AFD && AFD->hasAsync()) ||
+      (AFT->hasExtInfo() && AFT->isAsync()))
     Builder.addAnnotatedAsync();
 
   // 'throws' or 'rethrows'.
   if (AFD && AFD->getAttrs().hasAttribute<RethrowsAttr>())
     Builder.addAnnotatedRethrows();
-  else if (AFT->isThrowing())
+  else if (AFT->hasExtInfo() && AFT->isThrowing())
     Builder.addAnnotatedThrows();
 }
 
@@ -1146,7 +1147,8 @@ void CompletionLookup::addFunctionCallPattern(
     else
       addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
-    if (!isForCaching() && AFT->isAsync() && !CanCurrDeclContextHandleAsync) {
+    if (!isForCaching() && AFT->hasExtInfo() && AFT->isAsync() &&
+        !CanCurrDeclContextHandleAsync) {
       Builder.setContextualNotRecommended(
           ContextualNotRecommendedReason::InvalidAsyncContext);
     }
