@@ -363,7 +363,7 @@ private:
     // Generate constraints to initialize the pattern.
     auto initType =
         cs.generateConstraints(pattern, contextualLocator,
-                               /*shouldBindPatternOneWay=*/true,
+                               /*shouldBindPatternOneWay=*/false,
                                /*patternBinding=*/nullptr, /*patternIndex=*/0);
 
     if (!initType) {
@@ -434,7 +434,7 @@ private:
     {
       auto target = SolutionApplicationTarget::forForEachStmt(
           forEachStmt, sequenceProto, closure,
-          /*bindTypeVarsOneWay=*/true,
+          /*bindTypeVarsOneWay=*/false,
           /*contextualPurpose=*/CTP_ForEachSequence);
 
       auto &targetInfo = target.getForEachStmtInfo();
@@ -451,9 +451,9 @@ private:
   }
 
   void visitCaseItemPattern(Pattern *pattern, ContextualTypeInfo context) {
-    Type patternType =
-        cs.generateConstraints(pattern, locator, /*bindPatternVarsOneWay=*/true,
-                               /*patternBinding=*/nullptr, /*patternIndex=*/0);
+    Type patternType = cs.generateConstraints(
+        pattern, locator, /*bindPatternVarsOneWay=*/false,
+        /*patternBinding=*/nullptr, /*patternIndex=*/0);
 
     if (!patternType) {
       hadError = true;
