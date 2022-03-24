@@ -627,3 +627,10 @@ do {
     struct Inner: P47 {}
   }
 }
+
+protocol P48a { associatedtype A = Int }
+protocol P48b { associatedtype B }
+protocol P48c: P48a, P48b where A == B {}
+do {
+  struct Conformer: P48c {}
+}

@@ -871,3 +871,24 @@ do {
     struct Inner: P47 {}
   }
 }
+
+protocol P48a { associatedtype A = Int } // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+protocol P48b { associatedtype B } // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+protocol P48c: P48a, P48b where A == B {}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P48a: {
+  // CHECK-NEXT: A => Self.B,
+  // CHECK-NEXT: }
+
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P48b: {
+  // CHECK-NEXT: B => Self.A,
+  // CHECK-NEXT: }
+
+  // CHECK-NOT: Abstract type witness system for conformance of Conformer to P48c
+
+  // FIXME: Should compile
+  struct Conformer: P48c {}
+  // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P48a'}}
+  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P48b'}}
+  // expected-error@-3 {{type 'Conformer' does not conform to protocol 'P48c'}}
+}
