@@ -63,6 +63,22 @@ distributed actor ThrowBeforeFullyInit {
   }
 }
 
+distributed actor ThrowingAssign {
+  init(_ getSystem: @Sendable () throws -> FakeActorSystem) throws {
+    self.actorSystem = try getSystem()
+  }
+}
+
+distributed actor MaybeSystem {
+  init?(_ sys: FakeActorSystem?) {
+    if let system = sys {
+      self.actorSystem = system
+      return
+    }
+    return nil
+  }
+}
+
 // ==== Fake Transport ---------------------------------------------------------
 
 struct ActorAddress: Sendable, Hashable, Codable {
@@ -220,6 +236,19 @@ func test() async {
     // CHECK:      ready actor:main.Bug_CallsReadyTwice, id:ActorAddress(address: "[[ID7]]")
     // CHECK-NEXT: ready actor:main.Bug_CallsReadyTwice, id:ActorAddress(address: "[[ID7]]")
 
+  test.append(MaybeSystem(system))
+  // CHECK: assign type:MaybeSystem, id:ActorAddress(address: "[[ID8:.*]]")
+  // CHECK:      ready actor:main.MaybeSystem, id:ActorAddress(address: "[[ID8]]")
+
+  // the following tests fail to initialize the actor's identity.
+  print("-- start of no-assign tests --")
+  test.append(MaybeSystem(nil))
+  test.append(try? ThrowingAssign { throw MyError.test })
+  print("-- end of no-assign tests --")
+  // CHECK: -- start of no-assign tests --
+  // CHECK-NOT: assign
+  // CHECK: -- end of no-assign tests --
+
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID1]]")
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID2]]")
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID3]]")
@@ -227,6 +256,7 @@ func test() async {
   // MISSING-CHECK-DAG: resign id:ActorAddress(address: "[[ID5]]") // FIXME: should eventually work (rdar://84533820).
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID6]]")
   // CHECK-DAG: resign id:ActorAddress(address: "[[ID7]]")
+  // CHECK-DAG: resign id:ActorAddress(address: "[[ID8]]")
 }
 
 @main struct Main {
