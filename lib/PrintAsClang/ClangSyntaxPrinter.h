@@ -1,4 +1,4 @@
-//===--- CxxSynthesis.h - Rules for synthesizing C++ code -------*- C++ -*-===//
+//===--- ClangSyntaxPrinter.h - Printer for C and C++ code ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_PRINTASCLANG_CXXSYNTHESIS_H
-#define SWIFT_PRINTASCLANG_CXXSYNTHESIS_H
+#ifndef SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
+#define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
@@ -26,9 +26,11 @@ namespace cxx_synthesis {
 /// module in C++.
 StringRef getCxxImplNamespaceName();
 
-class CxxPrinter {
+} // end namespace cxx_synthesis
+
+class ClangSyntaxPrinter {
 public:
-  CxxPrinter(raw_ostream &os) : os(os) {}
+  ClangSyntaxPrinter(raw_ostream &os) : os(os) {}
 
   /// Print a C++ namespace declaration with the give name and body.
   void
@@ -43,7 +45,6 @@ private:
   raw_ostream &os;
 };
 
-} // end namespace cxx_synthesis
 } // end namespace swift
 
 #endif

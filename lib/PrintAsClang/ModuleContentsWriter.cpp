@@ -12,7 +12,7 @@
 
 #include "ModuleContentsWriter.h"
 
-#include "CxxSynthesis.h"
+#include "ClangSyntaxPrinter.h"
 #include "DeclAndTypePrinter.h"
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
@@ -642,8 +642,6 @@ swift::printModuleContentsAsObjC(raw_ostream &os,
 void swift::printModuleContentsAsCxx(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     ModuleDecl &M) {
-  using cxx_synthesis::CxxPrinter;
-
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
@@ -671,7 +669,7 @@ void swift::printModuleContentsAsCxx(
   }
 
   // Construct a C++ namespace for the module.
-  CxxPrinter(os).printNamespace(
+  ClangSyntaxPrinter(os).printNamespace(
       [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
       [&](raw_ostream &os) { os << moduleOS.str(); });
 }

@@ -1,4 +1,4 @@
-//===--- CxxSynthesis.cpp - Rules for synthesizing C++ code -----*- C++ -*-===//
+//===--- ClangSyntaxPrinter.cpp - Printer for C and C++ code ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CxxSynthesis.h"
+#include "ClangSyntaxPrinter.h"
 
 using namespace swift;
 using namespace cxx_synthesis;
@@ -18,7 +18,7 @@ using namespace cxx_synthesis;
 StringRef cxx_synthesis::getCxxImplNamespaceName() { return "_impl"; }
 
 /// Print a C++ namespace declaration with the give name and body.
-void CxxPrinter::printNamespace(
+void ClangSyntaxPrinter::printNamespace(
     llvm::function_ref<void(raw_ostream &OS)> namePrinter,
     llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
   os << "namespace ";
@@ -30,7 +30,7 @@ void CxxPrinter::printNamespace(
   os << "\n\n";
 }
 
-void CxxPrinter::printNamespace(
+void ClangSyntaxPrinter::printNamespace(
     StringRef name,
     llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
   printNamespace([&](raw_ostream &os) { os << name; }, bodyPrinter);

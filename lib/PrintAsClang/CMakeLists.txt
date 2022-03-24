@@ -1,6 +1,6 @@
 
 add_swift_host_library(swiftPrintAsClang STATIC
-  CxxSynthesis.cpp
+  ClangSyntaxPrinter.cpp
   DeclAndTypePrinter.cpp
   ModuleContentsWriter.cpp
   PrimitiveTypeMapping.cpp

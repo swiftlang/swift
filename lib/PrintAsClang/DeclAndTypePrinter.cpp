@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "DeclAndTypePrinter.h"
-#include "CxxSynthesis.h"
+#include "ClangSyntaxPrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangFunction.h"
 
