@@ -1,5 +1,4 @@
-// R/UN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on -disable-requirement-machine-concrete-contraction 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
 
 // Another GenericSignatureBuilder oddity, reduced from RxSwift.
 //
@@ -19,6 +18,11 @@ class GenericDelegateProxy<P : AnyObject, D> {
   typealias Parent = P
   typealias Delegate = D
 
+  // Here if we resolve Proxy.Parent and Proxy.Delegate to the typealiases,
+  // we get vacuous requirements 'P == P' and 'D == D'. By keeping both
+  // the substituted and original requirement, we ensure that the
+  // unrelated associated type 'Parent' is constrained instead.
+
   // CHECK-LABEL: .GenericDelegateProxy.init(_:)@
   // CHECK-NEXT: <P, D, Proxy where P == Proxy.[DelegateProxyType]Parent, D == Proxy.[DelegateProxyType]Delegate, Proxy : GenericDelegateProxy<P, D>, Proxy : DelegateProxyType>
   init<Proxy: DelegateProxyType>(_: Proxy.Type)
@@ -34,8 +38,21 @@ class ConcreteDelegateProxy {
   typealias Parent = SomeClass
   typealias Delegate = SomeStruct
 
+  // An even more esoteric edge case. Note that this one I made up; only
+  // the first one is relevant for compatibility with RxSwift.
+  //
+  // Here unfortunately we produce a different result from the GSB, because
+  // the hack for keeping both the substituted and original requirement means
+  // the substituted requirements become 'P == SomeClass' and 'D == SomeStruct'.
+  //
+  // The GSB does not constrain P and D in this way and instead produced the
+  // following minimized signature:
+  //
+  // <P, D, Proxy where P == Proxy.[DelegateProxyType]Parent, D == Proxy.[DelegateProxyType]Delegate, Proxy : ConcreteDelegateProxy, Proxy : DelegateProxyType>!
+
   // CHECK-LABEL: .ConcreteDelegateProxy.init(_:_:_:)@
-  // CHECK-NEXT: <P, D, Proxy where P == Proxy.[DelegateProxyType]Parent, D == Proxy.[DelegateProxyType]Delegate, Proxy : ConcreteDelegateProxy, Proxy : DelegateProxyType>
+  // CHECK-NEXT: <P, D, Proxy where P == SomeClass, D == SomeStruct, Proxy : ConcreteDelegateProxy, Proxy : DelegateProxyType, Proxy.[DelegateProxyType]Delegate == SomeStruct, Proxy.[DelegateProxyType]Parent == SomeClass>
+
   init<P, D, Proxy: DelegateProxyType>(_: P, _: D, _: Proxy.Type)
     where Proxy: ConcreteDelegateProxy,
           Proxy.Parent == P,
