@@ -193,9 +193,13 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     return;
   }
 
+  llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
+  getSolutionSpecificVarTypes(S, SolutionSpecificVarTypes);
+
   Results.push_back({ExpectedTy, isa<SubscriptExpr>(ParentCall), FuncD, FuncTy,
                      ArgIdx, ParamIdx, std::move(ClaimedParams),
-                     IsNoninitialVariadic, CallBaseTy, HasLabel, IsAsync});
+                     IsNoninitialVariadic, CallBaseTy, HasLabel, IsAsync,
+                     SolutionSpecificVarTypes});
 }
 
 void ArgumentTypeCheckCompletionCallback::deliverResults(
@@ -267,6 +271,7 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
   if (shouldPerformGlobalCompletion) {
     for (auto &Result : Results) {
       ExpectedTypes.push_back(Result.ExpectedType);
+      Lookup.setSolutionSpecificVarTypes(Result.SolutionSpecificVarTypes);
     }
     Lookup.setExpectedTypes(ExpectedTypes, false);
     bool IsInAsyncContext = llvm::any_of(

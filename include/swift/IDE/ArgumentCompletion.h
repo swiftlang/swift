@@ -48,6 +48,11 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.
     bool IsInAsyncContext;
+
+    /// Types of variables that were determined in the solution that produced
+    /// this result. This in particular includes parameters of closures that
+    /// were type-checked with the code completion expression.
+    llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
   };
 
   CodeCompletionExpr *CompletionExpr;

@@ -125,6 +125,17 @@ Type swift::ide::getPatternMatchType(const constraints::Solution &S, Expr *E) {
   return nullptr;
 }
 
+void swift::ide::getSolutionSpecificVarTypes(
+    const constraints::Solution &S,
+    llvm::SmallDenseMap<const VarDecl *, Type> &Result) {
+  assert(Result.empty());
+  for (auto NT : S.nodeTypes) {
+    if (auto VD = dyn_cast_or_null<VarDecl>(NT.first.dyn_cast<Decl *>())) {
+      Result[VD] = S.simplifyType(NT.second);
+    }
+  }
+}
+
 bool swift::ide::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
                                                   Expr *CompletionExpr) {
   Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
