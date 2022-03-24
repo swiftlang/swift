@@ -231,6 +231,15 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
           SemanticContext = SemanticContextKind::CurrentNominal;
         }
       }
+      if (SemanticContext == SemanticContextKind::None && Result.FuncD) {
+        if (Result.FuncD->getDeclContext()->isTypeContext()) {
+          SemanticContext = SemanticContextKind::CurrentNominal;
+        } else if (Result.FuncD->getDeclContext()->isLocalContext()) {
+          SemanticContext = SemanticContextKind::Local;
+        } else if (Result.FuncD->getModuleContext() == DC->getParentModule()) {
+          SemanticContext = SemanticContextKind::CurrentModule;
+        }
+      }
       if (Result.IsSubscript) {
         assert(SemanticContext != SemanticContextKind::None);
         auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
