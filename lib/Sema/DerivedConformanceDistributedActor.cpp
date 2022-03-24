@@ -323,10 +323,6 @@ deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd,
     auto openExistentialBaseIdent = C.getIdentifier("_openExistential");
     auto doIdent = C.getIdentifier("do");
 
-    DeclName openExistentialName =
-        DeclName(C, openExistentialBaseIdent,
-                 {Identifier(), doIdent});
-
     auto openExArgs = ArgumentList::createImplicit(
         C, {
                Argument(sloc, Identifier(),
