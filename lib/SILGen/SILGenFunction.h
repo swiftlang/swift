@@ -2073,7 +2073,8 @@ public:
 
   /// Given a function representing a distributed actor factory, emits the
   /// corresponding SIL function for it.
-  void emitDistributedActorFactory(FuncDecl *fd);
+  void emitDistributedActorFactory(
+      FuncDecl *fd); // TODO(distributed): this is the "resolve"
 
   /// Notify transport that actor has initialized successfully,
   /// and is ready to receive messages.

@@ -3500,11 +3500,16 @@ public:
   /// Find, or potentially synthesize, the implicit 'id' property of this actor.
   VarDecl *getDistributedActorIDProperty() const;
 
-  /// Find the 'RemoteCallTarget.init(_:)' initializer function
+  /// Find the 'RemoteCallTarget.init(_:)' initializer function.
   ConstructorDecl* getDistributedRemoteCallTargetInitFunction() const;
 
-  /// Find the 'RemoteCallArgument(label:name:value:)' initializer function
+  /// Find the 'RemoteCallArgument(label:name:value:)' initializer function.
   ConstructorDecl* getDistributedRemoteCallArgumentInitFunction() const;
+
+  /// Find the
+  /// 'DistributedActorSystem.invokeHandlerOnReturn(handler:value:metatype:)
+  /// function.
+  FuncDecl *getDistributedActorSystemInvokeHandlerOnReturnFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -4301,6 +4306,7 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Differentiable,
   Actor,
   DistributedActor,
+  DistributedActorSystem,
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:
@@ -5592,6 +5598,19 @@ public:
   /// Create a an identical copy of this ParamDecl.
   static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
 
+  static ParamDecl *
+  createImplicit(ASTContext &Context, SourceLoc specifierLoc,
+                 SourceLoc argumentNameLoc, Identifier argumentName,
+                 SourceLoc parameterNameLoc, Identifier parameterName,
+                 Type interfaceType, DeclContext *Parent,
+                 ParamSpecifier specifier = ParamSpecifier::Default);
+
+  static ParamDecl *
+  createImplicit(ASTContext &Context, Identifier argumentName,
+                 Identifier parameterName, Type interfaceType,
+                 DeclContext *Parent,
+                 ParamSpecifier specifier = ParamSpecifier::Default);
+
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
     return ArgumentNameAndFlags.getPointer();
@@ -6447,6 +6466,10 @@ public:
     return getBodyKind() == BodyKind::TypeChecked;
   }
 
+  bool isBodySILSynthesize() const {
+    return getBodyKind() == BodyKind::SILSynthesize;
+  }
+
   bool isBodySkipped() const {
     return getBodyKind() == BodyKind::Skipped;
   }
@@ -6460,8 +6483,8 @@ public:
   /// initialization factory. Such functions do not have a body that is
   /// representable in the AST, so it must be synthesized during SILGen.
   bool isDistributedActorFactory() const {
-    return getBodyKind() == BodyKind::SILSynthesize
-    && getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
+    return getBodyKind() == BodyKind::SILSynthesize &&
+           getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
   }
 
   /// Determines whether this function is a 'remoteCall' function,

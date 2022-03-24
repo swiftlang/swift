@@ -79,6 +79,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveActor(DC, Nominal);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
     return canDeriveDistributedActor(Nominal, DC);
+  if (*derivableKind == KnownDerivableProtocolKind::DistributedActorSystem)
+    return canDeriveDistributedActorSystem(Nominal, DC);
 
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
@@ -196,6 +198,10 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
 
   if (*knownProtocol == KnownProtocolKind::DistributedActor) {
     tryDiagnoseFailedDistributedActorDerivation(DC, nominal);
+  }
+
+  if (*knownProtocol == KnownProtocolKind::DistributedActorSystem) {
+    tryDiagnoseFailedDistributedActorSystemDerivation(DC, nominal);
   }
 }
 
@@ -373,6 +379,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::DistributedActor);
       }
     }
+
+    // DistributedActor.actorSystem
+    if (name.isCompoundName() &&
+        name.getBaseName() == ctx.Id_invokeHandlerOnReturn)
+      return getRequirement(KnownProtocolKind::DistributedActorSystem);
 
     return nullptr;
   }
