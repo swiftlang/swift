@@ -1331,7 +1331,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       continue;
     } else if (type2->is<ArchetypeType>() && !type1->is<ArchetypeType>() &&
                !type1->is<PlaceholderType>()) {
-      ++score2;
+      ++score1;
       continue;
     }
 
