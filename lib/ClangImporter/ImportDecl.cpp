@@ -2718,7 +2718,8 @@ namespace {
                                             *correctSwiftName);
 
       Type SwiftType;
-      if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
+      auto clangDC = Decl->getDeclContext()->getRedeclContext();
+      if (clangDC->isTranslationUnit() || clangDC->isStdNamespace()) {
         bool IsError;
         StringRef StdlibTypeName;
         MappedTypeNameKind NameMapping;
