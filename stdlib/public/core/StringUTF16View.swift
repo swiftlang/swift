@@ -437,14 +437,14 @@ extension String.UTF16View {
   @_effects(releasenone)
   internal func _foreignIndex(after i: Index) -> Index {
     _internalInvariant(_guts.isForeign)
-    return i.strippingTranscoding.nextEncoded
+    return i.strippingTranscoding.nextEncoded._knownUTF16
   }
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(before i: Index) -> Index {
     _internalInvariant(_guts.isForeign)
-    return i.strippingTranscoding.priorEncoded
+    return i.strippingTranscoding.priorEncoded._knownUTF16
   }
 
   @usableFromInline @inline(never)
