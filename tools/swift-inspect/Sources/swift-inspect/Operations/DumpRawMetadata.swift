@@ -24,7 +24,7 @@ internal struct DumpRawMetadata: ParsableCommand {
   var backtraceOptions: BacktraceOptions
 
   func run() throws {
-    try inspect(process: options.nameOrPid) { process in
+    try inspect(options: options) { process in
       let stacks: [swift_reflection_ptr_t:[swift_reflection_ptr_t]]? =
           backtraceOptions.style == nil
               ? nil
