@@ -538,7 +538,7 @@ def enable_experimental_opened_existential_types :
   HelpText<"Enable experimental support for implicitly opened existentials">;
 
 def disable_experimental_opened_existential_types :
-  Flag<["-"], "disble-experimental-opened-existential-types">,
+  Flag<["-"], "disable-experimental-opened-existential-types">,
   HelpText<"Disable experimental support for implicitly opened existentials">;
 
 def enable_deserialization_recovery :
