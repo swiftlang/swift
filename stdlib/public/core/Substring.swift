@@ -366,12 +366,14 @@ extension Substring: StringProtocol {
     // breaks, in which case this function must still terminate without trapping
     // and return a result that makes sense.
 
-    // Note: `limit` is intentionally not scalar aligned to ensure our behavior
-    // exactly matches the documentation.
+    // Note: `limit` is intentionally not scalar (or character-) aligned to
+    // ensure our behavior exactly matches the documentation above. We do need
+    // to ensure it has a matching encoding, though. The same goes for `start`,
+    // which is used to determine whether the limit applies at all.
     let limit = _wholeGuts.ensureMatchingEncoding(limit)
+    let start = _wholeGuts.ensureMatchingEncoding(i)
 
     var i = _validateInclusiveScalarIndex(i)
-    let start = i
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
         guard limit < start || i < limit else { return nil }
@@ -674,7 +676,7 @@ extension Substring {
 
     if i._encodedOffset == endIndex._encodedOffset { return 0 }
 
-    // I we don't have cached information, we can simply invoke the forward-only
+    // If we don't have cached information, we can simply invoke the forward-only
     // grapheme breaking algorithm.
     return _wholeGuts._opaqueCharacterStride(
       startingAt: i._encodedOffset, in: _offsetRange)
