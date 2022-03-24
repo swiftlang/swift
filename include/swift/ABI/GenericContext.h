@@ -184,6 +184,33 @@ public:
 using GenericRequirementDescriptor =
   TargetGenericRequirementDescriptor<InProcess>;
 
+/// A runtime description of a generic signature.
+class RuntimeGenericSignature {
+  GenericContextDescriptorHeader Header;
+  const GenericParamDescriptor *Params;
+  const GenericRequirementDescriptor *Requirements;
+public:
+  RuntimeGenericSignature()
+    : Header{0, 0, 0, 0}, Params(nullptr), Requirements(nullptr) {}
+
+  RuntimeGenericSignature(const GenericContextDescriptorHeader &header,
+                          const GenericParamDescriptor *params,
+                          const GenericRequirementDescriptor *requirements)
+    : Header(header), Params(params), Requirements(requirements) {}
+
+  llvm::ArrayRef<GenericParamDescriptor> getParams() const {
+    return llvm::makeArrayRef(Params, Header.NumParams);
+  }
+
+  llvm::ArrayRef<GenericRequirementDescriptor> getRequirements() const {
+    return llvm::makeArrayRef(Requirements, Header.NumRequirements);
+  }
+
+  size_t getArgumentLayoutSizeInWords() const {
+    return Header.getArgumentLayoutSizeInWords();
+  }
+};
+
 template<typename Runtime>
 class TargetGenericEnvironment
     : public swift::ABI::TrailingObjects<TargetGenericEnvironment<Runtime>,
@@ -339,6 +366,13 @@ public:
   StoredSize getGenericArgumentsStorageSize() const {
     return StoredSize(getGenericContextHeader().getNumArguments())
              * sizeof(StoredPointer);
+  }
+
+  RuntimeGenericSignature getGenericSignature() const {
+    if (!asSelf()->isGeneric()) return RuntimeGenericSignature();
+    return {getGenericContextHeader(),
+            getGenericParams().data(),
+            getGenericRequirements().data()};
   }
 
 protected:
