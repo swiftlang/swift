@@ -701,6 +701,10 @@ bb1:
   destroy_value %copy : $AnyObject
   %obj = load [copy] %access : $*AnyObject
   end_access %access : $*AnyObject
+  // Use %obj so it doesn't get deleted because it's unused a trigger a cascade
+  // of deletions.
+  %f2 = function_ref @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+  apply %f2(%obj) : $@convention(thin) (@guaranteed AnyObject) -> ()
   destroy_value %obj : $AnyObject
   destroy_value %box : ${ var AnyObject }
   %v = tuple ()
@@ -875,4 +879,25 @@ entry(%instance : @owned $C):
   destroy_value %lifetime : $C
   %retval = tuple ()
   return %retval : $()
+}
+
+// Verify that a dead copy_value is deleted.
+// CHECK-LABEL: sil [ossa] @delete_dead_reborrow_copy : {{.*}} {
+// CHECK-NOT:     copy_value
+// CHECK-LABEL: } // end sil function 'delete_dead_reborrow_copy'
+sil [ossa] @delete_dead_reborrow_copy : $@convention(thin) (@owned X) -> () {
+bb0(%instance : @owned $X):
+    %lifetime = begin_borrow %instance : $X
+    br bb1(%lifetime : $X)
+
+bb1(%reborrow : @guaranteed $X):
+    %dead_copy = copy_value %reborrow : $X
+    end_borrow %reborrow : $X
+    destroy_value %dead_copy : $X
+    br exit
+
+exit:
+    destroy_value %instance : $X
+    %retval = tuple ()
+    return %retval : $()
 }
