@@ -945,7 +945,7 @@ class TypeWitnessSystem final {
   struct TypeWitnessCandidate final {
     /// The defaulted associated type declaration correlating with this
     /// candidate, if present.
-    const AssociatedTypeDecl *DefaultedAssocType;
+    AssociatedTypeDecl *DefaultedAssocType;
 
     /// The equivalence class of this candidate.
     EquivalenceClass *EquivClass;
@@ -973,7 +973,7 @@ public:
 
   /// Get the defaulted associated type relating to the resolved type witness
   /// for the associated type with the given name, if present.
-  const AssociatedTypeDecl *getDefaultedAssocType(Identifier name) const;
+  AssociatedTypeDecl *getDefaultedAssocType(Identifier name) const;
 
   /// Record a type witness for the given associated type name.
   ///
@@ -987,8 +987,7 @@ public:
   /// defines the given default type.
   ///
   /// \note This need not lead to the resolution of a type witness.
-  void addDefaultTypeWitness(Type type,
-                             const AssociatedTypeDecl *defaultedAssocType);
+  void addDefaultTypeWitness(Type type, AssociatedTypeDecl *defaultedAssocType);
 
   /// Record the given same-type requirement, if regarded of interest to
   /// the system.

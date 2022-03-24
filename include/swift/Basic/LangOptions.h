@@ -352,6 +352,10 @@ namespace swift {
     /// Enable variadic generics.
     bool EnableExperimentalVariadicGenerics = false;
 
+    /// Enable experimental associated type inference using type witness
+    /// systems.
+    bool EnableExperimentalAssociatedTypeInference = false;
+
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;

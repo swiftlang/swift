@@ -1201,26 +1201,56 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
     return nullptr;
   }
 
-  TypeWitnessSystem system(unresolvedAssocTypes);
-  collectAbstractTypeWitnesses(system, unresolvedAssocTypes);
+  // Attempt to compute abstract type witnesses for associated types that could
+  // not resolve otherwise.
+  llvm::SmallVector<AbstractTypeWitness, 2> abstractTypeWitnesses;
 
-  if (ctx.LangOpts.DumpTypeWitnessSystems) {
-    system.dump(llvm::dbgs(), conformance);
-  }
+  if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+    TypeWitnessSystem system(unresolvedAssocTypes);
+    collectAbstractTypeWitnesses(system, unresolvedAssocTypes);
 
-  // If we couldn't resolve an associated type, bail out.
-  for (auto *assocType : unresolvedAssocTypes) {
-    if (!system.hasResolvedTypeWitness(assocType->getName())) {
+    if (ctx.LangOpts.DumpTypeWitnessSystems) {
+      system.dump(llvm::dbgs(), conformance);
+    }
+
+    // If we couldn't resolve an associated type, bail out.
+    for (auto *assocType : unresolvedAssocTypes) {
+      if (!system.hasResolvedTypeWitness(assocType->getName())) {
+        return assocType;
+      }
+    }
+
+    // Record the tentative type witnesses to make them available during
+    // substitutions.
+    for (auto *assocType : unresolvedAssocTypes) {
+      auto resolvedTy = system.getResolvedTypeWitness(assocType->getName());
+
+      typeWitnesses.insert(assocType, {resolvedTy, reqDepth});
+
+      if (auto *defaultedAssocType =
+              system.getDefaultedAssocType(assocType->getName())) {
+        abstractTypeWitnesses.emplace_back(assocType, resolvedTy,
+                                           defaultedAssocType);
+      } else {
+        abstractTypeWitnesses.emplace_back(assocType, resolvedTy);
+      }
+    }
+  } else {
+    for (auto *const assocType : unresolvedAssocTypes) {
+      // Try to compute the type without the aid of a specific potential
+      // witness.
+      if (const auto &typeWitness = computeAbstractTypeWitness(assocType)) {
+        // Record the type witness immediately to make it available
+        // for substitutions into other tentative type witnesses.
+        typeWitnesses.insert(assocType, {typeWitness->getType(), reqDepth});
+
+        abstractTypeWitnesses.push_back(std::move(typeWitness.getValue()));
+        continue;
+      }
+
+      // The solution is incomplete.
       return assocType;
     }
-  }
-
-  // Record the tentative type witnesses to make them available during
-  // substitutions.
-  for (auto *assocType : unresolvedAssocTypes) {
-    typeWitnesses.insert(
-        assocType,
-        {system.getResolvedTypeWitness(assocType->getName()), reqDepth});
   }
 
   // Check each abstract type witness against the generic requirements on the
@@ -1237,8 +1267,10 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
   //   associatedtype B: Sequence = Never
   // }
   const auto substOptions = getSubstOptionsWithCurrentTypeWitnesses();
-  for (auto *const assocType : unresolvedAssocTypes) {
-    Type type = system.getResolvedTypeWitness(assocType->getName());
+  for (const auto &witness : abstractTypeWitnesses) {
+    auto *const assocType = witness.getAssocType();
+    Type type = witness.getType();
+
     // Replace type parameters with other known or tentative type witnesses.
     if (type->hasTypeParameter()) {
       // FIXME: We should find a better way to detect and reason about these
@@ -1250,7 +1282,10 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
       std::function<Type(Type)> substCurrentTypeWitnesses;
       substCurrentTypeWitnesses = [&](Type ty) -> Type {
         if (auto *gp = ty->getAs<GenericTypeParamType>()) {
-          if (isa<ProtocolDecl>(gp->getDecl()->getDeclContext()->getAsDecl())) {
+          // FIXME: 'computeFixedTypeWitness' uses 'getCanonicalTypeInContext',
+          // so if a generic parameter is canonical here, it's 'Self'.
+          if (gp->isCanonical() ||
+              isa<ProtocolDecl>(gp->getDecl()->getDeclContext()->getAsDecl())) {
             return adoptee;
           }
 
@@ -1355,8 +1390,7 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
             checkTypeWitness(type, assocType, conformance, substOptions)) {
       // We failed to satisfy a requirement. If this is a default type
       // witness failure and we haven't seen one already, write it down.
-      auto *defaultedAssocType =
-          system.getDefaultedAssocType(assocType->getName());
+      auto *defaultedAssocType = witness.getDefaultedAssocType();
       if (defaultedAssocType && !failedDefaultedAssocType &&
           !failed.isError()) {
         failedDefaultedAssocType = defaultedAssocType;
@@ -2260,7 +2294,7 @@ Type TypeWitnessSystem::getResolvedTypeWitness(Identifier name) const {
   return Type();
 }
 
-const AssociatedTypeDecl *
+AssociatedTypeDecl *
 TypeWitnessSystem::getDefaultedAssocType(Identifier name) const {
   assert(this->TypeWitnesses.count(name));
 
@@ -2341,7 +2375,7 @@ void TypeWitnessSystem::addTypeWitness(Identifier name, Type type) {
 }
 
 void TypeWitnessSystem::addDefaultTypeWitness(
-    Type type, const AssociatedTypeDecl *defaultedAssocType) {
+    Type type, AssociatedTypeDecl *defaultedAssocType) {
   const auto name = defaultedAssocType->getName();
   assert(this->TypeWitnesses.count(name));
 
