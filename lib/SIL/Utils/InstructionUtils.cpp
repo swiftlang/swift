@@ -569,7 +569,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     //return RuntimeEffect::NoEffect;
   }
 
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::Casting | metadataEffect(impactType) |
@@ -584,10 +583,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::Casting | metadataEffect(impactType) |
       metadataEffect(cast<CheckedCastBranchInst>(inst)->getTargetLoweredType());
-  case SILInstructionKind::CheckedCastValueBranchInst:
-    impactType = inst->getOperand(0)->getType();
-    return RuntimeEffect::Casting | metadataEffect(impactType) |
-      metadataEffect(cast<CheckedCastValueBranchInst>(inst)->getTargetLoweredType());
 
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::ProjectBoxInst:

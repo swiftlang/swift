@@ -45,3 +45,17 @@ extension G where X : C<Dictionary<Y, Z>> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=G
 // CHECK-NEXT: Generic signature: <X, Y, Z where X : C<()>>
 extension G where X : C<()> {}
+
+// Make sure we reconstitute sugar when splitting concrete
+// equivalence classes too.
+
+protocol P {
+  associatedtype T where T == [U]
+  associatedtype U
+}
+
+struct G2<T1 : P, T2 : P> {}
+
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=G2
+// CHECK-NEXT: Generic signature: <T1, T2 where T1 : P, T2 : P, T1.[P]U == [Int], T2.[P]U == [Int]>
+extension G2 where T2.U == [Int], T1.T == T2.T {}

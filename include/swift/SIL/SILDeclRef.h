@@ -372,6 +372,8 @@ struct SILDeclRef {
   bool isNoinline() const;
   /// True if the function has __always inline attribute.
   bool isAlwaysInline() const;
+  /// True if the function has the @_backDeploy attribute.
+  bool isBackDeployed() const;
   
   /// Return the expected linkage of this declaration.
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;

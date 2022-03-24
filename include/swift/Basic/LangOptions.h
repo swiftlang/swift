@@ -379,11 +379,6 @@ namespace swift {
     /// [TODO: Clang-type-plumbing] Turn on for feature rollout.
     bool UseClangFunctionTypes = false;
 
-    /// If set to true, compile with the SIL Opaque Values enabled.
-    /// This is for bootstrapping. It can't be in SILOptions because the
-    /// TypeChecker uses it to set resolve the ParameterConvention.
-    bool EnableSILOpaqueValues = false;
-
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
     bool DiagnosticsEditorMode = false;
@@ -524,6 +519,10 @@ namespace swift {
     /// Maximum concrete type nesting depth for requirement machine property map
     /// algorithm.
     unsigned RequirementMachineMaxConcreteNesting = 30;
+
+    /// Maximum number of attempts to make when splitting concrete equivalence
+    /// classes.
+    unsigned RequirementMachineMaxSplitConcreteEquivClassAttempts = 2;
 
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.

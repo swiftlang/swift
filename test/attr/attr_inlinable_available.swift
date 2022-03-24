@@ -16,16 +16,28 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -target-min-inlining-version min
 
 
+// Check that `-library-level api` implies `-target-min-inlining-version min`
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -library-level api
+
+
 // Check that these rules are only applied when requested and that at least some
 // diagnostics are not present without it.
-// RUN: not %target-typecheck-verify-swift -swift-version 5 -target %target-next-stable-abi-triple 2>&1 | %FileCheck --check-prefix NON_ABI %s
-// NON_ABI: error: expected error not produced
-// NON_ABI: {'BetweenTargets' is only available in}
+// RUN: not %target-typecheck-verify-swift -swift-version 5 -target %target-next-stable-abi-triple 2>&1 | %FileCheck --check-prefix NON_MIN %s
+
+
+// Check that -target-min-inlining-version overrides -library-level, allowing
+// library owners to disable this behavior for API libraries if needed.
+// RUN: not %target-typecheck-verify-swift -swift-version 5 -target %target-next-stable-abi-triple -target-min-inlining-version target -library-level api 2>&1 | %FileCheck --check-prefix NON_MIN %s
 
 
 // Check that we respect -target-min-inlining-version by cranking it up high
 // enough to suppress any possible errors.
 // RUN: %target-swift-frontend -typecheck -disable-objc-attr-requires-foundation-module %s -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -target-min-inlining-version 42.0
+
+
+// NON_MIN: error: expected error not produced
+// NON_MIN: {'BetweenTargets' is only available in}
+
 
 /// Declaration with no availability annotation. Should be inferred as minimum
 /// inlining target.

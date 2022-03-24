@@ -130,7 +130,6 @@ namespace swift {
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
   struct InterfaceSubContextDelegate;
-  class TypeCheckCompletionCallback;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -144,6 +143,10 @@ namespace rewriting {
 
 namespace syntax {
   class SyntaxArena;
+}
+
+namespace ide {
+  class TypeCheckCompletionCallback;
 }
 
 /// Lists the set of "known" Foundation entities that are used in the
@@ -281,7 +284,7 @@ public:
   /// the cancellation might return with any result.
   std::shared_ptr<std::atomic<bool>> CancellationFlag = nullptr;
 
-  TypeCheckCompletionCallback *CompletionCallback = nullptr;
+  ide::TypeCheckCompletionCallback *CompletionCallback = nullptr;
 
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;

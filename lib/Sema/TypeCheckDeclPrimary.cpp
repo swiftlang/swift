@@ -2653,7 +2653,7 @@ public:
     // Do this before visiting members, to avoid a request cycle if
     // a member referenecs another declaration whose generic signature
     // has a conformance requirement to this protocol.
-    auto reqSig = PD->getRequirementSignature().getRequirements();
+    auto reqSig = PD->getRequirementSignature();
 
     // Check the members.
     for (auto Member : PD->getMembers())
@@ -2669,8 +2669,9 @@ public:
         TypeChecker::inferDefaultWitnesses(PD);
 
     if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
-      auto requirementsSig =
-        GenericSignature::get({PD->getProtocolSelfType()}, reqSig);
+      auto sig =
+        GenericSignature::get({PD->getProtocolSelfType()},
+                              reqSig.getRequirements());
 
       llvm::errs() << "\n";
       llvm::errs() << "Protocol requirement signature:\n";
@@ -2679,33 +2680,33 @@ public:
       llvm::errs() << "Requirement signature: ";
       PrintOptions Opts;
       Opts.ProtocolQualifiedDependentMemberTypes = true;
-      requirementsSig->print(llvm::errs(), Opts);
+      sig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
 
       llvm::errs() << "Canonical requirement signature: ";
-      auto canRequirementSig =
-        CanGenericSignature::getCanonical(requirementsSig.getGenericParams(),
-                                          requirementsSig.getRequirements());
-      canRequirementSig->print(llvm::errs(), Opts);
+      auto canSig =
+        CanGenericSignature::getCanonical(sig.getGenericParams(),
+                                          sig.getRequirements());
+      canSig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
 
-    if (getASTContext().LangOpts.RequirementMachineProtocolSignatures ==
-        RequirementMachineMode::Disabled) {
-  #ifndef NDEBUG
-      // The GenericSignatureBuilder outputs incorrectly-minimized signatures
-      // sometimes, so only check invariants in asserts builds.
-      PD->getGenericSignature().verify(reqSig);
-  #endif
-    } else {
-      // When using the Requirement Machine, always verify signatures.
-      // An incorrect signature indicates a serious problem which can cause
-      // miscompiles or inadvertent ABI dependencies on compiler bugs, so
-      // we really want to avoid letting one slip by.
-      PD->getGenericSignature().verify(reqSig);
+    if (!reqSig.getErrors()) {
+      if (getASTContext().LangOpts.RequirementMachineProtocolSignatures ==
+          RequirementMachineMode::Disabled) {
+    #ifndef NDEBUG
+        // The GenericSignatureBuilder outputs incorrectly-minimized signatures
+        // sometimes, so only check invariants in asserts builds.
+        PD->getGenericSignature().verify(reqSig.getRequirements());
+    #endif
+      } else {
+        // When using the Requirement Machine, always verify signatures.
+        // An incorrect signature indicates a serious problem which can cause
+        // miscompiles or inadvertent ABI dependencies on compiler bugs, so
+        // we really want to avoid letting one slip by.
+        PD->getGenericSignature().verify(reqSig.getRequirements());
+      }
     }
-
-    (void) reqSig;
 
     checkExplicitAvailability(PD);
   }

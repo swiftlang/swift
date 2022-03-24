@@ -16,7 +16,7 @@
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/PossibleParamInfo.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 
 namespace swift {
 namespace ide {
@@ -45,9 +45,14 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     Type BaseType;
     /// True if an argument label precedes the completion location.
     bool HasLabel;
+    /// Whether the surrounding context is async and thus calling async
+    /// functions is supported.
+    bool IsInAsyncContext;
   };
 
   CodeCompletionExpr *CompletionExpr;
+  DeclContext *DC;
+
   SmallVector<Result, 4> Results;
 
   /// Populates a vector of parameters to suggest along with a vector of types
@@ -58,11 +63,12 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
                          SmallVectorImpl<PossibleParamInfo> &Params,
                          SmallVectorImpl<Type> &Types);
 
-public:
-  ArgumentTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr)
-      : CompletionExpr(CompletionExpr) {}
+  void sawSolutionImpl(const constraints::Solution &solution) override;
 
-  void sawSolution(const constraints::Solution &solution) override;
+public:
+  ArgumentTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
+                                      DeclContext *DC)
+      : CompletionExpr(CompletionExpr), DC(DC) {}
 
   /// \param IncludeSignature Whether to include a suggestion for the entire
   /// function signature instead of suggesting individual labels. Used when

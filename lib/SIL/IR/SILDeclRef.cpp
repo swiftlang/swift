@@ -689,6 +689,19 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   if (isClangImported())
     return IsSerialized;
 
+  // Handle back deployed functions. The original back deployed function
+  // should not be serialized, but the thunk and fallback should be since they
+  // need to be emitted into the client.
+  if (isBackDeployed()) {
+    switch (backDeploymentKind) {
+      case BackDeploymentKind::None:
+        return IsNotSerialized;
+      case BackDeploymentKind::Fallback:
+      case BackDeploymentKind::Thunk:
+        return IsSerialized;
+    }
+  }
+
   // Otherwise, ask the AST if we're inside an @inlinable context.
   if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
     return IsSerialized;
@@ -732,6 +745,17 @@ bool SILDeclRef::isAlwaysInline() const {
       if (attr->getKind() == InlineKind::Always)
         return true;
   }
+
+  return false;
+}
+
+bool SILDeclRef::isBackDeployed() const {
+  if (!hasDecl())
+    return false;
+
+  auto *decl = getDecl();
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(decl))
+    return afd->isBackDeployed();
 
   return false;
 }

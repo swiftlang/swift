@@ -520,6 +520,7 @@ extension _StringGuts {
 
 extension String.UTF16View {
   
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
   @inline(__always)
   internal func _utf16Length<U: SIMD, S: SIMD>(
     readPtr: inout UnsafeRawPointer,
@@ -533,20 +534,25 @@ extension String.UTF16View {
       //Find the number of continuations (0b10xxxxxx)
       let sValue = Builtin.loadRaw(readPtr._rawValue) as S
       let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
-      let continuationCount = Int(continuations.wrappedSum())
             
       //Find the number of 4 byte code points (0b11110xxx)
       let uValue = Builtin.loadRaw(readPtr._rawValue) as U
-      let fourBytes = U.zero.replacing(with: U.one, where: uValue .>= 0b11110000)
-      let fourByteCount = Int(fourBytes.wrappedSum())
-            
-      utf16Count &+= (U.scalarCount - continuationCount) + fourByteCount
+      let fourBytes = S.zero.replacing(
+        with: S.one,
+        where: unsafeBitCast(
+          uValue .>= 0b11110000,
+          to: SIMDMask<S.MaskStorage>.self
+        )
+      )
+      
+      utf16Count &+= U.scalarCount + Int((fourBytes &- continuations).wrappedSum())
             
       readPtr += MemoryLayout<U>.stride
     }
     
     return utf16Count
   }
+#endif
   
   @inline(__always)
   internal func _utf16Distance(from start: Index, to end: Index) -> Int {
@@ -572,6 +578,7 @@ extension String.UTF16View {
         readPtr += 1
       }
 
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
       // TODO: Currently, using SIMD sizes above SIMD8 is slower
       // Once that's fixed we should go up to SIMD64 here
       
@@ -601,6 +608,7 @@ extension String.UTF16View {
           return 0
         }
       }
+#endif
 
       //trailing bytes
       while readPtr < endPtr {

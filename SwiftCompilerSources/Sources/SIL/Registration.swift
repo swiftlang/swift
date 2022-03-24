@@ -92,7 +92,6 @@ public func registerSILClasses() {
   register(RefElementAddrInst.self)
   register(RefTailAddrInst.self)
   register(UnconditionalCheckedCastInst.self)
-  register(UnconditionalCheckedCastValueInst.self)
   register(ConvertFunctionInst.self)
   register(ThinToThickFunctionInst.self)
   register(ObjCExistentialMetatypeToObjectInst.self)
@@ -140,5 +139,4 @@ public func registerSILClasses() {
   register(AwaitAsyncContinuationInst.self)
   register(CheckedCastBranchInst.self)
   register(CheckedCastAddrBranchInst.self)
-  register(CheckedCastValueBranchInst.self)
 }

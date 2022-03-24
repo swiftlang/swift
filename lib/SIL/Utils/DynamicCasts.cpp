@@ -1205,6 +1205,11 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
 
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions?
+///
+/// TODO: in OSSA-with-opaque-values SIL, all casts could be modeled using
+/// scalar casts by setting 'OwnershipForwardingMixin::directlyForwards =
+/// false'. This would simplify SIL analysis. Temporaries would be emitted
+/// during address lowering.
 bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
                                                 CanType sourceFormalType,
                                                 CanType targetFormalType) {

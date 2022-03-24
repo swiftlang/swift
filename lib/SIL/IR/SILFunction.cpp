@@ -602,9 +602,6 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
     if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(Term))
       return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
 
-    if (auto *CCBI = dyn_cast<CheckedCastValueBranchInst>(Term))
-      return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
-
     if (auto *CCBI = dyn_cast<CheckedCastAddrBranchInst>(Term))
       return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
 

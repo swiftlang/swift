@@ -34,52 +34,6 @@ static bool SwiftKeyPathFilter(ValueDecl *decl, DeclVisibilityKind) {
   }
 }
 
-/// Returns \c true if \p DC can handles async call.
-static bool canDeclContextHandleAsync(const DeclContext *DC) {
-  if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
-    return func->isAsyncContext();
-
-  if (auto *closure = dyn_cast<ClosureExpr>(DC)) {
-    // See if the closure has 'async' function type.
-    if (auto closureType = closure->getType())
-      if (auto fnType = closureType->getAs<AnyFunctionType>())
-        if (fnType->isAsync())
-          return true;
-
-    // If the closure doesn't contain any async call in the body, closure itself
-    // doesn't have 'async' type even if 'async' closure is expected.
-    //   func foo(fn: () async -> Void)
-    //   foo { <HERE> }
-    // In this case, the closure is wrapped with a 'FunctionConversionExpr'
-    // which has 'async' function type.
-    struct AsyncClosureChecker : public ASTWalker {
-      const ClosureExpr *Target;
-      bool Result = false;
-
-      AsyncClosureChecker(const ClosureExpr *Target) : Target(Target) {}
-
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-        if (E == Target)
-          return {false, E};
-
-        if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
-          if (conversionExpr->getSubExpr() == Target) {
-            if (conversionExpr->getType()->is<AnyFunctionType>() &&
-                conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
-              Result = true;
-            return {false, E};
-          }
-        }
-        return {true, E};
-      }
-    } checker(closure);
-    closure->getParent()->walkContext(checker);
-    return checker.Result;
-  }
-
-  return false;
-}
-
 static bool isTopLevelSubcontext(const DeclContext *DC) {
   for (; DC && DC->isLocalContext(); DC = DC->getParent()) {
     switch (DC->getContextKind()) {
@@ -205,6 +159,52 @@ bool swift::ide::isCompletionDeclContextLocalContext(DeclContext *DC) {
   if (isCodeCompletionAtTopLevel(DC))
     return false;
   return true;
+}
+
+/// Returns \c true if \p DC can handles async call.
+bool swift::ide::canDeclContextHandleAsync(const DeclContext *DC) {
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
+    return func->isAsyncContext();
+
+  if (auto *closure = dyn_cast<ClosureExpr>(DC)) {
+    // See if the closure has 'async' function type.
+    if (auto closureType = closure->getType())
+      if (auto fnType = closureType->getAs<AnyFunctionType>())
+        if (fnType->isAsync())
+          return true;
+
+    // If the closure doesn't contain any async call in the body, closure itself
+    // doesn't have 'async' type even if 'async' closure is expected.
+    //   func foo(fn: () async -> Void)
+    //   foo { <HERE> }
+    // In this case, the closure is wrapped with a 'FunctionConversionExpr'
+    // which has 'async' function type.
+    struct AsyncClosureChecker : public ASTWalker {
+      const ClosureExpr *Target;
+      bool Result = false;
+
+      AsyncClosureChecker(const ClosureExpr *Target) : Target(Target) {}
+
+      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+        if (E == Target)
+          return {false, E};
+
+        if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
+          if (conversionExpr->getSubExpr() == Target) {
+            if (conversionExpr->getType()->is<AnyFunctionType>() &&
+                conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
+              Result = true;
+            return {false, E};
+          }
+        }
+        return {true, E};
+      }
+    } checker(closure);
+    closure->getParent()->walkContext(checker);
+    return checker.Result;
+  }
+
+  return false;
 }
 
 /// Return \c true if the completion happens at top-level of a library file.
