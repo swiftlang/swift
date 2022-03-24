@@ -48,8 +48,18 @@ if var nonOptional.property { } // expected-error{{unwrap condition requires a v
 guard let _ = nonOptionalStruct() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 guard let _ = nonOptionalEnum() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
 
+let optional: String? = nil
+if case let optional? { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
+if case let .some(optional) { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
+if case .some(let optional) { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
+
 if case let x? = nonOptionalStruct() { _ = x } // expected-error{{'?' pattern cannot match values of type 'NonOptionalStruct'}}
 if case let x? = nonOptionalEnum() { _ = x } // expected-error{{'?' pattern cannot match values of type 'NonOptionalEnum'}}
+
+if let x { _ = x } // expected-error{{cannot find 'x' in scope}}
+
+if let optional: String { _ = optional }
+if let optional: Int { _ = optional } // expected-error{{cannot convert value of type 'String?' to specified type 'Int?'}}
 
 class B {} // expected-note * {{did you mean 'B'?}}
 class D : B {}// expected-note * {{did you mean 'D'?}}

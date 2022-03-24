@@ -1626,16 +1626,16 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     SyntaxParsingContext InitCtxt(SyntaxContext, SyntaxKind::InitializerClause);
     consumeToken();
     Init = parseExprBasic(diag::expected_expr_conditional_var);
-  } else if (!ThePattern.isNull() && !ThePattern.getPtrOrNull()->getBoundName().empty()) {
-    auto bindingName = new DeclNameRef(ThePattern.getPtrOrNull()->getBoundName());
-    auto loc = new DeclNameLoc(ThePattern.getPtrOrNull()->getEndLoc());
-    auto declRefExpr = new (Context) UnresolvedDeclRefExpr(*bindingName,
+  } else if (!ThePattern.getPtrOrNull()->getBoundName().empty()) {
+    auto bindingName = DeclNameRef(ThePattern.getPtrOrNull()->getBoundName());
+    auto loc = DeclNameLoc(ThePattern.getPtrOrNull()->getEndLoc());
+    auto declRefExpr = new (Context) UnresolvedDeclRefExpr(bindingName,
                                                            DeclRefKind::Ordinary,
-                                                           *loc);
+                                                           loc);
     
     declRefExpr->setImplicit();
     Init = makeParserResult(declRefExpr);
-  } else if (!ThePattern.isNull() && BindingKindStr != "case") {
+  } else if (BindingKindStr != "case") {
     // If the pattern is present but isn't an identifier, the user wrote
     // something invalid like `let foo.bar`. Emit a special diagnostic for this,
     // with a fix-it prepending "<#identifier#> = "
