@@ -34,8 +34,6 @@ int main() {
   VERIFY_PASSTHROUGH_VALUE($s9Functions17passThroughCShortys5Int16VADF, -512);
   // passThroughCInt
   VERIFY_PASSTHROUGH_VALUE($s9Functions15passThroughCIntys5Int32VADF, -999999);
-  // passThroughCLong
-  VERIFY_PASSTHROUGH_VALUE($s9Functions16passThroughCLongyS2iF, -999999);
   // passThroughCLongLong
   VERIFY_PASSTHROUGH_VALUE($s9Functions20passThroughCLongLongys5Int64VADF, -999998);
 
@@ -45,8 +43,6 @@ int main() {
   VERIFY_PASSTHROUGH_VALUE($s9Functions25passThroughCUnsignedShortys6UInt16VADF, 0xFFFF);
   // passThroughCUnsignedInt
   VERIFY_PASSTHROUGH_VALUE($s9Functions23passThroughCUnsignedIntys6UInt32VADF, 0xFFFFFFFF);
-  // passThroughCUnsignedLong
-  VERIFY_PASSTHROUGH_VALUE($s9Functions24passThroughCUnsignedLongyS2uF, 0xFFFFFFFF);
   // passThroughCUnsignedLongLong
   VERIFY_PASSTHROUGH_VALUE($s9Functions024passThroughCUnsignedLongE0ys6UInt64VADF, 0xFFFFFFFF);
 

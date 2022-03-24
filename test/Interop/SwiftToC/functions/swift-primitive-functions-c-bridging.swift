@@ -12,12 +12,10 @@
 // CHECK-NEXT: SWIFT_EXTERN char32_t $s9Functions18passThroughCChar32ys7UnicodeO6ScalarVAFF(char32_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN double $s9Functions18passThroughCDoubleyS2dF(double x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN int $s9Functions15passThroughCIntys5Int32VADF(int x) SWIFT_NOEXCEPT SWIFT_CALL;
-// CHECK-NEXT: SWIFT_EXTERN long $s9Functions16passThroughCLongyS2iF(long x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN long long $s9Functions20passThroughCLongLongys5Int64VADF(long long x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN short $s9Functions17passThroughCShortys5Int16VADF(short x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN signed char $s9Functions22passThroughCSignedCharys4Int8VADF(signed char x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN unsigned int $s9Functions23passThroughCUnsignedIntys6UInt32VADF(unsigned int x) SWIFT_NOEXCEPT SWIFT_CALL;
-// CHECK-NEXT: SWIFT_EXTERN unsigned long $s9Functions24passThroughCUnsignedLongyS2uF(unsigned long x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN unsigned long long $s9Functions024passThroughCUnsignedLongE0ys6UInt64VADF(unsigned long long x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN unsigned short $s9Functions25passThroughCUnsignedShortys6UInt16VADF(unsigned short x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN unsigned char $s9Functions30passThroughCUnsignedSignedCharys5UInt8VADF(unsigned char x) SWIFT_NOEXCEPT SWIFT_CALL;
@@ -47,16 +45,16 @@ public func passThroughCWideChar(_ x: CWideChar) -> CWideChar { return x }
 public func passThroughCChar16(_ x: CChar16) -> CChar16 { return x }
 public func passThroughCChar32(_ x: CChar32) -> CChar32 { return x }
 
+// Don't test CLong as it's platform specific. See long-lp64 test instead.
 public func passThroughCSignedChar(_ x: CSignedChar) -> CSignedChar { return x }
 public func passThroughCShort(_ x: CShort) -> CShort { return x }
 public func passThroughCInt(_ x: CInt) -> CInt { return x }
-public func passThroughCLong(_ x: CLong) -> CLong { return x }
 public func passThroughCLongLong(_ x: CLongLong) -> CLongLong { return x }
 
+// Don't test CUnsignedLong as it's platform specific. See long-lp64 test instead.
 public func passThroughCUnsignedSignedChar(_ x: CUnsignedChar) -> CUnsignedChar { return x }
 public func passThroughCUnsignedShort(_ x: CUnsignedShort) -> CUnsignedShort { return x }
 public func passThroughCUnsignedInt(_ x: CUnsignedInt) -> CUnsignedInt { return x }
-public func passThroughCUnsignedLong(_ x: CUnsignedLong) -> CUnsignedLong { return x }
 public func passThroughCUnsignedLongLong(_ x: CUnsignedLongLong) -> CUnsignedLongLong { return x }
 
 public func passThrougCFloat(_ x: CFloat) -> CFloat { return x }
