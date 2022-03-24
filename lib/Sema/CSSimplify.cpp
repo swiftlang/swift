@@ -1966,7 +1966,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
             locator->getAnchor().isExpr(ExprKind::UnresolvedMemberChainResult)) {
           locator =
             cs.getConstraintLocator(cast<UnresolvedMemberChainResultExpr>(
-              locator->getAnchor().get<Expr*>())->getChainBase());
+              locator->getAnchor().get<Expr*>())->getSubExpr());
         }
         cs.recordFix(NotCompileTimeConst::create(cs, paramTy, locator));
       }
