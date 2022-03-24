@@ -250,15 +250,16 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
         }
       }
       if (Result.FuncTy) {
-        if (Result.IsSubscript) {
-          assert(SemanticContext != SemanticContextKind::None);
-          auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
-          Lookup.addSubscriptCallPattern(
-              Result.FuncTy->getAs<AnyFunctionType>(), SD, SemanticContext);
-        } else {
-          auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Result.FuncD);
-          Lookup.addFunctionCallPattern(Result.FuncTy->getAs<AnyFunctionType>(),
-                                        FD, SemanticContext);
+        if (auto FuncTy = Result.FuncTy->lookThroughAllOptionalTypes()
+                              ->getAs<AnyFunctionType>()) {
+          if (Result.IsSubscript) {
+            assert(SemanticContext != SemanticContextKind::None);
+            auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
+            Lookup.addSubscriptCallPattern(FuncTy, SD, SemanticContext);
+          } else {
+            auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Result.FuncD);
+            Lookup.addFunctionCallPattern(FuncTy, FD, SemanticContext);
+          }
         }
       }
     }
