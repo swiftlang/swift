@@ -10,13 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  String is-not-a Sequence or Collection, but it exposes a
-//  collection of characters.
+//  String is a collection of characters.
 //
 //===----------------------------------------------------------------------===//
-
-// FIXME(ABI)#70 : The character string view should have a custom iterator type
-// to allow performance optimizations of linear traversals.
 
 import SwiftShims
 
