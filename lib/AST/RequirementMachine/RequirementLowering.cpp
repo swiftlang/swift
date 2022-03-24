@@ -723,44 +723,29 @@ bool swift::rewriting::diagnoseRequirementErrors(
 
     case RequirementError::Kind::ConflictingRequirement: {
       auto requirement = error.requirement;
-      auto subjectType = error.typeParameter;
-      switch (requirement.getKind()) {
-      case RequirementKind::SameType:
+      auto conflict = error.conflictingRequirement;
+
+      if (!conflict) {
         if (requirement.getFirstType()->hasError() ||
             requirement.getSecondType()->hasError()) {
           // Don't emit a cascading error.
-        } else if (subjectType) {
-          ctx.Diags.diagnose(loc, diag::same_type_conflict,
-                             false, subjectType,
-                             requirement.getFirstType(),
-                             requirement.getSecondType());
-        } else {
-          ctx.Diags.diagnose(loc, diag::requires_same_concrete_type,
-                             requirement.getFirstType(),
-                             requirement.getSecondType());
+          break;
         }
-        break;
-      case RequirementKind::Conformance:
-        ctx.Diags.diagnose(loc, diag::requires_generic_param_same_type_does_not_conform,
+        ctx.Diags.diagnose(loc, diag::requires_same_concrete_type,
                            requirement.getFirstType(),
-                           requirement.getProtocolDecl()->getName());
-        break;
-      case RequirementKind::Superclass:
-        if (subjectType) {
-          ctx.Diags.diagnose(loc, diag::conflicting_superclass_constraints,
-                             subjectType, requirement.getFirstType(),
-                             requirement.getSecondType());
-        } else {
-          ctx.Diags.diagnose(loc, diag::same_type_does_not_inherit,
-                             requirement.getFirstType(),
-                             requirement.getSecondType());
-        }
-        break;
-      case RequirementKind::Layout:
-        ctx.Diags.diagnose(loc, diag::requires_generic_param_same_type_does_not_conform,
-                           requirement.getFirstType(),
-                           ctx.getIdentifier(requirement.getLayoutConstraint()->getName()));
-        break;
+                           requirement.getSecondType());
+      } else {
+        auto options = PrintOptions::forDiagnosticArguments();
+        std::string requirements;
+        llvm::raw_string_ostream OS(requirements);
+        OS << "'";
+        requirement.print(OS, options);
+        OS << "' and '";
+        conflict->print(OS, options);
+        OS << "'";
+
+        ctx.Diags.diagnose(loc, diag::requirement_conflict,
+                           requirement.getFirstType(), requirements);
       }
 
       diagnosedError = true;

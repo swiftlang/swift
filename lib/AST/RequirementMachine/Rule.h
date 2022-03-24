@@ -13,6 +13,8 @@
 #ifndef SWIFT_RULE_H
 #define SWIFT_RULE_H
 
+#include "swift/AST/Requirement.h"
+
 #include "Symbol.h"
 #include "Term.h"
 
@@ -106,6 +108,8 @@ public:
   }
 
   Optional<Symbol> isPropertyRule() const;
+
+  Optional<Requirement> getPropertyRequirement(Type subject) const;
 
   const ProtocolDecl *isProtocolConformanceRule() const;
 

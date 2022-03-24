@@ -210,7 +210,7 @@ protocol ProtoAlias2 {
 }
 
 func basicConflict<T: ProtoAlias1 & ProtoAlias2>(_:T) where T.A1 == T.A2 {}
-// expected-error@-1{{generic signature requires types 'Int' and 'String' to be the same}}
+// expected-error@-1{{no type for 'T.A1' can satisfy both 'T.A1 == Int' and 'T.A1 == String'}}
 
 protocol RequiresAnyObject {
   associatedtype A: AnyObject
@@ -228,17 +228,17 @@ protocol RequiresSuperclass {
 func testMissingRequirements() {
   struct S {}
   func conflict1<T: RequiresAnyObject>(_: T) where T.A == S {}
-  // expected-error@-1{{same-type constraint type 'S' does not conform to required protocol 'AnyObject'}}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A == S' and 'T.A : AnyObject'}}
 
   func conflict2<T: RequiresConformance>(_: T) where T.A == C {}
-  // expected-error@-1{{same-type constraint type 'C' does not conform to required protocol 'P'}}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A : P' and 'T.A == C'}}
 
   class C {}
   func conflict3<T: RequiresSuperclass>(_: T) where T.A == C {}
-  // expected-error@-1{{type 'T.A' cannot be a subclass of both 'Super' and 'C'}}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A : Super' and 'T.A : C'}}
 
   func conflict4<T: RequiresSuperclass>(_: T) where T.A: C {}
-  // expected-error@-1{{type 'T.A' cannot be a subclass of both 'Super' and 'C'}}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A : Super' and 'T.A : C'}}
 }
 
 protocol Fooable {
@@ -265,7 +265,7 @@ func sameTypeConflicts() {
     var bar: Y { return Y() }
   }
 
-  // expected-error@+1{{generic parameter 'T.Foo' cannot be equal to both 'Y' and 'X'}}
+  // expected-error@+1{{no type for 'T.Foo' can satisfy both 'T.Foo == Y' and 'T.Foo == X'}}
   func fail1<
     T: Fooable, U: Fooable
   >(_ t: T, u: U) -> (X, Y)
@@ -273,7 +273,7 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{generic parameter 'T.Foo' cannot be equal to both 'X' and 'Y'}}
+  // expected-error@+1{{no type for 'T.Foo' can satisfy both 'T.Foo == X' and 'T.Foo == Y'}}
   func fail2<
     T: Fooable, U: Fooable
   >(_ t: T, u: U) -> (X, Y)
@@ -281,13 +281,13 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{same-type constraint type 'X' does not conform to required protocol 'Fooable'}}
+  // expected-error@+1{{no type for 'T.Bar' can satisfy both 'T.Bar : Fooable' and 'T.Bar == X'}}
   func fail3<T: Barrable>(_ t: T) -> X
     where T.Bar == X {
     fatalError()
   }
 
-  // expected-error@+1{{generic parameter 'T.Bar.Foo' cannot be equal to both 'Z' and 'X'}}
+  // expected-error@+1{{no type for 'T.Bar.Foo' can satisfy both 'T.Bar.Foo == Z' and 'T.Bar.Foo == X'}}
   func fail4<T: Barrable>(_ t: T) -> (Y, Z)
     where
     T.Bar == Y,
@@ -295,7 +295,7 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{generic parameter 'T.Bar.Foo' cannot be equal to both 'Z' and 'X'}}
+  // expected-error@+1{{no type for 'T.Bar.Foo' can satisfy both 'T.Bar.Foo == Z' and 'T.Bar.Foo == X'}}
   func fail5<T: Barrable>(_ t: T) -> (Y, Z)
     where
     T.Bar.Foo == Z,
@@ -303,6 +303,6 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{generic parameter 'T.X' cannot be equal to both 'Int' and 'String'}}
+  // expected-error@+1{{no type for 'T.X' can satisfy both 'T.X == Int' and 'T.X == String'}}
   func fail6<U, T: Concrete>(_: U, _: T) where T.X == String {}
 }

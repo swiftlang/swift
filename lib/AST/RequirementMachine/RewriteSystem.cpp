@@ -776,80 +776,10 @@ void RewriteSystem::computeConflictDiagnostics(
       continue;
 
     Type subject = propertyMap.getTypeForTerm(subjectTerm, genericParams);
-
-    // Record conflicting requirements on a type parameter, e.g.
-    // conflicting superclass requirements:
-    //
-    //   class C1 {}
-    //   class C2 {}
-    //   protocol P { associatedtype A: C1 }
-    //   func conflict<T: P>(_: T) where T.A: C2 {}
-    if (firstProperty->getKind() == secondProperty->getKind() &&
-        firstTerm.back().getKind() != Symbol::Kind::Name) {
-      switch (firstProperty->getKind()) {
-      case Symbol::Kind::ConcreteType:
-        errors.push_back(RequirementError::forConflictingRequirement(subject,
-            {RequirementKind::SameType, firstProperty->getConcreteType(),
-             secondProperty->getConcreteType()},
-            signatureLoc));
-        continue;
-
-      case Symbol::Kind::Superclass:
-        // FIXME: shoving the conflicting superclass types into a superclass
-        // requiement is a little gross.
-        errors.push_back(RequirementError::forConflictingRequirement(subject,
-            {RequirementKind::Superclass, firstProperty->getConcreteType(),
-             secondProperty->getConcreteType()},
-            signatureLoc));
-        continue;
-
-      // FIXME: Conflicting layout requirements?
-      default:
-        continue;
-      }
-    }
-
-    auto recordError = [&](Symbol subject, Symbol constraint) {
-      auto subjectType = subject.getConcreteType();
-      switch (constraint.getKind()) {
-      case Symbol::Kind::ConcreteType:
-        errors.push_back(RequirementError::forConflictingRequirement(
-            {RequirementKind::SameType, subjectType, constraint.getConcreteType()},
-            signatureLoc));
-        return;
-
-      case Symbol::Kind::Superclass:
-        errors.push_back(RequirementError::forConflictingRequirement(
-            {RequirementKind::Superclass, subjectType, constraint.getConcreteType()},
-            signatureLoc));
-        return;
-
-      case Symbol::Kind::Protocol:
-        errors.push_back(RequirementError::forConflictingRequirement(
-            {RequirementKind::Conformance, subjectType,
-             constraint.getProtocol()->getDeclaredInterfaceType()},
-            signatureLoc));
-        return;
-
-      case Symbol::Kind::Layout:
-        errors.push_back(RequirementError::forConflictingRequirement(
-            {RequirementKind::Layout, subjectType, constraint.getLayoutConstraint()},
-            signatureLoc));
-        return;
-
-      case Symbol::Kind::ConcreteConformance:
-      case Symbol::Kind::AssociatedType:
-      case Symbol::Kind::GenericParam:
-      case Symbol::Kind::Name:
-        return;
-      }
-    };
-
-    if (firstProperty->getKind() == Symbol::Kind::ConcreteType) {
-      recordError(*firstProperty, *secondProperty);
-    } else if (secondProperty->getKind() == Symbol::Kind::ConcreteType) {
-      recordError(*secondProperty, *firstProperty);
-    }
+    errors.push_back(RequirementError::forConflictingRequirement(
+        *firstRule->getPropertyRequirement(subject),
+        *secondRule->getPropertyRequirement(subject),
+        signatureLoc));
   }
 }
 

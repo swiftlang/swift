@@ -39,26 +39,23 @@ struct RequirementError {
     RedundantRequirement,
   } kind;
 
-  /// The type parameter on which there is an invalid or conflicting
-  /// requirement.
-  ///
-  /// FIXME: We probably want to just store two separate requirements
-  /// in the case of a confict. Right now, the conflicting constraint
-  /// types are both stored in the requirement below, and this serves
-  /// as the subject type.
-  Type typeParameter;
-
   /// The invalid requirement.
   Requirement requirement;
+
+  /// A requirement that conflicts with \c requirement. Both
+  /// requirements will have the same subject type.
+  Optional<Requirement> conflictingRequirement;
 
   SourceLoc loc;
 
 private:
   RequirementError(Kind kind, Requirement requirement, SourceLoc loc)
-    : kind(kind), typeParameter(Type()), requirement(requirement), loc(loc) {}
+    : kind(kind), requirement(requirement), conflictingRequirement(None), loc(loc) {}
 
-  RequirementError(Kind kind, Type subject, Requirement requirement, SourceLoc loc)
-    : kind(kind), typeParameter(subject), requirement(requirement), loc(loc) {}
+  RequirementError(Kind kind, Requirement requirement,
+                   Requirement conflict,
+                   SourceLoc loc)
+    : kind(kind), requirement(requirement), conflictingRequirement(conflict), loc(loc) {}
 
 public:
   static RequirementError forInvalidTypeRequirement(Type subjectType,
@@ -78,10 +75,10 @@ public:
     return {Kind::ConflictingRequirement, req, loc};
   }
 
-  static RequirementError forConflictingRequirement(Type typeParameter,
-                                                    Requirement req,
+  static RequirementError forConflictingRequirement(Requirement first,
+                                                    Requirement second,
                                                     SourceLoc loc) {
-    return {Kind::ConflictingRequirement, typeParameter, req, loc};
+    return {Kind::ConflictingRequirement, first, second, loc};
   }
 
   static RequirementError forRedundantRequirement(Requirement req,
