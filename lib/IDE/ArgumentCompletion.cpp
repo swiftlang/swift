@@ -238,6 +238,35 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
                      Info.BaseTy, HasLabel, IsAsync, SolutionSpecificVarTypes});
 }
 
+void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
+    SmallPtrSetImpl<ValueDecl *> &ShadowedDecls) {
+  for (size_t i = 0; i < Results.size(); ++i) {
+    auto &ResultA = Results[i];
+    for (size_t j = i + 1; j < Results.size(); ++j) {
+      auto &ResultB = Results[j];
+      if (!ResultA.FuncD || !ResultB.FuncD || !ResultA.FuncTy || !ResultB.FuncTy) {
+        continue;
+      }
+      if (ResultA.FuncD->getName() != ResultB.FuncD->getName()) {
+        continue;
+      }
+      if (!ResultA.FuncTy->isEqual(ResultB.FuncTy)) {
+        continue;
+      }
+      ProtocolDecl *inProtocolExtensionA =
+          ResultA.FuncD->getDeclContext()->getExtendedProtocolDecl();
+      ProtocolDecl *inProtocolExtensionB =
+          ResultB.FuncD->getDeclContext()->getExtendedProtocolDecl();
+
+      if (inProtocolExtensionA && !inProtocolExtensionB) {
+        ShadowedDecls.insert(ResultA.FuncD);
+      } else if (!inProtocolExtensionA && inProtocolExtensionB) {
+        ShadowedDecls.insert(ResultB.FuncD);
+      }
+    }
+  }
+}
+
 void ArgumentTypeCheckCompletionCallback::deliverResults(
     bool IncludeSignature, SourceLoc Loc, DeclContext *DC,
     ide::CodeCompletionContext &CompletionCtx,
@@ -245,6 +274,9 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
+
+  SmallPtrSet<ValueDecl *, 4> ShadowedDecls;
+  computeShadowedDecls(ShadowedDecls);
 
   // Perform global completion as a fallback if we don't have any results.
   bool shouldPerformGlobalCompletion = Results.empty();
@@ -290,13 +322,17 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
       }
       if (Result.FuncTy) {
         if (auto FuncTy = Result.FuncTy) {
-          if (Result.IsSubscript) {
-            assert(SemanticContext != SemanticContextKind::None);
-            auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
-            Lookup.addSubscriptCallPattern(FuncTy, SD, SemanticContext);
-          } else {
-            auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Result.FuncD);
-            Lookup.addFunctionCallPattern(FuncTy, FD, SemanticContext);
+          if (ShadowedDecls.count(Result.FuncD) == 0) {
+            // Don't show call pattern completions if the function is
+            // overridden.
+            if (Result.IsSubscript) {
+              assert(SemanticContext != SemanticContextKind::None);
+              auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
+              Lookup.addSubscriptCallPattern(FuncTy, SD, SemanticContext);
+            } else {
+              auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Result.FuncD);
+              Lookup.addFunctionCallPattern(FuncTy, FD, SemanticContext);
+            }
           }
         }
       }

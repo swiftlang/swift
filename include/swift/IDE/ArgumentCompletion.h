@@ -72,6 +72,11 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
 
   void sawSolutionImpl(const constraints::Solution &solution) override;
 
+  /// Populates \p ShadowedDecls with all \c FuncD in \p Results that are
+  /// defined in protocol extensions but redeclared on a nominal type and thus
+  /// cannot be accessed
+  void computeShadowedDecls(SmallPtrSetImpl<ValueDecl *> &ShadowedDecls);
+
 public:
   ArgumentTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
                                       DeclContext *DC)
