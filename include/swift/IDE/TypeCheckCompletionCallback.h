@@ -67,7 +67,13 @@ public:
 
 // MARK: - Utility functions for subclasses of TypeCheckCompletionCallback
 
-Type getTypeForCompletion(const constraints::Solution &S, Expr *E);
+Type getTypeForCompletion(const constraints::Solution &S, ASTNode Node);
+
+/// If \p E occurs in a pattern matching position, returns the type that it is
+/// being pattern-matched against.
+/// If that type is an enum, it allows us to suggest the enum cases for the code
+/// completion expression \p E.
+Type getPatternMatchType(const constraints::Solution &S, Expr *E);
 
 /// Whether the given completion expression is the only expression in its
 /// containing closure or function body and its value is implicitly returned.
@@ -83,6 +89,9 @@ bool isImplicitSingleExpressionReturn(constraints::ConstraintSystem &CS,
 
 /// Returns \c true iff the decl context \p DC allows calling async functions.
 bool isContextAsync(const constraints::Solution &S, DeclContext *DC);
+
+/// Returns true if both types are null or if they are equal.
+bool nullableTypesEqual(Type LHS, Type RHS);
 
 } // namespace ide
 } // namespace swift

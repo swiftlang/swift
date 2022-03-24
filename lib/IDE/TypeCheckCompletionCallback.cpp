@@ -40,8 +40,9 @@ void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
 
 // MARK: - Utility functions for subclasses of TypeCheckCompletionCallback
 
-Type swift::ide::getTypeForCompletion(const constraints::Solution &S, Expr *E) {
-  if (!S.hasType(E)) {
+Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
+                                      ASTNode Node) {
+  if (!S.hasType(Node)) {
     assert(false && "Expression wasn't type checked?");
     return nullptr;
   }
@@ -66,8 +67,8 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S, Expr *E) {
   // expression should still have a type of `[T]` instead of `[<<hole>>]`
   // because it helps to produce correct contextual member list based on
   // a conformance requirement associated with generic parameter `T`.
-  if (isa<CodeCompletionExpr>(E)) {
-    auto completionTy = S.getType(E).transform([&](Type type) -> Type {
+  if (isExpr<CodeCompletionExpr>(Node)) {
+    auto completionTy = S.getType(Node).transform([&](Type type) -> Type {
       if (auto *typeVar = type->getAs<TypeVariableType>())
         return S.getFixedType(typeVar);
       return type;
@@ -92,16 +93,75 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S, Expr *E) {
       return type;
     }));
   } else {
-    Result = S.getResolvedType(E);
+    Result = S.getResolvedType(Node);
   }
 
   if (!Result || Result->is<UnresolvedType>()) {
-    Result = CS.getContextualType(E, /*forConstraint=*/false);
+    Result = CS.getContextualType(Node, /*forConstraint=*/false);
   }
   if (Result && Result->is<UnresolvedType>()) {
     Result = Type();
   }
   return Result;
+}
+
+/// If the code completion expression \p E occurs in a pattern matching
+/// position, we have an AST that looks like this.
+/// \code
+/// (binary_expr implicit type='$T3'
+///   (overloaded_decl_ref_expr function_ref=compound decls=[
+///     Swift.(file).~=,
+///     Swift.(file).Optional extension.~=])
+///   (argument_list implicit
+///     (argument
+///       (code_completion_expr implicit type='$T1'))
+///     (argument
+///       (declref_expr implicit decl=swift_ide_test.(file).foo(x:).$match))))
+/// \endcode
+/// If the code completion expression occurs in such an AST, return the
+/// declaration of the \c $match variable, otherwise return \c nullptr.
+static VarDecl *getMatchVarIfInPatternMatch(Expr *E, ConstraintSystem &CS) {
+  auto &Context = CS.getASTContext();
+
+  auto *Binary = dyn_cast_or_null<BinaryExpr>(CS.getParentExpr(E));
+  if (!Binary || !Binary->isImplicit() || Binary->getLHS() != E) {
+    return nullptr;
+  }
+
+  auto CalledOperator = Binary->getFn();
+  if (!isPatternMatchingOperator(CalledOperator)) {
+    return nullptr;
+  }
+
+  auto MatchArg = dyn_cast_or_null<DeclRefExpr>(Binary->getRHS());
+  if (!MatchArg || !MatchArg->isImplicit()) {
+    return nullptr;
+  }
+
+  auto MatchVar = MatchArg->getDecl();
+  if (MatchVar && MatchVar->isImplicit() &&
+      MatchVar->getBaseName() == Context.Id_PatternMatchVar) {
+    return dyn_cast<VarDecl>(MatchVar);
+  } else {
+    return nullptr;
+  }
+}
+
+Type swift::ide::getPatternMatchType(const constraints::Solution &S, Expr *E) {
+  if (auto MatchVar = getMatchVarIfInPatternMatch(E, S.getConstraintSystem())) {
+    Type MatchVarType;
+    // If the MatchVar has an explicit type, it's not part of the solution. But
+    // we can look it up in the constraint system directly.
+    if (auto T = S.getConstraintSystem().getVarType(MatchVar)) {
+      MatchVarType = T;
+    } else {
+      MatchVarType = getTypeForCompletion(S, MatchVar);
+    }
+    if (MatchVarType) {
+      return MatchVarType;
+    }
+  }
+  return nullptr;
 }
 
 bool swift::ide::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
@@ -147,4 +207,15 @@ bool swift::ide::isContextAsync(const constraints::Solution &S,
   //    solution, but the type information recorded AST declares the context as
   //    async.
   return canDeclContextHandleAsync(DC);
+}
+
+bool swift::ide::nullableTypesEqual(Type LHS, Type RHS) {
+  if (LHS.isNull() && RHS.isNull()) {
+    return true;
+  } else if (LHS.isNull() || RHS.isNull()) {
+    // One type is null but the other is not.
+    return false;
+  } else {
+    return LHS->isEqual(RHS);
+  }
 }

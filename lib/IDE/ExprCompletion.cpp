@@ -19,6 +19,54 @@ using namespace swift;
 using namespace swift::ide;
 using namespace swift::constraints;
 
+static bool solutionSpecificVarTypesEqual(
+    const llvm::SmallDenseMap<const VarDecl *, Type> &LHS,
+    const llvm::SmallDenseMap<const VarDecl *, Type> &RHS) {
+  if (LHS.size() != RHS.size()) {
+    return false;
+  }
+  for (auto LHSEntry : LHS) {
+    auto RHSEntry = RHS.find(LHSEntry.first);
+    if (RHSEntry == RHS.end()) {
+      // Entry of the LHS doesn't exist in RHS
+      return false;
+    } else if (!nullableTypesEqual(LHSEntry.second, RHSEntry->second)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool ExprTypeCheckCompletionCallback::Result::operator==(
+    const Result &Other) const {
+  return IsImplicitSingleExpressionReturn ==
+             Other.IsImplicitSingleExpressionReturn &&
+         IsInAsyncContext == Other.IsInAsyncContext &&
+         solutionSpecificVarTypesEqual(SolutionSpecificVarTypes,
+                                       Other.SolutionSpecificVarTypes);
+}
+
+void ExprTypeCheckCompletionCallback::addExpectedType(Type ExpectedType) {
+  auto IsEqual = [&ExpectedType](Type Other) {
+    return nullableTypesEqual(ExpectedType, Other);
+  };
+  if (llvm::any_of(ExpectedTypes, IsEqual)) {
+    return;
+  }
+  ExpectedTypes.push_back(ExpectedType);
+}
+
+void ExprTypeCheckCompletionCallback::addResult(
+    bool IsImplicitSingleExpressionReturn, bool IsInAsyncContext,
+    llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes) {
+  Result NewResult = {IsImplicitSingleExpressionReturn, IsInAsyncContext,
+                      SolutionSpecificVarTypes};
+  if (llvm::is_contained(Results, NewResult)) {
+    return;
+  }
+  Results.push_back(NewResult);
+}
+
 void ExprTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
   auto &CS = S.getConstraintSystem();
@@ -36,8 +84,12 @@ void ExprTypeCheckCompletionCallback::sawSolutionImpl(
     }
   }
 
-  Results.push_back(
-      {ExpectedTy, ImplicitReturn, IsAsync, SolutionSpecificVarTypes});
+  addResult(ImplicitReturn, IsAsync, SolutionSpecificVarTypes);
+  addExpectedType(ExpectedTy);
+
+  if (auto PatternMatchType = getPatternMatchType(S, CompletionExpr)) {
+    addExpectedType(PatternMatchType);
+  }
 }
 
 void ExprTypeCheckCompletionCallback::deliverResults(
@@ -46,9 +98,10 @@ void ExprTypeCheckCompletionCallback::deliverResults(
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
+  Lookup.shouldCheckForDuplicates(Results.size() > 1);
 
   for (auto &Result : Results) {
-    Lookup.setExpectedTypes(Result.ExpectedType,
+    Lookup.setExpectedTypes(ExpectedTypes,
                             Result.IsImplicitSingleExpressionReturn);
     Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
     Lookup.setSolutionSpecificVarTypes(Result.SolutionSpecificVarTypes);

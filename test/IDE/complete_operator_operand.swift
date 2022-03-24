@@ -15,7 +15,9 @@ func test_binary1(c1: C1, c2: C2) {
 // BINARY_RHS_1: Begin completion
 // BINARY_RHS_1-NOT: Decl[LocalVar]/Local/TypeRelation[Identical]: c1[#C1#]; name=c1
 // BINARY_RHS_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: c2[#C2#]; name=c2
+}
 
+func test_binary2(c1: C1, c2: C2) {
   _ = c2 <--> #^BINARY_RHS_2^#
 // BINARY_RHS_2: Begin completion
 // BINARY_RHS_2-NOT: Decl[LocalVar]/Local/TypeRelation[Identical]: c2[#C2#]; name=c2

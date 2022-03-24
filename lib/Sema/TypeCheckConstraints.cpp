@@ -433,7 +433,11 @@ TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             DeclContext *DC, Type paramType,
                                             bool isAutoClosure) {
-  assert(paramType && !paramType->hasError());
+  // During normal type checking we don't type check the parameter default if
+  // the param has an error type. For code completion, we also type check the
+  // parameter default because it might contain the code completion token.
+  assert(paramType &&
+         (!paramType->hasError() || DC->getASTContext().CompletionCallback));
 
   auto &ctx = DC->getASTContext();
 

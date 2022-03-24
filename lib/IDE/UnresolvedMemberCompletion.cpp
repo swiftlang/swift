@@ -21,65 +21,6 @@ using namespace swift;
 using namespace swift::constraints;
 using namespace swift::ide;
 
-/// If the code completion variable occurs in a pattern matching position, we
-/// have an AST that looks like this.
-/// \code
-/// (binary_expr implicit type='$T3'
-///   (overloaded_decl_ref_expr function_ref=compound decls=[
-///     Swift.(file).~=,
-///     Swift.(file).Optional extension.~=])
-///   (argument_list implicit
-///     (argument
-///       (code_completion_expr implicit type='$T1'))
-///     (argument
-///       (declref_expr implicit decl=swift_ide_test.(file).foo(x:).$match))))
-/// \endcode
-/// If the code completion expression occurs in such an AST, return the
-/// declaration of the \c $match variable, otherwise return \c nullptr.
-static VarDecl *getMatchVarIfInPatternMatch(CodeCompletionExpr *CompletionExpr,
-                                            ConstraintSystem &CS) {
-  auto &Context = CS.getASTContext();
-
-  auto *Binary = dyn_cast_or_null<BinaryExpr>(CS.getParentExpr(CompletionExpr));
-  if (!Binary || !Binary->isImplicit() || Binary->getLHS() != CompletionExpr) {
-    return nullptr;
-  }
-
-  auto CalledOperator = Binary->getFn();
-  if (!CalledOperator || !CalledOperator->isImplicit()) {
-    return nullptr;
-  }
-  // The reference to the ~= operator might be an OverloadedDeclRefExpr or a
-  // DeclRefExpr, depending on how many ~= operators are viable.
-  if (auto Overloaded =
-          dyn_cast_or_null<OverloadedDeclRefExpr>(CalledOperator)) {
-    if (!llvm::all_of(Overloaded->getDecls(), [&Context](ValueDecl *D) {
-          return D->getBaseName() == Context.Id_MatchOperator;
-        })) {
-      return nullptr;
-    }
-  } else if (auto Ref = dyn_cast_or_null<DeclRefExpr>(CalledOperator)) {
-    if (Ref->getDecl()->getBaseName() != Context.Id_MatchOperator) {
-      return nullptr;
-    }
-  } else {
-    return nullptr;
-  }
-
-  auto MatchArg = dyn_cast_or_null<DeclRefExpr>(Binary->getRHS());
-  if (!MatchArg || !MatchArg->isImplicit()) {
-    return nullptr;
-  }
-
-  auto MatchVar = MatchArg->getDecl();
-  if (MatchVar && MatchVar->isImplicit() &&
-      MatchVar->getBaseName() == Context.Id_PatternMatchVar) {
-    return dyn_cast<VarDecl>(MatchVar);
-  } else {
-    return nullptr;
-  }
-}
-
 void UnresolvedMemberTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
   auto &CS = S.getConstraintSystem();
@@ -102,24 +43,14 @@ void UnresolvedMemberTypeCheckCompletionCallback::sawSolutionImpl(
     }
   }
 
-  if (auto MatchVar = getMatchVarIfInPatternMatch(CompletionExpr, CS)) {
-    Type MatchVarType;
-    // If the MatchVar has an explicit type, it's not part of the solution. But
-    // we can look it up in the constraint system directly.
-    if (auto T = S.getConstraintSystem().getVarType(MatchVar)) {
-      MatchVarType = T;
-    } else {
-      MatchVarType = S.getResolvedType(MatchVar);
-    }
-    if (MatchVarType && !MatchVarType->is<UnresolvedType>()) {
-      auto IsEqual = [&](const Result &R) {
-        return R.ExpectedTy->isEqual(MatchVarType);
-      };
-      if (!llvm::any_of(EnumPatternTypes, IsEqual)) {
-        EnumPatternTypes.push_back({MatchVarType,
-                                    /*IsImplicitSingleExpressionReturn=*/false,
-                                    IsAsync});
-      }
+  if (auto PatternType = getPatternMatchType(S, CompletionExpr)) {
+    auto IsEqual = [&](const Result &R) {
+      return R.ExpectedTy->isEqual(PatternType);
+    };
+    if (!llvm::any_of(EnumPatternTypes, IsEqual)) {
+      EnumPatternTypes.push_back({PatternType,
+                                  /*IsImplicitSingleExpressionReturn=*/false,
+                                  IsAsync});
     }
   }
 }
