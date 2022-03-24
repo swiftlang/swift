@@ -35,3 +35,44 @@ void ClangSyntaxPrinter::printNamespace(
     llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
   printNamespace([&](raw_ostream &os) { os << name; }, bodyPrinter);
 }
+
+void ClangSyntaxPrinter::printNullability(
+    Optional<OptionalTypeKind> kind, NullabilityPrintKind printKind) const {
+  if (!kind)
+    return;
+
+  switch (printKind) {
+  case NullabilityPrintKind::ContextSensitive:
+    switch (*kind) {
+    case OTK_None:
+      os << "nonnull";
+      break;
+    case OTK_Optional:
+      os << "nullable";
+      break;
+    case OTK_ImplicitlyUnwrappedOptional:
+      os << "null_unspecified";
+      break;
+    }
+    break;
+  case NullabilityPrintKind::After:
+    os << ' ';
+    LLVM_FALLTHROUGH;
+  case NullabilityPrintKind::Before:
+    switch (*kind) {
+    case OTK_None:
+      os << "_Nonnull";
+      break;
+    case OTK_Optional:
+      os << "_Nullable";
+      break;
+    case OTK_ImplicitlyUnwrappedOptional:
+      os << "_Null_unspecified";
+      break;
+    }
+    break;
+  }
+
+  if (printKind != NullabilityPrintKind::After)
+    os << ' ';
+}

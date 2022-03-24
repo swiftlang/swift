@@ -122,17 +122,14 @@ static bool looksLikeInitMethod(ObjCSelector selector) {
 }
 
 class DeclAndTypePrinter::Implementation
-  : private DeclVisitor<DeclAndTypePrinter::Implementation>,
-    private TypeVisitor<DeclAndTypePrinter::Implementation, void,
-                        Optional<OptionalTypeKind>>
-{
+    : private DeclVisitor<DeclAndTypePrinter::Implementation>,
+      private TypeVisitor<DeclAndTypePrinter::Implementation, void,
+                          Optional<OptionalTypeKind>>,
+      private ClangSyntaxPrinter {
   using PrinterImpl = Implementation;
   friend ASTVisitor;
   friend TypeVisitor;
 
-  // The output stream is accessible through 'owningPrinter',
-  // but it makes the code simpler to have it here too.
-  raw_ostream &os;
   DeclAndTypePrinter &owningPrinter;
   OutputLanguageMode outputLang;
 
@@ -150,7 +147,7 @@ class DeclAndTypePrinter::Implementation
 public:
   explicit Implementation(raw_ostream &out, DeclAndTypePrinter &owner,
                           OutputLanguageMode outputLang)
-      : os(out), owningPrinter(owner), outputLang(outputLang) {}
+      : ClangSyntaxPrinter(out), owningPrinter(owner), outputLang(outputLang) {}
 
   void print(const Decl *D) {
     PrettyStackTraceDecl trace("printing", D);
@@ -1387,55 +1384,6 @@ private:
   /// If a full type is being printed, use print() instead.
   void visitPart(Type ty, Optional<OptionalTypeKind> optionalKind) {
     TypeVisitor::visit(ty, optionalKind);
-  }
-
-  /// Where nullability information should be printed.
-  enum class NullabilityPrintKind {
-    Before,
-    After,
-    ContextSensitive,
-  };
-
-  void printNullability(Optional<OptionalTypeKind> kind,
-                        NullabilityPrintKind printKind
-                          = NullabilityPrintKind::After) {
-    if (!kind)
-      return;
-
-    switch (printKind) {
-    case NullabilityPrintKind::ContextSensitive:
-      switch (*kind) {
-      case OTK_None:
-        os << "nonnull";
-        break;
-      case OTK_Optional:
-        os << "nullable";
-        break;
-      case OTK_ImplicitlyUnwrappedOptional:
-        os << "null_unspecified";
-        break;
-      }
-      break;
-    case NullabilityPrintKind::After:
-      os << ' ';
-      LLVM_FALLTHROUGH;
-    case NullabilityPrintKind::Before:
-      switch (*kind) {
-      case OTK_None:
-        os << "_Nonnull";
-        break;
-      case OTK_Optional:
-        os << "_Nullable";
-        break;
-      case OTK_ImplicitlyUnwrappedOptional:
-        os << "_Null_unspecified";
-        break;
-      }
-      break;
-    }
-
-    if (printKind != NullabilityPrintKind::After)
-      os << ' ';
   }
 
   /// Determine whether this generic Swift nominal type maps to a

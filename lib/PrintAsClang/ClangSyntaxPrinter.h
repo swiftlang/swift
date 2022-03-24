@@ -14,6 +14,7 @@
 #define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -41,7 +42,18 @@ public:
   printNamespace(StringRef name,
                  llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
 
-private:
+  /// Where nullability information should be printed.
+  enum class NullabilityPrintKind {
+    Before,
+    After,
+    ContextSensitive,
+  };
+
+  void printNullability(
+      Optional<OptionalTypeKind> kind,
+      NullabilityPrintKind printKind = NullabilityPrintKind::After) const;
+
+protected:
   raw_ostream &os;
 };
 
