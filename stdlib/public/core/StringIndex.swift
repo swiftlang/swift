@@ -473,23 +473,25 @@ extension String.Index {
   @inline(never)
   public var description: String {
     var d = "String.Index("
+    d += "offset: \(_encodedOffset)"
+    if transcodedOffset != 0 {
+      d += "+\(transcodedOffset)"
+    }
+
+    d += ", encoding: "
     switch (__isUTF8, __isUTF16) {
     case (false, false): d += "unknown"
-    case (true, false): d += "UTF-8"
-    case (false, true): d += "UTF-16"
-    case (true, true): d += "universal"
+    case (true, false): d += "utf8"
+    case (false, true): d += "utf16"
+    case (true, true): d += "any"
     }
-    d += " offset: \(_encodedOffset)"
-    if transcodedOffset != 0 {
-      d += "(+\(transcodedOffset))"
+    if _isCharacterAligned {
+      d += ", aligned: character"
+    } else if _isScalarAligned {
+      d += ", aligned: scalar"
     }
     if let stride = characterStride {
       d += ", stride: \(stride)"
-    }
-    if _isCharacterAligned {
-      d += ", character aligned"
-    } else if _isScalarAligned {
-      d += ", scalar aligned"
     }
     d += ")"
     return d
