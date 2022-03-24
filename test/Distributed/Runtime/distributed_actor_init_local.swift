@@ -15,20 +15,27 @@ enum MyError: Error {
 }
 
 distributed actor PickATransport1 {
-  init(kappa system: FakeActorSystem, other: Int) {}
+  init(kappa system: FakeActorSystem, other: Int) {
+    self.actorSystem = system
+  }
 }
 
 distributed actor PickATransport2 {
-  init(other: Int, thesystem: FakeActorSystem) async {}
+  init(other: Int, thesystem: FakeActorSystem) async {
+    self.actorSystem = thesystem
+  }
 }
 
 distributed actor LocalWorker {
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 }
 
 distributed actor Bug_CallsReadyTwice {
   var x: Int
   init(system: FakeActorSystem, wantBug: Bool) async {
+    self.actorSystem = system
     if wantBug {
       self.x = 1
     }
@@ -38,6 +45,7 @@ distributed actor Bug_CallsReadyTwice {
 
 distributed actor Throwy {
   init(system: FakeActorSystem, doThrow: Bool) throws {
+    self.actorSystem = system
     if doThrow {
       throw MyError.test
     }
@@ -47,6 +55,7 @@ distributed actor Throwy {
 distributed actor ThrowBeforeFullyInit {
   var x: Int
   init(system: FakeActorSystem, doThrow: Bool) throws {
+    self.actorSystem = system
     if doThrow {
       throw MyError.test
     }
@@ -108,13 +117,26 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCall<Act, Err, Res>(
       on actor: Act,
       target: RemoteCallTarget,
-      invocation: inout InvocationDecoder,
+      invocation: inout InvocationEncoder,
       throwing: Err.Type,
       returning: Res.Type
   ) async throws -> Res
-      where Act: DistributedActor,
-            Act.ID == ActorID,
-            Res: SerializationRequirement {
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    throw ExecuteDistributedTargetError(message: "Not implemented")
+  }
+
+  func remoteCallVoid<Act, Err>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: inout InvocationEncoder,
+      throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
     throw ExecuteDistributedTargetError(message: "Not implemented")
   }
 
@@ -167,7 +189,7 @@ func test() async {
   // NOTE: All allocated distributed actors should be saved in this array, so
   // that they will be deallocated together at the end of this test!
   // This convention helps ensure that the test is not flaky.
-  var test: [DistributedActor?] = []
+  var test: [(any DistributedActor)?] = []
 
   test.append(LocalWorker(system: system))
   // CHECK: assign type:LocalWorker, id:ActorAddress(address: "[[ID1:.*]]")
