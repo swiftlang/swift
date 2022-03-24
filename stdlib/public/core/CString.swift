@@ -49,6 +49,29 @@ extension String {
       UnsafeBufferPointer(start: nullTerminatedUTF8._asUInt8, count: len)).0
   }
 
+  @inlinable
+  @_alwaysEmitIntoClient
+  public init(cString nullTerminatedUTF8: [CChar]) {
+    self = nullTerminatedUTF8.withUnsafeBytes {
+      String(_checkingCString: $0.assumingMemoryBound(to: UInt8.self))
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  private init(_checkingCString bytes: UnsafeBufferPointer<UInt8>) {
+    guard let length = bytes.firstIndex(of: 0) else {
+      _preconditionFailure(
+        "input of String.init(cString:) must be null-terminated"
+      )
+    }
+    self = String._fromUTF8Repairing(
+      UnsafeBufferPointer(
+        start: bytes.baseAddress._unsafelyUnwrappedUnchecked,
+        count: length
+      )
+    ).0
+  }
+
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
   /// by the given pointer.
   ///
@@ -58,6 +81,14 @@ extension String {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     self = String._fromUTF8Repairing(
       UnsafeBufferPointer(start: nullTerminatedUTF8, count: len)).0
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  public init(cString nullTerminatedUTF8: [UInt8]) {
+    self = nullTerminatedUTF8.withUnsafeBufferPointer {
+      String(_checkingCString: $0)
+    }
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8
