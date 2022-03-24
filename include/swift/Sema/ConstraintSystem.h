@@ -5833,6 +5833,14 @@ Type getDynamicSelfReplacementType(Type baseObjTy, const ValueDecl *member,
 
 ValueDecl *getOverloadChoiceDecl(Constraint *choice);
 
+/// Determine whether the first declaration is as "specialized" as
+/// the second declaration.
+///
+/// "Specialized" is essentially a form of subtyping, defined by
+/// \c CompareDeclSpecializationRequest.
+bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
+                           bool isDynamicOverloadComparison = false);
+
 class DisjunctionChoice {
   ConstraintSystem &CS;
   unsigned Index;

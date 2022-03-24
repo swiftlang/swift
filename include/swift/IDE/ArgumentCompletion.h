@@ -72,6 +72,10 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
 
   void sawSolutionImpl(const constraints::Solution &solution) override;
 
+  /// Populates \p OverriddenDecls with all \c FuncD in \p Results that are less
+  /// specialized as some other \c FuncD in \p Results.
+  void computeOverriddenDecls(SmallPtrSetImpl<ValueDecl *> &OverriddenDecls);
+
 public:
   ArgumentTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
                                       DeclContext *DC)

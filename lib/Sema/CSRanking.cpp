@@ -400,13 +400,9 @@ static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
     ->isImplicitlyUnwrappedOptional();
 }
 
-/// Determine whether the first declaration is as "specialized" as
-/// the second declaration.
-///
-/// "Specialized" is essentially a form of subtyping, defined below.
-static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
-                                  ValueDecl *decl2,
-                                  bool isDynamicOverloadComparison = false) {
+bool swift::constraints::isDeclAsSpecializedAs(DeclContext *dc,
+                                  ValueDecl *decl1, ValueDecl *decl2,
+                                  bool isDynamicOverloadComparison) {
   return evaluateOrDefault(decl1->getASTContext().evaluator,
                            CompareDeclSpecializationRequest{
                                dc, decl1, decl2, isDynamicOverloadComparison},
