@@ -14,60 +14,6 @@ import ArgumentParser
 import SwiftRemoteMirror
 
 
-internal struct UniversalOptions: ParsableArguments {
-  @Argument(help: "The pid or partial name of the target process")
-  var nameOrPid: String
-
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-  @Flag(help: ArgumentHelp(
-      "Fork a corpse of the target process",
-      discussion: "Creates a low-level copy of the target process, allowing " +
-                  "the target to immediately resume execution before " +
-                  "swift-inspect has completed its work."))
-  var forkCorpse: Bool = false
-#endif
-}
-
-internal struct BacktraceOptions: ParsableArguments {
-  @Flag(help: "Show the backtrace for each allocation")
-  var backtrace: Bool = false
-
-  @Flag(help: "Show a long-form backtrace for each allocation")
-  var backtraceLong: Bool = false
-
-  var style: BacktraceStyle? {
-    if backtraceLong { return .long }
-    if backtrace { return .oneline }
-    return nil
-  }
-}
-
-
-internal func inspect(options: UniversalOptions,
-                      _ body: (any RemoteProcess) throws -> Void) throws {
-  guard let processId = process(matching: options.nameOrPid) else {
-    print("No process found matching \(options.nameOrPid)")
-    return
-  }
-
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-  guard let process = DarwinRemoteProcess(processId: processId,
-                                          forkCorpse: options.forkCorpse) else {
-    print("Failed to create inspector for process id \(processId)")
-    return
-  }
-#elseif os(Windows)
-  guard let process = WindowsRemoteProcess(processId: processId) else {
-    print("Failed to create inspector for process id \(processId)")
-    return
-  }
-#else
-#error("Unsupported platform")
-#endif
-
-  try body(process)
-}
-
 @main
 internal struct SwiftInspect: ParsableCommand {
   // DumpArrays and DumpConcurrency cannot be reliably be ported outside of

@@ -12,15 +12,18 @@
 
 import ArgumentParser
 import SwiftRemoteMirror
+import libswiftInspect
 
-internal struct DumpCacheNodes: ParsableCommand {
-  static let configuration = CommandConfiguration(
+public struct DumpCacheNodes: ParsableCommand {
+  public static let configuration = CommandConfiguration(
     abstract: "Print the target's metadata cache nodes.")
 
   @OptionGroup()
   var options: UniversalOptions
 
-  func run() throws {
+  public init() {}
+
+  public func run() throws {
     try inspect(options: options) { process in
       print("Address", "Tag", "Tag Name", "Size", "Left", "Right", separator: "\t")
       try process.context.allocations.forEach {

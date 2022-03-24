@@ -15,7 +15,7 @@
 import SwiftRemoteMirror
 import SymbolicationShims
 
-internal final class DarwinRemoteProcess: RemoteProcess {
+public final class DarwinRemoteProcess: RemoteProcess {
   public typealias ProcessIdentifier = pid_t
   public typealias ProcessHandle = task_t
 
@@ -30,7 +30,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
 
   private lazy var threadInfos = getThreadInfos()
 
-  static var QueryDataLayout: QueryDataLayoutFunction {
+  public static var QueryDataLayout: QueryDataLayoutFunction {
     return { (context, type, _, output) in
       guard let output = output else { return 0 }
 
@@ -84,14 +84,14 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     return swift_addr_t(range.location)
   }
 
-  static var ReadBytes: ReadBytesFunction {
+  public static var ReadBytes: ReadBytesFunction {
     return { (context, address, size, _) in
       let process: DarwinRemoteProcess = DarwinRemoteProcess.fromOpaque(context!)
       return process.read(address: address, size: Int(size))
     }
   }
 
-  static var GetStringLength: GetStringLengthFunction {
+  public static var GetStringLength: GetStringLengthFunction {
     return { (context, address) in
       let process: DarwinRemoteProcess = DarwinRemoteProcess.fromOpaque(context!)
       if let str = task_peek_string(process.task, address) {
@@ -101,7 +101,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     }
   }
 
-  static var GetSymbolAddress: GetSymbolAddressFunction {
+  public static var GetSymbolAddress: GetSymbolAddressFunction {
     return { (context, symbol, length) in
       let process: DarwinRemoteProcess = DarwinRemoteProcess.fromOpaque(context!)
       guard let symbol = symbol else { return 0 }
@@ -113,7 +113,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     }
   }
 
-  init?(processId: ProcessIdentifier, forkCorpse: Bool) {
+  public init?(processId: ProcessIdentifier, forkCorpse: Bool) {
     var task: task_t = task_t()
     let taskResult = task_for_pid(mach_task_self_, processId, &task)
     guard taskResult == KERN_SUCCESS else {
@@ -163,7 +163,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     mach_port_deallocate(mach_task_self_, self.task)
   }
 
-  func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?) {
+  public func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?) {
     let symbol =
         CSSymbolicatorGetSymbolWithAddressAtTime(self.symbolicator, address, kCSNow)
 
@@ -171,7 +171,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     return (CSSymbolOwnerGetName(module), CSSymbolGetName(symbol))
   }
 
-  internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
+  public func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
     withoutActuallyEscaping(body) {
       withUnsafePointer(to: $0) {
         task_enumerate_malloc_blocks(self.task,

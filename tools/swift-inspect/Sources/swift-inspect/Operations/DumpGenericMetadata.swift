@@ -12,8 +12,9 @@
 
 import ArgumentParser
 import SwiftRemoteMirror
+import libswiftInspect
 
-private struct Metadata {
+public struct Metadata {
   let ptr: swift_reflection_ptr_t
   var allocation: swift_metadata_allocation_t?
 
@@ -23,8 +24,8 @@ private struct Metadata {
   var offset: Int? { allocation.map { Int(self.ptr - $0.ptr) } }
 }
 
-internal struct DumpGenericMetadata: ParsableCommand {
-  static let configuration = CommandConfiguration(
+public struct DumpGenericMetadata: ParsableCommand {
+  public static let configuration = CommandConfiguration(
     abstract: "Print the target's generic metadata allocations.")
 
   @OptionGroup()
@@ -33,7 +34,9 @@ internal struct DumpGenericMetadata: ParsableCommand {
   @OptionGroup()
   var backtraceOptions: BacktraceOptions
 
-  func run() throws {
+  public init() {}
+
+  public func run() throws {
     try inspect(options: options) { process in
       let allocations: [swift_metadata_allocation_t] =
           try process.context.allocations.sorted()

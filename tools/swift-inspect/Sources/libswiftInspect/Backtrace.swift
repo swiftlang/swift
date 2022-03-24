@@ -12,12 +12,12 @@
 
 import SwiftRemoteMirror
 
-internal enum BacktraceStyle {
+public enum BacktraceStyle {
   case oneline
   case long
 }
 
-internal func backtrace(_ stack: [swift_reflection_ptr_t], style: BacktraceStyle,
+public func backtrace(_ stack: [swift_reflection_ptr_t], style: BacktraceStyle,
                         _ symbolicate: (swift_addr_t) -> (module: String?, symbol: String?)) -> String {
   func entry(_ address: swift_reflection_ptr_t) -> String {
     let (module, symbol) = symbolicate(swift_addr_t(address))

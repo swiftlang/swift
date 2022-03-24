@@ -1182,14 +1182,11 @@ public:
     if (!DescriptorAddress)
       return false;
 
-    auto DescriptorBytes =
-        getReader().readBytes(RemoteAddress(DescriptorAddress),
-                              sizeof(TargetTypeContextDescriptor<Runtime>));
-    if (!DescriptorBytes)
+    auto Descriptor = readObj<TargetTypeContextDescriptor<Runtime>>(DescriptorAddress);
+    if (!Descriptor)
       return false;
-    auto Descriptor =
-        reinterpret_cast<const TargetTypeContextDescriptor<Runtime> *>(
-            DescriptorBytes.get());
+    if (Descriptor->getKind() != ContextDescriptorKind::Class)
+      return false;
     return Descriptor->getTypeContextDescriptorFlags().class_isActor();
   }
 

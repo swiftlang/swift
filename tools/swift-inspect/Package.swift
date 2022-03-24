@@ -14,7 +14,7 @@ let package = Package(
         .target(
             name: "swift-inspect",
             dependencies: [
-                "SymbolicationShims",
+                "libswiftInspect",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             swiftSettings: [
@@ -22,9 +22,14 @@ let package = Package(
                     "-parse-as-library",
                 ]),
             ]),
+        .target(
+            name: "libswiftInspect",
+            dependencies: [
+                "SymbolicationShims",
+            ]),
         .testTarget(
             name: "swiftInspectTests",
-            dependencies: ["swift-inspect"]),
+            dependencies: ["libswiftInspect"]),
         .systemLibrary(
             name: "SymbolicationShims")
     ]
