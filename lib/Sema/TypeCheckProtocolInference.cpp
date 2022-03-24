@@ -44,25 +44,6 @@ STATISTIC(NumDuplicateSolutionStates,
 
 using namespace swift;
 
-AbstractTypeWitness AbstractTypeWitness::forFixed(AssociatedTypeDecl *assocType,
-                                                  Type type) {
-  return AbstractTypeWitness(AbstractTypeWitnessKind::Fixed, assocType, type,
-                             nullptr);
-}
-
-AbstractTypeWitness
-AbstractTypeWitness::forDefault(AssociatedTypeDecl *assocType, Type type,
-                                AssociatedTypeDecl *defaultedAssocType) {
-  return AbstractTypeWitness(AbstractTypeWitnessKind::Default, assocType, type,
-                             defaultedAssocType);
-}
-
-AbstractTypeWitness
-AbstractTypeWitness::forGenericParam(AssociatedTypeDecl *assocType, Type type) {
-  return AbstractTypeWitness(AbstractTypeWitnessKind::GenericParam, assocType,
-                             type, nullptr);
-}
-
 void InferredAssociatedTypesByWitness::dump() const {
   dump(llvm::errs(), 0);
 }
@@ -882,8 +863,7 @@ AssociatedTypeInference::computeDefaultTypeWitness(
   if (defaultType->hasError())
     return None;
 
-  return AbstractTypeWitness::forDefault(assocType, defaultType,
-                                         defaultedAssocType);
+  return AbstractTypeWitness(assocType, defaultType, defaultedAssocType);
 }
 
 std::pair<Type, TypeDecl *>
@@ -920,7 +900,7 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   // We don't have a type witness for this associated type, so go
   // looking for more options.
   if (Type concreteType = computeFixedTypeWitness(assocType))
-    return AbstractTypeWitness::forFixed(assocType, concreteType);
+    return AbstractTypeWitness(assocType, concreteType);
 
   // If we can form a default type, do so.
   if (const auto &typeWitness = computeDefaultTypeWitness(assocType))
@@ -930,7 +910,7 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
     for (auto gp : genericSig.getInnermostGenericParams()) {
       if (gp->getName() == assocType->getName())
-        return AbstractTypeWitness::forGenericParam(assocType, gp);
+        return AbstractTypeWitness(assocType, gp);
     }
   }
 

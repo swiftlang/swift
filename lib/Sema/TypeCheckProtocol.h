@@ -100,51 +100,25 @@ CheckTypeWitnessResult checkTypeWitness(Type type,
                                         const NormalProtocolConformance *Conf,
                                         SubstOptions options = None);
 
-/// Describes the means of inferring an abstract type witness.
-enum class AbstractTypeWitnessKind : uint8_t {
-  /// The type witness was inferred via a same-type-to-concrete constraint
-  /// in a protocol requirement signature.
-  Fixed,
-
-  /// The type witness was inferred via a defaulted associated type.
-  Default,
-
-  /// The type witness was inferred to a generic parameter of the
-  /// conforming type.
-  GenericParam,
-};
-
 /// A type witness inferred without the aid of a specific potential
 /// value witness.
 class AbstractTypeWitness {
-  AbstractTypeWitnessKind Kind;
   AssociatedTypeDecl *AssocType;
   Type TheType;
 
-  /// When this is a default type witness, the declaration responsible for it.
-  /// May not necessarilly match \c AssocType.
+  /// The defaulted associated type that was used to infer this type witness.
+  /// Need not necessarilly match \c AssocType, but their names must.
   AssociatedTypeDecl *DefaultedAssocType;
 
-  AbstractTypeWitness(AbstractTypeWitnessKind Kind,
-                      AssociatedTypeDecl *AssocType, Type TheType,
-                      AssociatedTypeDecl *DefaultedAssocType)
-      : Kind(Kind), AssocType(AssocType), TheType(TheType),
+public:
+  AbstractTypeWitness(AssociatedTypeDecl *AssocType, Type TheType,
+                      AssociatedTypeDecl *DefaultedAssocType = nullptr)
+      : AssocType(AssocType), TheType(TheType),
         DefaultedAssocType(DefaultedAssocType) {
     assert(AssocType && TheType);
+    assert(!DefaultedAssocType ||
+           (AssocType->getName() == DefaultedAssocType->getName()));
   }
-
-public:
-  static AbstractTypeWitness forFixed(AssociatedTypeDecl *assocType, Type type);
-
-  static AbstractTypeWitness forDefault(AssociatedTypeDecl *assocType,
-                                        Type type,
-                                        AssociatedTypeDecl *defaultedAssocType);
-
-  static AbstractTypeWitness forGenericParam(AssociatedTypeDecl *assocType,
-                                             Type type);
-
-public:
-  AbstractTypeWitnessKind getKind() const { return Kind; }
 
   AssociatedTypeDecl *getAssocType() const { return AssocType; }
 
