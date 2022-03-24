@@ -18,40 +18,44 @@ enum SimpleString: String {
 }
 
 let simpleStrings: [String] = [
-    SimpleString.smallASCII.rawValue,
-    SimpleString.smallUnicode.rawValue,
-    SimpleString.largeASCII.rawValue,
-    SimpleString.largeUnicode.rawValue,
-    SimpleString.emoji.rawValue,
-    "",
+  SimpleString.smallASCII.rawValue,
+  SimpleString.smallUnicode.rawValue,
+  SimpleString.largeASCII.rawValue,
+  SimpleString.largeUnicode.rawValue,
+  SimpleString.emoji.rawValue,
+  "",
 ]
 
-StringIndexTests.test("Wat") {
-  let s = "\u{1F1FA}\u{1F1F8}\u{1F1E8}\u{1F1E6}" // Regional indicators <U,S> + <C,A>
-
-  s.unicodeScalars.indices.forEach {
-    print("\($0) -> U+\(String(s.unicodeScalars[$0].value, radix: 16, uppercase: true)) \(s.unicodeScalars[$0].properties.name ?? "\(s.unicodeScalars[$0].debugDescription)")")
+func dumpIndices(_ string: String) {
+  print("-------------------------------------------------------------------")
+  print("String: \(String(reflecting: string))")
+  print("Characters:")
+  string.indices.forEach { i in
+    let char = string[i]
+    print("  \(i) -> \(String(reflecting: char))")
   }
-
-  let i = s.unicodeScalars.index(s.unicodeScalars.startIndex, offsetBy: 1) // S
-  let j = s.unicodeScalars.index(s.unicodeScalars.startIndex, offsetBy: 3) // A
-  // Per SE-0180, `s[i..<j]` should be the Seychelles flag (country code SC)
-
-  print(i, j)
-
-  expectEqual(s.index(after: i), j) // Passes
-  expectEqual(s.index(before: j), i) // Fails, result is at scalar offset 2 (C)
-
-  let slice = s[i ..< j]
-  expectEqual(slice.index(after: slice.startIndex), slice.endIndex) // Passes
-  expectEqual(slice.index(before: slice.endIndex), slice.startIndex) // Fails
-
-  let ref = "a\u{1F1F8}\u{1F1E8}b"
-  let ri = ref.unicodeScalars.index(ref.unicodeScalars.startIndex, offsetBy: 1)
-  let rj = ref.unicodeScalars.index(ref.unicodeScalars.startIndex, offsetBy: 3)
-
-  expectEqual(ref.index(after: ri), rj)
-  expectEqual(ref.index(before: rj), ri)
+  print("Unicode Scalars:")
+  string.unicodeScalars.indices.forEach { i in
+    let scalar = string.unicodeScalars[i]
+    let value = String(scalar.value, radix: 16, uppercase: true)
+    let padding = String(repeating: "0", count: max(0, 4 - value.count))
+    let name = scalar.properties.name ?? "\(scalar.debugDescription)"
+    print("  \(i) -> U+\(padding)\(value) \(name)")
+  }
+  print("UTF-8:")
+  string.utf8.indices.forEach { i in
+    let code = string.utf8[i]
+    let value = String(code, radix: 16, uppercase: true)
+    let padding = value.count < 2 ? "0" : ""
+    print("  \(i) -> \(padding)\(value)")
+  }
+  print("UTF-16:")
+  string.utf16.indices.forEach { i in
+    let code = string.utf16[i]
+    let value = String(code, radix: 16, uppercase: true)
+    let padding = String(repeating: "0", count: 4 - value.count)
+    print("  \(i) -> \(padding)\(value)")
+  }
 }
 
 StringIndexTests.test("basic sanity checks") {
@@ -504,9 +508,9 @@ extension Collection {
   // item in `self`.
   func forEachIndexGroup<G: Collection>(
     by other: G,
-    body: (G.Index, Self.SubSequence) throws -> Void
+    body: (G.Index, Self.SubSequence, Int) throws -> Void
   ) rethrows
-where G.Index == Self.Index
+  where G.Index == Self.Index
   {
     if other.isEmpty {
       assert(self.isEmpty)
@@ -514,6 +518,7 @@ where G.Index == Self.Index
     }
     var i = other.startIndex
     var j = self.startIndex
+    var offset = 0
     while i != other.endIndex {
       let current = i
       other.formIndex(after: &i)
@@ -522,7 +527,8 @@ where G.Index == Self.Index
         self.formIndex(after: &j)
       }
       let end = j
-      try body(current, self[start ..< end])
+      try body(current, self[start ..< end], offset)
+      offset += 1
     }
   }
 }
@@ -530,40 +536,50 @@ where G.Index == Self.Index
 extension String {
   /// Returns a dictionary mapping each valid index to the index that lies on
   /// the nearest scalar boundary, rounding down.
-  func scalarMap() -> [String.Index: String.Index] {
-    var map: [String.Index: String.Index] = [:]
-    self.utf8.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice in
-      for i in slice.indices { map[i] = scalar }
+  func scalarMap() -> [String.Index: (index: String.Index, offset: Int)] {
+    var map: [String.Index: (index: String.Index, offset: Int)] = [:]
+
+    self.utf8.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice, offset in
+      for i in slice.indices { map[i] = (scalar, offset) }
     }
-    self.utf16.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice in
-      for i in slice.indices { map[i] = scalar }
+    self.utf16.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice, offset in
+      for i in slice.indices { map[i] = (scalar, offset) }
     }
-    self.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice in
-      for i in slice.indices { map[i] = scalar }
+    self.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice, offset in
+      for i in slice.indices { map[i] = (scalar, offset) }
     }
-    map[endIndex] = endIndex
+    map[endIndex] = (endIndex, self.unicodeScalars.count)
     return map
   }
 
   /// Returns a dictionary mapping each valid index to the index that lies on
   /// the nearest character boundary, rounding down.
-  func characterMap() -> [String.Index: String.Index] {
-    var map: [String.Index: String.Index] = [:]
-    self.utf8.forEachIndexGroup(by: self) { scalar, slice in
-      for i in slice.indices { map[i] = scalar }
+  func characterMap() -> [String.Index: (index: String.Index, offset: Int)] {
+    var map: [String.Index: (index: String.Index, offset: Int)] = [:]
+    self.utf8.forEachIndexGroup(by: self) { char, slice, offset in
+      for i in slice.indices { map[i] = (char, offset) }
     }
-    self.utf16.forEachIndexGroup(by: self) { scalar, slice in
-      for i in slice.indices { map[i] = scalar }
+    self.utf16.forEachIndexGroup(by: self) { char, slice, offset in
+      for i in slice.indices { map[i] = (char, offset) }
     }
-    self.unicodeScalars.forEachIndexGroup(by: self) { scalar, slice in
-      for i in slice.indices { map[i] = scalar }
+    self.unicodeScalars.forEachIndexGroup(by: self) { char, slice, offset in
+      for i in slice.indices { map[i] = (char, offset) }
     }
-    map[endIndex] = endIndex
+    map[endIndex] = (endIndex, count)
     return map
   }
 }
 
 StringIndexTests.test("Extra Exhaustive Index Interchange") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // Index navigation in 5.7 always rounds input indices down to the nearest
+    // Character, so that we always have a well-defined distance between
+    // indices, even if they aren't valid.
+    //
+    // 5.6 and below did not behave consistently in this case.
+    return
+  }
+
   func check(
     _ string: String,
     stackTrace: SourceLocStack = SourceLocStack(),
@@ -571,6 +587,8 @@ StringIndexTests.test("Extra Exhaustive Index Interchange") {
     file: String = #file,
     line: UInt = #line
   ) {
+    dumpIndices(string)
+
     let scalarMap = string.scalarMap()
     let characterMap = string.characterMap()
 
@@ -587,26 +605,32 @@ StringIndexTests.test("Extra Exhaustive Index Interchange") {
     ) -> Int {
       let ci = characterMap[i]!
       let cj = characterMap[j]!
+      return cj.offset - ci.offset
+    }
+
+    func referenceScalarDistance(
+      from i: String.Index, to j: String.Index
+    ) -> Int {
       let si = scalarMap[i]!
       let sj = scalarMap[j]!
-      var d = string.distance(from: ci, to: cj)
-      if si < sj {
-        if ci == cj { d = 1 }
-        else if cj < sj { d += 1 }
-      } else if si > sj {
-        if ci == cj { d = -1 }
-        else if ci < si { d -= 1 }
-      }
-      return d
+      return sj.offset - si.offset
     }
 
     for i in allIndices {
       for j in allIndices {
-        let si = scalarMap[i]!
-        let sj = scalarMap[j]!
-
         let characterDistance = referenceCharacterDistance(from: i, to: j)
-        let scalarDistance = string.unicodeScalars.distance(from: si, to: sj)
+        let scalarDistance = referenceScalarDistance(from: i, to: j)
+
+        let substringDistance: Int
+        if i <= j {
+          // The substring `string[i..<j]` does not round its bounds to
+          // `Character` boundaries, so it may have a different count than what
+          // the base string reports.
+          let s = String.UnicodeScalarView(string.unicodeScalars[i ..< j])
+          substringDistance = String(s).count
+        } else {
+          substringDistance = -1
+        }
 
         // Check distance calculations.
         if #available(SwiftStdlib 5.7, *) {
@@ -619,7 +643,7 @@ StringIndexTests.test("Extra Exhaustive Index Interchange") {
             j:      \(j)
             """)
           if i <= j {
-            expectEqual(string[i ..< j].count, characterDistance,
+            expectEqual(string[i ..< j].count, substringDistance,
               """
               string: \(string.debugDescription)
               i:      \(i)
@@ -637,6 +661,8 @@ StringIndexTests.test("Extra Exhaustive Index Interchange") {
           j:      \(j)
           """)
         if i <= j {
+          // The `Character` alignment consideration above doesn't apply to
+          // Unicode scalars in a substring.
           expectEqual(string.unicodeScalars[i ..< j].count, scalarDistance,
             """
             string: \(string.debugDescription)
@@ -650,7 +676,7 @@ StringIndexTests.test("Extra Exhaustive Index Interchange") {
           if #available(SwiftStdlib 5.7, *) {
             let substring = string[i ..< j]
             expectEqual(
-              substring.index(substring.startIndex, offsetBy: characterDistance),
+              substring.index(substring.startIndex, offsetBy: substringDistance),
               substring.endIndex,
               """
               string:   \(string.debugDescription)
@@ -659,7 +685,7 @@ StringIndexTests.test("Extra Exhaustive Index Interchange") {
               distance: \(characterDistance)
               """)
             expectEqual(
-              substring.index(substring.endIndex, offsetBy: -characterDistance),
+              substring.index(substring.endIndex, offsetBy: -substringDistance),
               substring.startIndex,
               """
               string:   \(string.debugDescription)
@@ -723,22 +749,114 @@ StringIndexTests.test("Extra Exhaustive Index Interchange") {
 
   for s in strings {
     let str = "\(s)"
-    print("-------------------------------------------------------------------")
-    str.unicodeScalars.indices.forEach { i in
-      let scalar = str.unicodeScalars[i]
-      let value = String(scalar.value, radix: 16, uppercase: true)
-      let name = scalar.properties.name ?? "\(scalar.debugDescription)"
-      print("\(i) -> U+\(value) \(name)")
-    }
-
     check(str)
 
     #if _runtime(_ObjC)
-    let nsstr = NSString(utf8String: s.utf8Start)!
+    let unichars = Array(str.utf16)
+    let nsstr = NSString(characters: unichars, length: unichars.count)
     check(nsstr as String)
     #endif
   }
 }
 
+StringIndexTests.test("Global vs local grapheme cluster boundaries") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // Index navigation in 5.7 always rounds input indices down to the nearest
+    // Character, so that we always have a well-defined distance between
+    // indices, even if they aren't valid.
+    //
+    // 5.6 and below did not behave consistently in this case.
+    return
+  }
+
+  let str = "a🇺🇸🇨🇦b"
+  // U+0061 LATIN SMALL LETTER A
+  // U+1F1FA REGIONAL INDICATOR SYMBOL LETTER U
+  // U+1F1F8 REGIONAL INDICATOR SYMBOL LETTER S
+  // U+1F1E8 REGIONAL INDICATOR SYMBOL LETTER C
+  // U+1F1E6 REGIONAL INDICATOR SYMBOL LETTER A
+  // U+0062 LATIN SMALL LETTER B
+
+  let c = Array(str.indices) + [str.endIndex]
+  let s = Array(str.unicodeScalars.indices) + [str.unicodeScalars.endIndex]
+  let u8 = Array(str.utf8.indices) + [str.utf8.endIndex]
+  let u16 = Array(str.utf16.indices) + [str.utf16.endIndex]
+
+  // Index navigation must always round the input index down to the nearest
+  // Character.
+
+  expectEqual(str.count, 4)
+  expectEqual(str.index(after: c[0]), c[1])
+  expectEqual(str.index(after: c[1]), c[2])
+  expectEqual(str.index(after: c[2]), c[3])
+  expectEqual(str.index(after: c[3]), c[4])
+
+  expectEqual(str.index(before: c[4]), c[3])
+  expectEqual(str.index(before: c[3]), c[2])
+  expectEqual(str.index(before: c[2]), c[1])
+  expectEqual(str.index(before: c[1]), c[0])
+
+  // Scalars
+  expectEqual(str.unicodeScalars.count, 6)
+  expectEqual(str.index(after: s[0]), s[1])
+  expectEqual(str.index(after: s[1]), s[3])
+  expectEqual(str.index(after: s[2]), s[3]) // s[2] ≅ s[1]
+  expectEqual(str.index(after: s[3]), s[5])
+  expectEqual(str.index(after: s[4]), s[5]) // s[4] ≅ s[3]
+  expectEqual(str.index(after: s[5]), s[6])
+
+  expectEqual(str.index(before: s[6]), s[5])
+  expectEqual(str.index(before: s[5]), s[3])
+  expectEqual(str.index(before: s[4]), s[1]) // s[4] ≅ s[3]
+  expectEqual(str.index(before: s[3]), s[1])
+  expectEqual(str.index(before: s[2]), s[0]) // s[2] ≅ s[1]
+  expectEqual(str.index(before: s[1]), s[0])
+
+  dumpIndices(str)
+  // UTF-8
+  expectEqual(str.utf8.count, 18)
+  expectEqual(str.index(after: u8[0]), u8[1])
+  for i in 1 ..< 9 { // s[i] ≅ s[1]
+    expectEqual(str.index(after: u8[i]), u8[9])
+  }
+  for i in 9 ..< 17 { // s[i] ≅ s[9]
+    expectEqual(str.index(after: u8[i]), u8[17])
+  }
+  expectEqual(str.index(after: u8[17]), u8[18])
+
+  // UTF-16
+  expectEqual(str.utf16.count, 10)
+  expectEqual(str.index(after: u16[0]), u16[1])
+  expectEqual(str.index(after: u16[1]), u16[5])
+  expectEqual(str.index(after: u16[2]), u16[5]) // s[2] ≅ s[1]
+  expectEqual(str.index(after: u16[3]), u16[5]) // s[3] ≅ s[1]
+  expectEqual(str.index(after: u16[4]), u16[5]) // s[4] ≅ s[1]
+  expectEqual(str.index(after: u16[5]), u16[9])
+  expectEqual(str.index(after: u16[6]), u16[9]) // s[6] ≅ s[5]
+  expectEqual(str.index(after: u16[7]), u16[9]) // s[7] ≅ s[5]
+  expectEqual(str.index(after: u16[8]), u16[9]) // s[8] ≅ s[5]
+  expectEqual(str.index(after: u16[9]), u16[10])
+
+  let i = s[2] // second scalar of US flag
+  let j = s[4] // second scalar of CA flag
+  // However, subscripting should only round down to the nearest scalar.
+  // Per SE-0180, `s[i..<j]` should be the Seychelles flag (country code SC)
+  let slice = str[i ..< j]
+  expectEqual(slice, "\u{1F1F8}\u{1F1E8}")
+  expectEqual(slice.first, "\u{1F1F8}\u{1F1E8}" as Character)
+  expectEqual(slice.count, 1)
+
+  // Index navigation within the substring must work as if we were in a string
+  // containing exactly the same scalars. Substring bounds must be reachable,
+  // even if they aren't reachable in the base string.
+  expectEqual(slice.startIndex, i)
+  expectEqual(slice.endIndex, j)
+  expectEqual(slice.index(after: slice.startIndex), j)
+  expectEqual(slice.index(before: slice.endIndex), i)
+
+  expectEqual(slice.unicodeScalars.count, 2)
+  expectEqual(slice.utf8.count, 8)
+  expectEqual(slice.utf16.count, 4)
+}
 
 runAllTests()
