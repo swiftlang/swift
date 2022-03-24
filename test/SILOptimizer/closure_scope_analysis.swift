@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-sil -O -Xllvm -debug-only=closure-scope -module-name main -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
 
 public protocol Apply {
   func apply(_ body: (Apply) -> ())
