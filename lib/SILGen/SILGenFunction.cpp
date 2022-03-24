@@ -270,10 +270,13 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         capturedArgs.push_back(emitUndef(getLoweredType(type)));
         break;
       case CaptureKind::Immutable:
-      case CaptureKind::StorageAddress:
-        // FIXME_addrlower: only call getAddressType for M.useLoweredAddresses()
-        capturedArgs.push_back(emitUndef(getLoweredType(type).getAddressType()));
+      case CaptureKind::StorageAddress: {
+        auto ty = getLoweredType(type);
+        if (SGM.M.useLoweredAddresses())
+          ty = ty.getAddressType();
+        capturedArgs.push_back(emitUndef(ty));
         break;
+      }
       case CaptureKind::Box: {
         auto boxTy = SGM.Types.getContextBoxTypeForCapture(
             vd,
