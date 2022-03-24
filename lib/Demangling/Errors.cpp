@@ -45,11 +45,31 @@ static SWIFT_NORETURN void demangleFatal(uint32_t flags, const char *format,
                                          va_list val);
 static void demangleWarn(uint32_t flags, const char *format, va_list val);
 
+static int demangle_vasprintf(char **strp, const char *format, va_list val);
+
+#if SWIFT_HAVE_CRASHREPORTERCLIENT
+static int demangle_asprintf(char **strp, const char *format, ...);
+#endif
+
 // -- Crash reporter integration ---------------------------------------------
 
 #if SWIFT_HAVE_CRASHREPORTERCLIENT
 #include <malloc/malloc.h>
 #include <pthread.h>
+
+#define CRASHREPORTER_ANNOTATIONS_VERSION 5
+#define CRASHREPORTER_ANNOTATIONS_SECTION "__crash_info"
+
+struct crashreporter_annotations_t {
+  uint64_t version;          // unsigned long
+  uint64_t message;          // char *
+  uint64_t signature_string; // char *
+  uint64_t backtrace;        // char *
+  uint64_t message2;         // char *
+  uint64_t thread;           // uint64_t
+  uint64_t dialog_mode;      // unsigned int
+  uint64_t abort_cause;      // unsigned int
+};
 
 // Instead of linking to CrashReporterClient.a (because it complicates the
 // build system), define the only symbol from that static archive ourselves.
@@ -63,6 +83,14 @@ struct crashreporter_annotations_t gCRAnnotations __attribute__((
     CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
 }
 
+static inline void CRSetCrashLogMessage(const char *message) {
+  gCRAnnotations.message = reinterpret_cast<uint64_t>(message);
+}
+
+static inline const char *CRGetCrashLogMessage() {
+  return reinterpret_cast<const char *>(gCRAnnotations.message);
+}
+
 // Report a message to any forthcoming crash log.
 static void reportOnCrash(uint32_t flags, const char *message) {
   // We must use an "unsafe" mutex in this pathway since the normal "safe"
@@ -73,10 +101,10 @@ static void reportOnCrash(uint32_t flags, const char *message) {
 
   pthread_mutex_lock(&crashlogLock);
 
-  char *oldMessage = (char *)CRGetCrashLogMessage();
+  char *oldMessage = const_cast<char *>(CRGetCrashLogMessage());
   char *newMessage;
   if (oldMessage) {
-    swift_asprintf(&newMessage, "%s%s", oldMessage, message);
+    demangle_asprintf(&newMessage, "%s%s", oldMessage, message);
     if (malloc_size(oldMessage))
       free(oldMessage);
   } else {
@@ -150,6 +178,19 @@ static int demangle_vasprintf(char **strp, const char *format, va_list args) {
   *strp = buffer;
   return result;
 }
+
+#if SWIFT_HAVE_CRASHREPORTERCLIENT
+SWIFT_FORMAT(2,3)
+static int demangle_asprintf(char **strp, const char *format, ...) {
+  va_list val;
+
+  va_start(val, format);
+  int ret = demangle_vasprintf(strp, format, val);
+  va_end(val);
+
+  return ret;
+}
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
 // -- Implementation ---------------------------------------------------------
 
