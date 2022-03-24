@@ -1818,7 +1818,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       
       auto directResults = substConv.getDirectSILResults();
       auto hasMultipleDirectResults
-        = std::next(directResults.begin()) != directResults.end();
+        = !directResults.empty() &&
+          std::next(directResults.begin()) != directResults.end();
       
       for (unsigned paramI : indices(completionTy->getParameters())) {
         if (errorParamIndex && paramI == *errorParamIndex) {
