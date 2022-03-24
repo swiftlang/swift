@@ -187,6 +187,7 @@ extension _StringGuts {
     startingAt i: Int,
     in bounds: Range<Int>
   ) -> Int {
+    _internalInvariant(bounds.lowerBound >= 0 && bounds.upperBound <= count)
     _internalInvariant(bounds.contains(i))
     if _slowPath(isForeign) {
       return _foreignOpaqueCharacterStride(startingAt: i, in: bounds)
@@ -201,6 +202,7 @@ extension _StringGuts {
       }
     }
 
+    _internalInvariant(nextIdx >= i && nextIdx <= bounds.upperBound)
     return nextIdx &- i
   }
 
@@ -241,6 +243,7 @@ extension _StringGuts {
       }
     }
 
+    _internalInvariant(bounds.contains(previousIdx))
     return i &- previousIdx
   }
 
