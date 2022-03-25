@@ -1603,10 +1603,11 @@ NOTE(option_set_empty_set_init,none,
      "use [] to silence this warning", ())
 
 ERROR(originally_definedin_topleve_decl,none,
-      "@%0 is only applicable to top-level decl", (StringRef))
+      "'%0' is only applicable to top-level decl", (DeclAttribute))
 
 ERROR(originally_definedin_must_not_before_available_version,none,
-      "symbols are moved to the current module before they were available in the OSs", (StringRef))
+      "symbols are moved to the current module before they were available in "
+      "the OSs", ())
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
