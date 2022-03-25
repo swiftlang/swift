@@ -152,8 +152,8 @@ class C4 {
 
 // Exhaustive to make sure we don't include `init({#(some):` or `init({#nilLiteral:` entries
 // UNRESOLVED_3_OPT: Begin completions, 9 items
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: North[#SomeEnum1#];
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: South[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: North[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_3_OPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1?#]; name=nil
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1>#]; name=none
@@ -165,8 +165,8 @@ class C4 {
 
 // Exhaustive to make sure we don't include `init({#(some):` or `init({#nilLiteral:` entries
 // UNRESOLVED_3_OPTOPTOPT: Begin completions, 9 items
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: North[#SomeEnum1#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: South[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: North[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1???#]; name=nil
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1??>#]; name=none
@@ -186,8 +186,8 @@ extension Optional where Wrapped == Somewhere {
 func testOptionalWithCustomExtension() {
   var _: Somewhere? = .#^UNRESOLVED_OPT_4^#
 // UNRESOLVED_OPT_4: Begin completions, 11 items
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]:     earth[#Somewhere#];
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]:     mars[#Somewhere#];
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     earth[#Somewhere#];
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     mars[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Somewhere#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_OPT_4-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#Somewhere?#]; name=nil
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<Somewhere>#]; name=none
@@ -270,7 +270,18 @@ class C6 {
 
 class C6 {
   func f1(e: SomeEnum1) {
-    if let x = Optional(e) where x == .#^UNRESOLVED_25?check=UNRESOLVED_3^#
+    if let x = Optional(e) where x == .#^UNRESOLVED_25^#
+// UNRESOLVED_25: Begin completions, 9 items
+// UNRESOLVED_25-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: North[#SomeEnum1#];
+// UNRESOLVED_25-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: South[#SomeEnum1#];
+// UNRESOLVED_25-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
+// UNRESOLVED_25-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1?#]; name=nil
+// UNRESOLVED_25-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1>#]; name=none
+// UNRESOLVED_25-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
+// UNRESOLVED_25-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U) -> U?#];
+// UNRESOLVED_25-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws -> U?) -> U?#];
+// UNRESOLVED_25-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1>#})[#(into: inout Hasher) -> Void#];
+// UNRESOLVED_25: End completions
   }
 }
 class C7 {}
@@ -732,3 +743,56 @@ func testSameType() {
 // SUGAR_TYPE: End completions
 }
 
+func testOverloadWithConvertibleArg() {
+  // This test case used to cause problems because the second overload needs a value to optional conversion, which increases the solution’s score in one of the later compontens.
+  // We were prematurely filtering the solution because its score is worse than the 0-score of the first overload (which only ignores the second argument, which doesn't increase the score)
+  struct S {
+    func xxx(_ foo: Foo) { }
+    func xxx(_ bar: Bar, _ other: Int?) { }
+  }
+
+  struct Foo {
+    init(x: String) {}
+  }
+
+  struct Bar {
+    static let top: Bar = Bar()
+  }
+
+  S().xxx(.#^CONVERTIBLE_ARG_OVERLOAD^#, 32)
+// CONVERTIBLE_ARG_OVERLOAD:     Begin completions, 2 items
+// CONVERTIBLE_ARG_OVERLOAD-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: top[#Bar#];
+// CONVERTIBLE_ARG_OVERLOAD-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#Bar#];
+// CONVERTIBLE_ARG_OVERLOAD:     End completions
+}
+
+func testOverloadWithConvertibleArgWithFixesInScore() {
+  // same as testOverloadWithConvertibleArg but with solutions that contain a fix-score > 0 because the result builder has no body for the initialization of FStack.
+
+  @resultBuilder struct ResBuilder {
+    static func buildBlock<Content>(_ content: Content) -> Content { fatalError() }
+  }
+
+  struct S<Content> {
+    init(@ResBuilder content: () -> Content) {}
+    
+    func xxx(_ foo: Foo) -> Self { return self }
+    func xxx(_ bar: Bar = .top, _ other: Int?) -> Self { return self }
+  }
+
+  struct Foo {
+    init(x: String) {}
+  }
+
+  struct Bar {
+    static let top: Bar = Bar()
+  }
+
+  S() {}
+  .xxx(.#^CONVERTIBLE_ARG_OVERLOAD_WITH_FIX_IN_SCORE^#top, 32)
+// CONVERTIBLE_ARG_OVERLOAD_WITH_FIX_IN_SCORE:     Begin completions, 2 items
+// CONVERTIBLE_ARG_OVERLOAD_WITH_FIX_IN_SCORE-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: top[#Bar#]; name=top
+// CONVERTIBLE_ARG_OVERLOAD_WITH_FIX_IN_SCORE-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#Bar#]; name=init()
+// CONVERTIBLE_ARG_OVERLOAD_WITH_FIX_IN_SCORE:     End completions
+
+}

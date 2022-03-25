@@ -14,8 +14,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR2_STATICMETHOD | %FileCheck %s -check-prefix=RETURN_TR2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR3_STATICMETHOD | %FileCheck %s -check-prefix=RETURN_TR3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR1_CLOSURE | %FileCheck %s -check-prefix=RETURN_TR1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR2_CLOSURE | %FileCheck %s -check-prefix=RETURN_TR2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR3_CLOSURE | %FileCheck %s -check-prefix=RETURN_TR3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR2_CLOSURE | %FileCheck %s -check-prefix=RETURN_TR2_CLOSURE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR3_CLOSURE | %FileCheck %s -check-prefix=RETURN_TR3_CLOSURE
 
 struct FooStruct {
   var instanceVar : Int
@@ -153,7 +153,23 @@ func testClosures(_ g: Gen) {
   _ = { () -> Int? in
     return g.#^RETURN_TR2_CLOSURE^#
   }
+// RETURN_TR2_CLOSURE: Begin completions
+// RETURN_TR2_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntGen()[#Int#]{{; name=.+$}}
+// RETURN_TR2_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntOpGen()[#Int?#]{{; name=.+$}}
+// RETURN_TR2_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal:   StringGen()[#String#]{{; name=.+$}}
+// RETURN_TR2_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]{{; name=.+$}}
+// RETURN_TR2_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]{{; name=.+$}}
+// RETURN_TR2_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]{{; name=.+$}}
+
   _ = { () -> Int? in
     return g.IG.#^RETURN_TR3_CLOSURE^#
   }
+// RETURN_TR3_CLOSURE: Begin completions
+// RETURN_TR3_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: InternalIntGen()[#Int#]{{; name=.+$}}
+// RETURN_TR3_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: InternalIntOpGen()[#Int?#]{{; name=.+$}}
+// RETURN_TR3_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringGen()[#String#]{{; name=.+$}}
+// RETURN_TR3_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]{{; name=.+$}}
+// RETURN_TR3_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]{{; name=.+$}}
+// RETURN_TR3_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]{{; name=.+$}}
+
 }

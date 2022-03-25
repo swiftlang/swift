@@ -87,10 +87,10 @@ func f2() {
 
 // ASSIGN_2-DAG: Begin completions
 // ASSIGN_2-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]:               		I3[#Int?#]; name=I3
-// ASSIGN_2-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      	I1[#Int#]; name=I1
-// ASSIGN_2-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      	I2[#Int#]; name=I2
+// ASSIGN_2-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:         I1[#Int#]; name=I1
+// ASSIGN_2-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:        	I2[#Int#]; name=I2
 // ASSIGN_2-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:      		IO1[#Int?#]; name=IO1
-// ASSIGN_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]:   	IntGenerator()[#Int#]; name=IntGenerator()
+// ASSIGN_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]:    	IntGenerator()[#Int#]; name=IntGenerator()
 // ASSIGN_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]:      IntOpGenerator()[#Int?#]; name=IntOpGenerator()
 // ASSIGN_2-DAG: Decl[InstanceVar]/CurrNominal:                                 S1[#String#]; name=S1
 
@@ -114,10 +114,10 @@ func f2() {
 
 // ASSIGN_4-DAG: Begin completions
 // ASSIGN_4-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]:                S4[#String?#]; name=S4
-// ASSIGN_4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:     S1[#String#]; name=S1
-// ASSIGN_4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:     S2[#String#]; name=S2
+// ASSIGN_4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:     S1[#String#]; name=S1
+// ASSIGN_4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:     S2[#String#]; name=S2
 // ASSIGN_4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:       SO1[#String?#]; name=SO1
-// ASSIGN_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]:  StringGenerator()[#String#]; name=StringGenerator()
+// ASSIGN_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]:  StringGenerator()[#String#]; name=StringGenerator()
 // ASSIGN_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]:    StringOpGenerator()[#String?#]; name=StringOpGenerator()
 // ASSIGN_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:      VoidGen()[#Void#]; name=VoidGen()
 // ASSIGN_4-DAG: Decl[InstanceVar]/CurrNominal:                               I1[#Int#]; name=I1
@@ -160,7 +160,7 @@ func f2() {
   }
 
 // ASSIGN_8: Begin completions
-// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntGen()[#Int#]
+// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntGen()[#Int#]
 // ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntOpGen()[#Int?#]
 // ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
 // ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#D2#]
@@ -233,10 +233,10 @@ func f2() {
   }
 
 // ASSIGN_14-DAG: Begin completions
-// ASSIGN_14-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:       I1[#Int#]; name=I1
-// ASSIGN_14-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:       I2[#Int#]; name=I2
+// ASSIGN_14-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:       I1[#Int#]; name=I1
+// ASSIGN_14-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:       I2[#Int#]; name=I2
 // ASSIGN_14-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:         IO1[#Int?#]; name=IO1
-// ASSIGN_14-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]:    IntGenerator()[#Int#]; name=IntGenerator()
+// ASSIGN_14-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]:    IntGenerator()[#Int#]; name=IntGenerator()
 // ASSIGN_14-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]:      IntOpGenerator()[#Int?#]; name=IntOpGenerator()
 // ASSIGN_14-DAG: Decl[InstanceVar]/CurrNominal:                                 S1[#String#]; name=S1
 

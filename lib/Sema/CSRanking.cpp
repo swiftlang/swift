@@ -130,9 +130,20 @@ bool ConstraintSystem::worseThanBestSolution() const {
   if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
-  if (!solverState || !solverState->BestScore ||
-      CurrentScore <= *solverState->BestScore)
+  if (!solverState || !solverState->BestScore)
     return false;
+
+  if (hasCodeCompletionTypeVar()) {
+    // For code completion, we only filter based on SK_Fix, not the entire
+    // score. See ConstraintSystem::filterSolutions.
+    if (CurrentScore.Data[SK_Fix] <= solverState->BestScore->Data[SK_Fix]) {
+      return false;
+    }
+  } else {
+    if (CurrentScore <= *solverState->BestScore) {
+      return false;
+    }
+  }
 
   if (isDebugMode()) {
     llvm::errs().indent(solverState->depth * 2)

@@ -89,14 +89,14 @@ func testBool2() {
 func testBool3() {
   let x: Bool? = #^BOOL_3^#
 }
-// BOOL_3: Literal[Boolean]/None/TypeRelation[Convertible]: true[#Bool#];
-// BOOL_3: Literal[Boolean]/None/TypeRelation[Convertible]: false[#Bool#];
+// BOOL_3: Literal[Boolean]/None/TypeRelation[Identical]: true[#Bool#];
+// BOOL_3: Literal[Boolean]/None/TypeRelation[Identical]: false[#Bool#];
 
 func testBool4() {
   let x: Bool! = #^BOOL_4^#
 }
-// BOOL_4: Literal[Boolean]/None/TypeRelation[Convertible]: true[#Bool#];
-// BOOL_4: Literal[Boolean]/None/TypeRelation[Convertible]: false[#Bool#];
+// BOOL_4: Literal[Boolean]/None/TypeRelation[Identical]: true[#Bool#];
+// BOOL_4: Literal[Boolean]/None/TypeRelation[Identical]: false[#Bool#];
 
 func testInt0() {
   let x: Bool = #^INT_0^#
@@ -208,7 +208,7 @@ func testColor1() {
 func testColor2() {
   let x: MyColor1? = #^COLOR_2^#
 }
-// COLOR_2: Literal[_Color]/None/TypeRelation[Convertible]: #colorLiteral({#red: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})[#MyColor1#];
+// COLOR_2: Literal[_Color]/None/TypeRelation[Identical]: #colorLiteral({#red: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})[#MyColor1#];
 
 struct MyImage1: _ExpressibleByImageLiteral {
   init(imageLiteralResourceName: String) {}

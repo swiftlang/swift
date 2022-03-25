@@ -483,7 +483,7 @@ func testBestSolutionGeneric() {
   func genAndInt(_ x: Int) -> Int { return 1 }
   func genAndInt<T>(_ x: T) -> Test1 { return Test1() }
 
-  genAndInt(2).#^BEST_SOLUTION_FILTER_GEN?xfail=rdar73282163^#
+  genAndInt(2).#^BEST_SOLUTION_FILTER_GEN^#
 }
 
 // BEST_SOLUTION_FILTER_GEN: Begin completions

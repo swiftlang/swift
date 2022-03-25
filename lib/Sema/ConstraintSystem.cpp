@@ -359,6 +359,15 @@ bool ConstraintSystem::containsCodeCompletionLoc(
   return Context.SourceMgr.rangeContainsCodeCompletionLoc(range);
 }
 
+bool ConstraintSystem::hasCodeCompletionTypeVar() const {
+  for (auto ty : TypeVariables) {
+    if (ty->getImpl().isCodeCompletionToken()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
     ASTNode anchor, ArrayRef<ConstraintLocator::PathElement> path) {
   auto summaryFlags = ConstraintLocator::getSummaryFlagsForPath(path);
