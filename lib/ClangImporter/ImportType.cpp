@@ -1998,15 +1998,6 @@ ImportTypeAttrs swift::getImportTypeAttrs(const clang::Decl *D, bool isParam,
   return attrs;
 }
 
-Type ClangImporter::Implementation::applyParamAttributes(
-    const clang::ParmVarDecl *param, Type type, bool sendableByDefault) {
-  auto parentDecl = cast<clang::Decl>(param->getDeclContext());
-  ImportDiagnosticAdder addDiag(*this, parentDecl, param->getLocation());
-
-  auto attrs = getImportTypeAttrs(param, /*isParam=*/true, sendableByDefault);
-  return applyImportTypeAttrs(attrs, type, addDiag);
-}
-
 Type ClangImporter::Implementation::
 applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
                      llvm::function_ref<void(Diagnostic &&)> addDiag) {
@@ -2221,6 +2212,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       importKind = ImportTypeKind::CFUnretainedOutParameter;
 
     // Import the parameter type into Swift.
+    ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
     Type swiftParamTy;
     bool isParamTypeImplicitlyUnwrapped = false;
     bool isInOut = false;
@@ -2254,9 +2246,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         if (!paramTy.isConstQualified())
           isInOut = true;
       }
-      auto importedType = importType(paramTy, importKind,
-                                     ImportDiagnosticAdder(*this, clangDecl,
-                                                           param->getLocation()),
+      auto importedType = importType(paramTy, importKind, paramAddDiag,
                                      allowNSUIntegerAsInt, Bridgeability::Full,
                                      OptionalityOfParam);
       if (!importedType) {
@@ -2271,8 +2261,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
 
     // Apply attributes to the type.
-    swiftParamTy = applyParamAttributes(
-        param, swiftParamTy, /*sendableByDefault=*/false);
+    auto attrs = getImportTypeAttrs(param, /*isParam=*/true);
+    swiftParamTy = applyImportTypeAttrs(attrs, swiftParamTy, paramAddDiag);
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
@@ -2878,8 +2868,9 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     }
 
     // Apply Clang attributes to the parameter type.
-    swiftParamTy = applyParamAttributes(param, swiftParamTy,
-                  /*sendableByDefault=*/paramIsCompletionHandler);
+    auto attrs = getImportTypeAttrs(param, /*isParam=*/true,
+              /*sendableByDefault=*/paramIsCompletionHandler);
+    swiftParamTy = applyImportTypeAttrs(attrs, swiftParamTy, paramAddDiag);
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)

@@ -995,9 +995,6 @@ public:
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
 
-  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type,
-                            bool sendableByDefault);
-
   Type applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
                  llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
 
