@@ -330,7 +330,7 @@ void SILGenFunction::emitDistributedActorReady(
 
   // --- load the actor system from the actor instance
   ManagedValue actorSystem;
-  SGFContext sgfCxt; // TODO: is this right?
+  SGFContext sgfCxt;
   {
     VarDecl *property = lookupProperty(classDecl, C.Id_actorSystem);
     Type formalType = F.mapTypeIntoContext(property->getInterfaceType());

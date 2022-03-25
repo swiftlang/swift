@@ -56,16 +56,6 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
   assert(decl->isDistributedActor());
   auto &C = decl->getASTContext();
 
-  auto mkParam = [&](Identifier argName, Identifier paramName, Type ty) -> ParamDecl* {
-    auto *param = new (C) ParamDecl(SourceLoc(),
-                                    SourceLoc(), argName,
-                                    SourceLoc(), paramName, decl);
-    param->setImplicit();
-    param->setSpecifier(ParamSpecifier::Default);
-    param->setInterfaceType(ty);
-    return param;
-  };
-
   auto idType = getDistributedActorIDType(decl);
   auto actorSystemType = getDistributedActorSystemType(decl);
 
@@ -73,8 +63,11 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
   auto *params = ParameterList::create(
       C,
       /*LParenLoc=*/SourceLoc(),
-      /*params=*/{ mkParam(C.Id_id, C.Id_id, idType),
-                   mkParam(C.Id_using, C.Id_system, actorSystemType)
+      /*params=*/{
+          ParamDecl::createImplicit(
+              C, C.Id_id, C.Id_id, idType, decl),
+          ParamDecl::createImplicit(
+              C, C.Id_using, C.Id_system, actorSystemType, decl)
       },
       /*RParenLoc=*/SourceLoc()
   );
@@ -364,16 +357,6 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
   auto system = derived.Nominal;
   auto &C = system->getASTContext();
 
-  auto mkParam = [&](Identifier argName, Identifier paramName,
-                     Type ty) -> ParamDecl * {
-    auto *param = new (C) ParamDecl(SourceLoc(), SourceLoc(), argName,
-                                    SourceLoc(), paramName, system);
-    param->setImplicit();
-    param->setSpecifier(ParamSpecifier::Default);
-    param->setInterfaceType(ty);
-    return param;
-  };
-
   // auto serializationRequirementType = getDistributedActorSystemType(decl);
   auto resultHandlerType = getDistributedActorSystemResultHandlerType(system);
   auto unsafeRawPointerType = C.getUnsafeRawPointerType();
@@ -390,10 +373,17 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
       C,
       /*LParenLoc=*/SourceLoc(),
       /*params=*/
-      {mkParam(C.Id_handler, C.Id_handler,
-               system->mapTypeIntoContext(resultHandlerType)),
-       mkParam(C.Id_resultBuffer, C.Id_resultBuffer, unsafeRawPointerType),
-       mkParam(C.Id_metatype, C.Id_metatype, anyTypeType)},
+      {
+          ParamDecl::createImplicit(
+              C, C.Id_handler, C.Id_handler,
+              system->mapTypeIntoContext(resultHandlerType), system),
+          ParamDecl::createImplicit(
+              C, C.Id_resultBuffer, C.Id_resultBuffer,
+              unsafeRawPointerType, system),
+          ParamDecl::createImplicit(
+              C, C.Id_metatype, C.Id_metatype,
+              anyTypeType, system)
+      },
       /*RParenLoc=*/SourceLoc());
 
   // Func name: invokeHandlerOnReturn(handler:resultBuffer:metatype)

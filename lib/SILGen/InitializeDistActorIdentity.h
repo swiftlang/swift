@@ -14,8 +14,6 @@
 
 namespace swift {
 
-class AllocStackInst;
-
 namespace Lowering {
 
 /// A clean-up designed to emit an initialization of a distributed actor's

@@ -786,18 +786,6 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   return nullptr;
 }
 
-FuncDecl *GetDistributedActorSystemInvokeHandlerOnReturnRequest::evaluate(
-    Evaluator &evaluator, NominalTypeDecl *system) const {
-  auto &C = system->getASTContext();
-
-  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
-  // we won't be emitting the offending decl after all.
-  if (!C.getLoadedModule(C.Id_Distributed))
-    return nullptr;
-
-  return nullptr; // FIXME
-}
-
 NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal,
     KnownProtocolKind protoKind) const {

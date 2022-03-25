@@ -1236,16 +1236,6 @@ NominalTypeDecl::getDistributedRemoteCallArgumentInitFunction() const {
       nullptr);
 }
 
-FuncDecl *
-NominalTypeDecl::getDistributedActorSystemInvokeHandlerOnReturnFunction()
-    const {
-  auto mutableThis = const_cast<NominalTypeDecl *>(this);
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      GetDistributedActorSystemInvokeHandlerOnReturnRequest(mutableThis),
-      nullptr);
-}
-
 AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
     NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
   assert(actorOrSystem && "distributed actor (or system) decl must be provided");
