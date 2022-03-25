@@ -234,7 +234,7 @@ func test_remote_invoke(address: ActorAddress, system: FakeActorSystem) async {
   let remote = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
   assert(__isRemoteActor(remote) == true, "should be remote")
 
-  let local = SomeSpecificDistributedActor(system: system)
+  let local = SomeSpecificDistributedActor(actorSystem: system)
   assert(__isRemoteActor(local) == false, "should be local")
 
   print("local isRemote: \(__isRemoteActor(local))")

@@ -3203,6 +3203,17 @@ ERROR(escaping_non_function_parameter,none,
 ERROR(escaping_optional_type_argument, none,
       "closure is already escaping in optional type argument", ())
 
+// @_compilerInitialized attribute
+ERROR(incompatible_compilerinitialized_var,none,
+      "'@_compilerInitialized' attribute only applies to "
+      "let-bound stored properties without a default value", ())
+ERROR(protocol_compilerinitialized,none,
+      "'@_compilerInitialized' is not currently supported in protocols", ())
+ERROR(optional_compilerinitialized,none,
+      "'@_compilerInitialized' cannot be applied to an Optional let", ())
+ERROR(instancemember_compilerinitialized,none,
+      "'@_compilerInitialized' can only be applied to a non-static class or actor member", ())
+
 // @_nonEphemeral attribute
 ERROR(non_ephemeral_non_pointer_type,none,
       "@_nonEphemeral attribute only applies to pointer types", ())
@@ -4777,14 +4788,6 @@ ERROR(distributed_actor_func_static,none,
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
       "'distributed' method can only be declared within 'distributed actor'",
       ())
-ERROR(distributed_actor_designated_ctor_must_have_one_distributedactorsystem_param,none,
-      "designated distributed actor initializer %0 must accept exactly one "
-      "DistributedActorSystem parameter, found %1",
-      (DeclName, int))
-ERROR(distributed_actor_designated_ctor_missing_transport_param,none,
-      "designated distributed actor initializer %0 is missing required "
-      "DistributedActorSystem parameter",
-      (DeclName))
 ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",

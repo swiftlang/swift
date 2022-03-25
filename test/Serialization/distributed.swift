@@ -11,6 +11,5 @@ import Distributed
 import def_distributed
 
 func testDoSomethingDistributed(system: LocalTestingDistributedActorSystem) {
-  let _: DA = DA(system: system)
+  let _: DA = DA(actorSystem: system)
 }
-

@@ -18,40 +18,6 @@
 
 namespace swift {
 
-SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
-  auto *module = F.getModule().getSwiftModule();
-  auto &C = F.getASTContext();
-
-  auto *transportProto = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
-  Type transportTy = transportProto->getDeclaredInterfaceType();
-
-  for (auto arg : F.getArguments()) {
-    // TODO(distributed): also be able to locate a generic transport
-    Type argTy = arg->getType().getASTType();
-    auto argDecl = arg->getDecl();
-
-    auto conformsToTransport =
-        module->lookupConformance(argDecl->getInterfaceType(), transportProto);
-
-    // Is it a protocol that conforms to DistributedActorSystem?
-    if (argTy->isEqual(transportTy) || conformsToTransport) {
-      return arg;
-    }
-
-    // Is it some specific DistributedActorSystem?
-    auto result = module->lookupConformance(argTy, transportProto);
-    if (!result.isInvalid()) {
-      return arg;
-    }
-  }
-
-#ifndef NDEBUG
-  llvm_unreachable("Missing required DistributedActorSystem argument!");
-#endif
-
-  return nullptr;
-}
-
 void emitDistributedActorSystemWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName,
     SILValue base,
@@ -218,6 +184,38 @@ void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
   emitDistributedActorSystemWitnessCall(
       B, loc, C.Id_actorReady, actorSystem,
       F.mapTypeIntoContext(actor->getType()), { actor });
+}
+
+void emitResignIdentityCall(SILBuilder &B, SILLocation loc,
+                            ClassDecl* actorDecl,
+                            SILValue actor, SILValue idRef) {
+  auto &F = B.getFunction();
+  auto &C = F.getASTContext();
+
+  SILValue systemRef = refDistributedActorSystem(B, loc, actorDecl, actor);
+
+  emitDistributedActorSystemWitnessCall(
+      B, loc, C.Id_resignID,
+      systemRef,
+      SILType(),
+      { idRef });
+}
+
+/// Creates a reference to the distributed actor's \p actorSystem
+/// stored property.
+SILValue refDistributedActorSystem(SILBuilder &b,
+                                   SILLocation loc,
+                                   ClassDecl *actDecl,
+                                   SILValue actorInstance) {
+  assert(actDecl);
+  assert(actDecl->isDistributedActor());
+
+  // get the VarDecl corresponding to the actorSystem.
+  auto refs = actDecl->lookupDirect(actDecl->getASTContext().Id_actorSystem);
+  assert(refs.size() == 1);
+  VarDecl *actorSystemVar = dyn_cast<VarDecl>(refs.front());
+
+  return b.createRefElementAddr(loc, actorInstance, actorSystemVar);
 }
 
 } // namespace swift

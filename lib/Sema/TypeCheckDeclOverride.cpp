@@ -1576,6 +1576,7 @@ namespace  {
     UNINTERESTING_ATTR(KnownToBeLocal)
 
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
+    UNINTERESTING_ATTR(CompilerInitialized)
 
 #undef UNINTERESTING_ATTR
 

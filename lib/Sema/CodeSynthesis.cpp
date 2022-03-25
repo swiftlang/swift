@@ -302,8 +302,8 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       accessLevel = decl->getEffectiveAccess();
       auto systemTy = getDistributedActorSystemType(classDecl);
 
-      // Create the parameter.
-      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_system, Loc,
+      // Create the parameter. API name is actorSystem, local name is system
+      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_actorSystem, Loc,
                                       ctx.Id_system, decl);
       arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(systemTy);

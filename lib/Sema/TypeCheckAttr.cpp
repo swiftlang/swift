@@ -316,6 +316,8 @@ public:
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
 
+  void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
+
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
 
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
@@ -5956,6 +5958,48 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   auto fn = cast<FuncDecl>(D);
   if (!fn->isAsyncContext()) {
     diagnose(attr->getLocation(), diag::inherits_executor_without_async);
+  }
+}
+
+void AttributeChecker::visitCompilerInitializedAttr(
+    CompilerInitializedAttr *attr) {
+  auto var = cast<VarDecl>(D);
+
+  // For now, ban its use within protocols. I could imagine supporting it
+  // by saying that witnesses must also be compiler-initialized, but I can't
+  // think of a use case for that right now.
+  if (auto ctx = var->getDeclContext()) {
+    if (isa<ProtocolDecl>(ctx) && var->isProtocolRequirement()) {
+      diagnose(attr->getLocation(), diag::protocol_compilerinitialized);
+      return;
+    }
+  }
+
+  // Must be a let-bound stored property without an initial value.
+  // The fact that it's let-bound generally simplifies the implementation
+  // of this attribute in definite initialization, since we don't need to
+  // reason about whether the compiler made the first assignment to the var,
+  // etc.
+  if (var->hasInitialValue()
+      || !var->isOrdinaryStoredProperty()
+      || !var->isLet()) {
+    diagnose(attr->getLocation(), diag::incompatible_compilerinitialized_var);
+    return;
+  }
+
+  // Because optionals are implicitly initialized to nil according to the
+  // language, this attribute doesn't make sense on optionals.
+  if (var->getType()->isOptional()) {
+    diagnose(attr->getLocation(), diag::optional_compilerinitialized);
+    return;
+  }
+
+  // To keep things even more simple in definite initialization, restrict
+  // the attribute to class/actor instance members only. This means we can
+  // focus just on the initialization in the init.
+  if (!(var->getDeclContext()->getSelfClassDecl() && var->isInstanceMember())) {
+    diagnose(attr->getLocation(), diag::instancemember_compilerinitialized);
+    return;
   }
 }
 

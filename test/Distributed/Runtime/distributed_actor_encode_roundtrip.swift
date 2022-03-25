@@ -30,7 +30,7 @@ typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
   static func main() async {
     let system = DefaultDistributedActorSystem()
 
-    let actor = Worker(system: system)
+    let actor = Worker(actorSystem: system)
     // CHECK: assign id: ActorAddress(address: "<unique-id>") for Worker
 
     // compilation check:

@@ -297,7 +297,7 @@ let expectsDecodeErrorName = "$s4main7GreeterC18expectsDecodeError1vySiSgSgSg_tY
 func test() async throws {
   let system = DefaultDistributedActorSystem()
 
-  let local = Greeter(system: system)
+  let local = Greeter(actorSystem: system)
 
   // act as if we decoded an Invocation:
   var emptyInvocation = FakeInvocationDecoder(args: [])
