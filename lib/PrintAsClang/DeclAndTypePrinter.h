@@ -26,6 +26,7 @@ namespace clang {
 namespace swift {
 
 class PrimitiveTypeMapping;
+class ValueDecl;
 
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be
 /// included in a Swift module's ObjC compatibility header.
@@ -88,6 +89,12 @@ public:
   /// Returns the name of an <os/object.h> type minus the leading "OS_",
   /// or an empty string if \p decl is not an <os/object.h> type.
   static StringRef maybeGetOSObjectBaseName(const clang::NamedDecl *decl);
+
+  static std::pair<Type, OptionalTypeKind>
+  getObjectTypeAndOptionality(const ValueDecl *D, Type ty);
+
+  /// Returns true if \p name matches a keyword in any Clang language mode.
+  static bool isStrClangKeyword(StringRef name);
 };
 
 } // end namespace swift
