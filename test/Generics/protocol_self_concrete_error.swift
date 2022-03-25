@@ -7,4 +7,5 @@
 
 struct S {}
 
+// expected-error@+1 {{no type for 'Self' can satisfy both 'Self : P' and 'Self == S'}}
 protocol P where Self == S {}
