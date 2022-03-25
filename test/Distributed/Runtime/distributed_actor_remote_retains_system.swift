@@ -130,6 +130,7 @@ public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
     fatalError("Not implemented: \(#function)")
   }
 }
+
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------

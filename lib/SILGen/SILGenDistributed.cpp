@@ -537,8 +537,7 @@ SILGenFunction::emitConditionalResignIdentityCall(SILLocation loc,
   "only distributed actors have actorSystem lifecycle hooks in deinit");
 
   auto selfTy = F.mapTypeIntoContext(actorDecl->getDeclaredInterfaceType());
-  fprintf(stderr, "[%s:%d] (%s) OKEY!!!!!\n", __FILE__, __LINE__, __FUNCTION__);
-  
+
   // we only system.resignID if we are a local actor,
   // and thus the address was created by system.assignID.
   auto isRemoteBB = createBasicBlock("isRemoteBB");
