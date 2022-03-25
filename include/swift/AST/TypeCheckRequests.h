@@ -1269,25 +1269,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Synthesize and return the 'invokeHandlerOnReturn' method for a concrete
-/// actor system.
-class GetDistributedActorSystemInvokeHandlerOnReturnRequest
-    : public SimpleRequest<
-          GetDistributedActorSystemInvokeHandlerOnReturnRequest,
-          FuncDecl *(NominalTypeDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  FuncDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *system) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-};
-
 /// Obtain the 'id' property of a 'distributed actor'.
 class GetDistributedActorIDPropertyRequest :
     public SimpleRequest<GetDistributedActorIDPropertyRequest,

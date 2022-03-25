@@ -148,9 +148,6 @@ SWIFT_REQUEST(TypeChecker, GetDistributedRemoteCallTargetInitFunctionRequest,
 SWIFT_REQUEST(TypeChecker, GetDistributedRemoteCallArgumentInitFunctionRequest,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, GetDistributedActorSystemInvokeHandlerOnReturnRequest,
-              FuncDecl *(NominalTypeDecl *),
-              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorInvocationDecoderRequest,
               NominalTypeDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
