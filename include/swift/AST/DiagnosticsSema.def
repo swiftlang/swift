@@ -6073,9 +6073,6 @@ ERROR(invalid_implicit_property_wrapper,none,
 ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
       "property wrapper %0 with a mutating getter cannot be composed inside "
       "get-only property wrapper %1", (TypeLoc, TypeLoc))
-
-ERROR(property_wrapper_top_level,none,
-      "property wrappers are not yet supported in top-level code", ())
 ERROR(property_wrapper_let, none,
       "property wrapper can only be applied to a 'var'",
       ())
