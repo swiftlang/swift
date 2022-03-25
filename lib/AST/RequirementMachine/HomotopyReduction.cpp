@@ -455,8 +455,6 @@ void RewriteSystem::performHomotopyReduction(
 
     deleteRule(ruleID, replacementPath);
   }
-
-  propagateRedundantRequirementIDs();
 }
 
 /// Use the loops to delete redundant rewrite rules via a series of Tietze
@@ -589,6 +587,8 @@ void RewriteSystem::minimizeRewriteSystem() {
 
     return false;
   });
+
+  propagateRedundantRequirementIDs();
 
   // Check invariants after homotopy reduction.
   verifyRewriteLoops();
