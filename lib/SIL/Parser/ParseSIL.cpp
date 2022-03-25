@@ -3608,8 +3608,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::RefTo##Name##Inst:                                  \
   case SILInstructionKind::Name##ToRefInst:
 #include "swift/AST/ReferenceStorage.def"
-  case SILInstructionKind::ThinFunctionToPointerInst:
-  case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::ThickToObjCMetatypeInst:
   case SILInstructionKind::ObjCToThickMetatypeInst:
@@ -3717,12 +3715,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.create##Name##ToRef(InstLoc, Val, Ty);                       \
     break;
 #include "swift/AST/ReferenceStorage.def"
-    case SILInstructionKind::ThinFunctionToPointerInst:
-      ResultVal = B.createThinFunctionToPointer(InstLoc, Val, Ty);
-      break;
-    case SILInstructionKind::PointerToThinFunctionInst:
-      ResultVal = B.createPointerToThinFunction(InstLoc, Val, Ty);
-      break;
     case SILInstructionKind::ThinToThickFunctionInst:
       ResultVal =
           B.createThinToThickFunction(InstLoc, Val, Ty, forwardingOwnership);
