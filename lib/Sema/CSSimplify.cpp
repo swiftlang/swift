@@ -1753,10 +1753,12 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
 
       if (ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments) {
         auto *paramList = getParameterList(callee);
-        auto *PD = paramList->get(paramIdx);
+        if (!paramList)
+          continue;
 
         // There is nothing to infer if parameter doesn't have any
         // generic parameters in its type.
+        auto *PD = paramList->get(paramIdx);
         if (!PD->getInterfaceType()->hasTypeParameter())
           continue;
 
