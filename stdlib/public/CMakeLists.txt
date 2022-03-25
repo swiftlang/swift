@@ -77,9 +77,15 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Errors.cpp")
 
   set(swift_demangling_cflags)
+
+  if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT)
+  list(APPEND swift_demangling_cflags
+      "-DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
+  endif()
 
   # The old mangling support is only needed on platforms with ObjC.
   if(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
@@ -98,7 +104,17 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
 
   add_swift_target_library(swiftDemangling OBJECT_LIBRARY
     ${swiftDemanglingSources}
-    C_COMPILE_FLAGS -DswiftCore_EXPORTS ${swift_demangling_cflags}
+    C_COMPILE_FLAGS
+      -DswiftCore_EXPORTS
+      ${swift_demangling_cflags}
+    INSTALL_IN_COMPONENT never_install)
+
+  add_swift_target_library(swiftDemanglingForCore OBJECT_LIBRARY
+    ${swiftDemanglingSources}
+    C_COMPILE_FLAGS
+      -DswiftCore_EXPORTS
+      -DSWIFT_DEMANGLE_USE_RUNTIME_ERRORS=1
+      ${swift_demangling_cflags}
     INSTALL_IN_COMPONENT never_install)
 endif()
 

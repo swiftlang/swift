@@ -92,7 +92,7 @@ KNOWN_SETTINGS=(
     android-ndk                                   ""                "An absolute path to the NDK that will be used as a libc implementation for Android builds"
 
     ## Darwin Options
-    darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration"
+    darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration, default is 1 on Darwin platforms, 0 otherwise"
     darwin-deployment-version-ios                 "7.0"             "minimum deployment target version for iOS"
     darwin-deployment-version-osx                 "10.9"            "minimum deployment target version for OS X"
     darwin-deployment-version-tvos                "9.0"             "minimum deployment target version for tvOS"
