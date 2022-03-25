@@ -32,6 +32,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/IDE/AfterPoundExprCompletion.h"
 #include "swift/IDE/ArgumentCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionConsumer.h"
@@ -1418,6 +1419,25 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     Lookup.deliverResults(CCLoc, CompletionContext, Consumer);
     return true;
   }
+  case CompletionKind::AfterPoundExpr: {
+    assert(CodeCompleteTokenExpr);
+    assert(CurDeclContext);
+
+    AfterPoundExprCompletion Lookup(CodeCompleteTokenExpr, CurDeclContext,
+                                    ParentStmtKind);
+    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+        Context.CompletionCallback, &Lookup);
+    typeCheckContextAt(CurDeclContext, CompletionLoc);
+
+    if (!Lookup.gotCallback()) {
+      Lookup.fallbackTypeCheck(CurDeclContext);
+    }
+
+    addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
+
+    Lookup.deliverResults(CompletionContext, Consumer);
+    return true;
+  }
   default:
     return false;
   }
@@ -1543,6 +1563,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::StmtOrExpr:
   case CompletionKind::ForEachSequence:
   case CompletionKind::PostfixExprBeginning:
+  case CompletionKind::AfterPoundExpr:
     llvm_unreachable("should be already handled");
     return;
 
@@ -1826,17 +1847,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       }
     }
     Lookup.getValueCompletionsInDeclContext(Loc);
-    break;
-  }
-
-  case CompletionKind::AfterPoundExpr: {
-    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isImplicitSingleExpressionReturn());
-
-    Lookup.addPoundAvailable(ParentStmtKind);
-    Lookup.addPoundLiteralCompletions(/*needPound=*/false);
-    Lookup.addObjCPoundKeywordCompletions(/*needPound=*/false);
     break;
   }
 
