@@ -398,7 +398,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
         continue;
 
       // Check if the new rule is too long.
-      if (Rules.back().getDepth() > maxRuleLength)
+      if (Rules.back().getDepth() > maxRuleLength + getLongestInitialRule())
         return std::make_pair(CompletionResult::MaxRuleLength, Rules.size() - 1);
     }
 
