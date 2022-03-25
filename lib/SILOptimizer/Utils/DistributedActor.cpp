@@ -183,7 +183,7 @@ void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
   auto &C = F.getASTContext();
   emitDistributedActorSystemWitnessCall(
       B, loc, C.Id_actorReady, actorSystem,
-      F.mapTypeIntoContext(actor->getType()), { actor });
+      actor->getType(), { actor });
 }
 
 void emitResignIdentityCall(SILBuilder &B, SILLocation loc,
