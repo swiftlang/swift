@@ -2556,8 +2556,8 @@ namespace {
         if (auto param =  dyn_cast<ParamDecl>(value)){
           if(param->isInOut()){
               ctx.Diags.diagnose(loc, diag::concurrent_access_of_inout_param, param->getName());
+              return true;
           }
-          return true;
         }
 
         // Otherwise, we have concurrent access. Complain.
