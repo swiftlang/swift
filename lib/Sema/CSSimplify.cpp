@@ -1748,7 +1748,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // If type inference from default arguments is enabled, let's
     // add a constraint from the parameter if necessary, otherwise
     // there is nothing to do but move to the next parameter.
-    if (parameterBindings[paramIdx].empty()) {
+    if (parameterBindings[paramIdx].empty() && callee) {
       auto &ctx = cs.getASTContext();
 
       if (ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments) {
