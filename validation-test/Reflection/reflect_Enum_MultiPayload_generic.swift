@@ -17,7 +17,7 @@ struct S {
   var c: Int
 }
 
-class ClassWithNonGenericEnum<T> {
+class ClassWithEnumDepth0<T> {
   enum E {
   case t(T)
   case u(Int)
@@ -25,12 +25,12 @@ class ClassWithNonGenericEnum<T> {
   var e: E?
 }
 
-reflect(object: ClassWithNonGenericEnum<S>())
+reflect(object: ClassWithEnumDepth0<S>())
 
 // CHECK: Reflecting an object.
 // CHECK-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-NEXT: Type reference:
-// CHECK-NEXT: (bound_generic_class reflect_Enum_MultiPayload_generic.ClassWithNonGenericEnum
+// CHECK-NEXT: (bound_generic_class reflect_Enum_MultiPayload_generic.ClassWithEnumDepth0
 // CHECK-NEXT:   (struct reflect_Enum_MultiPayload_generic.S))
 
 // CHECK: Type info:
@@ -60,7 +60,7 @@ reflect(object: ClassWithNonGenericEnum<S>())
 // CHECK-NEXT:       (case name=none index=1))))
 
 
-class ClassWithGenericEnum<T> {
+class ClassWithEnumDepth1<T> {
   enum E<T> {
   case t(T)
   case u(Int)
@@ -68,12 +68,12 @@ class ClassWithGenericEnum<T> {
   var e: E<T>?
 }
 
-reflect(object: ClassWithGenericEnum<S>())
+reflect(object: ClassWithEnumDepth1<S>())
 
 // CHECK: Reflecting an object.
 // CHECK-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-NEXT: Type reference:
-// CHECK-NEXT: (bound_generic_class reflect_Enum_MultiPayload_generic.ClassWithGenericEnum
+// CHECK-NEXT: (bound_generic_class reflect_Enum_MultiPayload_generic.ClassWithEnumDepth1
 // CHECK-NEXT:   (struct reflect_Enum_MultiPayload_generic.S))
 
 // CHECK: Type info:
