@@ -4862,6 +4862,27 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::ApplyArgToParam: {
     auto loc = getConstraintLocator(locator);
 
+    // If this type mismatch is associated with a synthesized argument,
+    // let's just ignore it because the main problem is the absence of
+    // the argument.
+    if (auto applyLoc = elt.getAs<LocatorPathElt::ApplyArgToParam>()) {
+      if (auto *argumentList = getArgumentList(loc)) {
+        // This is either synthesized argument or a default value.
+        if (applyLoc->getArgIdx() >= argumentList->size()) {
+          auto *calleeLoc = getCalleeLocator(loc);
+          auto overload = findSelectedOverloadFor(calleeLoc);
+          // If this cannot be a default value matching, let's ignore.
+          if (!(overload && overload->choice.isDecl()))
+            return true;
+
+          if (!getParameterList(overload->choice.getDecl())
+                   ->get(applyLoc->getParamIdx())
+                   ->getTypeOfDefaultExpr())
+            return true;
+        }
+      }
+    }
+
     // Don't attempt to fix an argument being passed to a
     // _OptionalNilComparisonType parameter. Such an overload should only take
     // effect when a nil literal is used in valid code, and doesn't offer any

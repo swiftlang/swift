@@ -27,6 +27,30 @@ public struct TopLevelStruct {
   @available(macOS 11.0, *)
   @_backDeploy(before: macOS 12.0)
   public subscript(_ index: Int) -> Int { index }
+
+  @available(macOS 11.0, *)
+  @_backDeploy(before: macOS 12.0)
+  public var readWriteProperty: Int {
+    get { 42 }
+    set(newValue) {}
+  }
+
+  @available(macOS 11.0, *)
+  @_backDeploy(before: macOS 12.0)
+  public subscript(at index: Int) -> Int {
+    get { 42 }
+    set(newValue) {}
+  }
+
+  public var explicitReadAndModify: Int {
+    @available(macOS 11.0, *)
+    @_backDeploy(before: macOS 12.0)
+    _read { yield 42 }
+
+    @available(macOS 11.0, *)
+    @_backDeploy(before: macOS 12.0)
+    _modify {}
+  }
 }
 
 // OK: final function decls in a non-final class
@@ -131,33 +155,6 @@ protocol CannotBackDeployProtocol {}
 @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' attribute cannot be applied to this declaration}}
 public actor CannotBackDeployActor {}
-
-// FIXME(backDeploy): support coroutines rdar://90111169
-public struct CannotBackDeployCoroutines {
-  @available(macOS 11.0, *)
-  @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' is not supported on coroutine _modify accessor}}
-  public var readWriteProperty: Int {
-    get { 42 }
-    set(newValue) {}
-  }
-
-  @available(macOS 11.0, *)
-  @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' is not supported on coroutine _modify accessor}}
-  public subscript(at index: Int) -> Int {
-    get { 42 }
-    set(newValue) {}
-  }
-
-  public var explicitReadAndModify: Int {
-    @available(macOS 11.0, *)
-    @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' is not supported on coroutine _read accessor}}
-    _read { yield 42 }
-
-    @available(macOS 11.0, *)
-    @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' is not supported on coroutine _modify accessor}}
-    _modify {}
-  }
-}
 
 // MARK: - Function body diagnostics
 

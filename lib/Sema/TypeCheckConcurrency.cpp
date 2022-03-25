@@ -4420,6 +4420,43 @@ bool swift::checkSendableConformance(
   return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }
 
+/// Add "unavailable" attributes to the given extension.
+static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
+  ASTContext &ctx = nominal->getASTContext();
+  llvm::VersionTuple noVersion;
+
+  // Add platform-version-specific @available attributes.
+  for (auto available : nominal->getAttrs().getAttributes<AvailableAttr>()) {
+    if (available->Platform == PlatformKind::none)
+      continue;
+
+    auto attr = new (ctx) AvailableAttr(
+        SourceLoc(), SourceRange(),
+        available->Platform,
+        available->Message,
+        "", nullptr,
+        available->Introduced.getValueOr(noVersion), SourceRange(),
+        available->Deprecated.getValueOr(noVersion), SourceRange(),
+        available->Obsoleted.getValueOr(noVersion), SourceRange(),
+        PlatformAgnosticAvailabilityKind::Unavailable,
+        /*implicit=*/true,
+        available->IsSPI);
+    ext->getAttrs().add(attr);
+  }
+
+  // Add the blanket "unavailable".
+
+  auto attr = new (ctx) AvailableAttr(SourceLoc(), SourceRange(),
+                                      PlatformKind::none, "", "", nullptr,
+                                      noVersion, SourceRange(),
+                                      noVersion, SourceRange(),
+                                      noVersion, SourceRange(),
+                                      PlatformAgnosticAvailabilityKind::Unavailable,
+                                      false,
+                                      false);
+  ext->getAttrs().add(attr);
+}
+
 ProtocolConformance *GetImplicitSendableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   // Protocols never get implicit Sendable conformances.
@@ -4475,16 +4512,6 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
         -> NormalProtocolConformance * {
     DeclContext *conformanceDC = nominal;
     if (attrMakingUnavailable) {
-      llvm::VersionTuple NoVersion;
-      auto attr = new (ctx) AvailableAttr(SourceLoc(), SourceRange(),
-                                          PlatformKind::none, "", "", nullptr,
-                                          NoVersion, SourceRange(),
-                                          NoVersion, SourceRange(),
-                                          NoVersion, SourceRange(),
-                                          PlatformAgnosticAvailabilityKind::Unavailable,
-                                          false,
-                                          false);
-
       // Conformance availability is currently tied to the declaring extension.
       // FIXME: This is a hack--we should give conformances real availability.
       auto inherits = ctx.AllocateCopy(makeArrayRef(
@@ -4497,7 +4524,7 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
                                              nominal->getModuleScopeContext(),
                                              nullptr);
       extension->setImplicit();
-      extension->getAttrs().add(attr);
+      addUnavailableAttrs(extension, nominal);
 
       ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
                                 nominal->getDeclaredType());
@@ -4523,27 +4550,27 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
     return conformance;
   };
 
-  // A non-protocol type with a global actor is implicitly Sendable.
-  if (nominal->getGlobalActorAttr()) {
-    // If this is a class, check the superclass. If it's already Sendable,
-    // form an inherited conformance.
-    if (classDecl) {
-      if (Type superclass = classDecl->getSuperclass()) {
-        auto classModule = classDecl->getParentModule();
-        if (auto inheritedConformance = TypeChecker::conformsToProtocol(
-                classDecl->mapTypeIntoContext(superclass),
-                proto, classModule, /*allowMissing=*/false)) {
-          inheritedConformance = inheritedConformance
-              .mapConformanceOutOfContext();
-          if (inheritedConformance.isConcrete()) {
-            return ctx.getInheritedConformance(
-                nominal->getDeclaredInterfaceType(),
-                inheritedConformance.getConcrete());
-          }
+  // If this is a class, check the superclass. If it's already Sendable,
+  // form an inherited conformance.
+  if (classDecl) {
+    if (Type superclass = classDecl->getSuperclass()) {
+      auto classModule = classDecl->getParentModule();
+      if (auto inheritedConformance = TypeChecker::conformsToProtocol(
+              classDecl->mapTypeIntoContext(superclass),
+              proto, classModule, /*allowMissing=*/false)) {
+        inheritedConformance = inheritedConformance
+            .mapConformanceOutOfContext();
+        if (inheritedConformance.isConcrete()) {
+          return ctx.getInheritedConformance(
+              nominal->getDeclaredInterfaceType(),
+              inheritedConformance.getConcrete());
         }
       }
     }
+  }
 
+  // A non-protocol type with a global actor is implicitly Sendable.
+  if (nominal->getGlobalActorAttr()) {
     // Form the implicit conformance to Sendable.
     return formConformance(nullptr);
   }

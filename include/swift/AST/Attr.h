@@ -291,6 +291,10 @@ public:
     OnAnyClangDecl = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
   };
 
+  static_assert(
+      (unsigned(DeclKindIndex::Last_Decl) + 17) < 64,
+      "Overflow decl attr options bitfields");
+
   LLVM_READNONE
   static uint64_t getOptions(DeclAttrKind DK);
 

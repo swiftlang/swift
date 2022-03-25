@@ -1603,10 +1603,11 @@ NOTE(option_set_empty_set_init,none,
      "use [] to silence this warning", ())
 
 ERROR(originally_definedin_topleve_decl,none,
-      "@%0 is only applicable to top-level decl", (StringRef))
+      "'%0' is only applicable to top-level decl", (DeclAttribute))
 
 ERROR(originally_definedin_must_not_before_available_version,none,
-      "symbols are moved to the current module before they were available in the OSs", (StringRef))
+      "symbols are moved to the current module before they were available in "
+      "the OSs", ())
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -6318,10 +6319,6 @@ ERROR(cannot_convert_default_value_type_to_argument_type, none,
 
 ERROR(attr_incompatible_with_back_deploy,none,
       "'%0' cannot be applied to a back deployed %1",
-      (DeclAttribute, DescriptiveDeclKind))
-
-ERROR(back_deploy_not_on_coroutine,none,
-      "'%0' is not supported on coroutine %1",
       (DeclAttribute, DescriptiveDeclKind))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
