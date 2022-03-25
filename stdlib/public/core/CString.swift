@@ -212,6 +212,42 @@ extension String {
     return String._fromCodeUnits(
       codeUnits, encoding: encoding, repair: isRepairing)
   }
+
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable // Fold away specializations
+  @_alwaysEmitIntoClient
+  public static func decodeCString<Encoding: _UnicodeEncoding>(
+    _ cString: [Encoding.CodeUnit],
+    as encoding: Encoding.Type,
+    repairingInvalidCodeUnits isRepairing: Bool = true
+  ) -> (result: String, repairsMade: Bool)? {
+    guard let length = cString.firstIndex(of: 0) else {
+      _preconditionFailure(
+        "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
+      )
+    }
+
+    if _fastPath(encoding == Unicode.UTF8.self) {
+      return cString.prefix(length).withUnsafeBytes {
+        buf -> (result: String, repairsMade: Bool)? in
+        let codeUnits = buf.assumingMemoryBound(to: UInt8.self)
+        if isRepairing {
+          return String._fromUTF8Repairing(codeUnits)
+        }
+        else if let str = String._tryFromUTF8(codeUnits) {
+          return (str, false)
+        }
+        return nil
+      }
+    }
+
+    return cString.prefix(length).withUnsafeBufferPointer {
+      buf -> (result: String, repairsMade: Bool)? in
+      String._fromCodeUnits(buf, encoding: encoding, repair: isRepairing)
+    }
+  }
+
   /// Creates a string from the null-terminated sequence of bytes at the given
   /// pointer.
   ///
@@ -226,6 +262,17 @@ extension String {
   @inlinable // Fold away specializations
   public init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    as sourceEncoding: Encoding.Type
+  ) {
+    self = String.decodeCString(nullTerminatedCodeUnits, as: sourceEncoding)!.0
+  }
+
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable // Fold away specializations
+  @_alwaysEmitIntoClient
+  public init<Encoding: Unicode.Encoding>(
+    decodingCString nullTerminatedCodeUnits: [Encoding.CodeUnit],
     as sourceEncoding: Encoding.Type
   ) {
     self = String.decodeCString(nullTerminatedCodeUnits, as: sourceEncoding)!.0
