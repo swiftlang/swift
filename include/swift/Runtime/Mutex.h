@@ -30,14 +30,14 @@
 #include <unistd.h>
 #endif
 
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#if SWIFT_STDLIB_THREADING_NONE
 #include "swift/Runtime/MutexSingleThreaded.h"
-#elif defined(_POSIX_THREADS)
+#elif SWIFT_STDLIB_THREADING_PTHREADS || SWIFT_STDLIB_THREADING_DARWIN
 #include "swift/Runtime/MutexPThread.h"
-#elif defined(_WIN32)
+#elif SWIFT_STDLIB_THREADING_WIN32
 #include "swift/Runtime/MutexWin32.h"
-#elif defined(__wasi__)
-#include "swift/Runtime/MutexSingleThreaded.h"
+#elif SWIFT_STDLIB_THREADING_C11
+#include "swift/Runtime/MutexC11.h"
 #else
 #error "Implement equivalent of MutexPThread.h/cpp for your platform."
 #endif

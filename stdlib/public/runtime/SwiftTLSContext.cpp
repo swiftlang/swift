@@ -18,7 +18,7 @@
 using namespace swift;
 using namespace swift::runtime;
 
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_STDLIB_THREADING_NONE
 
 SwiftTLSContext &SwiftTLSContext::get() {
   static SwiftTLSContext TLSContext;
@@ -38,7 +38,7 @@ SwiftTLSContext &SwiftTLSContext::get() {
   SWIFT_ONCE_F(
       setupToken,
       [](void *) {
-        pthread_key_init_np(SWIFT_RUNTIME_TLS_KEY, [](void *pointer) {
+        SWIFT_THREAD_KEY_INIT(SWIFT_RUNTIME_TLS_KEY, [](void *pointer) {
           delete static_cast<SwiftTLSContext *>(pointer);
         });
       },

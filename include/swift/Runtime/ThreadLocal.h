@@ -20,14 +20,15 @@
 
 #include <type_traits>
 #include "ThreadLocalStorage.h"
+#include "Once.h"
 
 /// SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL - Does the current configuration
 /// allow the use of SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL?
-#if SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#if SWIFT_STDLIB_THREADING_NONE
 // We define SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL to nothing in this
 // configuration and just use a global variable, so this is okay.
 #define SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL 1
-#elif defined(__APPLE__)
+#elif SWIFT_STDLIB_THREADING_DARWIN
 // The pthread TLS APIs work better than C++ TLS on Apple platforms.
 #define SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL 0
 #elif __has_feature(tls)
@@ -43,7 +44,7 @@
 
 /// SWIFT_RUNTIME_THREAD_LOCAL - Declare that something is a
 /// thread-local variable in the runtime.
-#if SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#if SWIFT_STDLIB_THREADING_NONE
 // In a single-threaded runtime, thread-locals are global.
 #define SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL
 #elif defined(__GNUC__)
@@ -81,14 +82,14 @@ namespace swift {
 //   SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL.  This makes the object
 //   itself thread-local, and no internal support is required.
 //
-//   Note that this includes platforms that set
-//   SWIFT_STDLIB_SINGLE_THREADED_RUNTIME, for which
-//   SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL is empty;
+//   Note that this includes platforms that don't support threading,
+//   for which SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL is empty;
 //   thread-local declarations then create an ordinary global.
 //
 // - On platforms that don't report SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL,
 //   we have to simulate thread-local storage.  Fortunately, all of
-//   these platforms (at least for now) support pthread_getspecific.
+//   these platforms (at least for now) support pthread_getspecific
+//   or similar.
 #if SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL
 template <class T>
 class ThreadLocal {
@@ -104,29 +105,30 @@ public:
   void set(T newValue) { value = newValue; }
 };
 #else
-// A wrapper around a pthread_key_t that is lazily initialized using
+// A wrapper around a __swift_thread_key_t that is lazily initialized using
 // dispatch_once.
 class ThreadLocalKey {
   // We rely on the zero-initialization of objects with static storage
   // duration.
-  dispatch_once_t once;
-  pthread_key_t key;
+  swift_once_t once;
+  __swift_thread_key_t key;
 
 public:
-  pthread_key_t getKey() {
-    dispatch_once_f(&once, &key, [](void *ctx) {
-      pthread_key_create(reinterpret_cast<pthread_key_t *>(ctx), nullptr);
-    });
+  __swift_thread_key_t getKey() {
+    swift_once(&once, [](void *ctx) {
+      SWIFT_THREAD_KEY_CREATE(reinterpret_cast<__swift_thread_key_t *>(ctx),
+                              nullptr);
+    }, &key);
     return key;
   }
 };
 
-// A type representing a constant pthread_key_t, for use on platforms that
-// provide reserved keys.
-template <pthread_key_t constantKey>
+// A type representing a constant __swift_thread_key_t, for use on platforms
+// that provide reserved keys.
+template <__swift_thread_key_t constantKey>
 class ConstantThreadLocalKey {
 public:
-  pthread_key_t getKey() { return constantKey; }
+  __swift_thread_key_t getKey() { return constantKey; }
 };
 
 template <class T, class Key>

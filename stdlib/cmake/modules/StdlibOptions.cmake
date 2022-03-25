@@ -1,6 +1,8 @@
 include_guard(GLOBAL)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/modules/SwiftUtils.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/modules/Threading.cmake)
+
 precondition(SWIFT_HOST_VARIANT_SDK)
 precondition(SWIFT_DARWIN_PLATFORMS)
 
@@ -166,11 +168,11 @@ option(SWIFT_STDLIB_HAS_ENVIRON
        "Build stdlib assuming the platform supports environment variables."
        TRUE)
 
-option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+option(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
 
-if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
 else()
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")

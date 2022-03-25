@@ -17,11 +17,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_STDLIB_THREADING_PTHREADS || SWIFT_STDLIB_THREADING_DARWIN
+
 #if __has_include(<unistd.h>)
 #include <unistd.h>
 #endif
-
-#if defined(_POSIX_THREADS) && !defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 
 // Notes: swift::fatalError is not shared between libswiftCore and libswift_Concurrency
 // and libswift_Concurrency uses swift_Concurrency_fatalError instead.
@@ -139,4 +139,5 @@ void ReadWriteLockPlatformHelper::readUnlock(pthread_rwlock_t &rwlock) {
 void ReadWriteLockPlatformHelper::writeUnlock(pthread_rwlock_t &rwlock) {
   reportError(pthread_rwlock_unlock(&rwlock));
 }
-#endif
+
+#endif // SWIFT_STDLIB_THREADING_PTHREADS

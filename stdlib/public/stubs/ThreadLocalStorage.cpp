@@ -54,7 +54,7 @@ _stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
 
 #endif
 
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_STDLIB_THREADING_NONE
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void *
@@ -77,7 +77,7 @@ _swift_stdlib_threadLocalStorageGet(void) {
   
   static swift::OnceToken_t token;
   SWIFT_ONCE_F(token, [](void *) {
-    int result = pthread_key_init_np(SWIFT_STDLIB_TLS_KEY, [](void *pointer) {
+    int result = SWIFT_THREAD_KEY_INIT(SWIFT_STDLIB_TLS_KEY, [](void *pointer) {
       _stdlib_destroyTLS(pointer);
     });
     if (result != 0)

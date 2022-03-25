@@ -21,11 +21,11 @@
 
 using namespace swift;
 
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#if SWIFT_STDLIB_THREADING_NONE
 
 // No dependencies on single-threaded environments.
 
-#elif defined(__APPLE__)
+#elif SWIFT_STDLIB_THREADING_DARWIN
 
 // On macOS and iOS, swift_once is implemented using GCD.
 // The compiler emits an inline check matching the barrier-free inline fast
@@ -52,16 +52,16 @@ static_assert(sizeof(swift_once_t) <= sizeof(void*),
 /// extent of type swift_once_t.
 void swift::swift_once(swift_once_t *predicate, void (*fn)(void *),
                        void *context) {
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_STDLIB_THREADING_NONE
   if (! *predicate) {
     *predicate = true;
     fn(context);
   }
-#elif defined(__APPLE__)
+#elif SWIFT_STDLIB_THREADING_DARWIN
   dispatch_once_f(predicate, context, fn);
 #elif defined(__CYGWIN__)
   _swift_once_f(predicate, context, fn);
 #else
-  std::call_once(*predicate, [fn, context]() { fn(context); });
+  std::call_once(*predicate, fn, context);
 #endif
 }

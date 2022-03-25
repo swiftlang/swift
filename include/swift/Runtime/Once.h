@@ -18,18 +18,23 @@
 #define SWIFT_RUNTIME_ONCE_H
 
 #include "swift/Runtime/HeapObject.h"
+
+#if SWIFT_STDLIB_THREADING_DARWIN
+#include <dispatch/dispatch.h>
+#else
 #include <mutex>
+#endif
 
 namespace swift {
 
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#ifdef SWIFT_STDLIB_THREADING_NONE
 
 typedef bool swift_once_t;
 
-#elif defined(__APPLE__)
+#elif SWIFT_STDLIB_THREADING_DARWIN
 
-// On OS X and iOS, swift_once_t matches dispatch_once_t.
-typedef long swift_once_t;
+// On OS X and iOS, swift_once_t is really a dispatch_once_t.
+typedef dispatch_once_t swift_once_t;
 
 #elif defined(__CYGWIN__)
 
