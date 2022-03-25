@@ -3283,8 +3283,18 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // retrieval request perform checking for us.
   if (nominal->isGlobalActor()) {
     (void)D->getGlobalActorAttr();
-    if (auto value = dyn_cast<ValueDecl>(D))
+    if (auto value = dyn_cast<ValueDecl>(D)) {
       (void)getActorIsolation(value);
+    } else {
+      // Make sure we evaluate the global actor type.
+      auto dc = D->getInnermostDeclContext();
+      (void)evaluateOrDefault(
+          Ctx.evaluator,
+          CustomAttrTypeRequest{
+            attr, dc, CustomAttrTypeKind::GlobalActor},
+          Type());
+    }
+
     return;
   }
 
