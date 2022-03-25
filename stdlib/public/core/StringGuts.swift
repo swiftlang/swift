@@ -367,14 +367,12 @@ extension _StringGuts {
   /// not set the flags that this method relies on. However, false positives
   /// cannot happen: if this method detects a mismatch, then it is guaranteed to
   /// be a real one.
-  @_alwaysEmitIntoClient // TODO(lorentey): Should this remain internal?
   @inline(__always)
   internal func ensureMatchingEncoding(_ i: String.Index) -> String.Index {
     if _fastPath(!isForeign && i._canBeUTF8) { return i }
     return _slowEnsureMatchingEncoding(i)
   }
 
-  @_alwaysEmitIntoClient // TODO(lorentey): Should this remain internal?
   @inline(never)
   internal func _slowEnsureMatchingEncoding(_ i: String.Index) -> String.Index {
     _internalInvariant(isForeign || !i._canBeUTF8)
@@ -430,7 +428,6 @@ extension _StringGuts {
   /// - has an encoding that matches this string,
   /// - is within the bounds of this string, and
   /// - is aligned on a scalar boundary.
-  @_alwaysEmitIntoClient
   internal func validateScalarIndex(_ i: String.Index) -> String.Index {
     let i = ensureMatchingEncoding(i)
     _precondition(i._encodedOffset < count, "String index is out of bounds")
@@ -463,7 +460,6 @@ extension _StringGuts {
   /// - has an encoding that matches this string,
   /// - is within the bounds of this string (including the `endIndex`), and
   /// - is aligned on a scalar boundary.
-  @_alwaysEmitIntoClient
   internal func validateInclusiveScalarIndex(
     _ i: String.Index
   ) -> String.Index {
@@ -479,7 +475,6 @@ extension _StringGuts {
   /// - has an encoding that matches this string,
   /// - is within the bounds of this string (including the `endIndex`), and
   /// - is aligned on a scalar boundary.
-  @_alwaysEmitIntoClient
   internal func validateInclusiveScalarIndex(
     _ i: String.Index,
     from start: String.Index,
@@ -499,7 +494,6 @@ extension _StringGuts {
   /// - have an encoding that matches this string,
   /// - are within the bounds of this string, and
   /// - are aligned on a scalar boundary.
-  @_alwaysEmitIntoClient
   internal func validateScalarRange(
     _ range: Range<String.Index>
   ) -> Range<String.Index> {
@@ -533,7 +527,6 @@ extension _StringGuts {
   /// - have an encoding that matches this string,
   /// - are within `start ..< end`, and
   /// - are aligned on a scalar boundary.
-  @_alwaysEmitIntoClient
   internal func validateScalarRange(
     _ range: Range<String.Index>,
     from start: String.Index,

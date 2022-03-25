@@ -302,14 +302,9 @@ extension String: BidirectionalCollection {
   ///
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
-  @inlinable @inline(__always) // TODO(lorentey): Consider removing these. If
-                               // `index(after:)` isn't inlinable, does it
-                               // really matter if this one is? (Potential
-                               // optimizations notwithstanding.) `subscript`
-                               // being inlinable forces a bunch of new
-                               // additions to be _aEIC, even though they ought
-                               // to be internal.
   public subscript(i: Index) -> Character {
+    // Prior to Swift 5.7, this function used to be inlinable.
+
     // Note: SE-0180 requires us not to round `i` down to the nearest whole
     // `Character` boundary.
     let i = _guts.validateScalarIndex(i)
@@ -331,8 +326,10 @@ extension String: BidirectionalCollection {
   /// This method is called from inlinable `subscript` implementations in
   /// current and previous versions of the stdlib, wich require this contract
   /// not to be violated.
-  @inlinable @inline(__always)
+  @usableFromInline
+  @inline(__always)
   internal func _characterStride(startingAt i: Index) -> Int {
+    // Prior to Swift 5.7, this function used to be inlinable.
     _internalInvariant_5_1(i._isScalarAligned)
 
     // Fast check if it's already been measured, otherwise check resiliently
@@ -343,8 +340,10 @@ extension String: BidirectionalCollection {
     return _guts._opaqueCharacterStride(startingAt: i._encodedOffset)
   }
 
-  @inlinable @inline(__always)
+  @usableFromInline
+  @inline(__always)
   internal func _characterStride(endingAt i: Index) -> Int {
+    // Prior to Swift 5.7, this function used to be inlinable.
     _internalInvariant_5_1(i._isScalarAligned)
 
     if i == startIndex { return 0 }
@@ -371,8 +370,8 @@ extension String {
       self._guts = guts
     }
 
-    @inlinable
     public mutating func next() -> Character? {
+      // Prior to Swift 5.7, this function used to be inlinable.
       guard _fastPath(_position < _end) else { return nil }
 
       let len = _guts._opaqueCharacterStride(startingAt: _position)
