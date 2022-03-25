@@ -28,6 +28,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include <memory>
 #include <vector>
@@ -214,9 +215,15 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
                                 ctx.AllocateCopy(typeAliases));
   }
 
+  auto &rewriteCtx = ctx.getRewriteContext();
+
   // We build requirement signatures for all protocols in a strongly connected
   // component at the same time.
-  auto component = ctx.getRewriteContext().getProtocolComponent(proto);
+  auto component = rewriteCtx.startComputingRequirementSignatures(proto);
+
+  SWIFT_DEFER {
+    rewriteCtx.finishComputingRequirementSignatures(proto);
+  };
 
   // Collect user-written requirements from the protocols in this connected
   // component.
@@ -234,7 +241,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
   for (;;) {
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
-        ctx.getRewriteContext()));
+        rewriteCtx));
 
     auto status = machine->initWithProtocolWrittenRequirements(component, protos);
     if (status.first != CompletionResult::Success) {
