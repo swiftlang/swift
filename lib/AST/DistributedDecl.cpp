@@ -207,6 +207,23 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
     return Type();
 
   auto module = actor->getParentModule();
+
+  // In case of protocol, let's find a concrete `ActorSystem`
+  if (auto *protocol = dyn_cast<ProtocolDecl>(actor)) {
+    auto signature = protocol->getGenericSignatureOfContext();
+
+    auto systemTy =
+        signature->getConcreteType(actorSystemDecl->getDeclaredInterfaceType());
+    if (!systemTy)
+      return Type();
+
+    auto conformance = module->lookupConformance(systemTy, actorSystemProtocol);
+    if (conformance.isInvalid())
+      return Type();
+
+    return conformance.getTypeWitnessByName(systemTy, member);
+  }
+
   Type selfType = actor->getSelfInterfaceType();
   auto conformance = module->lookupConformance(selfType, actorProtocol);
   Type dependentType = actorProtocol->getSelfInterfaceType();
