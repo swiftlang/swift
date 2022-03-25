@@ -556,6 +556,10 @@ def enable_experimental_variadic_generics :
   Flag<["-"], "enable-experimental-variadic-generics">,
   HelpText<"Enable experimental support for variadic generic types">;
 
+def enable_experimental_associated_type_inference :
+  Flag<["-"], "enable-experimental-associated-type-inference">,
+  HelpText<"Enable experimental associated type inference via type witness systems">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
