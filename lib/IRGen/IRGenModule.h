@@ -328,10 +328,10 @@ private:
 
   /// The queue of IRGenModules for multi-threaded compilation.
   SmallVector<IRGenModule *, 8> Queue;
-
+  
   std::atomic<int> QueueIndex;
   
-  friend class CurrentIGMPtr;  
+  friend class CurrentIGMPtr;
 public:
   explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
 
@@ -892,6 +892,10 @@ public:
 
   std::string GetObjCSectionName(StringRef Section, StringRef MachOAttributes);
   void SetCStringLiteralSection(llvm::GlobalVariable *GV, ObjCLabelType Type);
+
+  // Mapping of AsyncFunctionPointer records to their corresponding
+  // `@llvm.coro.id.async` intrinsic tag in the function implementation.
+  llvm::DenseMap<llvm::GlobalVariable*, llvm::CallInst*> AsyncCoroIDs;
 
 private:
   Size PtrSize;
