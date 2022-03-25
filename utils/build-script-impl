@@ -1670,7 +1670,7 @@ for host in "${ALL_HOSTS[@]}"; do
     if [[ "${DARWIN_CRASH_REPORTER_CLIENT}" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
-            -DSWIFT_RUNTIME_CRASH_REPORTER_CLIENT:BOOL=TRUE
+            -DSWIFT_RUNTIME_CRASH_REPORTER_CLIENT:BOOL=$(true_false "${DARWIN_CRASH_REPORTER_CLIENT}")
         )
     fi
 
