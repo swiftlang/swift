@@ -57,33 +57,6 @@ static bool isAnyObjectOrAny(Type type) {
   return type->isAnyObject() || type->isAny();
 }
 
-/// Returns true if \p name matches a keyword in any Clang language mode.
-static bool isClangKeyword(StringRef name) {
-  static const llvm::DenseSet<StringRef> keywords = []{
-    llvm::DenseSet<StringRef> set;
-    // FIXME: clang::IdentifierInfo /nearly/ has the API we need to do this
-    // in a more principled way, but not quite.
-#define KEYWORD(SPELLING, FLAGS) \
-    set.insert(#SPELLING);
-#define CXX_KEYWORD_OPERATOR(SPELLING, TOK) \
-    set.insert(#SPELLING);
-#include "clang/Basic/TokenKinds.def"
-    return set;
-  }();
-
-  return keywords.contains(name);
-}
-
-static bool isClangKeyword(Identifier name) {
-  if (name.empty())
-    return false;
-  return isClangKeyword(name.str());
-}
-
-bool DeclAndTypePrinter::isStrClangKeyword(StringRef name) {
-  return ::isClangKeyword(name);
-}
-
 // For a given Decl and Type, if the type is not an optional return
 // the type and OTK_None as the optionality. If the type is
 // optional, return the underlying object type, and an optionality

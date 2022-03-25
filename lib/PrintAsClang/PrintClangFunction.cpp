@@ -97,7 +97,7 @@ void DeclAndTypeClangFunctionPrinter::printFunctionDeclAsCFunctionDecl(
 
     if (!name.empty()) {
       os << ' ' << name;
-      if (DeclAndTypePrinter::isStrClangKeyword(name))
+      if (ClangSyntaxPrinter::isClangKeyword(name))
         os << '_';
     }
   };

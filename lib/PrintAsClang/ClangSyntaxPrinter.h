@@ -53,6 +53,10 @@ public:
       Optional<OptionalTypeKind> kind,
       NullabilityPrintKind printKind = NullabilityPrintKind::After) const;
 
+  /// Returns true if \p name matches a keyword in any Clang language mode.
+  static bool isClangKeyword(StringRef name);
+  static bool isClangKeyword(Identifier name);
+
 protected:
   raw_ostream &os;
 };
