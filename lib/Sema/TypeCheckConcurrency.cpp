@@ -4550,27 +4550,27 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
     return conformance;
   };
 
-  // A non-protocol type with a global actor is implicitly Sendable.
-  if (nominal->getGlobalActorAttr()) {
-    // If this is a class, check the superclass. If it's already Sendable,
-    // form an inherited conformance.
-    if (classDecl) {
-      if (Type superclass = classDecl->getSuperclass()) {
-        auto classModule = classDecl->getParentModule();
-        if (auto inheritedConformance = TypeChecker::conformsToProtocol(
-                classDecl->mapTypeIntoContext(superclass),
-                proto, classModule, /*allowMissing=*/false)) {
-          inheritedConformance = inheritedConformance
-              .mapConformanceOutOfContext();
-          if (inheritedConformance.isConcrete()) {
-            return ctx.getInheritedConformance(
-                nominal->getDeclaredInterfaceType(),
-                inheritedConformance.getConcrete());
-          }
+  // If this is a class, check the superclass. If it's already Sendable,
+  // form an inherited conformance.
+  if (classDecl) {
+    if (Type superclass = classDecl->getSuperclass()) {
+      auto classModule = classDecl->getParentModule();
+      if (auto inheritedConformance = TypeChecker::conformsToProtocol(
+              classDecl->mapTypeIntoContext(superclass),
+              proto, classModule, /*allowMissing=*/false)) {
+        inheritedConformance = inheritedConformance
+            .mapConformanceOutOfContext();
+        if (inheritedConformance.isConcrete()) {
+          return ctx.getInheritedConformance(
+              nominal->getDeclaredInterfaceType(),
+              inheritedConformance.getConcrete());
         }
       }
     }
+  }
 
+  // A non-protocol type with a global actor is implicitly Sendable.
+  if (nominal->getGlobalActorAttr()) {
     // Form the implicit conformance to Sendable.
     return formConformance(nullptr);
   }
