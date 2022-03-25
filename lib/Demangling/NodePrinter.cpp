@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if SWIFT_STDLIB_HAS_TYPE_PRINTING
-
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/AST/Ownership.h"
@@ -27,12 +25,6 @@
 using namespace swift;
 using namespace Demangle;
 using llvm::StringRef;
-
-[[noreturn]]
-static void printer_unreachable(const char *Message) {
-  fprintf(stderr, "fatal error: %s\n", Message);
-  std::abort();
-}
 
 DemanglerPrinter &DemanglerPrinter::operator<<(unsigned long long n) & {
   char buffer[32];
@@ -51,6 +43,14 @@ DemanglerPrinter &DemanglerPrinter::operator<<(long long n) & {
   snprintf(buffer, sizeof(buffer), "%lld",n);
   Stream.append(buffer);
   return *this;
+}
+
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+
+[[noreturn]]
+static void printer_unreachable(const char *Message) {
+  fprintf(stderr, "fatal error: %s\n", Message);
+  std::abort();
 }
 
 std::string Demangle::genericParameterName(uint64_t depth, uint64_t index) {
