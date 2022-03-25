@@ -14,44 +14,26 @@
 #define SWIFT_BASIC_LAZY_H
 
 #include <memory>
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+
+#if SWIFT_STDLIB_THREADING_NONE
 // No dependencies on single-threaded environments.
-#elif defined(__APPLE__)
+#elif SWIFT_STDLIB_THREADING_DARWIN
 #include <dispatch/dispatch.h>
-#elif defined(__wasi__)
-// No pthread on wasi, see https://bugs.swift.org/browse/SR-12097 for more details.
 #else
 #include <mutex>
 #endif
+
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/type_traits.h"
 
-#if defined(__wasi__)
-// Temporary single-threaded stub. Should be replaced with a thread-safe version
-// as soon as the WASI SDK allows it. See https://bugs.swift.org/browse/SR-12766.
-inline void wasi_call_once(int *flag, void *context, void (*func)(void *)) {
-  switch (*flag) {
-  case 0:
-    *flag = 1;
-    func(context);
-    return;
-  case 1:
-    return;
-  default:
-    assert(false && "wasi_call_once got invalid flag");
-    abort();
-  }
-}
-#endif
-
 namespace swift {
 
-#ifdef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+#if SWIFT_STDLIB_THREADING_NONE
   using OnceToken_t = bool;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
-  if (!TOKEN) { TOKEN = true; (FUNC)(CONTEXT); }
-#elif defined(__APPLE__)
-  using OnceToken_t = dispatch_once_t;
+  do { if (!TOKEN) { TOKEN = true; (FUNC)(CONTEXT); } } while (0)
+#elif SWIFT_STDLIB_THREADING_DARWIN
+  using OnceToken_t = ::dispatch_once_t;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
   ::dispatch_once_f(&TOKEN, CONTEXT, FUNC)
 #elif defined(__CYGWIN__)
@@ -62,10 +44,6 @@ namespace swift {
   using OnceToken_t = unsigned long;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
   _swift_once_f(&TOKEN, CONTEXT, FUNC)
-#elif defined(__wasi__)
-  using OnceToken_t = int;
-# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
-  ::wasi_call_once(&TOKEN, CONTEXT, FUNC)
 #else
   using OnceToken_t = std::once_flag;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \

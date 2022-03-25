@@ -59,6 +59,7 @@ set(swift_runtime_sources
     KnownMetadata.cpp
     Metadata.cpp
     MetadataLookup.cpp
+    MutexC11.cpp
     MutexPThread.cpp
     MutexWin32.cpp
     Numeric.cpp

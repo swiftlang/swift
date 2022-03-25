@@ -114,7 +114,7 @@ void _swift_tsan_release(void *addr);
 /// executors.
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
 
-#if !defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
 inline SerialExecutorWitnessTable *
 _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
   extern SerialExecutorWitnessTable wtable

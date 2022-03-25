@@ -66,6 +66,27 @@ else()
                   any compiler host sources written in Swift")
 endif()
 
+# A convenience pattern to match Darwin platforms. Example:
+#  if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
+#     ...
+#  endif()
+set(SWIFT_DARWIN_VARIANTS "^(macosx|iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
+set(SWIFT_DARWIN_EMBEDDED_VARIANTS "^(iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
+
+# A convenient list to match Darwin SDKs. Example:
+#  if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+#    ...
+#  endif()
+set(SWIFT_DARWIN_PLATFORMS "IOS" "IOS_SIMULATOR" "TVOS" "TVOS_SIMULATOR" "WATCHOS" "WATCHOS_SIMULATOR" "OSX")
+
+set(SWIFT_APPLE_PLATFORMS ${SWIFT_DARWIN_PLATFORMS})
+if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple")
+  list(APPEND SWIFT_APPLE_PLATFORMS "FREESTANDING")
+  if(SWIFT_FREESTANDING_IS_DARWIN)
+    list(APPEND SWIFT_DARWIN_PLATFORMS "FREESTANDING")
+  endif()
+endif()
+
 #
 # User-configurable options that control the inclusion and default build
 # behavior for components which may not strictly be necessary (tools, examples,
@@ -102,6 +123,15 @@ option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     "Include Unicode data files in the standard library.
     NOTE: Disabling this will cause many String methods to crash."
     TRUE)
+
+include(Threading)
+
+threading_package_default(SWIFT_STDLIB_THREADING_PACKAGE_default)
+
+set(SWIFT_STDLIB_THREADING_PACKAGE "${SWIFT_STDLIB_THREADING_PACKAGE_default}"
+    CACHE STRING
+    "The threading package to use.  Must be one of 'none', 'pthreads',
+    'darwin', 'win32', 'c11'.")
 
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
@@ -671,27 +701,6 @@ include_directories(BEFORE
   ${SWIFT_INCLUDE_DIR}
   )
 
-# A convenience pattern to match Darwin platforms. Example:
-#  if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
-#     ...
-#  endif()
-set(SWIFT_DARWIN_VARIANTS "^(macosx|iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
-set(SWIFT_DARWIN_EMBEDDED_VARIANTS "^(iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
-
-# A convenient list to match Darwin SDKs. Example:
-#  if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
-#    ...
-#  endif()
-set(SWIFT_DARWIN_PLATFORMS "IOS" "IOS_SIMULATOR" "TVOS" "TVOS_SIMULATOR" "WATCHOS" "WATCHOS_SIMULATOR" "OSX")
-
-set(SWIFT_APPLE_PLATFORMS ${SWIFT_DARWIN_PLATFORMS})
-if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple")
-  list(APPEND SWIFT_APPLE_PLATFORMS "FREESTANDING")
-  if(SWIFT_FREESTANDING_IS_DARWIN)
-    list(APPEND SWIFT_DARWIN_PLATFORMS "FREESTANDING")
-  endif()
-endif()
-
 # Configuration flags passed to all of our invocations of gyb.  Try to
 # avoid making up new variable names here if you can find a CMake
 # variable that will do the job.
@@ -1037,11 +1046,12 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
   message(STATUS "")
 
+  message(STATUS "Threading Package:                  ${SWIFT_STDLIB_THREADING_PACKAGE}")
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
-  message(STATUS "Concurrency Support: ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
-  message(STATUS "Distributed Support: ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
-  message(STATUS "String Processing Support: ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
-  message(STATUS "Unicode Support: ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
+  message(STATUS "Concurrency Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
+  message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
+  message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
+  message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
