@@ -3475,11 +3475,12 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
   for (auto *Attr: Attrs) {
     static StringRef AttrName = "_originallyDefinedIn";
 
+    if (!Attr->isActivePlatform(Ctx))
+      continue;
+
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/false))
       continue;
 
-    if (!Attr->isActivePlatform(Ctx))
-      continue;
     auto AtLoc = Attr->AtLoc;
     auto Platform = Attr->Platform;
     if (!seenPlatforms.insert({Platform, AtLoc}).second) {
