@@ -5186,6 +5186,19 @@ public:
   /// to a generic function?
   bool isArgumentGenericFunction(Type argType, Expr *argExpr);
 
+  /// Determine whether given constructor reference is valid or does it require
+  /// any fixes e.g. when base is a protocol metatype.
+  /// The function ref parameters can be used to validate an intializer ref with
+  /// types from a solution during code completion.
+  ConstraintFix *validateInitializerRef(
+      ConstructorDecl *init, ConstraintLocator *locator,
+      llvm::function_ref<Type(ASTNode)> getType,
+      llvm::function_ref<Type(Type)> simplifyType,
+      llvm::function_ref<bool(Expr *)> isTypeReference,
+      llvm::function_ref<bool(Expr *)> isStaticallyDerivedMetatype);
+  ConstraintFix *validateInitializerRef(ConstructorDecl *init,
+                                        ConstraintLocator *locator);
+
   // Given a type variable, attempt to find the disjunction of
   // bind overloads associated with it. This may return null in cases where
   // the disjunction has either not been created or binds the type variable

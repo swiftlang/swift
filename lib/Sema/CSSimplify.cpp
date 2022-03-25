@@ -8698,15 +8698,18 @@ static bool isNonFinalClass(Type type) {
 
 /// Determine whether given constructor reference is valid or does it require
 /// any fixes e.g. when base is a protocol metatype.
-static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
-                                             ConstructorDecl *init,
-                                             ConstraintLocator *locator) {
+ConstraintFix *ConstraintSystem::validateInitializerRef(
+    ConstructorDecl *init, ConstraintLocator *locator,
+    llvm::function_ref<Type(ASTNode)> getType,
+    llvm::function_ref<Type(Type)> simplifyType,
+    llvm::function_ref<bool(Expr *)> isTypeReference,
+    llvm::function_ref<bool(Expr *)> isStaticallyDerivedMetatype) {
   auto anchor = locator->getAnchor();
   if (!anchor)
     return nullptr;
 
-  auto getType = [&cs](Expr *expr) -> Type {
-    return cs.simplifyType(cs.getType(expr))->getRValueType();
+  auto getSimplifiedType = [getType, simplifyType](Expr *expr) -> Type {
+    return simplifyType(getType(expr))->getRValueType();
   };
 
   auto locatorEndsWith =
@@ -8722,21 +8725,21 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   // Explicit initializer reference e.g. `T.init(...)` or `T.init`.
   if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
     baseExpr = UDE->getBase();
-    baseType = getType(baseExpr);
+    baseType = getSimplifiedType(baseExpr);
     if (baseType->is<MetatypeType>()) {
       auto instanceType = baseType->getAs<MetatypeType>()
                               ->getInstanceType()
                               ->getWithoutParens();
-      if (!cs.isTypeReference(baseExpr) && instanceType->isExistentialType()) {
+      if (!isTypeReference(baseExpr) && instanceType->isExistentialType()) {
         return AllowInvalidInitRef::onProtocolMetatype(
-            cs, baseType, init, /*isStaticallyDerived=*/true,
+            *this, baseType, init, /*isStaticallyDerived=*/true,
             baseExpr->getSourceRange(), locator);
       }
     }
     // Initializer call e.g. `T(...)`
   } else if (auto *CE = getAsExpr<CallExpr>(anchor)) {
     baseExpr = CE->getFn();
-    baseType = getType(baseExpr);
+    baseType = getSimplifiedType(baseExpr);
     // FIXME: Historically, UnresolvedMemberExprs have allowed implicit
     // construction through a metatype value, but this should probably be
     // illegal.
@@ -8745,18 +8748,18 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
       // of `.init` on metatype value.
       if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
         auto instanceType = AMT->getInstanceType()->getWithoutParens();
-        if (!cs.isTypeReference(baseExpr)) {
+        if (!isTypeReference(baseExpr)) {
           if (baseType->is<MetatypeType>() &&
               instanceType->isAnyExistentialType()) {
             return AllowInvalidInitRef::onProtocolMetatype(
-                cs, baseType, init, cs.isStaticallyDerivedMetatype(baseExpr),
+                *this, baseType, init, isStaticallyDerivedMetatype(baseExpr),
                 baseExpr->getSourceRange(), locator);
           }
 
           if (!instanceType->isExistentialType() ||
               instanceType->isAnyExistentialType()) {
-            return AllowInvalidInitRef::onNonConstMetatype(cs, baseType, init,
-                                                           locator);
+            return AllowInvalidInitRef::onNonConstMetatype(*this, baseType,
+                                                           init, locator);
           }
         }
       }
@@ -8771,7 +8774,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // UnresolvedMemberExpr--instead, it will be the type of the nested type
     // member.
     // We need to find type variable which represents contextual base.
-    auto *baseLocator = cs.getConstraintLocator(
+    auto *baseLocator = getConstraintLocator(
         UME, locatorEndsWith(locator, ConstraintLocator::ConstructorMember)
                  ? ConstraintLocator::UnresolvedMember
                  : ConstraintLocator::MemberRefBase);
@@ -8779,19 +8782,19 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // FIXME: Type variables responsible for contextual base could be cached
     // in the constraint system to speed up lookup.
     auto result = llvm::find_if(
-        cs.getTypeVariables(), [&baseLocator](const TypeVariableType *typeVar) {
+        getTypeVariables(), [&baseLocator](const TypeVariableType *typeVar) {
           return typeVar->getImpl().getLocator() == baseLocator;
         });
 
-    assert(result != cs.getTypeVariables().end());
-    baseType = cs.simplifyType(*result)->getRValueType();
+    assert(result != getTypeVariables().end());
+    baseType = simplifyType(*result)->getRValueType();
     // Constraint for member base is formed as '$T.Type[.<member] = ...`
     // which means MetatypeType has to be added after finding a type variable.
     if (locatorEndsWith(baseLocator, ConstraintLocator::MemberRefBase))
       baseType = MetatypeType::get(baseType);
   } else if (auto *keyPathExpr = getAsExpr<KeyPathExpr>(anchor)) {
     // Key path can't refer to initializers e.g. `\Type.init`
-    return AllowInvalidRefInKeyPath::forRef(cs, init, locator);
+    return AllowInvalidRefInKeyPath::forRef(*this, init, locator);
   }
 
   if (!baseType)
@@ -8803,11 +8806,10 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // constrainted Self type, 'self' has archetype type, and only
     // required initializers can be called.
     if (baseExpr && !baseExpr->isSuperExpr()) {
-      auto &ctx = cs.getASTContext();
       if (auto *DRE =
               dyn_cast<DeclRefExpr>(baseExpr->getSemanticsProvidingExpr())) {
-        if (DRE->getDecl()->getName() == ctx.Id_self) {
-          if (getType(DRE)->is<ArchetypeType>())
+        if (DRE->getDecl()->getName() == getASTContext().Id_self) {
+          if (getSimplifiedType(DRE)->is<ArchetypeType>())
             applicable = true;
         }
       }
@@ -8826,7 +8828,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
                             instanceType->is<ArchetypeType>());
   // Otherwise this is something like `T.init(...)`
   } else {
-    isStaticallyDerived = cs.isStaticallyDerivedMetatype(baseExpr);
+    isStaticallyDerived = isStaticallyDerivedMetatype(baseExpr);
   }
 
   auto baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
@@ -8834,17 +8836,28 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   if (isNonFinalClass(instanceType) && !isStaticallyDerived &&
       !init->hasClangNode() &&
       !(init->isRequired() || init->getDeclContext()->getSelfProtocolDecl())) {
-    return AllowInvalidInitRef::dynamicOnMetatype(cs, baseType, init, baseRange,
-                                                  locator);
+    return AllowInvalidInitRef::dynamicOnMetatype(*this, baseType, init,
+                                                  baseRange, locator);
     // Constructors cannot be called on a protocol metatype, because there is no
     // metatype to witness it.
   } else if (baseType->is<MetatypeType>() &&
              instanceType->isExistentialType()) {
     return AllowInvalidInitRef::onProtocolMetatype(
-        cs, baseType, init, isStaticallyDerived, baseRange, locator);
+        *this, baseType, init, isStaticallyDerived, baseRange, locator);
   }
 
   return nullptr;
+}
+
+ConstraintFix *
+ConstraintSystem::validateInitializerRef(ConstructorDecl *init,
+                                         ConstraintLocator *locator) {
+  ConstraintSystem &cs = *this;
+  return validateInitializerRef(
+      init, locator, [&cs](ASTNode N) { return cs.getType(N); },
+      [&cs](Type T) { return cs.simplifyType(T); },
+      [&cs](Expr *E) { return cs.isTypeReference(E); },
+      [&cs](Expr *E) { return cs.isStaticallyDerivedMetatype(E); });
 }
 
 static ConstraintFix *
@@ -8856,7 +8869,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
   // to refer to a declaration.
   if (auto *decl = choice.getDeclOrNull()) {
     if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-      if (auto *fix = validateInitializerRef(cs, CD, locator))
+      if (auto *fix = cs.validateInitializerRef(CD, locator))
         return fix;
     }
 

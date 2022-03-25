@@ -23,7 +23,7 @@ using namespace swift::constraints;
 bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
     const ArgumentTypeCheckCompletionCallback::Result &Res,
     SmallVectorImpl<PossibleParamInfo> &Params, SmallVectorImpl<Type> &Types) {
-  if (!Res.ParamIdx) {
+  if (!Res.ParamIdx || !Res.FuncTy) {
     // We don't really know much here. Suggest global results without a specific
     // expected type.
     return true;
@@ -78,6 +78,20 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
   return ShowGlobalCompletions;
 }
 
+static bool isInvalidInitRef(const Solution &S, ValueDecl *FuncD,
+                             ConstraintLocator *Locator) {
+  if (auto Init = dyn_cast_or_null<ConstructorDecl>(FuncD)) {
+    return S.getConstraintSystem().validateInitializerRef(
+               Init, Locator, [&S](ASTNode N) { return S.getType(N); },
+               [&S](Type T) { return S.simplifyType(T); },
+               [&S](Expr *E) { return S.isTypeReference(E); },
+               [&S](Expr *E) { return S.isStaticallyDerivedMetatype(E); }) !=
+           nullptr;
+  } else {
+    return false;
+  }
+}
+
 void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
@@ -112,7 +126,8 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   // expected type) to provide useful code completion results.
   if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator)) {
     FuncD = SelectedOverload->choice.getDeclOrNull();
-    if (FuncD && FuncD->shouldHideFromEditor()) {
+    if (FuncD && (FuncD->shouldHideFromEditor() ||
+                  isInvalidInitRef(S, FuncD, CallLocator))) {
       return;
     }
     CallBaseTy = SelectedOverload->choice.getBaseType();
