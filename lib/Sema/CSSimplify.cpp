@@ -1782,6 +1782,11 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         if (!PD->getInterfaceType()->hasTypeParameter())
           continue;
 
+        // The type of the default value is going to be determined
+        // based on a type deduced for the parameter at this call site.
+        if (PD->hasCallerSideDefaultExpr())
+          continue;
+
         auto defaultExprType = PD->getTypeOfDefaultExpr();
 
         // A caller side default.

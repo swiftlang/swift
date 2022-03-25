@@ -7067,6 +7067,10 @@ Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
 Type ParamDecl::getTypeOfDefaultExpr() const {
   auto &ctx = getASTContext();
 
+  // If this is a caller-side default, the type is determined based on
+  // a particular call site.
+  assert(!hasCallerSideDefaultExpr());
+
   if (Type type = evaluateOrDefault(
           ctx.evaluator,
           DefaultArgumentTypeRequest{const_cast<ParamDecl *>(this)}, nullptr)) {
