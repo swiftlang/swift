@@ -76,6 +76,10 @@ static VarDecl *addImplicitDistributedActorIDProperty(
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
       new (C) NonisolatedAttr(/*IsImplicit=*/true));
+  // mark as @_compilerInitialized, since we synthesize the initializing
+  // assignment during SILGen.
+  propDecl->getAttrs().add(
+      new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
 
   nominal->addMember(propDecl);
   nominal->addMember(pbDecl);

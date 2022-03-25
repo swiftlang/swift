@@ -28,7 +28,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 func test() async throws {
   let system = DefaultDistributedActorSystem()
 
-  let local = Capybara(system: system)
+  let local = Capybara(actorSystem: system)
   // await local.eat() // SHOULD ERROR
   let valueWhenLocal: String? = await local.whenLocal { __secretlyKnownToBeLocal in
     __secretlyKnownToBeLocal.eat()

@@ -41,7 +41,7 @@ distributed actor Worker: LifecycleWatch {
 
 @main struct Main {
   static func main() async {
-    let worker: any LifecycleWatch = Worker(system: DefaultDistributedActorSystem())
+    let worker: any LifecycleWatch = Worker(actorSystem: DefaultDistributedActorSystem())
     try! await worker.test()
 
     // CHECK: executed: test()

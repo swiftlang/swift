@@ -23,6 +23,7 @@ distributed actor MyDistActor {
   var localOnlyField: SomeClass
 
   init?(system_async_fail_throws: FakeActorSystem, cond: Bool) async throws {
+    self.actorSystem = system_async_fail_throws
     guard cond else { throw Err.blah }
     self.localOnlyField = SomeClass()
   }

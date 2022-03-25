@@ -33,19 +33,19 @@ func test_initializers() {
   let address = ActorAddress(parse: "")
   let system = DefaultDistributedActorSystem()
 
-  _ = SomeSpecificDistributedActor(system: system)
+  _ = SomeSpecificDistributedActor(actorSystem: system)
   _ = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
 }
 
 func test_address() {
   let system = DefaultDistributedActorSystem()
 
-  let actor = SomeSpecificDistributedActor(system: system)
+  let actor = SomeSpecificDistributedActor(actorSystem: system)
   _ = actor.id
 }
 
 func test_run(system: FakeActorSystem) async {
-  let actor = SomeSpecificDistributedActor(system: system)
+  let actor = SomeSpecificDistributedActor(actorSystem: system)
 
   print("before") // CHECK: before
   try! await actor.hello()
@@ -53,7 +53,7 @@ func test_run(system: FakeActorSystem) async {
 }
 
 func test_echo(system: FakeActorSystem) async {
-  let actor = SomeSpecificDistributedActor(system: system)
+  let actor = SomeSpecificDistributedActor(actorSystem: system)
 
   let echo = try! await actor.echo(int: 42)
   print("echo: \(echo)") // CHECK: echo: 42

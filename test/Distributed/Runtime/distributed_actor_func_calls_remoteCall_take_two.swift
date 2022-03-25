@@ -40,7 +40,7 @@ distributed actor Greeter {
 func test() async throws {
   let system = DefaultDistributedActorSystem()
 
-  let local = Greeter(system: system)
+  let local = Greeter(actorSystem: system)
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   try await ref.take(name: "Caplin", int: 1337)
