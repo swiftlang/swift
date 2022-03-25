@@ -288,7 +288,8 @@ RewriteContext::getProtocolComponentImpl(const ProtocolDecl *proto) {
 ///
 /// This can only be called once, to prevent multiple requirement machines
 /// for being built with the same component.
-ArrayRef<const ProtocolDecl *> RewriteContext::getProtocolComponent(
+ArrayRef<const ProtocolDecl *>
+RewriteContext::startComputingRequirementSignatures(
     const ProtocolDecl *proto) {
   auto &component = getProtocolComponentImpl(proto);
 
@@ -303,6 +304,17 @@ ArrayRef<const ProtocolDecl *> RewriteContext::getProtocolComponent(
   component.ComputingRequirementSignatures = true;
 
   return component.Protos;
+}
+
+/// Mark the component as having completed, which will ensure that
+/// isRecursivelyComputingRequirementMachine() returns false.
+void RewriteContext::finishComputingRequirementSignatures(
+    const ProtocolDecl *proto) {
+  auto &component = getProtocolComponentImpl(proto);
+
+  assert(component.ComputingRequirementSignatures &&
+         "Didn't call startComputingRequirementSignatures()");
+  component.ComputedRequirementSignatures = true;
 }
 
 /// Get the list of protocols in the strongly connected component (SCC)
@@ -340,11 +352,12 @@ RequirementMachine *RewriteContext::getRequirementMachine(
   return newMachine;
 }
 
+/// Note: This doesn't use Evaluator::hasActiveRequest(), because in reality
+/// the active request could be for any protocol in the connected component.
+///
+/// Instead, just check a flag set in the component itself.
 bool RewriteContext::isRecursivelyConstructingRequirementMachine(
     const ProtocolDecl *proto) {
-  if (proto->isRequirementSignatureComputed())
-    return false;
-
   auto found = Protos.find(proto);
   if (found == Protos.end())
     return false;
@@ -353,7 +366,10 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
   if (component == Components.end())
     return false;
 
-  return component->second.ComputingRequirementSignatures;
+  // If we've started but not finished, we're in the middle of computing
+  // requirement signatures.
+  return (component->second.ComputingRequirementSignatures &&
+          !component->second.ComputedRequirementSignatures);
 }
 
 /// We print stats in the destructor, which should get executed at the end of
