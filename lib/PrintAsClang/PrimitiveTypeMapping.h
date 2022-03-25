@@ -39,14 +39,27 @@ public:
   /// primitive type declaration, or \c None if no such type name exists.
   Optional<ObjCClangTypeInfo> getKnownObjCTypeInfo(const TypeDecl *typeDecl);
 
+  struct CClangTypeInfo {
+    StringRef name;
+    bool canBeNullable;
+  };
+
+  /// Returns the C type name and nullability for the given Swift
+  /// primitive type declaration, or \c None if no such type name exists.
+  Optional<CClangTypeInfo> getKnownCTypeInfo(const TypeDecl *typeDecl);
+
 private:
   void initialize(ASTContext &ctx);
 
   struct ClangTypeInfo {
     // The Objective-C name of the Swift type.
     StringRef objcName;
+    // The C name of the Swift type.
+    Optional<StringRef> cName;
     bool canBeNullable;
   };
+
+  ClangTypeInfo *getMappedTypeInfoOrNull(const TypeDecl *typeDecl);
 
   /// A map from {Module, TypeName} pairs to {C name, C nullability} pairs.
   ///

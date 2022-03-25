@@ -11,8 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "DeclAndTypePrinter.h"
-#include "CxxSynthesis.h"
+#include "ClangSyntaxPrinter.h"
 #include "PrimitiveTypeMapping.h"
+#include "PrintClangFunction.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -79,6 +80,29 @@ static bool isClangKeyword(Identifier name) {
   return isClangKeyword(name.str());
 }
 
+bool DeclAndTypePrinter::isStrClangKeyword(StringRef name) {
+  return ::isClangKeyword(name);
+}
+
+// For a given Decl and Type, if the type is not an optional return
+// the type and OTK_None as the optionality. If the type is
+// optional, return the underlying object type, and an optionality
+// that is based on the type but overridden by the return value of
+// isImplicitlyUnwrappedOptional().
+std::pair<Type, OptionalTypeKind>
+DeclAndTypePrinter::getObjectTypeAndOptionality(const ValueDecl *D, Type ty) {
+  OptionalTypeKind kind;
+  if (auto objTy = ty->getReferenceStorageReferent()->getOptionalObjectType()) {
+    kind = OTK_Optional;
+    if (D->isImplicitlyUnwrappedOptional())
+      kind = OTK_ImplicitlyUnwrappedOptional;
+
+    return {objTy, kind};
+  }
+
+  return {ty, OTK_None};
+}
+
 namespace {
   /// Whether the type being printed is in function param position.
   enum IsFunctionParam_t : bool {
@@ -98,17 +122,14 @@ static bool looksLikeInitMethod(ObjCSelector selector) {
 }
 
 class DeclAndTypePrinter::Implementation
-  : private DeclVisitor<DeclAndTypePrinter::Implementation>,
-    private TypeVisitor<DeclAndTypePrinter::Implementation, void,
-                        Optional<OptionalTypeKind>>
-{
+    : private DeclVisitor<DeclAndTypePrinter::Implementation>,
+      private TypeVisitor<DeclAndTypePrinter::Implementation, void,
+                          Optional<OptionalTypeKind>>,
+      private ClangSyntaxPrinter {
   using PrinterImpl = Implementation;
   friend ASTVisitor;
   friend TypeVisitor;
 
-  // The output stream is accessible through 'owningPrinter',
-  // but it makes the code simpler to have it here too.
-  raw_ostream &os;
   DeclAndTypePrinter &owningPrinter;
   OutputLanguageMode outputLang;
 
@@ -126,7 +147,7 @@ class DeclAndTypePrinter::Implementation
 public:
   explicit Implementation(raw_ostream &out, DeclAndTypePrinter &owner,
                           OutputLanguageMode outputLang)
-      : os(out), owningPrinter(owner), outputLang(outputLang) {}
+      : ClangSyntaxPrinter(out), owningPrinter(owner), outputLang(outputLang) {}
 
   void print(const Decl *D) {
     PrettyStackTraceDecl trace("printing", D);
@@ -285,17 +306,7 @@ private:
   // isImplicitlyUnwrappedOptional().
   static std::pair<Type, OptionalTypeKind>
   getObjectTypeAndOptionality(const ValueDecl *D, Type ty) {
-    OptionalTypeKind kind;
-    if (auto objTy =
-            ty->getReferenceStorageReferent()->getOptionalObjectType()) {
-      kind = OTK_Optional;
-      if (D->isImplicitlyUnwrappedOptional())
-        kind = OTK_ImplicitlyUnwrappedOptional;
-
-      return {objTy, kind};
-    }
-
-    return {ty, OTK_None};
+    return DeclAndTypePrinter::getObjectTypeAndOptionality(D, ty);
   }
 
   // Ignore other declarations.
@@ -845,7 +856,10 @@ private:
     FuncionSwiftABIInformation funcABI(FD, mangler);
 
     os << "SWIFT_EXTERN ";
-    printFunctionDeclAsCFunctionDecl(FD, funcABI.getSymbolName(), resultTy);
+
+    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
+    funcPrinter.printFunctionDeclAsCFunctionDecl(FD, funcABI.getSymbolName(),
+                                                 resultTy);
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
@@ -1370,55 +1384,6 @@ private:
   /// If a full type is being printed, use print() instead.
   void visitPart(Type ty, Optional<OptionalTypeKind> optionalKind) {
     TypeVisitor::visit(ty, optionalKind);
-  }
-
-  /// Where nullability information should be printed.
-  enum class NullabilityPrintKind {
-    Before,
-    After,
-    ContextSensitive,
-  };
-
-  void printNullability(Optional<OptionalTypeKind> kind,
-                        NullabilityPrintKind printKind
-                          = NullabilityPrintKind::After) {
-    if (!kind)
-      return;
-
-    switch (printKind) {
-    case NullabilityPrintKind::ContextSensitive:
-      switch (*kind) {
-      case OTK_None:
-        os << "nonnull";
-        break;
-      case OTK_Optional:
-        os << "nullable";
-        break;
-      case OTK_ImplicitlyUnwrappedOptional:
-        os << "null_unspecified";
-        break;
-      }
-      break;
-    case NullabilityPrintKind::After:
-      os << ' ';
-      LLVM_FALLTHROUGH;
-    case NullabilityPrintKind::Before:
-      switch (*kind) {
-      case OTK_None:
-        os << "_Nonnull";
-        break;
-      case OTK_Optional:
-        os << "_Nullable";
-        break;
-      case OTK_ImplicitlyUnwrappedOptional:
-        os << "_Null_unspecified";
-        break;
-      }
-      break;
-    }
-
-    if (printKind != NullabilityPrintKind::After)
-      os << ' ';
   }
 
   /// Determine whether this generic Swift nominal type maps to a
