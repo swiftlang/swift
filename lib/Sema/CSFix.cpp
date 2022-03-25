@@ -1143,14 +1143,26 @@ NotCompileTimeConst::create(ConstraintSystem &cs, Type paramTy,
 
 bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const {
   auto *locator = getLocator();
-  // Referencing an enum element directly is considered a compile-time literal.
-  if (auto *d = solution.resolveLocatorToDecl(locator).getDecl()) {
-    if (isa<EnumElementDecl>(d)) {
-      if (!d->hasParameterList()) {
-        return true;
+  if (auto *E = getAsExpr(locator->getAnchor())) {
+    auto isAccepted = E->isSemanticallyConstExpr([&](Expr *E) {
+      if (auto *UMC = dyn_cast<UnresolvedMemberChainResultExpr>(E)) {
+        E = UMC->getSubExpr();
       }
-    }
+      auto locator = solution.getConstraintSystem().getConstraintLocator(E);
+      // Referencing an enum element directly is considered a compile-time literal.
+      if (auto *d = solution.resolveLocatorToDecl(locator).getDecl()) {
+        if (isa<EnumElementDecl>(d)) {
+          if (!d->hasParameterList()) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+    if (isAccepted)
+      return true;
   }
+
   NotCompileTimeConstFailure failure(solution, locator);
   return failure.diagnose(asNote);
 }

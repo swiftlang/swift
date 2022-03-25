@@ -496,8 +496,8 @@ public:
     return getSemanticsProvidingExpr()->getKind() == ExprKind::InOut;
   }
 
-  bool printConstExprValue(llvm::raw_ostream *OS) const;
-  bool isSemanticallyConstExpr() const;
+  bool printConstExprValue(llvm::raw_ostream *OS, llvm::function_ref<bool(Expr*)> additionalCheck) const;
+  bool isSemanticallyConstExpr(llvm::function_ref<bool(Expr*)> additionalCheck = nullptr) const;
 
   /// Returns false if this expression needs to be wrapped in parens when
   /// used inside of a any postfix expression, true otherwise.

@@ -1961,14 +1961,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         auto *locator = cs.getConstraintLocator(loc);
         SourceRange range;
         // simplify locator so the anchor is the exact argument.
-        locator = simplifyLocator(cs, locator, range);
-        if (locator->getPath().empty() &&
-            locator->getAnchor().isExpr(ExprKind::UnresolvedMemberChainResult)) {
-          locator =
-            cs.getConstraintLocator(cast<UnresolvedMemberChainResultExpr>(
-              locator->getAnchor().get<Expr*>())->getSubExpr());
-        }
-        cs.recordFix(NotCompileTimeConst::create(cs, paramTy, locator));
+        cs.recordFix(NotCompileTimeConst::create(cs, paramTy,
+          simplifyLocator(cs, locator, range)));
       }
 
       cs.addConstraint(
