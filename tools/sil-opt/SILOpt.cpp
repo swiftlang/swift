@@ -559,8 +559,6 @@ int main(int argc, char **argv) {
   }
   Invocation.getLangOptions().EnableExperimentalConcurrency =
     EnableExperimentalConcurrency;
-  Invocation.getLangOptions().EnableExperimentalDistributed =
-    EnableExperimentalDistributed;
   Optional<bool> enableExperimentalMoveOnly =
       toOptionalBool(EnableExperimentalMoveOnly);
   if (enableExperimentalMoveOnly)
