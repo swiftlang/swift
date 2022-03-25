@@ -2086,8 +2086,6 @@ public:
                                  SILValue selfVal,
                                  SILValue actorSystemVal);
 
-  void registerDistActorIdentityInit();
-
   /// Given a function representing a distributed actor factory, emits the
   /// corresponding SIL function for it.
   void emitDistributedActorFactory(
