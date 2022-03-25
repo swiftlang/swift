@@ -106,6 +106,10 @@ class RewriteSystem final {
   /// identities among rewrite rules discovered while resolving critical pairs.
   unsigned RecordLoops : 1;
 
+  /// The length of the longest initial rule, used for the MaxRuleLength
+  /// completion non-termination heuristic.
+  unsigned LongestInitialRule : 16;
+
 public:
   explicit RewriteSystem(RewriteContext &ctx);
   ~RewriteSystem();
@@ -130,6 +134,10 @@ public:
                   std::vector<Rule> &&importedRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
                   std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
+
+  unsigned getLongestInitialRule() const {
+    return LongestInitialRule;
+  }
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
     return Protos;

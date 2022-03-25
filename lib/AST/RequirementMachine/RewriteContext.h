@@ -86,9 +86,13 @@ class RewriteContext final {
     /// The members of this connected component.
     ArrayRef<const ProtocolDecl *> Protos;
 
-    /// Whether we are currently computing the requirement signatures of
+    /// Whether we have started computing the requirement signatures of
     /// the protocols in this component.
     bool ComputingRequirementSignatures = false;
+
+    /// Whether we have finished computing the requirement signatures of
+    /// the protocols in this component.
+    bool ComputedRequirementSignatures = false;
 
     /// Each connected component has a lazily-created requirement machine
     /// built from the requirement signatures of the protocols in this
@@ -194,7 +198,11 @@ public:
   RequirementMachine *getRequirementMachine(CanGenericSignature sig);
   bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);
 
-  ArrayRef<const ProtocolDecl *> getProtocolComponent(const ProtocolDecl *proto);
+  ArrayRef<const ProtocolDecl *>
+  startComputingRequirementSignatures(const ProtocolDecl *proto);
+
+  void finishComputingRequirementSignatures(const ProtocolDecl *proto);
+
   RequirementMachine *getRequirementMachine(const ProtocolDecl *proto);
   bool isRecursivelyConstructingRequirementMachine(const ProtocolDecl *proto);
 

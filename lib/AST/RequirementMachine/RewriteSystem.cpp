@@ -30,6 +30,7 @@ RewriteSystem::RewriteSystem(RewriteContext &ctx)
   Complete = 0;
   Minimized = 0;
   RecordLoops = 0;
+  LongestInitialRule = 0;
 }
 
 RewriteSystem::~RewriteSystem() {
@@ -85,6 +86,10 @@ void RewriteSystem::initialize(
   addRules(std::move(importedRules),
            std::move(permanentRules),
            std::move(requirementRules));
+
+  for (const auto &rule : getLocalRules()) {
+    LongestInitialRule = std::max(LongestInitialRule, rule.getDepth());
+  }
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.

@@ -301,7 +301,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
       // Check new rules added by the property map against configured limits.
       for (unsigned i = 0; i < rulesAdded; ++i) {
         const auto &newRule = System.getRule(ruleCount + i);
-        if (newRule.getDepth() > MaxRuleLength) {
+        if (newRule.getDepth() > MaxRuleLength + System.getLongestInitialRule()) {
           return std::make_pair(CompletionResult::MaxRuleLength,
                                 ruleCount + i);
         }
