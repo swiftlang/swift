@@ -753,20 +753,44 @@ void RewriteSystem::freeze() {
   ConflictingRules.clear();
 }
 
+static Optional<Requirement>
+getRequirementForDiagnostics(Type subject, Symbol property) {
+  switch (property.getKind()) {
+  case Symbol::Kind::ConcreteType:
+    return Requirement(RequirementKind::SameType, subject,
+                       property.getConcreteType());
+
+  case Symbol::Kind::Superclass:
+    return Requirement(RequirementKind::Superclass, subject,
+                       property.getConcreteType());
+
+  case Symbol::Kind::Protocol:
+    return Requirement(RequirementKind::Conformance, subject,
+                       property.getProtocol()->getDeclaredInterfaceType());
+
+  case Symbol::Kind::Layout:
+    return Requirement(RequirementKind::Layout, subject,
+                       property.getLayoutConstraint());
+
+  default:
+    return None;
+  }
+}
+
 void RewriteSystem::computeConflictDiagnostics(
     SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc,
     const PropertyMap &propertyMap,
     TypeArrayView<GenericTypeParamType> genericParams) {
   for (auto pair : ConflictingRules) {
-    auto *firstRule = &getRule(pair.first);
-    auto *secondRule = &getRule(pair.second);
+    const auto &firstRule = getRule(pair.first);
+    const auto &secondRule = getRule(pair.second);
 
-    auto firstProperty = firstRule->isPropertyRule();
-    auto secondProperty = secondRule->isPropertyRule();
+    auto firstProperty = firstRule.isPropertyRule();
+    auto secondProperty = secondRule.isPropertyRule();
     assert(firstProperty && secondProperty);
 
-    auto firstTerm = firstRule->getRHS();
-    auto secondTerm = secondRule->getRHS();
+    auto firstTerm = firstRule.getRHS();
+    auto secondTerm = secondRule.getRHS();
     auto subjectTerm =
         firstTerm.size() > secondTerm.size() ? firstTerm : secondTerm;
 
@@ -777,8 +801,8 @@ void RewriteSystem::computeConflictDiagnostics(
 
     Type subject = propertyMap.getTypeForTerm(subjectTerm, genericParams);
     errors.push_back(RequirementError::forConflictingRequirement(
-        *firstRule->getPropertyRequirement(subject),
-        *secondRule->getPropertyRequirement(subject),
+        *getRequirementForDiagnostics(subject, *firstProperty),
+        *getRequirementForDiagnostics(subject, *secondProperty),
         signatureLoc));
   }
 }

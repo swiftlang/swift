@@ -43,33 +43,6 @@ Optional<Symbol> Rule::isPropertyRule() const {
   return property;
 }
 
-Optional<Requirement> Rule::getPropertyRequirement(Type subject) const {
-  auto property = isPropertyRule();
-  if (!property)
-    return None;
-
-  switch (property->getKind()) {
-  case Symbol::Kind::ConcreteType:
-    return Requirement(RequirementKind::SameType, subject,
-                       property->getConcreteType());
-
-  case Symbol::Kind::Superclass:
-    return Requirement(RequirementKind::Superclass, subject,
-                       property->getConcreteType());
-
-  case Symbol::Kind::Protocol:
-    return Requirement(RequirementKind::Conformance, subject,
-                       property->getProtocol()->getDeclaredInterfaceType());
-
-  case Symbol::Kind::Layout:
-    return Requirement(RequirementKind::Layout, subject,
-                       property->getLayoutConstraint());
-
-  default:
-    return None;
-  }
-}
-
 /// If this is a rule of the form T.[P] => T where [P] is a protocol symbol,
 /// return the protocol P, otherwise return nullptr.
 const ProtocolDecl *Rule::isProtocolConformanceRule() const {
