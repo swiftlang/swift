@@ -13,7 +13,8 @@ func test_taskGroup_cancelAll() async {
 
        group.spawn {
          group.cancelAll() //expected-warning{{capture of 'group' with non-sendable type 'TaskGroup<Int>' in a `@Sendable` closure}}
-                           //expected-error@-1{{reference to captured parameter 'group' in concurrently-executing code}}
+                           //expected-error@-1{{mutable capture of 'inout' parameter 'group' is not allowed in concurrently-executing code}}
+
          return 0
        }
        group.spawn { [group] in
