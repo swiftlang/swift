@@ -37,6 +37,12 @@ bool ClangSyntaxPrinter::isClangKeyword(Identifier name) {
   return ClangSyntaxPrinter::isClangKeyword(name.str());
 }
 
+void ClangSyntaxPrinter::printIdentifier(StringRef name) {
+  os << name;
+  if (ClangSyntaxPrinter::isClangKeyword(name))
+    os << '_';
+}
+
 /// Print a C++ namespace declaration with the give name and body.
 void ClangSyntaxPrinter::printNamespace(
     llvm::function_ref<void(raw_ostream &OS)> namePrinter,
