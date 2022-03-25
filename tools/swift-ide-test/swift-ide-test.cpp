@@ -4271,13 +4271,6 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableExperimentalNamedOpaqueTypes = true;
   }
 
-  if (options::EnableExperimentalDistributed) {
-    // distributed implies concurrency features:
-    InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
-    // enable 'distributed' parsing and features
-    InitInvok.getLangOptions().EnableExperimentalDistributed = true;
-  }
-
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
