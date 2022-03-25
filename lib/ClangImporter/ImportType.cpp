@@ -1762,7 +1762,7 @@ ImportedType ClangImporter::Implementation::importPropertyType(
   return importType(decl->getType(), importKind,
                     ImportDiagnosticAdder(*this, decl, decl->getLocation()),
                     shouldAllowNSUIntegerAsInt(isFromSystemModule, decl),
-                    Bridgeability::Full, ImportTypeAttrs(),
+                    Bridgeability::Full, getImportTypeAttrs(decl),
                     optionality);
 }
 
@@ -1885,6 +1885,9 @@ private:
     // These types are produced during bridging and have conditional
     // conformances to Sendable depending on their generic parameters, so we
     // want to make their generic parameters `Sendable`.
+    // FIXME: `Unmanaged` ought to be here too, but `AnyObject & Sendable`
+    //        doesn't satisfy the generic parameter's `AnyObject` requirement.
+    //        (rdar://90946615)
     if (ty->isOptional() || ty->isArray() || ty->isSet() ||
         ty->isDictionary())
       return recurse(ty);
@@ -2081,7 +2084,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                     ImportDiagnosticAdder(*this, clangDecl,
                                           clangDecl->getLocation()),
                     allowNSUIntegerAsInt, Bridgeability::Full,
-                    ImportTypeAttrs(), OptionalityOfReturn);
+                    getImportTypeAttrs(clangDecl), OptionalityOfReturn);
 }
 
 static Type
@@ -2126,7 +2129,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
           dyn_cast<clang::TemplateTypeParmType>(clangDecl->getReturnType())) {
     importedType = {findGenericTypeInGenericDecls(
                         *this, templateType, genericParams,
-                        ImportTypeAttrs(), addDiag),
+                        getImportTypeAttrs(clangDecl), addDiag),
                     false};
   } else if ((isa<clang::PointerType>(clangDecl->getReturnType()) ||
           isa<clang::ReferenceType>(clangDecl->getReturnType())) &&
@@ -2138,7 +2141,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
                                       : PTK_UnsafeMutablePointer;
     auto genericType =
         findGenericTypeInGenericDecls(*this, templateParamType, genericParams,
-                                      ImportTypeAttrs(), addDiag);
+                                      getImportTypeAttrs(clangDecl), addDiag);
     importedType = {genericType->wrapInPointer(pointerKind), false};
   } else if (!(isa<clang::RecordType>(clangDecl->getReturnType()) ||
                isa<clang::TemplateSpecializationType>(clangDecl->getReturnType())) ||
@@ -2196,7 +2199,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       auto parentType = importType(
           parent->getASTContext().getRecordType(parent),
           ImportTypeKind::Parameter, ImportDiagnosticAdder(*this, clangDecl),
-          allowNSUIntegerAsInt, Bridgeability::None, ImportTypeAttrs());
+          allowNSUIntegerAsInt, Bridgeability::None,
+          getImportTypeAttrs(clangDecl));
 
       param->setInterfaceType(parentType.getType());
 
@@ -2691,7 +2695,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   auto importedType =
       importType(resultType, resultKind, addImportDiag,
                  allowNSUIntegerAsIntInResult, Bridgeability::Full,
-                 ImportTypeAttrs(), OptionalityOfReturn);
+                 getImportTypeAttrs(clangDecl), OptionalityOfReturn);
 
   // Adjust the result type for a throwing function.
   if (importedType.getType() && errorInfo) {
@@ -2700,7 +2704,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     auto origImportedType =
         importType(resultType, resultKind, addImportDiag,
                    allowNSUIntegerAsIntInResult, Bridgeability::None,
-                   ImportTypeAttrs(), OptionalityOfReturn);
+                   getImportTypeAttrs(clangDecl), OptionalityOfReturn);
     origSwiftResultTy = origImportedType.getType()->getCanonicalType();
 
     importedType =

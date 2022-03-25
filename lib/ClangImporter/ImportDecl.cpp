@@ -3993,7 +3993,7 @@ namespace {
           Impl.importType(decl->getType(), ImportTypeKind::Variable,
                           ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
                           isInSystemModule(dc), Bridgeability::None,
-                          ImportTypeAttrs());
+                          getImportTypeAttrs(decl));
       if (!importedType)
         return nullptr;
 
@@ -4517,7 +4517,7 @@ namespace {
           Impl.importType(decl->getType(), ImportTypeKind::RecordField,
                           ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
                           isInSystemModule(dc), Bridgeability::None,
-                          ImportTypeAttrs());
+                          getImportTypeAttrs(decl));
       if (!importedType) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::record_field_not_imported, decl),
@@ -4645,7 +4645,7 @@ namespace {
                                      : ImportTypeKind::Variable),
                           ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
                           isInSystemModule(dc), Bridgeability::None,
-                          ImportTypeAttrs());
+                          getImportTypeAttrs(decl));
 
       if (!importedType)
         return nullptr;
@@ -6948,7 +6948,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       propertyType, ImportTypeKind::Property,
       ImportDiagnosticAdder(Impl, getter, getter->getLocation()),
       Impl.shouldAllowNSUIntegerAsInt(isFromSystemModule, getter),
-      Bridgeability::Full, ImportTypeAttrs(), OTK_ImplicitlyUnwrappedOptional);
+      Bridgeability::Full, getImportTypeAttrs(accessor),
+      OTK_ImplicitlyUnwrappedOptional);
   if (!importedType)
     return nullptr;
 
@@ -8131,6 +8132,8 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
       if (clangBound->getInterfaceDecl()) {
         auto unqualifiedClangBound =
             clangBound->stripObjCKindOfTypeAndQuals(Impl.getClangASTContext());
+        assert(!objcGenericParam->hasAttrs()
+               && "ObjC generics can have attributes now--we should use 'em");
         Type superclassType = Impl.importTypeIgnoreIUO(
             clang::QualType(unqualifiedClangBound, 0), ImportTypeKind::Abstract,
             ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
@@ -8853,6 +8856,15 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
   // affect typealiases, even when there's an underlying nominal type in clang.
   if (isa<TypeAliasDecl>(MappedDecl))
     return;
+
+  // `@Sendable` on non-types is treated as an `ImportTypeAttr` and shouldn't
+  // be treated as an attribute on the declaration. (Particularly, @Sendable on
+  // a function or method should be treated as making the return value Sendable,
+  // *not* as making the function/method itself Sendable, because
+  // `@Sendable func` is primarily meant for local functions.)
+  if (!isa<TypeDecl>(MappedDecl))
+    while (auto attr = MappedDecl->getAttrs().getEffectiveSendableAttr())
+      MappedDecl->getAttrs().removeAttribute(attr);
 
   // Some types have an implicit '@Sendable' attribute.
   if (ClangDecl->hasAttr<clang::SwiftNewTypeAttr>() ||
