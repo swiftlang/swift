@@ -360,10 +360,8 @@ void swift::swift_reportError(uint32_t flags,
 }
 
 // Report a fatal error to system console, stderr, and crash logs, then abort.
-SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
-  va_list args;
-  va_start(args, format);
-
+SWIFT_NORETURN void swift::fatalErrorv(uint32_t flags, const char *format,
+                                       va_list args) {
   char *log;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
@@ -372,6 +370,14 @@ SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
 
   swift_reportError(flags, log);
   abort();
+}
+
+// Report a fatal error to system console, stderr, and crash logs, then abort.
+SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+
+  fatalErrorv(flags, format, args);
 }
 
 // Report a warning to system console and stderr.
