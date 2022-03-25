@@ -34,15 +34,19 @@ public class ToplevelClass4 {
 
 @available(OSX 13.10, *)
 @_originallyDefinedIn(module: "foo", OSX 13.13) // expected-warning {{'@_originallyDefinedIn' does not have any effect on internal declarations}}
-@_originallyDefinedIn(module: "foo", iOS 7.0) // expected-warning {{'@_originallyDefinedIn' does not have any effect on internal declarations}}
+@_originallyDefinedIn(module: "foo", iOS 7.0)
 internal class ToplevelClass5 {}
 
 @available(OSX 13.10, *)
 @_originallyDefinedIn(module: "foo", OSX 13.13) // expected-warning {{'@_originallyDefinedIn' does not have any effect on private declarations}}
-@_originallyDefinedIn(module: "foo", iOS 7.0) // expected-warning {{'@_originallyDefinedIn' does not have any effect on private declarations}}
+@_originallyDefinedIn(module: "foo", iOS 7.0)
 private class ToplevelClass6 {}
 
 @available(OSX 13.10, *)
 @_originallyDefinedIn(module: "foo", OSX 13.13) // expected-warning {{'@_originallyDefinedIn' does not have any effect on fileprivate declarations}}
-@_originallyDefinedIn(module: "foo", iOS 7.0) // expected-warning {{'@_originallyDefinedIn' does not have any effect on fileprivate declarations}}
+@_originallyDefinedIn(module: "foo", iOS 7.0)
 fileprivate class ToplevelClass7 {}
+
+@available(OSX 13.10, *)
+@_originallyDefinedIn(module: "foo", OSX 13.13, iOS 7.0) // expected-warning {{'@_originallyDefinedIn' does not have any effect on internal declarations}}
+internal class ToplevelClass8 {}

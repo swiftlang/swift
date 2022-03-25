@@ -3483,13 +3483,12 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
   // Attrs are in the reverse order of the source order. We need to visit them
   // in source order to diagnose the later attribute.
   for (auto *Attr: Attrs) {
-    static StringRef AttrName = "_originallyDefinedIn";
+    if (!Attr->isActivePlatform(Ctx))
+      continue;
 
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/false))
       continue;
 
-    if (!Attr->isActivePlatform(Ctx))
-      continue;
     auto AtLoc = Attr->AtLoc;
     auto Platform = Attr->Platform;
     if (!seenPlatforms.insert({Platform, AtLoc}).second) {
@@ -3501,7 +3500,7 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
       return;
     }
     if (!D->getDeclContext()->isModuleScopeContext()) {
-      diagnose(AtLoc, diag::originally_definedin_topleve_decl, AttrName);
+      diagnose(AtLoc, diag::originally_definedin_topleve_decl, Attr);
       return;
     }
 
@@ -3511,8 +3510,7 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
     auto IntroVer = D->getIntroducedOSVersion(Platform);
     if (IntroVer.getValue() > Attr->MovedVersion) {
       diagnose(AtLoc,
-               diag::originally_definedin_must_not_before_available_version,
-               AttrName);
+               diag::originally_definedin_must_not_before_available_version);
       return;
     }
   }
