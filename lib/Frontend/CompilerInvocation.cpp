@@ -459,6 +459,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalVariadicGenerics |=
     Args.hasArg(OPT_enable_experimental_variadic_generics);
 
+  Opts.EnableExperimentalAssociatedTypeInference |=
+      Args.hasArg(OPT_enable_experimental_associated_type_inference);
+
   Opts.EnableExperimentalMoveOnly |=
     Args.hasArg(OPT_enable_experimental_move_only);
 
