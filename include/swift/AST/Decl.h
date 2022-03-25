@@ -3506,11 +3506,6 @@ public:
   /// Find the 'RemoteCallArgument(label:name:value:)' initializer function.
   ConstructorDecl* getDistributedRemoteCallArgumentInitFunction() const;
 
-  /// Find the
-  /// 'DistributedActorSystem.invokeHandlerOnReturn(handler:value:metatype:)
-  /// function.
-  FuncDecl *getDistributedActorSystemInvokeHandlerOnReturnFunction() const;
-
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
