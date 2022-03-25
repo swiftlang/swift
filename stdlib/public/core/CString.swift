@@ -126,6 +126,21 @@ extension String {
     self = str
   }
 
+  @inlinable
+  @_alwaysEmitIntoClient
+  public init?(validatingUTF8 cString: [CChar]) {
+    guard let length = cString.firstIndex(of: 0) else {
+      _preconditionFailure(
+        "input of String.init(validatingUTF8:) must be null-terminated"
+      )
+    }
+    guard let string = cString.prefix(length).withUnsafeBytes({
+      String._tryFromUTF8($0.assumingMemoryBound(to: UInt8.self))
+    }) else { return nil }
+
+    self = string
+  }
+
   /// Creates a new string by copying the null-terminated data referenced by
   /// the given pointer using the specified encoding.
   ///
