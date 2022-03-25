@@ -106,24 +106,19 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   /// - Precondition: The next location exists.
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
+    let i = _guts.validateScalarIndex(i)
+    return _uncheckedIndex(after: i)
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal func _uncheckedIndex(after i: Index) -> Index {
     // TODO(String performance): isASCII fast-path
-
-    // TODO(lorentey): Review index validation
-    _precondition(i < endIndex, "String index is out of bounds")
-    let i = _guts.scalarAlign(i)
-
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.fastUTF8ScalarLength(startingAt: i._encodedOffset)
       return i.encoded(offsetBy: len)._scalarAligned._knownUTF8
     }
-
     return _foreignIndex(after: i)
-  }
-
-  @_alwaysEmitIntoClient // Swift 5.1 bug fix
-  public func distance(from start: Index, to end: Index) -> Int {
-    // TODO(lorentey): Review index validation
-    return _distance(from: _guts.scalarAlign(start), to: _guts.scalarAlign(end))
   }
 
   /// Returns the previous consecutive location before `i`.
@@ -131,17 +126,18 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   /// - Precondition: The previous location exists.
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
-    // TODO(lorentey): Review index validation
-    // TODO(String performance): isASCII fast-path
-
-    // Note: bounds checking in `index(before:)` is tricky as scalar aligning an
-    // index may need to access storage, but it may also move it closer towards
-    // the `startIndex`. Therefore, we must check against the `endIndex` before
-    // aligning, but we need to delay the `i > startIndex` check until after.
-    _precondition(i <= endIndex, "String index is out of bounds")
-    let i = _guts.scalarAlign(i)
+    let i = _guts.validateInclusiveScalarIndex(i)
+    // Note: Aligning an index may move it closer towards the `startIndex`, so
+    // the `i > startIndex` check needs to come after rounding.
     _precondition(i > startIndex, "String index is out of bounds")
 
+    return _uncheckedIndex(before: i)
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal func _uncheckedIndex(before i: Index) -> Index {
+    // TODO(String performance): isASCII fast-path
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.withFastUTF8 { utf8 in
         _utf8ScalarLength(utf8, endingAt: i._encodedOffset)
@@ -171,10 +167,79 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   ///   must be less than the view's end index.
   @inlinable @inline(__always)
   public subscript(position: Index) -> Unicode.Scalar {
-    // TODO(lorentey): Review index validation
-    String(_guts)._boundsCheck(position)
-    let i = _guts.scalarAlign(position)
+    let i = _guts.validateScalarIndex(position)
     return _guts.errorCorrectedScalar(startingAt: i._encodedOffset).0
+  }
+
+  @_alwaysEmitIntoClient // Swift 5.1 bug fix
+  public func distance(from start: Index, to end: Index) -> Int {
+    let start = _guts.validateInclusiveScalarIndex(start)
+    let end = _guts.validateInclusiveScalarIndex(end)
+
+    var i = start
+    var count = 0
+    if i < end {
+      while i < end {
+        count += 1
+        i = _uncheckedIndex(after: i)
+      }
+    }
+    else if i > end {
+      while i > end {
+        count -= 1
+        i = _uncheckedIndex(before: i)
+      }
+    }
+    return count
+  }
+
+  @_alwaysEmitIntoClient
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
+    var i = _guts.validateInclusiveScalarIndex(i)
+
+    if distance >= 0 {
+      for _ in stride(from: 0, to: distance, by: 1) {
+        _precondition(i._encodedOffset < _guts.count, "String index is out of bounds")
+        i = _uncheckedIndex(after: i)
+      }
+    } else {
+      for _ in stride(from: 0, to: distance, by: -1) {
+        _precondition(i._encodedOffset > 0, "String index is out of bounds")
+        i = _uncheckedIndex(before: i)
+      }
+    }
+    return _guts.markEncoding(i)
+  }
+
+  @_alwaysEmitIntoClient
+  public func index(
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
+  ) -> Index? {
+    // Note: `limit` is intentionally not scalar aligned to ensure our behavior
+    // exactly matches the documentation above. We do need to ensure it has a
+    // matching encoding, though. The same goes for `start`, which is used to
+    // determine whether the limit applies at all.
+    let limit = _guts.ensureMatchingEncoding(limit)
+    let start = _guts.ensureMatchingEncoding(i)
+
+    var i = _guts.validateInclusiveScalarIndex(i)
+
+    if distance >= 0 {
+      for _ in stride(from: 0, to: distance, by: 1) {
+        guard limit < start || i < limit else { return nil }
+        _precondition(i._encodedOffset < _guts.count, "String index is out of bounds")
+        i = _uncheckedIndex(after: i)
+      }
+      guard limit < start || i <= limit else { return nil }
+    } else {
+      for _ in stride(from: 0, to: distance, by: -1) {
+        guard limit > start || i > limit else { return nil }
+        _precondition(i._encodedOffset > 0, "String index is out of bounds")
+        i = _uncheckedIndex(before: i)
+      }
+      guard limit > start || i >= limit else { return nil }
+    }
+    return _guts.markEncoding(i)
   }
 }
 
@@ -318,9 +383,8 @@ extension String.UnicodeScalarView: RangeReplaceableCollection {
     _ bounds: Range<Index>,
     with newElements: C
   ) where C: Collection, C.Element == Unicode.Scalar {
-    // TODO(lorentey): Review index validation
     // TODO(String performance): Skip extra String and Array allocation
-
+    let bounds = _guts.validateScalarRange(bounds)
     let utf8Replacement = newElements.flatMap { String($0).utf8 }
     let replacement = utf8Replacement.withUnsafeBufferPointer {
       return String._uncheckedFromUTF8($0)
@@ -423,9 +487,8 @@ extension String.UnicodeScalarView {
 
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> String.UnicodeScalarView.SubSequence {
-    // TODO(lorentey): Review index validation
-    _failEarlyRangeCheck(r, bounds: startIndex..<endIndex)
-    return String.UnicodeScalarView.SubSequence(self, _bounds: r)
+    let r = _guts.validateScalarRange(r)
+    return SubSequence(_unchecked: self, bounds: r)
   }
 }
 

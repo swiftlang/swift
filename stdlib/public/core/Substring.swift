@@ -1018,14 +1018,24 @@ extension Substring {
     internal var _slice: Slice<String.UnicodeScalarView>
 
     /// Creates an instance that slices `base` at `_bounds`.
-    @inlinable
+    internal init(
+      _unchecked base: String.UnicodeScalarView, bounds: Range<Index>
+    ) {
+      _slice = Slice(base: base, bounds: bounds)
+    }
+
+    /// Creates an instance that slices `base` at `_bounds`.
+    @usableFromInline // This used to be inlinable before 5.7
+    @available(*, deprecated) // Use `init(_unchecked:)` in new code.
     internal init(_ base: String.UnicodeScalarView, _bounds: Range<Index>) {
       let start = base._guts.scalarAlign(_bounds.lowerBound)
       let end = base._guts.scalarAlign(_bounds.upperBound)
-      _slice = Slice(
-        base: String(base._guts).unicodeScalars,
-        bounds: Range(_uncheckedBounds: (start, end)))
+      _slice = Slice(base: base, bounds: Range(_uncheckedBounds: (start, end)))
     }
+
+    @_alwaysEmitIntoClient
+    @inline(__always)
+    internal var _wholeGuts: _StringGuts { _slice._base._guts }
   }
 }
 
@@ -1038,87 +1048,77 @@ extension Substring.UnicodeScalarView: BidirectionalCollection {
   //
   // Plumb slice operations through
   //
-  @inlinable
-  public var startIndex: Index { return _slice.startIndex }
+  @inlinable @inline(__always)
+  public var startIndex: Index { _slice._startIndex }
 
-  @inlinable
-  public var endIndex: Index { return _slice.endIndex }
+  @inlinable @inline(__always)
+  public var endIndex: Index { _slice._endIndex }
 
   @inlinable
   public subscript(index: Index) -> Element {
-    // TODO(lorentey): Review index validation
-    return _slice[index]
+    let index = _wholeGuts.validateScalarIndex(
+      index, from: startIndex, to: endIndex)
+    return _wholeGuts.errorCorrectedScalar(startingAt: index._encodedOffset).0
   }
 
   @inlinable
   public var indices: Indices {
-    // TODO(lorentey): Review index validation
     return _slice.indices
   }
 
   @inlinable
   public func index(after i: Index) -> Index {
-    // TODO(lorentey): Review index validation
-    return _slice.index(after: i)
+    _slice._base.index(after: i)
   }
 
   @inlinable
   public func formIndex(after i: inout Index) {
-    // TODO(lorentey): Review index validation
-    _slice.formIndex(after: &i)
+    _slice._base.formIndex(after: &i)
   }
 
   @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    // TODO(lorentey): Review index validation
-    return _slice.index(i, offsetBy: n)
+    _slice._base.index(i, offsetBy: n)
   }
 
   @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
-    // TODO(lorentey): Review index validation
-    return _slice.index(i, offsetBy: n, limitedBy: limit)
+    _slice._base.index(i, offsetBy: n, limitedBy: limit)
   }
 
   @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
-    // TODO(lorentey): Review index validation
-    return _slice.distance(from: start, to: end)
+    _slice._base.distance(from: start, to: end)
   }
 
   @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
-    // TODO(lorentey): Review index validation
-    _slice._failEarlyRangeCheck(index, bounds: bounds)
+    _slice._base._failEarlyRangeCheck(index, bounds: bounds)
   }
 
   @inlinable
   public func _failEarlyRangeCheck(
     _ range: Range<Index>, bounds: Range<Index>
   ) {
-    // TODO(lorentey): Review index validation
-    _slice._failEarlyRangeCheck(range, bounds: bounds)
+    _slice._base._failEarlyRangeCheck(range, bounds: bounds)
   }
 
   @inlinable
   public func index(before i: Index) -> Index {
-    // TODO(lorentey): Review index validation
-    return _slice.index(before: i)
+    _slice._base.index(before: i)
   }
 
   @inlinable
   public func formIndex(before i: inout Index) {
-    // TODO(lorentey): Review index validation
-    _slice.formIndex(before: &i)
+    _slice._base.formIndex(before: &i)
   }
 
-  @inlinable
   public subscript(r: Range<Index>) -> Substring.UnicodeScalarView {
-    // TODO(lorentey): Review index validation
-    _failEarlyRangeCheck(r, bounds: startIndex..<endIndex)
-    return Substring.UnicodeScalarView(_slice._base, _bounds: r)
+    // Note: This used to be inlinable until Swift 5.7
+    let r = _wholeGuts.validateScalarRange(r, from: startIndex, to: endIndex)
+    return Substring.UnicodeScalarView(_unchecked: _slice._base, bounds: r)
   }
 }
 
