@@ -405,47 +405,26 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok,
   return false;
 }
 
-static bool loadAndValidateVFSOverlay(
-    const std::string &File,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &BaseFS,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> &OverlayFS,
-    DiagnosticEngine &Diag) {
-  auto Buffer = BaseFS->getBufferForFile(File);
-  if (!Buffer) {
-    Diag.diagnose(SourceLoc(), diag::cannot_open_file, File,
-                         Buffer.getError().message());
-    return true;
-  }
-
-  auto VFS = llvm::vfs::getVFSFromYAML(std::move(Buffer.get()),
-                                        nullptr, File);
-  if (!VFS) {
-    Diag.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file, File);
-    return true;
-  }
-  OverlayFS->pushOverlay(std::move(VFS));
-  return false;
-}
-
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  auto BaseFS = SourceMgr.getFileSystem();
-  auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
-                    new llvm::vfs::OverlayFileSystem(BaseFS));
-  bool hadAnyFailure = false;
-  bool hasOverlays = false;
-  for (const auto &File : Invocation.getSearchPathOptions().VFSOverlayFiles) {
-    hasOverlays = true;
-    hadAnyFailure |=
-        loadAndValidateVFSOverlay(File, BaseFS, OverlayFS, Diagnostics);
+  auto ExpectedOverlay =
+      Invocation.getSearchPathOptions().makeOverlayFileSystem(
+          SourceMgr.getFileSystem());
+  if (!ExpectedOverlay) {
+    llvm::handleAllErrors(
+        ExpectedOverlay.takeError(), [&](const llvm::FileError &FE) {
+          if (FE.convertToErrorCode() == std::errc::no_such_file_or_directory) {
+            Diagnostics.diagnose(SourceLoc(), diag::cannot_open_file,
+                                 FE.getFileName(), FE.messageWithoutFileInfo());
+          } else {
+            Diagnostics.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file,
+                                 FE.getFileName());
+          }
+        });
+    return true;
   }
 
-  // If we successfully loaded all the overlays, let the source manager and
-  // diagnostic engine take advantage of the overlay file system.
-  if (!hadAnyFailure && hasOverlays) {
-    SourceMgr.setFileSystem(OverlayFS);
-  }
-
-  return hadAnyFailure;
+  SourceMgr.setFileSystem(*ExpectedOverlay);
+  return false;
 }
 
 void CompilerInstance::setUpLLVMArguments() {
