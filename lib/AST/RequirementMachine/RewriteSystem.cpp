@@ -610,46 +610,58 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 /// emit warnings for in the source code.
 void RewriteSystem::computeRedundantRequirementDiagnostics(
     SmallVectorImpl<RequirementError> &errors) {
-  // Map redundant rule IDs to their rewrite path for easy access
-  // in the `isRedundantRule` lambda.
-  llvm::SmallDenseMap<unsigned, RewritePath> redundantRules;
-  for (auto &pair : RedundantRules)
-    redundantRules[pair.first] = pair.second;
-
   // Collect all rule IDs for each unique requirement ID.
-  llvm::SmallDenseMap<unsigned, llvm::SmallDenseSet<unsigned, 2>>
+  llvm::SmallDenseMap<unsigned, llvm::SmallVector<unsigned, 2>>
       rulesPerRequirement;
 
   // Collect non-explicit requirements that are not redundant.
-  llvm::SmallDenseSet<unsigned, 2> impliedRequirements;
+  llvm::SmallDenseSet<unsigned, 2> nonExplicitNonRedundantRules;
 
   for (unsigned ruleID = FirstLocalRule, e = Rules.size();
        ruleID < e; ++ruleID) {
     auto &rule = getRules()[ruleID];
 
-    if (!rule.getRequirementID().hasValue() &&
-        !rule.isPermanent() && !rule.isRedundant() &&
-        isInMinimizationDomain(rule.getLHS().getRootProtocol()))
-      impliedRequirements.insert(ruleID);
-
-    auto requirementID = rule.getRequirementID();
-    if (!requirementID.hasValue())
+    if (rule.isPermanent())
       continue;
 
-    rulesPerRequirement[*requirementID].insert(ruleID);
+    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
+      continue;
+
+    auto requirementID = rule.getRequirementID();
+
+    if (!requirementID.hasValue()) {
+      if (!rule.isRedundant())
+        nonExplicitNonRedundantRules.insert(ruleID);
+
+      continue;
+    }
+
+    rulesPerRequirement[*requirementID].push_back(ruleID);
   }
 
-  auto isRedundantRule = [&](unsigned ruleID) {
-    auto &rule = getRules()[ruleID];
+  // Compute the set of redundant rules which transitively reference a
+  // non-explicit non-redundant rule. This updates nonExplicitNonRedundantRules.
+  //
+  // Since earlier redundant paths might reference rules which appear later in
+  // the list but not vice versa, walk the redundant paths in reverse order.
+  for (const auto &pair : llvm::reverse(RedundantRules)) {
+    // Pre-condition: the replacement path only references redundant rules
+    // which we have already seen. If any of those rules transitively reference
+    // a non-explicit, non-redundant rule, they have been inserted into the
+    // nonExplicitNonRedundantRules set on previous iterations.
+    unsigned ruleID = pair.first;
+    const auto &rewritePath = pair.second;
 
-    // If this rule is replaced using a non-explicit,
-    // non-redundant rule, it's not redundant.
-    auto rewritePath = redundantRules[ruleID];
+    // Check if this rewrite path references a rule that is already known to
+    // either be non-explicit and non-redundant, or reference such a rule via
+    // it's redundancy path.
     for (auto step : rewritePath) {
       switch (step.Kind) {
       case RewriteStep::Rule: {
-        if (impliedRequirements.count(step.getRuleID()))
-          return false;
+        if (nonExplicitNonRedundantRules.count(step.getRuleID())) {
+          nonExplicitNonRedundantRules.insert(ruleID);
+          continue;
+        }
 
         break;
       }
@@ -665,20 +677,37 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
       }
     }
 
-    return rule.isRedundant();
+    // Post-condition: If the current replacement path transitively references
+    // any non-explicit, non-redundant rules, then nonExplicitNonRedundantRules
+    // contains the current rule.
+  }
+
+  // We diagnose a redundancy if the rule is redundant, and if its replacement
+  // path does not transitively involve any non-explicit, non-redundant rules.
+  auto isRedundantRule = [&](unsigned ruleID) {
+    const auto &rule = getRules()[ruleID];
+
+    return (rule.isRedundant() &&
+            nonExplicitNonRedundantRules.count(ruleID) == 0);
   };
 
+  // Finally walk through the written requirements, diagnosing any that are
+  // redundant.
   for (auto requirementID : indices(WrittenRequirements)) {
     auto requirement = WrittenRequirements[requirementID];
-    auto pairIt = rulesPerRequirement.find(requirementID);
 
     // Inferred requirements can be re-stated without warning.
     if (requirement.inferred)
       continue;
 
-    // If there are no rules for this structural requirement, then
-    // the requirement was never added to the rewrite system because
-    // it is trivially redundant.
+    auto pairIt = rulesPerRequirement.find(requirementID);
+
+    // If there are no rules for this structural requirement, then the
+    // requirement is unnecessary in the source code.
+    //
+    // This means the requirement was determined to be vacuous by
+    // requirement lowering and produced no rules, or the rewrite rules were
+    // trivially simplified by RewriteSystem::addRule().
     if (pairIt == rulesPerRequirement.end()) {
       errors.push_back(
           RequirementError::forRedundantRequirement(requirement.req,
@@ -688,7 +717,7 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
 
     // If all rules derived from this structural requirement are redundant,
     // then the requirement is unnecessary in the source code.
-    auto ruleIDs = pairIt->second;
+    const auto &ruleIDs = pairIt->second;
     if (llvm::all_of(ruleIDs, isRedundantRule)) {
       auto requirement = WrittenRequirements[requirementID];
       errors.push_back(
