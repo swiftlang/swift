@@ -468,6 +468,11 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     if (!ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments)
       return Type();
 
+    // Caller-side defaults are always type-checked based on the concrete
+    // type of the argument deduced at a particular call site.
+    if (isa<MagicIdentifierLiteralExpr>(defaultValue))
+      return Type();
+
     // Parameter type doesn't have any generic parameters mentioned
     // in it, so there is nothing to infer.
     if (!paramInterfaceTy->hasTypeParameter())
