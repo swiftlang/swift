@@ -237,6 +237,24 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       requirements.push_back({req, SourceLoc(), /*inferred=*/false});
   }
 
+  if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+    rewriteCtx.beginTimer("RequirementSignatureRequest");
+    llvm::dbgs() << "[";
+    for (auto *proto : component)
+      llvm::dbgs() << " " << proto->getName();
+    llvm::dbgs() << " ]\n";
+  }
+
+  SWIFT_DEFER {
+    if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+      rewriteCtx.endTimer("RequirementSignatureRequest");
+      llvm::dbgs() << "[";
+      for (auto *proto : component)
+        llvm::dbgs() << " " << proto->getName();
+      llvm::dbgs() << " ]\n";
+    }
+  };
+
   unsigned attempt = 0;
   for (;;) {
     // Heap-allocate the requirement machine to save stack space.
@@ -501,12 +519,19 @@ AbstractGenericSignatureRequestRQM::evaluate(
       requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
   }
 
+  auto &rewriteCtx = ctx.getRewriteContext();
+
+  if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+    rewriteCtx.beginTimer("AbstractGenericSignatureRequest");
+    llvm::dbgs() << "\n";
+  }
+
   // Preprocess requirements to eliminate conformances on generic parameters
   // which are made concrete.
   if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
     SmallVector<StructuralRequirement, 4> contractedRequirements;
     if (performConcreteContraction(requirements, contractedRequirements,
-                                   ctx.getRewriteContext().getDebugOptions()
+                                   rewriteCtx.getDebugOptions()
                                       .contains(DebugFlags::ConcreteContraction))) {
       std::swap(contractedRequirements, requirements);
     }
@@ -516,7 +541,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
   for (;;) {
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
-        ctx.getRewriteContext()));
+        rewriteCtx));
 
     auto status =
         machine->initWithWrittenRequirements(genericParams, requirements);
@@ -545,6 +570,11 @@ AbstractGenericSignatureRequestRQM::evaluate(
 
       // Check invariants.
       result.verify();
+    }
+
+    if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+      rewriteCtx.endTimer("AbstractGenericSignatureRequest");
+      llvm::dbgs() << result << "\n";
     }
 
     return GenericSignatureWithError(result, errorFlags);
@@ -648,12 +678,23 @@ InferredGenericSignatureRequestRQM::evaluate(
   for (const auto &req : addedRequirements)
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/true});
 
+  auto &rewriteCtx = ctx.getRewriteContext();
+
+  if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+    rewriteCtx.beginTimer("InferredGenericSignatureRequest");
+
+    llvm::dbgs() << "@ ";
+    auto &sourceMgr = ctx.SourceMgr;
+    loc.print(llvm::dbgs(), sourceMgr);
+    llvm::dbgs() << "\n";
+  }
+
   // Preprocess requirements to eliminate conformances on generic parameters
   // which are made concrete.
   if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
     SmallVector<StructuralRequirement, 4> contractedRequirements;
     if (performConcreteContraction(requirements, contractedRequirements,
-                                   ctx.getRewriteContext().getDebugOptions()
+                                   rewriteCtx.getDebugOptions()
                                       .contains(DebugFlags::ConcreteContraction))) {
       std::swap(contractedRequirements, requirements);
     }
@@ -663,7 +704,7 @@ InferredGenericSignatureRequestRQM::evaluate(
   for (;;) {
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
-        ctx.getRewriteContext()));
+        rewriteCtx));
 
     auto status =
         machine->initWithWrittenRequirements(genericParams, requirements);
@@ -680,6 +721,12 @@ InferredGenericSignatureRequestRQM::evaluate(
 
       auto result = GenericSignature::get(genericParams,
                                           parentSig.getRequirements());
+
+      if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+        rewriteCtx.endTimer("InferredGenericSignatureRequest");
+        llvm::dbgs() << result << "\n";
+      }
+
       return GenericSignatureWithError(
           result, GenericSignatureErrorFlags::CompletionFailed);
     }
@@ -715,6 +762,11 @@ InferredGenericSignatureRequestRQM::evaluate(
 
       // Check invariants.
       result.verify();
+    }
+
+    if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+      rewriteCtx.endTimer("InferredGenericSignatureRequest");
+      llvm::dbgs() << result << "\n";
     }
 
     return GenericSignatureWithError(result, errorFlags);

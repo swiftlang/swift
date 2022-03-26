@@ -116,6 +116,10 @@ class RewriteContext final {
   /// ProtocolNode.
   llvm::DenseMap<unsigned, ProtocolComponent> Components;
 
+  /// The stack of timers for performance analysis. See beginTimer() and
+  /// endTimer().
+  llvm::SmallVector<uint64_t, 2> Timers;
+
   ASTContext &Context;
 
   DebugOptions Debug;
@@ -148,6 +152,10 @@ public:
   DebugOptions getDebugOptions() const { return Debug; }
 
   ASTContext &getASTContext() const { return Context; }
+
+  void beginTimer(StringRef name);
+
+  void endTimer(StringRef name);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
