@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
@@ -274,6 +275,8 @@ deriveComparable_lt(
     derived.ConformanceDecl->diagnose(diag::no_less_than_overload_for_int);
     return nullptr;
   }
+
+  addNonIsolatedToSynthesized(derived.Nominal, comparableDecl);
 
   comparableDecl->setBodySynthesizer(bodySynthesizer);
 
