@@ -98,6 +98,8 @@ RequirementMachine::initWithProtocolSignatureRequirements(
 
   auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
 
+  freeze();
+
   if (Dump) {
     llvm::dbgs() << "}\n";
   }
@@ -144,6 +146,8 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
                     std::move(builder.RequirementRules));
 
   auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+
+  freeze();
 
   if (Dump) {
     llvm::dbgs() << "}\n";
