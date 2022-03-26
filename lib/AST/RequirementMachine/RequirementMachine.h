@@ -113,6 +113,8 @@ class RequirementMachine final {
   std::pair<CompletionResult, unsigned>
   computeCompletion(RewriteSystem::ValidityPolicy policy);
 
+  void freeze();
+
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
   void buildRequirementsFromRules(
@@ -159,8 +161,8 @@ public:
   llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
   computeMinimalProtocolRequirements();
 
-  std::vector<Requirement>
-  computeMinimalGenericSignatureRequirements(bool reconstituteSugar);
+  GenericSignature
+  computeMinimalGenericSignature(bool reconstituteSugar);
 
   ArrayRef<Rule> getLocalRules() const;
 

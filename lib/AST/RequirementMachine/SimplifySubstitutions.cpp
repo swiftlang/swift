@@ -259,8 +259,15 @@ void RewriteSystem::processTypeDifference(const TypeDifference &difference,
   // the same rewrite loop in concretelySimplifyLeftHandSideSubstitutions().
   auto &lhsRule = getRule(lhsRuleID);
   if (lhsRule.getRHS() == difference.BaseTerm &&
-      !lhsRule.isSubstitutionSimplified())
+      !lhsRule.isSubstitutionSimplified()) {
+    if (lhsRule.isFrozen()) {
+      llvm::errs() << "Frozen rule should already be subst-simplified: "
+                   << lhsRule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
     lhsRule.markSubstitutionSimplified();
+  }
 }
 
 /// Simplify terms appearing in the substitutions of the last symbol of \p term,

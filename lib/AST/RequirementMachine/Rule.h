@@ -77,6 +77,9 @@ class Rule final {
   /// dropped from the minimal set of requirements.
   unsigned Conflicting : 1;
 
+  /// Whether this rule is now finalized and immutable.
+  unsigned Frozen : 1;
+
 public:
   Rule(Term lhs, Term rhs)
       : LHS(lhs), RHS(rhs) {
@@ -87,6 +90,7 @@ public:
     SubstitutionSimplified = false;
     Redundant = false;
     Conflicting = false;
+    Frozen = false;
   }
 
   const Term &getLHS() const { return LHS; }
@@ -97,6 +101,7 @@ public:
   }
 
   void setRequirementID(Optional<unsigned> requirementID) {
+    assert(!Frozen);
     this->requirementID = requirementID;
   }
 
@@ -141,6 +146,10 @@ public:
     return Conflicting;
   }
 
+  bool isFrozen() const {
+    return Frozen;
+  }
+
   bool containsUnresolvedSymbols() const {
     return (LHS.containsUnresolvedSymbols() ||
             RHS.containsUnresolvedSymbols());
@@ -151,42 +160,55 @@ public:
   bool isDerivedFromConcreteProtocolTypeAliasRule() const;
 
   void markLHSSimplified() {
+    assert(!Frozen);
     assert(!LHSSimplified);
     LHSSimplified = true;
   }
 
   void markRHSSimplified() {
+    assert(!Frozen);
     assert(!RHSSimplified);
     RHSSimplified = true;
   }
 
   void markSubstitutionSimplified() {
+    assert(!Frozen);
     assert(!SubstitutionSimplified);
     SubstitutionSimplified = true;
   }
 
   void markPermanent() {
+    assert(!Frozen);
     assert(!Explicit && !Permanent &&
            "Permanent and explicit are mutually exclusive");
     Permanent = true;
   }
 
   void markExplicit() {
+    assert(!Frozen);
     assert(!Explicit && !Permanent &&
            "Permanent and explicit are mutually exclusive");
     Explicit = true;
   }
 
   void markRedundant() {
+    assert(!Frozen);
     assert(!Redundant);
     Redundant = true;
   }
 
   void markConflicting() {
+    assert(!Frozen);
     // It's okay to mark a rule as conflicting multiple times, but it must not
     // be a permanent rule.
     assert(!Permanent && "Permanent rule should not conflict with anything");
     Conflicting = true;
+  }
+
+  void freeze() {
+    Redundant = false;
+    requirementID = None;
+    Frozen = true;
   }
 
   unsigned getDepth() const;

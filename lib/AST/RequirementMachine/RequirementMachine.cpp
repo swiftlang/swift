@@ -332,6 +332,10 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
   return std::make_pair(CompletionResult::Success, 0);
 }
 
+void RequirementMachine::freeze() {
+  System.freeze();
+}
+
 std::string RequirementMachine::getRuleAsStringForDiagnostics(
     unsigned ruleID) const {
   const auto &rule = System.getRule(ruleID);
