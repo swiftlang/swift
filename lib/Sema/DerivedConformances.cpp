@@ -502,7 +502,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     property->getInterfaceType(), parentDC);
   getterDecl->setImplicit();
   getterDecl->setIsTransparent(false);
-
   getterDecl->copyFormalAccessFrom(property);
 
 
@@ -886,4 +885,19 @@ VarDecl *DerivedConformance::indexedVarDecl(char prefixChar, int index, Type typ
                                  varContext);
   varDecl->setInterfaceType(type);
   return varDecl;
+}
+
+bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
+  if (!getActorIsolation(nominal).isActorIsolated())
+    return false;
+
+  for (auto property : nominal->getStoredProperties()) {
+    if (!property->isUserAccessible())
+      continue;
+
+    if (!property->isLet())
+      return true;
+  }
+
+  return false;
 }

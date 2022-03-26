@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "llvm/ADT/STLExtras.h"
 #include "swift/AST/Decl.h"
@@ -1247,6 +1248,8 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
+  addNonIsolatedToSynthesized(derived.Nominal, encodeDecl);
+
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
@@ -1866,6 +1869,8 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
+  addNonIsolatedToSynthesized(derived.Nominal, initDecl);
+
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);
 
@@ -2041,6 +2046,12 @@ static bool canDeriveCodable(NominalTypeDecl *NTD,
   if (!PD) {
     return false;
   }
+
+  // Actor-isolated structs and classes cannot derive encodable/decodable
+  // unless all of their stored properties are immutable.
+  if ((isa<StructDecl>(NTD) || isa<ClassDecl>(NTD)) &&
+      memberwiseAccessorsRequireActorIsolation(NTD))
+    return false;
 
   return true;
 }
