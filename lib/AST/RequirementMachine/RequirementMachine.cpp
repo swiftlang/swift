@@ -90,13 +90,15 @@ RequirementMachine::initWithProtocolSignatureRequirements(
   builder.initWithProtocolSignatureRequirements(protos);
 
   // Add the initial set of rewrite rules to the rewrite system.
-  System.initialize(/*recordLoops=*/true, protos,
+  System.initialize(/*recordLoops=*/false, protos,
                     std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
   auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+
+  freeze();
 
   if (Dump) {
     llvm::dbgs() << "}\n";
@@ -144,6 +146,8 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
                     std::move(builder.RequirementRules));
 
   auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+
+  freeze();
 
   if (Dump) {
     llvm::dbgs() << "}\n";
@@ -332,6 +336,10 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
   return std::make_pair(CompletionResult::Success, 0);
 }
 
+void RequirementMachine::freeze() {
+  System.freeze();
+}
+
 std::string RequirementMachine::getRuleAsStringForDiagnostics(
     unsigned ruleID) const {
   const auto &rule = System.getRule(ruleID);
@@ -359,19 +367,18 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   out << "Requirement machine for ";
   if (Sig)
     out << Sig;
-  else if (!Params.empty()) {
-    out << "fresh signature <";
-    for (auto paramTy : Params)
-      out << " " << Type(paramTy);
-    out << " >";
-  } else {
+  else if (!System.getProtocols().empty()) {
     auto protos = System.getProtocols();
-    assert(!protos.empty());
     out << "protocols [";
     for (auto *proto : protos) {
       out << " " << proto->getName();
     }
     out << " ]";
+  } else {
+    out << "fresh signature <";
+    for (auto paramTy : Params)
+      out << " " << Type(paramTy);
+    out << " >";
   }
   out << "\n";
 

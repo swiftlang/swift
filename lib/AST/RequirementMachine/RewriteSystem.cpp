@@ -29,6 +29,7 @@ RewriteSystem::RewriteSystem(RewriteContext &ctx)
   Initialized = 0;
   Complete = 0;
   Minimized = 0;
+  Frozen = 0;
   RecordLoops = 0;
   LongestInitialRule = 0;
 }
@@ -170,9 +171,7 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 /// \p lhs to \p rhs.
 bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
                             const RewritePath *path) {
-  // FIXME:
-  // assert(!Complete || path != nullptr &&
-  //        "Rules added by completion must have a path");
+  assert(!Frozen);
 
   assert(!lhs.empty());
   assert(!rhs.empty());
@@ -332,10 +331,10 @@ void RewriteSystem::addRules(
     const auto &newRule = Rules[newRuleID];
     // Skip simplified rules. At the very least we need to skip RHS-simplified
     // rules since their left hand sides might duplicate existing rules; the
-    // others are skipped purely as an optimization.
+    // others are skipped purely as an optimization. We can't skip subst-
+    // simplified rules, since property map construction considers them.
     if (newRule.isLHSSimplified() ||
-        newRule.isRHSSimplified() ||
-        newRule.isSubstitutionSimplified())
+        newRule.isRHSSimplified())
       continue;
 
     auto oldRuleID = Trie.insert(newRule.getLHS().begin(),
@@ -494,6 +493,8 @@ bool RewriteSystem::isInMinimizationDomain(const ProtocolDecl *proto) const {
 
 void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
                                       RewritePath path) {
+  assert(!Frozen);
+
   RewriteLoop loop(basepoint, path);
   loop.verify(*this);
 
@@ -725,6 +726,30 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
                                                     requirement.loc));
     }
   }
+}
+
+/// Free up memory by purging unused data structures after completion
+/// (for a rewrite system built from a generic signature) or minimization
+/// (for a rewrite system built from user-written requirements).
+void RewriteSystem::freeze() {
+  assert(Complete);
+  assert(!Frozen);
+
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
+       ruleID < e; ++ruleID) {
+    getRule(ruleID).freeze();
+  }
+
+  WrittenRequirements.clear();
+  CheckedOverlaps.clear();
+  RelationMap.clear();
+  Relations.clear();
+  DifferenceMap.clear();
+  Differences.clear();
+  CheckedDifferences.clear();
+  Loops.clear();
+  RedundantRules.clear();
+  ConflictingRules.clear();
 }
 
 void RewriteSystem::dump(llvm::raw_ostream &out) const {

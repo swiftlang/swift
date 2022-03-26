@@ -471,6 +471,7 @@ void RewriteSystem::minimizeRewriteSystem() {
 
   assert(Complete);
   assert(!Minimized);
+  assert(!Frozen);
   Minimized = 1;
 
   propagateExplicitBits();
@@ -626,7 +627,7 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
 
   GenericSignatureErrors result;
 
-  for (const auto &rule : Rules) {
+  for (const auto &rule : getLocalRules()) {
     if (rule.isPermanent())
       continue;
 
@@ -636,10 +637,15 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
     if (!rule.isRedundant() &&
         !rule.isProtocolTypeAliasRule() &&
         rule.containsUnresolvedSymbols())
-      result |= GenericSignatureErrorFlags::HasUnresolvedType;
+      result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
     if (rule.isConflicting())
-      result |= GenericSignatureErrorFlags::HasConflict;
+      result |= GenericSignatureErrorFlags::HasInvalidRequirements;
+
+    if (!rule.isRedundant())
+      if (auto property = rule.isPropertyRule())
+        if (property->getKind() == Symbol::Kind::ConcreteConformance)
+          result |= GenericSignatureErrorFlags::HasConcreteConformances;
   }
 
   return result;
