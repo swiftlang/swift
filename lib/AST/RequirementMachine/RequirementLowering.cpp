@@ -712,7 +712,13 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
         if (assocTypes.contains(typeAliasDecl->getName()))
           continue;
 
+        // The structural type of a typealias will always be a TypeAliasType,
+        // so unwrap it to avoid a requirement that prints as 'Self.T == Self.T'
+        // in diagnostics.
         auto underlyingType = typeAliasDecl->getStructuralType();
+        if (auto *aliasType = dyn_cast<TypeAliasType>(underlyingType.getPointer()))
+          underlyingType = aliasType->getSinglyDesugaredType();
+
         if (underlyingType->is<UnboundGenericType>())
           continue;
 
