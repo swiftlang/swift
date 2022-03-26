@@ -367,8 +367,6 @@ private:
   void computeMinimalConformances(
       llvm::DenseSet<unsigned> &redundantConformances);
 
-  void normalizeRedundantRules();
-
 public:
   void recordRewriteLoop(MutableTerm basepoint,
                          RewritePath path);
