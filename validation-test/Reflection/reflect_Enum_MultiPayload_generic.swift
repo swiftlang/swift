@@ -33,31 +33,57 @@ reflect(object: ClassWithEnumDepth0<S>())
 // CHECK-NEXT: (bound_generic_class reflect_Enum_MultiPayload_generic.ClassWithEnumDepth0
 // CHECK-NEXT:   (struct reflect_Enum_MultiPayload_generic.S))
 
-// CHECK: Type info:
-// CHECK-NEXT: (class_instance size=41 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:   (field name=e offset=16
-// CHECK-NEXT:     (single_payload_enum size=25 alignment=8 stride=32 num_extra_inhabitants=253 bitwise_takable=1
-// CHECK-NEXT:       (case name=some index=0 offset=0
-// CHECK-NEXT:         (multi_payload_enum size=25 alignment=8 stride=32 num_extra_inhabitants=254 bitwise_takable=1
-// CHECK-NEXT:           (case name=t index=0 offset=0
-// CHECK-NEXT:             (struct size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:               (field name=a offset=0
-// CHECK-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:                   (field name=_value offset=0
-// CHECK-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-NEXT:               (field name=b offset=8
-// CHECK-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:                   (field name=_value offset=0
-// CHECK-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-NEXT:               (field name=c offset=16
-// CHECK-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:                   (field name=_value offset=0
-// CHECK-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
-// CHECK-NEXT:           (case name=u index=1 offset=0
-// CHECK-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:               (field name=_value offset=0
-// CHECK-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
-// CHECK-NEXT:       (case name=none index=1))))
+// X64: Type info:
+// X64-NEXT: (class_instance size=41 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:   (field name=e offset=16
+// X64-NEXT:     (single_payload_enum size=25 alignment=8 stride=32 num_extra_inhabitants=253 bitwise_takable=1
+// X64-NEXT:       (case name=some index=0 offset=0
+// X64-NEXT:         (multi_payload_enum size=25 alignment=8 stride=32 num_extra_inhabitants=254 bitwise_takable=1
+// X64-NEXT:           (case name=t index=0 offset=0
+// X64-NEXT:             (struct size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:               (field name=a offset=0
+// X64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:                   (field name=_value offset=0
+// X64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// X64-NEXT:               (field name=b offset=8
+// X64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:                   (field name=_value offset=0
+// X64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// X64-NEXT:               (field name=c offset=16
+// X64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:                   (field name=_value offset=0
+// X64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
+// X64-NEXT:           (case name=u index=1 offset=0
+// X64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:               (field name=_value offset=0
+// X64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
+// X64-NEXT:       (case name=none index=1))))
+
+// X32: Type info:
+// X32-NEXT: (class_instance size=21 alignment=4 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:   (field name=e offset=8
+// X32-NEXT:     (single_payload_enum size=13 alignment=4 stride=16 num_extra_inhabitants=253 bitwise_takable=1
+// X32-NEXT:       (case name=some index=0 offset=0
+// X32-NEXT:         (multi_payload_enum size=13 alignment=4 stride=16 num_extra_inhabitants=254 bitwise_takable=1
+// X32-NEXT:           (case name=t index=0 offset=0
+// X32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:               (field name=a offset=0
+// X32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:                   (field name=_value offset=0
+// X32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// X32-NEXT:               (field name=b offset=4
+// X32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:                   (field name=_value offset=0
+// X32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// X32-NEXT:               (field name=c offset=8
+// X32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:                   (field name=_value offset=0
+// X32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))))
+// X32-NEXT:           (case name=u index=1 offset=0
+// X32-NEXT:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:               (field name=_value offset=0
+// X32-NEXT:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))))
+// X32-NEXT:       (case name=none index=1))))
 
 
 class ClassWithEnumDepth1<T> {
@@ -76,31 +102,57 @@ reflect(object: ClassWithEnumDepth1<S>())
 // CHECK-NEXT: (bound_generic_class reflect_Enum_MultiPayload_generic.ClassWithEnumDepth1
 // CHECK-NEXT:   (struct reflect_Enum_MultiPayload_generic.S))
 
-// CHECK: Type info:
-// CHECK-NEXT: (class_instance size=41 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:   (field name=e offset=16
-// CHECK-NEXT:     (single_payload_enum size=25 alignment=8 stride=32 num_extra_inhabitants=253 bitwise_takable=1
-// CHECK-NEXT:       (case name=some index=0 offset=0
-// CHECK-NEXT:         (multi_payload_enum size=25 alignment=8 stride=32 num_extra_inhabitants=254 bitwise_takable=1
-// CHECK-NEXT:           (case name=t index=0 offset=0
-// CHECK-NEXT:             (struct size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:               (field name=a offset=0
-// CHECK-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:                   (field name=_value offset=0
-// CHECK-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-NEXT:               (field name=b offset=8
-// CHECK-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:                   (field name=_value offset=0
-// CHECK-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
-// CHECK-NEXT:               (field name=c offset=16
-// CHECK-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:                   (field name=_value offset=0
-// CHECK-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
-// CHECK-NEXT:           (case name=u index=1 offset=0
-// CHECK-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-NEXT:               (field name=_value offset=0
-// CHECK-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
-// CHECK-NEXT:       (case name=none index=1))))
+// X64: Type info:
+// X64-NEXT: (class_instance size=41 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:   (field name=e offset=16
+// X64-NEXT:     (single_payload_enum size=25 alignment=8 stride=32 num_extra_inhabitants=253 bitwise_takable=1
+// X64-NEXT:       (case name=some index=0 offset=0
+// X64-NEXT:         (multi_payload_enum size=25 alignment=8 stride=32 num_extra_inhabitants=254 bitwise_takable=1
+// X64-NEXT:           (case name=t index=0 offset=0
+// X64-NEXT:             (struct size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:               (field name=a offset=0
+// X64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:                   (field name=_value offset=0
+// X64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// X64-NEXT:               (field name=b offset=8
+// X64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:                   (field name=_value offset=0
+// X64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
+// X64-NEXT:               (field name=c offset=16
+// X64-NEXT:                 (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:                   (field name=_value offset=0
+// X64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
+// X64-NEXT:           (case name=u index=1 offset=0
+// X64-NEXT:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// X64-NEXT:               (field name=_value offset=0
+// X64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
+// X64-NEXT:       (case name=none index=1))))
+
+// X32: Type info:
+// X32-NEXT: (class_instance size=21 alignment=4 stride=24 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:   (field name=e offset=8
+// X32-NEXT:     (single_payload_enum size=13 alignment=4 stride=16 num_extra_inhabitants=253 bitwise_takable=1
+// X32-NEXT:       (case name=some index=0 offset=0
+// X32-NEXT:         (multi_payload_enum size=13 alignment=4 stride=16 num_extra_inhabitants=254 bitwise_takable=1
+// X32-NEXT:           (case name=t index=0 offset=0
+// X32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:               (field name=a offset=0
+// X32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:                   (field name=_value offset=0
+// X32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// X32-NEXT:               (field name=b offset=4
+// X32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:                   (field name=_value offset=0
+// X32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// X32-NEXT:               (field name=c offset=8
+// X32-NEXT:                 (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:                   (field name=_value offset=0
+// X32-NEXT:                     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))))
+// X32-NEXT:           (case name=u index=1 offset=0
+// X32-NEXT:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// X32-NEXT:               (field name=_value offset=0
+// X32-NEXT:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))))
+// X32-NEXT:       (case name=none index=1))))
 
 doneReflecting()
 
