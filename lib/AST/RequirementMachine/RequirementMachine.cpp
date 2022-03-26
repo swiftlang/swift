@@ -359,19 +359,18 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   out << "Requirement machine for ";
   if (Sig)
     out << Sig;
-  else if (!Params.empty()) {
-    out << "fresh signature <";
-    for (auto paramTy : Params)
-      out << " " << Type(paramTy);
-    out << " >";
-  } else {
+  else if (!System.getProtocols().empty()) {
     auto protos = System.getProtocols();
-    assert(!protos.empty());
     out << "protocols [";
     for (auto *proto : protos) {
       out << " " << proto->getName();
     }
     out << " ]";
+  } else {
+    out << "fresh signature <";
+    for (auto paramTy : Params)
+      out << " " << Type(paramTy);
+    out << " >";
   }
   out << "\n";
 
