@@ -442,6 +442,12 @@ public:
   static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
                                  DeclContext *varContext);
 };
+
+/// Determine whether any "memberwise" accessors, which walk through the
+/// stored properties of the given nominal type, require actor isolation
+/// because they involve mutable state.
+bool memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal);
+
 } // namespace swift
 
 #endif

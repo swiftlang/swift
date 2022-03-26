@@ -3554,11 +3554,11 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::Param:
   case DeclKind::Module:
   case DeclKind::Destructor:
+  case DeclKind::EnumCase:
+  case DeclKind::EnumElement:
     return None;
 
   case DeclKind::PatternBinding:
-  case DeclKind::EnumCase:
-  case DeclKind::EnumElement:
     return MemberIsolationPropagation::GlobalActor;
 
   case DeclKind::Constructor:
