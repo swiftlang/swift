@@ -753,28 +753,53 @@ public:
 
     // Wrap the Builtin.RawUnsafeContinuation in an
     // UnsafeContinuation<T, E>.
-    auto continuationDecl =
-        true ? SGF.getASTContext().getCheckedContinuationDecl()
-             : SGF.getASTContext().getUnsafeContinuationDecl();
-
+    auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
     auto errorTy = throws
       ? SGF.getASTContext().getErrorExistentialType()
       : SGF.getASTContext().getNeverType();
     auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
                                                 { calleeTypeInfo.substResultType, errorTy })
       ->getCanonicalType();
-    auto wrappedContinuation =
+    SILValue wrappedContinuation =
         SGF.B.createStruct(loc,
                            SILType::getPrimitiveObjectType(continuationTy),
                            {continuation});
+
+    bool checkedBridging = true;
+
+    // If checked bridging is enabled, wrap that continuation again in a
+    // CheckedContinuation<T, E>
+    if (checkedBridging) {
+      continuationDecl = SGF.getASTContext().getCheckedContinuationDecl();
+      continuationTy = BoundGenericType::get(continuationDecl, Type(),
+                                                  { calleeTypeInfo.substResultType, errorTy })
+        ->getCanonicalType();
+    }
 
     // Stash it in a buffer for a block object.
     auto blockStorageTy = SILType::getPrimitiveAddressType(
         SILBlockStorageType::get(continuationTy));
     auto blockStorage = SGF.emitTemporaryAllocation(loc, blockStorageTy);
     auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
-    SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
+
+    if (checkedBridging) {
+      auto createIntrinsic = throws
+        ? SGF.SGM.getCreateCheckedThrowingContinuation()
+        : SGF.SGM.getCreateCheckedContinuation();
+
+      auto subs = SubstitutionMap::get(createIntrinsic->getGenericSignature(),
+                                       {calleeTypeInfo.substResultType},
+                                       ArrayRef<ProtocolConformanceRef>{});
+
+      auto continuationMV = ManagedValue::forUnmanaged(wrappedContinuation);
+      SGF.emitApplyOfLibraryIntrinsic(
+          loc, createIntrinsic, subs, {continuationMV}, SGFContext())
+        .assignInto(SGF, loc, continuationAddr);
+
+    } else {
+      SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
                       StoreOwnershipQualifier::Trivial);
+    }
 
     // Get the block invocation function for the given completion block type.
     auto completionHandlerIndex = calleeTypeInfo.foreign.async

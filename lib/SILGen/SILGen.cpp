@@ -467,6 +467,18 @@ SILGenModule::getCheckExpectedExecutor() {
 }
 
 FuncDecl *
+SILGenModule::getCreateCheckedContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    CreateCheckedContinuation,
+                                    "_createCheckedContinuation");
+}
+FuncDecl *
+SILGenModule::getCreateCheckedThrowingContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    CreateCheckedThrowingContinuation,
+                                    "_createCheckedThrowingContinuation");
+}
+FuncDecl *
 SILGenModule::getResumeCheckedContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
                                     ResumeCheckedContinuation,

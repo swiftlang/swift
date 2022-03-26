@@ -332,7 +332,23 @@ public func withCheckedThrowingContinuation<T>(
 
 #if _runtime(_ObjC)
 
-// Intrinsics used by SILGen to resume or fail checked continuations.
+// Intrinsics used by SILGen to create, resume, or fail checked continuations.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+internal func _createCheckedContinuation<T>(
+  _ continuation: __owned UnsafeContinuation<T, Never>
+) -> CheckedContinuation<T, Never> {
+  return CheckedContinuation(continuation: continuation)
+}
+
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+internal func _createCheckedThrowingContinuation<T>(
+  _ continuation: __owned UnsafeContinuation<T, Error>
+) -> CheckedContinuation<T, Error> {
+  return CheckedContinuation(continuation: continuation)
+}
+
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 internal func _resumeCheckedContinuation<T>(
