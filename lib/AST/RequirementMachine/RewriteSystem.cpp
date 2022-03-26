@@ -332,10 +332,10 @@ void RewriteSystem::addRules(
     const auto &newRule = Rules[newRuleID];
     // Skip simplified rules. At the very least we need to skip RHS-simplified
     // rules since their left hand sides might duplicate existing rules; the
-    // others are skipped purely as an optimization.
+    // others are skipped purely as an optimization. We can't skip subst-
+    // simplified rules, since property map construction considers them.
     if (newRule.isLHSSimplified() ||
-        newRule.isRHSSimplified() ||
-        newRule.isSubstitutionSimplified())
+        newRule.isRHSSimplified())
       continue;
 
     auto oldRuleID = Trie.insert(newRule.getLHS().begin(),
