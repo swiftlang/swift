@@ -116,6 +116,10 @@ class RewriteContext final {
   /// ProtocolNode.
   llvm::DenseMap<unsigned, ProtocolComponent> Components;
 
+  /// The stack of timers for performance analysis. See beginTimer() and
+  /// endTimer().
+  llvm::SmallVector<uint64_t, 2> Timers;
+
   ASTContext &Context;
 
   DebugOptions Debug;
@@ -148,6 +152,10 @@ public:
   DebugOptions getDebugOptions() const { return Debug; }
 
   ASTContext &getASTContext() const { return Context; }
+
+  void beginTimer(StringRef name);
+
+  void endTimer(StringRef name);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -198,6 +206,9 @@ public:
   RequirementMachine *getRequirementMachine(CanGenericSignature sig);
   bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);
 
+  void installRequirementMachine(CanGenericSignature sig,
+                                 std::unique_ptr<RequirementMachine> machine);
+
   ArrayRef<const ProtocolDecl *>
   startComputingRequirementSignatures(const ProtocolDecl *proto);
 
@@ -205,6 +216,9 @@ public:
 
   RequirementMachine *getRequirementMachine(const ProtocolDecl *proto);
   bool isRecursivelyConstructingRequirementMachine(const ProtocolDecl *proto);
+
+  void installRequirementMachine(const ProtocolDecl *proto,
+                                 std::unique_ptr<RequirementMachine> machine);
 
   ~RewriteContext();
 };

@@ -11,7 +11,7 @@ func foo<T : Generic<U>, U>(_: T, _: U) {
   _ = U.self
 }
 
-// CHECK-LABEL: Requirement machine for <τ_0_0, τ_0_1 where τ_0_0 : Generic<τ_0_1>>
+// CHECK: Requirement machine for fresh signature < T U >
 // CHECK-NEXT: Rewrite system: {
 // CHECK-NEXT: - τ_0_0.[superclass: Generic<τ_0_1>] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[layout: AnyObject] => τ_0_0

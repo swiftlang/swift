@@ -102,6 +102,10 @@ class RewriteSystem final {
   /// Whether we've minimized the rewrite system.
   unsigned Minimized : 1;
 
+  /// Whether the rewrite system is finalized, immutable, and ready for
+  /// generic signature queries.
+  unsigned Frozen : 1;
+
   /// If set, the completion procedure records rewrite loops describing the
   /// identities among rewrite rules discovered while resolving critical pairs.
   unsigned RecordLoops : 1;
@@ -403,6 +407,8 @@ private:
       const llvm::DenseSet<unsigned> &redundantConformances) const;
 
 public:
+  void freeze();
+
   void dump(llvm::raw_ostream &out) const;
 };
 

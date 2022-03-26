@@ -287,6 +287,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
                                           unsigned maxRuleLength) {
   assert(Initialized);
   assert(!Minimized);
+  assert(!Frozen);
 
   // Complete might already be set, if we're re-running completion after
   // adding new rules in the property map's concrete type unification procedure.
