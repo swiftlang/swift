@@ -90,7 +90,7 @@ RequirementMachine::initWithProtocolSignatureRequirements(
   builder.initWithProtocolSignatureRequirements(protos);
 
   // Add the initial set of rewrite rules to the rewrite system.
-  System.initialize(/*recordLoops=*/true, protos,
+  System.initialize(/*recordLoops=*/false, protos,
                     std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
