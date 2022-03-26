@@ -167,3 +167,11 @@ func main() {
   takesRectangle(.init())
   // expected-error@-1 {{cannot convert default value of type 'Rectangle' to expected argument type 'Circle' for parameter #0}}
 }
+
+func test_magic_defaults() {
+  func with_magic(_: Int = #function) {} // expected-error {{default argument value of type 'String' cannot be converted to type 'Int'}}
+  func generic_with_magic<T>(_: T = #line) -> T {} // expected-error {{default argument value of type 'Int' cannot be converted to type 'T'}}
+
+  let _ = with_magic()
+  let _: String = generic_with_magic()
+}
