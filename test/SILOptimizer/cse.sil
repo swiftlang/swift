@@ -865,32 +865,6 @@ bb0(%0 : $B):
   return %3 : $()
 }
 
-// CHECK-LABEL:   sil @cse_thin_function_to_pointer
-// CHECK:           [[REF:%[0-9]+]] = thin_function_to_pointer
-// CHECK-NOT:       thin_function_to_pointer
-// CHECK:           tuple ([[REF]] : $Builtin.RawPointer, [[REF]] : $Builtin.RawPointer)
-// CHECK-NEXT:      return
-sil @cse_thin_function_to_pointer : $@convention(thin) (@convention(thin) () -> ()) -> (Builtin.RawPointer, Builtin.RawPointer) {
-bb0(%0 : $@convention(thin) () -> ()):
-  %1 = thin_function_to_pointer %0 : $@convention(thin) () -> () to $Builtin.RawPointer
-  %2 = thin_function_to_pointer %0 : $@convention(thin) () -> () to $Builtin.RawPointer
-  %3 = tuple (%1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer)
-  return %3 : $(Builtin.RawPointer, Builtin.RawPointer)
-}
-
-// CHECK-LABEL:   sil @cse_pointer_to_thin_function
-// CHECK:           [[REF:%[0-9]+]] = pointer_to_thin_function
-// CHECK-NOT:       pointer_to_thin_function
-// CHECK:           tuple ([[REF]] : $@convention(thin) () -> (), [[REF]] : $@convention(thin) () -> ())
-// CHECK-NEXT:      return
-sil @cse_pointer_to_thin_function : $@convention(thin) (Builtin.RawPointer) -> (@convention(thin) () -> (), @convention(thin) () -> ()) {
-bb0(%0 : $Builtin.RawPointer):
-  %1 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@convention(thin) () -> ()
-  %2 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@convention(thin) () -> ()
-  %3 = tuple(%1 : $@convention(thin) () -> (), %2 : $@convention(thin) () -> ())
-  return %3 : $(@convention(thin) () -> (), @convention(thin) () -> ())
-}
-
 sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
 
 // CHECK-LABEL:   sil @dont_cse_get_count_on_low_level_sil
