@@ -24,6 +24,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
+#include "llvm/ADT/ArrayRef.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -55,6 +56,10 @@ enum {
 
   /// The number of words in an AsyncLet (flags + child task context & allocation)
   NumWords_AsyncLet = 80, // 640 bytes ought to be enough for anyone
+
+  /// The maximum number of generic parameters that can be
+  /// implicitly declared, for generic signatures that support that.
+  MaxNumImplicitGenericParamDescriptors = 64,
 };
 
 struct InProcess;
@@ -1652,7 +1657,39 @@ public:
   constexpr uint8_t getIntValue() const {
     return Value;
   }
+
+  friend bool operator==(GenericParamDescriptor lhs,
+                         GenericParamDescriptor rhs) {
+    return lhs.getIntValue() == rhs.getIntValue();
+  }
+  friend bool operator!=(GenericParamDescriptor lhs,
+                         GenericParamDescriptor rhs) {
+    return !(lhs == rhs);
+  }
+
+  /// The default parameter descriptor for an implicit parameter.
+  static constexpr GenericParamDescriptor implicit() {
+    return GenericParamDescriptor(GenericParamKind::Type,
+                                  /*key argument*/ true,
+                                  /*extra argument*/ false);
+  }
 };
+
+/// Can the given generic parameter array be implicit, for places in
+/// the ABI which support that?
+inline bool canGenericParamsBeImplicit(
+                            llvm::ArrayRef<GenericParamDescriptor> params) {
+  // If there are more parameters than the maximum, they cannot be implicit.
+  if (params.size() > MaxNumImplicitGenericParamDescriptors)
+    return false;
+
+  // If any parameter is not the implicit pattern, they cannot be implicit.
+  for (auto param : params)
+    if (param != GenericParamDescriptor::implicit())
+      return false;
+
+  return true;
+}
 
 enum class GenericRequirementKind : uint8_t {
   /// A protocol requirement.
