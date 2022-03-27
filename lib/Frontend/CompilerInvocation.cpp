@@ -1001,6 +1001,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_requirement_machine_loop_normalization))
     Opts.EnableRequirementMachineLoopNormalization = false;
 
+  if (Args.hasArg(OPT_disable_requirement_machine_reuse))
+    Opts.EnableRequirementMachineReuse = false;
+
   if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
     Opts.EnableRequirementMachineOpaqueArchetypes = true;
 

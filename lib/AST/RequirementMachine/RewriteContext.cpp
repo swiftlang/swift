@@ -201,13 +201,15 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
 void RewriteContext::installRequirementMachine(
     CanGenericSignature sig,
     std::unique_ptr<RequirementMachine> machine) {
-  auto *machinePtr = machine.release();
+  if (!Context.LangOpts.EnableRequirementMachineReuse)
+    return;
 
-  machinePtr->freeze();
+  auto &entry = Machines[sig];
+  if (entry != nullptr)
+    return;
 
-  auto inserted = Machines.insert(std::make_pair(sig, machinePtr)).second;
-  if (!inserted)
-    delete machinePtr;
+  machine->freeze();
+  entry = machine.release();
 }
 
 /// Implement Tarjan's algorithm to compute strongly-connected components in
@@ -455,22 +457,22 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
           !component->second.ComputedRequirementSignatures);
 }
 
-/// Given a reuirement machine that built the requirement signatures for a
+/// Given a requirement machine that built the requirement signatures for a
 /// protocol connected component, attempt to re-use it for subsequent
 /// queries against the connected component, instead of building a new one
 /// later.
 void RewriteContext::installRequirementMachine(
     const ProtocolDecl *proto,
     std::unique_ptr<RequirementMachine> machine) {
-  auto *machinePtr = machine.release();
-
-  machinePtr->freeze();
+  if (!Context.LangOpts.EnableRequirementMachineReuse)
+    return;
 
   auto &component = getProtocolComponentImpl(proto);
-  if (component.Machine == nullptr)
-    component.Machine = machinePtr;
-  else
-    delete machinePtr;
+  if (component.Machine != nullptr)
+    return;
+
+  machine->freeze();
+  component.Machine = machine.release();
 }
 
 /// We print stats in the destructor, which should get executed at the end of
