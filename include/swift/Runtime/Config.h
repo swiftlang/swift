@@ -295,6 +295,9 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_objc_superclass                                        \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             swift::SpecialPointerAuthDiscriminators::ObjCSuperclass)
+#define __ptrauth_swift_nonunique_extended_existential_type_shape                        \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape)
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer)         \
   ptrauth_auth_and_resign(__fn, ptrauth_key_function_pointer, 0,               \
                           ptrauth_key_process_independent_code,                \
@@ -327,6 +330,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_runtime_function_entry_strip(__fn) (__fn)
 #define __ptrauth_swift_heap_object_destructor
 #define __ptrauth_swift_type_descriptor
+#define __ptrauth_swift_nonunique_extended_existential_type_shape
 #define __ptrauth_swift_dynamic_replacement_key
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer) (__fn)
 #define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer) (__fn)
