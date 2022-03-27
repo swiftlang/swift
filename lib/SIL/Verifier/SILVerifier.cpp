@@ -4417,34 +4417,6 @@ public:
     }
   }
 
-  void checkThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
-    auto opTI = requireObjectType(SILFunctionType, CI->getOperand(),
-                                  "thin_function_to_pointer operand");
-    requireObjectType(BuiltinRawPointerType, CI,
-                      "thin_function_to_pointer result");
-
-    auto rep = opTI->getRepresentation();
-    require(rep == SILFunctionTypeRepresentation::Thin ||
-            rep == SILFunctionTypeRepresentation::Method ||
-            rep == SILFunctionTypeRepresentation::WitnessMethod,
-            "thin_function_to_pointer only works on thin, method or "
-            "witness_method functions");
-  }
-
-  void checkPointerToThinFunctionInst(PointerToThinFunctionInst *CI) {
-    auto resultTI = requireObjectType(SILFunctionType, CI,
-                                      "pointer_to_thin_function result");
-    requireObjectType(BuiltinRawPointerType, CI->getOperand(),
-                      "pointer_to_thin_function operand");
-
-    auto rep = resultTI->getRepresentation();
-    require(rep == SILFunctionTypeRepresentation::Thin ||
-            rep == SILFunctionTypeRepresentation::Method ||
-            rep == SILFunctionTypeRepresentation::WitnessMethod,
-            "pointer_to_thin_function only works on thin, method or "
-            "witness_method functions");
-  }
-
   void checkCondFailInst(CondFailInst *CFI) {
     requireSameType(CFI->getOperand()->getType(),
                     SILType::getBuiltinIntegerType(1, F.getASTContext()),

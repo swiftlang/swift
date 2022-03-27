@@ -1060,18 +1060,6 @@ public:
         lifetimeGuaranteed));
   }
 
-  ThinFunctionToPointerInst *
-  createThinFunctionToPointer(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (getModule()) ThinFunctionToPointerInst(
-        getSILDebugLocation(Loc), Op, Ty));
-  }
-
-  PointerToThinFunctionInst *
-  createPointerToThinFunction(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(PointerToThinFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction()));
-  }
-
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty) {
     return createUpcast(Loc, Op, Ty, Op.getOwnershipKind());
   }

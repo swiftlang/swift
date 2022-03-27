@@ -64,20 +64,3 @@ entry(%x : $*X):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @test_function_to_pointer(i8* %0)
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    ret i8* %0
-sil @test_function_to_pointer : $@convention(thin) (@convention(thin) () -> ()) -> Builtin.RawPointer {
-bb0(%0 : $@convention(thin) () -> ()):
-  %1 = thin_function_to_pointer %0 : $@convention(thin) () -> () to $Builtin.RawPointer
-  return %1 : $Builtin.RawPointer
-}
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @test_pointer_to_function(i8* %0)
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    ret i8* %0
-sil @test_pointer_to_function : $@convention(thin) (Builtin.RawPointer) -> @convention(thin) () -> () {
-bb0(%0 : $Builtin.RawPointer):
-  %1 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@convention(thin) () -> ()
-  return %1 : $@convention(thin) () -> ()
-}

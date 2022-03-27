@@ -155,7 +155,6 @@
                     "unowned_to_ref" "ref_to_unowned"
                     "convert_function" "convert_escape_to_noescape"
                     "ref_to_unmanaged" "unmanaged_to_ref"
-                    "thin_function_to_pointer" "pointer_to_thin_function"
                     "ref_to_bridge_object"
                     "bridge_object_to_word" "bridge_object_to_ref"
                     "thin_to_thick_function"
