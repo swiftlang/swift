@@ -368,6 +368,9 @@ def disable_requirement_machine_concrete_contraction : Flag<["-"], "disable-requ
 def disable_requirement_machine_loop_normalization : Flag<["-"], "disable-requirement-machine-loop-normalization">,
   HelpText<"Disable stronger minimization algorithm, for debugging only">;
 
+def disable_requirement_machine_reuse : Flag<["-"], "disable-requirement-machine-reuse">,
+  HelpText<"Disable re-use of requirement machines for minimization, for debugging only">;
+
 def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
   HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
 

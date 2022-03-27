@@ -549,6 +549,10 @@ namespace swift {
     /// enabled. It can be disabled for debugging and testing.
     bool EnableRequirementMachineLoopNormalization = true;
 
+    /// Enable reuse of requirement machines for minimization. Usually you want
+    /// this enabled. It can be disabled for debugging and testing.
+    bool EnableRequirementMachineReuse = true;
+
     /// Enable experimental, more correct support for opaque result types as
     /// concrete types. This will sometimes fail to produce a convergent
     /// rewrite system.
