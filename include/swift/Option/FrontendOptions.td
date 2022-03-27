@@ -365,8 +365,8 @@ def disable_requirement_machine_concrete_contraction : Flag<["-"], "disable-requ
   HelpText<"Disable preprocessing pass to eliminate conformance requirements "
            "on generic parameters which are made concrete">;
 
-def enable_requirement_machine_loop_normalization : Flag<["-"], "enable-requirement-machine-loop-normalization">,
-  HelpText<"Enable stronger minimization algorithm, for debugging only">;
+def disable_requirement_machine_loop_normalization : Flag<["-"], "disable-requirement-machine-loop-normalization">,
+  HelpText<"Disable stronger minimization algorithm, for debugging only">;
 
 def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
   HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
