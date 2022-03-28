@@ -184,6 +184,13 @@ public:
 using GenericRequirementDescriptor =
   TargetGenericRequirementDescriptor<InProcess>;
 
+/// An array of generic parameter descriptors, all
+/// GenericParamDescriptor::implicit(), which is by far
+/// the most common case.  Some generic context storage can
+/// avoid storing descriptors when they all match this pattern.
+extern const GenericParamDescriptor
+ImplicitGenericParamDescriptors[MaxNumImplicitGenericParamDescriptors];
+
 /// A runtime description of a generic signature.
 class RuntimeGenericSignature {
   GenericContextDescriptorHeader Header;
