@@ -39,7 +39,8 @@ struct ConcreteNestedConformsInfer: NestedConforms {
     func foo(_: ConcreteConforms) {}
 }
 struct BadConcreteNestedConforms: NestedConforms {
-    // expected-error@-1 {{type 'ConcreteConformsNonFoo2.T' (aka 'Float') does not conform to protocol 'Foo2'}}
+// expected-error@-1 {{type 'BadConcreteNestedConforms' does not conform to protocol 'NestedConforms'}}
+// expected-error@-2 {{type 'ConcreteConformsNonFoo2.T' (aka 'Float') does not conform to protocol 'Foo2'}}
     typealias U = ConcreteConformsNonFoo2
 }
 struct BadConcreteNestedConformsInfer: NestedConforms {
@@ -71,8 +72,10 @@ func needsNestedSameType<X: NestedSameType>(_: X.Type) {
     needsSameType(X.U.T.self, Int.self)
 }
 struct BadConcreteNestedSameType: NestedSameType {
-    // expected-error@-1 {{'NestedSameType' requires the types 'ConcreteConformsNonFoo2.T' (aka 'Float') and 'Int' be equivalent}}
-    // expected-note@-2 {{requirement specified as 'Self.U.T' == 'Int' [with Self = BadConcreteNestedSameType]}}
+// expected-error@-1 {{type 'BadConcreteNestedSameType' does not conform to protocol 'NestedSameType'}}
+// expected-error@-2 {{'NestedSameType' requires the types 'ConcreteConformsNonFoo2.T' (aka 'Float') and 'Int' be equivalent}}
+// expected-note@-3 {{requirement specified as 'Self.U.T' == 'Int' [with Self = BadConcreteNestedSameType]}}
+
     typealias U = ConcreteConformsNonFoo2
 }
 struct BadConcreteNestedSameTypeInfer: NestedSameType {
