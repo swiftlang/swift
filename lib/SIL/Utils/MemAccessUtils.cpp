@@ -423,6 +423,99 @@ static bool mayLoadWeakOrUnowned(SILInstruction *instruction) {
   return isa<LoadWeakInst>(instruction) || isa<LoadUnownedInst>(instruction);
 }
 
+/// Does this instruction potentially retain a reference that originates from an
+/// unowned value, such as an integer bitcast:
+///   %refVal = unchecked_bitwise_cast %intVal : $Builtin.Word to $Class
+///   %ref = copy_value %refVal : $Class
+static bool mayRetainUnmanagedReference(SILInstruction *instruction) {
+  SILValue copiedRef;
+  if (auto *copy = dyn_cast<CopyValueInst>(instruction)) {
+    copiedRef = copy->getOperand();
+  } else if (auto *copy = dyn_cast<ExplicitCopyValueInst>(instruction)) {
+    copiedRef = copy->getOperand();
+  }
+  if (!copiedRef)
+    return false;
+
+  GraphNodeWorklist<SILValue, 4> worklist;
+  auto push = [&](SILValue value) {
+    if (value->getOwnershipKind() != OwnershipKind::None)
+      worklist.insert(value);
+  };
+  push(copiedRef);
+
+  while (auto ref = worklist.pop()) {
+    auto root = findReferenceRoot(ref);
+
+    if (auto phi = PhiValue(root)) {
+      for (auto *pred : phi.phiBlock->getPredecessorBlocks()) {
+        push(phi.getOperand(pred)->get());
+      }
+      continue;
+    }
+    if (auto *arg = dyn_cast<SILPhiArgument>(root)) {
+      auto *term = arg->getSingleTerminator();
+      if (isa<OwnershipForwardingTermInst>(term)) {
+        push(term->getOperand(0));
+        continue;
+      }
+      if (ApplySite::isa(term))
+        continue;
+    }
+    if (ApplySite::isa(root) || isa<SILFunctionArgument>(root)) {
+      // Function arguments are known managed references. A bitcast must always
+      // be copied before being passed as an argument.
+      continue;
+    }
+    if (auto *rootInst = root.getDefiningInstruction()) {
+      if (isa<FirstArgOwnershipForwardingSingleValueInst>(rootInst)
+          || isa<OwnershipForwardingConversionInst>(rootInst)
+          || isa<OwnershipForwardingSelectEnumInstBase>(rootInst)
+          || isa<OwnershipForwardingMultipleValueInstruction>(rootInst)) {
+        push(rootInst->getOperand(0));
+        continue;
+      }
+      switch (rootInst->getKind()) {
+      case SILInstructionKind::AllocRefInst:
+      case SILInstructionKind::AllocRefDynamicInst:
+      case SILInstructionKind::CopyValueInst:
+      case SILInstructionKind::LoadInst:
+      case SILInstructionKind::LoadBorrowInst:
+        // Known managed reference (assuming a bitcast is never assigned to a
+        // managed property before being retained).
+        continue;
+
+      case SILInstructionKind::StructExtractInst:
+      case SILInstructionKind::DestructureStructInst:
+      case SILInstructionKind::TupleExtractInst:
+      case SILInstructionKind::DestructureTupleInst:
+      case SILInstructionKind::MoveValueInst:
+      case SILInstructionKind::BeginCOWMutationInst:
+      case SILInstructionKind::EndCOWMutationInst:
+        push(rootInst->getOperand(0));
+        continue;
+
+      case SILInstructionKind::StructInst: {
+        for (Operand &oper : cast<StructInst>(rootInst)->getElementOperands()) {
+          push(oper.get());
+        }
+        continue;
+      }
+      case SILInstructionKind::TupleInst: {
+        for (Operand &oper : cast<TupleInst>(rootInst)->getElementOperands()) {
+          push(oper.get());
+        }
+        continue;
+      }
+      default:
+        break;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
 bool swift::isDeinitBarrier(SILInstruction *instruction) {
   if (instruction->maySynchronize()) {
     if (auto apply = FullApplySite::isa(instruction)) {
@@ -430,7 +523,8 @@ bool swift::isDeinitBarrier(SILInstruction *instruction) {
     }
     return true;
   }
-  return mayLoadWeakOrUnowned(instruction) || mayAccessPointer(instruction);
+  return mayLoadWeakOrUnowned(instruction) || mayAccessPointer(instruction)
+    || mayRetainUnmanagedReference(instruction);
 }
 
 //===----------------------------------------------------------------------===//
