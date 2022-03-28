@@ -1478,9 +1478,9 @@ shouldOpenExistentialCallArgument(
   // An argument expression that explicitly coerces to an existential
   // disables the implicit opening of the existential.
   if (argExpr) {
-    if (auto argCoercion = dyn_cast<CoerceExpr>(
+    if (auto argCast = dyn_cast<ExplicitCastExpr>(
             argExpr->getSemanticsProvidingExpr())) {
-      if (auto typeRepr = argCoercion->getCastTypeRepr()) {
+      if (auto typeRepr = argCast->getCastTypeRepr()) {
         if (auto toType = cs.getType(typeRepr)) {
           if (toType->isAnyExistentialType())
             return None;

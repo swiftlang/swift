@@ -43,8 +43,8 @@ distributed actor D4 {
   // expected-error@-6{{type 'D4' does not conform to protocol 'Encodable'}}
 
   let actorSystem: String
-  // expected-error@-1{{invalid redeclaration of synthesized property 'actorSystem'}}
-  // expected-error@-2{{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-error@-1{{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-error@-2 {{invalid redeclaration of synthesized property 'actorSystem'}}
   // expected-note@-3{{stored property 'actorSystem' without initial value prevents synthesized initializers}}
   let id: OtherActorIdentity
   // expected-error@-1{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}

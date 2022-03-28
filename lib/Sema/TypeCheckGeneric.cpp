@@ -30,55 +30,6 @@
 
 using namespace swift;
 
-///
-/// Common code for generic functions, generic types
-///
-
-std::string
-TypeChecker::gatherGenericParamBindingsText(
-                              ArrayRef<Type> types,
-                              TypeArrayView<GenericTypeParamType> genericParams,
-                              TypeSubstitutionFn substitutions) {
-  llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
-  for (auto type : types) {
-    if (type.isNull()) continue;
-
-    type.visit([&](Type type) {
-      if (auto gp = type->getAs<GenericTypeParamType>()) {
-        knownGenericParams.insert(
-            gp->getCanonicalType()->castTo<GenericTypeParamType>());
-      }
-    });
-  }
-
-  if (knownGenericParams.empty())
-    return "";
-
-  SmallString<128> result;
-  for (auto gp : genericParams) {
-    auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
-    if (!knownGenericParams.count(canonGP))
-      continue;
-
-    if (result.empty())
-      result += " [with ";
-    else
-      result += ", ";
-    result += gp->getName().str();
-    result += " = ";
-
-    auto type = substitutions(canonGP);
-    if (!type)
-      return "";
-
-    result += type.getString();
-  }
-
-  result += "]";
-  return result.str().str();
-}
-
-
 //
 // Generic functions
 //
@@ -817,129 +768,204 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 /// Checking bound generic type arguments
 ///
 
-RequirementCheckResult TypeChecker::checkGenericArguments(
-    ModuleDecl *module, SourceLoc loc, SourceLoc noteLoc, Type owner,
+/// Create a text string that describes the bindings of generic parameters
+/// that are relevant to the given set of types, e.g.,
+/// "[with T = Bar, U = Wibble]".
+///
+/// \param types The types that will be scanned for generic type parameters,
+/// which will be used in the resulting type.
+///
+/// \param genericParams The generic parameters to use to resugar any
+/// generic parameters that occur within the types.
+///
+/// \param substitutions The generic parameter -> generic argument
+/// substitutions that will have been applied to these types.
+/// These are used to produce the "parameter = argument" bindings in the test.
+static std::string gatherGenericParamBindingsText(
+    ArrayRef<Type> types, TypeArrayView<GenericTypeParamType> genericParams,
+    TypeSubstitutionFn substitutions) {
+  llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
+  for (auto type : types) {
+    if (type.isNull()) continue;
+
+    type.visit([&](Type type) {
+      if (auto gp = type->getAs<GenericTypeParamType>()) {
+        knownGenericParams.insert(
+            gp->getCanonicalType()->castTo<GenericTypeParamType>());
+      }
+    });
+  }
+
+  if (knownGenericParams.empty())
+    return "";
+
+  SmallString<128> result;
+  for (auto gp : genericParams) {
+    auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
+    if (!knownGenericParams.count(canonGP))
+      continue;
+
+    if (result.empty())
+      result += " [with ";
+    else
+      result += ", ";
+    result += gp->getName().str();
+    result += " = ";
+
+    auto type = substitutions(canonGP);
+    if (!type)
+      return "";
+
+    result += type.getString();
+  }
+
+  result += "]";
+  return result.str().str();
+}
+
+void TypeChecker::diagnoseRequirementFailure(
+    const CheckGenericArgumentsResult::RequirementFailureInfo &reqFailureInfo,
+    SourceLoc errorLoc, SourceLoc noteLoc, Type targetTy,
     TypeArrayView<GenericTypeParamType> genericParams,
-    ArrayRef<Requirement> requirements,
-    TypeSubstitutionFn substitutions,
-    SubstOptions options) {
-  bool valid = true;
+    TypeSubstitutionFn substitutions, ModuleDecl *module) {
+  assert(errorLoc.isValid() && noteLoc.isValid());
 
-  struct RequirementSet {
-    ArrayRef<Requirement> Requirements;
-    SmallVector<ParentConditionalConformance, 4> Parents;
-  };
+  const auto &req = reqFailureInfo.Req;
+  const auto &substReq = reqFailureInfo.SubstReq;
 
-  SmallVector<RequirementSet, 8> pendingReqs;
-  pendingReqs.push_back({requirements, {}});
+  Diag<Type, Type, Type> diagnostic;
+  Diag<Type, Type, StringRef> diagnosticNote;
+
+  const auto reqKind = req.getKind();
+  switch (reqKind) {
+  case RequirementKind::Conformance: {
+    diagnoseConformanceFailure(substReq.getFirstType(),
+                               substReq.getProtocolDecl(), module, errorLoc);
+
+    if (reqFailureInfo.ReqPath.empty())
+      return;
+
+    diagnostic = diag::type_does_not_conform_owner;
+    diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+    break;
+  }
+
+  case RequirementKind::Layout:
+    diagnostic = diag::type_is_not_a_class;
+    diagnosticNote = diag::anyobject_requirement;
+    break;
+
+  case RequirementKind::Superclass:
+    diagnostic = diag::type_does_not_inherit;
+    diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+    break;
+
+  case RequirementKind::SameType:
+    diagnostic = diag::types_not_equal;
+    diagnosticNote = diag::types_not_equal_requirement;
+    break;
+  }
+
+  Type secondTy, substSecondTy;
+  if (req.getKind() != RequirementKind::Layout) {
+    secondTy = req.getSecondType();
+    substSecondTy = substReq.getSecondType();
+  }
 
   ASTContext &ctx = module->getASTContext();
-  while (!pendingReqs.empty()) {
-    auto current = pendingReqs.pop_back_val();
+  // FIXME: Poor source-location information.
+  ctx.Diags.diagnose(errorLoc, diagnostic, targetTy, substReq.getFirstType(),
+                     substSecondTy);
 
-    for (const auto &rawReq : current.Requirements) {
-      auto req = rawReq;
-      if (current.Parents.empty()) {
-        auto substed = rawReq.subst(
-            substitutions, LookUpConformanceInModule(module), options);
-        if (!substed) {
-          // Another requirement will fail later; just continue.
-          valid = false;
+  const auto genericParamBindingsText = gatherGenericParamBindingsText(
+      {req.getFirstType(), secondTy}, genericParams, substitutions);
+
+  ctx.Diags.diagnose(noteLoc, diagnosticNote, req.getFirstType(), secondTy,
+                     genericParamBindingsText);
+
+  ParentConditionalConformance::diagnoseConformanceStack(
+      ctx.Diags, noteLoc, reqFailureInfo.ReqPath);
+}
+
+CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
+    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions) {
+  using ParentConditionalConformances =
+      SmallVector<ParentConditionalConformance, 2>;
+
+  struct WorklistItem {
+    /// The set of requirements to check. These are either the primary set
+    /// of requirements, or the conditional requirements of the last conformance
+    /// in \c ReqsPath (if any).
+    ArrayRef<Requirement> Requirements;
+
+    /// The chain of conditional conformances that leads to the above
+    /// requirement set.
+    ParentConditionalConformances ReqsPath;
+
+    WorklistItem(ArrayRef<Requirement> Requirements,
+                 ParentConditionalConformances ReqsPath)
+        : Requirements(Requirements), ReqsPath(ReqsPath) {}
+  };
+
+  bool hadSubstFailure = false;
+  SmallVector<WorklistItem, 4> worklist;
+
+  worklist.emplace_back(requirements, ParentConditionalConformances{});
+  while (!worklist.empty()) {
+    const auto item = worklist.pop_back_val();
+
+    const bool isPrimaryReq = item.ReqsPath.empty();
+    for (const auto &req : item.Requirements) {
+      Requirement substReq = req;
+      if (isPrimaryReq) {
+        // Primary requirements do not have substitutions applied.
+        if (auto resolved =
+                req.subst(substitutions, LookUpConformanceInModule(module))) {
+          substReq = *resolved;
+        } else {
+          // Another requirement might fail later; just continue.
+          hadSubstFailure = true;
           continue;
         }
-
-        req = *substed;
       }
 
       ArrayRef<Requirement> conditionalRequirements;
-      if (req.isSatisfied(conditionalRequirements, /*allowMissing=*/true)) {
-        if (!conditionalRequirements.empty()) {
-          assert(req.getKind() == RequirementKind::Conformance);
+      if (!substReq.isSatisfied(conditionalRequirements,
+                                /*allowMissing=*/true)) {
+        return CheckGenericArgumentsResult::createRequirementFailure(
+            req, substReq, std::move(item.ReqsPath));
+      }
 
-          auto history = current.Parents;
-          history.push_back({req.getFirstType(), req.getProtocolDecl()});
-          pendingReqs.push_back({conditionalRequirements, std::move(history)});
-        }
+      if (conditionalRequirements.empty()) {
         continue;
       }
 
-      if (loc.isValid()) {
-        Diag<Type, Type, Type> diagnostic;
-        Diag<Type, Type, StringRef> diagnosticNote;
+      assert(req.getKind() == RequirementKind::Conformance);
 
-        switch (req.getKind()) {
-        case RequirementKind::Conformance: {
-          diagnoseConformanceFailure(req.getFirstType(), req.getProtocolDecl(),
-                                     module, loc);
+      auto reqsPath = item.ReqsPath;
+      reqsPath.push_back({substReq.getFirstType(), substReq.getProtocolDecl()});
 
-          if (current.Parents.empty())
-            return RequirementCheckResult::Failure;
-
-          diagnostic = diag::type_does_not_conform_owner;
-          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
-          break;
-        }
-
-        case RequirementKind::Layout:
-          diagnostic = diag::type_is_not_a_class;
-          diagnosticNote = diag::anyobject_requirement;
-          break;
-
-        case RequirementKind::Superclass:
-          diagnostic = diag::type_does_not_inherit;
-          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
-          break;
-
-        case RequirementKind::SameType:
-          diagnostic = diag::types_not_equal;
-          diagnosticNote = diag::types_not_equal_requirement;
-          break;
-        }
-
-        Type rawSecondType, secondType;
-        if (req.getKind() != RequirementKind::Layout) {
-          rawSecondType = rawReq.getSecondType();
-          secondType = req.getSecondType();
-        }
-
-        // FIXME: Poor source-location information.
-        ctx.Diags.diagnose(loc, diagnostic, owner,
-                           req.getFirstType(), secondType);
-
-        std::string genericParamBindingsText;
-        if (!genericParams.empty()) {
-          genericParamBindingsText =
-            gatherGenericParamBindingsText(
-              {rawReq.getFirstType(), rawSecondType},
-              genericParams, substitutions);
-        }
-        ctx.Diags.diagnose(noteLoc, diagnosticNote,
-                           rawReq.getFirstType(), rawSecondType,
-                           genericParamBindingsText);
-
-        ParentConditionalConformance::diagnoseConformanceStack(
-            ctx.Diags, noteLoc, current.Parents);
-      }
-
-      return RequirementCheckResult::Failure;
+      worklist.emplace_back(conditionalRequirements, std::move(reqsPath));
     }
   }
 
-  if (valid)
-    return RequirementCheckResult::Success;
-  return RequirementCheckResult::SubstitutionFailure;
+  if (hadSubstFailure) {
+    return CheckGenericArgumentsResult::createSubstitutionFailure();
+  }
+
+  return CheckGenericArgumentsResult::createSuccess();
 }
 
-RequirementCheckResult
-TypeChecker::checkGenericArguments(ModuleDecl *module,
-                                   ArrayRef<Requirement> requirements,
-                                   TypeSubstitutionFn substitutions) {
+CheckGenericArgumentsResult::Kind TypeChecker::checkGenericArguments(
+    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions, SubstOptions options) {
   SmallVector<Requirement, 4> worklist;
   bool valid = true;
 
   for (auto req : requirements) {
     if (auto resolved = req.subst(substitutions,
-                                  LookUpConformanceInModule(module))) {
+                                  LookUpConformanceInModule(module), options)) {
       worklist.push_back(*resolved);
     } else {
       valid = false;
@@ -950,15 +976,15 @@ TypeChecker::checkGenericArguments(ModuleDecl *module,
     auto req = worklist.pop_back_val();
     ArrayRef<Requirement> conditionalRequirements;
     if (!req.isSatisfied(conditionalRequirements, /*allowMissing=*/true))
-      return RequirementCheckResult::Failure;
+      return CheckGenericArgumentsResult::RequirementFailure;
 
     worklist.append(conditionalRequirements.begin(),
                     conditionalRequirements.end());
   }
 
   if (valid)
-    return RequirementCheckResult::Success;
-  return RequirementCheckResult::SubstitutionFailure;
+    return CheckGenericArgumentsResult::Success;
+  return CheckGenericArgumentsResult::SubstitutionFailure;
 }
 
 Requirement

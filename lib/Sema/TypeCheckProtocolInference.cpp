@@ -1131,20 +1131,16 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   auto requirements = proto->getRequirementSignature().getRequirements();
   sanitizeProtocolRequirements(proto, requirements,
                                sanitizedRequirements);
-  auto result =
-    TypeChecker::checkGenericArguments(dc->getParentModule(), SourceLoc(),
-                                       SourceLoc(), typeInContext,
-                                       { proto->getSelfInterfaceType() },
-                                       sanitizedRequirements,
-                                       QuerySubstitutionMap{substitutions},
-                                       options);
-  switch (result) {
-  case RequirementCheckResult::Failure:
+
+  switch (TypeChecker::checkGenericArguments(
+      dc->getParentModule(), sanitizedRequirements,
+      QuerySubstitutionMap{substitutions}, options)) {
+  case CheckGenericArgumentsResult::RequirementFailure:
     ++NumSolutionStatesFailedCheck;
     return true;
 
-  case RequirementCheckResult::Success:
-  case RequirementCheckResult::SubstitutionFailure:
+  case CheckGenericArgumentsResult::Success:
+  case CheckGenericArgumentsResult::SubstitutionFailure:
     break;
   }
 
@@ -1180,16 +1176,13 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
 
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
   switch (TypeChecker::checkGenericArguments(
-                       dc->getParentModule(), SourceLoc(), SourceLoc(), adoptee,
-                       ext->getGenericSignature().getGenericParams(),
-                       ext->getGenericSignature().getRequirements(),
-                       QueryTypeSubstitutionMap{subs},
-                       options)) {
-  case RequirementCheckResult::Success:
-  case RequirementCheckResult::SubstitutionFailure:
+      dc->getParentModule(), ext->getGenericSignature().getRequirements(),
+      QueryTypeSubstitutionMap{subs}, options)) {
+  case CheckGenericArgumentsResult::Success:
+  case CheckGenericArgumentsResult::SubstitutionFailure:
     return false;
 
-  case RequirementCheckResult::Failure:
+  case CheckGenericArgumentsResult::RequirementFailure:
     return true;
   }
   llvm_unreachable("unhandled result");

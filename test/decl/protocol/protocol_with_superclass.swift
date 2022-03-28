@@ -95,8 +95,9 @@ func usesProtoRefinesClass2<T : ProtoRefinesClass>(_ t: T) {
 }
 
 class BadConformingClass1 : ProtoRefinesClass {
-  // expected-error@-1 {{'ProtoRefinesClass' requires that 'BadConformingClass1' inherit from 'Generic<Int>'}}
-  // expected-note@-2 {{requirement specified as 'Self' : 'Generic<Int>' [with Self = BadConformingClass1]}}
+  // expected-error@-1 {{type 'BadConformingClass1' does not conform to protocol 'ProtoRefinesClass'}}
+  // expected-error@-2 {{'ProtoRefinesClass' requires that 'BadConformingClass1' inherit from 'Generic<Int>'}}
+  // expected-note@-3 {{requirement specified as 'Self' : 'Generic<Int>' [with Self = BadConformingClass1]}}
   func requirementUsesClassTypes(_: ConcreteAlias, _: GenericAlias) {
     // expected-error@-1 {{cannot find type 'ConcreteAlias' in scope}}
     // expected-error@-2 {{cannot find type 'GenericAlias' in scope}}
@@ -112,8 +113,9 @@ class BadConformingClass2 : Generic<String>, ProtoRefinesClass {
   // expected-error@-1 {{'ProtoRefinesClass' requires that 'BadConformingClass2' inherit from 'Generic<Int>'}}
   // expected-note@-2 {{requirement specified as 'Self' : 'Generic<Int>' [with Self = BadConformingClass2]}}
   // expected-error@-3 {{type 'BadConformingClass2' does not conform to protocol 'ProtoRefinesClass'}}
+
+  // expected-note@+1 {{candidate has non-matching type '(BadConformingClass2.ConcreteAlias, BadConformingClass2.GenericAlias) -> ()' (aka '(String, (String, String)) -> ()')}}
   func requirementUsesClassTypes(_: ConcreteAlias, _: GenericAlias) {
-    // expected-note@-1 {{candidate has non-matching type '(BadConformingClass2.ConcreteAlias, BadConformingClass2.GenericAlias) -> ()' (aka '(String, (String, String)) -> ()')}}
     _ = ConcreteAlias.self
     _ = GenericAlias.self
   }
@@ -315,8 +317,9 @@ class SecondClass : FirstClass {}
 protocol SecondProtocol : SecondClass, FirstProtocol {}
 
 class FirstConformer : FirstClass, SecondProtocol {}
-// expected-error@-1 {{'SecondProtocol' requires that 'FirstConformer' inherit from 'SecondClass'}}
-// expected-note@-2 {{requirement specified as 'Self' : 'SecondClass' [with Self = FirstConformer]}}
+// expected-error@-1 {{type 'FirstConformer' does not conform to protocol 'SecondProtocol'}}
+// expected-error@-2 {{'SecondProtocol' requires that 'FirstConformer' inherit from 'SecondClass'}}
+// expected-note@-3 {{requirement specified as 'Self' : 'SecondClass' [with Self = FirstConformer]}}
 
 class SecondConformer : SecondClass, SecondProtocol {}
 
