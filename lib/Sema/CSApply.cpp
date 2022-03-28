@@ -6020,7 +6020,6 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
                                     Type destType, bool bridged,
                                     ConstraintLocatorBuilder locator,
                                     Expr *element) {
-  auto &cs = rewriter.getConstraintSystem();
   if (bridged &&
       TypeChecker::typeCheckCheckedCast(srcType, destType,
                                         CheckedCastContextKind::None,
