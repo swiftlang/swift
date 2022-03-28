@@ -3903,14 +3903,17 @@ void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
                                    unsigned asyncContextIndex) {
   auto &IGM = IGF.IGM;
   auto size = layout.getSize();
+  auto asyncFuncPointerVar = cast<llvm::GlobalVariable>(IGM.getAddrOfAsyncFunctionPointer(asyncFunction));
   auto asyncFuncPointer = IGF.Builder.CreateBitOrPointerCast(
-      IGM.getAddrOfAsyncFunctionPointer(asyncFunction), IGM.Int8PtrTy);
+                                           asyncFuncPointerVar, IGM.Int8PtrTy);
   auto *id = IGF.Builder.CreateIntrinsicCall(
       llvm::Intrinsic::coro_id_async,
       {llvm::ConstantInt::get(IGM.Int32Ty, size.getValue()),
        llvm::ConstantInt::get(IGM.Int32Ty, 16),
        llvm::ConstantInt::get(IGM.Int32Ty, asyncContextIndex),
        asyncFuncPointer});
+  auto inserted = IGM.AsyncCoroIDs.insert({asyncFuncPointerVar, id});
+  assert(inserted.second);
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
   // This serves as a handle that we can pass around to other intrinsics.
   auto hdl = IGF.Builder.CreateIntrinsicCall(
