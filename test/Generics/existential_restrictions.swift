@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-experimental-opened-existential-types
 
 protocol P { }
 @objc protocol OP { }

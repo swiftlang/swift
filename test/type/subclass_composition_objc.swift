@@ -50,8 +50,7 @@ func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProt
 func takesStaticObjCProtocol<T : StaticObjCProtocol>(_: T) {}
 
 func testSelfConformance(cp: ObjCClass & StaticObjCProtocol) {
-  takesStaticObjCProtocol(cp)
-  // expected-error@-1 {{'any ObjCClass & StaticObjCProtocol' cannot be used as a type conforming to protocol 'StaticObjCProtocol' because 'StaticObjCProtocol' has static requirements}}
+  takesStaticObjCProtocol(cp) // okay because the type is opened
 }
 
 func testMetatypeSelfConformance(m1: (ObjCClass & ObjCProtocol).Protocol,
