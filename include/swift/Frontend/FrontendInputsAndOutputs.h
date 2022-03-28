@@ -249,7 +249,8 @@ public:
 
   bool hasDependenciesPath() const;
   bool hasReferenceDependenciesPath() const;
-  bool hasClangHeaderOutputPath() const;
+  bool hasObjCHeaderOutputPath() const;
+  bool hasCxxHeaderOutputPath() const;
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
