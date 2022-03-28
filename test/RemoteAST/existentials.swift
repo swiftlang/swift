@@ -51,6 +51,6 @@ printDynamicTypeAndAddressForExistential(q)
 // Case five: existential metatypes.
 // CHECK-NEXT: Any.Type
 let metatype : Any.Type = Any.self
-printDynamicTypeAndAddressForExistential(metatype)
+printDynamicTypeAndAddressForExistential(metatype as Any.Type)
 
 stopRemoteAST()
