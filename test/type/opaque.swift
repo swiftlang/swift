@@ -519,3 +519,17 @@ func takesOpaqueProtocol<T : OpaqueProtocol>(generic: T) {
 
 func opaquePlaceholderFunc() -> some _ { 1 } // expected-error {{type placeholder not allowed here}}
 var opaquePlaceholderVar: some _ = 1 // expected-error {{type placeholder not allowed here}}
+
+// rdar://90456579 - crash in `OpaqueUnderlyingTypeChecker`
+func test_diagnostic_with_contextual_generic_params() {
+  struct S {
+    func test<T: Q>(t: T) -> some Q {
+    // expected-error@-1 {{function declares an opaque return type 'some Q', but the return statements in its body do not have matching underlying types}}
+      if true {
+        return t // expected-note {{return statement has underlying type 'T'}}
+      }
+      return "" // String conforms to `Q`
+      // expected-note@-1 {{return statement has underlying type 'String'}}
+    }
+  }
+}
