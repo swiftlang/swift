@@ -73,6 +73,18 @@ extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
 using namespace swift;
 using namespace metadataimpl;
 
+// GenericParamDescriptor is a single byte, so while it's difficult to
+// imagine needing even a quarter this many generic params, there's very
+// little harm in doing it.
+constexpr GenericParamDescriptor
+swift::ImplicitGenericParamDescriptors[MaxNumImplicitGenericParamDescriptors] = {
+#define D GenericParamDescriptor::implicit()
+  D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D,
+  D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D, D,D,D,D
+#undef D
+};
+static_assert(MaxNumImplicitGenericParamDescriptors == 64, "length mismatch");
+
 static ClassMetadata *
 _swift_relocateClassMetadata(const ClassDescriptor *description,
                              const ResilientClassMetadataPattern *pattern);
@@ -134,8 +146,7 @@ static void installGenericArguments(Metadata *metadata,
                                     const void *arguments) {
   auto &generics = description->getFullGenericContextHeader();
 
-  // If we ever have parameter packs, we may need to do more than just
-  // copy here.
+  // FIXME: variadic-parameter-packs
   memcpy(reinterpret_cast<const void **>(metadata)
            + description->getGenericArgumentOffset(),
          reinterpret_cast<const void * const *>(arguments),
@@ -2681,11 +2692,13 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
     // Copy the generic requirements.
     if (description->isGeneric()
         && description->getGenericContextHeader().hasArguments()) {
+      // This should be okay even with variadic packs because we're
+      // copying from an existing metadata, so we've already uniqued.
       auto genericOffset = description->getGenericArgumentOffset();
       memcpy(classWords + genericOffset,
              superWords + genericOffset,
-             description->getGenericContextHeader().getNumArguments() *
-               sizeof(uintptr_t));
+             description->getGenericContextHeader()
+                 .getArgumentLayoutSizeInWords() * sizeof(uintptr_t));
     }
 
     // Copy the vtable entries.
@@ -4156,6 +4169,282 @@ OpaqueValue *swift::swift_assignExistentialWithCopy(OpaqueValue *dest,
                                            /*known allocated*/ true>;
   return Witnesses::assignWithCopy(dest, const_cast<OpaqueValue*>(src), type);
 }
+
+/***************************************************************************/
+/*** Extended existential type descriptors *********************************/
+/***************************************************************************/
+
+namespace {
+
+class ExtendedExistentialTypeShapeCacheEntry {
+public:
+  const NonUniqueExtendedExistentialTypeShape *
+    __ptrauth_swift_nonunique_extended_existential_type_shape Data;
+
+  struct Key {
+    const NonUniqueExtendedExistentialTypeShape *Candidate;
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      auto &candidate = *key.Candidate;
+      return hash_value(candidate.Hash);
+    }
+  };
+
+  ExtendedExistentialTypeShapeCacheEntry(Key key)
+    : Data(key.Candidate) {}
+
+  intptr_t getKeyIntValueForDump() {
+    return 0;
+  }
+
+  bool matchesKey(Key key) const {
+    auto self = Data;
+    auto other = key.Candidate;
+    if (self == other) return true;
+    return other->Hash == self->Hash;
+  }
+
+  friend llvm::hash_code hash_value(
+                        const ExtendedExistentialTypeShapeCacheEntry &value) {
+    Key key = {value.Data};
+    return hash_value(key);
+  }
+
+  static size_t getExtraAllocationSize(Key key) {
+    return 0;
+  }
+};
+
+}
+
+/// The uniquing structure for extended existential type descriptors.
+static SimpleGlobalCache<ExtendedExistentialTypeShapeCacheEntry,
+                         ExtendedExistentialTypeShapesTag>
+  ExtendedExistentialTypeShapes;
+
+const ExtendedExistentialTypeShape *
+swift::swift_getExtendedExistentialTypeShape(
+            const NonUniqueExtendedExistentialTypeShape *nonUnique) {
+#if SWIFT_PTRAUTH
+  // The description pointer is expected to be signed with an
+  // address-undiversified schema when passed in.
+  nonUnique = ptrauth_auth_data(nonUnique,
+      ptrauth_key_process_independent_data,
+      SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape);
+#endif
+
+  // Check the cache.
+  auto &cache = *nonUnique->UniqueCache.get();
+  if (auto ptr = cache.load(std::memory_order_acquire)) {
+#if SWIFT_PTRAUTH
+    // Resign the returned pointer from an address-diversified to an
+    // undiversified schema.
+    ptr = ptrauth_auth_and_resign(ptr,
+        ptrauth_key_process_independent_data,
+        ptrauth_blend_discriminator(&cache,
+          SpecialPointerAuthDiscriminators::ExtendedExistentialTypeShape),
+        ptrauth_key_process_independent_data,
+        SpecialPointerAuthDiscriminators::ExtendedExistentialTypeShape);
+#endif
+    return ptr;
+  }
+
+  // Find the unique entry.
+  auto uniqueEntry = ExtendedExistentialTypeShapes.getOrInsert(
+      ExtendedExistentialTypeShapeCacheEntry::Key{ nonUnique });
+
+  const ExtendedExistentialTypeShape *unique =
+    &uniqueEntry.first->Data->LocalCopy;
+
+  // Cache the uniqued description, signing it with an
+  // address-diversified schema.
+  auto uniqueForCache = unique;
+#if SWIFT_PTRAUTH
+  uniqueForCache = ptrauth_sign_unauthenticated(uniqueForCache,
+                     ptrauth_key_process_independent_data,
+                     ptrauth_blend_discriminator(&cache,
+          SpecialPointerAuthDiscriminators::ExtendedExistentialTypeShape));
+#endif
+  cache.store(uniqueForCache, std::memory_order_release);
+
+  // Return the uniqued description, signing it with an
+  // address-undiversified schema.
+#if SWIFT_PTRAUTH
+  unique = ptrauth_sign_unauthenticated(unique,
+             ptrauth_key_process_independent_data,
+             SpecialPointerAuthDiscriminators::ExtendedExistentialTypeShape);
+#endif
+  return unique;
+}
+
+/***************************************************************************/
+/*** Extended existential types ********************************************/
+/***************************************************************************/
+
+namespace {
+
+class ExtendedExistentialTypeCacheEntry {
+public:
+  FullMetadata<ExtendedExistentialTypeMetadata> Data;
+
+  struct Key {
+    MetadataCacheKey Arguments;
+    const ExtendedExistentialTypeShape *Shape;
+
+    Key(const ExtendedExistentialTypeShape *shape,
+        const void * const *arguments)
+      : Arguments(shape->getGeneralizationSignature(), arguments),
+        Shape(shape) {}
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      return llvm::hash_combine(key.Shape, // by address
+                                key.Arguments.hash());
+    }
+
+    bool operator==(const Key &other) {
+      return Shape == other.Shape && Arguments == other.Arguments;
+    }
+  };
+
+  ExtendedExistentialTypeCacheEntry(Key key)
+      : Data{{getOrCreateVWT(key)}, key.Shape} {
+    key.Arguments.installInto(Data.getTrailingObjects<const void *>());
+  }
+
+  static const ValueWitnessTable *getOrCreateVWT(Key key);
+
+  intptr_t getKeyIntValueForDump() {
+    return 0;
+  }
+
+  Key getKey() const {
+    return Key{Data.Shape, Data.getGeneralizationArguments()};
+  }
+
+  bool matchesKey(Key key) const {
+    // Bypass the eager hashing done in the Key constructor in the most
+    // important negative case.
+    if (Data.Shape != key.Shape)
+      return false;
+
+    return (getKey() == key);
+  }
+
+  friend llvm::hash_code hash_value(const ExtendedExistentialTypeCacheEntry &value) {
+    return hash_value(value.getKey());
+  }
+
+  static size_t getExtraAllocationSize(Key key) {
+    return ExtendedExistentialTypeMetadata::additionalSizeToAlloc<
+             const void *
+           >(key.Shape->getGenSigArgumentLayoutSizeInWords());
+  }
+
+  size_t getExtraAllocationSize() const {
+    return ExtendedExistentialTypeMetadata::additionalSizeToAlloc<
+             const void *
+           >(Data.Shape->getGenSigArgumentLayoutSizeInWords());
+  }
+};
+
+} // end anonymous namespace
+
+const ValueWitnessTable *
+ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
+  auto shape = key.Shape;
+
+  if (auto witnesses = shape->getSuggestedValueWitnesses())
+    return witnesses;
+
+  // The type head must name all the type parameters, so we must not have
+  // multiple type parameters if we have an opaque type head.
+  auto sigSizeInWords = shape->ReqSigHeader.getArgumentLayoutSizeInWords();
+
+#ifndef NDEBUG
+  auto layout = GenericSignatureLayout(shape->getRequirementSignature());
+  assert(layout.NumKeyParameters == shape->ReqSigHeader.NumParams &&
+         "requirement signature for existential includes a "
+         "redundant parameter?");
+  assert(layout.NumWitnessTables
+            == sigSizeInWords - shape->ReqSigHeader.NumParams &&
+         "requirement signature for existential includes an "
+         "unexpected key argument?");
+#endif
+
+  // We're lowering onto existing witnesses for existential types,
+  // which are parameterized only by the number of witness tables they
+  // need to copy around.
+  // TODO: variadic-parameter-packs?  Or is a memcpy okay, because we
+  // can assume existentials store permanent packs, in the unlikely
+  // case that the requirement signature includes a pack parameter?
+  unsigned wtableStorageSizeInWords =
+    sigSizeInWords - shape->ReqSigHeader.NumParams;
+
+  using SpecialKind = ExtendedExistentialTypeShape::SpecialKind;
+  switch (shape->Flags.getSpecialKind()) {
+  case SpecialKind::None:
+    assert(shape->isTypeExpressionOpaque() &&
+           "shape with a non-opaque type expression has no suggested VWT");
+    // Use the standard opaque-existential representation.
+    return getExistentialValueWitnesses(ProtocolClassConstraint::Any,
+                                        /*superclass*/ nullptr,
+                                        wtableStorageSizeInWords,
+                                        SpecialProtocol::None);
+
+  case SpecialKind::ExplicitLayout:
+    swift_unreachable("shape with explicit layout but no suggested VWT");
+
+  case SpecialKind::Class:
+    // Class-constrained existentials don't store type metadata.
+    // TODO: pull out a superclass constraint if there is one so that
+    // we can use native reference counting.
+    return getExistentialValueWitnesses(ProtocolClassConstraint::Class,
+                                        /*superclass*/ nullptr,
+                                        wtableStorageSizeInWords,
+                                        SpecialProtocol::None);
+
+  case SpecialKind::Metatype:
+    // Existential metatypes don't store type metadata.
+    return getExistentialMetatypeValueWitnesses(wtableStorageSizeInWords);
+  }
+
+  // We can support back-deployment of new special kinds (at least here)
+  // if we just require them to provide suggested value witnesses.
+  swift_unreachable("shape with unknown special kind had no suggested VWT");
+}
+
+/// The uniquing structure for extended existential type metadata.
+static SimpleGlobalCache<ExtendedExistentialTypeCacheEntry,
+                         ExtendedExistentialTypesTag>
+  ExtendedExistentialTypes;
+
+const ExtendedExistentialTypeMetadata *
+swift::swift_getExtendedExistentialTypeMetadata_unique(
+            const ExtendedExistentialTypeShape *shape,
+            const void * const *generalizationArguments) {
+#if SWIFT_PTRAUTH
+  shape = ptrauth_auth_data(shape, ptrauth_key_process_independent_data,
+            SpecialPointerAuthDiscriminators::ExtendedExistentialTypeShape);
+#endif
+
+  ExtendedExistentialTypeCacheEntry::Key key(shape, generalizationArguments);
+
+  auto entry = ExtendedExistentialTypes.getOrInsert(key);
+  return &entry.first->Data;
+}
+
+/// Fetch a unique existential shape descriptor for an extended
+/// existential type.
+SWIFT_RUNTIME_EXPORT
+const ExtendedExistentialTypeMetadata *
+swift_getExtendedExistentialTypeMetadata(
+            const NonUniqueExtendedExistentialTypeShape *nonUniqueShape,
+            const void * const *generalizationArguments) {
+  auto uniqueShape = swift_getExtendedExistentialTypeShape(nonUniqueShape);
+  return swift_getExtendedExistentialTypeMetadata_unique(uniqueShape,
+                                              generalizationArguments);
+}
+
 
 /***************************************************************************/
 /*** Foreign types *********************************************************/

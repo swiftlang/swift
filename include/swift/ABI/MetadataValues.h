@@ -24,6 +24,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
+#include "llvm/ADT/ArrayRef.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -55,6 +56,13 @@ enum {
 
   /// The number of words in an AsyncLet (flags + child task context & allocation)
   NumWords_AsyncLet = 80, // 640 bytes ought to be enough for anyone
+
+  /// The size of a unique hash.
+  NumBytes_UniqueHash = 16,
+
+  /// The maximum number of generic parameters that can be
+  /// implicitly declared, for generic signatures that support that.
+  MaxNumImplicitGenericParamDescriptors = 64,
 };
 
 struct InProcess;
@@ -786,6 +794,140 @@ public:
   }
 };
 
+/// Flags in an extended existential shape.
+class ExtendedExistentialTypeShapeFlags {
+public:
+  typedef uint32_t int_type;
+
+  /// Special cases for the representation.
+  enum class SpecialKind {
+    None = 0,
+
+    /// The existential has a class constraint.
+    /// The inline storage is sizeof(void*) / alignof(void*),
+    /// the value is always stored inline, the value is reference-
+    /// counted (using unknown reference counting), and the
+    /// type metadata for the requirement generic parameters are
+    /// not stored in the existential container because they can
+    /// be recovered from the instance type of the class.
+    Class = 1,
+
+    /// The existential has a metatype constraint.
+    /// The inline storage is sizeof(void*) / alignof(void*),
+    /// the value is always stored inline, the value is a Metadata*,
+    /// and the type metadata for the requirement generic parameters
+    /// are not stored in the existential container because they can
+    /// be recovered from the stored metatype.
+    Metatype = 2,
+
+    /// The inline value storage has a non-storage layout.  The shape
+    /// must include a value witness table.  Type metadata for the
+    /// requirement generic parameters are still stored in the existential
+    /// container.
+    ExplicitLayout = 3,
+
+    // 255 is the maximum
+  };
+
+private:
+  enum : int_type {
+    SpecialKindMask             = 0x000000FFU,
+    SpecialKindShift            = 0,
+    HasGeneralizationSignature  = 0x00000100U,
+    HasTypeExpression           = 0x00000200U,
+    HasSuggestedValueWitnesses  = 0x00000400U,
+    HasImplicitReqSigParams     = 0x00000800U,
+    HasImplicitGenSigParams     = 0x00001000U,
+  };
+  int_type Data;
+
+public:
+  constexpr ExtendedExistentialTypeShapeFlags() : Data(0) {}
+  constexpr ExtendedExistentialTypeShapeFlags(int_type Data) : Data(Data) {}
+  constexpr ExtendedExistentialTypeShapeFlags
+  withSpecialKind(SpecialKind kind) const {
+    return ExtendedExistentialTypeShapeFlags(
+      (Data & ~SpecialKindMask) | (int_type(kind) << SpecialKindShift));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withHasTypeExpresssion(bool hasTypeExpression) const {
+    return ExtendedExistentialTypeShapeFlags(
+      hasTypeExpression ? (Data | HasTypeExpression)
+                        : (Data & ~HasTypeExpression));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withGeneralizationSignature(bool hasGeneralization) const {
+    return ExtendedExistentialTypeShapeFlags(
+      hasGeneralization ? (Data | HasGeneralizationSignature)
+                        : (Data & ~HasGeneralizationSignature));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withSuggestedValueWitnesses(bool hasSuggestedVWT) const {
+    return ExtendedExistentialTypeShapeFlags(
+      hasSuggestedVWT ? (Data | HasSuggestedValueWitnesses)
+                      : (Data & ~HasSuggestedValueWitnesses));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withImplicitReqSigParams(bool implicit) const {
+    return ExtendedExistentialTypeShapeFlags(
+      implicit ? (Data | HasImplicitReqSigParams)
+               : (Data & ~HasImplicitReqSigParams));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withImplicitGenSigParams(bool implicit) const {
+    return ExtendedExistentialTypeShapeFlags(
+      implicit ? (Data | HasImplicitGenSigParams)
+               : (Data & ~HasImplicitGenSigParams));
+  }
+
+  /// Is this a special kind of existential?
+  SpecialKind getSpecialKind() const {
+    return SpecialKind((Data & SpecialKindMask) >> SpecialKindShift);
+  }
+  bool isClassConstrained() const {
+    return getSpecialKind() == SpecialKind::Class;
+  }
+  bool isMetatypeConstrained() const {
+    return getSpecialKind() == SpecialKind::Metatype;
+  }
+
+  bool hasGeneralizationSignature() const {
+    return Data & HasGeneralizationSignature;
+  }
+
+  bool hasTypeExpression() const {
+    return Data & HasTypeExpression;
+  }
+
+  bool hasSuggestedValueWitnesses() const {
+    return Data & HasSuggestedValueWitnesses;
+  }
+
+  /// The parameters of the requirement signature are not stored
+  /// explicitly in the shape.
+  ///
+  /// In order to enable this, there must be no more than
+  /// MaxNumImplicitGenericParamDescriptors generic parameters, and
+  /// they must match GenericParamDescriptor::implicit().
+  bool hasImplicitReqSigParams() const {
+    return Data & HasImplicitReqSigParams;
+  }
+
+  /// The parameters of the generalization signature are not stored
+  /// explicitly in the shape.
+  ///
+  /// In order to enable this, there must be no more than
+  /// MaxNumImplicitGenericParamDescriptors generic parameters, and
+  /// they must match GenericParamDescriptor::implicit().
+  bool hasImplicitGenSigParams() const {
+    return Data & HasImplicitGenSigParams;
+  }
+
+  int_type getIntValue() const {
+    return Data;
+  }
+};
+
 /// Convention values for function type metadata.
 enum class FunctionMetadataConvention: uint8_t {
   Swift = 0,
@@ -1190,6 +1332,10 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Protocol conformance descriptors.
   const uint16_t ProtocolConformanceDescriptor = 0xc6eb;
+
+  /// Extended existential type shapes.
+  const uint16_t ExtendedExistentialTypeShape = 0x5a3d; // = 23101
+  const uint16_t NonUniqueExtendedExistentialTypeShape = 0xe798; // = 59288
 
   /// Value witness functions.
   const uint16_t InitializeBufferWithCopyOfBuffer = 0xda4a;
@@ -1652,7 +1798,39 @@ public:
   constexpr uint8_t getIntValue() const {
     return Value;
   }
+
+  friend bool operator==(GenericParamDescriptor lhs,
+                         GenericParamDescriptor rhs) {
+    return lhs.getIntValue() == rhs.getIntValue();
+  }
+  friend bool operator!=(GenericParamDescriptor lhs,
+                         GenericParamDescriptor rhs) {
+    return !(lhs == rhs);
+  }
+
+  /// The default parameter descriptor for an implicit parameter.
+  static constexpr GenericParamDescriptor implicit() {
+    return GenericParamDescriptor(GenericParamKind::Type,
+                                  /*key argument*/ true,
+                                  /*extra argument*/ false);
+  }
 };
+
+/// Can the given generic parameter array be implicit, for places in
+/// the ABI which support that?
+inline bool canGenericParamsBeImplicit(
+                            llvm::ArrayRef<GenericParamDescriptor> params) {
+  // If there are more parameters than the maximum, they cannot be implicit.
+  if (params.size() > MaxNumImplicitGenericParamDescriptors)
+    return false;
+
+  // If any parameter is not the implicit pattern, they cannot be implicit.
+  for (auto param : params)
+    if (param != GenericParamDescriptor::implicit())
+      return false;
+
+  return true;
+}
 
 enum class GenericRequirementKind : uint8_t {
   /// A protocol requirement.

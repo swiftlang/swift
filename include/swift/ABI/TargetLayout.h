@@ -100,6 +100,11 @@ struct InProcess {
 
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = RelativeDirectPointer<T, Nullable>;
+
+  template<typename T>
+  T *getStrippedSignedPointer(const T *pointer) const {
+    return swift_ptrauth_strip(pointer);
+  }
 };
 
 /// Represents a pointer in another address space.
@@ -157,6 +162,10 @@ struct External {
 
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = int32_t;
+
+  StoredPointer getStrippedSignedPointer(const StoredSignedPointer pointer) const {
+    return swift_ptrauth_strip(pointer);
+  }
 };
 
 template <typename Runtime, typename T>

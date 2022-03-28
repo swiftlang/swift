@@ -163,25 +163,59 @@ public:
                     TaggedUnionImpl::Empty>::type = {})
     : super(std::forward<T>(value)) {}
 
-  TaggedUnionBase(const TaggedUnionBase &other) : super(other.TheKind) {
+  // We want to either define or delete all the special members.
+  // C++ does not provide a direct way to conditionally delete a
+  // function.  enable_if doesn't work, for several reasons: you can't
+  // make an enable_if condition depend only on a property of the
+  // enclosing class template (because all member function signatures
+  // must successfully instantiate as part of instantiating the class
+  // template; this is not covered by SFINAE), and you can't make the
+  // special member itself a template (because then it's not a special
+  // member anymore).  static_assert within the member also doesn't work.
+  // But we *can* make template substitution decide whether something
+  // turns into a special member, then declare it both ways.
+  template <bool condition>
+  using self_if = typename std::conditional<condition,
+                                            TaggedUnionBase,
+                                            TaggedUnionImpl::Empty>::type;
+
+  TaggedUnionBase(const self_if<Members::is_copy_constructible> &other)
+      noexcept(Members::is_nothrow_copy_constructible)
+        : super(other.TheKind) {
     Storage.copyConstruct(other.TheKind, other.Storage);
   }
 
-  TaggedUnionBase(TaggedUnionBase &&other) : super(other.TheKind) {
+  TaggedUnionBase(const self_if<!Members::is_copy_constructible> &other)
+    = delete;
+
+  TaggedUnionBase(self_if<Members::is_move_constructible> &&other)
+      noexcept(Members::is_nothrow_move_constructible)
+        : super(other.TheKind) {
     Storage.moveConstruct(other.TheKind, std::move(other.Storage));
   }
 
-  TaggedUnionBase &operator=(const TaggedUnionBase &other) {
+  TaggedUnionBase(self_if<!Members::is_move_constructible> &&other)
+    = delete;
+
+  TaggedUnionBase &operator=(const self_if<Members::is_copy_assignable> &other)
+      noexcept(Members::is_nothrow_copy_assignable) {
     Storage.copyAssign(TheKind, other.TheKind, other.Storage);
     TheKind = other.TheKind;
     return *this;
   }
 
-  TaggedUnionBase &operator=(TaggedUnionBase &&other) {
+  TaggedUnionBase &operator=(const self_if<!Members::is_copy_assignable> &other)
+    = delete;
+
+  TaggedUnionBase &operator=(self_if<Members::is_move_assignable> &&other)
+      noexcept(Members::is_nothrow_move_assignable) {
     Storage.moveAssign(TheKind, other.TheKind, std::move(other.Storage));
     TheKind = other.TheKind;
     return *this;
   }
+
+  TaggedUnionBase &operator=(self_if<!Members::is_move_assignable> &&other)
+    = delete;
 
   ~TaggedUnionBase() {
     Storage.destruct(TheKind);
@@ -250,10 +284,16 @@ public:
 /// empty state and provides a default constructor as well as `empty()`
 /// and `reset()` methods.
 template <class... Members>
-using TaggedUnion =
-  TaggedUnionBase<ExternalUnionImpl::OptimalKindTypeHelper<sizeof...(Members)>,
-                  ExternalUnionMembers<Members...>>;
+class TaggedUnion :
+  public TaggedUnionBase<ExternalUnionImpl::OptimalKindTypeHelper<sizeof...(Members)>,
+                         ExternalUnionMembers<Members...>> {
+  using super =
+         TaggedUnionBase<ExternalUnionImpl::OptimalKindTypeHelper<sizeof...(Members)>,
+                         ExternalUnionMembers<Members...>>;
+public:
+  using super::super;
+};
 
-}
+} // end namespace swift
 
 #endif
