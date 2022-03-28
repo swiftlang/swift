@@ -218,6 +218,8 @@ StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
       return "armv7";
     case llvm::Triple::SubArchType::ARMSubArch_v6:
       return "armv6";
+    case llvm::Triple::SubArchType::ARMSubArch_v5:
+      return "armv5";
     default:
       break;
     }

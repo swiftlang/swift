@@ -713,6 +713,8 @@ else()
     set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64le")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "s390x")
     set(SWIFT_HOST_VARIANT_ARCH_default "s390x")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "armv5|armv5te")
+    set(SWIFT_HOST_VARIANT_ARCH_default "armv5")
   # FIXME: Only matches v6l/v7l - by far the most common variants
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
     set(SWIFT_HOST_VARIANT_ARCH_default "armv6")
