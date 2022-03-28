@@ -15,7 +15,6 @@
 #include "CxxSynthesis.h"
 #include "DeclAndTypePrinter.h"
 #include "OutputLanguageMode.h"
-#include "PrimitiveTypeMapping.h"
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
@@ -124,7 +123,6 @@ class ModuleWriter {
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
-  PrimitiveTypeMapping typeMapping;
   DeclAndTypePrinter printer;
   OutputLanguageMode outputLangMode;
 
@@ -133,8 +131,7 @@ public:
                llvm::SmallPtrSetImpl<ImportModuleTy> &imports, ModuleDecl &mod,
                AccessLevel access, OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
-        printer(M, os, prologueOS, delayedMembers, typeMapping, access,
-                outputLang),
+        printer(M, os, prologueOS, delayedMembers, access, outputLang),
         outputLangMode(outputLang) {}
 
   /// Returns true if we added the decl's module to the import set, false if
