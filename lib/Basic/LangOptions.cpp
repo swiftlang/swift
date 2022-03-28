@@ -67,6 +67,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "powerpc64le",
   "s390x",
   "wasm32",
+  "riscv64",
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationEndianness[] = {
@@ -316,6 +317,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::ppc:
     addPlatformConditionValue(PlatformConditionKind::Arch, "powerpc");
     break;
+  case llvm::Triple::ArchType::riscv64:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "riscv64");
+    break;
   case llvm::Triple::ArchType::ppc64:
     addPlatformConditionValue(PlatformConditionKind::Arch, "powerpc64");
     break;
@@ -350,6 +354,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::aarch64_32:
   case llvm::Triple::ArchType::ppc64le:
   case llvm::Triple::ArchType::wasm32:
+  case llvm::Triple::ArchType::riscv64:
   case llvm::Triple::ArchType::x86:
   case llvm::Triple::ArchType::x86_64:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "little");

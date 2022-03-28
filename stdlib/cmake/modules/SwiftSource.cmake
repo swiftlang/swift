@@ -549,6 +549,10 @@ function(_compile_swift_files
 
   list(APPEND swift_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
 
+  if(CFLAGS_ARCH STREQUAL "riscv64")
+     list(APPEND swift_flags "-Xcc" "-mno-relax")
+  endif()
+
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
 
   if(SWIFTFILE_OPT_FLAGS)

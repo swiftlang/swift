@@ -66,7 +66,7 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
   // arm64_32 is special since it has 32-bit pointers but __arm64__ is true.
   // Catch it early since __POINTER_WIDTH__ is generally non-portable.
   return p != nullptr;
-#elif defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
+#elif defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__)) || defined(__riscv)
   // On these platforms, except s390x, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
   // On s390x it is theoretically possible to have high bit set but in practice

@@ -29,8 +29,8 @@
 
 // Android NDK <r21 do not provide `__aeabi_d2h` in the compiler runtime,
 // provide shims in that case.
-#if (defined(__ANDROID__) && defined(__ARM_ARCH_7A__) && defined(__ARM_EABI__)) || \
-  ((defined(__i386__) || defined(__i686__) || defined(__x86_64__)) && !defined(__APPLE__))
+#if ((defined(__ANDROID__) || defined(__linux__)) && defined(__arm__)) || \
+  ((defined(__i386__) || defined(__i686__) || defined(__x86_64__) || defined(__riscv)) && !defined(__APPLE__))
 
 #include "../SwiftShims/Visibility.h"
 
