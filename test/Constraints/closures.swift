@@ -1172,3 +1172,15 @@ func test(arr: [[Int]]) {
   arr.map { ($0 as? [Int]).map { A($0) } } // expected-error {{missing argument label 'arg:' in call}} {{36-36=arg: }}
   // expected-warning@-1 {{conditional cast from '[Int]' to '[Int]' always succeeds}}
 }
+
+func closureWithCaseArchetype<T>(_: T.Type) {
+  let _ = { (any: Any) throws -> Any? in
+    switch any {
+    case let type as T:
+      return type
+
+    default:
+      return any
+    }
+  }
+}
