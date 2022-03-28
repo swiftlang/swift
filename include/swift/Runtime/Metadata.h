@@ -151,6 +151,11 @@ SWIFT_RUNTIME_EXPORT
 const ValueWitnessTable
   VALUE_WITNESS_SYM(THIN_FUNCTION_MANGLING);    // @convention(thin) () -> ()
 
+// The @convention(block) () -> () table can be used for arbitrary block function types.
+SWIFT_RUNTIME_EXPORT
+const ValueWitnessTable
+  VALUE_WITNESS_SYM(BLOCK_MANGLING);  // @convention(block) () -> ()
+
 // The () table can be used for arbitrary empty types.
 SWIFT_RUNTIME_EXPORT
 const ValueWitnessTable VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING);        // ()
