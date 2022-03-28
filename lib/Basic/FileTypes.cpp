@@ -61,6 +61,7 @@ ID file_types::lookupTypeForName(StringRef Name) {
 #define TYPE(NAME, ID, EXTENSION, FLAGS) \
            .Case(NAME, TY_##ID)
 #include "swift/Basic/FileTypes.def"
+      .Case("objc-header", TY_ClangHeader)
       .Default(TY_INVALID);
 }
 
