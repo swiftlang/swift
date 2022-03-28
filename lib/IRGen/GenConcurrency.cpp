@@ -26,6 +26,7 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "ScalarPairTypeInfo.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
 
@@ -192,6 +193,44 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   auto futureResultType = subs.getReplacementTypes()[0]->getCanonicalType();
   auto futureResultTypeMetadata = IGF.emitAbstractTypeMetadataRef(futureResultType);
 
+  // The concurrency runtime for older Apple OSes has a bug in task formation
+  // for `async let`s that may manifest when trying to use room in the
+  // parent task's preallocated `async let` buffer for the child task's
+  // initial task allocator slab. If targeting those older OSes, pad the
+  // context size for async let entry points to never fit in the preallocated
+  // space, so that we don't run into that bug. We leave a note on the
+  // declaration so that coroutine splitting can pad out the final context
+  // size after splitting.
+  auto deploymentAvailability
+    = AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
+  if (!deploymentAvailability.isContainedIn(
+                                   IGF.IGM.Context.getSwift57Availability())) {
+    auto taskAsyncFunctionPointer
+                = cast<llvm::GlobalVariable>(taskFunction->stripPointerCasts());
+
+    auto taskAsyncIDIter = IGF.IGM.AsyncCoroIDs.find(taskAsyncFunctionPointer);
+    assert(taskAsyncIDIter != IGF.IGM.AsyncCoroIDs.end()
+           && "async let entry point not emitted locally");
+    auto taskAsyncID = taskAsyncIDIter->second;
+    
+    // Pad out the initial context size in the async function pointer record
+    // and ID intrinsic so that it will never fit in the preallocated space.
+    uint64_t origSize = cast<llvm::ConstantInt>(taskAsyncID->getArgOperand(0))
+      ->getValue().getLimitedValue();
+    
+    uint64_t paddedSize = std::max(origSize,
+                     (NumWords_AsyncLet * IGF.IGM.getPointerSize()).getValue());
+    auto paddedSizeVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, paddedSize);
+    taskAsyncID->setArgOperand(0, paddedSizeVal);
+    
+    auto origInit = taskAsyncFunctionPointer->getInitializer();
+    auto newInit = llvm::ConstantStruct::get(
+                                   cast<llvm::StructType>(origInit->getType()),
+                                   origInit->getAggregateElement(0u),
+                                   paddedSizeVal);
+    taskAsyncFunctionPointer->setInitializer(newInit);
+  }
+  
   llvm::CallInst *call;
   if (localResultBuffer) {
     // This is @_silgen_name("swift_asyncLet_begin")
