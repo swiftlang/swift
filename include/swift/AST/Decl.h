@@ -2840,7 +2840,7 @@ private:
   /// expressed as a SubstitutionMap for the opaque interface generic signature.
   /// This maps types in the interface generic signature to the outer generic
   /// signature of the original declaration.
-  Optional<SubstitutionMap> UnderlyingTypeSubstitutions;
+  Optional<SubstitutionMap> UniqueUnderlyingType;
 
   /// A set of substitutions which are used based on the availability
   /// checks performed at runtime. This set of only populated if there
@@ -2922,16 +2922,16 @@ public:
   }
 
   /// The substitutions that map the generic parameters of the opaque type to
-  /// their underlying types, when that information is known.
-  Optional<SubstitutionMap> getUnderlyingTypeSubstitutions() const {
-    return UnderlyingTypeSubstitutions;
+  /// the unique underlying types, when that information is known.
+  Optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const {
+    return UniqueUnderlyingType;
   }
   
-  void setUnderlyingTypeSubstitutions(SubstitutionMap subs) {
-    assert(!UnderlyingTypeSubstitutions.hasValue() && "resetting underlying type?!");
-    UnderlyingTypeSubstitutions = subs;
+  void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
+    assert(!UniqueUnderlyingType.hasValue() && "resetting underlying type?!");
+    UniqueUnderlyingType = subs;
   }
-t
+
   void setConditionallyAvailableSubstitutions(
       ArrayRef<ConditionallyAvailableSubstitutions *> substitutions) {
     assert(!ConditionallyAvailableTypes &&

@@ -2040,7 +2040,7 @@ namespace {
     void addUnderlyingTypeAndConformances() {
       auto sig = O->getOpaqueInterfaceGenericSignature();
       auto contextSig = O->getGenericSignature().getCanonicalSignature();
-      auto subs = *O->getUnderlyingTypeSubstitutions();
+      auto subs = *O->getUniqueUnderlyingTypeSubstitutions();
 
       // Add the underlying types for each generic parameter.
       for (auto genericParam : O->getOpaqueGenericParams()) {

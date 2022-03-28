@@ -2713,7 +2713,7 @@ public:
 
     // If we have one successful candidate, then save it as the underlying
     // substitutions of the opaque decl.
-    OpaqueDecl->setUnderlyingTypeSubstitutions(
+    OpaqueDecl->setUniqueUnderlyingTypeSubstitutions(
         underlyingSubs.mapReplacementTypesOutOfContext());
   }
   
