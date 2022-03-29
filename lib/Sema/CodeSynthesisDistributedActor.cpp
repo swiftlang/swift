@@ -699,8 +699,7 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
   // Force type-checking the original function, so we can avoid synthesizing
   // the thunks (which would have many of the same errors, if they are caused
   // by a bad source function signature, e.g. missing conformances etc).
-  (void) TypeChecker::typeCheckDecl(distributedTarget);
-  if (distributedTarget->getDiags().hadAnyError()) {
+  if (distributedTarget->getInterfaceType()->hasError()) {
     return nullptr;
   }
 
