@@ -1421,18 +1421,6 @@ namespace {
     OptionSet<OpenedExistentialAdjustmentFlags>;
 }
 
-/// Determine if this function is part of the _isUnique family of functions in
-/// the standard library.
-static bool isStdlibUniqueFunction(ValueDecl *callee) {
-  if (!callee->isStdlibDecl())
-    return false;
-
-  auto baseName = callee->getName().getBaseName().userFacingName();
-  return baseName ==  "_isUnique" || baseName == "_isUnique_native" ||
-         baseName == "_COWBufferForReading" ||
-         baseName == "_unsafeDowncastToAnyObject";
-}
-
 /// Determine whether we should open up the existential argument to the
 /// given parameters.
 ///
@@ -1469,14 +1457,6 @@ shouldOpenExistentialCallArgument(
     return None;
 
   case DeclTypeCheckingSemantics::Normal:
-    // _isUnique and friends are special because opening an existential when
-    // calling them would make them non-unique.
-    // FIXME: Borrowing properly from the existential box would probably
-    // eliminate this.
-    if (isStdlibUniqueFunction(callee))
-      return None;
-    break;
-
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping:
     break;
   }
