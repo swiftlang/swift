@@ -826,8 +826,9 @@ private:
     os << "SWIFT_EXTERN ";
 
     DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
-    funcPrinter.printFunctionDeclAsCFunctionDecl(FD, funcABI.getSymbolName(),
-                                                 resultTy);
+    funcPrinter.printFunctionSignature(
+        FD, funcABI.getSymbolName(), resultTy,
+        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto);
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
@@ -864,8 +865,9 @@ private:
 
     os << "inline ";
     DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
-    funcPrinter.printFunctionDeclAsCxxFunctionDecl(
-        FD, FD->getName().getBaseIdentifier().get(), resultTy);
+    funcPrinter.printFunctionSignature(
+        FD, FD->getName().getBaseIdentifier().get(), resultTy,
+        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk);
     // FIXME: Support throwing exceptions for Swift errors.
     os << " noexcept";
     printFunctionClangAttributes(FD, funcTy);
