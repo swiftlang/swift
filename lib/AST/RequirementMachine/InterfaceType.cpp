@@ -158,25 +158,14 @@ AssociatedTypeDecl *RewriteContext::getAssociatedTypeForSymbol(Symbol symbol) {
 
   AssociatedTypeDecl *assocType = nullptr;
 
-  // An associated type symbol [P1&P1&...&Pn:A] has one or more protocols
-  // P0...Pn and an identifier 'A'.
+  // An associated type symbol [P1:A] stores a protocol 'P' and an
+  // identifier 'A'.
   //
-  // We map it back to a AssociatedTypeDecl as follows:
-  //
-  // - For each protocol Pn, look for associated types A in Pn itself,
-  //   and all protocols that Pn refines.
-  //
-  // - For each candidate associated type An in protocol Qn where
-  //   Pn refines Qn, get the associated type anchor An' defined in
-  //   protocol Qn', where Qn refines Qn'.
-  //
-  // - Out of all the candidiate pairs (Qn', An'), pick the one where
-  //   the protocol Qn' is the lowest element according to the linear
-  //   order defined by TypeDecl::compare().
-  //
-  // The associated type An' is then the canonical associated type
-  // representative of the associated type symbol [P0&...&Pn:A].
-  //
+  // We map it back to a AssociatedTypeDecl by looking for associated
+  // types named 'A' in 'P' and all protocols 'P' inherits. If there
+  // are multiple candidates, we discard overrides, and then pick the
+  // candidate that is minimal with respect to the linear order
+  // defined by TypeDecl::compare().
   auto *proto = symbol.getProtocol();
 
   auto checkOtherAssocType = [&](AssociatedTypeDecl *otherAssocType) {
