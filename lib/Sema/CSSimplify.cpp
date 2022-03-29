@@ -1421,18 +1421,6 @@ namespace {
     OptionSet<OpenedExistentialAdjustmentFlags>;
 }
 
-/// Determine if this function is part of the _isUnique family of functions in
-/// the standard library.
-static bool isStdlibUniqueFunction(ValueDecl *callee) {
-  if (!callee->isStdlibDecl())
-    return false;
-
-  auto baseName = callee->getName().getBaseName().userFacingName();
-  return baseName ==  "_isUnique" || baseName == "_isUnique_native" ||
-         baseName == "_COWBufferForReading" ||
-         baseName == "_unsafeDowncastToAnyObject";
-}
-
 /// Determine whether we should open up the existential argument to the
 /// given parameters.
 ///
@@ -1469,14 +1457,6 @@ shouldOpenExistentialCallArgument(
     return None;
 
   case DeclTypeCheckingSemantics::Normal:
-    // _isUnique and friends are special because opening an existential when
-    // calling them would make them non-unique.
-    // FIXME: Borrowing properly from the existential box would probably
-    // eliminate this.
-    if (isStdlibUniqueFunction(callee))
-      return None;
-    break;
-
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping:
     break;
   }
@@ -1521,32 +1501,6 @@ shouldOpenExistentialCallArgument(
   if (!argTy->isAnyExistentialType())
     return None;
 
-
-  // If the existential argument type conforms to all of its protocol
-  // requirements, don't open the existential.
-  {
-    Type existentialObjectType;
-    if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
-      existentialObjectType = existentialMetaTy->getInstanceType();
-    else
-      existentialObjectType = argTy;
-    auto layout = existentialObjectType->getExistentialLayout();
-    auto module = cs.DC->getParentModule();
-    bool containsNonSelfConformance = false;
-    for (auto proto : layout.getProtocols()) {
-      auto protoDecl = proto->getDecl();
-      auto conformance = module->lookupExistentialConformance(
-          existentialObjectType, protoDecl);
-      if (conformance.isInvalid()) {
-        containsNonSelfConformance = true;
-        break;
-      }
-    }
-
-    if (!containsNonSelfConformance)
-      return None;
-  }
-
   auto param = getParameterAt(callee, paramIdx);
   if (!param)
     return None;
@@ -1587,6 +1541,31 @@ shouldOpenExistentialCallArgument(
   if (genericParam->getDepth() <
           genericSig.getGenericParams().back()->getDepth())
     return None;
+
+  // If the existential argument conforms to all of protocol requirements on
+  // the formal parameter's type, don't open.
+  // If all of the conformance requirements on the formal parameter's type
+  // are self-conforming, don't open.
+  {
+    Type existentialObjectType;
+    if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
+      existentialObjectType = existentialMetaTy->getInstanceType();
+    else
+      existentialObjectType = argTy;
+    auto module = cs.DC->getParentModule();
+    bool containsNonSelfConformance = false;
+    for (auto proto : genericSig->getRequiredProtocols(genericParam)) {
+      auto conformance = module->lookupExistentialConformance(
+          existentialObjectType, proto);
+      if (conformance.isInvalid()) {
+        containsNonSelfConformance = true;
+        break;
+      }
+    }
+
+    if (!containsNonSelfConformance)
+      return None;
+  }
 
   // Ensure that the formal parameter is only used in covariant positions,
   // because it won't match anywhere else.
