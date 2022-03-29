@@ -1501,15 +1501,22 @@ shouldOpenExistentialCallArgument(
   if (!argTy->isAnyExistentialType())
     return None;
 
-  if (argTy->isExistentialType()) {
-    // If the existential argument type conforms to all of its protocol
-    // requirements, don't open the existential.
-    auto layout = argTy->getExistentialLayout();
+
+  // If the existential argument type conforms to all of its protocol
+  // requirements, don't open the existential.
+  {
+    Type existentialObjectType;
+    if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
+      existentialObjectType = existentialMetaTy->getInstanceType();
+    else
+      existentialObjectType = argTy;
+    auto layout = existentialObjectType->getExistentialLayout();
     auto module = cs.DC->getParentModule();
     bool containsNonSelfConformance = false;
     for (auto proto : layout.getProtocols()) {
       auto protoDecl = proto->getDecl();
-      auto conformance = module->lookupExistentialConformance(argTy, protoDecl);
+      auto conformance = module->lookupExistentialConformance(
+          existentialObjectType, protoDecl);
       if (conformance.isInvalid()) {
         containsNonSelfConformance = true;
         break;
