@@ -84,6 +84,10 @@ swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
   if (triple.isMacOSX())
     return llvm::VersionTuple(10, 10, 0);
 
+  // Mac Catalyst was introduced with an iOS deployment target of 13.1.
+  if (tripleIsMacCatalystEnvironment(triple))
+    return llvm::VersionTuple(13, 1);
+  
   // Note: this must come before checking iOS since that returns true for
   // both iOS and tvOS.
   if (triple.isTvOS())
@@ -133,6 +137,7 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
 
     if (tripleIsiOSSimulator(triple))
       return DarwinPlatformKind::IPhoneOSSimulator;
+
     return DarwinPlatformKind::IPhoneOS;
   }
 
