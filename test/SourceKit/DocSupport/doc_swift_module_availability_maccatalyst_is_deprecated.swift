@@ -1,4 +1,5 @@
-// REQUIRES: OS=maccatalyst
+// REQUIRES: maccatalyst_support
+// REQUIRES: rdar90937993
 
 // RUN: %empty-directory(%t.mod)
 // RUN: %swift -emit-module -target x86_64-apple-ios13.1-macabi -o %t.mod/availability.swiftmodule %S/Inputs/availability_maccatalyst_is_deprecated.swift -parse-as-library -emit-module-doc-path %t.mod/availability.swiftdoc
