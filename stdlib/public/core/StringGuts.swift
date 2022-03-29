@@ -417,7 +417,9 @@ extension _StringGuts {
     // FIXME: Consider performing a linked-on-or-after check & trapping if the
     // client executable was built on some particular future Swift release.
     let utf16 = String(self).utf16
-    return utf16.index(utf16.startIndex, offsetBy: i._encodedOffset)
+    let base = utf16.index(utf16.startIndex, offsetBy: i._encodedOffset)
+    if i.transcodedOffset == 0 { return base }
+    return base.encoded(offsetBy: i.transcodedOffset)._knownUTF8
   }
 }
 
