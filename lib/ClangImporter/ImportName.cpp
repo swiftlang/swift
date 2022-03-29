@@ -999,7 +999,11 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
   lookupResult.setAllowHidden(true);
   lookupResult.suppressDiagnostics();
 
-  if (clangSema.LookupName(lookupResult, /*scope=*/clangSema.TUScope)) {
+  // Only force the Objective-C codepath in LookupName if clangSema.TUScope is
+  // nullptr
+  if (clangSema.LookupName(lookupResult, /*scope=*/clangSema.TUScope,
+                           /*AllowBuiltinCreation=*/false,
+                           /*ForceNoCPlusPlus=*/!clangSema.TUScope)) {
     if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
       return true;
   }
