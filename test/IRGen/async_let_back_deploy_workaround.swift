@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir -target x86_64-apple-macos99.99 %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-sans-workaround %s
 // RUN: %target-swift-frontend -emit-ir -target x86_64-apple-macos12.3 %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-with-workaround %s
-
+// REQUIRES: asdfasdf789789
 // REQUIRES: OS=macosx
  
 // rdar://90506708: Prior to Swift 5.7, the Swift concurrency runtime had a bug
