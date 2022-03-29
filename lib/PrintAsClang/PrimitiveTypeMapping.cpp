@@ -118,7 +118,7 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
                 "SIMD elements is changed");
 }
 
-PrimitiveTypeMapping::ClangTypeInfo *
+PrimitiveTypeMapping::FullClangTypeInfo *
 PrimitiveTypeMapping::getMappedTypeInfoOrNull(const TypeDecl *typeDecl) {
   if (mappedTypeNames.empty())
     initialize(typeDecl->getASTContext());
@@ -131,27 +131,27 @@ PrimitiveTypeMapping::getMappedTypeInfoOrNull(const TypeDecl *typeDecl) {
   return &iter->second;
 }
 
-Optional<PrimitiveTypeMapping::ObjCClangTypeInfo>
+Optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownObjCTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl))
-    return ObjCClangTypeInfo{typeInfo->objcName, typeInfo->canBeNullable};
+    return ClangTypeInfo{typeInfo->objcName, typeInfo->canBeNullable};
   return None;
 }
 
-Optional<PrimitiveTypeMapping::CClangTypeInfo>
+Optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownCTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl)) {
     if (typeInfo->cName)
-      return CClangTypeInfo{*typeInfo->cName, typeInfo->canBeNullable};
+      return ClangTypeInfo{*typeInfo->cName, typeInfo->canBeNullable};
   }
   return None;
 }
 
-Optional<PrimitiveTypeMapping::CxxClangTypeInfo>
+Optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownCxxTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl)) {
     if (typeInfo->cxxName)
-      return CxxClangTypeInfo{*typeInfo->cxxName, typeInfo->canBeNullable};
+      return ClangTypeInfo{*typeInfo->cxxName, typeInfo->canBeNullable};
   }
   return None;
 }
