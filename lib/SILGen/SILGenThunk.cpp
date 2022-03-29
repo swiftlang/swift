@@ -293,9 +293,9 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       // Get the continuation out of the block object.
       auto blockStorage = params[0].getValue();
       auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
-      auto continuationVal = SGF.B.createLoad(loc, continuationAddr,
-                                           LoadOwnershipQualifier::Trivial);
-      auto continuation = ManagedValue::forUnmanaged(continuationVal);
+      auto continuation = SGF.emitLoad(loc, continuationAddr,
+                            SGF.getTypeLowering(continuationTy),
+                              SGFContext(), IsTake);
 
       // Check for an error if the convention includes one.
       // Increment the error and flag indices if present.  They do not account
