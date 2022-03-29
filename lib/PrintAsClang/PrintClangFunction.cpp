@@ -13,6 +13,7 @@
 #include "PrintClangFunction.h"
 #include "ClangSyntaxPrinter.h"
 #include "DeclAndTypePrinter.h"
+#include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
@@ -23,6 +24,22 @@
 
 using namespace swift;
 
+namespace {
+
+class ClangFunctionSignatureTypePrinter : private ClangSyntaxPrinter {
+public:
+  ClangFunctionSignatureTypePrinter(raw_ostream &os) : ClangSyntaxPrinter(os) {}
+
+  void printIfSimpleType(StringRef name, bool canBeNullable,
+                         Optional<OptionalTypeKind> optionalKind) {
+    os << name;
+    if (canBeNullable)
+      printNullability(optionalKind);
+  }
+
+  void printVoidType() { os << "void"; }
+};
+
 // Prints types in the C function signature that corresponds to the
 // native Swift function/method.
 class CFunctionSignatureTypePrinter
@@ -31,11 +48,22 @@ class CFunctionSignatureTypePrinter
       private ClangSyntaxPrinter {
 public:
   CFunctionSignatureTypePrinter(raw_ostream &os,
-                                PrimitiveTypeMapping &typeMapping)
-      : ClangSyntaxPrinter(os), typeMapping(typeMapping) {}
+                                PrimitiveTypeMapping &typeMapping,
+                                OutputLanguageMode languageMode)
+      : ClangSyntaxPrinter(os), typeMapping(typeMapping),
+        languageMode(languageMode) {}
 
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               Optional<OptionalTypeKind> optionalKind) {
+    if (languageMode == OutputLanguageMode::Cxx) {
+      auto knownTypeInfo = typeMapping.getKnownCxxTypeInfo(typeDecl);
+      if (!knownTypeInfo)
+        return false;
+      os << knownTypeInfo->name;
+      if (knownTypeInfo->canBeNullable)
+        printNullability(optionalKind);
+      return true;
+    }
     auto knownTypeInfo = typeMapping.getKnownCTypeInfo(typeDecl);
     if (!knownTypeInfo)
       return false;
@@ -83,7 +111,10 @@ public:
 
 private:
   PrimitiveTypeMapping &typeMapping;
+  OutputLanguageMode languageMode;
 };
+
+} // end namespace
 
 void DeclAndTypeClangFunctionPrinter::printFunctionDeclAsCFunctionDecl(
     FuncDecl *FD, StringRef name, Type resultTy) {
@@ -92,7 +123,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionDeclAsCFunctionDecl(
                       StringRef name) {
     // FIXME: add support for noescape and PrintMultiPartType,
     // see DeclAndTypePrinter::print.
-    CFunctionSignatureTypePrinter typePrinter(os, typeMapping);
+    CFunctionSignatureTypePrinter typePrinter(os, typeMapping,
+                                              OutputLanguageMode::ObjC);
     typePrinter.visit(ty, optionalKind);
 
     if (!name.empty()) {
@@ -106,7 +138,8 @@ void DeclAndTypeClangFunctionPrinter::printFunctionDeclAsCFunctionDecl(
   Type objTy;
   std::tie(objTy, kind) =
       DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
-  CFunctionSignatureTypePrinter typePrinter(os, typeMapping);
+  CFunctionSignatureTypePrinter typePrinter(os, typeMapping,
+                                            OutputLanguageMode::ObjC);
   typePrinter.visit(objTy, kind);
 
   os << ' ' << name << '(';
@@ -125,6 +158,56 @@ void DeclAndTypeClangFunctionPrinter::printFunctionDeclAsCFunctionDecl(
     });
   } else {
     os << "void";
+  }
+  os << ')';
+}
+
+void DeclAndTypeClangFunctionPrinter::printFunctionDeclAsCxxFunctionDecl(
+    FuncDecl *FD, StringRef name, Type resultTy) {
+  // FIXME: Might need a PrintMultiPartType here.
+  auto print = [this](Type ty, Optional<OptionalTypeKind> optionalKind,
+                      StringRef name) {
+    // FIXME: add support for noescape and PrintMultiPartType,
+    // see DeclAndTypePrinter::print.
+    CFunctionSignatureTypePrinter typePrinter(os, typeMapping,
+                                              OutputLanguageMode::Cxx);
+    typePrinter.visit(ty, optionalKind);
+
+    if (!name.empty()) {
+      os << ' ';
+      ClangSyntaxPrinter(os).printIdentifier(name);
+    }
+  };
+
+  // Print out the return type.
+  OptionalTypeKind kind;
+  Type objTy;
+  std::tie(objTy, kind) =
+      DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
+  CFunctionSignatureTypePrinter typePrinter(os, typeMapping,
+                                            OutputLanguageMode::Cxx);
+  typePrinter.visit(objTy, kind);
+
+  os << ' ' << name << '(';
+
+  // Print out the parameter types.
+  auto params = FD->getParameters();
+  if (params->size()) {
+    size_t paramIndex = 1;
+    llvm::interleaveComma(*params, os, [&](const ParamDecl *param) {
+      OptionalTypeKind kind;
+      Type objTy;
+      std::tie(objTy, kind) = DeclAndTypePrinter::getObjectTypeAndOptionality(
+          param, param->getInterfaceType());
+      std::string paramName =
+          param->getName().empty() ? "" : param->getName().str().str();
+      if (paramName.empty()) {
+        llvm::raw_string_ostream os(paramName);
+        os << "_" << paramIndex;
+      }
+      print(objTy, kind, paramName);
+      ++paramIndex;
+    });
   }
   os << ')';
 }

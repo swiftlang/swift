@@ -48,6 +48,15 @@ public:
   /// primitive type declaration, or \c None if no such type name exists.
   Optional<CClangTypeInfo> getKnownCTypeInfo(const TypeDecl *typeDecl);
 
+  struct CxxClangTypeInfo {
+    StringRef name;
+    bool canBeNullable;
+  };
+
+  /// Returns the C++ type name and nullability for the given Swift
+  /// primitive type declaration, or \c None if no such type name exists.
+  Optional<CxxClangTypeInfo> getKnownCxxTypeInfo(const TypeDecl *typeDecl);
+
 private:
   void initialize(ASTContext &ctx);
 
@@ -56,6 +65,8 @@ private:
     StringRef objcName;
     // The C name of the Swift type.
     Optional<StringRef> cName;
+    // The C++ name of the Swift type.
+    Optional<StringRef> cxxName;
     bool canBeNullable;
   };
 

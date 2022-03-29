@@ -716,8 +716,7 @@ private:
   /// Print the core function declaration for a given function with the given
   /// name.
   void printFunctionDeclAsCFunctionDecl(FuncDecl *FD, StringRef name,
-                                        Type resultTy,
-                                        bool printEmptyParamNames = false) {
+                                        Type resultTy) {
     // The result type may be a partial function type we need to close
     // up later.
     PrintMultiPartType multiPart(*this);
@@ -737,12 +736,8 @@ private:
         Type objTy;
         std::tie(objTy, kind) =
             getObjectTypeAndOptionality(param, param->getInterfaceType());
-        std::string paramName =
-            param->getName().empty() ? "" : param->getName().str().str();
-        if (printEmptyParamNames && paramName.empty()) {
-          llvm::raw_string_ostream os(paramName);
-          os << "_" << index;
-        }
+        StringRef paramName =
+            param->getName().empty() ? "" : param->getName().str();
         print(objTy, kind, paramName, IsFunctionParam);
         ++index;
       });
@@ -868,9 +863,9 @@ private:
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
     os << "inline ";
-    printFunctionDeclAsCFunctionDecl(FD,
-                                     FD->getName().getBaseIdentifier().get(),
-                                     resultTy, /*printEmptyParamNames=*/true);
+    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
+    funcPrinter.printFunctionDeclAsCxxFunctionDecl(
+        FD, FD->getName().getBaseIdentifier().get(), resultTy);
     // FIXME: Support throwing exceptions for Swift errors.
     os << " noexcept";
     printFunctionClangAttributes(FD, funcTy);
@@ -1998,7 +1993,7 @@ private:
   /// visitPart().
 public:
   void print(Type ty, Optional<OptionalTypeKind> optionalKind,
-             std::string name = "",
+             StringRef name = "",
              IsFunctionParam_t isFuncParam = IsNotFunctionParam) {
     PrettyStackTraceType trace(getASTContext(), "printing", ty);
 

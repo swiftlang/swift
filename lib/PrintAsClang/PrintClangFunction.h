@@ -36,6 +36,11 @@ public:
   void printFunctionDeclAsCFunctionDecl(FuncDecl *FD, StringRef name,
                                         Type resultTy);
 
+  /// Print the inline C++ function thunk declaration that corresponds to the
+  /// given Swift function declaration.
+  void printFunctionDeclAsCxxFunctionDecl(FuncDecl *FD, StringRef name,
+                                          Type resultTy);
+
 private:
   raw_ostream &os;
   PrimitiveTypeMapping &typeMapping;

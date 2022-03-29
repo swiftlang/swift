@@ -24,11 +24,20 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
     CLANG_REPR,                                                                \
     Optional<StringRef>(CLANG_REPR),                                           \
+    Optional<StringRef>(CLANG_REPR),                                           \
     NEEDS_NULLABILITY                                                          \
   }
 #define MAP_C(SWIFT_NAME, OBJC_REPR, C_REPR, NEEDS_NULLABILITY)                \
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      OBJC_REPR, Optional<StringRef>(C_REPR), NEEDS_NULLABILITY}
+    OBJC_REPR,                                                                 \
+    Optional<StringRef>(C_REPR),                                               \
+    Optional<StringRef>(C_REPR),                                               \
+    NEEDS_NULLABILITY                                                          \
+  }
+#define MAP_CXX(SWIFT_NAME, OBJC_REPR, C_REPR, CXX_REPR, NEEDS_NULLABILITY)    \
+  mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
+      OBJC_REPR, Optional<StringRef>(C_REPR), Optional<StringRef>(CXX_REPR),   \
+      NEEDS_NULLABILITY}
 
   MAP(CBool, "bool", false);
 
@@ -66,8 +75,8 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   MAP(Float32, "float", false);
   MAP(Float64, "double", false);
 
-  MAP_C(Int, "NSInteger", "ptrdiff_t", false);
-  MAP_C(UInt, "NSUInteger", "size_t", false);
+  MAP_CXX(Int, "NSInteger", "ptrdiff_t", "swift::Int", false);
+  MAP_CXX(UInt, "NSUInteger", "size_t", "swift::UInt", false);
   MAP_C(Bool, "BOOL", "bool", false);
 
   MAP(OpaquePointer, "void *", true);
@@ -76,33 +85,33 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
 
   Identifier ID_ObjectiveC = ctx.Id_ObjectiveC;
   mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] = {
-      "BOOL", None, false};
+      "BOOL", None, None, false};
   mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] = {
-      "SEL", None, true};
+      "SEL", None, None, true};
   mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier(ctx.getSwiftName(
                                       KnownFoundationEntity::NSZone))}] = {
-      "struct _NSZone *", None, true};
+      "struct _NSZone *", None, None, true};
 
   mappedTypeNames[{ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean")}] = {
-      "Boolean", None, false};
+      "Boolean", None, None, false};
 
   mappedTypeNames[{ctx.Id_CoreGraphics, ctx.Id_CGFloat}] = {"CGFloat", None,
-                                                            false};
+                                                            None, false};
 
   mappedTypeNames[{ctx.Id_CoreFoundation, ctx.Id_CGFloat}] = {"CGFloat", None,
-                                                              false};
+                                                              None, false};
 
   // Use typedefs we set up for SIMD vector types.
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
+  StringRef simd2##BASENAME = "swift_" #BASENAME "2";                          \
   mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "2")}] = {         \
-      "swift_" #BASENAME "2", Optional<StringRef>("swift_" #BASENAME "2"),     \
-      false};                                                                  \
+      simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false};               \
+  StringRef simd3##BASENAME = "swift_" #BASENAME "3";                          \
   mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "3")}] = {         \
-      "swift_" #BASENAME "3", Optional<StringRef>("swift_" #BASENAME "3"),     \
-      false};                                                                  \
+      simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false};               \
+  StringRef simd4##BASENAME = "swift_" #BASENAME "4";                          \
   mappedTypeNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "4")}] = {         \
-      "swift_" #BASENAME "4", Optional<StringRef>("swift_" #BASENAME "4"),     \
-      false};
+      simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false};
 #include "swift/ClangImporter/SIMDMappedTypes.def"
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
                 "must add or remove special name mappings if max number of "
@@ -134,6 +143,15 @@ PrimitiveTypeMapping::getKnownCTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl)) {
     if (typeInfo->cName)
       return CClangTypeInfo{*typeInfo->cName, typeInfo->canBeNullable};
+  }
+  return None;
+}
+
+Optional<PrimitiveTypeMapping::CxxClangTypeInfo>
+PrimitiveTypeMapping::getKnownCxxTypeInfo(const TypeDecl *typeDecl) {
+  if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl)) {
+    if (typeInfo->cxxName)
+      return CxxClangTypeInfo{*typeInfo->cxxName, typeInfo->canBeNullable};
   }
   return None;
 }
