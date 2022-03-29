@@ -14,7 +14,6 @@
 # Utility code for later in this template
 #
 
-from __future__ import division
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
 from SwiftFloatingPointTypes import getFtoIBounds
 

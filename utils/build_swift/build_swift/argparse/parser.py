@@ -13,9 +13,6 @@ destination actions as well as a new builder DSL for declaratively
 constructing complex parsers.
 """
 
-
-from __future__ import absolute_import, unicode_literals
-
 import argparse
 from contextlib import contextmanager
 

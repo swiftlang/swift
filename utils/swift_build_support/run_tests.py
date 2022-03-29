@@ -14,8 +14,6 @@ Small script used to easily run the swift_build_support module unit tests.
 """
 
 
-from __future__ import absolute_import, unicode_literals
-
 import os
 import sys
 import unittest

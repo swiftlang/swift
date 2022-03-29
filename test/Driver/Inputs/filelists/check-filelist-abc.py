@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # check-filelist-abc.py - Fake build to test driver-produced -filelists.
 #
 # This source file is part of the Swift.org open source project
