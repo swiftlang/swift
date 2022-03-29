@@ -731,6 +731,12 @@ extension Substring {
         base: String(base._guts).utf8,
         bounds: _bounds)
     }
+
+    @_alwaysEmitIntoClient @inline(__always)
+    internal var _wholeGuts: _StringGuts { _slice._base._guts }
+
+    @_alwaysEmitIntoClient @inline(__always)
+    internal var _base: String.UTF8View { _slice._base }
   }
 }
 
@@ -740,48 +746,52 @@ extension Substring.UTF8View: BidirectionalCollection {
   public typealias Element = String.UTF8View.Element
   public typealias SubSequence = Substring.UTF8View
 
-  //
-  // Plumb slice operations through
-  //
   @inlinable
-  public var startIndex: Index { return _slice.startIndex }
+  public var startIndex: Index { _slice._startIndex }
 
   @inlinable
-  public var endIndex: Index { return _slice.endIndex }
+  public var endIndex: Index { _slice._endIndex }
 
   @inlinable
-  public subscript(index: Index) -> Element { return _slice[index] }
+  public subscript(index: Index) -> Element {
+    let index = _wholeGuts.ensureMatchingEncoding(index)
+    _precondition(index >= startIndex && index < endIndex,
+      "String index is out of bounds")
+    return _base[_unchecked: index]
+  }
 
   @inlinable
   public var indices: Indices { return _slice.indices }
 
   @inlinable
-  public func index(after i: Index) -> Index { return _slice.index(after: i) }
+  public func index(after i: Index) -> Index {
+    // Note: deferred bounds check
+    return _base.index(after: i)
+  }
 
   @inlinable
   public func formIndex(after i: inout Index) {
-    // TODO(lorentey): Review index validation
-    _slice.formIndex(after: &i)
+    // Note: deferred bounds check
+    _base.formIndex(after: &i)
   }
 
   @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    // TODO(lorentey): Review index validation
-    return _slice.index(i, offsetBy: n)
+    // Note: deferred bounds check
+    return _base.index(i, offsetBy: n)
   }
 
   @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
-    // TODO(lorentey): Review index validation
-    return _slice.index(i, offsetBy: n, limitedBy: limit)
+    // Note: deferred bounds check
+    return _base.index(i, offsetBy: n, limitedBy: limit)
   }
 
   @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
-    // TODO(lorentey): Review index validation
-    return _slice.distance(from: start, to: end)
+    return _base.distance(from: start, to: end)
   }
 
   @_alwaysEmitIntoClient
@@ -794,36 +804,36 @@ extension Substring.UTF8View: BidirectionalCollection {
 
   @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
-    // TODO(lorentey): Review index validation
-    _slice._failEarlyRangeCheck(index, bounds: bounds)
+    // FIXME: This probably ought to ensure that all three indices have matching
+    // encodings.
+    _base._failEarlyRangeCheck(index, bounds: bounds)
   }
 
   @inlinable
   public func _failEarlyRangeCheck(
     _ range: Range<Index>, bounds: Range<Index>
   ) {
-    // TODO(lorentey): Review index validation
-    _slice._failEarlyRangeCheck(range, bounds: bounds)
+    // FIXME: This probably ought to ensure that all three indices have matching
+    // encodings.
+    _base._failEarlyRangeCheck(range, bounds: bounds)
   }
 
   @inlinable
   public func index(before i: Index) -> Index {
-    // TODO(lorentey): Review index validation
-    return _slice.index(before: i)
+    // Note: deferred bounds check
+    return _base.index(before: i)
   }
 
   @inlinable
   public func formIndex(before i: inout Index) {
-    // TODO(lorentey): Review index validation
-    _slice.formIndex(before: &i)
+    // Note: deferred bounds check
+    _base.formIndex(before: &i)
   }
 
   @inlinable
   public subscript(r: Range<Index>) -> Substring.UTF8View {
-    // TODO(lorentey): Review index validation
     // FIXME(strings): tests.
-    _precondition(r.lowerBound >= startIndex && r.upperBound <= endIndex,
-      "UTF8View index range out of bounds")
+    let r = _wholeGuts.validateSubscalarRange(r, from: startIndex, to: endIndex)
     return Substring.UTF8View(_slice.base, _bounds: r)
   }
 }

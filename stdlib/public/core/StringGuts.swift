@@ -456,7 +456,9 @@ extension _StringGuts {
     _precondition(i >= start && i < end, "Substring index is out of bounds")
     return scalarAlign(i)
   }
+}
 
+extension _StringGuts {
   /// Validate `i` and adjust its position toward the start, returning the
   /// resulting index or trapping as appropriate. If this function returns, then
   /// the returned value
@@ -491,7 +493,47 @@ extension _StringGuts {
     _precondition(i >= start && i <= end, "Substring index is out of bounds")
     return scalarAlign(i)
   }
+}
 
+extension _StringGuts {
+  @_alwaysEmitIntoClient
+  internal func validateSubscalarRange(
+    _ range: Range<String.Index>
+  ) -> Range<String.Index> {
+    let upper = ensureMatchingEncoding(range.upperBound)
+    let lower = ensureMatchingEncoding(range.lowerBound)
+
+    // Note: if only `lower` was miscoded, then the range invariant `lower <=
+    // upper` may no longer hold after the above conversions, so we need to
+    // re-check it here.
+    _precondition(upper._encodedOffset <= count && lower <= upper,
+      "String index range is out of bounds")
+
+    return Range(_uncheckedBounds: (lower, upper))
+  }
+
+  @_alwaysEmitIntoClient
+  internal func validateSubscalarRange(
+    _ range: Range<String.Index>,
+    from start: String.Index,
+    to end: String.Index
+  ) -> Range<String.Index> {
+    _internalInvariant(start <= end && end <= endIndex)
+
+    let upper = ensureMatchingEncoding(range.upperBound)
+    let lower = ensureMatchingEncoding(range.lowerBound)
+
+    // Note: if only `lower` was miscoded, then the range invariant `lower <=
+    // upper` may no longer hold after the above conversions, so we need to
+    // re-check it here.
+    _precondition(upper <= end && lower >= start && lower <= upper,
+      "Substring index range is out of bounds")
+
+    return Range(_uncheckedBounds: (lower, upper))
+  }
+}
+
+extension _StringGuts {
   /// Validate `range` and adjust the position of its bounds, returning the
   /// resulting range or trapping as appropriate. If this function returns, then
   /// the bounds of the returned value
