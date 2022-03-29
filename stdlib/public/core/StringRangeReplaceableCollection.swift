@@ -311,24 +311,28 @@ extension String: RangeReplaceableCollection {
 }
 
 extension String {
-  @inlinable @inline(__always)
+  @available(*, deprecated,
+    message: "Use one of the _StringGuts.validateScalarIndex methods")
+  @usableFromInline // Used to be inlinable before 5.7
   internal func _boundsCheck(_ index: Index) {
-    _precondition(index._encodedOffset >= 0 && index._encodedOffset < _guts.count,
+    _precondition(index._encodedOffset < _guts.count,
       "String index is out of bounds")
   }
 
-  @inlinable @inline(__always)
+  @available(*, deprecated,
+    message: "Use one of the _StringGuts.validateScalarIndexRange methods")
+  @usableFromInline // Used to be inlinable before 5.7
   internal func _boundsCheck(_ range: Range<Index>) {
     _precondition(
-      range.lowerBound._encodedOffset >= 0 &&
       range.upperBound._encodedOffset <= _guts.count,
       "String index range is out of bounds")
   }
 
-  @inlinable @inline(__always)
+  @available(*, deprecated,
+    message: "Use one of the _StringGuts.validateScalarIndex methods")
+  @usableFromInline // Used to be inlinable before 5.7
   internal func _boundsCheck(_ range: ClosedRange<Index>) {
     _precondition(
-      range.lowerBound._encodedOffset >= 0 &&
       range.upperBound._encodedOffset < _guts.count,
       "String index range is out of bounds")
   }
