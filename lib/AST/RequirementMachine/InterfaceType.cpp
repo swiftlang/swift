@@ -143,57 +143,6 @@ MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
   return MutableTerm(symbols);
 }
 
-/// Map an associated type symbol to an associated type declaration.
-///
-/// Note that the protocol graph is not part of the caching key; each
-/// protocol graph is a subgraph of the global inheritance graph, so
-/// the specific choice of subgraph does not change the result.
-AssociatedTypeDecl *RewriteContext::getAssociatedTypeForSymbol(Symbol symbol) {
-  auto found = AssocTypes.find(symbol);
-  if (found != AssocTypes.end())
-    return found->second;
-
-  assert(symbol.getKind() == Symbol::Kind::AssociatedType);
-  auto name = symbol.getName();
-
-  AssociatedTypeDecl *assocType = nullptr;
-
-  // An associated type symbol [P1:A] stores a protocol 'P' and an
-  // identifier 'A'.
-  //
-  // We map it back to a AssociatedTypeDecl by looking for associated
-  // types named 'A' in 'P' and all protocols 'P' inherits. If there
-  // are multiple candidates, we discard overrides, and then pick the
-  // candidate that is minimal with respect to the linear order
-  // defined by TypeDecl::compare().
-  auto *proto = symbol.getProtocol();
-
-  auto checkOtherAssocType = [&](AssociatedTypeDecl *otherAssocType) {
-    otherAssocType = otherAssocType->getAssociatedTypeAnchor();
-
-    if (otherAssocType->getName() == name &&
-        (assocType == nullptr ||
-         TypeDecl::compare(otherAssocType->getProtocol(),
-                           assocType->getProtocol()) < 0)) {
-      assocType = otherAssocType;
-    }
-  };
-
-  for (auto *otherAssocType : proto->getAssociatedTypeMembers()) {
-    checkOtherAssocType(otherAssocType);
-  }
-
-  for (auto *inheritedProto : getInheritedProtocols(proto)) {
-    for (auto *otherAssocType : inheritedProto->getAssociatedTypeMembers()) {
-      checkOtherAssocType(otherAssocType);
-    }
-  }
-
-  assert(assocType && "Need to look harder");
-  AssocTypes[symbol] = assocType;
-  return assocType;
-}
-
 /// Find the most canonical associated type declaration with the given
 /// name among a set of conforming protocols stored in this property map
 /// entry.
@@ -230,18 +179,13 @@ AssociatedTypeDecl *PropertyBag::getAssociatedType(Identifier name) {
   return assocType;
 }
 
-/// Compute the interface type for a range of symbols, with an optional
-/// root type.
-///
-/// If the root type is specified, we wrap it in a series of
-/// DependentMemberTypes. Otherwise, the root is computed from
-/// the first symbol of the range.
+/// Compute the interface type for a range of symbols.
 static Type
-getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
+getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
                       TypeArrayView<GenericTypeParamType> genericParams,
                       const PropertyMap &map) {
   auto &ctx = map.getRewriteContext();
-  Type result = root;
+  Type result;
 
   auto handleRoot = [&](GenericTypeParamType *genericParam) {
     assert(genericParam->isCanonical());
@@ -328,12 +272,13 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
       continue;
     }
 
-    // We should have a resolved type at this point.
-    AssociatedTypeDecl *assocType;
+    assert(symbol.getKind() == Symbol::Kind::AssociatedType);
 
+    MutableTerm prefix;
     if (begin == iter) {
-      // FIXME: Eliminate this case once merged associated types are gone.
-      assocType = ctx.getAssociatedTypeForSymbol(symbol);
+      // If the term begins with an associated type symbol, look for the
+      // associated type in the protocol itself.
+      prefix.add(Symbol::forProtocol(symbol.getProtocol(), ctx));
     } else {
       // The protocol stored in an associated type symbol appearing in a
       // canonical term is not necessarily the right protocol to look for
@@ -343,41 +288,40 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
       //
       // Instead, find all protocols that the prefix conforms to, and look
       // for an associated type in those protocols.
-      MutableTerm prefix(begin, iter);
-      assert(prefix.size() > 0);
+      prefix.append(begin, iter);
+    }
 
-      auto *props = map.lookUpProperties(prefix.rbegin(), prefix.rend());
-      if (props == nullptr) {
-        llvm::errs() << "Cannot build interface type for term "
-                     << MutableTerm(begin, end) << "\n";
-        llvm::errs() << "Prefix does not conform to any protocols: "
-                     << prefix << "\n\n";
-        map.dump(llvm::errs());
-        abort();
-      }
+    auto *props = map.lookUpProperties(prefix.rbegin(), prefix.rend());
+    if (props == nullptr) {
+      llvm::errs() << "Cannot build interface type for term "
+                   << MutableTerm(begin, end) << "\n";
+      llvm::errs() << "Prefix does not conform to any protocols: "
+                   << prefix << "\n\n";
+      map.dump(llvm::errs());
+      abort();
+    }
 
-      // Assert that the associated type's protocol appears among the set
-      // of protocols that the prefix conforms to.
-  #ifndef NDEBUG
-      auto conformsTo = props->getConformsTo();
-      assert(std::find(conformsTo.begin(), conformsTo.end(),
-                       symbol.getProtocol())
-             != conformsTo.end());
-  #endif
+    // Assert that the associated type's protocol appears among the set
+    // of protocols that the prefix conforms to.
+#ifndef NDEBUG
+    auto conformsTo = props->getConformsTo();
+    assert(std::find(conformsTo.begin(), conformsTo.end(),
+                     symbol.getProtocol())
+           != conformsTo.end());
+#endif
 
-      assocType = props->getAssociatedType(symbol.getName());
-      if (assocType == nullptr) {
-        llvm::errs() << "Cannot build interface type for term "
-                     << MutableTerm(begin, end) << "\n";
-        llvm::errs() << "Prefix term does not not have a nested type named "
-                     << symbol.getName() << ": "
-                     << prefix << "\n";
-        llvm::errs() << "Property map entry: ";
-        props->dump(llvm::errs());
-        llvm::errs() << "\n\n";
-        map.dump(llvm::errs());
-        abort();
-      }
+    auto *assocType = props->getAssociatedType(symbol.getName());
+    if (assocType == nullptr) {
+      llvm::errs() << "Cannot build interface type for term "
+                   << MutableTerm(begin, end) << "\n";
+      llvm::errs() << "Prefix term does not not have a nested type named "
+                   << symbol.getName() << ": "
+                   << prefix << "\n";
+      llvm::errs() << "Property map entry: ";
+      props->dump(llvm::errs());
+      llvm::errs() << "\n\n";
+      map.dump(llvm::errs());
+      abort();
     }
 
     result = DependentMemberType::get(result, assocType);
@@ -388,26 +332,12 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
 
 Type PropertyMap::getTypeForTerm(Term term,
                       TypeArrayView<GenericTypeParamType> genericParams) const {
-  return getTypeForSymbolRange(term.begin(), term.end(), Type(),
-                               genericParams, *this);
+  return getTypeForSymbolRange(term.begin(), term.end(), genericParams, *this);
 }
 
 Type PropertyMap::getTypeForTerm(const MutableTerm &term,
                       TypeArrayView<GenericTypeParamType> genericParams) const {
-  return getTypeForSymbolRange(term.begin(), term.end(), Type(),
-                               genericParams, *this);
-}
-
-Type PropertyMap::getRelativeTypeForTerm(
-    const MutableTerm &term, const MutableTerm &prefix) const {
-  assert(std::equal(prefix.begin(), prefix.end(), term.begin()));
-
-  auto genericParam =
-      CanGenericTypeParamType::get(/*type sequence*/ false, 0, 0,
-                                   Context.getASTContext());
-  return getTypeForSymbolRange(
-      term.begin() + prefix.size(), term.end(), genericParam,
-      { }, *this);
+  return getTypeForSymbolRange(term.begin(), term.end(), genericParams, *this);
 }
 
 /// Concrete type terms are written in terms of generic parameter types that

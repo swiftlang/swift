@@ -307,6 +307,21 @@ bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
   return !type.walk(Walker(*this));
 }
 
+/// Given a type parameter 'T.A1.A2...An', a suffix length m where m <= n,
+/// and a replacement type U, produce the type 'U.A(n-m)...An' by replacing
+/// 'T.A1...A(n-m-1)' with 'U'.
+static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
+                            GenericSignature sig) {
+  if (suffixLength == 0)
+    return prefixType;
+
+  auto *memberType = type->castTo<DependentMemberType>();
+  auto substBaseType = substPrefixType(memberType->getBase(), suffixLength - 1,
+                                       prefixType, sig);
+  return memberType->substBaseType(substBaseType,
+                                   LookUpConformanceInSignature(sig.getPointer()));
+}
+
 /// Unlike most other queries, the input type can be any type, not just a
 /// type parameter.
 ///
@@ -416,31 +431,9 @@ Type RequirementMachine::getCanonicalTypeInContext(
       abort();
     }
 
-    // Compute the type of the unresolved suffix term V, rooted in the
-    // generic parameter τ_0_0.
-    auto origType = Map.getRelativeTypeForTerm(term, prefix);
-
-    // Substitute τ_0_0 in the above relative type with the concrete type
-    // for U.
-    //
-    // Example: if T == A.B.C and the longest valid prefix is A.B which
-    // maps to a concrete type Foo<Int>, then we have:
-    //
-    // U == A.B
-    // V == C
-    //
-    // prefixType == Foo<Int>
-    // origType   == τ_0_0.C
-    // substType  == Foo<Int>.C
-    //
-    auto substType = origType.subst(
-      [&](SubstitutableType *type) -> Type {
-        assert(cast<GenericTypeParamType>(type)->getDepth() == 0);
-        assert(cast<GenericTypeParamType>(type)->getIndex() == 0);
-
-        return prefixType;
-      },
-      LookUpConformanceInSignature(Sig.getPointer()));
+    // Compute the type of the unresolved suffix term V.
+    auto substType = substPrefixType(t, term.size() - prefix.size(),
+                                     prefixType, Sig);
 
     // FIXME: Recursion guard is needed here
     return getCanonicalTypeInContext(substType, genericParams);
