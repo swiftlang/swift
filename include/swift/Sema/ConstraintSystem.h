@@ -2214,7 +2214,7 @@ public:
     // local variables with initializers.
     bool hasInit = expression.propertyWrapper.hasInitialWrappedValue;
     if (wrappedVar->isStatic() ||
-        (hasInit && wrappedVar->getDeclContext()->isLocalContext()))
+        (hasInit && wrappedVar->getDeclContext()->isLocalContext()) || (hasInit && wrappedVar->isTopLevelGlobal()))
       return false;
 
     return expression.propertyWrapper.innermostWrappedValueInit == apply;

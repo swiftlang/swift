@@ -1321,7 +1321,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     FullExpr Scope(Cleanups, CleanupLocation(Init));
 
     auto *var = PBD->getSingleVar();
-    if (var && var->getDeclContext()->isLocalContext()) {
+    if (var && (var->getDeclContext()->isLocalContext() || var->getDeclContext()->isModuleScopeContext())) {
       if (auto *orig = var->getOriginalWrappedProperty()) {
         auto initInfo = orig->getPropertyWrapperInitializerInfo();
         if (auto *placeholder = initInfo.getWrappedValuePlaceholder()) {
