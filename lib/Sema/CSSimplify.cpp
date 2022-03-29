@@ -1501,32 +1501,6 @@ shouldOpenExistentialCallArgument(
   if (!argTy->isAnyExistentialType())
     return None;
 
-
-  // If the existential argument type conforms to all of its protocol
-  // requirements, don't open the existential.
-  {
-    Type existentialObjectType;
-    if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
-      existentialObjectType = existentialMetaTy->getInstanceType();
-    else
-      existentialObjectType = argTy;
-    auto layout = existentialObjectType->getExistentialLayout();
-    auto module = cs.DC->getParentModule();
-    bool containsNonSelfConformance = false;
-    for (auto proto : layout.getProtocols()) {
-      auto protoDecl = proto->getDecl();
-      auto conformance = module->lookupExistentialConformance(
-          existentialObjectType, protoDecl);
-      if (conformance.isInvalid()) {
-        containsNonSelfConformance = true;
-        break;
-      }
-    }
-
-    if (!containsNonSelfConformance)
-      return None;
-  }
-
   auto param = getParameterAt(callee, paramIdx);
   if (!param)
     return None;
@@ -1567,6 +1541,31 @@ shouldOpenExistentialCallArgument(
   if (genericParam->getDepth() <
           genericSig.getGenericParams().back()->getDepth())
     return None;
+
+  // If the existential argument conforms to all of protocol requirements on
+  // the formal parameter's type, don't open.
+  // If all of the conformance requirements on the formal parameter's type
+  // are self-conforming, don't open.
+  {
+    Type existentialObjectType;
+    if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
+      existentialObjectType = existentialMetaTy->getInstanceType();
+    else
+      existentialObjectType = argTy;
+    auto module = cs.DC->getParentModule();
+    bool containsNonSelfConformance = false;
+    for (auto proto : genericSig->getRequiredProtocols(genericParam)) {
+      auto conformance = module->lookupExistentialConformance(
+          existentialObjectType, proto);
+      if (conformance.isInvalid()) {
+        containsNonSelfConformance = true;
+        break;
+      }
+    }
+
+    if (!containsNonSelfConformance)
+      return None;
+  }
 
   // Ensure that the formal parameter is only used in covariant positions,
   // because it won't match anywhere else.

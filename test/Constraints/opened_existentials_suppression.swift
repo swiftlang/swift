@@ -9,6 +9,7 @@ func acceptsBoxType<T>(_ value: T.Type) { }
 // CHECK: passBox
 // CHECK-NOT: open_existential_expr
 func passBox(p: P, obj: AnyObject, err: Error) {
+  acceptsBox(p)
   acceptsBox(p as P)
   acceptsBox(p as! P)
   acceptsBox(p as? P)
