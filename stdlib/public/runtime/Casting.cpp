@@ -145,8 +145,8 @@ enum class TypeNameKind {
 using TypeNameCacheKey = llvm::PointerIntPair<const Metadata *, 2, TypeNameKind>;
 
 #if SWIFT_CASTING_SUPPORTS_MUTEX
-static StaticReadWriteLock TypeNameCacheLock;
-static StaticReadWriteLock MangledToPrettyFunctionNameCacheLock;
+static StaticMutex TypeNameCacheLock;
+static StaticMutex MangledToPrettyFunctionNameCacheLock;
 #endif
 
 /// Cache containing rendered names for Metadata.
@@ -167,7 +167,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
   // Attempt read-only lookup of cache entry.
   {
     #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedReadLock guard(TypeNameCacheLock);
+    StaticMutex::ScopedLock guard(TypeNameCacheLock);
     #endif
 
     auto found = cache.find(key);
@@ -180,7 +180,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
   // Read-only lookup failed to find item, we may need to create it.
   {
     #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedWriteLock guard(TypeNameCacheLock);
+    StaticMutex::ScopedLock guard(TypeNameCacheLock);
     #endif
 
     // Do lookup again just to make sure it wasn't created by another
@@ -213,7 +213,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
   // Attempt read-only lookup of cache entry.
   {
     #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedReadLock guard(TypeNameCacheLock);
+    StaticMutex::ScopedLock guard(TypeNameCacheLock);
     #endif
 
     auto found = cache.find(key);
@@ -226,7 +226,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
   // Read-only cache lookup failed, we may need to create it.
   {
     #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedWriteLock guard(TypeNameCacheLock);
+    StaticMutex::ScopedLock guard(TypeNameCacheLock);
     #endif
 
     // Do lookup again just to make sure it wasn't created by another
@@ -271,7 +271,7 @@ swift::swift_getFunctionFullNameFromMangledName(
   // Attempt read-only lookup of cache entry.
   {
     #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedReadLock guard(MangledToPrettyFunctionNameCacheLock);
+    StaticMutex::ScopedLock guard(MangledToPrettyFunctionNameCacheLock);
     #endif
 
     auto found = cache.find(mangledName);
@@ -388,7 +388,7 @@ swift::swift_getFunctionFullNameFromMangledName(
 
   {
     #if SWIFT_CASTING_SUPPORTS_MUTEX
-    StaticScopedWriteLock guard(MangledToPrettyFunctionNameCacheLock);
+    StaticMutex::ScopedLock guard(MangledToPrettyFunctionNameCacheLock);
     #endif
 
     cache.insert({mangledName, {result, size}});

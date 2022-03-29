@@ -59,7 +59,7 @@ namespace {
 
 struct SwiftNullSentinelCache {
   std::vector<id> Cache;
-  StaticReadWriteLock Lock;
+  StaticMutex Lock;
 };
 
 static Lazy<SwiftNullSentinelCache> Sentinels;
@@ -73,7 +73,7 @@ static id getSentinelForDepth(unsigned depth) {
   auto &theSentinels = Sentinels.get();
   unsigned depthIndex = depth - 2;
   {
-    StaticScopedReadLock lock(theSentinels.Lock);
+    StaticMutex::ScopedLock lock(theSentinels.Lock);
     const auto &cache = theSentinels.Cache;
     if (depthIndex < cache.size()) {
       id cached = cache[depthIndex];
@@ -83,7 +83,7 @@ static id getSentinelForDepth(unsigned depth) {
   }
   // Make one if we need to.
   {
-    StaticScopedWriteLock lock(theSentinels.Lock);
+    StaticMutex::ScopedLock lock(theSentinels.Lock);
     if (depthIndex >= theSentinels.Cache.size())
       theSentinels.Cache.resize(depthIndex + 1);
     auto &cached = theSentinels.Cache[depthIndex];

@@ -25,10 +25,8 @@
 namespace swift {
 
 typedef SRWLOCK MutexHandle;
-typedef SRWLOCK ReadWriteLockHandle;
 
 #define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 1
-#define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 1
 
 struct MutexPlatformHelper {
   static constexpr MutexHandle staticInit() { return SRWLOCK_INIT; }
@@ -49,30 +47,5 @@ struct MutexPlatformHelper {
     ReleaseSRWLockExclusive(&mutex);
   }
 };
-
-struct ReadWriteLockPlatformHelper {
-  static constexpr ReadWriteLockHandle staticInit() { return SRWLOCK_INIT; }
-  static void init(ReadWriteLockHandle &rwlock) { InitializeSRWLock(&rwlock); }
-  static void destroy(ReadWriteLockHandle &rwlock) {}
-  static void readLock(ReadWriteLockHandle &rwlock) {
-    AcquireSRWLockShared(&rwlock);
-  }
-  static bool try_readLock(ReadWriteLockHandle &rwlock) {
-    return TryAcquireSRWLockShared(&rwlock) != 0;
-  }
-  static void readUnlock(ReadWriteLockHandle &rwlock) {
-    ReleaseSRWLockShared(&rwlock);
-  }
-  static void writeLock(ReadWriteLockHandle &rwlock) {
-    AcquireSRWLockExclusive(&rwlock);
-  }
-  static bool try_writeLock(ReadWriteLockHandle &rwlock) {
-    return TryAcquireSRWLockExclusive(&rwlock) != 0;
-  }
-  static void writeUnlock(ReadWriteLockHandle &rwlock) {
-    ReleaseSRWLockExclusive(&rwlock);
-  }
-};
-}
 
 #endif

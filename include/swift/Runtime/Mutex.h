@@ -1,4 +1,4 @@
-//===--- Mutex.h - Mutex and ReadWriteLock ----------------------*- C++ -*-===//
+//===--- Mutex.h - Mutex ----------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,13 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Mutex, ReadWriteLock, and Scoped lock abstractions for use in
-// Swift runtime.
+// Mutex and Scoped lock abstractions for use in Swift runtime.
 //
 // We intentionally do not provide a condition-variable abstraction.
 // Traditional condition-variable interfaces are subject to unavoidable
 // priority inversions, as well as making poor use of threads.
 // Prefer AtomicWaitQueue.
+//
+// We also intentionally avoid read/write locks.  It's difficult to implement a
+// performant and fair read/write lock, and indeed many common implementations
+// rely on condition variables, which, again, are subject to unavoidable
+// priority inversions.
 //
 //===----------------------------------------------------------------------===//
 
@@ -167,238 +171,6 @@ private:
   MutexHandle Handle;
 };
 
-/// Compile time adjusted stack based object that locks/unlocks the supplied
-/// ReadWriteLock type. Use the provided typedefs instead of this directly.
-template <typename T, bool Read, bool Inverted> class ScopedRWLockT {
-
-  ScopedRWLockT() = delete;
-  ScopedRWLockT(const ScopedRWLockT &) = delete;
-  ScopedRWLockT &operator=(const ScopedRWLockT &) = delete;
-  ScopedRWLockT(ScopedRWLockT &&) = delete;
-  ScopedRWLockT &operator=(ScopedRWLockT &&) = delete;
-
-public:
-  explicit ScopedRWLockT(T &l) : Lock(l) {
-    if (Inverted) {
-      if (Read) {
-        Lock.readUnlock();
-      } else {
-        Lock.writeUnlock();
-      }
-    } else {
-      if (Read) {
-        Lock.readLock();
-      } else {
-        Lock.writeLock();
-      }
-    }
-  }
-
-  ~ScopedRWLockT() {
-    if (Inverted) {
-      if (Read) {
-        Lock.readLock();
-      } else {
-        Lock.writeLock();
-      }
-    } else {
-      if (Read) {
-        Lock.readUnlock();
-      } else {
-        Lock.writeUnlock();
-      }
-    }
-  }
-
-private:
-  T &Lock;
-};
-
-class ReadWriteLock;
-class StaticReadWriteLock;
-
-/// A stack based object that unlocks the supplied ReadWriteLock on
-/// construction and locks it for reading on destruction.
-///
-/// Precondition: ReadWriteLock unlocked by this thread, undefined otherwise.
-typedef ScopedRWLockT<ReadWriteLock, true, false> ScopedReadLock;
-typedef ScopedRWLockT<StaticReadWriteLock, true, false> StaticScopedReadLock;
-
-/// A stack based object that unlocks the supplied ReadWriteLock on
-/// construction and locks it for reading on destruction.
-///
-/// Precondition: ReadWriteLock unlocked by this thread, undefined
-/// otherwise.
-typedef ScopedRWLockT<ReadWriteLock, true, true> ScopedReadUnlock;
-typedef ScopedRWLockT<StaticReadWriteLock, true, true> StaticScopedReadUnlock;
-
-/// A stack based object that unlocks the supplied ReadWriteLock on
-/// construction and locks it for reading on destruction.
-///
-/// Precondition: ReadWriteLock unlocked by this thread, undefined otherwise.
-typedef ScopedRWLockT<ReadWriteLock, false, false> ScopedWriteLock;
-typedef ScopedRWLockT<StaticReadWriteLock, false, false> StaticScopedWriteLock;
-
-/// A stack based object that unlocks the supplied ReadWriteLock on
-/// construction and locks it for writing on destruction.
-///
-/// Precondition: ReadWriteLock unlocked by this thread, undefined otherwise.
-typedef ScopedRWLockT<ReadWriteLock, false, true> ScopedWriteUnlock;
-typedef ScopedRWLockT<StaticReadWriteLock, false, true> StaticScopedWriteUnlock;
-
-/// A Read / Write lock object that has semantics similar to `BasicLockable`
-/// and `Lockable` C++ concepts however it supports multiple concurrent
-/// threads holding the reader lock as long as the write lock isn't held and
-/// only one thread can hold the write local at the same time.
-///
-/// If you need static allocated ReadWriteLock use StaticReadWriteLock.
-///
-/// See http://en.cppreference.com/w/cpp/concept/BasicLockable
-/// See http://en.cppreference.com/w/cpp/concept/Lockable
-///
-/// This is NOT a recursive mutex.
-class ReadWriteLock {
-
-  ReadWriteLock(const ReadWriteLock &) = delete;
-  ReadWriteLock &operator=(const ReadWriteLock &) = delete;
-  ReadWriteLock(ReadWriteLock &&) = delete;
-  ReadWriteLock &operator=(ReadWriteLock &&) = delete;
-
-public:
-  ReadWriteLock() { ReadWriteLockPlatformHelper::init(Handle); }
-  ~ReadWriteLock() { ReadWriteLockPlatformHelper::destroy(Handle); }
-
-  /// The readLock() method has the following properties:
-  /// - Behaves as an atomic operation.
-  /// - Blocks the calling thread while the write lock is held by another 
-  ///   thread and once the read lock is acquired by the calling thread
-  ///   other threads are prevented from acquiring the write lock.
-  /// - Multiple threads can hold the read lock at the same time.
-  /// - Prior unlock() operations on the same lock synchronize-with
-  ///   this lock operation.
-  /// - The behavior is undefined if the calling thread already owns
-  ///   the read or write lock (likely a deadlock).
-  /// - Does not throw exceptions but will halt on error (fatalError).
-  ///
-  /// Callers must not mutate the data protected by the ReadWriteLock while
-  /// holding the read lock, the write lock must be used.
-  void readLock() { ReadWriteLockPlatformHelper::readLock(Handle); }
-
-  /// The try_readLock() method has the following properties:
-  /// - Behaves as an atomic operation.
-  /// - Attempts to obtain the read lock without blocking the calling thread.
-  ///   If ownership is not obtained, returns immediately. The function is
-  ///   allowed to spuriously fail and return even if the lock is not
-  ///   currently owned by another thread.
-  /// - If try_readLock() succeeds, prior unlock() operations on the same
-  ///   object synchronize-with this operation. unlock() does not synchronize
-  ///   with a failed try_readLock().
-  /// - The behavior is undefined if the calling thread already owns
-  ///   the read or write lock (likely a deadlock)?
-  /// - Does not throw exceptions but will halt on error (fatalError).
-  ///
-  /// Callers must not mutate the data protected by the ReadWriteLock while
-  /// holding the read lock, the write lock must be used.
-  bool try_readLock() {
-    return ReadWriteLockPlatformHelper::try_readLock(Handle);
-  }
-
-  /// The readUnlock() method has the following properties:
-  /// - Behaves as an atomic operation.
-  /// - Releases the calling thread's ownership of the read lock
-  ///   and synchronizes-with the subsequent successful lock operations on
-  ///   the same object.
-  /// - The behavior is undefined if the calling thread does not own
-  ///   the read lock.
-  /// - Does not throw exceptions but will halt on error (fatalError).
-  void readUnlock() { ReadWriteLockPlatformHelper::readUnlock(Handle); }
-
-  /// The writeLock() method has the following properties:
-  /// - Behaves as an atomic operation.
-  /// - Blocks the calling thread while the write lock or a read lock is held
-  ///   by another thread and once the write lock is acquired by the calling
-  ///   thread other threads are prevented from acquiring the write lock or a
-  ///   read lock.
-  /// - Only one thread can hold the write lock at the same time.
-  /// - Prior unlock() operations on the same lock synchronize-with
-  ///   this lock operation.
-  /// - The behavior is undefined if the calling thread already owns
-  ///   the read or write lock (likely a deadlock).
-  /// - Does not throw exceptions but will halt on error (fatalError).
-  void writeLock() { ReadWriteLockPlatformHelper::writeLock(Handle); }
-
-  /// The try_writeLock() method has the following properties:
-  /// - Behaves as an atomic operation.
-  /// - Attempts to obtain the write lock without blocking the calling thread.
-  ///   If ownership is not obtained, returns immediately. The function is
-  ///   allowed to spuriously fail and return even if the lock is not
-  ///   currently owned by another thread.
-  /// - If try_writeLock() succeeds, prior unlock() operations on the same
-  ///   object synchronize-with this operation. unlock() does not synchronize
-  ///   with a failed try_writeLock().
-  /// - The behavior is undefined if the calling thread already owns
-  ///   the read or write lock (likely a deadlock)?
-  /// - Does not throw exceptions but will halt on error (fatalError).
-  bool try_writeLock() {
-    return ReadWriteLockPlatformHelper::try_writeLock(Handle);
-  }
-
-  /// The writeUnlock() method has the following properties:
-  /// - Behaves as an atomic operation.
-  /// - Releases the calling thread's ownership of the write lock
-  ///   and synchronizes-with the subsequent successful lock operations on
-  ///   the same object.
-  /// - The behavior is undefined if the calling thread does not own
-  ///   the write lock.
-  /// - Does not throw exceptions but will halt on error (fatalError).
-  void writeUnlock() { ReadWriteLockPlatformHelper::writeUnlock(Handle); }
-
-  /// Acquires read lock before calling the supplied critical section and
-  /// releases lock on return from critical section. Callers must not mutate
-  /// the data protected by the ReadWriteLock while holding the read lock, the
-  /// write lock must be used.
-  ///
-  /// This call can block while waiting for the lock to become available.
-  ///
-  /// For example the following reads the cached value while holding
-  /// the read lock.
-  ///
-  /// ```
-  ///   rw.withReadLock([&value] { value = cachedValue; });
-  /// ```
-  ///
-  /// Precondition: ReadWriteLock not held by this thread, undefined otherwise.
-  template <typename CriticalSection>
-  auto withReadLock(CriticalSection &&criticalSection)
-      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
-    ScopedReadLock guard(*this);
-    return std::forward<CriticalSection>(criticalSection)();
-  }
-
-  /// Acquires write lock before calling the supplied critical section and
-  /// releases lock on return from critical section.
-  ///
-  /// This call can block while waiting for the lock to become available.
-  ///
-  /// For example the following updates the cached value while holding
-  /// the write lock.
-  ///
-  /// ```
-  ///   rw.withWriteLock([&newValue] { cachedValue = newValue });
-  /// ```
-  ///
-  /// Precondition: ReadWriteLock not held by this thread, undefined otherwise.
-  template <typename CriticalSection>
-  auto withWriteLock(CriticalSection &&criticalSection)
-      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
-    ScopedWriteLock guard(*this);
-    return std::forward<CriticalSection>(criticalSection)();
-  }
-
-private:
-  ReadWriteLockHandle Handle;
-};
-
 /// A static allocation variant of Mutex.
 ///
 /// Use Mutex instead unless you need static allocation.
@@ -448,66 +220,6 @@ public:
 
 private:
   MutexHandle Handle;
-};
-
-/// A static allocation variant of ReadWriteLock.
-///
-/// Use ReadWriteLock instead unless you need static allocation.
-class StaticReadWriteLock {
-
-  StaticReadWriteLock(const StaticReadWriteLock &) = delete;
-  StaticReadWriteLock &operator=(const StaticReadWriteLock &) = delete;
-  StaticReadWriteLock(StaticReadWriteLock &&) = delete;
-  StaticReadWriteLock &operator=(StaticReadWriteLock &&) = delete;
-
-public:
-#if SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR
-  constexpr
-#endif
-  StaticReadWriteLock()
-      : Handle(ReadWriteLockPlatformHelper::staticInit()) {
-  }
-
-  /// See ReadWriteLock::readLock
-  void readLock() { ReadWriteLockPlatformHelper::readLock(Handle); }
-
-  /// See ReadWriteLock::try_readLock
-  bool try_readLock() {
-    return ReadWriteLockPlatformHelper::try_readLock(Handle);
-  }
-
-  /// See ReadWriteLock::readUnlock
-  void readUnlock() { ReadWriteLockPlatformHelper::readUnlock(Handle); }
-
-  /// See ReadWriteLock::writeLock
-  void writeLock() { ReadWriteLockPlatformHelper::writeLock(Handle); }
-
-  /// See ReadWriteLock::try_writeLock
-  bool try_writeLock() {
-    return ReadWriteLockPlatformHelper::try_writeLock(Handle);
-  }
-
-  /// See ReadWriteLock::writeUnlock
-  void writeUnlock() { ReadWriteLockPlatformHelper::writeUnlock(Handle); }
-
-  /// See ReadWriteLock::withReadLock
-  template <typename CriticalSection>
-  auto withReadLock(CriticalSection &&criticalSection)
-      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
-    StaticScopedReadLock guard(*this);
-    return std::forward<CriticalSection>(criticalSection)();
-  }
-
-  /// See ReadWriteLock::withWriteLock
-  template <typename CriticalSection>
-  auto withWriteLock(CriticalSection &&criticalSection)
-      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
-    StaticScopedWriteLock guard(*this);
-    return std::forward<CriticalSection>(criticalSection)();
-  }
-
-private:
-  ReadWriteLockHandle Handle;
 };
 
 /// A Mutex object that supports `BasicLockable` C++ concepts. It is
@@ -634,13 +346,6 @@ static_assert(std::is_literal_type<StaticConditionVariable>::value,
 // you will possibly see global-constructors warnings
 #endif
 
-#if SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR
-static_assert(std::is_literal_type<StaticReadWriteLock>::value,
-              "StaticReadWriteLock must be literal type");
-#else
-// Your platform doesn't currently support statically allocated ReadWriteLocks
-// you will possibly see global-constructors warnings
-#endif
 }
 
 #endif

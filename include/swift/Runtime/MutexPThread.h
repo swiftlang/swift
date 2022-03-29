@@ -27,8 +27,6 @@
 
 namespace swift {
 
-typedef pthread_rwlock_t ReadWriteLockHandle;
-
 #if HAS_OS_UNFAIR_LOCK
 typedef os_unfair_lock MutexHandle;
 #else
@@ -41,10 +39,8 @@ typedef pthread_mutex_t MutexHandle;
 // results in a reinterpret_cast which violates constexpr.
 // WASI currently doesn't support threading/locking at all.
 #define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 0
-#define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 0
 #else
 #define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 1
-#define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 1
 #endif
 
 /// PThread low-level implementation that supports Mutex
@@ -114,30 +110,6 @@ inline bool MutexPlatformHelper::try_lock(os_unfair_lock &lock) {
 
 #endif
 
-/// PThread low-level implementation that supports ReadWriteLock
-/// found in Mutex.h
-///
-/// See ReadWriteLock
-struct ReadWriteLockPlatformHelper {
-#if SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR
-  static constexpr
-#else
-  static
-#endif
-      ReadWriteLockHandle
-      staticInit() {
-    return PTHREAD_RWLOCK_INITIALIZER;
-  };
-
-  static void init(ReadWriteLockHandle &rwlock);
-  static void destroy(ReadWriteLockHandle &rwlock);
-  static void readLock(ReadWriteLockHandle &rwlock);
-  static bool try_readLock(ReadWriteLockHandle &rwlock);
-  static void readUnlock(ReadWriteLockHandle &rwlock);
-  static void writeLock(ReadWriteLockHandle &rwlock);
-  static bool try_writeLock(ReadWriteLockHandle &rwlock);
-  static void writeUnlock(ReadWriteLockHandle &rwlock);
-};
 }
 
 #endif

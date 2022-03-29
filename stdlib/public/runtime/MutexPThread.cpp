@@ -106,38 +106,4 @@ bool MutexPlatformHelper::try_lock(pthread_mutex_t &mutex) {
 
 #endif
 
-void ReadWriteLockPlatformHelper::init(pthread_rwlock_t &rwlock) {
-  reportError(pthread_rwlock_init(&rwlock, nullptr));
-}
-
-void ReadWriteLockPlatformHelper::destroy(pthread_rwlock_t &rwlock) {
-  reportError(pthread_rwlock_destroy(&rwlock));
-}
-
-void ReadWriteLockPlatformHelper::readLock(pthread_rwlock_t &rwlock) {
-  reportError(pthread_rwlock_rdlock(&rwlock));
-}
-
-bool ReadWriteLockPlatformHelper::try_readLock(pthread_rwlock_t &rwlock) {
-  returnTrueOrReportError(pthread_rwlock_tryrdlock(&rwlock),
-                          /* returnFalseOnEBUSY = */ true);
-}
-
-void ReadWriteLockPlatformHelper::writeLock(pthread_rwlock_t &rwlock) {
-  reportError(pthread_rwlock_wrlock(&rwlock));
-}
-
-bool ReadWriteLockPlatformHelper::try_writeLock(pthread_rwlock_t &rwlock) {
-  returnTrueOrReportError(pthread_rwlock_trywrlock(&rwlock),
-                          /* returnFalseOnEBUSY = */ true);
-}
-
-void ReadWriteLockPlatformHelper::readUnlock(pthread_rwlock_t &rwlock) {
-  reportError(pthread_rwlock_unlock(&rwlock));
-}
-
-void ReadWriteLockPlatformHelper::writeUnlock(pthread_rwlock_t &rwlock) {
-  reportError(pthread_rwlock_unlock(&rwlock));
-}
-
 #endif // SWIFT_STDLIB_THREADING_PTHREADS

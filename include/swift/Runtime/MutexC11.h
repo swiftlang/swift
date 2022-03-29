@@ -34,11 +34,9 @@ namespace c11threads {
   }
 }
 
-typedef c11threads::rwlock *ReadWriteLockHandle;
 typedef ::mtx_t MutexHandle;
 
 #define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 0
-#define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 0
 
 /// C11 low-level implementation that supports Mutex
 /// found in Mutex.h
@@ -85,77 +83,6 @@ public:
     (void)::mtx_unlock(&mutex);
   }
 };
-
-/// C11 low-level implementation that supports ReadWriteLock
-/// found in Mutex.h
-///
-/// See ReadWriteLock
-namespace c11threads {
-
-class rwlock {
-private:
-  unsigned activeReaders_;
-  unsigned waitingWriters_;
-  bool     writerActive_;
-  ::cnd_t  cond_;
-  ::mtx_t  mutex_;
-
-public:
-  rwlock();
-  ~rwlock();
-
-  rwlock(const rwlock &other) = delete;
-  rwlock &operator=(const rwlock &other) = delete;
-
-  void readLock();
-  bool try_readLock();
-  void readUnlock();
-  void writeLock();
-  bool try_writeLock();
-  void writeUnlock();
-};
-
-}
-
-class ReadWriteLockPlatformHelper {
-public:
-  static ReadWriteLockHandle staticInit() {
-    return new c11threads::rwlock();
-  };
-
-  static void init(ReadWriteLockHandle &rwlock) {
-    rwlock = new c11threads::rwlock();
-  }
-
-  static void destroy(ReadWriteLockHandle &rwlock) {
-    delete rwlock;
-  }
-
-  static void readLock(ReadWriteLockHandle &rwlock) {
-    rwlock->readLock();
-  }
-
-  static bool try_readLock(ReadWriteLockHandle &rwlock) {
-    rwlock->try_readLock();
-  }
-
-  static void readUnlock(ReadWriteLockHandle &rwlock) {
-    rwlock->readUnlock();
-  }
-
-  static void writeLock(ReadWriteLockHandle &rwlock) {
-    rwlock->writeLock();
-  }
-
-  static bool try_writeLock(ReadWriteLockHandle &rwlock) {
-    rwlock->try_writeLock();
-  }
-
-  static void writeUnlock(ReadWriteLockHandle &rwlock) {
-    rwlock->writeUnlock();
-  }
-};
-
 
 }
 
