@@ -9,6 +9,138 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// The RewriteContext is a global singleton object with three primary
+// responsibilities:
+//
+// - Arena allocation of uniqued immutable Symbols and Terms.
+// - Caching requirement machine instances corresponding to generic signatures,
+//   used for generic signature queries.
+// - Building the graph of protocol connected components, in support of the
+//   above.
+//
+// # Requirement machines for generic signatures
+//
+// The RewriteContext caches requirement machine instances built from generic
+// signatures. When a generic signature is performed for the first time,
+// a requirement machine is built for the generic signature by calling the
+// RewriteContext::getRequirementMachine() method.
+//
+// An optimization is performed if this signature was written in source. When
+// a new minimal generic signature is built from generic requirements, the
+// AbstractGenericSignatureRequest and InferredGenericSignatureRequest requests
+// transfer ownership of the requirement machine used for minimization to the
+// RewriteContext by calling the installRequirementMachine() method, which
+// associates this requirement machine with the newly-built generic signature.
+//
+// This saves the effort of rebuilding a new requirement machine from this
+// signature the first time a query is performed, which typically happens when
+// type checking the body of the generic declaration. 
+//
+// A requirement machine for a generic signature must include rewrite rules
+// for all requirements in protocols referenced from this signature as well.
+// Instead of rebuilding all of these rules every time a requirement machine
+// is created, the rewrite rules for protocols themselves are also cached in
+// the RewriteContext.
+//
+// # Protocol dependency graph
+//
+// The central concept behind this caching is the protocol dependency graph.
+// This graph records which protocols mention other protocols via conformance
+// requirements.
+//
+// Formally, the protocol dependency graph is a (directed) graph where the
+// vertices are protocols, and there is an edge from protocol P to a protocol Q
+// if P has a conformance requirement with Q on the right hand side.
+//
+// Consider these definitions:
+//
+//   protocol P1 : P2 {}
+//   protocol P2 { associatedtype T : P3; associatedtype V : P4 }
+//   protocol P3 { associatedtype U : P2; associatedtype V : P5 }
+//   protocol P4 {}
+//
+// P1 has a dependency on P2; P2 and P3 depend on each other; P2 depends on P4,
+// and finally, P3 depends on P5. The protocol dependency graph looks like this:
+//
+//             +----+
+//             | P1 |
+//             +----+
+//              /  \
+//             /    \
+//            /      \
+//           /        \
+//          /          \
+//         /            \
+//        v              v
+//     +----+  ----->  +----+
+//     | P2 |          | P3 |
+//     +----+  <-----  +----+
+//       |                |
+//       v                v
+//     +----+          +----+
+//     | P4 |          | P5 |
+//     +----+          +----+
+//
+// When building a rewrite system for a generic signature that includes a
+// conformance to protocol P2, we must include rewrite rules for P2, as well as
+// all protocols reachable from P2 via the protocol dependency graph: P3, P4,
+// and P5. Note that the set of all protocols reachable from P2 includes P3,
+// and the set of all protocols reachable from P3 includes P2; so if a generic
+// signature depends on one, it necessarily depends on the other.
+//
+// In general, this graph can contain cycles, as with P2 and P3 above. If we
+// compute the strongly connected components of the protocol dependency graph,
+// we get an acyclic graph:
+//
+//          +----+
+//          | P1 |
+//          +----+
+//            |
+//            v
+//        +-------+
+//        | P2 P3 |
+//        +-------+
+//          /   \
+//         /     \
+//        v       v
+//     +----+   +----+
+//     | P4 |   | P5 |
+//     +----+   +----+
+//
+// The vertices of this graph are the strongly connected components of the
+// original protocol dependency graph. Each connected component is a set of
+// protocols that are interdependent and must be considered together as a
+// single unit when building a rewrite system.
+//
+// # Requirement machines for protocol connected components
+//
+// The RewriteContext computes the protocol dependency graph and the associated
+// graph of connected components. When building a rewrite system for a generic
+// signature, the RuleBuilder queries the RewriteContext for the set of all
+// connected components reachable from all conformance requirements in the
+// generic signature.
+//
+// The RewriteContext associates a requirement machine to each connected
+// component. This requirement machine is created when needed by the
+// RewriteContext::getRequirementMachine(ProtocolDecl *) method.
+//
+// The rewrite rules from the requirement machine of each connected component
+// are then imported into the newly-built requirement machine for the generic
+// signature.
+//
+// If the protocol definitions in the connected component were parsed from
+// source, this requirement machine is constructed when evaluating
+// RequirementSignatureRequest, which computes a requirement signature for
+// each protocol in the component from user-written requirements, and then
+// saves the requirement machine in the RewriteContext by calling the
+// installRequirementMachine() method.
+//
+// If the protocol definitions came from a deserialized module, we build a
+// requirement machine from the previously-computed requirement signatures
+// of those protocols.
+//
+//===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"

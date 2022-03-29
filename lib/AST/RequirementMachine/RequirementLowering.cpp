@@ -10,10 +10,141 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements logic for desugaring requirements, for example breaking
-// down 'T : P & Q' into 'T : P' and 'T : Q', as well as requirement inference,
-// where an occurrence of 'Set<T>' in a function signature introduces the
-// requirement 'T : Hashable' from the generic signature of 'struct Set'.
+// The process of constructing a requirement machine from some input requirements
+// can be summarized by the following diagram.
+//
+//     ------------------
+//    / RequirementRepr / <-------- Generic parameter lists, 'where' clauses,
+//    ------------------            and protocol definitions written in source
+//             |                    start here:
+//             |                    - InferredGenericSignatureRequest
+//             |                    - RequirementSignatureRequest
+//             v                    
+// +-------------------------+            -------------------
+// | Requirement realization | --------> / Sema diagnostics /
+// +-------------------------+           -------------------
+//             |       
+//             |       -------------------------------------
+//             |      / Function parameter/result TypeRepr /
+//             |      -------------------------------------
+//             |                       |
+//             |                       v
+//             |            +-----------------------+
+//             |            | Requirement inference |
+//             |            +-----------------------+
+//             |                       |
+//             |       +---------------+
+//             v       v
+//   ------------------------
+//  / StructuralRequirement / <---- Minimization of a set of abstract
+//  ------------------------        requirements internally by the compiler
+//             |                    starts here:
+//             |                    - AbstractGenericSignatureRequest
+//             v
+// +------------------------+           -------------------
+// | Requirement desugaring | -------> / RequirementError /
+// +------------------------+          -------------------
+//             |
+//             v
+//       --------------
+//      / Requirement /
+//      --------------
+//             |
+//             v
+//  +----------------------+
+//  | Concrete contraction |
+//  +----------------------+
+//             |                       -------------------------
+//             v                      / Existing RewriteSystem /
+//       --------------               -------------------------
+//      / Requirement /                           |
+//      --------------                            v
+//             |            +--------------------------------------------+
+//             |            | Importing rules from protocol dependencies |
+//             |            +--------------------------------------------+
+//             |                                  |
+//             |   +------------------------------+
+//             |   |
+//             v   v
+//      +-------------+
+//      | RuleBuilder | <--- Construction of a rewrite system to answer
+//      +-------------+      queries about an already-minimized generic
+//             |                   signature or connected component of protocol
+//             v                   requirement signatures starts here:
+//          -------                - RewriteContext::getRequirementMachine()
+//         / Rule /
+//         -------
+//
+// This file implements the "requirement realization", "requirement inference"
+// and "requirement desugaring" steps above. Concrete contraction is implemented
+// in ConcreteContraction.cpp. Building rewrite rules from desugared requirements
+// is implemented in RuleBuilder.cpp.
+//
+// # Requirement realization and inference
+//
+// Requirement realization takes parsed representations of generic requirements,
+// and converts them to StructuralRequirements:
+//
+// - RequirementReprs in 'where' clauses
+// - TypeReprs in generic parameter and associated type inheritance clauses
+// - TypeReprs of function parameters and results, for requirement inference
+//
+// Requirement inference is the language feature where requirements on type
+// parameters are inferred from bound generic type applications. For example,
+// in the following, 'T : Hashable' is not explicitly stated:
+//
+//    func foo<T>(_: Set<T>) {}
+//
+// The application of the bound generic type "Set<T>" requires that
+// 'T : Hashable', from the generic signature of the declaration of 'Set'.
+// Requirement inference, when performed, will introduce this requirement.
+//
+// Requirement realization calls into Sema' resolveType() and similar operations
+// and emits diagnostics that way.
+//
+// # Requirement desugaring
+//
+// Requirements in 'where' clauses allow for some unneeded generality that we
+// eliminate early. For example:
+//
+// - The right hand side of a protocol conformance requirement might be a
+//   protocol composition.
+//
+// - Same-type requirements involving concrete types can take various forms:
+//   a) Between a type parameter and a concrete type, eg. 'T == Int'.
+//   b) Between a concrete type and a type parameter, eg. 'Int == T'.
+//   c) Between two concrete types, eg 'Array<T> == Array<Int>'.
+//
+// 'Desugared requirements' take the following special form:
+//
+// - The subject type of a requirement is always a type parameter.
+//
+// - The right hand side of a conformance requirement is always a single
+//   protocol.
+//
+// - A concrete same-type requirement is always between a type parameter and
+//   a concrete type.
+//
+// The desugaring process eliminates requirements where both sides are
+// concrete by evaluating them immediately, reporting an error if the
+// requirement does not hold, or a warning if it is trivially true.
+//
+// Conformance requirements with protocol compositions on the right hand side
+// are broken down into multiple conformance requirements.
+//
+// Same-type requirements where both sides are concrete are decomposed by
+// walking the two concrete types in parallel. If there is a mismatch in the
+// concrete structure, an error is recorded. If a mismatch involves a concrete
+// type and a type parameter, a new same-type requirement is recorded.
+//
+// For example, in the above, 'Array<T> == Array<Int>' is desugared into the
+// single requirement 'T == Int'.
+//
+// Finally, same-type requirements between a type parameter and concrete type
+// are oriented so that the type parameter always appears on the left hand side.
+//
+// Requirement desugaring diagnoses errors by building a list of
+// RequirementError values.
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,6 +163,10 @@
 
 using namespace swift;
 using namespace rewriting;
+
+//
+// Requirement desugaring
+//
 
 /// Desugar a same-type requirement that possibly has concrete types on either
 /// side into a series of same-type and concrete-type requirements where the
@@ -248,11 +383,7 @@ swift::rewriting::desugarRequirement(Requirement req,
 }
 
 //
-// StructuralRequirementsRequest computation.
-//
-// This realizes RequirementReprs into Requirements, desugars them using the
-// above, performs requirement inference, and wraps them with source location
-// information.
+// Requirement realization and inference.
 //
 
 static void realizeTypeRequirement(Type subjectType, Type constraintType,
@@ -638,6 +769,11 @@ bool swift::rewriting::diagnoseRequirementErrors(
   return diagnosedError;
 }
 
+/// StructuralRequirementsRequest realizes all the user-written requirements
+/// on the associated type declarations inside of a protocol.
+///
+/// This request is invoked by RequirementSignatureRequest for each protocol
+/// in the connected component.
 ArrayRef<StructuralRequirement>
 StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *proto) const {
@@ -740,6 +876,14 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   return ctx.AllocateCopy(result);
 }
 
+/// This request primarily emits diagnostics about typealiases and associated
+/// type declarations that override another associate type, and can better be
+/// expressed as requirements in the 'where' clause.
+///
+/// It also implements a compatibility behavior where sometimes typealiases in
+/// protocol extensions would introduce requirements in the
+/// GenericSignatureBuilder, if they had the same name as an inherited
+/// associated type.
 ArrayRef<Requirement>
 TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *proto) const {
