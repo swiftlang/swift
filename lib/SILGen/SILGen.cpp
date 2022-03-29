@@ -1763,6 +1763,28 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {
+    // We handle emitting the variable storage when we see the pattern binding.
+
+    // Avoid request evaluator overhead in the common case where there's
+    // no wrapper.
+    /*if (vd->getAttrs().hasAttribute<CustomAttr>()) {
+      // Emit the property wrapper backing initializer if necessary.
+      auto initInfo = vd->getPropertyWrapperInitializerInfo();
+      if (initInfo.hasInitFromWrappedValue())
+        emitPropertyWrapperBackingInitializer(vd);
+    }*/
+
+    // Emit lazy and property wrapper backing storage.
+    vd->visitAuxiliaryDecls([&](VarDecl *var) {
+        if (auto *patternBinding = var->getParentPatternBinding())
+          TopLevelSGF->visitPatternBindingDecl(patternBinding);
+        TopLevelSGF->visit(var);
+
+        if (var->hasStorage())
+          addGlobalVariable(var);
+
+    });
+
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
@@ -1967,12 +1989,15 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
       return;
     }
 
+    auto *decl = td->getDeclContext();
+    auto *vard = dyn_cast<VarDecl>(td);
+
     if (auto *S = ESD.dyn_cast<Stmt*>()) {
       TopLevelSGF->emitStmt(S);
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       TopLevelSGF->emitIgnoredExpr(E);
-    } else {
-      TopLevelSGF->visit(ESD.get<Decl*>());
+    }else {
+        TopLevelSGF->visit(ESD.get<Decl*>());
     }
   }
 }
@@ -2167,6 +2192,8 @@ public:
     for (auto *D : sf->getTopLevelDecls()) {
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                       "SILgen-decl", D);
+      if(isa<TopLevelCodeDecl>(D))
+          bool top = true;
       SGM.visit(D);
     }
 

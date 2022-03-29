@@ -1380,8 +1380,8 @@ namespace {
             !(cast<ConstructorDecl>(fnDecl)->isConvenienceInit());
 
         // Assignment to a wrapped property can only be re-written to initialization for
-        // members of `self` in an initializer, and for local variables.
-        if (!(isAssignmentToSelfParamInInit || VD->getDeclContext()->isLocalContext()))
+        // members of `self` in an initializer, and for local or global variables.
+        if (!(isAssignmentToSelfParamInInit || VD->getDeclContext()->isLocalContext() || VD->isTopLevelGlobal() || VD->getDeclContext()->isModuleScopeContext()))
           return false;
 
         // If this var isn't in a type context, assignment will always use the setter
@@ -1497,6 +1497,7 @@ namespace {
         if (!BaseFormalType) {
           proj = SGF.maybeEmitValueOfLocalVarDecl(
               backingVar, AccessKind::Write);
+
         } else if (BaseFormalType->mayHaveSuperclass()) {
           RefElementComponent REC(backingVar, LValueOptions(), varStorageType,
                                   typeData, /*actorIsolation=*/None);
