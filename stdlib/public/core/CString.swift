@@ -42,11 +42,11 @@ extension String {
   ///     }
   ///     // Prints "Caf�"
   ///
-  /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
-  public init(cString: UnsafePointer<CChar>) {
-    let len = UTF8._nullCodeUnitOffset(in: cString)
+  /// - Parameter nullTerminatedUTF8: A pointer to a null-terminated UTF-8 code sequence.
+  public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
+    let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     self = String._fromUTF8Repairing(
-      UnsafeBufferPointer(start: cString._asUInt8, count: len)).0
+      UnsafeBufferPointer(start: nullTerminatedUTF8._asUInt8, count: len)).0
   }
 
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
@@ -54,10 +54,10 @@ extension String {
   ///
   /// This is identical to `init(cString: UnsafePointer<CChar>)` but operates on
   /// an unsigned sequence of bytes.
-  public init(cString: UnsafePointer<UInt8>) {
-    let len = UTF8._nullCodeUnitOffset(in: cString)
+  public init(cString nullTerminatedUTF8: UnsafePointer<UInt8>) {
+    let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     self = String._fromUTF8Repairing(
-      UnsafeBufferPointer(start: cString, count: len)).0
+      UnsafeBufferPointer(start: nullTerminatedUTF8, count: len)).0
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8
@@ -179,10 +179,10 @@ extension String {
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable // Fold away specializations
   public init<Encoding: Unicode.Encoding>(
-    decodingCString ptr: UnsafePointer<Encoding.CodeUnit>,
+    decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type
   ) {
-    self = String.decodeCString(ptr, as: sourceEncoding)!.0
+    self = String.decodeCString(nullTerminatedCodeUnits, as: sourceEncoding)!.0
   }
 }
 
