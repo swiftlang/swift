@@ -32,6 +32,12 @@
 // REQUIRES: executable_test
 // REQUIRES: VENDOR=apple
 
+// This test doesn't behave as expected on iOS arm64e because the minimum OS
+// version for that architecture is 14 according to the linker and that means
+// symbols available prior to iOS 14 don't get weak linked despite the
+// deployment target of the client binary.
+// UNSUPPORTED: CPU=arm64e && OS=ios
+
 // ---- (0) Prepare SDK
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/SDK_ABI)
