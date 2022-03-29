@@ -137,18 +137,23 @@ extension String.UTF16View: BidirectionalCollection {
   /// In an empty UTF-16 view, `endIndex` is equal to `startIndex`.
   @inlinable @inline(__always)
   public var endIndex: Index { return _guts.endIndex }
-  
+
   @inlinable @inline(__always)
   public func index(after idx: Index) -> Index {
+    var idx = _guts.ensureMatchingEncoding(idx)
+    _precondition(idx._encodedOffset < _guts.count,
+      "String index is out of bounds")
     if _slowPath(_guts.isForeign) { return _foreignIndex(after: idx) }
-    if _guts.isASCII { return idx.nextEncoded._knownUTF8._knownUTF16 }
+    if _guts.isASCII {
+      return idx.nextEncoded._scalarAligned._knownUTF8._knownUTF16
+    }
 
     // For a BMP scalar (1-3 UTF-8 code units), advance past it. For a non-BMP
     // scalar, use a transcoded offset first.
 
     // TODO: If transcoded is 1, can we just skip ahead 4?
 
-    let idx = _utf16AlignNativeIndex(idx)
+    idx = _utf16AlignNativeIndex(idx)
 
     let len = _guts.fastUTF8ScalarLength(startingAt: idx._encodedOffset)
     if len == 4 && idx.transcodedOffset == 0 {
@@ -163,16 +168,20 @@ extension String.UTF16View: BidirectionalCollection {
 
   @inlinable @inline(__always)
   public func index(before idx: Index) -> Index {
-    _precondition(!idx.isZeroPosition)
+    var idx = _guts.ensureMatchingEncoding(idx)
+    _precondition(!idx.isZeroPosition && idx <= endIndex,
+      "String index is out of bounds")
     if _slowPath(_guts.isForeign) { return _foreignIndex(before: idx) }
-    if _guts.isASCII { return idx.priorEncoded._knownUTF8._knownUTF16 }
+    if _guts.isASCII {
+      return idx.priorEncoded._scalarAligned._knownUTF8._knownUTF16
+    }
 
     if idx.transcodedOffset != 0 {
       _internalInvariant(idx.transcodedOffset == 1)
-      return idx.strippingTranscoding._knownUTF8
+      return idx.strippingTranscoding._scalarAligned._knownUTF8
     }
 
-    let idx = _utf16AlignNativeIndex(idx)
+    idx = _utf16AlignNativeIndex(idx)
     let len = _guts.fastUTF8ScalarLength(endingAt: idx._encodedOffset)
     if len == 4 {
       // 2 UTF-16 code units comprise this scalar; advance to the beginning and
@@ -186,6 +195,8 @@ extension String.UTF16View: BidirectionalCollection {
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
+    let i = _guts.ensureMatchingEncoding(i)
+    _precondition(i <= endIndex, "String index is out of bounds")
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(i, offsetBy: n)
     }
@@ -198,6 +209,12 @@ extension String.UTF16View: BidirectionalCollection {
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
+    let limit = _guts.ensureMatchingEncoding(limit)
+    guard _fastPath(limit <= endIndex) else { return index(i, offsetBy: n) }
+
+    let i = _guts.ensureMatchingEncoding(i)
+    _precondition(i <= endIndex, "String index is out of bounds")
+
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(i, offsetBy: n, limitedBy: limit)
     }
@@ -219,6 +236,14 @@ extension String.UTF16View: BidirectionalCollection {
   }
 
   public func distance(from start: Index, to end: Index) -> Int {
+    let start = _guts.ensureMatchingEncoding(start)
+    let end = _guts.ensureMatchingEncoding(end)
+
+    _precondition(start._encodedOffset <= _guts.count,
+      "String index is out of bounds")
+    _precondition(end._encodedOffset <= _guts.count,
+      "String index is out of bounds")
+
     if _slowPath(_guts.isForeign) {
       return _foreignDistance(from: start, to: end)
     }
@@ -250,8 +275,14 @@ extension String.UTF16View: BidirectionalCollection {
   ///   less than the view's end index.
   @inlinable @inline(__always)
   public subscript(idx: Index) -> UTF16.CodeUnit {
-    String(_guts)._boundsCheck(idx)
+    let idx = _guts.ensureMatchingEncoding(idx)
+    _precondition(idx._encodedOffset < _guts.count,
+      "String index is out of bounds")
+    return self[_unchecked: idx]
+  }
 
+  @_alwaysEmitIntoClient @inline(__always)
+  internal subscript(_unchecked idx: Index) -> UTF16.CodeUnit {
     if _fastPath(_guts.isFastUTF8) {
       let scalar = _guts.fastUTF8Scalar(
         startingAt: _guts.scalarAlign(idx)._encodedOffset)
@@ -427,6 +458,7 @@ extension String.UTF16View {
   public typealias SubSequence = Substring.UTF16View
 
   public subscript(r: Range<Index>) -> Substring.UTF16View {
+    let r = _guts.validateSubscalarRange(r)
     return Substring.UTF16View(self, _bounds: r)
   }
 }
@@ -474,14 +506,20 @@ extension String.UTF16View {
     if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
       return nil
     }
-    return i.strippingTranscoding.encoded(offsetBy: n)
+    let offset = i._encodedOffset &+ n
+    _precondition(offset >= 0 && offset <= _guts.count,
+      "String index is out of bounds")
+    return Index(_encodedOffset: offset)._knownUTF16
   }
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(_ i: Index, offsetBy n: Int) -> Index {
     _internalInvariant(_guts.isForeign)
-    return i.strippingTranscoding.encoded(offsetBy: n)
+    let offset = i._encodedOffset &+ n
+    _precondition(offset >= 0 && offset <= _guts.count,
+      "String index is out of bounds")
+    return Index(_encodedOffset: offset)._knownUTF16
   }
 
   @usableFromInline @inline(never)
@@ -631,10 +669,11 @@ extension String.UTF16View {
       return utf16Count
     }
   }
-  
+
   @usableFromInline
   @_effects(releasenone)
   internal func _nativeGetOffset(for idx: Index) -> Int {
+    _internalInvariant(idx._encodedOffset <= _guts.count)
     // Trivial and common: start
     if idx == startIndex { return 0 }
 
@@ -656,13 +695,14 @@ extension String.UTF16View {
     // Otherwise, find the nearest lower-bound breadcrumb and count from there
     let (crumb, crumbOffset) = breadcrumbsPtr.pointee.getBreadcrumb(
       forIndex: idx)
-    
     return crumbOffset + _utf16Distance(from: crumb, to: idx)
   }
 
   @usableFromInline
   @_effects(releasenone)
   internal func _nativeGetIndex(for offset: Int) -> Index {
+    _precondition(offset >= 0, "String index is out of bounds")
+
     // Trivial and common: start
     if offset == 0 { return startIndex }
 
@@ -701,6 +741,7 @@ extension String.UTF16View {
       }
 
       while true {
+        _precondition(readIdx < readEnd, "String index is out of bounds")
         let len = _utf8ScalarLength(utf8[_unchecked: readIdx])
         let utf16Len = len == 4 ? 2 : 1
         utf16I &+= utf16Len
