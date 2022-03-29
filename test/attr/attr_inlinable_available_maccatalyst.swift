@@ -1,38 +1,34 @@
-// A module with library evolution enabled has two different "minimum versions".
-// One, the minimum deployment target, is the lowest version that non-ABI
-// declarations and bodies of non-inlinable functions will ever see. The other,
-// the minimum inlining target, is the lowest version that ABI declarations and
-// inlinable bodies will ever see.
-//
-// Test that we use the right version floor in the right places.
-//
-// To keep this test multi-platform, we only check fragments of diagnostics that
-// don't include platform names or versions.
+// This is the same test as attr_inlinable_available, but specifically using a
+// macCatalyst target which has its own version floor separate from iOS. The two
+// tests could be merged in the future if there were a CI bot running tests with
+// OS=maccatalyst and there were a lit.py substitution for the -target argument
+// that substituted to a macCatalyst SDK version compatible with the
+// configuration of this test.
 
-// REQUIRES: swift_stable_abi
+// REQUIRES: maccatalyst_support
 
 // Primary execution of this test. Uses the default minimum inlining version,
 // which is the version when Swift was introduced.
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -target-min-inlining-version min
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-cpu-apple-ios14.4-macabi -target-min-inlining-version min
 
 
 // Check that `-library-level api` implies `-target-min-inlining-version min`
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -library-level api
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-cpu-apple-ios14.4-macabi -library-level api
 
 
 // Check that these rules are only applied when requested and that at least some
 // diagnostics are not present without it.
-// RUN: not %target-typecheck-verify-swift -swift-version 5 -target %target-next-stable-abi-triple 2>&1 | %FileCheck --check-prefix NON_MIN %s
+// RUN: not %target-typecheck-verify-swift -swift-version 5 -target %target-cpu-apple-ios14.4-macabi 2>&1 | %FileCheck --check-prefix NON_MIN %s
 
 
 // Check that -target-min-inlining-version overrides -library-level, allowing
 // library owners to disable this behavior for API libraries if needed.
-// RUN: not %target-typecheck-verify-swift -swift-version 5 -target %target-next-stable-abi-triple -target-min-inlining-version target -library-level api 2>&1 | %FileCheck --check-prefix NON_MIN %s
+// RUN: not %target-typecheck-verify-swift -swift-version 5 -target %target-cpu-apple-ios14.4-macabi -target-min-inlining-version target -library-level api 2>&1 | %FileCheck --check-prefix NON_MIN %s
 
 
 // Check that we respect -target-min-inlining-version by cranking it up high
 // enough to suppress any possible errors.
-// RUN: %target-swift-frontend -typecheck -disable-objc-attr-requires-foundation-module %s -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -target-min-inlining-version 42.0
+// RUN: %target-swift-frontend -typecheck -disable-objc-attr-requires-foundation-module %s -swift-version 5 -enable-library-evolution -target %target-cpu-apple-ios14.4-macabi -target-min-inlining-version 42.0
 
 
 // NON_MIN: error: expected error not produced
@@ -45,27 +41,27 @@ public struct NoAvailable {
   @usableFromInline internal init() {}
 }
 
-@available(macOS 10.9, iOS 7.0, tvOS 8.0, watchOS 1.0, *)
+@available(macCatalyst 12, *)
 public struct BeforeInliningTarget {
   @usableFromInline internal init() {}
 }
 
-@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
+@available(macCatalyst 13.1, *)
 public struct AtInliningTarget {
   @usableFromInline internal init() {}
 }
 
-@available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
+@available(macCatalyst 14, *)
 public struct BetweenTargets {
   @usableFromInline internal init() {}
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(macCatalyst 14.4, *)
 public struct AtDeploymentTarget {
   @usableFromInline internal init() {}
 }
 
-@available(macOS 11, iOS 14, tvOS 14, watchOS 7, *)
+@available(macCatalyst 15, *)
 public struct AfterDeploymentTarget {
   @usableFromInline internal init() {}
 }
@@ -96,12 +92,12 @@ public func deployedUseNoAvailable( // expected-note 5 {{add @available attribut
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
-@available(macOS 10.9, iOS 7.0, tvOS 8.0, watchOS 1.0, *)
+@available(macCatalyst 12, *)
 public func deployedUseBeforeInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -121,12 +117,12 @@ public func deployedUseBeforeInliningTarget(
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
-@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
+@available(macCatalyst 13.1, *)
 public func deployedUseAtInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -146,12 +142,12 @@ public func deployedUseAtInliningTarget(
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
-@available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
+@available(macCatalyst 14, *)
 public func deployedUseBetweenTargets(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -171,12 +167,12 @@ public func deployedUseBetweenTargets(
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(macCatalyst 14.4, *)
 public func deployedUseAtDeploymentTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -196,12 +192,12 @@ public func deployedUseAtDeploymentTarget(
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
-@available(macOS 11, iOS 14, tvOS 14, watchOS 7, *)
+@available(macCatalyst 15, *)
 public func deployedUseAfterDeploymentTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -247,18 +243,18 @@ public func deployedUseAfterDeploymentTarget(
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *) {
+  if #available(macCatalyst 14, *) {
     _ = BetweenTargets()
   }
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+  if #available(macCatalyst 14.4, *) {
     _ = AtDeploymentTarget()
   }
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
-@available(macOS 10.9, iOS 7.0, tvOS 8.0, watchOS 1.0, *)
+@available(macCatalyst 12, *)
 @inlinable public func inlinedUseBeforeInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -278,18 +274,18 @@ public func deployedUseAfterDeploymentTarget(
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *) {
+  if #available(macCatalyst 14, *) {
     _ = BetweenTargets()
   }
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+  if #available(macCatalyst 14.4, *) {
     _ = AtDeploymentTarget()
   }
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
-@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
+@available(macCatalyst 13.1, *)
 @inlinable public func inlinedUseAtInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -309,18 +305,18 @@ public func deployedUseAfterDeploymentTarget(
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *) {
+  if #available(macCatalyst 14, *) {
     _ = BetweenTargets()
   }
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+  if #available(macCatalyst 14.4, *) {
     _ = AtDeploymentTarget()
   }
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
-@available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
+@available(macCatalyst 14, *)
 @inlinable public func inlinedUseBetweenTargets(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -330,25 +326,25 @@ public func deployedUseAfterDeploymentTarget(
   _: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
 ) {
   defer {
-    _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+    _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
-  _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+  _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+  if #available(macCatalyst 14.4, *) {
     _ = AtDeploymentTarget()
   }
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(macCatalyst 14.4, *)
 @inlinable public func inlinedUseAtDeploymentTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -368,12 +364,12 @@ public func deployedUseAfterDeploymentTarget(
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
-@available(macOS 11, iOS 14, tvOS 14, watchOS 7, *)
+@available(macCatalyst 15, *)
 @inlinable public func inlinedUseAfterDeploymentTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -425,21 +421,21 @@ internal func fn() {
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *) {
+  if #available(macCatalyst 14, *) {
     _ = BetweenTargets()
   }
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+  if #available(macCatalyst 14.4, *) {
     _ = AtDeploymentTarget()
   }
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
 
 // @_backDeploy acts like @inlinable.
 
-@available(macOS 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *)
-@_backDeploy(before: macOS 999.0, iOS 999.0, tvOS 999.0, watchOS 999.0)
+@available(macCatalyst 13.1, *)
+@_backDeploy(before: macCatalyst 999.0)
 public func backDeployedToInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -459,13 +455,13 @@ public func backDeployedToInliningTarget(
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *) {
+  if #available(macCatalyst 14, *) {
     _ = BetweenTargets()
   }
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+  if #available(macCatalyst 14.4, *) {
     _ = AtDeploymentTarget()
   }
-  if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+  if #available(macCatalyst 15, *) {
     _ = AfterDeploymentTarget()
   }
 }
@@ -481,7 +477,7 @@ public func defaultArgsUseNoAvailable( // expected-note 3 {{add @available attri
   _: Any = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in}}
 ) {}
 
-public struct PublicStruct { // expected-note 7 {{add @available attribute}}
+public struct PublicStruct { // expected-note 6 {{add @available attribute}}
   // Public declarations act like @inlinable.
   public var aPublic: NoAvailable
   public var bPublic: BeforeInliningTarget
@@ -498,7 +494,7 @@ public struct PublicStruct { // expected-note 7 {{add @available attribute}}
   var eInternal: AtDeploymentTarget
   var fInternal: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in}}
 
-  @available(macOS 10.14.5, iOS 12.3, tvOS 12.3, watchOS 5.3, *)
+  @available(macCatalyst 14, *)
   public internal(set) var internalSetter: Void {
     @inlinable get {
       // Public inlinable getter acts like @inlinable
@@ -506,7 +502,7 @@ public struct PublicStruct { // expected-note 7 {{add @available attribute}}
       _ = BeforeInliningTarget()
       _ = AtInliningTarget()
       _ = BetweenTargets()
-      _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
+      _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in}}
       _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
     }
@@ -563,7 +559,8 @@ _ = BetweenTargets()
 _ = AtDeploymentTarget()
 _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in}} expected-note {{add 'if #available'}}
 
-if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+if #available(macCatalyst 15, *) {
   _ = AfterDeploymentTarget()
 }
+
 
