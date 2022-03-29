@@ -6777,9 +6777,9 @@ Checked Conversions
 
 Some user-level cast operations can fail and thus require runtime checking.
 
-The `unconditional_checked_cast_addr`_, `unconditional_checked_cast_value`_ and `unconditional_checked_cast`_
+The `unconditional_checked_cast_addr` and `unconditional_checked_cast`_
 instructions performs an unconditional checked cast; it is a runtime failure
-if the cast fails. The `checked_cast_addr_br`_, `checked_cast_value_br`_ and `checked_cast_br`_
+if the cast fails. The `checked_cast_addr_br`_ and `checked_cast_br`_
 terminator instruction performs a conditional checked cast; it branches to one
 of two destinations based on whether the cast succeeds or not.
 
@@ -6813,25 +6813,6 @@ unconditional_checked_cast_addr
 
 Performs a checked indirect conversion, causing a runtime failure if the
 conversion fails.
-
-unconditional_checked_cast_value
-````````````````````````````````
-::
-
-  sil-instruction ::= 'unconditional_checked_cast_value'
-                       sil-operand 'to' sil-type
-
-  %1 = unconditional_checked_cast_value %0 : $A to $B
-  // $A must not be an address
-  // $B must not be an address
-  // %1 will be of type $B
-  // $A is destroyed during the conversion. There is no implicit copy.
-
-Performs a checked conversion, causing a runtime failure if the conversion
-fails. Unlike `unconditional_checked_cast`, this destroys its operand and
-creates a new value. Consequently, this supports bridging objects to values, as
-well as casting to a different ownership classification such as `$AnyObject` to
-`$T.Type`.
 
 Runtime Failures
 ~~~~~~~~~~~~~~~~
@@ -7212,26 +7193,6 @@ transferred to ``bb2``.
 An exact cast checks whether the dynamic type is exactly the target
 type, not any possible subtype of it.  The source and target types
 must be class types.
-
-checked_cast_value_br
-`````````````````````
-::
-
-  sil-terminator ::= 'checked_cast_value_br'
-                      sil-operand 'to' sil-type ','
-                      sil-identifier ',' sil-identifier
-  sil-checked-cast-exact ::= '[' 'exact' ']'
-
-  checked_cast_value_br %0 : $A to $B, bb1, bb2
-  // $A must be not be an address
-  // $B must be an opaque value
-  // bb1 must take a single argument of type $B
-  // bb2 must take no arguments
-
-Performs a checked opaque conversion from ``$A`` to ``$B``. If the conversion
-succeeds, control is transferred to ``bb1``, and the result of the cast is
-passed into ``bb1`` as an argument. If the conversion fails, control is
-transferred to ``bb2``.
 
 checked_cast_addr_br
 ````````````````````
