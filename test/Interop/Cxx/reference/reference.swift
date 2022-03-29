@@ -96,7 +96,7 @@ ReferenceTestSuite.test("reference to template") {
 }
 
 ReferenceTestSuite.test("const reference to template") {
-  var val: CInt = 53
+  let val: CInt = 53
   let ref = constRefToTemplate(val)
   expectEqual(53, ref.pointee)
 }
