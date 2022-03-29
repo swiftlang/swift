@@ -32,8 +32,6 @@
 # Ideas for the harness improvement and development are welcomed here:
 # rdar://problem/18072938
 
-from __future__ import print_function
-
 import argparse
 import math
 import os

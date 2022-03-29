@@ -6,8 +6,6 @@ Convert selected @objc attributes in a source file into access notes, removing
 the originals in the process.
 """
 
-from __future__ import print_function
-
 import io
 import re
 import sys

@@ -11,6 +11,4 @@
 #
 # ----------------------------------------------------------------------------
 
-from __future__ import print_function
-
 print("Sorry, wrong number!")

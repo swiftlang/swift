@@ -21,8 +21,6 @@
 #      -s macosx iphoneos watchos appletvos
 #
 
-from __future__ import print_function
-
 import argparse
 import multiprocessing
 import os

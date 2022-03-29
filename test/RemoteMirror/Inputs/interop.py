@@ -7,8 +7,6 @@
 #
 # Invoke by passing the various Swift build directories as parameters.
 
-from __future__ import print_function
-
 import itertools
 import os
 import subprocess

@@ -27,8 +27,6 @@
 # It operates on the current, potentially unsaved buffer and does not create or
 # save any files.  To revert a indenting, just undo.
 
-from __future__ import print_function
-
 import difflib
 import platform
 import subprocess

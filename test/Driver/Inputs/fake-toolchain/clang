@@ -11,6 +11,4 @@
 #
 # ----------------------------------------------------------------------------
 
-from __future__ import print_function
-
 print("Sorry, I'm lazy-clang")

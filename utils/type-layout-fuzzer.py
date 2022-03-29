@@ -5,8 +5,6 @@
 
 # TODO: generate types with generics, existentials, compositions
 
-from __future__ import print_function
-
 import random
 import sys
 

@@ -11,8 +11,6 @@
 #
 # ----------------------------------------------------------------------------
 
-from __future__ import print_function
-
 import sys
 
 filelistFile = sys.argv[sys.argv.index('-filelist') + 1]

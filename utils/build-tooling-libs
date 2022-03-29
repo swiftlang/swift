@@ -23,8 +23,6 @@
 # This utility also provides capability to gather profile data and build the parser
 # library with PGO optimization enabled.
 
-from __future__ import print_function
-
 import copy
 import multiprocessing
 import os

@@ -4,8 +4,6 @@ Renames files or directories with "module-triple-here" in their names to use
 the indicated module triples instead.
 """
 
-from __future__ import print_function
-
 import os
 import platform
 import shutil

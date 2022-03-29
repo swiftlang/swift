@@ -2,8 +2,6 @@
 
 # RUN: %empty-directory(%t) && %gyb %s | %FileCheck %s
 
-from __future__ import print_function
-
 from GYBUnicodeDataUtils import *
 
 def test_trie_generation(property_table, configure_generator=None):

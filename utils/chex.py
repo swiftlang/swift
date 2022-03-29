@@ -4,8 +4,6 @@
 # strings matching the regex /< (i[0-9]+) \s+ (0x[0-9A-Fa-f]+) >/x with the
 # decimal literal equivalent that would really appear in printed LLVM IR.
 
-from __future__ import print_function
-
 import re
 import sys
 
