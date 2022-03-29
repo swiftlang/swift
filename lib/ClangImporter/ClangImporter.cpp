@@ -5396,6 +5396,20 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
   return {body, /*isTypeChecked=*/true};
 }
 
+static bool unwrappedOptionalPointerTypeIsAny(Type type) {
+  auto subjectType = type->lookThroughAllOptionalTypes();
+
+  if (subjectType->isAny())
+    return true;
+
+  if (subjectType->isUnsafeMutablePointer() ||
+      subjectType->isUnsafePointer()) {
+    return subjectType->getAnyPointerElementType()->isAny();
+  }
+
+  return false;
+}
+
 // Create a thunk to map functions with dependent types to their specialized
 // version. For example, create a thunk with type (Any) -> Any to wrap a
 // specialized function template with type (Dependent<T>) -> Dependent<T>.
@@ -5409,7 +5423,7 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
     // If the un-specialized function had a parameter with type "Any" preserve
     // that parameter. Otherwise, use the new function parameter.
     auto oldParamType = oldDecl->getParameters()->get(parameterIndex)->getType();
-    if (oldParamType->isEqual(newDecl->getASTContext().TheAnyType)) {
+    if (unwrappedOptionalPointerTypeIsAny(oldParamType)) {
       updatedAnyParams = true;
       auto newParam =
           ParamDecl::cloneWithoutType(newDecl->getASTContext(), newFnParam);
@@ -5422,18 +5436,18 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
   }
 
   // If we don't need this thunk, bail out.
+  bool resultIsAny = unwrappedOptionalPointerTypeIsAny(oldDecl->getResultInterfaceType());
   if (!updatedAnyParams &&
-      !oldDecl->getResultInterfaceType()->isEqual(
-          oldDecl->getASTContext().TheAnyType))
+      !resultIsAny) {
     return newDecl;
+  }
 
   auto fixedParams =
       ParameterList::create(newDecl->getASTContext(), fixedParameters);
 
   Type fixedResultType;
-  if (oldDecl->getResultInterfaceType()->isEqual(
-          oldDecl->getASTContext().TheAnyType))
-    fixedResultType = oldDecl->getASTContext().TheAnyType;
+  if (resultIsAny)
+    fixedResultType = oldDecl->getResultInterfaceType();
   else
     fixedResultType = newDecl->getResultInterfaceType();
 

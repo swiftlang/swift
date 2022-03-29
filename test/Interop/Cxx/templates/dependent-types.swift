@@ -58,6 +58,11 @@ DependentTypesTestSuite.test("Takes const ref and returns dependent type.") {
   expectEqual(m.getValue(), 42)
 }
 
+DependentTypesTestSuite.test("Takes pointer and returns pointer to dependent type.") {
+  var m: Any = M<Int>(value: 42)
+  let m2 = dependentPointer(&m, T: Int.self).pointee as! M<Int>
+  expectEqual(m2.getValue(), 42)
+}
 
 // We still have some problems calling methods on Windows: SR-13129 and rdar://88391102
 #if !os(Windows)
@@ -82,6 +87,14 @@ DependentTypesTestSuite.test("Function template methods (static)") {
 
   let m2 = M<Int>.memberDependentReturnTypeStatic(CInt(32)) as! M<CInt>
   expectEqual(m2.getValue(), 32)
+}
+
+DependentTypesTestSuite.test("Function template methods takes pointer to dependent") {
+  let m = M<Int>(value: 32)
+  var ptr: Any = M<CInt>(value: 42)
+  let val: CInt = m.memberPointerToDependentParamType(&ptr)
+
+  expectEqual(val, 42)
 }
 #endif // Windows
 

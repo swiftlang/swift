@@ -25,6 +25,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -787,6 +788,9 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &SGF,
                                               CanType bridgedType,
                                               SILType loweredBridgedTy,
                                               SGFContext C = SGFContext()) {
+  PrettyStackTraceType nativeTrace{nativeType->getASTContext(), "native to bridged value (NATIVE TYPE)", nativeType};
+  PrettyStackTraceType bridgedTrace{nativeType->getASTContext(), "native to bridged value (BRIDGED TYPE)", bridgedType};
+
   SILType loweredNativeTy = v.getType();
   if (loweredNativeTy.getObjectType() == loweredBridgedTy.getObjectType())
     return v;
