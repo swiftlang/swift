@@ -19,9 +19,11 @@
 // 2) Small enough that no further rules can be deleted without changing the
 //    resulting confluent rewrite system.
 //
-// Redundant rules that are not part of the minimal set are redundant are
-// detected by analyzing the set of rewrite loops computed by the completion
-// procedure. See RewriteLoop.cpp for a discussion of rewrite loops.
+// The main entry point here is RewriteSystem::minimizeRewriteSystem().
+//
+// Redundant rules are detected by analyzing the set of rewrite loops computed
+// by the completion procedure. See RewriteLoop.cpp for a discussion of rewrite
+// loops.
 //
 // If a rewrite rule appears exactly once in a loop and without context, the
 // loop witnesses a redundancy; the rewrite rule is equivalent to traveling
