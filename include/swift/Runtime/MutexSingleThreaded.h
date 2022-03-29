@@ -22,10 +22,8 @@
 namespace swift {
 
 typedef void* MutexHandle;
-typedef void* ReadWriteLockHandle;
 
 #define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 1
-#define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 1
 
 struct MutexPlatformHelper {
   static constexpr MutexHandle staticInit() { return nullptr; }
@@ -38,17 +36,6 @@ struct MutexPlatformHelper {
   static void unsafeUnlock(MutexHandle &mutex) {}
 };
 
-struct ReadWriteLockPlatformHelper {
-  static constexpr ReadWriteLockHandle staticInit() { return nullptr; }
-  static void init(ReadWriteLockHandle &rwlock) {}
-  static void destroy(ReadWriteLockHandle &rwlock) {}
-  static void readLock(ReadWriteLockHandle &rwlock) {}
-  static bool try_readLock(ReadWriteLockHandle &rwlock) { return true; }
-  static void readUnlock(ReadWriteLockHandle &rwlock) {}
-  static void writeLock(ReadWriteLockHandle &rwlock) {}
-  static bool try_writeLock(ReadWriteLockHandle &rwlock) { return true; }
-  static void writeUnlock(ReadWriteLockHandle &rwlock) {}
-};
 }
 
 #endif

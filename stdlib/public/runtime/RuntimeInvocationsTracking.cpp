@@ -49,7 +49,7 @@ static bool UpdateGlobalRuntimeFunctionCounters = false;
 /// Global set of counters tracking the total number of runtime invocations.
 struct RuntimeFunctionCountersStateSentinel {
   RuntimeFunctionCountersState State;
-  StaticReadWriteLock Lock;
+  StaticMutex Lock;
 };
 static RuntimeFunctionCountersStateSentinel RuntimeGlobalFunctionCountersState;
 
@@ -57,7 +57,7 @@ static RuntimeFunctionCountersStateSentinel RuntimeGlobalFunctionCountersState;
 /// them.
 struct RuntimeObjectCacheSentinel {
   llvm::DenseMap<HeapObject *, RuntimeFunctionCountersState> Cache;
-  StaticReadWriteLock Lock;
+  StaticMutex Lock;
 };
 static Lazy<RuntimeObjectCacheSentinel> RuntimeObjectStateCache;
 
@@ -101,7 +101,7 @@ static uint16_t RuntimeFunctionCountersOffsets[] = {
   void SWIFT_RT_TRACK_INVOCATION_NAME(RT_FUNCTION)(HeapObject * object) {      \
     /* Update global counters. */                                              \
     if (UpdateGlobalRuntimeFunctionCounters) {                                 \
-      StaticScopedWriteLock lock(RuntimeGlobalFunctionCountersState.Lock);     \
+      StaticMutex::ScopedLock lock(RuntimeGlobalFunctionCountersState.Lock);   \
       RuntimeGlobalFunctionCountersState.State                                 \
           .SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(RT_FUNCTION)++;           \
       if (GlobalRuntimeFunctionCountersUpdateHandler) {                        \
@@ -117,7 +117,7 @@ static uint16_t RuntimeFunctionCountersOffsets[] = {
     /* Update per object counters. */                                          \
     if (UpdatePerObjectRuntimeFunctionCounters && object) {                    \
       auto &theSentinel = RuntimeObjectStateCache.get();                       \
-      StaticScopedWriteLock lock(theSentinel.Lock);                            \
+      StaticMutex::ScopedLock lock(theSentinel.Lock);                          \
       theSentinel.Cache[object].SWIFT_RT_FUNCTION_INVOCATION_COUNTER_NAME(     \
           RT_FUNCTION)++;                                                      \
       /* TODO: Remember the order/history of  operations? */                   \
@@ -131,7 +131,7 @@ static uint16_t RuntimeFunctionCountersOffsets[] = {
 void _swift_getObjectRuntimeFunctionCounters(
     HeapObject *object, RuntimeFunctionCountersState *result) {
   auto &theSentinel = RuntimeObjectStateCache.get();
-  StaticScopedReadLock lock(theSentinel.Lock);
+  StaticMutex::ScopedLock lock(theSentinel.Lock);
   *result = theSentinel.Cache[object];
 }
 
@@ -140,7 +140,7 @@ void _swift_getObjectRuntimeFunctionCounters(
 void _swift_setObjectRuntimeFunctionCounters(
     HeapObject *object, RuntimeFunctionCountersState *state) {
   auto &theSentinel = RuntimeObjectStateCache.get();
-  StaticScopedWriteLock lock(theSentinel.Lock);
+  StaticMutex::ScopedLock lock(theSentinel.Lock);
   theSentinel.Cache[object] = *state;
 }
 
@@ -148,14 +148,14 @@ void _swift_setObjectRuntimeFunctionCounters(
 /// each runtime function of interest.
 void _swift_getGlobalRuntimeFunctionCounters(
     RuntimeFunctionCountersState *result) {
-  StaticScopedReadLock lock(RuntimeGlobalFunctionCountersState.Lock);
+  StaticMutex::ScopedLock lock(RuntimeGlobalFunctionCountersState.Lock);
   *result = RuntimeGlobalFunctionCountersState.State;
 }
 
 /// Set the global runtime state of function pointers from a provided state.
 void _swift_setGlobalRuntimeFunctionCounters(
     RuntimeFunctionCountersState *state) {
-  StaticScopedWriteLock lock(RuntimeGlobalFunctionCountersState.Lock);
+  StaticMutex::ScopedLock lock(RuntimeGlobalFunctionCountersState.Lock);
   RuntimeGlobalFunctionCountersState.State = *state;
 }
 
@@ -192,7 +192,7 @@ static void _swift_dumpRuntimeCounters(RuntimeFunctionCountersState *State) {
 /// Dump all per-object runtime function pointers.
 void _swift_dumpObjectsRuntimeFunctionPointers() {
   auto &theSentinel = RuntimeObjectStateCache.get();
-  StaticScopedReadLock lock(theSentinel.Lock);
+  StaticMutex::ScopedLock lock(theSentinel.Lock);
   for (auto &Pair : theSentinel.Cache) {
     printf("\n\nRuntime counters for object at address %p:\n", Pair.getFirst());
     _swift_dumpRuntimeCounters(&Pair.getSecond());
