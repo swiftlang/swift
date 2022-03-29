@@ -52,9 +52,6 @@ class RewriteContext final {
   llvm::DenseMap<const ProtocolDecl *,
                  llvm::TinyPtrVector<const ProtocolDecl *>> AllInherited;
 
-  /// Cache for associated type declarations.
-  llvm::DenseMap<Symbol, AssociatedTypeDecl *> AssocTypes;
-
   /// Requirement machines built from generic signatures.
   llvm::DenseMap<GenericSignature, RequirementMachine *> Machines;
 
@@ -193,8 +190,6 @@ public:
   CanType getRelativeSubstitutionSchemaFromType(CanType concreteType,
                                                 ArrayRef<Term> substitutions,
                                                 SmallVectorImpl<Term> &result);
-
-  AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
