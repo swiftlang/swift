@@ -19,6 +19,7 @@
 
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -2786,6 +2787,12 @@ class OpaqueTypeDecl final :
     private llvm::TrailingObjects<OpaqueTypeDecl, OpaqueReturnTypeRepr *> {
   friend TrailingObjects;
 
+public:
+  /// A set of substitutions that represents a possible underlying type iff
+  /// associated set of availability conditions is met.
+  class ConditionallyAvailableSubstitutions;
+
+private:
   /// The original declaration that "names" the opaque type. Although a specific
   /// opaque type cannot be explicitly named, oapque types can propagate
   /// arbitrarily through expressions, so we need to know *which* opaque type is
@@ -2805,8 +2812,17 @@ class OpaqueTypeDecl final :
   /// expressed as a SubstitutionMap for the opaque interface generic signature.
   /// This maps types in the interface generic signature to the outer generic
   /// signature of the original declaration.
-  Optional<SubstitutionMap> UnderlyingTypeSubstitutions;
-  
+  Optional<SubstitutionMap> UniqueUnderlyingType;
+
+  /// A set of substitutions which are used based on the availability
+  /// checks performed at runtime. This set of only populated if there
+  /// is no single unique underlying type for this opaque type declaration.
+  ///
+  /// It always contains one or more conditionally available substitutions
+  /// followed by a universally available type used as a fallback.
+  Optional<MutableArrayRef<ConditionallyAvailableSubstitutions *>>
+      ConditionallyAvailableTypes = None;
+
   mutable Identifier OpaqueReturnTypeIdentifier;
 
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
@@ -2882,16 +2898,25 @@ public:
   }
 
   /// The substitutions that map the generic parameters of the opaque type to
-  /// their underlying types, when that information is known.
-  Optional<SubstitutionMap> getUnderlyingTypeSubstitutions() const {
-    return UnderlyingTypeSubstitutions;
+  /// the unique underlying types, when that information is known.
+  Optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const {
+    return UniqueUnderlyingType;
   }
   
-  void setUnderlyingTypeSubstitutions(SubstitutionMap subs) {
-    assert(!UnderlyingTypeSubstitutions.hasValue() && "resetting underlying type?!");
-    UnderlyingTypeSubstitutions = subs;
+  void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
+    assert(!UniqueUnderlyingType.hasValue() && "resetting underlying type?!");
+    UniqueUnderlyingType = subs;
   }
-  
+
+  ArrayRef<ConditionallyAvailableSubstitutions *>
+  getConditionallyAvailableSubstitutions() const {
+    assert(ConditionallyAvailableTypes);
+    return ConditionallyAvailableTypes.getValue();
+  }
+
+  void setConditionallyAvailableSubstitutions(
+      ArrayRef<ConditionallyAvailableSubstitutions *> substitutions);
+
   // Opaque type decls are currently always implicit
   SourceRange getSourceRange() const { return SourceRange(); }
   
@@ -2910,6 +2935,40 @@ public:
       return classof(D);
     return false;
   }
+
+  class ConditionallyAvailableSubstitutions final
+      : private llvm::TrailingObjects<ConditionallyAvailableSubstitutions,
+                                      VersionRange> {
+    friend TrailingObjects;
+
+    unsigned NumAvailabilityConditions;
+
+    SubstitutionMap Substitutions;
+
+    /// A type with limited availability described by the provided set
+    /// of availability conditions (with `and` relationship).
+    ConditionallyAvailableSubstitutions(
+        ArrayRef<VersionRange> availabilityContext,
+        SubstitutionMap substitutions)
+        : NumAvailabilityConditions(availabilityContext.size()),
+          Substitutions(substitutions) {
+      assert(!availabilityContext.empty());
+      std::uninitialized_copy(availabilityContext.begin(),
+                              availabilityContext.end(),
+                              getTrailingObjects<VersionRange>());
+    }
+
+  public:
+    ArrayRef<VersionRange> getAvailability() const {
+      return {getTrailingObjects<VersionRange>(), NumAvailabilityConditions};
+    }
+
+    SubstitutionMap getSubstitutions() const { return Substitutions; }
+
+    static ConditionallyAvailableSubstitutions *
+    get(ASTContext &ctx, ArrayRef<VersionRange> availabilityContext,
+        SubstitutionMap substitutions);
+  };
 };
 
 /// TypeAliasDecl - This is a declaration of a typealias, for example:

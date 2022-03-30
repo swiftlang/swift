@@ -8442,7 +8442,7 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
         return expr;
       });
 
-      opaque->setUnderlyingTypeSubstitutions(substitutions);
+      opaque->setUniqueUnderlyingTypeSubstitutions(substitutions);
     }
   }
 

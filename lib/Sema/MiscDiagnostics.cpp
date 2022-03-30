@@ -2603,29 +2603,36 @@ public:
 /// An AST walker that determines the underlying type of an opaque return decl
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
-  using Candidate = std::pair<Expr *, SubstitutionMap>;
+  using Candidate = std::tuple<Expr *, SubstitutionMap, /*isUnique=*/bool>;
+  using AvailabilityContext = IfStmt *;
 
   ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
   OpaqueTypeDecl *OpaqueDecl;
   BraceStmt *Body;
-  SmallVector<Candidate, 4> Candidates;
-  SmallPtrSet<const void *, 4> KnownCandidates;
+
+  /// A set of all candidates with unique signatures.
+  SmallPtrSet<const void *, 4> UniqueSignatures;
+
+  /// Represents a current availability context. `nullptr` means that
+  /// there are no restrictions.
+  AvailabilityContext CurrentAvailability = nullptr;
+
+  /// All of the candidates together with their availability.
+  ///
+  /// If a candidate is found in non-`if #available` context or
+  /// `if #available` has other dynamic conditions, it covers 'all'
+  /// versions and the context is set to `nullptr`.
+  SmallVector<std::pair<AvailabilityContext, Candidate>, 4> Candidates;
 
   bool HasInvalidReturn = false;
 
 public:
   OpaqueUnderlyingTypeChecker(AbstractFunctionDecl *Implementation,
-                              OpaqueTypeDecl *OpaqueDecl,
-                              BraceStmt *Body)
-    : Ctx(Implementation->getASTContext()),
-      Implementation(Implementation),
-      OpaqueDecl(OpaqueDecl),
-      Body(Body)
-  {
-    
-  }
-  
+                              OpaqueTypeDecl *OpaqueDecl, BraceStmt *Body)
+      : Ctx(Implementation->getASTContext()), Implementation(Implementation),
+        OpaqueDecl(OpaqueDecl), Body(Body) {}
+
   void check() {
     Body->walk(*this);
 
@@ -2642,95 +2649,242 @@ public:
       return;
     }
 
-    // Check whether all of the underlying type candidates match up.
-    // TODO [OPAQUE SUPPORT]: diagnose multiple opaque types
-    SubstitutionMap underlyingSubs = Candidates.front().second;
-    if (Candidates.size() > 1) {
-      Optional<std::pair<unsigned, GenericTypeParamType *>> mismatch;
-
-      auto opaqueParams = OpaqueDecl->getOpaqueGenericParams();
-      for (auto index : indices(opaqueParams)) {
-        auto *genericParam = opaqueParams[index];
-
-        Type underlyingType = Type(genericParam).subst(underlyingSubs);
-        bool found = false;
-        for (const auto &candidate : Candidates) {
-          Type otherType = Type(genericParam).subst(candidate.second);
-
-          if (!underlyingType->isEqual(otherType)) {
-            mismatch.emplace(index, genericParam);
-            found = true;
-            break;
-          }
-        }
-
-        if (found)
-          break;
-      }
-      assert(mismatch.hasValue());
-
-      if (auto genericParam =
-              OpaqueDecl->getExplicitGenericParam(mismatch->first)) {
-        Implementation->diagnose(
-            diag::opaque_type_mismatched_underlying_type_candidates_named,
-            genericParam->getName())
-          .highlight(genericParam->getLoc());
-      } else {
-        TypeRepr *opaqueRepr =
-            OpaqueDecl->getOpaqueReturnTypeReprs()[mismatch->first];
-        Implementation->diagnose(
-            diag::opaque_type_mismatched_underlying_type_candidates,
-            opaqueRepr)
-          .highlight(opaqueRepr->getSourceRange());
-      }
-
-      for (auto candidate : Candidates) {
-        Ctx.Diags.diagnose(candidate.first->getLoc(),
-                           diag::opaque_type_underlying_type_candidate_here,
-                           Type(mismatch->second).subst(candidate.second));
-      }
+    if (Candidates.size() == 1) {
+      finalizeUnique(Candidates.front().second);
       return;
     }
-    
+
+    // Check whether all of the underlying type candidates match up.
+    // TODO [OPAQUE SUPPORT]: diagnose multiple opaque types
+
+    // There is a single unique signature, which means that all returns
+    // matched.
+    if (llvm::count_if(Candidates, [](const auto &entry) {
+          const auto &candidate = entry.second;
+          return std::get<2>(candidate); // isUnique field.
+        }) == 1) {
+      finalizeUnique(Candidates.front().second);
+      return;
+    }
+
+    SmallVector<Candidate, 4> universalyUniqueCandidates;
+
+    for (const auto &entry : Candidates) {
+      AvailabilityContext availability = entry.first;
+      const auto &candidate = entry.second;
+
+      // Unique candidate without availability context.
+      if (!availability && std::get<2>(candidate))
+        universalyUniqueCandidates.push_back(candidate);
+    }
+
+    // TODO(diagnostics): Need a tailored diagnostic for this case.
+    if (universalyUniqueCandidates.empty()) {
+      Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
+      return;
+    }
+
+    // If there is a single universally available unique candidate
+    // the underlying type would have to be determined at runtime
+    // based on the results of availability checks.
+    if (universalyUniqueCandidates.size() == 1) {
+      finalizeOpaque(universalyUniqueCandidates.front());
+      return;
+    }
+
+    // A list of all mismatches discovered across all candidates.
+    // If there are any mismatches in availability contexts, they
+    // are not diagnosed but propagated to the declaration.
+    Optional<std::pair<unsigned, GenericTypeParamType *>> mismatch;
+
+    auto opaqueParams = OpaqueDecl->getOpaqueGenericParams();
+    SubstitutionMap underlyingSubs = std::get<1>(Candidates.front().second);
+
+    for (auto index : indices(opaqueParams)) {
+      auto *genericParam = opaqueParams[index];
+
+      Type underlyingType = Type(genericParam).subst(underlyingSubs);
+      bool found = false;
+      for (const auto &candidate : universalyUniqueCandidates) {
+        Type otherType = Type(genericParam).subst(std::get<1>(candidate));
+
+        if (!underlyingType->isEqual(otherType)) {
+          mismatch.emplace(index, genericParam);
+          found = true;
+          break;
+        }
+      }
+
+      if (found)
+        break;
+    }
+
+    assert(mismatch.hasValue());
+
+    if (auto genericParam =
+            OpaqueDecl->getExplicitGenericParam(mismatch->first)) {
+      Implementation
+          ->diagnose(
+              diag::opaque_type_mismatched_underlying_type_candidates_named,
+              genericParam->getName())
+          .highlight(genericParam->getLoc());
+    } else {
+      TypeRepr *opaqueRepr =
+          OpaqueDecl->getOpaqueReturnTypeReprs()[mismatch->first];
+      Implementation
+          ->diagnose(diag::opaque_type_mismatched_underlying_type_candidates,
+                     opaqueRepr)
+          .highlight(opaqueRepr->getSourceRange());
+    }
+
+    for (const auto &candidate : universalyUniqueCandidates) {
+      Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
+                         diag::opaque_type_underlying_type_candidate_here,
+                         Type(mismatch->second).subst(std::get<1>(candidate)));
+    }
+  }
+
+  bool isSelfReferencing(const Candidate &candidate) {
+    auto substitutions = std::get<1>(candidate);
+
     // The underlying type can't be defined recursively
     // in terms of the opaque type itself.
     auto opaqueTypeInContext = Implementation->mapTypeIntoContext(
         OpaqueDecl->getDeclaredInterfaceType());
     for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
-      auto underlyingType = Type(genericParam).subst(underlyingSubs);
-      auto isSelfReferencing = underlyingType.findIf([&](Type t) -> bool {
-        return t->isEqual(opaqueTypeInContext);
-      });
+      auto underlyingType = Type(genericParam).subst(substitutions);
+      auto isSelfReferencing = underlyingType.findIf(
+          [&](Type t) -> bool { return t->isEqual(opaqueTypeInContext); });
 
       if (isSelfReferencing) {
-        unsigned index = genericParam->getIndex();
-        Ctx.Diags.diagnose(Candidates.front().first->getLoc(),
+        Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
                            diag::opaque_type_self_referential_underlying_type,
-                           underlyingSubs.getReplacementTypes()[index]);
-        return;
+                           underlyingType);
+        return true;
       }
     }
 
+    return false;
+  }
+
+  // A single unique underlying substitution.
+  void finalizeUnique(const Candidate &candidate) {
     // If we have one successful candidate, then save it as the underlying
     // substitutions of the opaque decl.
-    OpaqueDecl->setUnderlyingTypeSubstitutions(
-        underlyingSubs.mapReplacementTypesOutOfContext());
+    OpaqueDecl->setUniqueUnderlyingTypeSubstitutions(
+        std::get<1>(candidate).mapReplacementTypesOutOfContext());
   }
-  
+
+  // There is no clear winner here since there are candidates within
+  // limited availability contexts.
+  void finalizeOpaque(const Candidate &universallyAvailable) {
+    SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *, 4>
+        conditionalSubstitutions;
+
+    for (const auto &entry : Candidates) {
+      auto availabilityContext = entry.first;
+      const auto &candidate = entry.second;
+
+      if (!availabilityContext)
+        continue;
+
+      SmallVector<VersionRange, 4> conditions;
+
+      llvm::transform(availabilityContext->getCond(),
+                      std::back_inserter(conditions),
+                      [&](const StmtConditionElement &elt) {
+                        return elt.getAvailability()->getAvailableRange();
+                      });
+
+      conditionalSubstitutions.push_back(
+          OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+              Ctx, conditions,
+              std::get<1>(candidate).mapReplacementTypesOutOfContext()));
+    }
+
+    // Add universally available choice as the last one.
+    conditionalSubstitutions.push_back(
+        OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+            Ctx, {VersionRange::empty()},
+            std::get<1>(universallyAvailable)
+                .mapReplacementTypesOutOfContext()));
+
+    OpaqueDecl->setConditionallyAvailableSubstitutions(
+        conditionalSubstitutions);
+  }
+
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
       auto key =
           underlyingToOpaque->substitutions.getCanonical().getOpaqueValue();
-      if (KnownCandidates.insert(key).second) {
-        Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
-                                            underlyingToOpaque->substitutions));
+
+      auto isUnique = UniqueSignatures.insert(key).second;
+
+      auto candidate =
+          std::make_tuple(underlyingToOpaque->getSubExpr(),
+                          underlyingToOpaque->substitutions, isUnique);
+
+      if (isSelfReferencing(candidate)) {
+        HasInvalidReturn = true;
+        return {false, nullptr};
       }
+
+      Candidates.push_back({CurrentAvailability, candidate});
       return {false, E};
     }
+
     return {true, E};
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (auto *If = dyn_cast<IfStmt>(S)) {
+      if (Parent.getAsStmt() != Body) {
+        // If this is not a top-level `if`, let's drop
+        // contextual information that has been set previously.
+        CurrentAvailability = nullptr;
+        return {true, S};
+      }
+
+      // If this is `if #available` statement with no other dynamic
+      // conditions, let's check if it returns opaque type directly.
+      if (llvm::all_of(If->getCond(), [&](const auto &condition) {
+            return condition.getKind() == StmtConditionElement::CK_Availability;
+          })) {
+        // Check return statement directly with availability context set.
+        if (auto *Then = dyn_cast<BraceStmt>(If->getThenStmt())) {
+          llvm::SaveAndRestore<ParentTy> parent(Parent, Then);
+
+          for (auto element : Then->getElements()) {
+            auto *Return = getAsStmt<ReturnStmt>(element);
+
+            // If this is not a direct return statement, walk into it
+            // without setting contextual availability because we want
+            // to find all `return`s.
+            if (!(Return && Return->hasResult())) {
+              element.walk(*this);
+              continue;
+            }
+
+            // Note that we are about to walk into a return statement
+            // that is located in a `if #available` without any other
+            // conditions.
+            llvm::SaveAndRestore<AvailabilityContext> context(
+                CurrentAvailability, If);
+
+            Return->getResult()->walk(*this);
+          }
+        }
+
+        // Walk the else branch directly as well.
+        if (auto *Else = If->getElseStmt()) {
+          llvm::SaveAndRestore<ParentTy> parent(Parent, If);
+          Else->walk(*this);
+        }
+
+        return {false, S};
+      }
+    }
+
     if (auto *RS = dyn_cast<ReturnStmt>(S)) {
       if (RS->hasResult()) {
         auto resultTy = RS->getResult()->getType();
@@ -2743,7 +2897,7 @@ public:
 
     return {true, S};
   }
-  
+
   // Don't descend into nested decls.
   bool walkToDeclPre(Decl *D) override {
     return false;
