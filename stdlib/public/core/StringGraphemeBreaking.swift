@@ -109,22 +109,25 @@ extension _StringGuts {
 
   internal func roundDownToNearestCharacter(
     _ i: String.Index,
-    from start: String.Index,
-    to end: String.Index
+    in bounds: Range<String.Index>
   ) -> String.Index {
-    _internalInvariant(start._isScalarAligned && end._isScalarAligned)
-    _internalInvariant(hasMatchingEncoding(start) && hasMatchingEncoding(end))
-    _internalInvariant(start <= end && end <= endIndex)
+    _internalInvariant(
+      bounds.lowerBound._isScalarAligned && bounds.upperBound._isScalarAligned)
+    _internalInvariant(
+      hasMatchingEncoding(bounds.lowerBound) && hasMatchingEncoding(bounds.upperBound))
+    _internalInvariant(bounds.upperBound <= endIndex)
 
     _internalInvariant(i._isScalarAligned)
     _internalInvariant(hasMatchingEncoding(i))
-    _internalInvariant(i >= start && i <= end)
+    _internalInvariant(i >= bounds.lowerBound && i <= bounds.upperBound)
 
     // We can only use the `_isCharacterAligned` bit if the start index is also
     // character-aligned.
-    if start._isCharacterAligned && i._isCharacterAligned { return i }
+    if bounds.lowerBound._isCharacterAligned && i._isCharacterAligned {
+      return i
+    }
 
-    if i == start || i == end { return i }
+    if i == bounds.lowerBound || i == bounds.upperBound { return i }
 
     let offset = i._encodedOffset
     let prior = offset - _opaqueCharacterStride(endingAt: offset)
@@ -136,7 +139,7 @@ extension _StringGuts {
       return i
     }
     var r = String.Index(encodedOffset: prior, characterStride: stride)
-    if start._isCharacterAligned {
+    if bounds.lowerBound._isCharacterAligned {
       r = r._characterAligned
     } else {
       r = r._scalarAligned

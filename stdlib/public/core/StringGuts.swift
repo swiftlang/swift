@@ -449,13 +449,13 @@ extension _StringGuts {
   @_alwaysEmitIntoClient
   internal func validateScalarIndex(
     _ i: String.Index,
-    from start: String.Index,
-    to end: String.Index
+    in bounds: Range<String.Index>
   ) -> String.Index {
-    _internalInvariant(start <= end && end <= endIndex)
+    _internalInvariant(bounds.upperBound <= endIndex)
 
     let i = ensureMatchingEncoding(i)
-    _precondition(i >= start && i < end, "Substring index is out of bounds")
+    _precondition(i >= bounds.lowerBound && i < bounds.upperBound,
+      "Substring index is out of bounds")
     return scalarAlign(i)
   }
 }
@@ -486,13 +486,13 @@ extension _StringGuts {
   /// - is aligned on a scalar boundary.
   internal func validateInclusiveScalarIndex(
     _ i: String.Index,
-    from start: String.Index,
-    to end: String.Index
+    in bounds: Range<String.Index>
   ) -> String.Index {
-    _internalInvariant(start <= end && end <= endIndex)
+    _internalInvariant(bounds.upperBound <= endIndex)
 
     let i = ensureMatchingEncoding(i)
-    _precondition(i >= start && i <= end, "Substring index is out of bounds")
+    _precondition(i >= bounds.lowerBound && i <= bounds.upperBound,
+      "Substring index is out of bounds")
     return scalarAlign(i)
   }
 }
@@ -517,10 +517,9 @@ extension _StringGuts {
   @_alwaysEmitIntoClient
   internal func validateSubscalarRange(
     _ range: Range<String.Index>,
-    from start: String.Index,
-    to end: String.Index
+    in bounds: Range<String.Index>
   ) -> Range<String.Index> {
-    _internalInvariant(start <= end && end <= endIndex)
+    _internalInvariant(bounds.upperBound <= endIndex)
 
     let upper = ensureMatchingEncoding(range.upperBound)
     let lower = ensureMatchingEncoding(range.lowerBound)
@@ -528,7 +527,10 @@ extension _StringGuts {
     // Note: if only `lower` was miscoded, then the range invariant `lower <=
     // upper` may no longer hold after the above conversions, so we need to
     // re-check it here.
-    _precondition(upper <= end && lower >= start && lower <= upper,
+    _precondition(
+      upper <= bounds.upperBound
+      && lower >= bounds.lowerBound
+      && lower <= upper,
       "Substring index range is out of bounds")
 
     return Range(_uncheckedBounds: (lower, upper))
@@ -578,10 +580,9 @@ extension _StringGuts {
   /// - are aligned on a scalar boundary.
   internal func validateScalarRange(
     _ range: Range<String.Index>,
-    from start: String.Index,
-    to end: String.Index
+    in bounds: Range<String.Index>
   ) -> Range<String.Index> {
-    _internalInvariant(start <= end && end <= endIndex)
+    _internalInvariant(bounds.upperBound <= endIndex)
 
     var upper = ensureMatchingEncoding(range.upperBound)
     var lower = ensureMatchingEncoding(range.lowerBound)
@@ -589,7 +590,10 @@ extension _StringGuts {
     // Note: if only `lower` was miscoded, then the range invariant `lower <=
     // upper` may no longer hold after the above conversions, so we need to
     // re-check it here.
-    _precondition(upper <= end && lower >= start && lower <= upper,
+    _precondition(
+      upper <= bounds.upperBound
+      && lower >= bounds.lowerBound
+      && lower <= upper,
       "Substring index range is out of bounds")
 
     upper = scalarAlign(upper)

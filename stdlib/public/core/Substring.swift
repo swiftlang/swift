@@ -145,6 +145,23 @@ extension Substring {
     return Range(_uncheckedBounds: (lower, upper))
   }
 
+  @inlinable @inline(__always)
+  internal var _bounds: Range<Index> {
+    Range(_uncheckedBounds: (startIndex, endIndex))
+  }
+}
+
+extension Substring {
+  internal var _startIsCharacterAligned: Bool {
+    startIndex._isCharacterAligned
+  }
+
+  internal var _endIsCharacterAligned: Bool {
+    endIndex._isCharacterAligned
+  }
+}
+
+extension Substring {
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}
   #else
@@ -167,28 +184,28 @@ extension Substring {
 extension Substring {
   @inline(__always)
   internal func _validateScalarIndex(_ i: String.Index) -> String.Index {
-    _wholeGuts.validateScalarIndex(i, from: startIndex, to: endIndex)
+    _wholeGuts.validateScalarIndex(i, in: _bounds)
   }
 
   @inline(__always)
   internal func _validateInclusiveScalarIndex(
     _ i: String.Index
   ) -> String.Index {
-    _wholeGuts.validateInclusiveScalarIndex(i, from: startIndex, to: endIndex)
+    _wholeGuts.validateInclusiveScalarIndex(i, in: _bounds)
   }
 
   @inline(__always)
   internal func _validateScalarRange(
     _ range: Range<String.Index>
   ) -> Range<String.Index> {
-    _wholeGuts.validateScalarRange(range, from: startIndex, to: endIndex)
+    _wholeGuts.validateScalarRange(range, in: _bounds)
   }
 
   @inline(__always)
   internal func _roundDownToNearestCharacter(
     _ i: String.Index
   ) -> String.Index {
-    _wholeGuts.roundDownToNearestCharacter(i, from: startIndex, to: endIndex)
+    _wholeGuts.roundDownToNearestCharacter(i, in: _bounds)
   }
 
   /// Return true if and only if `i` is a valid index in this substring,
@@ -648,16 +665,6 @@ extension Substring: StringProtocol {
 }
 
 extension Substring {
-  internal var _startIsCharacterAligned: Bool {
-    startIndex._isCharacterAligned
-  }
-
-  internal var _endIsCharacterAligned: Bool {
-    endIndex._isCharacterAligned
-  }
-}
-
-extension Substring {
   internal func _characterStride(startingAt i: Index) -> Int {
     _internalInvariant(i._isScalarAligned)
     _internalInvariant(i._encodedOffset <= _wholeGuts.count)
@@ -737,6 +744,11 @@ extension Substring {
 
     @_alwaysEmitIntoClient @inline(__always)
     internal var _base: String.UTF8View { _slice._base }
+
+    @_alwaysEmitIntoClient @inline(__always)
+    internal var _bounds: Range<Index> {
+      Range(_uncheckedBounds: (_slice._startIndex, _slice._endIndex))
+    }
   }
 }
 
@@ -833,7 +845,7 @@ extension Substring.UTF8View: BidirectionalCollection {
   @inlinable
   public subscript(r: Range<Index>) -> Substring.UTF8View {
     // FIXME(strings): tests.
-    let r = _wholeGuts.validateSubscalarRange(r, from: startIndex, to: endIndex)
+    let r = _wholeGuts.validateSubscalarRange(r, in: _bounds)
     return Substring.UTF8View(_slice.base, _bounds: r)
   }
 }
@@ -894,6 +906,11 @@ extension Substring {
 
     @_alwaysEmitIntoClient @inline(__always)
     internal var _base: String.UTF16View { _slice._base }
+
+    @_alwaysEmitIntoClient @inline(__always)
+    internal var _bounds: Range<Index> {
+      Range(_uncheckedBounds: (_slice._startIndex, _slice._endIndex))
+    }
   }
 }
 
@@ -981,7 +998,7 @@ extension Substring.UTF16View: BidirectionalCollection {
 
   @inlinable
   public subscript(r: Range<Index>) -> Substring.UTF16View {
-    let r = _wholeGuts.validateSubscalarRange(r, from: startIndex, to: endIndex)
+    let r = _wholeGuts.validateSubscalarRange(r, in: _bounds)
     return Substring.UTF16View(_slice.base, _bounds: r)
   }
 }
@@ -1039,16 +1056,31 @@ extension Substring {
 
     /// Creates an instance that slices `base` at `_bounds`.
     @usableFromInline // This used to be inlinable before 5.7
-    @available(*, deprecated) // Use `init(_unchecked:)` in new code.
+    @available(*, deprecated, message: "Use `init(_unchecked:bounds)` in new code")
     internal init(_ base: String.UnicodeScalarView, _bounds: Range<Index>) {
       let start = base._guts.scalarAlign(_bounds.lowerBound)
       let end = base._guts.scalarAlign(_bounds.upperBound)
       _slice = Slice(base: base, bounds: Range(_uncheckedBounds: (start, end)))
     }
+  }
+}
 
-    @_alwaysEmitIntoClient
-    @inline(__always)
-    internal var _wholeGuts: _StringGuts { _slice._base._guts }
+extension Substring.UnicodeScalarView {
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var _wholeGuts: _StringGuts { _slice._base._guts }
+
+  @inline(__always)
+  internal var _offsetRange: Range<Int> {
+    let lower = _slice._startIndex._encodedOffset
+    let upper = _slice._endIndex._encodedOffset
+    return Range(_uncheckedBounds: (lower, upper))
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var _bounds: Range<Index> {
+    Range(_uncheckedBounds: (startIndex, endIndex))
   }
 }
 
@@ -1069,8 +1101,7 @@ extension Substring.UnicodeScalarView: BidirectionalCollection {
 
   @inlinable
   public subscript(index: Index) -> Element {
-    let index = _wholeGuts.validateScalarIndex(
-      index, from: startIndex, to: endIndex)
+    let index = _wholeGuts.validateScalarIndex(index, in: _bounds)
     return _wholeGuts.errorCorrectedScalar(startingAt: index._encodedOffset).0
   }
 
@@ -1130,7 +1161,7 @@ extension Substring.UnicodeScalarView: BidirectionalCollection {
 
   public subscript(r: Range<Index>) -> Substring.UnicodeScalarView {
     // Note: This used to be inlinable until Swift 5.7
-    let r = _wholeGuts.validateScalarRange(r, from: startIndex, to: endIndex)
+    let r = _wholeGuts.validateScalarRange(r, in: _bounds)
     return Substring.UnicodeScalarView(_unchecked: _slice._base, bounds: r)
   }
 }
@@ -1175,8 +1206,7 @@ extension Substring.UnicodeScalarView: RangeReplaceableCollection {
     _ subrange: Range<Index>, with replacement: C
   ) where C.Element == Element {
     // TODO(lorentey): Review index validation
-    let subrange = _slice._base._guts.validateScalarRange(
-      subrange, from: startIndex, to: endIndex)
+    let subrange = _wholeGuts.validateScalarRange(subrange, in: _bounds)
     _slice.replaceSubrange(subrange, with: replacement)
   }
 }
