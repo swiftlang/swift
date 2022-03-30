@@ -8173,6 +8173,23 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
   return OpaqueReturnTypeIdentifier;
 }
 
+void OpaqueTypeDecl::setConditionallyAvailableSubstitutions(
+    ArrayRef<ConditionallyAvailableSubstitutions *> substitutions) {
+  assert(!ConditionallyAvailableTypes &&
+         "resetting conditionally available substitutions?!");
+  ConditionallyAvailableTypes = getASTContext().AllocateCopy(substitutions);
+}
+
+OpaqueTypeDecl::ConditionallyAvailableSubstitutions *
+OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+    ASTContext &ctx, ArrayRef<VersionRange> availabilityContext,
+    SubstitutionMap substitutions) {
+  auto size = totalSizeToAlloc<VersionRange>(availabilityContext.size());
+  auto mem = ctx.Allocate(size, alignof(ConditionallyAvailableSubstitutions));
+  return new (mem)
+      ConditionallyAvailableSubstitutions(availabilityContext, substitutions);
+}
+
 bool AbstractFunctionDecl::hasInlinableBodyText() const {
   switch (getBodyKind()) {
   case BodyKind::Deserialized:

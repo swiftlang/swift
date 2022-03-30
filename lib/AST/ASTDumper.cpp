@@ -572,7 +572,7 @@ namespace {
         << OTD->getDeclaredInterfaceType().getString();
       OS << " in "
          << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
-      if (auto underlyingSubs = OTD->getUnderlyingTypeSubstitutions()) {
+      if (auto underlyingSubs = OTD->getUniqueUnderlyingTypeSubstitutions()) {
         OS << " underlying:\n";
         SmallPtrSet<const ProtocolConformance *, 4> Dumped;
         dumpSubstitutionMapRec(*underlyingSubs, OS,
