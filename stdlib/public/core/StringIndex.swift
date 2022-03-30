@@ -439,6 +439,11 @@ extension String.Index {
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
   internal var __isUTF16: Bool { _rawBits & 0x8 != 0 }
+
+  @_alwaysEmitIntoClient // Swift 5.7
+  internal func _copyEncoding(from index: Self) -> Self {
+    Self((_rawBits & ~0xC) | (index._rawBits & 0xC))
+  }
 }
 
 extension String.Index: Equatable {

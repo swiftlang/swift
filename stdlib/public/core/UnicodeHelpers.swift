@@ -167,7 +167,7 @@ extension _StringGuts {
       result = idx
     } else {
       // TODO(String performance): isASCII check
-      result = scalarAlignSlow(idx)
+      result = scalarAlignSlow(idx)._scalarAligned._copyEncoding(from: idx)
     }
 
     _internalInvariant(isOnUnicodeScalarBoundary(result),
@@ -183,7 +183,7 @@ extension _StringGuts {
 
     if _slowPath(idx.transcodedOffset != 0 || idx._encodedOffset == 0) {
       // Transcoded index offsets are already scalar aligned
-      return String.Index(_encodedOffset: idx._encodedOffset)._scalarAligned
+      return String.Index(_encodedOffset: idx._encodedOffset)
     }
     if _slowPath(self.isForeign) {
       // In 5.1 this check was added to foreignScalarAlign, but when this is
@@ -191,7 +191,7 @@ extension _StringGuts {
       // a version of foreignScalarAlign that doesn't check for this, which
       // ends up asking CFString for its endIndex'th character, which throws
       // an exception. So we duplicate the check here for back deployment.
-      guard idx._encodedOffset != self.count else { return idx._scalarAligned }
+      guard idx._encodedOffset != self.count else { return idx }
 
       let foreignIdx = foreignScalarAlign(idx)
       _internalInvariant_5_1(foreignIdx._isScalarAligned)
@@ -200,7 +200,7 @@ extension _StringGuts {
 
     return String.Index(_encodedOffset:
       self.withFastUTF8 { _scalarAlign($0, idx._encodedOffset) }
-    )._scalarAligned
+    )
   }
 
   @inlinable
