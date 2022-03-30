@@ -18,6 +18,8 @@ enum SimpleString: String {
   case emoji = "😀😃🤢🤮👩🏿‍🎤🧛🏻‍♂️🧛🏻‍♂️👩‍👩‍👦‍👦"
 }
 
+/// Print out a full list of indices in every view of `string`.
+/// This is useful while debugging test failures in this test.
 func dumpIndices(_ string: String) {
   print("-------------------------------------------------------------------")
   print("String: \(String(reflecting: string))")
@@ -350,7 +352,7 @@ suite.test("Exhaustive Index Interchange")
     return
   }
 
-  dumpIndices(str)
+  //dumpIndices(str)
 
   var curCharIdx = str.startIndex
   var curScalarIdx = str.startIndex
@@ -481,10 +483,9 @@ suite.test("Exhaustive Index Interchange")
 #endif
 
 extension Collection {
-  // Assuming both `self` and `other` are sorted, call `body` for each element
-  // `a` in `other` together with the slice in `self` that starts with the first
-  // element in `self` that is greater than or equal to `a`, up to the first
-  // element that is greater than or equal to the next value in `other`.
+  // Assuming both `self` and `other` use the same index space, call `body` for
+  // each index `i` in `other`, along with the slice in `self` that begins at
+  // `i` and ends at the index following it in `other`.
   //
   // `other` must start with an item that is less than or equal to the first
   // item in `self`.
@@ -516,9 +517,9 @@ extension Collection {
 }
 
 extension String {
-  // Returns a list of every valid index in every string view, including end
-  // indices. We keep equal indices originating from different views because
-  // they may have different grapheme size caches or flags etc.
+  // Returns a list of every valid index in every string view, optionally
+  // including end indices. We keep equal indices originating from different
+  // views because they may have different grapheme size caches or flags etc.
   func allIndices(includingEnd: Bool = true) -> [String.Index] {
     var r = Array(self.indices)
     if includingEnd { r.append(self.endIndex) }
@@ -567,6 +568,23 @@ extension String {
   }
 }
 
+extension Substring {
+  // Returns a list of every valid index in every string view, optionally
+  // including end indices. We keep equal indices originating from different
+  // views because they may have different grapheme size caches or flags etc.
+  func allIndices(includingEnd: Bool = true) -> [String.Index] {
+    var r = Array(self.indices)
+    if includingEnd { r.append(self.endIndex) }
+    r += Array(self.unicodeScalars.indices)
+    if includingEnd { r.append(self.unicodeScalars.endIndex) }
+    r += Array(self.utf8.indices)
+    if includingEnd { r.append(self.utf8.endIndex) }
+    r += Array(self.utf16.indices)
+    if includingEnd { r.append(self.utf16.endIndex) }
+    return r
+  }
+}
+
 suite.test("Fully exhaustive index interchange")
 .forEach(in: examples) { string in
   guard #available(SwiftStdlib 5.7, *) else {
@@ -578,7 +596,7 @@ suite.test("Fully exhaustive index interchange")
     return
   }
 
-  dumpIndices(string)
+  //dumpIndices(string)
 
   let scalarMap = string.scalarMap()
   let characterMap = string.characterMap()
@@ -627,7 +645,9 @@ suite.test("Fully exhaustive index interchange")
         // The substring `string[i..<j]` does not round its bounds to
         // `Character` boundaries, so it may have a different count than what
         // the base string reports.
-        let s = String.UnicodeScalarView(string.unicodeScalars[i ..< j])
+        let si = scalarMap[i]!.index
+        let sj = scalarMap[j]!.index
+        let s = String.UnicodeScalarView(string.unicodeScalars[si ..< sj])
         let substringDistance = String(s).count
 
         let substring = string[i ..< j]
@@ -650,6 +670,12 @@ suite.test("Fully exhaustive index interchange")
           """)
 
         // Check reachability of substring bounds.
+        var i = substring.startIndex
+        for _ in 0 ..< substringDistance {
+          substring.formIndex(after: &i)
+        }
+        expectEqual(i, substring.endIndex)
+
         expectEqual(
           substring.index(substring.startIndex, offsetBy: substringDistance),
           substring.endIndex,
@@ -763,7 +789,6 @@ suite.test("Global vs local grapheme cluster boundaries") {
   expectEqual(str.index(before: s[2]), s[0]) // s[2] ≅ s[1]
   expectEqual(str.index(before: s[1]), s[0])
 
-  dumpIndices(str)
   // UTF-8
   expectEqual(str.utf8.count, 18)
   expectEqual(str.index(after: u8[0]), u8[1])
@@ -839,14 +864,14 @@ suite.test("Index encoding correction") {
   // If the mutation's effect included the data addressed by the original index,
   // then we may still get nonsensical results.
   var s = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
-  dumpIndices(s)
+  //dumpIndices(s)
 
   let originals = s.allIndices(includingEnd: false).map {
     ($0, s[$0], s.unicodeScalars[$0], s.utf8[$0], s.utf16[$0])
   }
 
   s.append(".")
-  dumpIndices(s)
+  //dumpIndices(s)
 
   for (i, char, scalar, u8, u16) in originals {
     expectEqual(s[i], char, "i: \(i)")
@@ -856,3 +881,152 @@ suite.test("Index encoding correction") {
   }
 }
 #endif
+
+suite.test("String.replaceSubrange index validation")
+.forEach(in: examples) { string in
+  guard #available(SwiftStdlib 5.7, *) else {
+    // Index navigation in 5.7 always rounds input indices down to the nearest
+    // Character, so that we always have a well-defined distance between
+    // indices, even if they aren't valid.
+    //
+    // 5.6 and below did not behave consistently in this case.
+    return
+  }
+
+  //dumpIndices(string)
+
+  let scalarMap = string.scalarMap()
+  let allIndices = string.allIndices()
+
+  for i in allIndices {
+    for j in allIndices {
+      guard i <= j else { continue }
+      let si = scalarMap[i]!.index
+      let sj = scalarMap[j]!.index
+
+      // Check String.replaceSubrange(_:with:)
+      do {
+        let replacement = "x"
+
+        var expected = "".unicodeScalars
+        expected += string.unicodeScalars[..<si]
+        expected += replacement.unicodeScalars
+        expected += string.unicodeScalars[sj...]
+
+        var actual = string
+        actual.replaceSubrange(i ..< j, with: replacement)
+
+        expectEqual(actual, String(expected),
+          """
+          string: \(string.debugDescription)
+          i:      \(i)
+          j:      \(j)
+          """)
+      }
+
+      // Check String.unicodeScalars.replaceSubrange(_:with:)
+      do {
+        let replacement = "x".unicodeScalars
+
+        var expected = "".unicodeScalars
+        expected += string.unicodeScalars[..<si]
+        expected += replacement
+        expected += string.unicodeScalars[sj...]
+
+        var actual = string
+        actual.unicodeScalars.replaceSubrange(i ..< j, with: replacement)
+
+        expectEqual(actual, String(expected),
+          """
+          string: \(string.debugDescription)
+          i:      \(i)
+          j:      \(j)
+          """)
+      }
+    }
+  }
+}
+
+suite.test("Substring.replaceSubrange index validation")
+.forEach(in: examples) { string in
+  guard #available(SwiftStdlib 5.7, *) else {
+    // Index navigation in 5.7 always rounds input indices down to the nearest
+    // Character, so that we always have a well-defined distance between
+    // indices, even if they aren't valid.
+    //
+    // 5.6 and below did not behave consistently in this case.
+    return
+  }
+
+  dumpIndices(string)
+
+  let scalarMap = string.scalarMap()
+  let allIndices = string.allIndices()
+
+  for i in allIndices {
+    for j in allIndices {
+      guard i <= j else { continue }
+      let si = scalarMap[i]!.index
+      let sj = scalarMap[j]!.index
+
+      let substring = string[i ..< j]
+
+      let subindices = substring.allIndices()
+      for m in subindices {
+        for n in subindices {
+          guard m <= n else { continue }
+          let sm = scalarMap[m]!.index
+          let sn = scalarMap[n]!.index
+
+          // Check Substring.replaceSubrange(_:with:)
+          do {
+            let replacement = "x"
+
+            var expected = "".unicodeScalars
+            expected += string.unicodeScalars[si ..< sm]
+            expected += replacement.unicodeScalars
+            expected += string.unicodeScalars[sn ..< sj]
+
+            var actual = substring
+            actual.replaceSubrange(m ..< n, with: replacement)
+
+            expectEqual(actual, Substring(expected[...]),
+              """
+              string: \(string.debugDescription)
+              i:      \(i)
+              j:      \(j)
+              m:      \(m)
+              n:      \(n)
+              """)
+          }
+
+          // Check String.unicodeScalars.replaceSubrange(_:with:)
+          do {
+            let replacement = "x".unicodeScalars
+
+            var expected = "".unicodeScalars
+            expected += string.unicodeScalars[si ..< sm]
+            expected += replacement
+            expected += string.unicodeScalars[sn ..< sj]
+
+            var actual = substring
+            actual.unicodeScalars.replaceSubrange(m ..< n, with: replacement)
+
+            expectEqual(actual, Substring(expected[...]),
+              """
+              string: \(string.debugDescription)
+              i:      \(i)
+              j:      \(j)
+              m:      \(m)
+              n:      \(n)
+              substring.startIndex: \(substring.startIndex)
+              substring.endIndex:   \(substring.endIndex)
+              actual.startIndex: \(actual.startIndex)
+              actual.endIndex:   \(actual.endIndex)
+              """)
+          }
+        }
+      }
+    }
+  }
+}
