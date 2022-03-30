@@ -1387,7 +1387,7 @@ ERROR(nominal_type_not_attribute,none,
 
 ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
       (SelfAccessKind))
-ERROR(mutating_invalid_classes,none, "%0 is not valid on %1s in " 
+ERROR(mutating_invalid_classes,none, "%0 is not valid on %1s in "
       "%select{classes|class-bound protocols}2",
       (SelfAccessKind, DescriptiveDeclKind, bool))
 
@@ -2605,7 +2605,7 @@ NOTE(overridden_near_match_here,none,
 ERROR(override_decl_extension,none,
       "%select{|non-@objc}0 %2 %3 %select{"
       "is declared in extension of %4 and cannot be overridden|"
-      "declared in %4 cannot be overridden from extension}1", 
+      "declared in %4 cannot be overridden from extension}1",
       (bool, bool, DescriptiveDeclKind, DeclName, DeclName))
 NOTE(overridden_here,none,
      "overridden declaration is here", ())
@@ -2986,6 +2986,14 @@ ERROR(broken_comparable_requirement,none,
       "Comparable protocol is broken: unexpected requirement", ())
 ERROR(broken_equatable_requirement,none,
       "Equatable protocol is broken: unexpected requirement", ())
+WARNING(synthesized_equatable_nonsythesized_comparable_fixit,none,
+      "compiler synthesized implementation of operator '==(lhs:rhs:)' "
+      "for 'Equatable' conformance for %0 may not match behavior of "
+      "custom implementation of operator '<(lhs:rhs:)'",
+      (Type))
+FIXIT(insert_equals_function_declaration,
+      "static func == (lhs: %0, rhs: $0) -> Bool {\n<#code#>\n}\n\n",
+      (Type))
 ERROR(broken_hashable_requirement,none,
       "Hashable protocol is broken: unexpected requirement", ())
 ERROR(broken_hashable_no_hasher,none,
@@ -3088,7 +3096,7 @@ NOTE(automatic_protocol_synthesis_unsupported,none,
     "automatic synthesis of '%0' is not supported for %select{classes|structs}1",
     (StringRef, unsigned))
 NOTE(comparable_synthesis_raw_value_not_allowed, none,
-     "enum declares raw type %0, preventing synthesized conformance of %1 to %2", 
+     "enum declares raw type %0, preventing synthesized conformance of %1 to %2",
      (Type, Type, Type))
 
 // Dynamic Self
@@ -3618,15 +3626,15 @@ ERROR(unordered_adjacent_operators,none,
 ERROR(missing_builtin_precedence_group,none,
       "broken standard library: missing builtin precedence group %0",
       (Identifier))
-WARNING(nan_comparison, none, 
+WARNING(nan_comparison, none,
        "comparison with '.nan' using %0 is always %select{false|true}1, use "
        "'%2.isNaN' to check if '%3' %select{is not a number|is a number}1",
        (Identifier, bool, StringRef, StringRef))
-WARNING(nan_comparison_without_isnan, none, 
-       "comparison with '.nan' using %0 is always %select{false|true}1", 
+WARNING(nan_comparison_without_isnan, none,
+       "comparison with '.nan' using %0 is always %select{false|true}1",
        (Identifier, bool))
-WARNING(nan_comparison_both_nan, none, 
-       "'.nan' %0 '.nan' is always %select{false|true}1", 
+WARNING(nan_comparison_both_nan, none,
+       "'.nan' %0 '.nan' is always %select{false|true}1",
        (StringRef, bool))
 
 // If you change this, also change enum TryKindForDiagnostics.
@@ -4455,7 +4463,7 @@ NOTE(note_distributed_requirement_defined_here,none,
      "distributed instance method requirement %0 declared here",
      (DeclName))
 NOTE(note_add_globalactor_to_function,none,
-     "add '@%0' to make %1 %2 part of global actor %3", 
+     "add '@%0' to make %1 %2 part of global actor %3",
      (StringRef, DescriptiveDeclKind, DeclName, Type))
 FIXIT(insert_globalactor_attr, "@%0 ", (Type))
 
@@ -5045,7 +5053,7 @@ ERROR(differentiable_function_type_invalid_result,none,
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
       "function type is '@differentiable%select{|(_linear)}1'",
       (StringRef, bool))
-ERROR(differentiable_function_type_no_differentiability_parameters, 
+ERROR(differentiable_function_type_no_differentiability_parameters,
       none,
       "'@differentiable' function type requires at least one differentiability "
       "parameter, i.e. a non-'@noDerivative' parameter whose type conforms to "
