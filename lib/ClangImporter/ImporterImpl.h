@@ -1213,6 +1213,11 @@ public:
   ///   but in parameter position they are known to always be passed at +0.
   ///   See also the \p topLevelBridgeability parameter.
   ///
+  /// \param addImportDiagnosticFn A function that can be called to add import
+  ///   diagnostics to the declaration being imported. This can be any lambda or
+  ///   callable object, but it's designed to be compatible with
+  ///   \c ImportDiagnosticAdder .
+  ///
   /// \param allowNSUIntegerAsInt If true, NSUInteger will be imported as Int
   ///   in certain contexts. If false, it will always be imported as UInt.
   ///
@@ -1247,6 +1252,7 @@ public:
   ///          field will be null.
   ImportedType
   importType(clang::QualType type, ImportTypeKind kind,
+             llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
              bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
              OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
              bool resugarNSErrorPointer = true,
@@ -1262,8 +1268,9 @@ public:
   /// \returns The imported type, or null if this type could not be
   ///   represented in Swift.
   Type importTypeIgnoreIUO(
-      clang::QualType type, ImportTypeKind kind, bool allowNSUIntegerAsInt,
-      Bridgeability topLevelBridgeability,
+      clang::QualType type, ImportTypeKind kind,
+      llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
+      bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
       bool resugarNSErrorPointer = true);
 
@@ -1678,6 +1685,22 @@ public:
     if (SinglePCHImport.hasValue())
       return *SinglePCHImport;
     return StringRef();
+  }
+};
+
+class ImportDiagnosticAdder {
+  ClangImporter::Implementation &impl;
+  ImportDiagnosticTarget target;
+  const clang::SourceLocation loc;
+
+public:
+  ImportDiagnosticAdder(
+      ClangImporter::Implementation &impl, ImportDiagnosticTarget target,
+      const clang::SourceLocation &loc = clang::SourceLocation())
+      : impl(impl), target(target), loc(loc) {}
+
+  void operator () (Diagnostic &&diag) {
+    impl.addImportDiagnostic(target, std::move(diag), loc);
   }
 };
 
