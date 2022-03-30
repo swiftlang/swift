@@ -540,6 +540,8 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     Tok.setKind(tok::oper_prefix);
     LLVM_FALLTHROUGH;
   case tok::oper_prefix:
+    if (Tok.getText().contains("/"))
+      diagnose(Tok, diag::prefix_slash_not_allowed);
     Operator = parseExprOperator();
     break;
   case tok::oper_binary_spaced:
