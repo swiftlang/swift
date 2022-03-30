@@ -99,12 +99,6 @@ public struct Substring: Sendable {
 
   @inline(__always)
   internal init(_unchecked slice: Slice<String>) {
-    _internalInvariant(slice.endIndex <= slice._base._guts.endIndex)
-    _internalInvariant(
-      slice._base._guts.hasMatchingEncoding(slice.startIndex) &&
-      slice._base._guts.hasMatchingEncoding(slice.endIndex))
-    _internalInvariant(
-      slice.startIndex._isScalarAligned && slice.endIndex._isScalarAligned)
     self._slice = slice
     _invariantCheck()
   }
@@ -167,15 +161,12 @@ extension Substring {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    _internalInvariant(_slice.endIndex <= _wholeGuts.endIndex)
+    _internalInvariant(endIndex <= _wholeGuts.endIndex)
     _internalInvariant(
-      _wholeGuts.hasMatchingEncoding(_slice.startIndex) &&
-      _wholeGuts.hasMatchingEncoding(_slice.endIndex))
-    // Indices are always scalar aligned
+      _wholeGuts.hasMatchingEncoding(startIndex) &&
+      _wholeGuts.hasMatchingEncoding(endIndex))
     _internalInvariant(
-      _slice.startIndex == _wholeGuts.scalarAlign(_slice.startIndex) &&
-      _slice.endIndex == _wholeGuts.scalarAlign(_slice.endIndex))
-
+      startIndex._isScalarAligned && endIndex._isScalarAligned)
     self.base._invariantCheck()
   }
   #endif // INTERNAL_CHECKS_ENABLED
