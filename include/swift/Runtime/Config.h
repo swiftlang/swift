@@ -248,6 +248,16 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define SWIFT_VFORMAT(fmt)
 #endif
 
+/// Should we use absolute function pointers instead of relative ones?
+/// WebAssembly target uses it by default.
+#ifndef SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
+# if defined(__wasm__)
+#  define SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER 1
+# else
+#  define SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER 0
+# endif
+#endif
+
 // Pointer authentication.
 #if __has_feature(ptrauth_calls)
 #define SWIFT_PTRAUTH 1

@@ -611,6 +611,21 @@ public:
 
   int_type getIntValue() const { return Value; }
 
+  /// Is the method implementation is represented as a native function pointer?
+  bool isFunctionImpl() const {
+    switch (getKind()) {
+    case ProtocolRequirementFlags::Kind::Method:
+    case ProtocolRequirementFlags::Kind::Init:
+    case ProtocolRequirementFlags::Kind::Getter:
+    case ProtocolRequirementFlags::Kind::Setter:
+    case ProtocolRequirementFlags::Kind::ReadCoroutine:
+    case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+      return !isAsync();
+    default:
+      return false;
+    }
+  }
+
   enum : uintptr_t {
     /// Bit used to indicate that an associated type witness is a pointer to
     /// a mangled name (vs. a pointer to metadata).

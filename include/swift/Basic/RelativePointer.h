@@ -386,6 +386,10 @@ public:
 /// position-independent constant data.
 template<typename T, bool Nullable, typename Offset>
 class RelativeDirectPointerImpl {
+#if SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
+  static_assert(!std::is_function<T>::value,
+                "relative direct function pointer should not be used under absolute function pointer mode");
+#endif
 private:
   /// The relative offset of the function's entry point from *this.
   Offset RelativeOffset;
@@ -454,18 +458,24 @@ public:
 
   /// Apply the offset to a parameter, instead of `this`.
   PointerTy getRelative(void *base) const & {
-    // Check for null.
-    if (Nullable && RelativeOffset == 0)
-      return nullptr;
-
-    // The value is addressed relative to `base`.
-    uintptr_t absolute = detail::applyRelativeOffset(base, RelativeOffset);
-    return reinterpret_cast<PointerTy>(absolute);
+    return resolve(base, RelativeOffset);
   }
 
   /// A zero relative offset encodes a null reference.
   bool isNull() const & {
     return RelativeOffset == 0;
+  }
+
+  /// Resolve a pointer from a `base` pointer and a value loaded from `base`.
+  template<typename BasePtrTy>
+  static PointerTy resolve(BasePtrTy *base, Offset value) {
+    // Check for null.
+    if (Nullable && value == 0)
+      return nullptr;
+
+    // The value is addressed relative to `base`.
+    uintptr_t absolute = detail::applyRelativeOffset(base, value);
+    return reinterpret_cast<PointerTy>(absolute);
   }
 };
 
@@ -502,6 +512,7 @@ public:
   }
 
   using super::isNull;
+  using super::resolve;
 };
 
 /// A specialization of RelativeDirectPointer for function pointers,
@@ -548,6 +559,7 @@ public:
   }
 
   using super::isNull;
+  using super::resolve;
 };
 
 /// A direct relative reference to an aligned object, with an additional
