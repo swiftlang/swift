@@ -1168,6 +1168,11 @@ public:
 
   /// Defined inline below due to forward declaration issues.
   static OwnershipForwardingMixin *get(SILInstruction *inst);
+
+  /// For instructions that forward a single operand, return it. Otherwise
+  /// return nullptr.
+  static Operand *getForwardedOperand(SILInstruction *inst);
+
   /// Defined inline below due to forward declaration issues.
   static bool isa(SILInstructionKind kind);
   static bool isa(const SILInstruction *inst) { return isa(inst->getKind()); }
@@ -1190,7 +1195,12 @@ public:
   static bool isAddressOnly(SILInstruction *inst);
 };
 
-/// A single value inst that forwards a static ownership from its first operand.
+/// A single value inst that forwards a static ownership from its first operand
+/// if it has any non-dependent-type operands.
+///
+/// Warning: 'enum' with no payload has no operands. So a dynamic check for the
+/// operand is always needed. Use
+/// OwnershipForwardingMixin::getForwardedOperand(SILInstruction *).
 ///
 /// The ownership kind is set on construction and afterwards must be changed
 /// explicitly using setOwnershipKind().
@@ -9717,6 +9727,21 @@ OwnershipForwardingMixin::get(SILInstruction *inst) {
     return result;
   if (auto *result = dyn_cast<MarkMustCheckInst>(inst))
     return result;
+  return nullptr;
+}
+
+inline Operand *
+OwnershipForwardingMixin::getForwardedOperand(SILInstruction *inst) {
+  auto kind = inst->getKind();
+  if (FirstArgOwnershipForwardingSingleValueInst::classof(kind)
+      || OwnershipForwardingTermInst::classof(kind)
+      || OwnershipForwardingConversionInst::classof(kind)
+      || OwnershipForwardingSelectEnumInstBase::classof(kind)
+      || OwnershipForwardingMultipleValueInstruction::classof(kind)) {
+    // The first operand may be missing (e.g. enum #Optional.none)
+    if (inst->getNumOperands() > inst->getNumTypeDependentOperands())
+      return &inst->getOperandRef(0);
+  }
   return nullptr;
 }
 
