@@ -38,6 +38,7 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
                                        ParamDecl::Specifier specifier,
                                        SourceLoc specifierLoc,
                                        SourceLoc isolatedLoc,
+                                       SourceLoc knownToBeLocalLoc,
                                        SourceLoc constLoc) {
   // Apply those attributes that do apply.
   if (!attrs.empty()) {
@@ -66,6 +67,12 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
     ty = new (Context) IsolatedTypeRepr(ty, isolatedLoc);
   }
 
+  // Apply '_local'.
+  if (knownToBeLocalLoc.isValid()) {
+    ty = new (Context) KnownToBeLocalTypeRepr(ty, knownToBeLocalLoc);
+  }
+
+  // Apply '_const'.
   if (constLoc.isValid()) {
     ty = new (Context) CompileTimeConstTypeRepr(ty, constLoc);
   }
@@ -328,7 +335,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   return makeParserResult(applyAttributeToType(repr, attrs,
                                                ParamDecl::Specifier::Owned,
                                                SourceLoc(), SourceLoc(),
-                                               SourceLoc()));
+                                               SourceLoc(), SourceLoc()));
 }
 
 
@@ -352,10 +359,11 @@ ParserResult<TypeRepr> Parser::parseType(
   ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
   SourceLoc isolatedLoc;
+  SourceLoc knownToBeLocalLoc;
   SourceLoc constLoc;
   TypeAttributes attrs;
-  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, constLoc,
-                                   attrs);
+  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc,
+                                   knownToBeLocalLoc, constLoc, attrs);
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
@@ -552,14 +560,14 @@ ParserResult<TypeRepr> Parser::parseType(
     if (tyR)
       tyR->walk(walker);
   }
-  if (specifierLoc.isValid() || isolatedLoc.isValid() || !attrs.empty() ||
-      constLoc.isValid())
+  if (specifierLoc.isValid() || isolatedLoc.isValid() ||
+      knownToBeLocalLoc.isValid() || !attrs.empty() || constLoc.isValid())
     SyntaxContext->setCreateSyntax(SyntaxKind::AttributedType);
 
   return makeParserResult(
       status,
       applyAttributeToType(tyR, attrs, specifier, specifierLoc, isolatedLoc,
-                           constLoc));
+                           knownToBeLocalLoc, constLoc));
 }
 
 ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {

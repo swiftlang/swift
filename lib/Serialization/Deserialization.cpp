@@ -3220,6 +3220,7 @@ public:
     bool isVariadic;
     bool isAutoClosure;
     bool isIsolated;
+    bool isKnownToBeLocal;
     bool isCompileTimeConst;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
@@ -3228,6 +3229,7 @@ public:
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
+                                         isKnownToBeLocal,
                                          isCompileTimeConst,
                                          rawDefaultArg,
                                          defaultExprType);
@@ -3265,6 +3267,11 @@ public:
     param->setVariadic(isVariadic);
     param->setAutoClosure(isAutoClosure);
     param->setIsolated(isIsolated);
+    param->setKnownToBeLocal(isKnownToBeLocal);
+    if (isKnownToBeLocal) {
+      fprintf(stderr, "[%s:%d] (%s) KNOWN LOCAL:\n", __FILE__, __LINE__, __FUNCTION__);
+      param->dump();
+    }
     param->setCompileTimeConst(isCompileTimeConst);
 
     // Decode the default argument kind.
@@ -5478,13 +5485,14 @@ public:
       IdentifierID labelID;
       IdentifierID internalLabelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated, isCompileTimeConst;
+      bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
+          isKnownToBeLocal, isCompileTimeConst;
       bool isNoDerivative;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(
           scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
-          isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-          isCompileTimeConst);
+          isNonEphemeral, rawOwnership, isIsolated, isKnownToBeLocal,
+          isNoDerivative, isCompileTimeConst);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -5498,8 +5506,8 @@ public:
       params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
                                              isNonEphemeral, *ownership,
-                                             isIsolated, isNoDerivative,
-                                             isCompileTimeConst),
+                                             isIsolated, isKnownToBeLocal,
+                                             isNoDerivative, isCompileTimeConst),
                           MF.getIdentifier(internalLabelID));
     }
 

@@ -962,7 +962,8 @@ public:
     return T->getKind() == TypeReprKind::InOut ||
            T->getKind() == TypeReprKind::Shared ||
            T->getKind() == TypeReprKind::Owned ||
-           T->getKind() == TypeReprKind::Isolated;
+           T->getKind() == TypeReprKind::Isolated ||
+           T->getKind() == TypeReprKind::KnownToBeLocal;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1024,8 +1025,8 @@ public:
 /// \endcode
 class IsolatedTypeRepr : public SpecifierTypeRepr {
 public:
-  IsolatedTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-    : SpecifierTypeRepr(TypeReprKind::Isolated, Base, InOutLoc) {}
+  IsolatedTypeRepr(TypeRepr *Base, SourceLoc Loc)
+    : SpecifierTypeRepr(TypeReprKind::Isolated, Base, Loc) {}
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Isolated;
@@ -1039,13 +1040,28 @@ public:
 /// \endcode
 class CompileTimeConstTypeRepr : public SpecifierTypeRepr {
 public:
-  CompileTimeConstTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-    : SpecifierTypeRepr(TypeReprKind::CompileTimeConst, Base, InOutLoc) {}
+  CompileTimeConstTypeRepr(TypeRepr *Base, SourceLoc Loc)
+    : SpecifierTypeRepr(TypeReprKind::CompileTimeConst, Base, Loc) {}
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::CompileTimeConst;
   }
   static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
+};
+
+/// A '_local' type.
+/// \code
+///   x : _local SomeDistributedActor
+/// \endcode
+class KnownToBeLocalTypeRepr : public SpecifierTypeRepr {
+public:
+  KnownToBeLocalTypeRepr(TypeRepr *Base, SourceLoc Loc)
+    : SpecifierTypeRepr(TypeReprKind::KnownToBeLocal, Base, Loc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::KnownToBeLocal;
+  }
+  static bool classof(const KnownToBeLocalTypeRepr *T) { return true; }
 };
 
 /// A TypeRepr for a known, fixed type.
@@ -1348,6 +1364,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Isolated:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::KnownToBeLocal:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

@@ -333,7 +333,7 @@ extension DistributedActorSystem {
 
     do {
       let returnType = try invocationDecoder.decodeReturnType() ?? returnTypeFromTypeInfo
-      // let errorType = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use?
+       _ = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use?
 
       // Execute the target!
       try await _executeDistributedTarget(

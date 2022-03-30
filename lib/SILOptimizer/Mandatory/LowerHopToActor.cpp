@@ -179,7 +179,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor,
   auto module = F->getModule().getSwiftModule();
   SILValue unmarkedExecutor;
   if (isDefaultActorType(actorType, module, F->getResilienceExpansion()) ||
-      actorType->isDistributedActor()) {
+      actorType->isDistributedActorType()) {
     auto builtinName = ctx.getIdentifier(
       getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
     auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));

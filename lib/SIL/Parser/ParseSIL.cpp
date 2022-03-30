@@ -1370,9 +1370,11 @@ bool SILParser::parseSILType(SILType &Result,
   ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
   SourceLoc isolatedLoc;
+  SourceLoc knownToBeLocalLoc;
   SourceLoc constLoc;
   TypeAttributes attrs;
-  P.parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, constLoc, attrs);
+  P.parseTypeAttributeList(specifier, specifierLoc, isolatedLoc,
+                           knownToBeLocalLoc, constLoc, attrs);
 
   // Global functions are implicitly @convention(thin) if not specified otherwise.
   if (IsFuncDecl && !attrs.has(TAK_convention)) {
@@ -1392,7 +1394,8 @@ bool SILParser::parseSILType(SILType &Result,
   // Apply attributes to the type.
   auto *attrRepr =
       P.applyAttributeToType(
-        TyR.get(), attrs, specifier, specifierLoc, isolatedLoc, constLoc);
+        TyR.get(), attrs, specifier, specifierLoc, isolatedLoc,
+        knownToBeLocalLoc, constLoc);
   auto Ty = performTypeResolution(attrRepr, /*IsSILType=*/true, OuterGenericEnv,
                                   OuterGenericParams);
   if (OuterGenericEnv) {

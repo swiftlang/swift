@@ -3814,6 +3814,7 @@ public:
         param->isVariadic(),
         param->isAutoClosure(),
         param->isIsolated(),
+        param->isKnownToBeLocal(),
         param->isCompileTimeConst(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
@@ -4620,7 +4621,8 @@ public:
           S.addDeclBaseNameRef(param.getInternalLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
-          paramFlags.isIsolated(), paramFlags.isNoDerivative(),
+          paramFlags.isIsolated(), paramFlags.isKnownToBeLocal(),
+          paramFlags.isNoDerivative(),
           paramFlags.isCompileTimeConst());
     }
   }

@@ -4745,6 +4745,10 @@ public:
   }
   bool isCompileTimeConst() const;
 
+  /// Is this type a '_local' distributed actor type?
+  /// I.e. it is known to be local and distributed checks need not apply.
+  bool isKnownToBeLocal() const;
+
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
 
@@ -5537,9 +5541,12 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is '_const'.
     IsCompileTimeConst = 1 << 1,
+
+    /// Whether or not this parameter is '_local'.
+    IsKnownToBeLocal = 1 << 2,
   };
 
-  llvm::PointerIntPair<Identifier, 2, OptionSet<ArgumentNameFlags>>
+  llvm::PointerIntPair<Identifier, 3, OptionSet<ArgumentNameFlags>>
       ArgumentNameAndFlags;
   SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
@@ -5574,9 +5581,13 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
+
+//    /// Whether or not this parameter is '_local'.
+//    IsKnownToBeLocal = 1 << 3, // FIXME: can't because "PointerIntPair with integer size too large for pointer"
   };
 
   /// The default value, if any, along with flags.
+//  llvm::PointerIntPair<StoredDefaultArgument *, 4, OptionSet<Flags>>
   llvm::PointerIntPair<StoredDefaultArgument *, 3, OptionSet<Flags>>
       DefaultValueAndFlags;
 
@@ -5774,6 +5785,19 @@ public:
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsIsolated
                                       : flags - Flags::IsIsolated);
+  }
+
+  /// Whether or not this parameter is marked with 'isolated'.
+  bool isKnownToBeLocal() const {
+    return ArgumentNameAndFlags.getInt().contains(
+        ArgumentNameFlags::IsKnownToBeLocal);
+  }
+
+  void setKnownToBeLocal(bool value = true) {
+    auto flags = ArgumentNameAndFlags.getInt();
+    flags = value ? flags | ArgumentNameFlags::IsKnownToBeLocal
+                  : flags - ArgumentNameFlags::IsKnownToBeLocal;
+    ArgumentNameAndFlags.setInt(flags);
   }
 
   /// Whether or not this parameter is marked with '_const'.

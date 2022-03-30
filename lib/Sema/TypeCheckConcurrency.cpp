@@ -1877,7 +1877,7 @@ namespace {
       return nullptr;
     }
 
-    VarDecl *findReferencedBaseSelf(Expr *expr) {
+    VarDecl *findReferencedCallBase(Expr *expr) {
       if (auto selfVar = getReferencedParamOrCapture(expr))
         if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
           return selfVar;
@@ -1893,14 +1893,22 @@ namespace {
           expr = conversion->getSubExpr();
       } while (prior != expr);
 
+      // it could be a function call
       if (auto call = dyn_cast<DotSyntaxCallExpr>(expr)) {
         for (auto arg : *call->getArgs()) {
           if (auto declRef = dyn_cast<DeclRefExpr>(arg.getExpr())) {
             if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
-              if (var->isSelfParameter()) {
-                return var;
-              }
+              return var;
             }
+          }
+        }
+      }
+
+      // maybe it's a property access?
+      if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
+        if (auto baseDeclRef = dyn_cast<DeclRefExpr>(memberRef->getBase())) {
+          if (auto var = dyn_cast<VarDecl>(baseDeclRef->getDecl())) {
+            return var;
           }
         }
       }
@@ -1970,6 +1978,8 @@ namespace {
                          nominal->getName());
         } else {
           // it's a function or subscript
+          fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+          decl->dump();
           decl->diagnose(diag::note_distributed_actor_isolated_method,
                          decl->getDescriptiveKind(),
                          decl->getName());
@@ -2147,6 +2157,23 @@ namespace {
     Optional<std::pair<bool, bool>>
     checkDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
                            Expr *context) {
+      fprintf(stderr, "[%s:%d] (%s) CON\n", __FILE__, __LINE__, __FUNCTION__);
+      context->dump();
+
+      // Check if the base of the call is known to be local; this can be true
+      // either when:
+      // - the base is `self`, which we're only allowed to call when "inside"
+      //   the distributed actor
+      // - the parameter is explicitly known to be '_local'
+      if (auto base = findReferencedCallBase(context)) {
+        if (base->isSelfParameter() ||
+            base->getAttrs().getAttribute<KnownToBeLocalAttr>()) {
+          return std::make_pair(
+              /*setThrows=*/false,
+              /*isDistributedThunk=*/false);
+        }
+      }
+
       // Cannot reference properties or subscripts of distributed actors.
       if (isPropOrSubscript(decl)) {
         ctx.Diags.diagnose(
@@ -2154,14 +2181,6 @@ namespace {
             decl->getDescriptiveKind(), decl->getName());
         noteIsolatedActorMember(decl, context);
         return None;
-      }
-
-      if (auto baseSelf = findReferencedBaseSelf(context)) {
-        if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
-        return std::make_pair(
-            /*setThrows=*/false,
-            /*isDistributedThunk=*/false);
-        }
       }
 
       // Check that we have a distributed function.
@@ -3074,6 +3093,8 @@ namespace {
         if (nominal && nominal->isDistributedActor()) {
           auto funcDecl = dyn_cast<AbstractFunctionDecl>(member);
           if (funcDecl && !funcDecl->isStatic()) {
+            fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+            funcDecl->dump();
             member->diagnose(diag::distributed_actor_isolated_method);
             return true;
           }

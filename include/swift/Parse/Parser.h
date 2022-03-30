@@ -1121,6 +1121,7 @@ public:
   ParserStatus parseTypeAttributeList(ParamDecl::Specifier &Specifier,
                                       SourceLoc &SpecifierLoc,
                                       SourceLoc &IsolatedLoc,
+                                      SourceLoc &KnownToBeLocalLoc,
                                       SourceLoc &ConstLoc,
                                       TypeAttributes &Attributes) {
     if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
@@ -1128,15 +1129,18 @@ public:
          (Tok.getRawText().equals("__shared") ||
           Tok.getRawText().equals("__owned") ||
           Tok.isContextualKeyword("isolated") ||
+          Tok.isContextualKeyword("_local") ||
           Tok.isContextualKeyword("_const"))))
       return parseTypeAttributeListPresent(
-          Specifier, SpecifierLoc, IsolatedLoc, ConstLoc, Attributes);
+          Specifier, SpecifierLoc, IsolatedLoc, KnownToBeLocalLoc, ConstLoc,
+          Attributes);
     return makeParserSuccess();
   }
 
   ParserStatus parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                              SourceLoc &SpecifierLoc,
                                              SourceLoc &IsolatedLoc,
+                                             SourceLoc &KnownToBeLocalLoc,
                                              SourceLoc &ConstLoc,
                                              TypeAttributes &Attributes);
 
@@ -1322,6 +1326,7 @@ public:
                                  ParamDecl::Specifier Specifier,
                                  SourceLoc SpecifierLoc,
                                  SourceLoc IsolatedLoc,
+                                 SourceLoc KnownToBeLocalLoc,
                                  SourceLoc ConstLoc);
 
   //===--------------------------------------------------------------------===//
@@ -1386,6 +1391,9 @@ public:
 
     /// The location of the '_const' keyword, if present.
     SourceLoc CompileConstLoc;
+
+    /// The location of the '_local' keyword, if present.
+    SourceLoc KnownToBeLocalLoc;
 
     /// The type following the ':'.
     TypeRepr *Type = nullptr;

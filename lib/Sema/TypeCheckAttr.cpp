@@ -309,6 +309,7 @@ public:
 
   void visitReasyncAttr(ReasyncAttr *attr);
   void visitNonisolatedAttr(NonisolatedAttr *attr);
+  void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
   void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
 
@@ -319,8 +320,6 @@ public:
   void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
 
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
-
-  void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 };
 
 } // end anonymous namespace
@@ -5722,7 +5721,7 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
 
     // distributed func must be declared inside an distributed actor
     auto selfTy = dc->getSelfTypeInContext();
-    if (!selfTy->isDistributedActor()) {
+    if (!selfTy->isDistributedActorType()) {
       auto diagnostic = diagnoseAndRemoveAttr(
         attr, diag::distributed_actor_func_not_in_distributed_actor);
 

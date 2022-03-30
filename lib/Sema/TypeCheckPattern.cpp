@@ -750,6 +750,14 @@ validateTypedPattern(TypedPattern *TP, DeclContext *dc,
     return named->getDecl()->getDeclContext()->mapTypeIntoContext(opaqueTy);
   }
 
+  // TODO(distributed): `_local` is not completely implemented, and for now not
+  //  supported in patterns
+  if (auto local = dyn_cast_or_null<KnownToBeLocalTypeRepr>(Repr)) {
+    Context.Diags.diagnose(TP->getLoc(),
+                           diag::local_not_supported_in_pattern);
+    return ErrorType::get(Context);
+  }
+
   const auto ty = TypeResolution::resolveContextualType(
       Repr, dc, options, unboundTyOpener, placeholderHandler);
 

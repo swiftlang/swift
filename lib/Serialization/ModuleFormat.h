@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 682; // Remove unused instructions
+const uint16_t SWIFTMODULE_VERSION_MINOR = 683; // Add _local parameter attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1053,6 +1053,7 @@ namespace decls_block {
     BCFixed<1>,          // non-ephemeral?
     ValueOwnershipField, // inout, shared or owned?
     BCFixed<1>,          // isolated
+    BCFixed<1>,          // knownToBeLocal?
     BCFixed<1>,          // noDerivative?
     BCFixed<1>           // compileTimeConst
   >;
@@ -1376,6 +1377,7 @@ namespace decls_block {
     BCFixed<1>,              // isVariadic?
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
+    BCFixed<1>,              // isKnownToBeLocal?
     BCFixed<1>,              // isCompileTimeConst?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type

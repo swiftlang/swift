@@ -380,10 +380,12 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       }
     }
 
-    // DistributedActor.actorSystem
+    // DistributedActorSystem
+    //    .invokeHandlerOnReturn(handler:resultBuffer:metatype)
     if (name.isCompoundName() &&
-        name.getBaseName() == ctx.Id_invokeHandlerOnReturn)
+        name.getBaseName() == ctx.Id_invokeHandlerOnReturn) {
       return getRequirement(KnownProtocolKind::DistributedActorSystem);
+    }
 
     return nullptr;
   }

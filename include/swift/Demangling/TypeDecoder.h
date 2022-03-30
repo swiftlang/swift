@@ -1512,6 +1512,8 @@ private:
           hasParamFlags = true;
           break;
 
+      // TODO: demangle _local as well?
+
         case NodeKind::AutoClosureType:
         case NodeKind::EscapingAutoClosureType:
           param.setAutoClosure();

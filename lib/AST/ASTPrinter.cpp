@@ -3654,6 +3654,9 @@ static void printParameterFlags(ASTPrinter &printer,
   if (flags.isIsolated())
     printer.printKeyword("isolated", options, " ");
 
+  if (flags.isKnownToBeLocal())
+    printer.printKeyword("_local", options, " ");
+
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
 

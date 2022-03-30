@@ -3096,6 +3096,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitKnownToBeLocalTypeRepr(KnownToBeLocalTypeRepr *T) {
+    printCommon("_local") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
     printCommon("_const") << '\n';
     printRec(T->getBase());

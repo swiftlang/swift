@@ -811,6 +811,10 @@ bool AbstractStorageDecl::isCompileTimeConst() const {
   return getAttrs().hasAttribute<CompileTimeConstAttr>();
 }
 
+bool AbstractStorageDecl::isKnownToBeLocal() const {
+  return getAttrs().hasAttribute<KnownToBeLocalAttr>();
+}
+
 bool AbstractStorageDecl::isTransparent() const {
   return getAttrs().hasAttribute<TransparentAttr>();
 }
@@ -6984,8 +6988,8 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto internalLabel = getParameterName();
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(),
-      getValueOwnership(), isIsolated(), /*isNoDerivative*/ false,
-      isCompileTimeConst());
+      getValueOwnership(), isIsolated(), isKnownToBeLocal(),
+      /*isNoDerivative*/ false, isCompileTimeConst());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 

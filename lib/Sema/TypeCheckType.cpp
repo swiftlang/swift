@@ -1919,6 +1919,8 @@ namespace {
                                            TypeResolutionOptions options);
     NeverNullType resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
                                           TypeResolutionOptions options);
+    NeverNullType resolveKnownToBeLocalTypeRepr(KnownToBeLocalTypeRepr *repr,
+                                                TypeResolutionOptions options);
     NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                                   TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
@@ -2058,6 +2060,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Isolated:
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
+  case TypeReprKind::KnownToBeLocal:
+      return resolveKnownToBeLocalTypeRepr(cast<KnownToBeLocalTypeRepr>(repr),
+                                           options);
   case TypeReprKind::CompileTimeConst:
       return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
                                              options);
@@ -2858,6 +2863,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     auto *nestedRepr = eltTypeRepr->getWithoutParens();
 
     bool isolated = false;
+    bool knownToBeLocal = false;
     bool compileTimeConst = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
@@ -2876,6 +2882,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           continue;
         case TypeReprKind::Isolated:
           isolated = true;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        case TypeReprKind::KnownToBeLocal:
+          knownToBeLocal = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         case TypeReprKind::CompileTimeConst:
@@ -2906,7 +2916,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst);
+        isolated, knownToBeLocal, noDerivative, compileTimeConst);
     elements.emplace_back(ty, Identifier(), paramFlags,
                           inputRepr->getElementName(i));
   }
@@ -3565,6 +3575,9 @@ TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     case TypeReprKind::Owned:
       name = "__owned";
       break;
+    case TypeReprKind::KnownToBeLocal:
+      name = "_local";
+      break;
     default:
       llvm_unreachable("unknown SpecifierTypeRepr kind");
     }
@@ -3599,6 +3612,32 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
   if (!type->hasTypeParameter() && !type->isActorType() && !type->hasError()) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(), diag::isolated_parameter_not_actor, type);
+    return ErrorType::get(type);
+  }
+
+  return type;
+}
+
+NeverNullType
+TypeResolver::resolveKnownToBeLocalTypeRepr(KnownToBeLocalTypeRepr *repr,
+                                            TypeResolutionOptions options) {
+//  // '_local' is only value for non-EnumCaseDecl parameters.
+//  if (!options.is(TypeResolverContext::FunctionInput) ||
+//      options.hasBase(TypeResolverContext::EnumElementDecl)) {
+//    diagnoseInvalid(
+//        repr, repr->getSpecifierLoc(), diag::attr_only_on_parameters,
+//        "_local");
+//    return ErrorType::get(getASTContext());
+//  }
+  Type type = resolveType(repr->getBase(), options);
+
+  // isolated parameters must be of 'distributed actor' type
+  if (!type->hasTypeParameter() &&
+      !type->isDistributedActorType() &&
+      !type->hasError()) {
+    diagnoseInvalid(
+        repr, repr->getSpecifierLoc(),
+        diag::local_parameter_not_distributed_actor, type);
     return ErrorType::get(type);
   }
 
@@ -4208,6 +4247,7 @@ public:
     case TypeReprKind::Shared:
     case TypeReprKind::Owned:
     case TypeReprKind::Isolated:
+    case TypeReprKind::KnownToBeLocal:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:
       return false;

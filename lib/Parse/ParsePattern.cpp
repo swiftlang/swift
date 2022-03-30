@@ -165,6 +165,7 @@ bool Parser::startsParameterName(bool isClosure) {
   if (nextTok.canBeArgumentLabel()) {
     // If the first name wasn't "isolated", we're done.
     if (!Tok.isContextualKeyword("isolated") &&
+        !Tok.isContextualKeyword("_local") &&
         !Tok.isContextualKeyword("some") &&
         !Tok.isContextualKeyword("any"))
       return true;
@@ -261,6 +262,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
            Tok.isContextualKeyword("__shared") ||
            Tok.isContextualKeyword("__owned") ||
            Tok.isContextualKeyword("isolated") ||
+           Tok.isContextualKeyword("_local") ||
            Tok.isContextualKeyword("_const")) {
 
       if (Tok.isContextualKeyword("isolated")) {
@@ -286,6 +288,32 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
         // consume 'isolated' as type modifier
         param.IsolatedLoc = consumeToken();
+        continue;
+      }
+
+      if (Tok.isContextualKeyword("_local")) {
+        // did we already find an '_local' type modifier?
+        if (param.KnownToBeLocalLoc.isValid()) {
+          diagnose(Tok, diag::parameter_specifier_repeated)
+              .fixItRemove(Tok.getLoc());
+          consumeToken();
+          continue;
+        }
+
+        // is this '_local' token the identifier of an argument label?
+        bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+          if (Tok.is(tok::colon))
+            return true;  // _local :
+
+          // _local x :
+          return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
+        });
+
+        if (partOfArgumentLabel)
+          break;
+
+        // consume '_local' as type modifier
+        param.KnownToBeLocalLoc = consumeToken();
         continue;
       }
 
@@ -596,6 +624,12 @@ mapParsedParameters(Parser &parser,
         param->setIsolated();
       }
 
+      if (paramInfo.KnownToBeLocalLoc.isValid()) {
+        type = new (parser.Context) KnownToBeLocalTypeRepr(
+            type, paramInfo.KnownToBeLocalLoc);
+        param->setKnownToBeLocal();
+      }
+
       if (paramInfo.CompileConstLoc.isValid()) {
         type = new (parser.Context) CompileTimeConstTypeRepr(
             type, paramInfo.CompileConstLoc);
@@ -623,10 +657,19 @@ mapParsedParameters(Parser &parser,
           }
 
           if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
-            if (isa<IsolatedTypeRepr>(STR))
+            if (isa<IsolatedTypeRepr>(STR)) {
               param->setIsolated(true);
+            }
+
+            if (isa<KnownToBeLocalTypeRepr>(STR)) {
+              param->setKnownToBeLocal(true);
+              auto localAttr = new (parser.Context)
+                  KnownToBeLocalAttr(paramInfo.KnownToBeLocalLoc);
+              param->getAttrs().add(localAttr);
+            }
+
             unwrappedType = STR->getBase();
-            continue;;
+            continue;
           }
 
           if (auto *CTR = dyn_cast<CompileTimeConstTypeRepr>(unwrappedType)) {

@@ -429,7 +429,7 @@ bool TypeBase::isActorType() {
   return false;
 }
 
-bool TypeBase::isDistributedActor() {
+bool TypeBase::isDistributedActorType() {
   // Nominal types: check whether the declaration is an actor.
   if (auto *nominal = getAnyNominal()) {
     if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
@@ -450,13 +450,11 @@ bool TypeBase::isDistributedActor() {
     if (!actorProto)
       return false;
 
-    // TODO(distributed): Inheritance is not yet supported.
-
     auto layout = getExistentialLayout();
     return llvm::any_of(layout.getProtocols(),
                         [&actorProto](ProtocolType *protocol) {
                           return protocol->getDecl() == actorProto ||
-                                 protocol->isDistributedActor();
+                                 protocol->isDistributedActorType();
                         });
   }
 

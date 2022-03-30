@@ -4000,6 +4000,7 @@ ParserStatus
 Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                       SourceLoc &SpecifierLoc,
                                       SourceLoc &IsolatedLoc,
+                                      SourceLoc &KnownToBeLocalLoc,
                                       SourceLoc &ConstLoc,
                                       TypeAttributes &Attributes) {
   PatternBindingInitializer *initContext = nullptr;
@@ -4008,6 +4009,7 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
          Tok.isContextualKeyword("__shared") ||
          Tok.isContextualKeyword("__owned") ||
          Tok.isContextualKeyword("isolated") ||
+         Tok.isContextualKeyword("_local") ||
          Tok.isContextualKeyword("_const")) {
 
     if (Tok.isContextualKeyword("isolated")) {
@@ -4016,6 +4018,11 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
           .fixItRemove(SpecifierLoc);
       }
       IsolatedLoc = consumeToken();
+      continue;
+    }
+
+    if (Tok.isContextualKeyword("_local")) {
+      KnownToBeLocalLoc = consumeToken();
       continue;
     }
 
