@@ -97,10 +97,17 @@ public struct Substring: Sendable {
   @usableFromInline
   internal var _slice: Slice<String>
 
+  @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
   internal init(_unchecked slice: Slice<String>) {
     self._slice = slice
     _invariantCheck()
+  }
+
+  @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
+  internal init(_unchecked guts: _StringGuts, bounds: Range<Index>) {
+    self.init(_unchecked: Slice(base: String(guts), bounds: bounds))
   }
 
   @usableFromInline // This used to be @inlinable before 5.7
@@ -728,9 +735,7 @@ extension Substring {
     /// Creates an instance that slices `base` at `_bounds`.
     @inlinable
     internal init(_ base: String.UTF8View, _bounds: Range<Index>) {
-      _slice = Slice(
-        base: String(base._guts).utf8,
-        bounds: _bounds)
+      _slice = Slice(base: base, bounds: _bounds)
     }
 
     @_alwaysEmitIntoClient @inline(__always)
@@ -848,7 +853,8 @@ extension Substring {
   @inlinable
   public var utf8: UTF8View {
     get {
-      return base.utf8[startIndex..<endIndex]
+      // No need for index validation
+      UTF8View(base.utf8, _bounds: _bounds)
     }
     set {
       self = Substring(newValue)
@@ -859,9 +865,12 @@ extension Substring {
   ///
   /// - Complexity: O(1)
   public init(_ content: UTF8View) {
-    self = String(
-      content._slice._base._guts
-    )[content.startIndex..<content.endIndex]
+    // Note: We can trust that `content`'s bounds are valid, but they may not be
+    // scalar aligned.
+    let lower = content._wholeGuts.scalarAlign(content.startIndex)
+    let upper = content._wholeGuts.scalarAlign(content.endIndex)
+    let bounds = Range(_uncheckedBounds: (lower, upper))
+    self.init(_unchecked: content._wholeGuts, bounds: bounds)
   }
 }
 
@@ -873,9 +882,9 @@ extension String {
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
   public init?(_ codeUnits: Substring.UTF8View) {
-    let guts = codeUnits._slice._base._guts
-    guard guts.isOnUnicodeScalarBoundary(codeUnits._slice.startIndex),
-          guts.isOnUnicodeScalarBoundary(codeUnits._slice.endIndex) else {
+    let guts = codeUnits._wholeGuts
+    guard guts.isOnUnicodeScalarBoundary(codeUnits.startIndex),
+          guts.isOnUnicodeScalarBoundary(codeUnits.endIndex) else {
       return nil
     }
 
@@ -1001,7 +1010,8 @@ extension Substring {
   @inlinable
   public var utf16: UTF16View {
     get {
-      return base.utf16[startIndex..<endIndex]
+      // No need for index validation
+      UTF16View(base.utf16, _bounds: _bounds)
     }
     set {
       self = Substring(newValue)
@@ -1012,9 +1022,12 @@ extension Substring {
   ///
   /// - Complexity: O(1)
   public init(_ content: UTF16View) {
-    self = String(
-      content._slice._base._guts
-    )[content.startIndex..<content.endIndex]
+    // Note: We can trust that `content`'s bounds are valid, but they may not be
+    // scalar aligned.
+    let lower = content._wholeGuts.scalarAlign(content.startIndex)
+    let upper = content._wholeGuts.scalarAlign(content.endIndex)
+    let bounds = Range(_uncheckedBounds: (lower, upper))
+    self.init(_unchecked: content._wholeGuts, bounds: bounds)
   }
 }
 
@@ -1026,9 +1039,9 @@ extension String {
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
   public init?(_ codeUnits: Substring.UTF16View) {
-    let guts = codeUnits._slice._base._guts
-    guard guts.isOnUnicodeScalarBoundary(codeUnits._slice.startIndex),
-          guts.isOnUnicodeScalarBoundary(codeUnits._slice.endIndex) else {
+    let guts = codeUnits._wholeGuts
+    guard guts.isOnUnicodeScalarBoundary(codeUnits.startIndex),
+          guts.isOnUnicodeScalarBoundary(codeUnits.endIndex) else {
       return nil
     }
 
@@ -1042,6 +1055,7 @@ extension Substring {
     internal var _slice: Slice<String.UnicodeScalarView>
 
     /// Creates an instance that slices `base` at `_bounds`.
+    @_alwaysEmitIntoClient
     internal init(
       _unchecked base: String.UnicodeScalarView, bounds: Range<Index>
     ) {
@@ -1164,7 +1178,8 @@ extension Substring {
   @inlinable
   public var unicodeScalars: UnicodeScalarView {
     get {
-      return base.unicodeScalars[startIndex..<endIndex]
+      // No need to validate any indices.
+      UnicodeScalarView(_unchecked: base.unicodeScalars, bounds: _bounds)
     }
     set {
       self = Substring(newValue)
@@ -1175,9 +1190,9 @@ extension Substring {
   ///
   /// - Complexity: O(1)
   public init(_ content: UnicodeScalarView) {
-    self = String(
-      content._slice._base._guts
-    )[content.startIndex..<content.endIndex]
+      // No need to validate any indices.
+    let slice = Slice(base: String(content._wholeGuts), bounds: content._bounds)
+    self.init(_unchecked: slice)
   }
 }
 
