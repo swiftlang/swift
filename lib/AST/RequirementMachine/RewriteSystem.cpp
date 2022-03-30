@@ -754,15 +754,23 @@ void RewriteSystem::freeze() {
 }
 
 static Optional<Requirement>
-getRequirementForDiagnostics(Type subject, Symbol property) {
+getRequirementForDiagnostics(Type subject, Symbol property,
+                             const PropertyMap &map,
+                             TypeArrayView<GenericTypeParamType> genericParams) {
   switch (property.getKind()) {
-  case Symbol::Kind::ConcreteType:
-    return Requirement(RequirementKind::SameType, subject,
-                       property.getConcreteType());
+  case Symbol::Kind::ConcreteType: {
+    auto concreteType = map.getTypeFromSubstitutionSchema(
+        property.getConcreteType(), property.getSubstitutions(),
+        genericParams, MutableTerm());
+    return Requirement(RequirementKind::SameType, subject, concreteType);
+  }
 
-  case Symbol::Kind::Superclass:
-    return Requirement(RequirementKind::Superclass, subject,
-                       property.getConcreteType());
+  case Symbol::Kind::Superclass: {
+    auto concreteType = map.getTypeFromSubstitutionSchema(
+        property.getConcreteType(), property.getSubstitutions(),
+        genericParams, MutableTerm());
+    return Requirement(RequirementKind::Superclass, subject, concreteType);
+  }
 
   case Symbol::Kind::Protocol:
     return Requirement(RequirementKind::Conformance, subject,
@@ -785,14 +793,11 @@ void RewriteSystem::computeConflictDiagnostics(
     const auto &firstRule = getRule(pair.first);
     const auto &secondRule = getRule(pair.second);
 
-    auto firstProperty = firstRule.isPropertyRule();
-    auto secondProperty = secondRule.isPropertyRule();
-    assert(firstProperty && secondProperty);
+    assert(firstRule.isPropertyRule() && secondRule.isPropertyRule());
 
-    auto firstTerm = firstRule.getRHS();
-    auto secondTerm = secondRule.getRHS();
-    auto subjectTerm =
-        firstTerm.size() > secondTerm.size() ? firstTerm : secondTerm;
+    bool chooseFirstRule = firstRule.getRHS().size() > secondRule.getRHS().size();
+    auto subjectRule = chooseFirstRule ? firstRule : secondRule;
+    auto subjectTerm = subjectRule.getRHS();
 
     // If the root protocol of the subject term isn't in this minimization
     // domain, the conflict was already diagnosed.
@@ -801,8 +806,10 @@ void RewriteSystem::computeConflictDiagnostics(
 
     Type subject = propertyMap.getTypeForTerm(subjectTerm, genericParams);
     errors.push_back(RequirementError::forConflictingRequirement(
-        *getRequirementForDiagnostics(subject, *firstProperty),
-        *getRequirementForDiagnostics(subject, *secondProperty),
+        *getRequirementForDiagnostics(subject, *firstRule.isPropertyRule(),
+                                      propertyMap, genericParams),
+        *getRequirementForDiagnostics(subject, *secondRule.isPropertyRule(),
+                                      propertyMap, genericParams),
         signatureLoc));
   }
 }
