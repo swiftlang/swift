@@ -8173,14 +8173,11 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
   return OpaqueReturnTypeIdentifier;
 }
 
-OpaqueTypeDecl::ConditionalAlternatives *
-OpaqueTypeDecl::ConditionalAlternatives::get(
-    ASTContext &ctx,
-    ArrayRef<ConditionallyAvailableSubstitutions *> underlyingTypes) {
-  auto size = totalSizeToAlloc<ConditionallyAvailableSubstitutions *>(
-      underlyingTypes.size());
-  auto mem = ctx.Allocate(size, alignof(ConditionalAlternatives));
-  return new (mem) ConditionalAlternatives(underlyingTypes);
+void OpaqueTypeDecl::setConditionallyAvailableSubstitutions(
+    ArrayRef<ConditionallyAvailableSubstitutions *> substitutions) {
+  assert(!ConditionallyAvailableTypes &&
+         "resetting conditionally available substitutions?!");
+  ConditionallyAvailableTypes = getASTContext().AllocateCopy(substitutions);
 }
 
 OpaqueTypeDecl::ConditionallyAvailableSubstitutions *

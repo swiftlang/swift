@@ -2793,34 +2793,6 @@ public:
   class ConditionallyAvailableSubstitutions;
 
 private:
-  /// A container to keep a set of conditional available underlying type
-  /// substitutions with their availability conditions.
-  class ConditionalAlternatives final
-      : private llvm::TrailingObjects<ConditionalAlternatives,
-                                      ConditionallyAvailableSubstitutions *> {
-    friend TrailingObjects;
-
-    unsigned NumAlternatives;
-
-    ConditionalAlternatives(
-        ArrayRef<ConditionallyAvailableSubstitutions *> underlyingTypes)
-        : NumAlternatives(underlyingTypes.size()) {
-      std::uninitialized_copy(
-          underlyingTypes.begin(), underlyingTypes.end(),
-          getTrailingObjects<ConditionallyAvailableSubstitutions *>());
-    }
-
-  public:
-    ArrayRef<ConditionallyAvailableSubstitutions *> getAlternatives() const {
-      return {getTrailingObjects<ConditionallyAvailableSubstitutions *>(),
-              NumAlternatives};
-    }
-
-    static ConditionalAlternatives *
-    get(ASTContext &ctx,
-        ArrayRef<ConditionallyAvailableSubstitutions *> underlyingTypes);
-  };
-
   /// The original declaration that "names" the opaque type. Although a specific
   /// opaque type cannot be explicitly named, oapque types can propagate
   /// arbitrarily through expressions, so we need to know *which* opaque type is
@@ -2845,7 +2817,11 @@ private:
   /// A set of substitutions which are used based on the availability
   /// checks performed at runtime. This set of only populated if there
   /// is no single unique underlying type for this opaque type declaration.
-  ConditionalAlternatives *ConditionallyAvailableTypes = nullptr;
+  ///
+  /// It always contains one or more conditionally available substitutions
+  /// followed by a universally available type used as a fallback.
+  Optional<MutableArrayRef<ConditionallyAvailableSubstitutions *>>
+      ConditionallyAvailableTypes = None;
 
   mutable Identifier OpaqueReturnTypeIdentifier;
 
@@ -2932,13 +2908,14 @@ public:
     UniqueUnderlyingType = subs;
   }
 
-  void setConditionallyAvailableSubstitutions(
-      ArrayRef<ConditionallyAvailableSubstitutions *> substitutions) {
-    assert(!ConditionallyAvailableTypes &&
-           "resetting conditional substitutions?!");
-    ConditionallyAvailableTypes =
-        ConditionalAlternatives::get(getASTContext(), substitutions);
+  ArrayRef<ConditionallyAvailableSubstitutions *>
+  getConditionallyAvailableSubstitutions() const {
+    assert(ConditionallyAvailableTypes);
+    return ConditionallyAvailableTypes.getValue();
   }
+
+  void setConditionallyAvailableSubstitutions(
+      ArrayRef<ConditionallyAvailableSubstitutions *> substitutions);
 
   // Opaque type decls are currently always implicit
   SourceRange getSourceRange() const { return SourceRange(); }
