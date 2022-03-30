@@ -13,6 +13,28 @@
 // This file implements routines for converting Swift AST interface types to
 // rewrite system terms.
 //
+// A type parameter in Swift is a GenericTypeParamType wrapped in zero or
+// more DependentMemberTypes. DependentMemberTypes come in two flavors,
+// "unresolved" and "resolved". Unresolved DependentMemberTypes store an
+// identifier. Resolved DependentMemberTypes store an associated type
+// declaration.
+//
+// In the rewrite system, unresolved DependentMemberTypes map to name symbols;
+// resolved DependentMemberTypes map to associated type symbols.
+//
+// The mapping of the root generic parameter depends on the specific usage:
+//
+// - If the type is understood to be the subject type of a requirement in a
+//   protocol, the root generic parameter, which must equal τ_0_0, maps to a
+//   protocol symbol for the protocol in question.
+//
+// - If the type is part of a top-level generic signature, the root generic
+//   parameter maps to the corresponding generic parameter symbol.
+//
+// - If the type was derived from a superclass or concrete type symbol, the
+//   root generic parameter, which must equal τ_0_N for some N, maps to the
+//   Nth substitution stored in the superclass or concrete type symbol.
+//
 // The rewrite system's reduction order differs from the canonical type order
 // used by Swift's ABI and name mangling. What this means in practice is that
 // converting a canonical type to a term does not necessarily produce a
@@ -35,6 +57,43 @@
 // In the canonical type order, P1 < P2 based on the protocol names alone (or
 // their module names, if the unqualified names are the same). In the reduction
 // order, we want P1 < P2 to also hold if P1 inherits from P2.
+//
+// The following diagram shows the relationship between the two directions of
+// the type to term mapping:
+//
+//      ---------------------
+//     / Non-canonical Type /
+//     ---------------------
+//               |
+//               v
+//     +------------------+
+//     | getTermForType() |
+//     +------------------+
+//               |
+//               v
+//     ---------------------
+//    / Non-canonical Term /
+//    ---------------------
+//               |
+//               v
+//        +------------+
+//        | simplify() |
+//        +------------+
+//               |
+//               v
+//       -----------------
+//      / Canonical Term /
+//      -----------------
+//               |
+//               v
+//     +------------------+
+//     | getTypeForTerm() |
+//     +------------------+
+//               |
+//               v
+//       -----------------
+//      / Canonical Type /
+//      -----------------
 //
 //===----------------------------------------------------------------------===//
 

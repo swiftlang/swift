@@ -10,8 +10,25 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements the various operations on interface types in GenericSignature.
-// Use those methods instead of calling into the RequirementMachine directly.
+// The various generic signature query operations on GenericSignature will
+// lazily construct a requirement machine for the generic signature from the
+// RewriteContext, then call the methods in this file.
+//
+// If you're working elsewhere in the compiler, use the methods on
+// GenericSignature instead of calling into the RequirementMachine directly.
+//
+// Each query is generally implemented in the same manner:
+//
+// - First, convert the subject type parameter into a Term.
+// - Simplify the Term to obtain a canonical Term.
+// - Perform a property map lookup on the Term.
+// - Return the appropriate piece of information from the property map.
+//
+// A few are slightly different; for example, getCanonicalTypeInContext() takes
+// an arbitrary type, not just a type parameter, and recursively transforms the
+// type parameters it contains, if any.
+//
+// Also, getConformanceAccessPath() is another one-off operation.
 //
 //===----------------------------------------------------------------------===//
 
