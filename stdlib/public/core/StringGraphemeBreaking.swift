@@ -130,8 +130,13 @@ extension _StringGuts {
     if i == bounds.lowerBound || i == bounds.upperBound { return i }
 
     let offset = i._encodedOffset
-    let prior = offset - _opaqueCharacterStride(endingAt: offset)
-    let stride = _opaqueCharacterStride(startingAt: prior)
+
+    let offsetBounds = Range(
+      _uncheckedBounds: (
+        bounds.lowerBound._encodedOffset, bounds.upperBound._encodedOffset))
+
+    let prior = offset - _opaqueCharacterStride(endingAt: offset, in: offsetBounds)
+    let stride = _opaqueCharacterStride(startingAt: prior, in: offsetBounds)
     _internalInvariant(offset <= prior + stride,
       "Grapheme breaking inconsistency")
     if offset >= prior + stride {
