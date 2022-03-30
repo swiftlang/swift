@@ -848,6 +848,7 @@ namespace swift {
     friend class DiagnosticTransaction;
     friend class CompoundDiagnosticTransaction;
     friend class DiagnosticStateRAII;
+    friend class DiagnosticQueue;
 
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
@@ -1137,9 +1138,15 @@ namespace swift {
     /// Send \c diag to all diagnostic consumers.
     void emitDiagnostic(const Diagnostic &diag);
 
+    /// Handle a new diagnostic, which will either be emitted, or added to an
+    /// active transaction.
+    void handleDiagnostic(Diagnostic diag);
+
     /// Send all tentative diagnostics to all diagnostic consumers and
     /// delete them.
     void emitTentativeDiagnostics();
+
+    void forwardTentativeDiagnosticsTo(DiagnosticEngine &targetEngine);
 
   public:
     DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
@@ -1330,6 +1337,50 @@ namespace swift {
                                         Engine.TentativeDiagnostics.end());
 
       DiagnosticTransaction::commit();
+    }
+  };
+
+  class DiagnosticQueue final {
+    /// The underlying diagnostic engine that the diagnostics will be emitted
+    /// by.
+    DiagnosticEngine &UnderlyingEngine;
+
+    /// A temporary engine used to queue diagnostics.
+    DiagnosticEngine QueueEngine;
+
+  public:
+    DiagnosticQueue(const DiagnosticQueue &) = delete;
+    DiagnosticQueue &operator=(const DiagnosticQueue &) = delete;
+
+    explicit DiagnosticQueue(DiagnosticEngine &engine)
+        : UnderlyingEngine(engine), QueueEngine(engine.SourceMgr) {
+      // Open a transaction to avoid emitting any diagnostics.
+      QueueEngine.TransactionCount++;
+    }
+
+    /// Retrieve the engine which may be used to enqueue diagnostics.
+    DiagnosticEngine &getDiags() { return QueueEngine; }
+
+    /// Retrieve the underlying engine which will receive the diagnostics.
+    DiagnosticEngine &getUnderlyingDiags() { return UnderlyingEngine; }
+
+    /// Clear this queue and erase all diagnostics recorded.
+    void clear() {
+      assert(QueueEngine.TransactionCount == 1 &&
+             "Haven't closed outstanding DiagnosticTransactions");
+      QueueEngine.TentativeDiagnostics.clear();
+    }
+
+    /// Emit all the diagnostics recorded by this queue.
+    void emit() {
+      assert(QueueEngine.TransactionCount == 1 &&
+             "Haven't closed outstanding DiagnosticTransactions");
+      QueueEngine.forwardTentativeDiagnosticsTo(UnderlyingEngine);
+    }
+
+    ~DiagnosticQueue() {
+      emit();
+      QueueEngine.TransactionCount--;
     }
   };
 

@@ -282,9 +282,9 @@ _ = /]/
 _ = /:/
 _ = /;/
 
-// TODO: Need to delay diagnostics for these.
-_ = /0xG/ // expected-error {{'G' is not a valid hexadecimal digit (0-9, A-F) in integer literal}}
-_ = /0oG/ // expected-error {{'G' is not a valid octal digit (0-7) in integer literal}}
-_ = /"/ // expected-error {{unterminated string literal}}
-_ = /'/ // expected-error {{unterminated string literal}}
-_ = /<#placeholder#>/ // expected-error {{editor placeholder in source file}}
+// Don't emit diagnostics here, as we re-lex.
+_ = /0xG/
+_ = /0oG/
+_ = /"/
+_ = /'/
+_ = /<#placeholder#>/

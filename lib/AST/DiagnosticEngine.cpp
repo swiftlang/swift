@@ -1040,20 +1040,34 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
 
 void DiagnosticEngine::flushActiveDiagnostic() {
   assert(ActiveDiagnostic && "No active diagnostic to flush");
+  handleDiagnostic(std::move(*ActiveDiagnostic));
+  ActiveDiagnostic.reset();
+}
+
+void DiagnosticEngine::handleDiagnostic(Diagnostic diag) {
   if (TransactionCount == 0) {
-    emitDiagnostic(*ActiveDiagnostic);
+    emitDiagnostic(diag);
     WrappedDiagnostics.clear();
     WrappedDiagnosticArgs.clear();
   } else {
-    onTentativeDiagnosticFlush(*ActiveDiagnostic);
-    TentativeDiagnostics.emplace_back(std::move(*ActiveDiagnostic));
+    onTentativeDiagnosticFlush(diag);
+    TentativeDiagnostics.emplace_back(std::move(diag));
   }
-  ActiveDiagnostic.reset();
 }
 
 void DiagnosticEngine::emitTentativeDiagnostics() {
   for (auto &diag : TentativeDiagnostics) {
     emitDiagnostic(diag);
+  }
+  TentativeDiagnostics.clear();
+  WrappedDiagnostics.clear();
+  WrappedDiagnosticArgs.clear();
+}
+
+void DiagnosticEngine::forwardTentativeDiagnosticsTo(
+    DiagnosticEngine &targetEngine) {
+  for (auto &diag : TentativeDiagnostics) {
+    targetEngine.handleDiagnostic(diag);
   }
   TentativeDiagnostics.clear();
   WrappedDiagnostics.clear();
