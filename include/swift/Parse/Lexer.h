@@ -531,6 +531,9 @@ public:
     void operator=(const SILBodyRAII&) = delete;
   };
 
+  /// Attempt to re-lex a regex literal with forward slashes `/.../`.
+  bool tryLexAsForwardSlashRegexLiteral(State S);
+
 private:
   /// Nul character meaning kind.
   enum class NulCharacterKind {

@@ -39,6 +39,16 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
 
   auto regexText = Tok.getText();
 
+  // The Swift library doesn't know about `/.../` regexes, let's pretend it's
+  // `#/.../#` instead.
+  if (regexText[0] == '/') {
+    SmallString<32> scratch;
+    scratch.append("#");
+    scratch.append(regexText);
+    scratch.append("#");
+    regexText = Context.AllocateCopy(StringRef(scratch));
+  }
+
   // Let the Swift library parse the contents, returning an error, or null if
   // successful.
   // TODO: We need to be able to pass back a source location to emit the error
