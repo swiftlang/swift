@@ -33,6 +33,10 @@ class ClangSyntaxPrinter {
 public:
   ClangSyntaxPrinter(raw_ostream &os) : os(os) {}
 
+  /// Print a given identifier. If the identifer conflicts with a keyword, add a
+  /// trailing underscore.
+  void printIdentifier(StringRef name);
+
   /// Print a C++ namespace declaration with the give name and body.
   void
   printNamespace(llvm::function_ref<void(raw_ostream &OS)> namePrinter,
@@ -52,6 +56,10 @@ public:
   void printNullability(
       Optional<OptionalTypeKind> kind,
       NullabilityPrintKind printKind = NullabilityPrintKind::After) const;
+
+  /// Returns true if \p name matches a keyword in any Clang language mode.
+  static bool isClangKeyword(StringRef name);
+  static bool isClangKeyword(Identifier name);
 
 protected:
   raw_ostream &os;

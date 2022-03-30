@@ -57,33 +57,6 @@ static bool isAnyObjectOrAny(Type type) {
   return type->isAnyObject() || type->isAny();
 }
 
-/// Returns true if \p name matches a keyword in any Clang language mode.
-static bool isClangKeyword(StringRef name) {
-  static const llvm::DenseSet<StringRef> keywords = []{
-    llvm::DenseSet<StringRef> set;
-    // FIXME: clang::IdentifierInfo /nearly/ has the API we need to do this
-    // in a more principled way, but not quite.
-#define KEYWORD(SPELLING, FLAGS) \
-    set.insert(#SPELLING);
-#define CXX_KEYWORD_OPERATOR(SPELLING, TOK) \
-    set.insert(#SPELLING);
-#include "clang/Basic/TokenKinds.def"
-    return set;
-  }();
-
-  return keywords.contains(name);
-}
-
-static bool isClangKeyword(Identifier name) {
-  if (name.empty())
-    return false;
-  return isClangKeyword(name.str());
-}
-
-bool DeclAndTypePrinter::isStrClangKeyword(StringRef name) {
-  return ::isClangKeyword(name);
-}
-
 // For a given Decl and Type, if the type is not an optional return
 // the type and OTK_None as the optionality. If the type is
 // optional, return the underlying object type, and an optionality
@@ -743,8 +716,7 @@ private:
   /// Print the core function declaration for a given function with the given
   /// name.
   void printFunctionDeclAsCFunctionDecl(FuncDecl *FD, StringRef name,
-                                        Type resultTy,
-                                        bool printEmptyParamNames = false) {
+                                        Type resultTy) {
     // The result type may be a partial function type we need to close
     // up later.
     PrintMultiPartType multiPart(*this);
@@ -764,12 +736,8 @@ private:
         Type objTy;
         std::tie(objTy, kind) =
             getObjectTypeAndOptionality(param, param->getInterfaceType());
-        std::string paramName =
-            param->getName().empty() ? "" : param->getName().str().str();
-        if (printEmptyParamNames && paramName.empty()) {
-          llvm::raw_string_ostream os(paramName);
-          os << "_" << index;
-        }
+        StringRef paramName =
+            param->getName().empty() ? "" : param->getName().str();
         print(objTy, kind, paramName, IsFunctionParam);
         ++index;
       });
@@ -858,8 +826,9 @@ private:
     os << "SWIFT_EXTERN ";
 
     DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
-    funcPrinter.printFunctionDeclAsCFunctionDecl(FD, funcABI.getSymbolName(),
-                                                 resultTy);
+    funcPrinter.printFunctionSignature(
+        FD, funcABI.getSymbolName(), resultTy,
+        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto);
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
@@ -895,9 +864,10 @@ private:
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
     os << "inline ";
-    printFunctionDeclAsCFunctionDecl(FD,
-                                     FD->getName().getBaseIdentifier().get(),
-                                     resultTy, /*printEmptyParamNames=*/true);
+    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
+    funcPrinter.printFunctionSignature(
+        FD, FD->getName().getBaseIdentifier().get(), resultTy,
+        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk);
     // FIXME: Support throwing exceptions for Swift errors.
     os << " noexcept";
     printFunctionClangAttributes(FD, funcTy);
@@ -2025,7 +1995,7 @@ private:
   /// visitPart().
 public:
   void print(Type ty, Optional<OptionalTypeKind> optionalKind,
-             std::string name = "",
+             StringRef name = "",
              IsFunctionParam_t isFuncParam = IsNotFunctionParam) {
     PrettyStackTraceType trace(getASTContext(), "printing", ty);
 
