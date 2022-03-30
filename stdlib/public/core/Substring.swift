@@ -354,7 +354,8 @@ extension Substring: StringProtocol {
     // `Substring`'s bounds do not fall on grapheme boundaries in `base`.
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    var i = _validateInclusiveScalarIndex(i)
+    var i = _roundDownToNearestCharacter(
+      _validateInclusiveScalarIndex(i))
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
         _precondition(i < endIndex, "String index is out of bounds")
@@ -390,7 +391,7 @@ extension Substring: StringProtocol {
     let limit = _wholeGuts.ensureMatchingEncoding(limit)
     let start = _wholeGuts.ensureMatchingEncoding(i)
 
-    var i = _validateInclusiveScalarIndex(i)
+    var i = _roundDownToNearestCharacter(_validateInclusiveScalarIndex(i))
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
         guard limit < start || i < limit else { return nil }
@@ -422,8 +423,10 @@ extension Substring: StringProtocol {
     // grapheme breaks -- swapping `start` and `end` may change the magnitude of
     // the result.
 
-    let start = _validateInclusiveScalarIndex(start)
-    let end = _validateInclusiveScalarIndex(end)
+    let start = _roundDownToNearestCharacter(
+      _validateInclusiveScalarIndex(start))
+    let end = _roundDownToNearestCharacter(
+      _validateInclusiveScalarIndex(end))
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
