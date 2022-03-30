@@ -2063,7 +2063,7 @@ void IRGenerator::emitEntryPointInfo() {
   auto &IGM = *getGenModule(entrypoint);
   ConstantInitBuilder builder(IGM);
   auto entrypointInfo = builder.beginStruct();
-  entrypointInfo.addRelativeAddress(
+  entrypointInfo.addCompactFunctionReference(
       IGM.getAddrOfSILFunction(entrypoint, NotForDefinition));
   auto var = entrypointInfo.finishAndCreateGlobal(
       "\x01l_entry_point", Alignment(4),
@@ -3737,11 +3737,6 @@ IRGenModule::emitDirectRelativeReference(llvm::Constant *target,
                                          ArrayRef<unsigned> baseIndices) {
   // Convert the target to an integer.
   auto targetAddr = llvm::ConstantExpr::getPtrToInt(target, SizeTy);
-
-  // WebAssembly hack: WebAssembly doesn't support PC-relative references
-  if (TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
-    return targetAddr;
-  }
 
   SmallVector<llvm::Constant*, 4> indices;
   indices.push_back(llvm::ConstantInt::get(Int32Ty, 0));

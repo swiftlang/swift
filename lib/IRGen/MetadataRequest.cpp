@@ -2775,18 +2775,14 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
                                                           IGM.SizeTy);
 
     llvm::Value *stringAddr;
-    if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
-      stringAddr = subIGF.Builder.CreateIntToPtr(stringAddrOffset, IGM.Int8PtrTy);
-    } else {
-      auto stringAddrBase = subIGF.Builder.CreatePtrToInt(cache, IGM.SizeTy);
-      if (IGM.getModule()->getDataLayout().isBigEndian()) {
-        stringAddrBase = subIGF.Builder.CreateAdd(stringAddrBase,
-                                        llvm::ConstantInt::get(IGM.SizeTy, 4));
-      }
-      stringAddr = subIGF.Builder.CreateAdd(stringAddrBase,
-                                                stringAddrOffset);
-      stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
+    auto stringAddrBase = subIGF.Builder.CreatePtrToInt(cache, IGM.SizeTy);
+    if (IGM.getModule()->getDataLayout().isBigEndian()) {
+      stringAddrBase = subIGF.Builder.CreateAdd(stringAddrBase,
+                                      llvm::ConstantInt::get(IGM.SizeTy, 4));
     }
+    stringAddr = subIGF.Builder.CreateAdd(stringAddrBase,
+                                              stringAddrOffset);
+    stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
 
     llvm::CallInst *call;
     if (request.isStaticallyAbstract()) {

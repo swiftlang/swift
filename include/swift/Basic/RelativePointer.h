@@ -146,11 +146,6 @@ static inline uintptr_t applyRelativeOffset(BasePtrTy *basePtr, Offset offset) {
                 std::is_signed<Offset>::value,
                 "offset type should be signed integer");
 
-#ifdef __wasm__
-  // WebAssembly: hack: disable relative pointers
-  return (uintptr_t)(intptr_t)offset;
-#endif
-
   auto base = reinterpret_cast<uintptr_t>(basePtr);
   // We want to do wrapping arithmetic, but with a sign-extended
   // offset. To do this in C, we need to do signed promotion to get
@@ -169,13 +164,6 @@ static inline Offset measureRelativeOffset(A *referent, B *base) {
   static_assert(std::is_integral<Offset>::value &&
                 std::is_signed<Offset>::value,
                 "offset type should be signed integer");
-#ifdef __wasm__
-  // WebAssembly: hack: disable relative pointers
-  auto offset = (Offset)(uintptr_t)referent;
-  assert((intptr_t)offset == (intptr_t)(uintptr_t)referent
-         && "pointer too large to fit in offset type");
-  return offset;
-#endif
 
   auto distance = (uintptr_t)referent - (uintptr_t)base;
   // Truncate as unsigned, then wrap around to signed.
@@ -398,6 +386,10 @@ public:
 /// position-independent constant data.
 template<typename T, bool Nullable, typename Offset>
 class RelativeDirectPointerImpl {
+#if SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
+  static_assert(!std::is_function<T>::value,
+                "relative direct function pointer should not be used under absolute function pointer mode");
+#endif
 private:
   /// The relative offset of the function's entry point from *this.
   Offset RelativeOffset;
@@ -466,18 +458,24 @@ public:
 
   /// Apply the offset to a parameter, instead of `this`.
   PointerTy getRelative(void *base) const & {
-    // Check for null.
-    if (Nullable && RelativeOffset == 0)
-      return nullptr;
-
-    // The value is addressed relative to `base`.
-    uintptr_t absolute = detail::applyRelativeOffset(base, RelativeOffset);
-    return reinterpret_cast<PointerTy>(absolute);
+    return resolve(base, RelativeOffset);
   }
 
   /// A zero relative offset encodes a null reference.
   bool isNull() const & {
     return RelativeOffset == 0;
+  }
+
+  /// Resolve a pointer from a `base` pointer and a value loaded from `base`.
+  template<typename BasePtrTy>
+  static PointerTy resolve(BasePtrTy *base, Offset value) {
+    // Check for null.
+    if (Nullable && value == 0)
+      return nullptr;
+
+    // The value is addressed relative to `base`.
+    uintptr_t absolute = detail::applyRelativeOffset(base, value);
+    return reinterpret_cast<PointerTy>(absolute);
   }
 };
 
@@ -514,6 +512,7 @@ public:
   }
 
   using super::isNull;
+  using super::resolve;
 };
 
 /// A specialization of RelativeDirectPointer for function pointers,
@@ -560,6 +559,7 @@ public:
   }
 
   using super::isNull;
+  using super::resolve;
 };
 
 /// A direct relative reference to an aligned object, with an additional

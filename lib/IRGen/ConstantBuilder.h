@@ -14,6 +14,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/IRGenOptions.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -81,6 +82,26 @@ public:
 
   void addSize(Size size) { addInt(IGM().SizeTy, size.getValue()); }
 
+  void addCompactFunctionReferenceOrNull(llvm::Function *function) {
+    if (function) {
+      addCompactFunctionReference(function);
+    } else {
+      addInt(IGM().RelativeAddressTy, 0);
+    }
+  }
+
+  /// Add a 32-bit function reference to the given function. The reference
+  /// is direct relative pointer whenever possible. Otherwise, it is a
+  /// absolute pointer assuming the function address is 32-bit.
+  void addCompactFunctionReference(llvm::Function *function) {
+    if (IGM().getOptions().CompactAbsoluteFunctionPointer) {
+      // Assume that the function address is 32-bit.
+      add(llvm::ConstantExpr::getPtrToInt(function, IGM().RelativeAddressTy));
+    } else {
+      addRelativeOffset(IGM().RelativeAddressTy, function);
+    }
+  }
+
   void addRelativeAddressOrNull(llvm::Constant *target) {
     if (target) {
       addRelativeAddress(target);
@@ -91,11 +112,8 @@ public:
 
   void addRelativeAddress(llvm::Constant *target) {
     assert(!isa<llvm::ConstantPointerNull>(target));
-    if (IGM().TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
-      // WebAssembly: hack: doesn't support PCrel data relocations
-      add(llvm::ConstantExpr::getPtrToInt(target, IGM().RelativeAddressTy, false));
-      return;
-    }
+    assert((!IGM().getOptions().CompactAbsoluteFunctionPointer ||
+           !isa<llvm::Function>(target)) && "use addCompactFunctionReference");
     addRelativeOffset(IGM().RelativeAddressTy, target);
   }
 
@@ -104,21 +122,6 @@ public:
   /// a "GOT-equivalent", i.e. a pointer to an external object; if so,
   /// set the low bit of the offset to indicate that this is true.
   void addRelativeAddress(ConstantReference reference) {
-    if (IGM().TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
-      // WebAssembly: hack: doesn't support PCrel data relocations
-      // also, we should set the lowest bit, but I don't know how to do that
-      // there's no GOT on WebAssembly anyways though
-
-
-      llvm::Constant *offset = llvm::ConstantExpr::getPtrToInt(reference.getValue(), IGM().RelativeAddressTy, false);
-      // borrowed from addTaggedRelativeOffset
-      unsigned tag = unsigned(reference.isIndirect());
-      if (tag) {
-        offset = llvm::ConstantExpr::getAdd(offset, llvm::ConstantInt::get(IGM().RelativeAddressTy, tag));
-      }
-      add(offset);
-      return;
-    }
     addTaggedRelativeOffset(IGM().RelativeAddressTy,
                             reference.getValue(),
                             unsigned(reference.isIndirect()));
@@ -128,11 +131,6 @@ public:
   /// The target must be a "GOT-equivalent", i.e. a pointer to an
   /// external object.
   void addIndirectRelativeAddress(ConstantReference reference) {
-    if (IGM().TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
-      // WebAssembly: hack: doesn't support PCrel data relocations
-      add(llvm::ConstantExpr::getPtrToInt(reference.getValue(), IGM().RelativeAddressTy, false));
-      return;
-    }
     assert(reference.isIndirect());
     addRelativeOffset(IGM().RelativeAddressTy,
                       reference.getValue());

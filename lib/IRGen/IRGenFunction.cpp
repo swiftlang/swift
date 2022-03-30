@@ -330,19 +330,26 @@ IRGenFunction::emitLoadOfRelativePointer(Address addr, bool isFar,
     value = Builder.CreateSExt(value, IGM.IntPtrTy);
   }
 
-  // FIXME: add absolute pointer mode for IRGen
-  if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
-    auto *uncastPointer = Builder.CreateIntToPtr(value, IGM.Int8PtrTy);
-    auto uncastPointerAddress = Address(uncastPointer, IGM.getPointerAlignment());
-    auto pointer = Builder.CreateBitCast(uncastPointerAddress, expectedType);
-    return pointer.getAddress();
-  }
   auto *addrInt = Builder.CreatePtrToInt(addr.getAddress(), IGM.IntPtrTy);
   auto *uncastPointerInt = Builder.CreateAdd(addrInt, value);
   auto *uncastPointer = Builder.CreateIntToPtr(uncastPointerInt, IGM.Int8PtrTy);
   auto uncastPointerAddress = Address(uncastPointer, IGM.getPointerAlignment());
   auto pointer = Builder.CreateBitCast(uncastPointerAddress, expectedType);
   return pointer.getAddress();
+}
+
+llvm::Value *
+IRGenFunction::emitLoadOfCompactFunctionPointer(Address addr, bool isFar,
+                                                 llvm::PointerType *expectedType,
+                                                 const llvm::Twine &name) {
+  if (IGM.getOptions().CompactAbsoluteFunctionPointer) {
+    llvm::Value *value = Builder.CreateLoad(addr);
+    auto *uncastPointer = Builder.CreateIntToPtr(value, IGM.Int8PtrTy);
+    auto pointer = Builder.CreateBitCast(Address(uncastPointer, IGM.getPointerAlignment()), expectedType);
+    return pointer.getAddress();
+  } else {
+    return emitLoadOfRelativePointer(addr, isFar, expectedType, name);
+  }
 }
 
 llvm::Value *
