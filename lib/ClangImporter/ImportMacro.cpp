@@ -104,7 +104,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     auto literalType = Impl.importTypeIgnoreIUO(
         clangTy, ImportTypeKind::Value,
         ImportDiagnosticAdder(Impl, MI, tok.getLocation()),
-        isInSystemModule(DC), Bridgeability::None);
+        isInSystemModule(DC), Bridgeability::None, ImportTypeAttrs());
     if (!literalType)
       return nullptr;
 
@@ -115,7 +115,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       constantType = Impl.importTypeIgnoreIUO(
           castType, ImportTypeKind::Value,
           ImportDiagnosticAdder(Impl, MI, MI->getDefinitionLoc()),
-          isInSystemModule(DC), Bridgeability::None);
+          isInSystemModule(DC), Bridgeability::None, ImportTypeAttrs());
       if (!constantType)
         return nullptr;
     }
@@ -322,7 +322,7 @@ static Optional<std::pair<llvm::APSInt, Type>>
       auto type = impl.importTypeIgnoreIUO(
           literal->getType(), ImportTypeKind::Value,
           ImportDiagnosticAdder(impl, macro, token.getLocation()),
-          isInSystemModule(DC), Bridgeability::None);
+          isInSystemModule(DC), Bridgeability::None, ImportTypeAttrs());
       return {{ value, type }};
     }
 

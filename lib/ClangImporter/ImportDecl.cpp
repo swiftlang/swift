@@ -2848,7 +2848,8 @@ namespace {
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef,
             ImportDiagnosticAdder(Impl, Decl, Decl->getLocation()),
-            isInSystemModule(DC), getTypedefBridgeability(Decl), OTK_Optional);
+            isInSystemModule(DC), getTypedefBridgeability(Decl),
+            getImportTypeAttrs(Decl), OTK_Optional);
       }
 
       if (!SwiftType)
@@ -2861,14 +2862,6 @@ namespace {
                                       SourceLoc(), Name,
                                       Loc,
                                       /*genericparams*/nullptr, DC);
-
-      // If the typedef is marked with @Sendable and not @_nonSendable, make
-      // any function type in it Sendable.
-      auto sendability = Result->getAttrs().getEffectiveSendableAttr();
-      if (isa_and_nonnull<SendableAttr>(sendability))
-        SwiftType = applyToFunctionType(SwiftType, [](ASTExtInfo info) {
-          return info.withConcurrent();
-        });
 
       Result->setUnderlyingType(SwiftType);
 
@@ -2967,7 +2960,7 @@ namespace {
         // Compute the underlying type of the enumeration.
         auto underlyingType = Impl.importTypeIgnoreIUO(
             decl->getIntegerType(), ImportTypeKind::Enum, addDiag,
-            isInSystemModule(dc), Bridgeability::None);
+            isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
         if (!underlyingType)
           return nullptr;
 
@@ -3000,7 +2993,7 @@ namespace {
         // Compute the underlying type.
         auto underlyingType = Impl.importTypeIgnoreIUO(
             decl->getIntegerType(), ImportTypeKind::Enum, addDiag,
-            isInSystemModule(dc), Bridgeability::None);
+            isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
         if (!underlyingType)
           return nullptr;
 
@@ -3932,7 +3925,7 @@ namespace {
         auto type = Impl.importTypeIgnoreIUO(
             clangContext.getTagDeclType(clangEnum), ImportTypeKind::Value,
             ImportDiagnosticAdder(Impl, clangEnum, clangEnum->getLocation()),
-            isInSystemModule(dc), Bridgeability::None);
+            isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
         if (!type)
           return nullptr;
 
@@ -3999,7 +3992,8 @@ namespace {
       auto importedType =
           Impl.importType(decl->getType(), ImportTypeKind::Variable,
                           ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                          isInSystemModule(dc), Bridgeability::None);
+                          isInSystemModule(dc), Bridgeability::None,
+                          ImportTypeAttrs());
       if (!importedType)
         return nullptr;
 
@@ -4522,7 +4516,8 @@ namespace {
       auto importedType =
           Impl.importType(decl->getType(), ImportTypeKind::RecordField,
                           ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                          isInSystemModule(dc), Bridgeability::None);
+                          isInSystemModule(dc), Bridgeability::None,
+                          ImportTypeAttrs());
       if (!importedType) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::record_field_not_imported, decl),
@@ -4649,7 +4644,8 @@ namespace {
                           (isAudited ? ImportTypeKind::AuditedVariable
                                      : ImportTypeKind::Variable),
                           ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                          isInSystemModule(dc), Bridgeability::None);
+                          isInSystemModule(dc), Bridgeability::None,
+                          ImportTypeAttrs());
 
       if (!importedType)
         return nullptr;
@@ -5852,7 +5848,7 @@ namespace {
         superclassType = Impl.importTypeIgnoreIUO(
             clangSuperclassType, ImportTypeKind::Abstract,
             ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-            isInSystemModule(dc), Bridgeability::None);
+            isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
         if (superclassType) {
           assert(superclassType->is<ClassType>() ||
                  superclassType->is<BoundGenericClassType>());
@@ -6449,7 +6445,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   ImportDiagnosticAdder addImportDiag(Impl, decl, decl->getLocation());
   auto storedUnderlyingType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Value, addImportDiag,
-      isInSystemModule(dc), Bridgeability::None, OTK_None);
+      isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs(), OTK_None);
 
   if (!storedUnderlyingType)
     return nullptr;
@@ -6470,7 +6466,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // Find a bridged type, which may be different
   auto computedPropertyUnderlyingType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Property, addImportDiag,
-      isInSystemModule(dc), Bridgeability::Full, OTK_None);
+      isInSystemModule(dc), Bridgeability::Full, ImportTypeAttrs(), OTK_None);
   if (auto objTy = computedPropertyUnderlyingType->getOptionalObjectType())
     computedPropertyUnderlyingType = objTy;
 
@@ -6731,7 +6727,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   auto underlyingType = Impl.importTypeIgnoreIUO(
       decl->getIntegerType(), ImportTypeKind::Enum,
       ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-      isInSystemModule(dc), Bridgeability::None);
+      isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
   if (!underlyingType)
     return nullptr;
 
@@ -6952,7 +6948,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       propertyType, ImportTypeKind::Property,
       ImportDiagnosticAdder(Impl, getter, getter->getLocation()),
       Impl.shouldAllowNSUIntegerAsInt(isFromSystemModule, getter),
-      Bridgeability::Full, OTK_ImplicitlyUnwrappedOptional);
+      Bridgeability::Full, ImportTypeAttrs(), OTK_ImplicitlyUnwrappedOptional);
   if (!importedType)
     return nullptr;
 
@@ -8138,7 +8134,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
         Type superclassType = Impl.importTypeIgnoreIUO(
             clang::QualType(unqualifiedClangBound, 0), ImportTypeKind::Abstract,
             ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-            false, Bridgeability::None);
+            false, Bridgeability::None, ImportTypeAttrs());
         if (!superclassType) {
           return None;
         }
