@@ -251,7 +251,7 @@ extension Substring: StringProtocol {
   ///
   /// - has the right encoding,
   /// - is within bounds, and
-  /// - is scalar aligned.
+  /// - is character aligned within this substring.
   ///
   /// It does not mark the encoding of the returned index.
   internal func _uncheckedIndex(after i: Index) -> Index {
@@ -259,8 +259,8 @@ extension Substring: StringProtocol {
     _internalInvariant(i._isScalarAligned)
     _internalInvariant(i >= startIndex && i < endIndex)
 
-    // Implicit precondition: `i` must be `Character`-aligned within this
-    // substring, even if it doesn't have the corresponding flag set.
+    // Note: `i` must be `Character`-aligned within this substring, even if it
+    // doesn't have the corresponding flag set.
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(startingAt: i)
@@ -309,7 +309,7 @@ extension Substring: StringProtocol {
   ///
   /// - has the right encoding,
   /// - is within bounds, and
-  /// - is scalar aligned.
+  /// - is character aligned within this substring.
   ///
   /// It does not mark the encoding of the returned index.
   internal func _uncheckedIndex(before i: Index) -> Index {
@@ -317,8 +317,8 @@ extension Substring: StringProtocol {
     _internalInvariant(i._isScalarAligned)
     _internalInvariant(i > startIndex && i <= endIndex)
 
-    // Implicit precondition: `i` must be `Character`-aligned within this
-    // substring, even if it doesn't have the corresponding flag set.
+    // Note: `i` must be `Character`-aligned within this substring, even if it
+    // doesn't have the corresponding flag set.
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let priorStride = _characterStride(endingAt: i)
@@ -562,17 +562,18 @@ extension Substring: StringProtocol {
         in: newOffsetBounds.lowerBound ..< _wholeGuts.count)
       _slice._startIndex = String.Index(
         encodedOffset: startIndex._encodedOffset,
-        transcodedOffset: 0,
-        characterStride: newStride)._scalarAligned._knownUTF8
+        characterStride: newStride
+      )._scalarAligned._knownUTF8
     }
 
     // Update endIndex.
     if newOffsetBounds.upperBound != endIndex._encodedOffset {
       _slice._endIndex = Index(
-        encodedOffset: newOffsetBounds.upperBound,
-        transcodedOffset: 0
+        _encodedOffset: newOffsetBounds.upperBound
       )._scalarAligned._knownUTF8
     }
+
+    // TODO(lorentey): Mark new bounds character aligned if possible
   }
 
   /// Creates a string from the given Unicode code units in the specified
@@ -1214,7 +1215,7 @@ extension Substring.UnicodeScalarView: RangeReplaceableCollection {
   public mutating func replaceSubrange<C: Collection>(
     _ subrange: Range<Index>, with replacement: C
   ) where C.Element == Element {
-    // TODO(lorentey): Review index validation
+    // TODO(lorentey): Don't forward to slice
     let subrange = _wholeGuts.validateScalarRange(subrange, in: _bounds)
     _slice.replaceSubrange(subrange, with: replacement)
   }
