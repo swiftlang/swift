@@ -320,6 +320,11 @@ public:
   unsigned LazyInitializeProtocolConformances : 1;
   unsigned IndirectAsyncFunctionPointer : 1;
 
+  /// Use absolute function references instead of relative ones.
+  /// Mainly used on WebAssembly, that doesn't support relative references
+  /// to code from data.
+  unsigned CompactAbsoluteFunctionPointer : 1;
+
   /// Normally if the -read-legacy-type-info flag is not specified, we look for
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
   /// Passing this flag completely disables this behavior.
