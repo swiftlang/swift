@@ -10,4 +10,10 @@ import Foundation
 
 public enum SwiftEnum {}
 
+// ensure that synthesized inherited objc symbols do not appear in the symbol graph
+
+// CHECK-NOT:       "c:objc(cs)NSObject(im)init"
+
+// ensure that children of clang nodes appear in the symbol graph
+
 // CHECK: "precise": "c:objc(cs)Foo(py)today"
