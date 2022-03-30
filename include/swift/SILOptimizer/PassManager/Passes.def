@@ -230,6 +230,8 @@ PASS(FunctionOrderPrinter, "function-order-printer",
      "Print Function Order for Testing")
 PASS(FunctionSignatureOpts, "function-signature-opts",
      "Function Signature Optimization")
+SWIFT_FUNCTION_PASS(RangeDumper, "dump-ranges",
+     "Dumps block and instruction ranges")
 PASS(ARCSequenceOpts, "arc-sequence-opts",
      "ARC Sequence Optimization")
 PASS(ARCLoopOpts, "arc-loop-opts",
