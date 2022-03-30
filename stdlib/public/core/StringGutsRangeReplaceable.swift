@@ -307,10 +307,19 @@ extension _StringGuts {
   ) -> Range<Int>
   where C: Collection, C.Iterator.Element == Character {
     if isUniqueNative {
-      if let replStr = newElements as? String, replStr._guts.isFastUTF8 {
-        return replStr._guts.withFastUTF8 {
-          uniqueNativeReplaceSubrange(
-            bounds, with: $0, isASCII: replStr._guts.isASCII)
+      if let repl = newElements as? String {
+        if repl._guts.isFastUTF8 {
+          return repl._guts.withFastUTF8 {
+            uniqueNativeReplaceSubrange(
+              bounds, with: $0, isASCII: repl._guts.isASCII)
+          }
+        }
+      } else if let repl = newElements as? Substring {
+        if repl._wholeGuts.isFastUTF8 {
+          return repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
+            uniqueNativeReplaceSubrange(
+              bounds, with: $0, isASCII: repl._wholeGuts.isASCII)
+          }
         }
       }
       return uniqueNativeReplaceSubrange(
