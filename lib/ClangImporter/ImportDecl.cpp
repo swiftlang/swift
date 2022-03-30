@@ -4129,6 +4129,11 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // Support for importing operators is temporarily disabled: rdar://91070109
+      if (decl->getDeclName().getNameKind() == clang::DeclarationName::CXXOperatorName &&
+          decl->getDeclName().getCXXOverloadedOperator() != clang::OO_Subscript)
+        return nullptr;
+
       // Handle cases where 2 CXX methods differ strictly in "constness"
       // In such a case append a suffix ("Mutating") to the mutable version
       // of the method when importing to swift
