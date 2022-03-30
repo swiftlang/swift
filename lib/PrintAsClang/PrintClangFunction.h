@@ -31,10 +31,19 @@ public:
                                   PrimitiveTypeMapping &typeMapping)
       : os(os), typeMapping(typeMapping) {}
 
-  /// Print the C function declaration that corresponds to the given function
-  /// declaration.
-  void printFunctionDeclAsCFunctionDecl(FuncDecl *FD, StringRef name,
-                                        Type resultTy);
+  /// What kind of function signature should be emitted for the given Swift
+  /// function.
+  enum class FunctionSignatureKind {
+    /// Emit a signature for the C function prototype.
+    CFunctionProto,
+    /// Emit a signature for the inline C++ function thunk.
+    CxxInlineThunk
+  };
+
+  /// Print the C function declaration or the C++ function thunk that
+  /// corresponds to the given function declaration.
+  void printFunctionSignature(FuncDecl *FD, StringRef name, Type resultTy,
+                              FunctionSignatureKind kind);
 
 private:
   raw_ostream &os;

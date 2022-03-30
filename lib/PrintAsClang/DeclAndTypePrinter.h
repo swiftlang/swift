@@ -92,9 +92,6 @@ public:
 
   static std::pair<Type, OptionalTypeKind>
   getObjectTypeAndOptionality(const ValueDecl *D, Type ty);
-
-  /// Returns true if \p name matches a keyword in any Clang language mode.
-  static bool isStrClangKeyword(StringRef name);
 };
 
 } // end namespace swift
