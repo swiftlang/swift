@@ -1456,7 +1456,7 @@ public:
 
   ManagedValue emitAsyncLetStart(SILLocation loc,
                                  SILValue taskOptions,
-                                 Type functionType, ManagedValue taskFunction,
+                                 AbstractClosureExpr *asyncLetEntryPoint,
                                  SILValue resultBuf);
 
   void emitFinishAsyncLet(SILLocation loc, SILValue asyncLet, SILValue resultBuf);
