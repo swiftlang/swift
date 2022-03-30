@@ -1304,6 +1304,19 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
+  if (auto A = Args.getLastArg(OPT_checked_async_objc_bridging)) {
+    auto value = llvm::StringSwitch<llvm::Optional<bool>>(A->getValue())
+        .Case("off", false)
+        .Case("on", true)
+        .Default(llvm::None);
+
+    if (value)
+      Opts.UseCheckedAsyncObjCBridging = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 

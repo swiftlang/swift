@@ -385,6 +385,10 @@ namespace swift {
     bool DisableImplicitBacktracingModuleImport =
         !SWIFT_IMPLICIT_BACKTRACING_IMPORT;
 
+    // Whether to use checked continuations when making an async call from
+    // Swift into ObjC. If false, will use unchecked continuations instead.
+    bool UseCheckedAsyncObjCBridging = true;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;

@@ -738,25 +738,27 @@ public:
     // A foreign async function shouldn't have any indirect results.
   }
 
-  ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
-                                    AbstractionPattern origFormalType,
-                                    SILLocation loc) override {
-    // Get the current continuation for the task.
-    bool throws =
-        calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
-            .has_value() ||
-        calleeTypeInfo.foreign.error.has_value();
-
-    continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
-                               calleeTypeInfo.substResultType, throws);
+  /// Wraps the raw continuation stored in \p continuation as either an
+  /// UncheckedContinuation or CheckedContinuation, depending on a frontend flag.
+  /// The call-back \p genTargetAddr is used to communicate the ultimate type of
+  /// the wrapped continuation so that storage can be allocated and initialized.
+  /// After this function completes, the address returned by the call-back will
+  /// be initialized with the wrapped continuation.
+  ///
+  /// \param genTargetAddr a call-back that accepts the wrapped continuation's
+  /// type and must return an address that can be used to store the wrapped
+  /// continuation. Thus, the "target address" is the place where you want the
+  /// wrapped continuation to be stored.
+  void wrapRawContinuation(SILGenFunction &SGF,
+                           SILLocation loc,
+                           bool throws,
+                           llvm::function_ref<SILValue(CanType)> genTargetAddr) {
+    auto &ctx = SGF.getASTContext();
 
     // Wrap the Builtin.RawUnsafeContinuation in an
     // UnsafeContinuation<T, E>.
-    auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
-    auto errorTy = throws
-      ? SGF.getASTContext().getErrorExistentialType()
-      : SGF.getASTContext().getNeverType();
+    auto continuationDecl = ctx.getUnsafeContinuationDecl();
+    auto errorTy = throws ? ctx.getErrorExistentialType() : ctx.getNeverType();
     auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
                                                 { calleeTypeInfo.substResultType, errorTy })
       ->getCanonicalType();
@@ -765,22 +767,18 @@ public:
                            SILType::getPrimitiveObjectType(continuationTy),
                            {continuation});
 
-    bool checkedBridging = true;
+    const bool checkedBridging = ctx.LangOpts.UseCheckedAsyncObjCBridging;
 
     // If checked bridging is enabled, wrap that continuation again in a
     // CheckedContinuation<T, E>
     if (checkedBridging) {
-      continuationDecl = SGF.getASTContext().getCheckedContinuationDecl();
+      continuationDecl = ctx.getCheckedContinuationDecl();
       continuationTy = BoundGenericType::get(continuationDecl, Type(),
                                                   { calleeTypeInfo.substResultType, errorTy })
         ->getCanonicalType();
     }
 
-    // Stash it in a buffer for a block object.
-    auto blockStorageTy = SILType::getPrimitiveAddressType(
-        SILBlockStorageType::get(continuationTy));
-    auto blockStorage = SGF.emitTemporaryAllocation(loc, blockStorageTy);
-    auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
+    SILValue continuationAddr = genTargetAddr(continuationTy);
 
     if (checkedBridging) {
       auto createIntrinsic = throws
@@ -800,6 +798,34 @@ public:
       SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
                       StoreOwnershipQualifier::Trivial);
     }
+  }
+
+  ManagedValue
+  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
+                                    AbstractionPattern origFormalType,
+                                    SILLocation loc) override {
+    // Get the current continuation for the task.
+    bool throws =
+        calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
+            .has_value() ||
+        calleeTypeInfo.foreign.error.has_value();
+
+    continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
+                               calleeTypeInfo.substResultType, throws);
+
+    SILValue blockStorage;
+    CanType continuationTy;
+
+    // Wrap up the Builtin.RawContinuation into either a checked or unchecked
+    // continuation object, stored in the block.
+    wrapRawContinuation(SGF, loc, throws, [&](CanType wrappedContTy) {
+      // Stash it in a buffer for a block object.
+      continuationTy = wrappedContTy;
+      auto blockStorageTy = SILType::getPrimitiveAddressType(
+          SILBlockStorageType::get(continuationTy));
+      blockStorage = SGF.emitTemporaryAllocation(loc, blockStorageTy);
+      return SGF.B.createProjectBlockStorage(loc, blockStorage);
+    });
 
     // Get the block invocation function for the given completion block type.
     auto completionHandlerIndex = calleeTypeInfo.foreign.async
@@ -854,6 +880,7 @@ public:
                 SILValue bridgedForeignError) override {
     // There should be no direct results from the call.
     assert(directResults.empty());
+    auto &ctx = SGF.getASTContext();
     
     // Await the continuation we handed off to the completion handler.
     SILBasicBlock *resumeBlock = SGF.createBasicBlock();
@@ -896,11 +923,20 @@ public:
         SGF.B.setInsertionPoint(
             ++bridgedForeignError->getDefiningInstruction()->getIterator());
 
-        auto continuationDecl =
-            true ? SGF.getASTContext().getCheckedContinuationDecl()
-                 : SGF.getASTContext().getUnsafeContinuationDecl();
+        // FIXME: this case is not respecting checked bridging, and it's a
+        // great candidate for that. This situation comes up when bridging
+        // to an ObjC completion-handler method that returns a bool. It seems
+        // that bool indicates whether the handler was invoked. If it was not
+        // then it writes out an error. Here for the unsafe bridging, we're
+        // invoking the continuation by re-wrapping it in an
+        // UnsafeContinuation<_, Error> and then immediately calling its
+        // resume(throwing: error) method. For a checked bridging scenario, we
+        // would need to use a copy of the original CheckedContinuation that
+        // was passed to the callee. Whether that's by invoking the block
+        // ourselves, or just invoking the CheckedContinuation.
 
-        auto errorTy = SGF.getASTContext().getErrorExistentialType();
+        auto continuationDecl = ctx.getUnsafeContinuationDecl();
+        auto errorTy = ctx.getErrorExistentialType();
         auto continuationBGT =
             BoundGenericType::get(continuationDecl, Type(),
                                   {calleeTypeInfo.substResultType, errorTy});
@@ -950,7 +986,7 @@ public:
       
       Scope errorScope(SGF, loc);
 
-      auto errorTy = SGF.getASTContext().getErrorExistentialType();
+      auto errorTy = ctx.getErrorExistentialType();
       auto errorVal = SGF.B.createTermResult(
         SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
 

@@ -282,6 +282,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   
   if (F->empty()) {
     // Emit the implementation.
+    const bool checkedBridging = getASTContext().LangOpts.UseCheckedAsyncObjCBridging;
     F->setGenericEnvironment(sig.getGenericEnvironment());
 
     SILGenFunction SGF(*this, *F, SwiftModule);
@@ -310,11 +311,11 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       SILBasicBlock *returnBB = nullptr;
       if (errorIndex) {
         resumeIntrinsic =
-          true ? getResumeCheckedThrowingContinuation()
-               : getResumeUnsafeThrowingContinuation();
+          checkedBridging ? getResumeCheckedThrowingContinuation()
+                          : getResumeUnsafeThrowingContinuation();
         auto errorIntrinsic =
-          true ? getResumeCheckedThrowingContinuationWithError()
-               : getResumeUnsafeThrowingContinuationWithError();
+          checkedBridging ? getResumeCheckedThrowingContinuationWithError()
+                          : getResumeUnsafeThrowingContinuationWithError();
 
         auto errorArgument = params[*errorIndex];
         auto someErrorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
@@ -388,12 +389,12 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         SGF.B.emitBlock(noneErrorBB);
       } else if (foreignError) {
         resumeIntrinsic =
-          true ? getResumeCheckedThrowingContinuation()
-               : getResumeUnsafeThrowingContinuation();
+          checkedBridging ? getResumeCheckedThrowingContinuation()
+                          : getResumeUnsafeThrowingContinuation();
       } else {
         resumeIntrinsic =
-          true ? getResumeCheckedContinuation()
-               : getResumeUnsafeContinuation();
+          checkedBridging ? getResumeCheckedContinuation()
+                          : getResumeUnsafeContinuation();
       }
 
       auto loweredResumeTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),

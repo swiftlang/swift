@@ -326,6 +326,10 @@ def enable_experimental_async_top_level :
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
+def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
+  HelpText<"Control whether checked continuations are used when bridging "
+           "async calls from Swift to ObjC: 'on', 'off' ">;
+
 def debug_constraints : Flag<["-"], "debug-constraints">,
   HelpText<"Debug the constraint-based type checker">;
 
