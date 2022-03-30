@@ -198,8 +198,7 @@ public func copyableVarTest() {
 // We check that we get two separate locations for the different lifetimes of
 // the values.
 // DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
-// TODO: This is incorrect.
-// XWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
+// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
 // DWARF-NEXT: DW_AT_name	("k")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
@@ -391,8 +390,7 @@ public func addressOnlyVarTest<T : P>(_ x: T) {
 // DWARF: DW_TAG_formal_parameter
 // DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
 // DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
-// TODO: We are missing a debug_value in codegen.
-// XWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
+// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
 // DWARF-NEXT: DW_AT_name      ("k")
 // DWARF-NEXT: DW_AT_decl_file (
 // DWARF-NEXT: DW_AT_decl_line (
