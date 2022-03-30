@@ -881,7 +881,7 @@ private:
       size_t index = 1;
       interleaveComma(*params, os, [&](const ParamDecl *param) {
         if (param->hasName()) {
-          os << param->getName();
+          ClangSyntaxPrinter(os).printIdentifier(param->getName().str());
         } else {
           os << "_" << index;
         }
