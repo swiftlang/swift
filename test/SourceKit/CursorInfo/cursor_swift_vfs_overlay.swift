@@ -9,11 +9,7 @@ func a() {
 }
 
 //--- B/b.swift
-// TODO: This should be B/b.swift, but there's currently a bug with multiple overlays.
-//       See rdar://90578880 or https://github.com/llvm/llvm-project/issues/53306.
-//       Replace with CHECK-FIXED when that's fixed.
-// CHECK: source.lang.swift.ref.function.free ({{.*}}{{/|\\}}A{{/|\\}}b.swift:*missing file*)
-// CHECK-FIXED: source.lang.swift.ref.function.free ({{.*}}{{/|\\}}B{{/|\\}}b.swift:[[@LINE+1]]:6-[[@LINE+1]]:9)
+// CHECK: source.lang.swift.ref.function.free ({{.*}}{{/|\\}}B{{/|\\}}b.swift:[[@LINE+1]]:6-[[@LINE+1]]:9)
 func b() {}
 
 //--- base.yaml
