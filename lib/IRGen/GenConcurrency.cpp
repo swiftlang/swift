@@ -181,6 +181,9 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
                                              llvm::Value *localContextInfo,
                                              llvm::Value *localResultBuffer,
                                              SubstitutionMap subs) {
+  localContextInfo = IGF.Builder.CreateBitCast(localContextInfo,
+                                               IGF.IGM.OpaquePtrTy);
+  
   // stack allocate AsyncLet, and begin lifetime for it (until EndAsyncLet)
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_AsyncLet);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_AsyncLet));
@@ -204,31 +207,35 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   auto deploymentAvailability
     = AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
   if (!deploymentAvailability.isContainedIn(
-                                   IGF.IGM.Context.getSwift57Availability())) {
+                                   IGF.IGM.Context.getSwift57Availability()))
+  {
     auto taskAsyncFunctionPointer
                 = cast<llvm::GlobalVariable>(taskFunction->stripPointerCasts());
 
-    auto taskAsyncIDIter = IGF.IGM.AsyncCoroIDs.find(taskAsyncFunctionPointer);
-    assert(taskAsyncIDIter != IGF.IGM.AsyncCoroIDs.end()
-           && "async let entry point not emitted locally");
-    auto taskAsyncID = taskAsyncIDIter->second;
-    
-    // Pad out the initial context size in the async function pointer record
-    // and ID intrinsic so that it will never fit in the preallocated space.
-    uint64_t origSize = cast<llvm::ConstantInt>(taskAsyncID->getArgOperand(0))
-      ->getValue().getLimitedValue();
-    
-    uint64_t paddedSize = std::max(origSize,
+    if (auto taskAsyncID
+          = IGF.IGM.getAsyncCoroIDMapping(taskAsyncFunctionPointer)) {
+      // If the entry point function has already been emitted, retroactively
+      // pad out the initial context size in the async function pointer record
+      // and ID intrinsic so that it will never fit in the preallocated space.
+      uint64_t origSize = cast<llvm::ConstantInt>(taskAsyncID->getArgOperand(0))
+        ->getValue().getLimitedValue();
+      
+      uint64_t paddedSize = std::max(origSize,
                      (NumWords_AsyncLet * IGF.IGM.getPointerSize()).getValue());
-    auto paddedSizeVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, paddedSize);
-    taskAsyncID->setArgOperand(0, paddedSizeVal);
-    
-    auto origInit = taskAsyncFunctionPointer->getInitializer();
-    auto newInit = llvm::ConstantStruct::get(
+      auto paddedSizeVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, paddedSize);
+      taskAsyncID->setArgOperand(0, paddedSizeVal);
+      
+      auto origInit = taskAsyncFunctionPointer->getInitializer();
+      auto newInit = llvm::ConstantStruct::get(
                                    cast<llvm::StructType>(origInit->getType()),
                                    origInit->getAggregateElement(0u),
                                    paddedSizeVal);
-    taskAsyncFunctionPointer->setInitializer(newInit);
+      taskAsyncFunctionPointer->setInitializer(newInit);
+    } else {
+      // If it hasn't been emitted yet, mark it to get the padding when it does
+      // get emitted.
+      IGF.IGM.markAsyncFunctionPointerForPadding(taskAsyncFunctionPointer);
+    }
   }
   
   llvm::CallInst *call;

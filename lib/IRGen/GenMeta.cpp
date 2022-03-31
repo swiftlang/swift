@@ -5619,6 +5619,12 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
                                                    llvm::Function *function,
                                                    LinkEntity entity,
                                                    Size size) {
+  auto afp = cast<llvm::GlobalVariable>(IGM.getAddrOfAsyncFunctionPointer(entity));
+  if (IGM.isAsyncFunctionPointerMarkedForPadding(afp)) {
+    size = std::max(size,
+                    NumWords_AsyncLet * IGM.getPointerSize());
+  }
+  
   ConstantInitBuilder initBuilder(IGM);
   ConstantStructBuilder builder(
       initBuilder.beginStruct(IGM.AsyncFunctionPointerTy));

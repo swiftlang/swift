@@ -5948,10 +5948,11 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
 ManagedValue SILGenFunction::emitAsyncLetStart(
     SILLocation loc,
     SILValue taskOptions,
-    Type functionType, ManagedValue taskFunction,
+    AbstractClosureExpr *asyncLetEntryPoint,
     SILValue resultBuf) {
   ASTContext &ctx = getASTContext();
-  Type resultType = functionType->castTo<FunctionType>()->getResult();
+  Type resultType = asyncLetEntryPoint->getType()
+    ->castTo<FunctionType>()->getResult();
   Type replacementTypes[] = {resultType};
   auto startBuiltin = cast<FuncDecl>(
       getBuiltinValueDecl(ctx, ctx.getIdentifier("startAsyncLet")));
@@ -5966,8 +5967,15 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
   AbstractionPattern origParam(
       startBuiltin->getGenericSignature().getCanonicalSignature(),
       origParamType);
-  taskFunction = emitSubstToOrigValue(
-      loc, taskFunction, origParam, substParamType);
+  
+  auto conversion = Conversion::getSubstToOrig(origParam, substParamType,
+                                     getLoweredType(origParam, substParamType));
+  ConvertingInitialization convertingInit(conversion, SGFContext());
+  auto taskFunction = emitRValue(asyncLetEntryPoint,
+                                 SGFContext(&convertingInit))
+    .getAsSingleValue(*this, loc);
+  taskFunction = emitSubstToOrigValue(loc, taskFunction,
+                                      origParam, substParamType);
 
   auto apply = B.createBuiltin(
       loc,
