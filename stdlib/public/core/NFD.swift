@@ -11,13 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 extension Unicode {
-  internal struct _NFD<S: StringProtocol> {
+  @_spi(_Unicode)
+  public struct _NFD<S: StringProtocol> {
     let base: S
   }
 }
 
 extension Unicode._NFD {
-  internal struct Iterator {
+  @_spi(_Unicode)
+  public struct Iterator {
     var buffer = Unicode._NormDataBuffer()
 
     // This index always points at the next starter of a normalization segment.
@@ -124,7 +126,8 @@ extension Unicode._NFD.Iterator: IteratorProtocol {
     }
   }
 
-  internal mutating func next() -> ScalarAndNormData? {
+  @_spi(_Unicode)
+  public mutating func next() -> ScalarAndNormData? {
     // Empty out our buffer before attempting to decompose the next
     // normalization segment.
     if let nextBuffered = buffer.next() {
@@ -166,7 +169,8 @@ extension Unicode._NFD.Iterator: IteratorProtocol {
 }
 
 extension Unicode._NFD: Sequence {
-  internal func makeIterator() -> Iterator {
+  @_spi(_Unicode)
+  public func makeIterator() -> Iterator {
     Iterator(
       index: base.unicodeScalars.startIndex,
       unicodeScalars: base.unicodeScalars
@@ -175,7 +179,8 @@ extension Unicode._NFD: Sequence {
 }
 
 extension StringProtocol {
-  internal var _nfd: Unicode._NFD<Self> {
+  @_spi(_Unicode)
+  public var _nfd: Unicode._NFD<Self> {
     Unicode._NFD(base: self)
   }
 }
