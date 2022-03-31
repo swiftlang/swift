@@ -24,9 +24,9 @@ protocol P3 {
 // CHECK-LABEL: .P4@
 // CHECK-LABEL: Requirement signature: <Self where Self.[P4]T : P1, Self.[P4]T : P2, Self.[P4]T : P3>
 
-// expected-error@+3{{no type for 'Self.T.T' can satisfy both 'Self.T.T == Int' and 'Self.T.T == String'}}
-// expected-error@+2{{no type for 'Self.T.T' can satisfy both 'Self.T.T == Int' and 'Self.T.T == Float'}}
-// expected-error@+1{{no type for 'Self.T.T' can satisfy both 'Self.T.T == String' and 'Self.T.T == Float'}}
+// expected-error@+3{{no type for 'Self.T.T' can satisfy both 'Self.T.T == String' and 'Self.T.T == Int'}}
+// expected-error@+2{{no type for 'Self.T.T' can satisfy both 'Self.T.T == Float' and 'Self.T.T == Int'}}
+// expected-error@+1{{no type for 'Self.T.T' can satisfy both 'Self.T.T == Float' and 'Self.T.T == String'}}
 protocol P4 {
   associatedtype T : P1 & P2 & P3
 }
@@ -37,5 +37,5 @@ extension Class where T == Bool {
   // CHECK-LABEL: .badRequirement()@
   // CHECK-NEXT: <T>
   func badRequirement() where T == Int { }
-  // expected-error@-1 {{no type for 'T' can satisfy both 'T == Bool' and 'T == Int'}}
+  // expected-error@-1 {{no type for 'T' can satisfy both 'T == Int' and 'T == Bool'}}
 }

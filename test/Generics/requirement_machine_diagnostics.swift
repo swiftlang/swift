@@ -210,7 +210,7 @@ protocol ProtoAlias2 {
 }
 
 func basicConflict<T: ProtoAlias1 & ProtoAlias2>(_:T) where T.A1 == T.A2 {}
-// expected-error@-1{{no type for 'T.A1' can satisfy both 'T.A1 == Int' and 'T.A1 == String'}}
+// expected-error@-1{{no type for 'T.A1' can satisfy both 'T.A1 == String' and 'T.A1 == Int'}}
 
 protocol RequiresAnyObject {
   associatedtype A: AnyObject
@@ -231,14 +231,14 @@ func testMissingRequirements() {
   // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A == S' and 'T.A : AnyObject'}}
 
   func conflict2<T: RequiresConformance>(_: T) where T.A == C {}
-  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A : P' and 'T.A == C'}}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A == C' and 'T.A : P'}}
 
   class C {}
   func conflict3<T: RequiresSuperclass>(_: T) where T.A == C {}
-  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A : Super' and 'T.A : C'}}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A : C' and 'T.A : Super'}}
 
   func conflict4<T: RequiresSuperclass>(_: T) where T.A: C {}
-  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A : Super' and 'T.A : C'}}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A : C' and 'T.A : Super'}}
 }
 
 protocol Fooable {
@@ -265,7 +265,7 @@ func sameTypeConflicts() {
     var bar: Y { return Y() }
   }
 
-  // expected-error@+1{{no type for 'T.Foo' can satisfy both 'T.Foo == Y' and 'T.Foo == X'}}
+  // expected-error@+1{{no type for 'T.Foo' can satisfy both 'T.Foo == X' and 'T.Foo == Y'}}
   func fail1<
     T: Fooable, U: Fooable
   >(_ t: T, u: U) -> (X, Y)
@@ -273,7 +273,7 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{no type for 'T.Foo' can satisfy both 'T.Foo == X' and 'T.Foo == Y'}}
+  // expected-error@+1{{no type for 'T.Foo' can satisfy both 'T.Foo == Y' and 'T.Foo == X'}}
   func fail2<
     T: Fooable, U: Fooable
   >(_ t: T, u: U) -> (X, Y)
@@ -281,13 +281,13 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{no type for 'T.Bar' can satisfy both 'T.Bar : Fooable' and 'T.Bar == X'}}
+  // expected-error@+1{{no type for 'T.Bar' can satisfy both 'T.Bar == X' and 'T.Bar : Fooable'}}
   func fail3<T: Barrable>(_ t: T) -> X
     where T.Bar == X {
     fatalError()
   }
 
-  // expected-error@+1{{no type for 'T.Bar.Foo' can satisfy both 'T.Bar.Foo == Z' and 'T.Bar.Foo == X'}}
+  // expected-error@+1{{no type for 'T.Bar.Foo' can satisfy both 'T.Bar.Foo == X' and 'T.Bar.Foo == Z'}}
   func fail4<T: Barrable>(_ t: T) -> (Y, Z)
     where
     T.Bar == Y,
@@ -295,7 +295,7 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{no type for 'T.Bar.Foo' can satisfy both 'T.Bar.Foo == Z' and 'T.Bar.Foo == X'}}
+  // expected-error@+1{{no type for 'T.Bar.Foo' can satisfy both 'T.Bar.Foo == X' and 'T.Bar.Foo == Z'}}
   func fail5<T: Barrable>(_ t: T) -> (Y, Z)
     where
     T.Bar.Foo == Z,
@@ -303,13 +303,13 @@ func sameTypeConflicts() {
     fatalError()
   }
 
-  // expected-error@+1{{no type for 'T.X' can satisfy both 'T.X == Int' and 'T.X == String'}}
+  // expected-error@+1{{no type for 'T.X' can satisfy both 'T.X == String' and 'T.X == Int'}}
   func fail6<U, T: Concrete>(_: U, _: T) where T.X == String {}
 
   struct G<T> {}
 
   // FIXME: conflict diagnosed twice
-  // expected-error@+1 2{{no type for 'T.X' can satisfy both 'T.X == Int' and 'T.X == G<U.Foo>'}}
+  // expected-error@+1 2{{no type for 'T.X' can satisfy both 'T.X == G<U.Foo>' and 'T.X == Int'}}
   func fail7<U: Fooable, T: Concrete>(_: U, _: T) where T.X == G<U.Foo> {}
 
   // FIXME: conflict diagnosed twice
@@ -318,6 +318,6 @@ func sameTypeConflicts() {
   func fail8<T, U: Fooable>(_: U, _: T) where T == G<U.Foo>, T == Int {}
 
   // FIXME: conflict diagnosed twice
-  // expected-error@+1 2{{no type for 'T' can satisfy both 'T == Int' and 'T == G<U.Foo>'}}
+  // expected-error@+1 2{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
   func fail9<T, U: Fooable>(_: U, _: T) where T == Int, T == G<U.Foo> {}
 }

@@ -756,19 +756,20 @@ void RewriteSystem::freeze() {
 static Optional<Requirement>
 getRequirementForDiagnostics(Type subject, Symbol property,
                              const PropertyMap &map,
-                             TypeArrayView<GenericTypeParamType> genericParams) {
+                             TypeArrayView<GenericTypeParamType> genericParams,
+                             const MutableTerm &prefix) {
   switch (property.getKind()) {
   case Symbol::Kind::ConcreteType: {
     auto concreteType = map.getTypeFromSubstitutionSchema(
         property.getConcreteType(), property.getSubstitutions(),
-        genericParams, MutableTerm());
+        genericParams, prefix);
     return Requirement(RequirementKind::SameType, subject, concreteType);
   }
 
   case Symbol::Kind::Superclass: {
     auto concreteType = map.getTypeFromSubstitutionSchema(
         property.getConcreteType(), property.getSubstitutions(),
-        genericParams, MutableTerm());
+        genericParams, prefix);
     return Requirement(RequirementKind::Superclass, subject, concreteType);
   }
 
@@ -799,17 +800,21 @@ void RewriteSystem::computeConflictDiagnostics(
     auto subjectRule = chooseFirstRule ? firstRule : secondRule;
     auto subjectTerm = subjectRule.getRHS();
 
+    auto suffixRule = chooseFirstRule ? secondRule : firstRule;
+    auto suffixTerm = suffixRule.getRHS();
+
     // If the root protocol of the subject term isn't in this minimization
     // domain, the conflict was already diagnosed.
     if (!isInMinimizationDomain(subjectTerm[0].getRootProtocol()))
       continue;
 
     Type subject = propertyMap.getTypeForTerm(subjectTerm, genericParams);
+    MutableTerm prefix(subjectTerm.begin(), subjectTerm.end() - suffixTerm.size());
     errors.push_back(RequirementError::forConflictingRequirement(
-        *getRequirementForDiagnostics(subject, *firstRule.isPropertyRule(),
-                                      propertyMap, genericParams),
-        *getRequirementForDiagnostics(subject, *secondRule.isPropertyRule(),
-                                      propertyMap, genericParams),
+        *getRequirementForDiagnostics(subject, *subjectRule.isPropertyRule(),
+                                      propertyMap, genericParams, MutableTerm()),
+        *getRequirementForDiagnostics(subject, *suffixRule.isPropertyRule(),
+                                      propertyMap, genericParams, prefix),
         signatureLoc));
   }
 }
