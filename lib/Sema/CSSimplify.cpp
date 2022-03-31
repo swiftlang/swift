@@ -7501,13 +7501,20 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   // we need to store the difference as a signed integer.
   int extraOptionals = fromOptionals.size() - toOptionals.size();
 
-  // "from" expression could be a type variable with value-to-optional
-  // restrictions that we have to account for optionality mismatch.
+  // "from" expression could be a type variable wrapped in an optional e.g.
+  // Optional<$T0>. So when that is the case we have to add this additional
+  // optionality levels to from type.
   const auto subExprType = cs.getType(castExpr->getSubExpr());
-  if (cs.hasConversionRestriction(fromType, subExprType,
-                                  ConversionRestrictionKind::ValueToOptional)) {
-    extraOptionals++;
-    origFromType = OptionalType::get(origFromType);
+  if (subExprType->getOptionalObjectType()) {
+    SmallVector<Type, 4> subExprOptionals;
+    const auto unwrappedSubExprType =
+        subExprType->lookThroughAllOptionalTypes(subExprOptionals);
+    if (unwrappedSubExprType->is<TypeVariableType>()) {
+      extraOptionals += subExprOptionals.size();
+      for (size_t i = 0; i != subExprOptionals.size(); ++i) {
+        origFromType = OptionalType::get(origFromType);
+      }
+    }
   }
 
   // Removing the optionality from to type when the force cast expr is an IUO.
