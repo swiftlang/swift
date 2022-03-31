@@ -86,15 +86,13 @@
 /// or by writing `@Sendable` before the closure's parameters ---
 /// for example:
 ///
-/// ```
-/// let sendableClosure = { @Sendable (number: Int) -> String in
-///     if number > 12 {
-///         return "More than a dozen."
-///     } else {
-///         return "Less than a dozen"
+///     let sendableClosure = { @Sendable (number: Int) -> String in
+///         if number > 12 {
+///             return "More than a dozen."
+///         } else {
+///             return "Less than a dozen"
+///         }
 ///     }
-/// }
-/// ```
 ///
 /// ### Sendable Tuples
 ///
@@ -108,9 +106,7 @@
 ///
 /// Use an unchecked conformance to `Sendable` instead --- for example:
 ///
-/// ```
-/// struct MyStructure: @unchecked Sendable { ... }
-/// ```
+///     struct MyStructure: @unchecked Sendable { ... }
 @available(*, deprecated, message: "Use @unchecked Sendable instead")
 @_marker public protocol UnsafeSendable: Sendable { }
 
