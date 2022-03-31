@@ -2457,9 +2457,14 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
         }
       }
 
+      auto hasAppliedSelf =
+          doesMemberRefApplyCurriedSelf(overload.getBaseType(), decl);
+      unsigned numApplies = getNumApplications(
+          decl, hasAppliedSelf, overload.getFunctionRefKind());
+
       type = adjustFunctionTypeForConcurrency(
           type->castTo<FunctionType>(),
-          subscript, useDC, /*numApplies=*/2, /*isMainDispatchQueue=*/false)
+          decl, useDC, numApplies, /*isMainDispatchQueue=*/false)
         ->getResult();
     }
   }
