@@ -436,7 +436,8 @@ public struct UnsafeRawPointer: _Pointer {
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
   ///
-  /// This function only supports loading trivial types.
+  /// This function only supports loading trivial types,
+  /// and will trap if this precondition is not met.
   /// A trivial type does not contain any reference-counted property
   /// within its in-memory representation.
   /// The memory at this pointer plus `offset` must be laid out
@@ -1160,7 +1161,8 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
   ///
-  /// This function only supports loading trivial types.
+  /// This function only supports loading trivial types,
+  /// and will trap if this precondition is not met.
   /// A trivial type does not contain any reference-counted property
   /// within its in-memory representation.
   /// The memory at this pointer plus `offset` must be laid out
