@@ -213,10 +213,8 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
         return true;
       }
 
-      errors.push_back(
-          RequirementError::forConcreteTypeMismatch(sugaredFirstType,
-                                                    secondType,
-                                                    loc));
+      errors.push_back(RequirementError::forConflictingRequirement(
+          {RequirementKind::SameType, sugaredFirstType, secondType}, loc));
       recordedErrors = true;
       return true;
     }
@@ -249,7 +247,7 @@ static void desugarSuperclassRequirement(Type subjectType,
           RequirementError::forRedundantRequirement(requirement, loc));
     } else {
       errors.push_back(
-          RequirementError::forConflictingRequirement(requirement, loc));
+          RequirementError::forInvalidRequirementSubject(requirement, loc));
     }
 
     return;
@@ -271,7 +269,7 @@ static void desugarLayoutRequirement(Type subjectType,
           RequirementError::forRedundantRequirement(requirement, loc));
     } else {
       errors.push_back(
-          RequirementError::forConflictingRequirement(requirement, loc));
+          RequirementError::forInvalidRequirementSubject(requirement, loc));
     }
 
     return;
@@ -295,7 +293,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
       auto *module = protoDecl->getParentModule();
       auto conformance = module->lookupConformance(subjectType, protoDecl);
       if (conformance.isInvalid()) {
-        errors.push_back(RequirementError::forConflictingRequirement(
+        errors.push_back(RequirementError::forInvalidRequirementSubject(
             {RequirementKind::Conformance, subjectType, constraintType}, loc));
         return;
       }
@@ -712,26 +710,44 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
-    case RequirementError::Kind::ConcreteTypeMismatch: {
-      auto type1 = error.requirement.getFirstType();
-      auto type2 = error.requirement.getSecondType();
-
-      if (!type1->hasError() && !type2->hasError()) {
-        ctx.Diags.diagnose(loc, diag::requires_same_concrete_type,
-                           type1, type2);
-        diagnosedError = true;
-      }
-
-      break;
-    }
-
-    case RequirementError::Kind::ConflictingRequirement: {
+    case RequirementError::Kind::InvalidRequirementSubject: {
       auto subjectType = error.requirement.getFirstType();
       if (subjectType->hasError())
         break;
 
       ctx.Diags.diagnose(loc, diag::requires_not_suitable_archetype,
                          subjectType);
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::ConflictingRequirement: {
+      auto requirement = error.requirement;
+      auto conflict = error.conflictingRequirement;
+
+      if (!conflict) {
+        if (requirement.getFirstType()->hasError() ||
+            requirement.getSecondType()->hasError()) {
+          // Don't emit a cascading error.
+          break;
+        }
+        ctx.Diags.diagnose(loc, diag::requires_same_concrete_type,
+                           requirement.getFirstType(),
+                           requirement.getSecondType());
+      } else {
+        auto options = PrintOptions::forDiagnosticArguments();
+        std::string requirements;
+        llvm::raw_string_ostream OS(requirements);
+        OS << "'";
+        requirement.print(OS, options);
+        OS << "' and '";
+        conflict->print(OS, options);
+        OS << "'";
+
+        ctx.Diags.diagnose(loc, diag::requirement_conflict,
+                           requirement.getFirstType(), requirements);
+      }
+
       diagnosedError = true;
       break;
     }
