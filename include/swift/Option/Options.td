@@ -676,6 +676,10 @@ def disable_actor_data_race_checks :
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Disable runtime checks for actor data races">;
 
+def enable_regex_literals : Flag<["-"], "enable-regex-literals">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Enable the use of regular-expression literals">;
+
 def warn_implicit_overrides :
   Flag<["-"], "warn-implicit-overrides">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
