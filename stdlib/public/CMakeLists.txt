@@ -139,7 +139,7 @@ if(SWIFT_BUILD_STDLIB)
   endif()
 
   if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-    add_subdirectory(MatchingEngine)
+    add_subdirectory(RegexParser)
     add_subdirectory(StringProcessing)
     add_subdirectory(RegexBuilder)
   endif()
