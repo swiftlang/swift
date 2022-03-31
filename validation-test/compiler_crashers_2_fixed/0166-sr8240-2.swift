@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=verify
-
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=verify 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 struct Box<Representation, T> {
     let value: Representation

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures -requirement-machine-inferred-signatures=on > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 {}
@@ -55,6 +55,7 @@ struct RedundantSuper<T: P4> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundantSuper
 // CHECK-NEXT: (normal_conformance type=RedundantSuper<T> protocol=P2)
 extension RedundantSuper: P2 where T: P1 {}
+// expected-warning@-1 {{redundant conformance constraint 'T' : 'P1'}}
 
 struct OverlappingSub<T: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=OverlappingSub
@@ -187,6 +188,7 @@ struct ClassLessSpecific<T: C3> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassLessSpecific
 // CHECK-NEXT: (normal_conformance type=ClassLessSpecific<T> protocol=P2)
 extension ClassLessSpecific: P2 where T: C1 {}
+// expected-warning@-1 {{redundant superclass constraint 'T' : 'C1'}}
 
 
 // Inherited conformances:

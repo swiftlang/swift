@@ -1,7 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=off
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
-
-// FIXME: Both RUN lines should pass 'on' once diagnostics are implemented.
 
 protocol P {}
 class C {}
