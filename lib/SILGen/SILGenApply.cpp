@@ -6137,19 +6137,18 @@ static ManagedValue emitDynamicPartialApply(SILGenFunction &SGF,
   return result;
 }
 
-RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
-                                                SGFContext c) {
-  // Emit the operand.
-  ManagedValue base = emitRValueAsSingleValue(e->getBase());
+RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
+                                            ConcreteDeclRef memberRef,
+                                            CanType refTy, SGFContext C) {
+  assert(refTy->isOptional());
 
-  SILValue operand = base.getValue();
-  if (!e->getMember().getDecl()->isInstanceMember()) {
+  if (!memberRef.getDecl()->isInstanceMember()) {
     auto metatype = operand->getType().castTo<MetatypeType>();
     assert(metatype->getRepresentation() == MetatypeRepresentation::Thick);
     metatype = CanMetatypeType::get(metatype.getInstanceType(),
                                     MetatypeRepresentation::ObjC);
-    operand = B.createThickToObjCMetatype(e, operand,
-                                    SILType::getPrimitiveObjectType(metatype));
+    operand = B.createThickToObjCMetatype(
+        loc, operand, SILType::getPrimitiveObjectType(metatype));
   }
 
   // Create the continuation block.
@@ -6162,38 +6161,39 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   SILBasicBlock *hasMemberBB = createBasicBlock();
 
   // The continuation block
-  auto memberMethodTy = e->getType()->getOptionalObjectType();
+  CanType memberMethodTy = refTy.getOptionalObjectType();
 
-  const TypeLowering &optTL = getTypeLowering(e->getType());
+  const TypeLowering &optTL = getTypeLowering(refTy);
   auto loweredOptTy = optTL.getLoweredType();
 
-  SILValue optTemp = emitTemporaryAllocation(e, loweredOptTy);
+  SILValue optTemp = emitTemporaryAllocation(loc, loweredOptTy);
 
   // Create the branch.
   FuncDecl *memberFunc;
-  if (auto *VD = dyn_cast<VarDecl>(e->getMember().getDecl())) {
+  if (auto *VD = dyn_cast<VarDecl>(memberRef.getDecl())) {
     memberFunc = VD->getOpaqueAccessor(AccessorKind::Get);
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo info;
-    memberMethodTy = FunctionType::get({}, memberMethodTy, info);
-  } else
-    memberFunc = cast<FuncDecl>(e->getMember().getDecl());
+    memberMethodTy = CanFunctionType::get({}, memberMethodTy, info);
+  } else {
+    memberFunc = cast<FuncDecl>(memberRef.getDecl());
+  }
   auto member = SILDeclRef(memberFunc, SILDeclRef::Kind::Func)
     .asForeign();
-  B.createDynamicMethodBranch(e, operand, member, hasMemberBB, noMemberBB);
+  B.createDynamicMethodBranch(loc, operand, member, hasMemberBB, noMemberBB);
 
   // Create the has-member branch.
   {
     B.emitBlock(hasMemberBB);
 
-    FullExpr hasMemberScope(Cleanups, CleanupLocation(e));
+    FullExpr hasMemberScope(Cleanups, CleanupLocation(loc));
 
     // The argument to the has-member block is the uncurried method.
-    auto valueTy = e->getType()->getCanonicalType().getOptionalObjectType();
+    const CanType valueTy = refTy.getOptionalObjectType();
     CanFunctionType methodTy;
 
     // For a computed variable, we want the getter.
-    if (isa<VarDecl>(e->getMember().getDecl())) {
+    if (isa<VarDecl>(memberRef.getDecl())) {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
       methodTy = CanFunctionType::get({}, valueTy, info);
@@ -6205,13 +6205,12 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     // TODO: instead of building this and then potentially converting, we
     // should just build a single thunk.
     auto foreignMethodTy =
-      getPartialApplyOfDynamicMethodFormalType(SGM, member, e->getMember());
+        getPartialApplyOfDynamicMethodFormalType(SGM, member, memberRef);
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo info;
     FunctionType::Param arg(operand->getType().getASTType());
-    auto memberFnTy =
-        CanFunctionType::get({arg}, memberMethodTy->getCanonicalType(), info);
+    auto memberFnTy = CanFunctionType::get({arg}, memberMethodTy, info);
 
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        memberFnTy);
@@ -6219,36 +6218,36 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
         hasMemberBB->createPhiArgument(loweredMethodTy, OwnershipKind::Owned);
 
     // Create the result value.
-    Scope applyScope(Cleanups, CleanupLocation(e));
-    ManagedValue result =
-      emitDynamicPartialApply(*this, e, memberArg, operand,
-                              foreignMethodTy, methodTy);
+    Scope applyScope(Cleanups, CleanupLocation(loc));
+    ManagedValue result = emitDynamicPartialApply(
+        *this, loc, memberArg, operand, foreignMethodTy, methodTy);
 
     RValue resultRV;
-    if (isa<VarDecl>(e->getMember().getDecl())) {
-      resultRV = emitMonomorphicApply(e, result, {},
-                                      foreignMethodTy.getResult(), valueTy,
-                                      ApplyOptions(), None, None);
+    if (isa<VarDecl>(memberRef.getDecl())) {
+      resultRV =
+          emitMonomorphicApply(loc, result, {}, foreignMethodTy.getResult(),
+                               valueTy, ApplyOptions(), None, None);
     } else {
-      resultRV = RValue(*this, e, valueTy, result);
+      resultRV = RValue(*this, loc, valueTy, result);
     }
 
     // Package up the result in an optional.
-    emitInjectOptionalValueInto(e, {e, std::move(resultRV)}, optTemp, optTL);
+    emitInjectOptionalValueInto(loc, {loc, std::move(resultRV)}, optTemp,
+                                optTL);
 
     applyScope.pop();
     // Branch to the continuation block.
-    B.createBranch(e, contBB);
+    B.createBranch(loc, contBB);
   }
 
   // Create the no-member branch.
   {
     B.emitBlock(noMemberBB);
 
-    emitInjectOptionalNothingInto(e, optTemp, optTL);
+    emitInjectOptionalNothingInto(loc, optTemp, optTL);
 
     // Branch to the continuation block.
-    B.createBranch(e, contBB);
+    B.createBranch(loc, contBB);
   }
 
   // Emit the continuation block.
@@ -6257,8 +6256,9 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   // Package up the result.
   auto optResult = optTemp;
   if (optTL.isLoadable())
-    optResult = optTL.emitLoad(B, e, optResult, LoadOwnershipQualifier::Take);
-  return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
+    optResult = optTL.emitLoad(B, loc, optResult, LoadOwnershipQualifier::Take);
+  return RValue(*this, loc, refTy,
+                emitManagedRValueWithCleanup(optResult, optTL));
 }
 
 RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,

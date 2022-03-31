@@ -2219,7 +2219,13 @@ RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
                                                 SGFContext C) {
   assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
   assert(!E->isImplicitlyThrows() && "an distributed-actor-isolated @objc member?");
-  return SGF.emitDynamicMemberRefExpr(E, C);
+
+  // Emit the operand (the base).
+  SILValue Operand = SGF.emitRValueAsSingleValue(E->getBase()).getValue();
+
+  // Emit the member reference.
+  return SGF.emitDynamicMemberRef(E, Operand, E->getMember(),
+                                  E->getType()->getCanonicalType(), C);
 }
 
 RValue RValueEmitter::
