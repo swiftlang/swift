@@ -1467,3 +1467,22 @@ class SGA_MADirect: MADirect {
   // directly-nonisolated vs overridden-MainActor = nonisolated
   nonisolated override func method2() { beets_ma() } // expected-error {{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
 }
+
+// Actor isolation allows capture
+extension MyActor {
+  func testNonSendableCaptures(sc: SomeClass) {
+    Task {
+      _ = self
+      _ = sc
+
+      Task { [sc,self] in
+        _ = self
+        _ = sc
+
+        Task {
+          _ = sc // expected-warning{{capture of 'sc' with non-sendable type 'SomeClass' in a `@Sendable` closure}}
+        }
+      }
+    }
+  }
+}
