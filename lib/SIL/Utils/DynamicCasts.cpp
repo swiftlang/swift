@@ -1281,7 +1281,7 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions at the current SIL stage?
 ///
-/// FIXME: Always return true for !useLoweredAddresses: Scalar casts are always
+/// Always returns true for !useLoweredAddresses. Scalar casts are always
 /// valid for owned values. If the operand is +1, the case will always destroy
 /// or forward it. The result is always either +1 or trivial. The cast never
 /// hides a copy. doesCastPreserveOwnershipForTypes determines whether the
@@ -1289,12 +1289,11 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
 bool swift::canSILUseScalarCheckedCastInstructions(SILModule &M,
                                                    CanType sourceFormalType,
                                                    CanType targetFormalType) {
-  if (M.useLoweredAddresses())
-    return canIRGenUseScalarCheckedCastInstructions(M, sourceFormalType,
-                                                    targetFormalType);
+  if (!M.useLoweredAddresses())
+    return true;
 
-  return
-    doesCastPreserveOwnershipForTypes(M, sourceFormalType, targetFormalType);
+  return canIRGenUseScalarCheckedCastInstructions(M, sourceFormalType,
+                                                  targetFormalType);
 }
 
 /// Can the given cast be performed by the scalar checked-cast
