@@ -9,6 +9,8 @@
 // RUN: %target-build-swift -O -I %t -L %t -lresilient %s -o %t/main %target-rpath(%t)
 // RUN: %target-run %t/main %t/%target-library-name(resilient) | %FileCheck --check-prefix=EXEC-CHECK %s
 
+// REQUIRES: executable_test
+
 @testable import resilient
 
 // Don't access via the class offset global. Use a fragile access pattern instead.
