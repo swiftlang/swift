@@ -11,20 +11,20 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   shadows the existing declaration. For example, the following:
   
   ```swift
-  let foo: String?
+  let foo: String? = "hello world"
   
   if let foo {
-    print(foo)
+    print(foo) // prints "hello world"
   }
   ```
   
   is equivalent to:
   
   ```swift
-  let foo: String?
+  let foo: String? = "hello world"
   
   if let foo = foo {
-    print(foo)
+    print(foo) // prints "hello world"
   }
   ```
 
