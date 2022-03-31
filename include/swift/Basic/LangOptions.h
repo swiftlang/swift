@@ -828,7 +828,7 @@ namespace swift {
     bool DisableOverlayModules = false;
 
     /// When set, import SPI_AVAILABLE symbols with Swift SPI attribtues.
-    bool EnableClangSPI = false;
+    bool EnableClangSPI = true;
 
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;
