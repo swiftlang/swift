@@ -5,6 +5,36 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0326][]:
+
+  It's now possible to infer parameter and result types from the body of a multi-statement
+  closure. The distinction between single- and multi-statement closures has been removed.
+
+  Use of closures becomes less cumbersome by removing the need to constantly specify explicit
+  closure types which sometimes could be pretty large e.g. when there are multiple parameters
+  or a complex tuple result type.
+
+  For example:
+
+  ```swift
+  func map<T>(fn: (Int) -> T) -> T {
+    return fn(42)
+  }
+
+  func computeResult<U: BinaryInteger>(_: U) -> U { /* processing */ }
+
+  let _ = map {
+    if let $0 < 0 {
+       // do some processing
+    }
+
+    return computeResult($0)
+  }
+  ```
+
+  The result type of `map` can now be inferred from the body of the trailing closure
+  passed as an argument.
+
 * [SE-0345][]:
 
   It is now possible to unwrap optional variables with a shorthand syntax that
@@ -9119,6 +9149,7 @@ Swift 1.0
 [SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
 [SE-0340]: <https://github.com/apple/swift-evolution/blob/main/proposals/0340-swift-noasync.md>
 [SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
+[SE-0326]: <https://github.com/apple/swift-evolution/blob/main/proposals/0326-extending-multi-statement-closure-inference.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
