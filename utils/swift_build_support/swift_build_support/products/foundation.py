@@ -14,6 +14,7 @@ from . import cmark
 from . import libcxx
 from . import libdispatch
 from . import libicu
+from . import libxml2
 from . import llvm
 from . import product
 from . import swift
@@ -51,7 +52,8 @@ class Foundation(product.Product):
                 libcxx.LibCXX,
                 libicu.LibICU,
                 swift.Swift,
-                libdispatch.LibDispatch]
+                libdispatch.LibDispatch,
+                libxml2.LibXML2]
 
     @classmethod
     def is_nondarwin_only_build_product(cls):

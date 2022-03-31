@@ -19,6 +19,7 @@ from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
 from .libdispatch import LibDispatch
 from .libicu import LibICU
+from .libxml2 import LibXML2
 from .llbuild import LLBuild
 from .lldb import LLDB
 from .llvm import LLVM
@@ -46,6 +47,7 @@ __all__ = [
     'LibCXX',
     'LibDispatch',
     'LibICU',
+    'LibXML2',
     'LLBuild',
     'LLDB',
     'LLVM',
