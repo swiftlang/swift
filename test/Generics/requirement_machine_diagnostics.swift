@@ -308,16 +308,12 @@ func sameTypeConflicts() {
 
   struct G<T> {}
 
-  // FIXME: conflict diagnosed twice
-  // expected-error@+1 2{{no type for 'T.X' can satisfy both 'T.X == G<U.Foo>' and 'T.X == Int'}}
+  // expected-error@+1{{no type for 'T.X' can satisfy both 'T.X == G<U.Foo>' and 'T.X == Int'}}
   func fail7<U: Fooable, T: Concrete>(_: U, _: T) where T.X == G<U.Foo> {}
 
-  // FIXME: conflict diagnosed twice
-  // expected-error@+2{{no type for 'T' can satisfy both 'T == Int' and 'T == G<U.Foo>'}}
   // expected-error@+1{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
   func fail8<T, U: Fooable>(_: U, _: T) where T == G<U.Foo>, T == Int {}
 
-  // FIXME: conflict diagnosed twice
-  // expected-error@+1 2{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
+  // expected-error@+1{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
   func fail9<T, U: Fooable>(_: U, _: T) where T == Int, T == G<U.Foo> {}
 }

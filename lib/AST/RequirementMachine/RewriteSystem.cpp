@@ -796,6 +796,10 @@ void RewriteSystem::computeConflictDiagnostics(
 
     assert(firstRule.isPropertyRule() && secondRule.isPropertyRule());
 
+    if (firstRule.isSubstitutionSimplified() ||
+        secondRule.isSubstitutionSimplified())
+      continue;
+
     bool chooseFirstRule = firstRule.getRHS().size() > secondRule.getRHS().size();
     auto subjectRule = chooseFirstRule ? firstRule : secondRule;
     auto subjectTerm = subjectRule.getRHS();
