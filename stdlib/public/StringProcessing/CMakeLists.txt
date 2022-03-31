@@ -12,7 +12,7 @@
 
 set(swift_string_processing_link_libraries
   swiftCore
-  swift_MatchingEngine)
+  swift_RegexParser)
 
 file(GLOB_RECURSE _STRING_PROCESSING_SOURCES
   "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_StringProcessing/*.swift"
@@ -44,6 +44,6 @@ add_swift_target_library(swift_StringProcessing ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
     -Xfrontend -enable-experimental-pairwise-build-block
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
-  SWIFT_MODULE_DEPENDS _MatchingEngine
+  SWIFT_MODULE_DEPENDS _RegexParser
   INSTALL_IN_COMPONENT stdlib
 )
