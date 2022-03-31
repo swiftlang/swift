@@ -268,7 +268,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   return accessorThunk;
 }
 
-static llvm::Constant *
+static llvm::Function *
 getLayoutFunctionForComputedComponent(IRGenModule &IGM,
                                     const KeyPathPatternComponent &component,
                                     GenericEnvironment *genericEnv,
@@ -548,7 +548,7 @@ struct KeyPathIndexOperand {
   const KeyPathPatternComponent *LastUser;
 };
 
-static llvm::Constant *
+static llvm::Function *
 getInitializerForComputedComponent(IRGenModule &IGM,
            const KeyPathPatternComponent &component,
            ArrayRef<KeyPathIndexOperand> operands,
@@ -1101,12 +1101,12 @@ emitKeyPathComponent(IRGenModule &IGM,
     }
 
     // Push the accessors, possibly thunked to marshal generic environment.
-    fields.addRelativeAddress(
+    fields.addCompactFunctionReference(
       getAccessorForComputedComponent(IGM, component, Getter,
                                       genericEnv, requirements,
                                       hasSubscriptIndices));
     if (settable)
-      fields.addRelativeAddress(
+      fields.addCompactFunctionReference(
         getAccessorForComputedComponent(IGM, component, Setter,
                                         genericEnv, requirements,
                                         hasSubscriptIndices));
@@ -1116,7 +1116,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       // arguments in the component. Thunk the SIL-level accessors to give the
       // runtime implementation a polymorphically-callable interface.
 
-      fields.addRelativeAddress(
+      fields.addCompactFunctionReference(
         getLayoutFunctionForComputedComponent(IGM, component,
                                               genericEnv, requirements));
       
@@ -1136,7 +1136,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       
       // Add an initializer function that copies generic arguments out of the
       // pattern argument buffer into the instantiated object.
-      fields.addRelativeAddress(
+      fields.addCompactFunctionReference(
         getInitializerForComputedComponent(IGM, component, operands,
                                            genericEnv, requirements));
     }

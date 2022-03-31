@@ -302,13 +302,13 @@ static void buildMethodDescriptorFields(IRGenModule &IGM,
     assert(entry->getKind() == SILVTable::Entry::Kind::Normal);
 
     auto *impl = entry->getImplementation();
-    llvm::Constant *implFn;
-    if (impl->isAsync())
-      implFn = IGM.getAddrOfAsyncFunctionPointer(impl);
-    else
-      implFn = IGM.getAddrOfSILFunction(impl, NotForDefinition);
-
-    descriptor.addRelativeAddress(implFn);
+    if (impl->isAsync()) {
+      llvm::Constant *implFn = IGM.getAddrOfAsyncFunctionPointer(impl);
+      descriptor.addRelativeAddress(implFn);
+    } else {
+      llvm::Function *implFn = IGM.getAddrOfSILFunction(impl, NotForDefinition);
+      descriptor.addCompactFunctionReference(implFn);
+    }
   } else {
     // The method is removed by dead method elimination.
     // It should be never called. We add a pointer to an error function.
@@ -962,7 +962,15 @@ namespace {
         reqt.addInt32(info.Flags.getIntValue());
 
         // Default implementation.
-        reqt.addRelativeAddressOrNull(info.DefaultImpl);
+        if (info.DefaultImpl) {
+          if (auto *fn = llvm::dyn_cast<llvm::Function>(info.DefaultImpl)) {
+            reqt.addCompactFunctionReference(fn);
+          } else {
+            reqt.addRelativeAddress(info.DefaultImpl);
+          }
+        } else {
+          reqt.addRelativeAddressOrNull(nullptr);
+        }
 
         reqt.finishAndAddTo(B);
       }
@@ -1226,7 +1234,7 @@ namespace {
     }
       
     void addAccessFunction() {
-      llvm::Constant *accessor;
+      llvm::Function *accessor;
 
       // Don't include an access function if we're emitting the context
       // descriptor without metadata.
@@ -1247,7 +1255,7 @@ namespace {
         accessor = getOtherwiseDefinedTypeMetadataAccessFunction(IGM, type);
       }
     
-      B.addRelativeAddressOrNull(accessor);
+      B.addCompactFunctionReferenceOrNull(accessor);
     }
     
     ConstantReference getParent() {
@@ -1376,12 +1384,12 @@ namespace {
 
     /// Add a ForeignMetadataInitialization structure to the descriptor.
     void addForeignMetadataInitialization() {
-      llvm::Constant *completionFunction = nullptr;
+      llvm::Function *completionFunction = nullptr;
       if (asImpl().needsForeignMetadataCompletionFunction()) {
         completionFunction =
           IGM.getAddrOfTypeMetadataCompletionFunction(Type, NotForDefinition);
       }
-      B.addRelativeAddressOrNull(completionFunction);
+      B.addCompactFunctionReferenceOrNull(completionFunction);
     }
 
     bool needsForeignMetadataCompletionFunction() {
@@ -1402,7 +1410,7 @@ namespace {
       // Completion function.
       auto completionFunction =
         IGM.getAddrOfTypeMetadataCompletionFunction(Type, NotForDefinition);
-      B.addRelativeAddress(completionFunction);
+      B.addCompactFunctionReference(completionFunction);
     }
 
     void addIncompleteMetadata() {
@@ -1905,13 +1913,13 @@ namespace {
         assert(entry->getKind() == SILVTable::Entry::Kind::Override);
 
         auto *impl = entry->getImplementation();
-        llvm::Constant *implFn;
-        if (impl->isAsync())
-          implFn = IGM.getAddrOfAsyncFunctionPointer(impl);
-        else
-          implFn = IGM.getAddrOfSILFunction(impl, NotForDefinition);
-
-        descriptor.addRelativeAddress(implFn);
+        if (impl->isAsync()) {
+          llvm::Constant *implFn = IGM.getAddrOfAsyncFunctionPointer(impl);
+          descriptor.addRelativeAddress(implFn);
+        } else {
+          llvm::Function *implFn = IGM.getAddrOfSILFunction(impl, NotForDefinition);
+          descriptor.addCompactFunctionReference(implFn);
+        }
       } else {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.
@@ -2005,7 +2013,7 @@ namespace {
         }
         auto specialization = pair.first;
         auto *function = IGM.getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(specialization, NotForDefinition);
-        B.addRelativeAddress(function);
+        B.addCompactFunctionReference(function);
       }
     }
   };
@@ -2723,7 +2731,7 @@ namespace {
     void addInstantiationFunction() {
       auto function = IGM.getAddrOfTypeMetadataInstantiationFunction(Target,
                                                               NotForDefinition);
-      B.addRelativeAddress(function);
+      B.addCompactFunctionReference(function);
     }
 
     void addCompletionFunction() {
@@ -2734,7 +2742,7 @@ namespace {
 
       auto function = IGM.getAddrOfTypeMetadataCompletionFunction(Target,
                                                               NotForDefinition);
-      B.addRelativeAddress(function);
+      B.addCompactFunctionReference(function);
     }
 
     void addPatternFlags() {
@@ -2935,7 +2943,7 @@ static void emitClassMetadataBaseOffset(IRGenModule &IGM,
   offsetVar->setConstant(true);
 }
 
-static Optional<llvm::Constant *>
+static Optional<llvm::Function *>
 getAddrOfDestructorFunction(IRGenModule &IGM, ClassDecl *classDecl) {
   auto dtorRef = SILDeclRef(classDecl->getDestructor(),
                             SILDeclRef::Kind::Deallocator);
@@ -3539,7 +3547,7 @@ namespace {
 
     void addDestructorFunction() {
       auto function = getAddrOfDestructorFunction(IGM, Target);
-      B.addRelativeAddressOrNull(function ? *function : nullptr);
+      B.addCompactFunctionReferenceOrNull(function ? *function : nullptr);
     }
 
     void addIVarDestroyer() {
@@ -3547,7 +3555,7 @@ namespace {
                                                    /*isDestroyer=*/ true,
                                                    /*isForeign=*/ false,
                                                    NotForDefinition);
-      B.addRelativeAddressOrNull(function ? *function : nullptr);
+      B.addCompactFunctionReferenceOrNull(function ? *function : nullptr);
     }
 
     void addClassFlags() {
@@ -3663,7 +3671,7 @@ namespace {
 
     void addDestructorFunction() {
       auto function = getAddrOfDestructorFunction(IGM, Target);
-      B.addRelativeAddressOrNull(function ? *function : nullptr);
+      B.addCompactFunctionReferenceOrNull(function ? *function : nullptr);
     }
 
     void addIVarDestroyer() {
@@ -3671,7 +3679,7 @@ namespace {
                                                    /*isDestroyer=*/ true,
                                                    /*isForeign=*/ false,
                                                    NotForDefinition);
-      B.addRelativeAddressOrNull(function ? *function : nullptr);
+      B.addCompactFunctionReferenceOrNull(function ? *function : nullptr);
     }
 
     bool hasExtraDataPattern() {
@@ -5614,7 +5622,7 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
   ConstantInitBuilder initBuilder(IGM);
   ConstantStructBuilder builder(
       initBuilder.beginStruct(IGM.AsyncFunctionPointerTy));
-  builder.addRelativeAddress(function);
+  builder.addCompactFunctionReference(function);
   builder.addInt32(size.getValue());
   return cast<llvm::GlobalValue>(IGM.defineAsyncFunctionPointer(
       entity, builder.finishAndCreateFuture()));

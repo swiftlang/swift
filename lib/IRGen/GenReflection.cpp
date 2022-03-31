@@ -281,7 +281,7 @@ getTypeRefByFunction(IRGenModule &IGM,
       S.setPacked(true);
       S.add(llvm::ConstantInt::get(IGM.Int8Ty, 255));
       S.add(llvm::ConstantInt::get(IGM.Int8Ty, 9));
-      S.addRelativeAddress(accessor);
+      S.addCompactFunctionReference(accessor);
 
       // And a null terminator!
       S.addInt(IGM.Int8Ty, 0);
@@ -438,7 +438,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
         S.setPacked(true);
         S.add(llvm::ConstantInt::get(Int8Ty, 255));
         S.add(llvm::ConstantInt::get(Int8Ty, 9));
-        S.addRelativeAddress(accessorThunk);
+        S.addCompactFunctionReference(accessorThunk);
 
         // And a null terminator!
         S.addInt(Int8Ty, 0);
@@ -482,7 +482,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   S.setPacked(true);
   S.add(llvm::ConstantInt::get(Int8Ty, 255));
   S.add(llvm::ConstantInt::get(Int8Ty, kind));
-  S.addRelativeAddress(accessor);
+  S.addCompactFunctionReference(accessor);
 
   // And a null terminator!
   S.addInt(Int8Ty, 0);

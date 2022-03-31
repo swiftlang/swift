@@ -2063,7 +2063,7 @@ void IRGenerator::emitEntryPointInfo() {
   auto &IGM = *getGenModule(entrypoint);
   ConstantInitBuilder builder(IGM);
   auto entrypointInfo = builder.beginStruct();
-  entrypointInfo.addRelativeAddress(
+  entrypointInfo.addCompactFunctionReference(
       IGM.getAddrOfSILFunction(entrypoint, NotForDefinition));
   auto var = entrypointInfo.finishAndCreateGlobal(
       "\x01l_entry_point", Alignment(4),

@@ -2153,6 +2153,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // AsyncFunctionPointer access.
   Opts.IndirectAsyncFunctionPointer = Triple.isOSBinFormatCOFF();
 
+  // On some Harvard architectures that allow sliding code and data address space
+  // offsets independently, it's impossible to make direct relative reference to
+  // code from data because the relative offset between them is not representable.
+  // Use absolute function references instead of relative ones on such targets.
+  // TODO(katei): This is a short-term solution until the WebAssembly target stabilizes
+  // PIC and 64-bit specifications and toolchain support.
+  Opts.CompactAbsoluteFunctionPointer = Triple.isOSBinFormatWasm();
+
   if (Args.hasArg(OPT_disable_legacy_type_info)) {
     Opts.DisableLegacyTypeInfo = true;
   }
