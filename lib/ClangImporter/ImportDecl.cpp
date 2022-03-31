@@ -9069,7 +9069,7 @@ void ClangImporter::Implementation::importAttributes(
                                           obsoleted,
                                           /*ObsoletedRange=*/SourceRange(),
                                           PlatformAgnostic, /*Implicit=*/false,
-                                          IsSPI);
+                                          EnableClangSPI && IsSPI);
 
       MappedDecl->getAttrs().add(AvAttr);
     }
