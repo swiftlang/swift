@@ -18,6 +18,8 @@ import _Concurrency
 
 // NEGATIVE-NOT: @Sendable{{.+}}class
 // NEGATIVE-NOT: @_nonSendable{{.+}}class
+// NEGATIVE-NOT: @Sendable{{.+}}func
+// NEGATIVE-NOT: @Sendable{{.+}}var
 
 // CHECK-LABEL: class SendableClass :
 // CHECK-SAME: @unchecked Sendable
