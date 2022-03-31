@@ -5,6 +5,29 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0345][]:
+
+  It is now possible to unwrap optional variables with a shorthand syntax that
+  shadows the existing declaration. For example, the following:
+  
+  ```swift
+  let foo: String?
+  
+  if let foo {
+    print(foo)
+  }
+  ```
+  
+  is equivalent to:
+  
+  ```swift
+  let foo: String?
+  
+  if let foo = foo {
+    print(foo)
+  }
+  ```
+
 * [SE-0340][]:
 
   It is now possible to make declarations unavailable from use in asynchronous
