@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
 
 // Protocols with superclass-constrained Self.
 
@@ -28,7 +28,6 @@ func duplicateOverload<T : ProtoRefinesClass>(_: T) {}
 func duplicateOverload<T : ProtoRefinesClass & Generic<Int>>(_: T) {}
 // expected-error@-1 {{invalid redeclaration of 'duplicateOverload'}}
 // expected-warning@-2 {{redundant superclass constraint 'T' : 'Generic<Int>'}}
-// expected-note@-3 {{superclass constraint 'T' : 'Generic<Int>' implied here}}
 
 extension ProtoRefinesClass {
   func extensionMethodUsesClassTypes(_ x: ConcreteAlias, _ y: GenericAlias) {
@@ -280,10 +279,8 @@ extension HasMutableProperty {
 // Some pathological examples -- just make sure they don't crash.
 
 protocol RecursiveSelf where Self : Generic<Self> {}
-// expected-error@-1 {{superclass constraint 'Self' : 'Generic<Self>' is recursive}}
 
 protocol RecursiveAssociatedType where Self : Generic<Self.X> {
-  // expected-error@-1 {{superclass constraint 'Self' : 'Generic<Self.X>' is recursive}}
   associatedtype X
 }
 
@@ -327,11 +324,9 @@ class SecondConformer : SecondClass, SecondProtocol {}
 // Duplicate superclass
 // FIXME: Should be an error here too
 protocol DuplicateSuper1 : Concrete where Self : Concrete {}
-// expected-note@-1 {{superclass constraint 'Self' : 'Concrete' implied here}}
-// expected-warning@-2 {{redundant superclass constraint 'Self' : 'Concrete'}}
+// expected-warning@-1 {{redundant superclass constraint 'Self' : 'Concrete'}}
 protocol DuplicateSuper2 where Self : Concrete, Self : Concrete {}
-// expected-note@-1 {{superclass constraint 'Self' : 'Concrete' implied here}}
-// expected-warning@-2 {{redundant superclass constraint 'Self' : 'Concrete'}}
+// expected-warning@-1 {{redundant superclass constraint 'Self' : 'Concrete'}}
 
 // Ambiguous name lookup situation
 protocol Amb where Self : Concrete {}

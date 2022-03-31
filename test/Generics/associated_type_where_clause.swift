@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4 -requirement-machine-protocol-signatures=on
 
 func needsSameType<T>(_: T.Type, _: T.Type) {}
 
@@ -133,7 +133,6 @@ struct X { }
 
 protocol P {
 	associatedtype P1 where P1 == X
-	// expected-note@-1{{same-type constraint 'Self.P1' == 'X' written here}}
 	associatedtype P2 where P2 == P1, P2 == X
 	// expected-warning@-1{{redundant same-type constraint 'Self.P2' == 'X'}}
 }
