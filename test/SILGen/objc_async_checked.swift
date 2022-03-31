@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -checked-async-objc-bridging=off -I %S/Inputs/custom-modules  -disable-availability-checking %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -checked-async-objc-bridging=on -I %S/Inputs/custom-modules  -disable-availability-checking %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
@@ -34,11 +34,11 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $String
   // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), SlowServer) -> ()
   // CHECK: [[CONT:%.*]] = get_async_continuation_addr [throws] String, [[RESUME_BUF]]
-  // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<String, any Error> ([[CONT]] : $Builtin.RawUnsafeContinuation)
-  // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage UnsafeContinuation<String, any Error>
+  // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<String, Error> ([[CONT]] : $Builtin.RawUnsafeContinuation)
+  // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage UnsafeContinuation<String, Error>
   // CHECK: [[CONT_SLOT:%.*]] = project_block_storage [[BLOCK_STORAGE]]
   // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT]]
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[STRING_COMPLETION_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, any Error>, Optional<NSString>, Optional<NSError>) -> ()
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[STRING_COMPLETION_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, Error>, Optional<NSString>, Optional<NSError>) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[BLOCK]], %0)
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
@@ -52,22 +52,22 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[VOID_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(), Never>) -> ()
   await slowServer.serverRestart("somewhere")
 
-  // CHECK: function_ref @[[STRING_NONZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, any Error>, {{.*}}Bool, Optional<NSString>, Optional<NSError>) -> ()
+  // CHECK: function_ref @[[STRING_NONZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, Error>, {{.*}}Bool, Optional<NSString>, Optional<NSError>) -> ()
   let _: String = try await slowServer.doSomethingFlaggy()
-  // CHECK: function_ref @[[STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, any Error>, Optional<NSString>, {{.*}}Bool, Optional<NSError>) -> ()
+  // CHECK: function_ref @[[STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, Error>, Optional<NSString>, {{.*}}Bool, Optional<NSError>) -> ()
   let _: String = try await slowServer.doSomethingZeroFlaggy()
-  // CHECK: function_ref @[[STRING_STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(String, String), any Error>, {{.*}}Bool, Optional<NSString>, Optional<NSError>, Optional<NSString>) -> ()
+  // CHECK: function_ref @[[STRING_STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(String, String), Error>, {{.*}}Bool, Optional<NSString>, Optional<NSError>, Optional<NSString>) -> ()
   let _: (String, String) = try await slowServer.doSomethingMultiResultFlaggy()
 
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSSTRING_INT_THROW_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(String, Int), any Error>, Optional<NSString>, Int, Optional<NSError>) -> ()
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSSTRING_INT_THROW_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(String, Int), Error>, Optional<NSString>, Int, Optional<NSError>) -> ()
   let (_, _): (String, Int) = try await slowServer.findMultipleAnswers()
 
   let (_, _): (Bool, Bool) = try await slowServer.findDifferentlyFlavoredBooleans()
 
-  // CHECK: [[ERROR]]([[ERROR_VALUE:%.*]] : @owned $any Error):
+  // CHECK: [[ERROR]]([[ERROR_VALUE:%.*]] : @owned $Error):
   // CHECK:   dealloc_stack [[RESUME_BUF]]
   // CHECK:   br [[THROWBB:bb[0-9]+]]([[ERROR_VALUE]]
-  // CHECK: [[THROWBB]]([[ERROR_VALUE:%.*]] : @owned $any Error):
+  // CHECK: [[THROWBB]]([[ERROR_VALUE:%.*]] : @owned $Error):
   // CHECK:   throw [[ERROR_VALUE]]
 
   let _: String = await slowServer.findAnswerNullably("foo")
@@ -177,7 +177,7 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 // CHECK-LABEL: sil {{.*}}@${{.*}}22testSlowServerFromMain
 @MainActor
 func testSlowServerFromMain(slowServer: SlowServer) async throws {
-  // CHECK: hop_to_executor {{%.*}} : $MainActor
+  // CHECK: hop_to_executor %6 : $MainActor
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $Int
   // CHECK: [[STRINGINIT:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF :
   // CHECK: [[ARG:%.*]] = apply [[STRINGINIT]]
@@ -194,8 +194,8 @@ func testSlowServerFromMain(slowServer: SlowServer) async throws {
   // CHECK: destroy_value [[ARG]]
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]]
   // CHECK: [[RESUME]]:
-  // CHECK: hop_to_executor {{%.*}} : $MainActor
   // CHECK: [[RESULT:%.*]] = load [trivial] [[RESUME_BUF]]
+  // CHECK: hop_to_executor %6 : $MainActor
   // CHECK: fix_lifetime [[COPY]]
   // CHECK: destroy_value [[COPY]]
   // CHECK: dealloc_stack [[RESUME_BUF]]
@@ -209,22 +209,22 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // CHECK:  [[STRING_ARG:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@guaranteed String) -> @owned NSString
 // CHECK:  [[METH:%.*]] = objc_method {{%.*}} : $SlowServer, #SlowServer.doSomethingDangerous!foreign
 // CHECK:  [[RAW_CONT:%.*]] = get_async_continuation_addr [throws] String, [[RESULT_BUF]] : $*String
-// CHECK:  [[CONT:%.*]] = struct $UnsafeContinuation<String, any Error> ([[RAW_CONT]] : $Builtin.RawUnsafeContinuation)
-// CHECK:  [[STORE_ALLOC:%.*]] = alloc_stack $@block_storage UnsafeContinuation<String, any Error>
+// CHECK:  [[CONT:%.*]] = struct $UnsafeContinuation<String, Error> ([[RAW_CONT]] : $Builtin.RawUnsafeContinuation)
+// CHECK:  [[STORE_ALLOC:%.*]] = alloc_stack $@block_storage UnsafeContinuation<String, Error>
 // CHECK:  [[PROJECTED:%.*]] = project_block_storage [[STORE_ALLOC]] : $*@block_storage
-// CHECK:  store [[CONT]] to [trivial] [[PROJECTED]] : $*UnsafeContinuation<String, any Error>
+// CHECK:  store [[CONT]] to [trivial] [[PROJECTED]] : $*UnsafeContinuation<String, Error>
 // CHECK:  [[INVOKER:%.*]] = function_ref @$sSo8NSStringCSgSo7NSErrorCSgIeyByy_SSTz_
 // CHECK:  [[BLOCK:%.*]] = init_block_storage_header [[STORE_ALLOC]] {{.*}}, invoke [[INVOKER]]
 // CHECK:  [[OPTIONAL_BLK:%.*]] = enum {{.*}}, #Optional.some!enumelt, [[BLOCK]]
 // CHECK:  %28 = apply [[METH]]([[STRING_ARG]], [[OPTIONAL_BLK]], {{%.*}}) : $@convention(objc_method) (NSString, Optional<@convention(block) (Optional<NSString>, Optional<NSError>) -> ()>, SlowServer) -> ()
 // CHECK:  [[STRING_ARG_COPY:%.*]] = copy_value [[STRING_ARG]] : $NSString
-// CHECK:  dealloc_stack [[STORE_ALLOC]] : $*@block_storage UnsafeContinuation<String, any Error>
+// CHECK:  dealloc_stack [[STORE_ALLOC]] : $*@block_storage UnsafeContinuation<String, Error>
 // CHECK:  destroy_value [[STRING_ARG]] : $NSString
 // CHECK:  await_async_continuation [[RAW_CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
 
 // CHECK: [[RESUME]]
-// CHECK:   hop_to_executor {{%.*}} : $MainActor
 // CHECK:   {{.*}} = load [take] [[RESULT_BUF]] : $*String
+// CHECK:   hop_to_executor {{%.*}} : $MainActor
 // CHECK:   fix_lifetime [[STRING_ARG_COPY]] : $NSString
 // CHECK:   destroy_value [[STRING_ARG_COPY]] : $NSString
 // CHECK:   dealloc_stack [[RESULT_BUF]] : $*String
@@ -240,39 +240,4 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
   } catch {
     return "none"
   }
-}
-
-// rdar://91502776
-// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}21checkCostcoMembershipSbyYaF : $@convention(thin) @async () -> Bool {
-// CHECK:    bb0:
-// CHECK:        hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
-// CHECK:        [[FINAL_BUF:%.*]] = alloc_stack $Bool
-// CHECK:        [[RESULT_BUF:%.*]] = alloc_stack $NSObject
-// CHECK:        [[METH:%.*]] = objc_method {{%.*}} : $@objc_metatype Person.Type, #Person.asCustomer!foreign
-// CHECK:        get_async_continuation_addr NSObject, [[RESULT_BUF]] : $*NSObject
-// CHECK:        = apply [[METH]]
-// CHECK:        dealloc_stack {{%.*}} : $*@block_storage
-// CHECK:        await_async_continuation {{%.*}} : $Builtin.RawUnsafeContinuation, resume bb1
-// CHECK:    bb1:
-// CHECK:        hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
-// CHECK:        [[RESULT:%.*]] = load [take] [[RESULT_BUF]] : $*NSObject
-// CHECK:        objc_method {{%.*}} : $CostcoManager, #CostcoManager.isCustomerEnrolled!foreign
-// CHECK:        get_async_continuation_addr Bool, [[FINAL_BUF]] : $*Bool
-// CHECK:        [[BLOCK_ARG:%.*]] = init_block_storage_header [[BLOCK_STORAGE:%.*]] : $*@block_storage
-// CHECK:        = apply {{%.*}}([[RESULT]], [[BLOCK_ARG]], [[MANAGER:%.*]]) : $@convention(objc_method)
-// CHECK:        [[EXTEND1:%.*]] = copy_value [[RESULT]] : $NSObject
-// CHECK:        [[EXTEND2:%.*]] = copy_value [[MANAGER]] : $CostcoManager
-// CHECK:        dealloc_stack [[BLOCK_STORAGE]] : $*@block_storage
-// CHECK:        await_async_continuation {{%.*}} : $Builtin.RawUnsafeContinuation, resume bb2
-// CHECK:    bb2:
-// CHECK:        hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
-// CHECK:        [[ANSWER:%.*]] = load [trivial] [[FINAL_BUF]] : $*Bool
-// CHECK:        fix_lifetime [[EXTEND2]] : $CostcoManager
-// CHECK:        destroy_value [[EXTEND2]] : $CostcoManager
-// CHECK:        fix_lifetime [[EXTEND1]] : $NSObject
-// CHECK:        destroy_value [[EXTEND1]] : $NSObject
-// CHECK:        return [[ANSWER]] : $Bool
-// CHECK:  }
-func checkCostcoMembership() async -> Bool {
-  return await CostcoManager.shared().isCustomerEnrolled(inExecutiveProgram: Person.asCustomer())
 }
