@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify -requirement-machine-abstract-signatures=verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify %s
 
 protocol P {
   func paul()
