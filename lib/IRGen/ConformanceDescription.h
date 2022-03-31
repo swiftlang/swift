@@ -53,7 +53,7 @@ public:
 
   /// The instantiation function, to be run at the end of witness table
   /// instantiation.
-  llvm::Constant *instantiationFn = nullptr;
+  llvm::Function *instantiationFn = nullptr;
 
   /// The resilient witnesses, if any.
   SmallVector<llvm::Constant *, 4> resilientWitnesses;

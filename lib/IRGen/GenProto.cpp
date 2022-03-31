@@ -1472,7 +1472,7 @@ public:
 
     /// Build the instantiation function that runs at the end of witness
     /// table specialization.
-    llvm::Constant *buildInstantiationFunction();
+    llvm::Function *buildInstantiationFunction();
   };
 
   /// A resilient witness table consists of a list of descriptor/witness pairs,
@@ -1741,7 +1741,7 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
   }
 }
 
-llvm::Constant *FragileWitnessTableBuilder::buildInstantiationFunction() {
+llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
   // We need an instantiation function if any base conformance
   // is non-dependent.
   if (SpecializedBaseConformances.empty())
@@ -1962,7 +1962,12 @@ namespace {
         }
 
         // Add the witness.
-        B.addRelativeAddress(witnesses.front());
+        llvm::Constant *witness = witnesses.front();
+        if (auto *fn = llvm::dyn_cast<llvm::Function>(witness)) {
+          B.addCompactFunctionReference(fn);
+        } else {
+          B.addRelativeAddress(witness);
+        }
         witnesses = witnesses.drop_front();
       }
       assert(witnesses.empty() && "Wrong # of resilient witnesses");
@@ -1979,7 +1984,7 @@ namespace {
                (Description.witnessTablePrivateSize << 1) |
                 Description.requiresSpecialization);
       // Instantiation function
-      B.addRelativeAddressOrNull(Description.instantiationFn);
+      B.addCompactFunctionReferenceOrNull(Description.instantiationFn);
 
       // Private data
       if (IGM.IRGen.Opts.NoPreallocatedInstantiationCaches) {
@@ -2255,7 +2260,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 
   unsigned tableSize = 0;
   llvm::GlobalVariable *global = nullptr;
-  llvm::Constant *instantiationFunction = nullptr;
+  llvm::Function *instantiationFunction = nullptr;
   bool isDependent = isDependentConformance(conf);
   SmallVector<llvm::Constant *, 4> resilientWitnesses;
 

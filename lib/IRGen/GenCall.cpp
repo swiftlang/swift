@@ -2086,7 +2086,7 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
       llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(
           getAFPPtr()->getType()->getScalarType()->getPointerElementType(),
           getAFPPtr(), 0);
-      fn = IGF.emitLoadOfRelativePointer(
+      fn = IGF.emitLoadOfCompactFunctionPointer(
           Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
           /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
     }
@@ -4955,7 +4955,7 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
     auto *addrPtr = IGF.Builder.CreateStructGEP(
         descriptorPtr->getType()->getScalarType()->getPointerElementType(),
         descriptorPtr, 0);
-    auto *result = IGF.emitLoadOfRelativePointer(
+    auto *result = IGF.emitLoadOfCompactFunctionPointer(
         Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
         /*expectedType*/ getFunctionType()->getPointerTo());
     if (auto codeAuthInfo = AuthInfo.getCorrespondingCodeAuthInfo()) {
