@@ -272,21 +272,37 @@ typedef void(^BlockTypedef)(id);
 
 @interface NXSender : NSObject
 
-- (void)sendAny:(SENDABLE id)obj;
-- (void)sendOptionalAny:(nullable SENDABLE id)obj;
-- (void)sendSendable:(SENDABLE SendableClass *)sendable;
-- (void)sendSendableSubclasses:(SENDABLE NonSendableClass *)sendableSubclass;
-- (void)sendProto:(SENDABLE id <LabellyProtocol>)obj;
-- (void)sendProtos:(SENDABLE id <LabellyProtocol, ObjCClub>)obj;
-- (void)sendAnyArray:(SENDABLE NSArray<id> *)array;
-- (void)sendGeneric:(SENDABLE GenericObject<SendableClass *> *)generic;
-- (void)sendPtr:(SENDABLE void *)val;    // bad
-- (void)sendStringArray:(SENDABLE NSArray<NSString *> *)obj;    // bad
-- (void)sendAnyTypedef:(SENDABLE ObjectTypedef)obj;
-- (void)sendAnyTypedefs:(SENDABLE NSArray<ObjectTypedef> *)objs;
-- (void)sendBlockTypedef:(SENDABLE BlockTypedef)block;
-- (void)sendBlockTypedefs:(SENDABLE NSArray<BlockTypedef> *)blocks;
-- (void)sendUnbound:(SENDABLE NSArray *)array;
+- (id)sendAny:(SENDABLE id)obj SENDABLE;
+- (nullable id)sendOptionalAny:(nullable SENDABLE id)obj SENDABLE;
+- (SendableClass *)sendSendable:(SENDABLE SendableClass *)sendable SENDABLE;
+- (NonSendableClass *)sendSendableSubclasses:(SENDABLE NonSendableClass *)sendableSubclass SENDABLE;
+- (id <LabellyProtocol>)sendProto:(SENDABLE id <LabellyProtocol>)obj SENDABLE;
+- (id <LabellyProtocol, ObjCClub>)sendProtos:(SENDABLE id <LabellyProtocol, ObjCClub>)obj SENDABLE;
+- (NSArray<id> *)sendAnyArray:(SENDABLE NSArray<id> *)array SENDABLE;
+- (GenericObject<SendableClass *> *)sendGeneric:(SENDABLE GenericObject<SendableClass *> *)generic SENDABLE;
+- (void *)sendPtr:(SENDABLE void *)val SENDABLE;    // bad
+- (NSArray<NSString *> *)sendStringArray:(SENDABLE NSArray<NSString *> *)obj SENDABLE;    // bad
+- (ObjectTypedef)sendAnyTypedef:(SENDABLE ObjectTypedef)obj SENDABLE;
+- (NSArray<ObjectTypedef> *)sendAnyTypedefs:(SENDABLE NSArray<ObjectTypedef> *)objs SENDABLE;
+- (BlockTypedef)sendBlockTypedef:(SENDABLE BlockTypedef)block SENDABLE;
+- (NSArray<BlockTypedef> *)sendBlockTypedefs:(SENDABLE NSArray<BlockTypedef> *)blocks SENDABLE;
+- (NSArray *)sendUnbound:(SENDABLE NSArray *)array SENDABLE;
+
+@property (strong) SENDABLE id sendableProp;
+
 @end
+
+SENDABLE id NXSendFunc(SENDABLE id arg);
+SENDABLE id NXSendGlobal;
+
+struct StructWithSendableContents {
+  __unsafe_unretained SENDABLE id sendableField;
+  union {
+    __unsafe_unretained SENDABLE id sendableIndirectField;
+  };
+};
+
+SENDABLE id StructWithSendableContentsGetSendableComputed(struct StructWithSendableContents contents)
+  __attribute__((swift_name("getter:StructWithSendableContents.sendableComputed(self:)")));
 
 #pragma clang assume_nonnull end
