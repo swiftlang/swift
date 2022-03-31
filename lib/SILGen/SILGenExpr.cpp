@@ -2843,13 +2843,27 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto subscriptIndices =
     loadIndexValuesForKeyPathComponent(subSGF, loc, property,
                                        indexes, indexPtrArg);
-  
-  auto resultSubst = subSGF.emitRValueForStorageLoad(loc, baseSubstValue,
-                                   baseType, /*super*/false,
-                                   property, std::move(subscriptIndices),
-                                   subs, AccessSemantics::Ordinary,
-                                   propertyType, SGFContext())
-    .getAsSingleValue(subSGF, loc);
+
+  ManagedValue resultSubst;
+  {
+    RValue resultRValue;
+
+    // Emit a dynamic method branch if the storage decl is an @objc optional
+    // requirement, or just a load otherwise.
+    if (property->getAttrs().hasAttribute<OptionalAttr>() &&
+        isa<VarDecl>(property)) {
+      resultRValue = subSGF.emitDynamicMemberRef(
+          loc, baseSubstValue.getValue(), ConcreteDeclRef(property, subs),
+          propertyType, SGFContext());
+    } else {
+      resultRValue = subSGF.emitRValueForStorageLoad(
+          loc, baseSubstValue, baseType, /*super*/ false, property,
+          std::move(subscriptIndices), subs, AccessSemantics::Ordinary,
+          propertyType, SGFContext());
+    }
+    resultSubst = std::move(resultRValue).getAsSingleValue(subSGF, loc);
+  }
+
   if (resultSubst.getType().getAddressType() != resultArg->getType())
     resultSubst = subSGF.emitSubstToOrigValue(loc, resultSubst,
                                          AbstractionPattern::getOpaque(),
@@ -3561,6 +3575,12 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
           ->mapTypeOutOfContext()
           ->getCanonicalType(
                       genericEnv ? genericEnv->getGenericSignature() : nullptr);
+
+      // The component type for an @objc optional requirement needs to be
+      // wrapped in an optional.
+      if (var->getAttrs().hasAttribute<OptionalAttr>()) {
+        componentTy = OptionalType::get(componentTy)->getCanonicalType();
+      }
     }
   
     if (canStorageUseStoredKeyPathComponent(var, expansion)) {
