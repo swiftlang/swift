@@ -36,6 +36,9 @@
 #if SWIFT_HAVE_CRASHREPORTERCLIENT
 #include <atomic>
 #include <malloc/malloc.h>
+
+#include "swift/Runtime/Atomic.h"
+
 #include "CrashReporter.h"
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
@@ -53,15 +56,15 @@ static int demangle_asprintf(char **strp, const char *format, ...);
 
 // -- Crash reporter integration ---------------------------------------------
 
-#if SWIFT_HAVE_CRASHREPORTERCLIENT
 // Report a message to any forthcoming crash log.
 static void reportOnCrash(uint32_t flags, const char *message) {
+#if SWIFT_HAVE_CRASHREPORTERCLIENT
   char *oldMessage = nullptr;
   char *newMessage = nullptr;
 
   oldMessage = std::atomic_load_explicit(
     (volatile std::atomic<char *> *)&gCRAnnotations.message,
-    std::memory_order_relaxed);
+    SWIFT_MEMORY_ORDER_CONSUME);
 
   do {
     if (newMessage) {
@@ -78,18 +81,14 @@ static void reportOnCrash(uint32_t flags, const char *message) {
              (volatile std::atomic<char *> *)&gCRAnnotations.message,
              &oldMessage, newMessage,
              std::memory_order_release,
-             std::memory_order_relaxed));
+             SWIFT_MEMORY_ORDER_CONSUME));
 
   if (oldMessage && malloc_size(oldMessage))
     free(oldMessage);
-}
-
 #else
-static void
-reportOnCrash(uint32_t flags, const char *message) {
   // empty
-}
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
+}
 
 // -- Utility functions ------------------------------------------------------
 

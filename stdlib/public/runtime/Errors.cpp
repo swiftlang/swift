@@ -60,6 +60,8 @@
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 #include <atomic>
 #include <malloc/malloc.h>
+
+#include "swift/Runtime/Atomic.h"
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
 namespace FatalErrorFlags {
@@ -269,7 +271,7 @@ reportOnCrash(uint32_t flags, const char *message)
 
   oldMessage = std::atomic_load_explicit(
     (volatile std::atomic<char *> *)&gCRAnnotations.message,
-    std::memory_order_relaxed);
+    SWIFT_MEMORY_ORDER_CONSUME);
 
   do {
     if (newMessage) {
@@ -286,7 +288,7 @@ reportOnCrash(uint32_t flags, const char *message)
              (volatile std::atomic<char *> *)&gCRAnnotations.message,
              &oldMessage, newMessage,
              std::memory_order_release,
-             std::memory_order_relaxed));
+             SWIFT_MEMORY_ORDER_CONSUME));
 #else
   // empty
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
