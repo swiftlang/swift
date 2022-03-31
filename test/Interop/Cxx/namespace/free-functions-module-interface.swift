@@ -7,7 +7,8 @@
 // CHECK-NEXT:   struct X {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
-// CHECK-NEXT:   static func + (_: FunctionsNS1.X, _: FunctionsNS1.X) -> UnsafePointer<CChar>!
+// TODO: check this again when operators are re-enabled: rdar://91070109 (also please enable this in the execution test "free-functions.swift")
+// CHECK-NOT:   static func +
 // CHECK-NEXT:   static func sameNameInChild() -> UnsafePointer<CChar>!
 // CHECK-NEXT:   static func sameNameInSibling() -> UnsafePointer<CChar>!
 // CHECK-NEXT:   enum FunctionsNS2 {
@@ -20,7 +21,8 @@
 // CHECK-NEXT:   static func definedInDefs() -> UnsafePointer<CChar>!
 // CHECK-NEXT: }
 
-// CHECK-NEXT: static func + (_: FunctionsNS1.X, _: FunctionsNS1.X) -> UnsafePointer<CChar>!
+// TODO: check this again when operators are re-enabled: rdar://91070109 (also please enable this in the execution test "free-functions.swift")
+// CHECK-NOT: static func +
 
 // CHECK-NEXT: enum FunctionsNS4 {
 // CHECK-NEXT:   static func sameNameInSibling() -> UnsafePointer<CChar>!
