@@ -535,6 +535,13 @@ namespace {
     // The frontend will currently never emit copy_addr or destroy_addr for
     // block storage.
 
+    // FIXME: it seems that, in order to implement the block-stored CheckedContinuation,
+    // we _do_ need the ability to handle a copy_addr to and from block storage.
+    // The only other alternative I can think of is to store only a pointer to
+    // that CheckedContinuation in the storage, having it be heap-allocated instead.
+    // This lack of support is why we can't get past IRGen; we fail in `convertBlockStorageType`
+    // and none of the below are implemented for it either.
+
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
       IGF.unimplemented(SourceLoc(), "copying @block_storage");
