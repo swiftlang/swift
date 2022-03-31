@@ -15,6 +15,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <vector>
+#include "PropertyMap.h"
 #include "RewriteContext.h"
 #include "RewriteLoop.h"
 #include "RewriteSystem.h"
@@ -750,6 +751,76 @@ void RewriteSystem::freeze() {
   Loops.clear();
   RedundantRules.clear();
   ConflictingRules.clear();
+}
+
+static Optional<Requirement>
+getRequirementForDiagnostics(Type subject, Symbol property,
+                             const PropertyMap &map,
+                             TypeArrayView<GenericTypeParamType> genericParams,
+                             const MutableTerm &prefix) {
+  switch (property.getKind()) {
+  case Symbol::Kind::ConcreteType: {
+    auto concreteType = map.getTypeFromSubstitutionSchema(
+        property.getConcreteType(), property.getSubstitutions(),
+        genericParams, prefix);
+    return Requirement(RequirementKind::SameType, subject, concreteType);
+  }
+
+  case Symbol::Kind::Superclass: {
+    auto concreteType = map.getTypeFromSubstitutionSchema(
+        property.getConcreteType(), property.getSubstitutions(),
+        genericParams, prefix);
+    return Requirement(RequirementKind::Superclass, subject, concreteType);
+  }
+
+  case Symbol::Kind::Protocol:
+    return Requirement(RequirementKind::Conformance, subject,
+                       property.getProtocol()->getDeclaredInterfaceType());
+
+  case Symbol::Kind::Layout:
+    return Requirement(RequirementKind::Layout, subject,
+                       property.getLayoutConstraint());
+
+  default:
+    return None;
+  }
+}
+
+void RewriteSystem::computeConflictDiagnostics(
+    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc,
+    const PropertyMap &propertyMap,
+    TypeArrayView<GenericTypeParamType> genericParams) {
+  for (auto pair : ConflictingRules) {
+    const auto &firstRule = getRule(pair.first);
+    const auto &secondRule = getRule(pair.second);
+
+    assert(firstRule.isPropertyRule() && secondRule.isPropertyRule());
+
+    if (firstRule.isSubstitutionSimplified() ||
+        secondRule.isSubstitutionSimplified())
+      continue;
+
+    bool chooseFirstRule = firstRule.getRHS().size() > secondRule.getRHS().size();
+    auto subjectRule = chooseFirstRule ? firstRule : secondRule;
+    auto subjectTerm = subjectRule.getRHS();
+
+    auto suffixRule = chooseFirstRule ? secondRule : firstRule;
+    auto suffixTerm = suffixRule.getRHS();
+
+    // If the root protocol of the subject term isn't in this minimization
+    // domain, the conflict was already diagnosed.
+    if (!isInMinimizationDomain(subjectTerm[0].getRootProtocol()))
+      continue;
+
+    Type subject = propertyMap.getTypeForTerm(subjectTerm, genericParams);
+    MutableTerm prefix(subjectTerm.begin(), subjectTerm.end() - suffixTerm.size());
+    errors.push_back(RequirementError::forConflictingRequirement(
+        *getRequirementForDiagnostics(subject, *subjectRule.isPropertyRule(),
+                                      propertyMap, genericParams, MutableTerm()),
+        *getRequirementForDiagnostics(subject, *suffixRule.isPropertyRule(),
+                                      propertyMap, genericParams, prefix),
+        signatureLoc));
+  }
 }
 
 void RewriteSystem::dump(llvm::raw_ostream &out) const {

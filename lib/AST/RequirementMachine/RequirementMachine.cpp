@@ -366,7 +366,7 @@ RequirementMachine::initWithProtocolWrittenRequirements(
 
   // For RequirementMachine::verify() when called by generic signature queries;
   // We have a single valid generic parameter at depth 0, index 0.
-  Params.push_back(component[0]->getSelfInterfaceType()->getCanonicalType());
+  Params.push_back(component[0]->getSelfInterfaceType());
 
   if (Dump) {
     llvm::dbgs() << "Adding protocols";
@@ -528,6 +528,13 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
 /// immutable, and generic signature queries may be performed.
 void RequirementMachine::freeze() {
   System.freeze();
+}
+
+void RequirementMachine::computeRequirementDiagnostics(
+    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc) {
+  System.computeRedundantRequirementDiagnostics(errors);
+  System.computeConflictDiagnostics(errors, signatureLoc, Map,
+                                    getGenericParams());
 }
 
 std::string RequirementMachine::getRuleAsStringForDiagnostics(
