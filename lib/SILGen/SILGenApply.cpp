@@ -6160,9 +6160,6 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
   // Create the has-member block.
   SILBasicBlock *hasMemberBB = createBasicBlock();
 
-  // The continuation block
-  CanType memberMethodTy = refTy.getOptionalObjectType();
-
   const TypeLowering &optTL = getTypeLowering(refTy);
   auto loweredOptTy = optTL.getLoweredType();
 
@@ -6172,9 +6169,6 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
   FuncDecl *memberFunc;
   if (auto *VD = dyn_cast<VarDecl>(memberRef.getDecl())) {
     memberFunc = VD->getOpaqueAccessor(AccessorKind::Get);
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
-    CanFunctionType::ExtInfo info;
-    memberMethodTy = CanFunctionType::get({}, memberMethodTy, info);
   } else {
     memberFunc = cast<FuncDecl>(memberRef.getDecl());
   }
@@ -6210,7 +6204,7 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo info;
     FunctionType::Param arg(operand->getType().getASTType());
-    auto memberFnTy = CanFunctionType::get({arg}, memberMethodTy, info);
+    auto memberFnTy = CanFunctionType::get({arg}, methodTy, info);
 
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        memberFnTy);
