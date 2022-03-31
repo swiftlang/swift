@@ -175,3 +175,27 @@ func test_magic_defaults() {
   let _ = with_magic()
   let _: String = generic_with_magic()
 }
+
+// SR-16069
+func test_allow_same_type_between_dependent_types() {
+  struct Default : P {
+    typealias X = Int
+  }
+
+  struct Other : P {
+    typealias X = Int
+  }
+
+  struct S<T: P> {
+    func test<U: P>(_: U = Default()) where U.X == T.X { // expected-note {{where 'T.X' = 'String', 'U.X' = 'Default.X' (aka 'Int')}}
+    }
+  }
+
+  func test_ok<T: P>(s: S<T>) where T.X == Int {
+    s.test() // Ok: U == Default
+  }
+
+  func test_bad<T: P>(s: S<T>) where T.X == String {
+    s.test() // expected-error {{instance method 'test' requires the types 'String' and 'Default.X' (aka 'Int') be equivalent}}
+  }
+}

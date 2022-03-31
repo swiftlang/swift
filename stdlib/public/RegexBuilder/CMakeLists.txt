@@ -12,7 +12,7 @@
 
 set(swift_regex_builder_link_libraries
   swiftCore
-  swift_MatchingEngine
+  swift_RegexParser
   swift_StringProcessing)
 
 file(GLOB_RECURSE _REGEX_BUILDER_SOURCES

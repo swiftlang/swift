@@ -2491,6 +2491,9 @@ ERROR(recursive_superclass_constraint,none,
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
+ERROR(same_type_does_not_inherit,none,
+      "same-type constraint type %0 does not inherit from required superclass %1",
+      (Type, Type))
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
@@ -2506,6 +2509,9 @@ WARNING(missing_protocol_refinement, none,
 ERROR(same_type_conflict,none,
       "%select{generic parameter |protocol |}0%1 cannot be equal to both "
       "%2 and %3", (unsigned, Type, Type, Type))
+ERROR(requirement_conflict,none,
+      "no type for %0 can satisfy both %1",
+      (Type, StringRef))
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(same_type_redundancy_here,none,

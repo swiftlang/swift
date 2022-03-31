@@ -4,7 +4,7 @@
 
 // RUN: %check-in-clang -std=c99 %t/empty.h
 // RUN: %check-in-clang -std=c11 %t/empty.h
-// RUN: %check-cxx-header-in-clang -x objective-c++-header -std=c++98 %t/empty.h
+// RUN: %check-cxx-header-in-clang -x objective-c++-header -std=c++11 %t/empty.h
 // RUN: %check-cxx-header-in-clang -x objective-c++-header -std=c++14 %t/empty.h
 
 // RUN: %check-in-clang -std=c99 -fno-modules -Qunused-arguments %t/empty.h

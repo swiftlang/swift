@@ -151,7 +151,8 @@
 using namespace swift;
 using namespace rewriting;
 
-/// Build a DebugOptions by parsing a comma-separated list of debug flags.
+/// Parse a comma-separated list from the -debug-requirement-machine= frontend
+/// flag.
 static DebugOptions parseDebugFlags(StringRef debugFlags) {
   DebugOptions result;
 

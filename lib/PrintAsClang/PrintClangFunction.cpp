@@ -13,6 +13,7 @@
 #include "PrintClangFunction.h"
 #include "ClangSyntaxPrinter.h"
 #include "DeclAndTypePrinter.h"
+#include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
@@ -23,6 +24,8 @@
 
 using namespace swift;
 
+namespace {
+
 // Prints types in the C function signature that corresponds to the
 // native Swift function/method.
 class CFunctionSignatureTypePrinter
@@ -31,12 +34,16 @@ class CFunctionSignatureTypePrinter
       private ClangSyntaxPrinter {
 public:
   CFunctionSignatureTypePrinter(raw_ostream &os,
-                                PrimitiveTypeMapping &typeMapping)
-      : ClangSyntaxPrinter(os), typeMapping(typeMapping) {}
+                                PrimitiveTypeMapping &typeMapping,
+                                OutputLanguageMode languageMode)
+      : ClangSyntaxPrinter(os), typeMapping(typeMapping),
+        languageMode(languageMode) {}
 
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               Optional<OptionalTypeKind> optionalKind) {
-    auto knownTypeInfo = typeMapping.getKnownCTypeInfo(typeDecl);
+    auto knownTypeInfo = languageMode == OutputLanguageMode::Cxx
+                             ? typeMapping.getKnownCxxTypeInfo(typeDecl)
+                             : typeMapping.getKnownCTypeInfo(typeDecl);
     if (!knownTypeInfo)
       return false;
     os << knownTypeInfo->name;
@@ -83,48 +90,63 @@ public:
 
 private:
   PrimitiveTypeMapping &typeMapping;
+  OutputLanguageMode languageMode;
 };
 
-void DeclAndTypeClangFunctionPrinter::printFunctionDeclAsCFunctionDecl(
-    FuncDecl *FD, StringRef name, Type resultTy) {
+} // end namespace
+
+void DeclAndTypeClangFunctionPrinter::printFunctionSignature(
+    FuncDecl *FD, StringRef name, Type resultTy, FunctionSignatureKind kind) {
+  OutputLanguageMode outputLang = kind == FunctionSignatureKind::CFunctionProto
+                                      ? OutputLanguageMode::ObjC
+                                      : OutputLanguageMode::Cxx;
   // FIXME: Might need a PrintMultiPartType here.
-  auto print = [this](Type ty, Optional<OptionalTypeKind> optionalKind,
-                      StringRef name) {
+  auto print = [&, this](Type ty, Optional<OptionalTypeKind> optionalKind,
+                         StringRef name) {
     // FIXME: add support for noescape and PrintMultiPartType,
     // see DeclAndTypePrinter::print.
-    CFunctionSignatureTypePrinter typePrinter(os, typeMapping);
+    CFunctionSignatureTypePrinter typePrinter(os, typeMapping, outputLang);
     typePrinter.visit(ty, optionalKind);
 
     if (!name.empty()) {
-      os << ' ' << name;
-      if (DeclAndTypePrinter::isStrClangKeyword(name))
-        os << '_';
+      os << ' ';
+      ClangSyntaxPrinter(os).printIdentifier(name);
     }
   };
 
   // Print out the return type.
-  OptionalTypeKind kind;
+  OptionalTypeKind retKind;
   Type objTy;
-  std::tie(objTy, kind) =
+  std::tie(objTy, retKind) =
       DeclAndTypePrinter::getObjectTypeAndOptionality(FD, resultTy);
-  CFunctionSignatureTypePrinter typePrinter(os, typeMapping);
-  typePrinter.visit(objTy, kind);
+  CFunctionSignatureTypePrinter typePrinter(os, typeMapping, outputLang);
+  typePrinter.visit(objTy, retKind);
 
   os << ' ' << name << '(';
 
   // Print out the parameter types.
   auto params = FD->getParameters();
   if (params->size()) {
+    size_t paramIndex = 1;
     llvm::interleaveComma(*params, os, [&](const ParamDecl *param) {
-      OptionalTypeKind kind;
+      OptionalTypeKind argKind;
       Type objTy;
-      std::tie(objTy, kind) = DeclAndTypePrinter::getObjectTypeAndOptionality(
-          param, param->getInterfaceType());
-      StringRef paramName =
-          param->getName().empty() ? "" : param->getName().str();
-      print(objTy, kind, paramName);
+      std::tie(objTy, argKind) =
+          DeclAndTypePrinter::getObjectTypeAndOptionality(
+              param, param->getInterfaceType());
+      std::string paramName =
+          param->getName().empty() ? "" : param->getName().str().str();
+      // Always emit a named parameter for the C++ inline thunk to ensure it can
+      // be referenced in the body.
+      if (kind == FunctionSignatureKind::CxxInlineThunk && paramName.empty()) {
+        llvm::raw_string_ostream os(paramName);
+        os << "_" << paramIndex;
+      }
+      print(objTy, argKind, paramName);
+      ++paramIndex;
     });
-  } else {
+  } else if (kind == FunctionSignatureKind::CFunctionProto) {
+    // Emit 'void' in an empty parameter list for C function declarations.
     os << "void";
   }
   os << ')';

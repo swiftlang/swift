@@ -2054,13 +2054,6 @@ ConstraintSystem::getTypeOfMemberReference(
 
   AnyFunctionType *funcType;
 
-  // Check if we need to apply a layer of optionality to the resulting type.
-  auto isReferenceOptional = false;
-  if (!isRequirementOrWitness(locator)) {
-    if (isDynamicResult || value->getAttrs().hasAttribute<OptionalAttr>())
-      isReferenceOptional = true;
-  }
-
   if (isa<AbstractFunctionDecl>(value) ||
       isa<EnumElementDecl>(value)) {
     if (auto ErrorTy = value->getInterfaceType()->getAs<ErrorType>()) {
@@ -2088,12 +2081,6 @@ ConstraintSystem::getTypeOfMemberReference(
 
       if (doesStorageProduceLValue(subscript, baseTy, useDC, locator))
         elementTy = LValueType::get(elementTy);
-
-      // Optional and dynamic subscripts are a special case, because the
-      // optionality is applied to the result type and not the type of the
-      // reference.
-      if (isReferenceOptional)
-        elementTy = OptionalType::get(elementTy->getRValueType());
 
       auto indices = subscript->getInterfaceType()
                               ->castTo<AnyFunctionType>()->getParams();
@@ -2239,6 +2226,38 @@ ConstraintSystem::getTypeOfMemberReference(
     }
   }
 
+  // Check if we need to apply a layer of optionality to the uncurried type.
+  if (!isRequirementOrWitness(locator)) {
+    if (isDynamicResult || value->getAttrs().hasAttribute<OptionalAttr>()) {
+      const auto applyOptionality = [&](FunctionType *fnTy) -> Type {
+        Type resultTy;
+        // Optional and dynamic subscripts are a special case, because the
+        // optionality is applied to the result type and not the type of the
+        // reference.
+        if (isa<SubscriptDecl>(value)) {
+          auto *innerFn = fnTy->getResult()->castTo<FunctionType>();
+          resultTy = FunctionType::get(
+              innerFn->getParams(),
+              OptionalType::get(innerFn->getResult()->getRValueType()),
+              innerFn->getExtInfo());
+        } else {
+          resultTy = OptionalType::get(fnTy->getResult()->getRValueType());
+        }
+
+        return FunctionType::get(fnTy->getParams(), resultTy,
+                                 fnTy->getExtInfo());
+      };
+
+      // FIXME: Refactor 'replaceCovariantResultType' not to rely on the passed
+      // uncurry level.
+      //
+      // This is done after handling dynamic 'Self' to make
+      // 'replaceCovariantResultType' work, so we have to transform both types.
+      openedType = applyOptionality(openedType->castTo<FunctionType>());
+      type = applyOptionality(type->castTo<FunctionType>());
+    }
+  }
+
   if (hasAppliedSelf) {
     // For a static member referenced through a metatype or an instance
     // member referenced through an instance, strip off the 'self'.
@@ -2292,10 +2311,6 @@ ConstraintSystem::getTypeOfMemberReference(
           FunctionType::get(params, fnType->getResult(), fnType->getExtInfo());
     }
   }
-
-  // If we need to wrap the type in an optional, do so now.
-  if (isReferenceOptional && !isa<SubscriptDecl>(value))
-    type = OptionalType::get(type->getRValueType());
 
   if (isForCodeCompletion() && type->hasError()) {
     // In code completion, replace error types by placeholder types so we can
@@ -2998,6 +3013,14 @@ void ConstraintSystem::bindOverloadType(
     // Subscripts have optionality applied to their result type rather than
     // the type of their reference, so there's nothing to adjust here.
     if (isa<SubscriptDecl>(choice.getDecl())) {
+      bindTypeOrIUO(openedType);
+      return;
+    }
+
+    // The opened type of an unbound member reference has optionality applied
+    // to the uncurried type.
+    if (!doesMemberRefApplyCurriedSelf(choice.getBaseType(),
+                                       choice.getDecl())) {
       bindTypeOrIUO(openedType);
       return;
     }

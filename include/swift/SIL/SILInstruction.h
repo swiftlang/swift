@@ -8384,16 +8384,6 @@ public:
 private:
   std::array<SILSuccessor, 2> DestBBs;
 
-  /// The number of arguments for the True branch.
-  unsigned getNumTrueArgs() const {
-    return SILNode::Bits.CondBranchInst.NumTrueArgs;
-  }
-  /// The number of arguments for the False branch.
-  unsigned getNumFalseArgs() const {
-    return getAllOperands().size() - NumFixedOpers -
-        SILNode::Bits.CondBranchInst.NumTrueArgs;
-  }
-
   CondBranchInst(SILDebugLocation DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
                  ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse,
@@ -8437,6 +8427,16 @@ public:
   ProfileCounter getTrueBBCount() const { return DestBBs[0].getCount(); }
   /// The number of times the False branch was executed.
   ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
+
+  /// The number of arguments for the True branch.
+  unsigned getNumTrueArgs() const {
+    return SILNode::Bits.CondBranchInst.NumTrueArgs;
+  }
+  /// The number of arguments for the False branch.
+  unsigned getNumFalseArgs() const {
+    return getAllOperands().size() - NumFixedOpers -
+        SILNode::Bits.CondBranchInst.NumTrueArgs;
+  }
 
   /// Get the arguments to the true BB.
   OperandValueArrayRef getTrueArgs() const {

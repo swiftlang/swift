@@ -7533,6 +7533,18 @@ ParameterList *swift::getParameterList(ValueDecl *source) {
   return nullptr;
 }
 
+ParameterList *swift::getParameterList(DeclContext *source) {
+  if (auto *D = source->getAsDecl()) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      return getParameterList(VD);
+    }
+  } else if (auto *CE = dyn_cast<AbstractClosureExpr>(source)) {
+    return CE->getParameters();
+  }
+
+  return nullptr;
+}
+
 const ParamDecl *swift::getParameterAt(const ValueDecl *source,
                                        unsigned index) {
   if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
@@ -8171,6 +8183,23 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
 
   OpaqueReturnTypeIdentifier = getASTContext().getIdentifier(mangleBuf);
   return OpaqueReturnTypeIdentifier;
+}
+
+void OpaqueTypeDecl::setConditionallyAvailableSubstitutions(
+    ArrayRef<ConditionallyAvailableSubstitutions *> substitutions) {
+  assert(!ConditionallyAvailableTypes &&
+         "resetting conditionally available substitutions?!");
+  ConditionallyAvailableTypes = getASTContext().AllocateCopy(substitutions);
+}
+
+OpaqueTypeDecl::ConditionallyAvailableSubstitutions *
+OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+    ASTContext &ctx, ArrayRef<VersionRange> availabilityContext,
+    SubstitutionMap substitutions) {
+  auto size = totalSizeToAlloc<VersionRange>(availabilityContext.size());
+  auto mem = ctx.Allocate(size, alignof(ConditionallyAvailableSubstitutions));
+  return new (mem)
+      ConditionallyAvailableSubstitutions(availabilityContext, substitutions);
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {
