@@ -912,7 +912,13 @@ SILValue swift::findOwnershipReferenceAggregate(SILValue ref) {
         || isa<OwnershipForwardingConversionInst>(root)
         || isa<OwnershipForwardingSelectEnumInstBase>(root)
         || isa<OwnershipForwardingMultipleValueInstruction>(root)) {
-      root = root->getDefiningInstruction()->getOperand(0);
+      SILInstruction *inst = root->getDefiningInstruction();
+
+      // The `enum` instruction can have no operand.
+      if (inst->getNumOperands() == 0)
+        return root;
+
+      root = inst->getOperand(0);
       continue;
     }
     if (auto *arg = dyn_cast<SILArgument>(root)) {
