@@ -32,6 +32,7 @@ set(swift_runtime_sources
     AutoDiffSupport.cpp
     Bincompat.cpp
     Casting.cpp
+    CrashReporter.cpp
     CygwinPort.cpp
     Demangle.cpp
     DynamicCast.cpp

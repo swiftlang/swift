@@ -18,7 +18,8 @@ add_swift_host_library(swiftDemangling STATIC
   OldRemangler.cpp
   Punycode.cpp
   Remangler.cpp
-  Errors.cpp)
+  Errors.cpp
+  CrashReporter.cpp)
 target_compile_definitions(swiftDemangling PRIVATE
   ${swift_demangling_compile_flags})
 
