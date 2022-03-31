@@ -106,7 +106,7 @@
 /// A type whose values can safely be passed across concurrency domains by copying,
 /// but which disables some safety checking at the conformance site.
 ///
-/// Use an unchecked conformance to `Sendable` instead.
+/// Use an unchecked conformance to `Sendable` instead --- for example:
 ///
 /// ```
 /// struct MyStructure: @unchecked Sendable { ... }
