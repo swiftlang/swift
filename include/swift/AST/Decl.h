@@ -8117,9 +8117,13 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   return result;
 }
 
-/// Retrieve the parameter list for a given declaration, or nullputr if there
+/// Retrieve the parameter list for a given declaration, or nullptr if there
 /// is none.
 ParameterList *getParameterList(ValueDecl *source);
+
+/// Retrieve the parameter list for a given declaration context, or nullptr if
+/// there is none.
+ParameterList *getParameterList(DeclContext *source);
 
 /// Retrieve parameter declaration from the given source at given index, or
 /// nullptr if the source does not have a parameter list.

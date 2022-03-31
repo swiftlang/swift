@@ -3374,8 +3374,9 @@ public:
             "method does not have a witness table entry");
   }
 
-  // Get the expected type of a dynamic method reference.
-  SILType getDynamicMethodType(SILType selfType, SILDeclRef method) {
+  /// Verify the given type of a dynamic or @objc optional method reference.
+  bool verifyDynamicMethodType(CanSILFunctionType verifiedTy, SILType selfType,
+                               SILDeclRef method) {
     auto &C = F.getASTContext();
 
     // The type of the dynamic method must match the usual type of the method,
@@ -3394,28 +3395,50 @@ public:
     }
     assert(!methodTy->isPolymorphic());
 
-    // Replace Self parameter with type of 'self' at the call site.
-    auto params = methodTy->getParameters();
-    SmallVector<SILParameterInfo, 4>
-      dynParams(params.begin(), params.end() - 1);
-    dynParams.push_back(SILParameterInfo(selfType.getASTType(),
-                                         params.back().getConvention()));
+    // Assume the parameter conventions are correct.
+    SmallVector<SILParameterInfo, 4> params;
+    {
+      const auto actualParams = methodTy->getParameters();
+      const auto verifiedParams = verifiedTy->getParameters();
+      if (actualParams.size() != verifiedParams.size())
+        return false;
 
-    auto results = methodTy->getResults();
-    SmallVector<SILResultInfo, 4> dynResults(results.begin(), results.end());    
+      for (const auto idx : indices(actualParams)) {
+        params.push_back(actualParams[idx].getWithConvention(
+            verifiedParams[idx].getConvention()));
+      }
+    }
 
-    // If the method returns Self, substitute AnyObject for the result type.
+    // Have the 'self' parameter assume the type of 'self' at the call site.
+    params.back() = params.back().getWithInterfaceType(selfType.getASTType());
+
+    // Assume the result conventions are correct.
+    SmallVector<SILResultInfo, 4> results;
+    {
+      const auto actualResults = methodTy->getResults();
+      const auto verifiedResults = verifiedTy->getResults();
+      if (actualResults.size() != verifiedResults.size())
+        return false;
+
+      for (const auto idx : indices(actualResults)) {
+        results.push_back(actualResults[idx].getWithConvention(
+            verifiedResults[idx].getConvention()));
+      }
+    }
+
+    // If the method returns dynamic Self, substitute AnyObject for the
+    // result type.
     if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
       if (fnDecl->hasDynamicSelfResult()) {
         auto anyObjectTy = C.getAnyObjectType();
-        for (auto &dynResult : dynResults) {
+        for (auto &result : results) {
           auto newResultTy =
-              dynResult
+              result
                   .getReturnValueType(F.getModule(), methodTy,
                                       F.getTypeExpansionContext())
                   ->replaceCovariantResultType(anyObjectTy, 0);
-          dynResult = SILResultInfo(newResultTy->getCanonicalType(),
-                                    dynResult.getConvention());
+          result = SILResultInfo(newResultTy->getCanonicalType(),
+                                 result.getConvention());
         }
       }
     }
@@ -3424,13 +3447,14 @@ public:
                                      methodTy->getExtInfo(),
                                      methodTy->getCoroutineKind(),
                                      methodTy->getCalleeConvention(),
-                                     dynParams,
+                                     params,
                                      methodTy->getYields(),
-                                     dynResults,
+                                     results,
                                      methodTy->getOptionalErrorResult(),
                                      SubstitutionMap(), SubstitutionMap(),
                                      F.getASTContext());
-    return SILType::getPrimitiveObjectType(fnTy);
+
+    return fnTy->isBindableTo(verifiedTy);
   }
 
   /// Visitor class that checks whether a given decl ref has an entry in the
@@ -4853,9 +4877,8 @@ public:
             "true bb for dynamic_method_br must take an argument");
 
     auto bbArgTy = DMBI->getHasMethodBB()->args_begin()[0]->getType();
-    require(getDynamicMethodType(operandType, DMBI->getMember())
-              .getASTType()
-              ->isBindableTo(bbArgTy.getASTType()),
+    require(verifyDynamicMethodType(cast<SILFunctionType>(bbArgTy.getASTType()),
+                                    operandType, DMBI->getMember()),
             "bb argument for dynamic_method_br must be of the method's type");
   }
 

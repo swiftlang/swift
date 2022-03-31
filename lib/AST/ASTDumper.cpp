@@ -2513,6 +2513,7 @@ public:
 
   void visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *E) {
     printCommon(E, "applied_property_wrapper_expr");
+    OS << '\n';
     printRec(E->getValue());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
