@@ -123,7 +123,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     # and the stdlib.
     $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     $<TARGET_OBJECTS:swiftLLVMSupport${SWIFT_PRIMARY_VARIANT_SUFFIX}>
-    $<TARGET_OBJECTS:swiftDemanglingForCore${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    $<TARGET_OBJECTS:swiftDemangling${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     )
 
   # The local stdlib implementation provides definitions of the swiftCore
