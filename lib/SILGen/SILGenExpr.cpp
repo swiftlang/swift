@@ -2248,7 +2248,24 @@ RValue RValueEmitter::visitDynamicSubscriptExpr(
                                       DynamicSubscriptExpr *E, SGFContext C) {
   assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
   assert(!E->isImplicitlyThrows() && "an distributed-actor-isolated @objc member?");
-  return SGF.emitDynamicSubscriptExpr(E, C);
+
+  // Emit the base operand.
+  SILValue Operand = SGF.emitRValueAsSingleValue(E->getBase()).getValue();
+
+  // Emit the indices.
+  //
+  // FIXME: This is apparently not true for Swift @objc subscripts.
+  // Objective-C subscripts only ever have a single parameter.
+  Expr *IndexExpr = E->getArgs()->getUnaryExpr();
+  assert(IndexExpr);
+
+  PreparedArguments IndexArgs(
+      FunctionType::Param(IndexExpr->getType()->getCanonicalType()));
+  IndexArgs.add(E, SGF.emitRValue(IndexExpr));
+
+  return SGF.emitDynamicSubscriptGetterApply(
+      E, Operand, E->getMember(), std::move(IndexArgs),
+      E->getType()->getCanonicalType(), C);
 }
 
 

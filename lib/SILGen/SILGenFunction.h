@@ -1755,8 +1755,11 @@ public:
                               ConcreteDeclRef memberRef, CanType refTy,
                               SGFContext C);
 
-  /// Emit a dynamic subscript.
-  RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
+  /// Emit a dynamic subscript getter application.
+  RValue emitDynamicSubscriptGetterApply(SILLocation loc, SILValue operand,
+                                         ConcreteDeclRef subscriptRef,
+                                         PreparedArguments &&indexArgs,
+                                         CanType resultTy, SGFContext C);
 
   /// Open up the given existential expression and emit its
   /// subexpression in a caller-specified manner.
