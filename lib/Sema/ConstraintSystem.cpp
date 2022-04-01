@@ -1795,16 +1795,16 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
 /// routine will recurse into the concrete type.
 static Type
 typeEraseExistentialSelfReferences(
-    Type refTy, Type baseTy, const DeclContext *useDC,
+    Type refTy, Type baseTy,
     TypePosition outermostPosition) {
   assert(baseTy->isExistentialType());
   if (!refTy->hasTypeParameter()) {
     return refTy;
   }
 
-  auto contextSig = useDC->getGenericSignatureOfContext();
   const auto existentialSig =
-      baseTy->getASTContext().getOpenedArchetypeSignature(baseTy, contextSig);
+      baseTy->getASTContext().getOpenedArchetypeSignature(baseTy,
+                                                          GenericSignature());
 
   unsigned metatypeDepth = 0;
 
@@ -1916,7 +1916,7 @@ typeEraseExistentialSelfReferences(
 
 Type constraints::typeEraseOpenedExistentialReference(
     Type type, Type existentialBaseType, TypeVariableType *openedTypeVar,
-    const DeclContext *useDC, TypePosition outermostPosition) {
+    TypePosition outermostPosition) {
   Type selfGP = GenericTypeParamType::get(false, 0, 0, type->getASTContext());
 
   // First, temporarily reconstitute the 'Self' generic parameter.
@@ -1933,8 +1933,8 @@ Type constraints::typeEraseOpenedExistentialReference(
   });
 
   // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
-  type = typeEraseExistentialSelfReferences(
-      type, existentialBaseType, useDC, outermostPosition);
+  type = typeEraseExistentialSelfReferences(type, existentialBaseType,
+                                            outermostPosition);
 
   // Finally, swap the 'Self'-corresponding type variable back in.
   return type.transformRec([&](TypeBase *t) -> Optional<Type> {
@@ -2279,9 +2279,8 @@ ConstraintSystem::getTypeOfMemberReference(
     const auto selfGP = cast<GenericTypeParamType>(
         outerDC->getSelfInterfaceType()->getCanonicalType());
     auto openedTypeVar = replacements.lookup(selfGP);
-    type =
-        typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar, DC,
-                                            TypePosition::Covariant);
+    type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
+                                               TypePosition::Covariant);
   }
 
   // Construct an idealized parameter type of the initializer associated

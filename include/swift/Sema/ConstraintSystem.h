@@ -5694,7 +5694,6 @@ Expr *getArgumentLabelTargetExpr(Expr *fn);
 /// variable and anything that depends on it to their non-dependent bounds.
 Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
                                          TypeVariableType *openedTypeVar,
-                                         const DeclContext *useDC,
                                          TypePosition outermostPosition);
 
 /// Returns true if a reference to a member on a given base type will apply
