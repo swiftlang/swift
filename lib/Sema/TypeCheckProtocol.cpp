@@ -155,13 +155,25 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     // function types that aren't in a parameter can be Sendable or not.
     // FIXME: Should we check for a Sendable bound on the requirement type?
     bool inRequirement = (adjustment != TypeAdjustment::NoescapeToEscaping);
-    (void)adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
+    Type adjustedReqtType =
+      adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
 
     bool inWitness = false;
     Type adjustedWitnessType =
       adjustInferredAssociatedType(adjustment, witnessType, inWitness);
-    if (inWitness && !inRequirement)
-      witnessType = adjustedWitnessType;
+
+    switch (variance) {
+    case VarianceKind::None:
+      break;
+    case VarianceKind::Covariant:
+      if (inRequirement && !inWitness)
+        reqtType = adjustedReqtType;
+      break;
+    case VarianceKind::Contravariant:
+      if (inWitness && !inRequirement)
+        witnessType = adjustedWitnessType;
+      break;
+    }
   };
 
   applyAdjustment(TypeAdjustment::NoescapeToEscaping);
