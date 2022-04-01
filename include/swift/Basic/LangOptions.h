@@ -209,6 +209,9 @@ namespace swift {
     /// Emit a remark after loading a module.
     bool EnableModuleLoadingRemarks = false;
 
+    /// Resolve main function as though it were called from an async context
+    bool EnableAsyncMainResolution = false;
+
     ///
     /// Support for alternate usage modes
     ///

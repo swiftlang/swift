@@ -2171,8 +2171,14 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   // mainType.main() from the entry point, and that would require fully
   // type-checking the call to mainType.main().
 
+  constraints::ConstraintSystemOptions lookupOptions;
+  if (context.LangOpts.EnableAsyncMainResolution)
+    lookupOptions |=
+        constraints::ConstraintSystemFlags::ConsiderNominalTypeContextsAsync;
+
   auto resolution = resolveValueMember(
-      *declContext, nominal->getInterfaceType(), context.Id_main);
+      *declContext, nominal->getInterfaceType(), context.Id_main,
+      lookupOptions);
   FuncDecl *mainFunction =
       resolveMainFunctionDecl(declContext, resolution, context);
   if (!mainFunction) {

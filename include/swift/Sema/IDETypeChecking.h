@@ -21,6 +21,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include <memory>
 #include <tuple>
 
@@ -93,8 +94,9 @@ namespace swift {
   /// Unlike other member lookup functions, \c swift::resolveValueMember()
   /// should be used when you want to look up declarations with the same name as
   /// one you already have.
-  ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
-                                         DeclName Name);
+  ResolvedMemberResult
+  resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name,
+                     constraints::ConstraintSystemOptions Options = {});
 
   /// Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
