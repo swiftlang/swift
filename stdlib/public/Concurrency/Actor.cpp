@@ -616,7 +616,8 @@ public:
 ///     achieved through careful arrangement of the storage for this in the
 ///     DefaultActorImpl. The additional alignment requirements are
 ///     enforced by static asserts below.
-class alignas(sizeof(void *) * 2) ActiveActorStatus {
+class alignas(2 * sizeof(void *)) ActiveActorStatus
+    : public swift::aligned_alloc<2 * sizeof(void *)> {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;
   dispatch_lock_t DrainLock;
