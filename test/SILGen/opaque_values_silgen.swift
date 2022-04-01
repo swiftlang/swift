@@ -367,3 +367,11 @@ extension Array where Element == Int {
     }
   }
 }
+
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen22anon_read_only_captureyS2iFSiyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> Int {
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen22anon_read_only_captureyS2iFSiyXEfU_'
+func anon_read_only_capture(_ x: Int) -> Int {
+  var x = x
+  return ({ x })()
+}
+
