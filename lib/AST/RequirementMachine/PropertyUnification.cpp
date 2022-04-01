@@ -378,8 +378,10 @@ void PropertyMap::addSuperclassProperty(
     }
 
     auto &req = props->Superclasses[props->SuperclassDecl];
-    for (const auto &pair : req.SuperclassRules)
-      System.recordConflict(pair.second, ruleID);
+    for (const auto &pair : req.SuperclassRules) {
+      if (checkRulePairOnce(pair.second, ruleID))
+        System.recordConflict(pair.second, ruleID);
+    }
   }
 }
 
