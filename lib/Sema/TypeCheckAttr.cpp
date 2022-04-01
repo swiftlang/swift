@@ -316,6 +316,8 @@ public:
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
 
+  void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
+
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
 
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
@@ -2997,7 +2999,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
             return getSubstitution(type);
           });
 
-    if (result != RequirementCheckResult::Success) {
+    if (result != CheckGenericArgumentsResult::Success) {
       unviable.push_back(
           std::make_tuple(init, UnviableReason::UnsatisfiedRequirements,
                           genericParamType));
@@ -3281,8 +3283,18 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // retrieval request perform checking for us.
   if (nominal->isGlobalActor()) {
     (void)D->getGlobalActorAttr();
-    if (auto value = dyn_cast<ValueDecl>(D))
+    if (auto value = dyn_cast<ValueDecl>(D)) {
       (void)getActorIsolation(value);
+    } else {
+      // Make sure we evaluate the global actor type.
+      auto dc = D->getInnermostDeclContext();
+      (void)evaluateOrDefault(
+          Ctx.evaluator,
+          CustomAttrTypeRequest{
+            attr, dc, CustomAttrTypeKind::GlobalActor},
+          Type());
+    }
+
     return;
   }
 
@@ -3471,13 +3483,12 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
   // Attrs are in the reverse order of the source order. We need to visit them
   // in source order to diagnose the later attribute.
   for (auto *Attr: Attrs) {
-    static StringRef AttrName = "_originallyDefinedIn";
+    if (!Attr->isActivePlatform(Ctx))
+      continue;
 
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/false))
       continue;
 
-    if (!Attr->isActivePlatform(Ctx))
-      continue;
     auto AtLoc = Attr->AtLoc;
     auto Platform = Attr->Platform;
     if (!seenPlatforms.insert({Platform, AtLoc}).second) {
@@ -3489,7 +3500,7 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
       return;
     }
     if (!D->getDeclContext()->isModuleScopeContext()) {
-      diagnose(AtLoc, diag::originally_definedin_topleve_decl, AttrName);
+      diagnose(AtLoc, diag::originally_definedin_topleve_decl, Attr);
       return;
     }
 
@@ -3499,8 +3510,7 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
     auto IntroVer = D->getIntroducedOSVersion(Platform);
     if (IntroVer.getValue() > Attr->MovedVersion) {
       diagnose(AtLoc,
-               diag::originally_definedin_must_not_before_available_version,
-               AttrName);
+               diag::originally_definedin_must_not_before_available_version);
       return;
     }
   }
@@ -3560,21 +3570,6 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
         diagnoseAndRemoveAttr(Attr, diag::attr_not_on_stored_properties, Attr);
         continue;
       }
-    }
-
-    // FIXME(backDeploy): support coroutines rdar://90111169
-    auto diagnoseCoroutineIfNecessary = [&](AccessorDecl *AD) {
-      if (AD->isCoroutine())
-        diagnose(Attr->getLocation(), diag::back_deploy_not_on_coroutine,
-                 Attr, AD->getDescriptiveKind());
-    };
-    if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
-      ASD->visitEmittedAccessors([&](AccessorDecl *AD) {
-        diagnoseCoroutineIfNecessary(AD);
-      });
-    }
-    if (auto *AD = dyn_cast<AccessorDecl>(D)) {
-      diagnoseCoroutineIfNecessary(AD);
     }
 
     auto AtLoc = Attr->AtLoc;
@@ -5956,6 +5951,48 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   auto fn = cast<FuncDecl>(D);
   if (!fn->isAsyncContext()) {
     diagnose(attr->getLocation(), diag::inherits_executor_without_async);
+  }
+}
+
+void AttributeChecker::visitCompilerInitializedAttr(
+    CompilerInitializedAttr *attr) {
+  auto var = cast<VarDecl>(D);
+
+  // For now, ban its use within protocols. I could imagine supporting it
+  // by saying that witnesses must also be compiler-initialized, but I can't
+  // think of a use case for that right now.
+  if (auto ctx = var->getDeclContext()) {
+    if (isa<ProtocolDecl>(ctx) && var->isProtocolRequirement()) {
+      diagnose(attr->getLocation(), diag::protocol_compilerinitialized);
+      return;
+    }
+  }
+
+  // Must be a let-bound stored property without an initial value.
+  // The fact that it's let-bound generally simplifies the implementation
+  // of this attribute in definite initialization, since we don't need to
+  // reason about whether the compiler made the first assignment to the var,
+  // etc.
+  if (var->hasInitialValue()
+      || !var->isOrdinaryStoredProperty()
+      || !var->isLet()) {
+    diagnose(attr->getLocation(), diag::incompatible_compilerinitialized_var);
+    return;
+  }
+
+  // Because optionals are implicitly initialized to nil according to the
+  // language, this attribute doesn't make sense on optionals.
+  if (var->getType()->isOptional()) {
+    diagnose(attr->getLocation(), diag::optional_compilerinitialized);
+    return;
+  }
+
+  // To keep things even more simple in definite initialization, restrict
+  // the attribute to class/actor instance members only. This means we can
+  // focus just on the initialization in the init.
+  if (!(var->getDeclContext()->getSelfClassDecl() && var->isInstanceMember())) {
+    diagnose(attr->getLocation(), diag::instancemember_compilerinitialized);
+    return;
   }
 }
 

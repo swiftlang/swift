@@ -15,6 +15,7 @@
 
 #include "FormalEvaluation.h"
 #include "Initialization.h"
+#include "InitializeDistActorIdentity.h"
 #include "JumpDest.h"
 #include "RValue.h"
 #include "SGFContext.h"
@@ -398,6 +399,11 @@ public:
   llvm::SmallDenseMap<std::pair<PatternBindingDecl *, unsigned>,
                       AsyncLetChildTask>
       AsyncLetChildTasks;
+
+  /// Indicates whether this function is a distributed actor's designated
+  /// initializer, providing the needed clean-up to emit an identity
+  /// assignment after initializing the actorSystem property.
+  Optional<InitializeDistActorIdentity> DistActorCtorContext;
 
   /// When rebinding 'self' during an initializer delegation, we have to be
   /// careful to preserve the object at 1 retain count during the delegation
@@ -1450,7 +1456,7 @@ public:
 
   ManagedValue emitAsyncLetStart(SILLocation loc,
                                  SILValue taskOptions,
-                                 Type functionType, ManagedValue taskFunction,
+                                 AbstractClosureExpr *asyncLetEntryPoint,
                                  SILValue resultBuf);
 
   void emitFinishAsyncLet(SILLocation loc, SILValue asyncLet, SILValue resultBuf);
@@ -2071,9 +2077,19 @@ public:
   void emitDistributedActorImplicitPropertyInits(
       ConstructorDecl *ctor, ManagedValue selfArg);
 
+  /// Initializes just the implicit identity property of a distributed actor.
+  /// \param selfVal a value corresponding to the actor's self
+  /// \param actorSystemVal a value corresponding to the actorSystem, to be used
+  /// to invoke its \p assignIdentity method.
+  void emitDistActorIdentityInit(ConstructorDecl *ctor,
+                                 SILLocation loc,
+                                 SILValue selfVal,
+                                 SILValue actorSystemVal);
+
   /// Given a function representing a distributed actor factory, emits the
   /// corresponding SIL function for it.
-  void emitDistributedActorFactory(FuncDecl *fd);
+  void emitDistributedActorFactory(
+      FuncDecl *fd); // TODO(distributed): this is the "resolve"
 
   /// Notify transport that actor has initialized successfully,
   /// and is ready to receive messages.

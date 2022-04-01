@@ -107,6 +107,10 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
         auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
         (void)Param->getTypeCheckedDefaultExpr();
       }
+      if (auto *SD = dyn_cast<SubscriptDecl>(defaultArg->getParent())) {
+        auto *Param = SD->getIndices()->get(defaultArg->getIndex());
+        (void)Param->getTypeCheckedDefaultExpr();
+      }
     }
     break;
 

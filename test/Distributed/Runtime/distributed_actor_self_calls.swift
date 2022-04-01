@@ -44,6 +44,7 @@ struct FakeActorSystem: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor,
@@ -115,12 +116,28 @@ class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
   func decodeErrorType() throws -> Any.Type? { nil }
 }
 
+public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
+
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onReturnVoid() async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onThrow<Err: Error>(error: Err) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+}
+
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
 func test(system: FakeActorSystem) async {
-  _ = Philosopher(system: system)
+  _ = Philosopher(actorSystem: system)
 }
 
 @main struct Main {

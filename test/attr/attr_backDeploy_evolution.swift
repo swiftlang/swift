@@ -32,6 +32,13 @@
 // REQUIRES: executable_test
 // REQUIRES: VENDOR=apple
 
+// This test doesn't behave as expected on some deployment targets because
+// the minimum OS versions accepted by the linker are later than the deployment
+// targets given to the compiler invocation, and therefore symbols that need
+// to be weak linked for the test to function are not.
+// UNSUPPORTED: OS=ios && CPU=arm64e
+// UNSUPPORTED: OS=watchos && CPU=x86_64
+
 // ---- (0) Prepare SDK
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/SDK_ABI)
@@ -132,59 +139,51 @@ do {
 }
 
 do {
-  let zero = MutableInt.zero
-  precondition(zero.value == 0)
+  let empty = IntArray.empty
+  precondition(empty.values == [])
 
-  var int = MutableInt(5)
+  var array = IntArray([5])
 
-  // CHECK-ABI: library: 5
-  // CHECK-BD: client: 5
-  int.print()
+  // CHECK-ABI: library: [5]
+  // CHECK-BD: client: [5]
+  array.print()
 
-  precondition(int.increment(by: 2) == 7)
-  precondition(genericIncrement(&int, by: 3) == 10)
-  precondition(int.decrement(by: 1) == 9)
+  array.append(42)
+  genericAppend(&array, 3)
+  let countable = array.toCountable()
+  precondition(existentialCount(countable) == 3)
+  array[1] += 1
+  precondition(array[1] == 43)
 
-  var incrementable: any Incrementable = int.toIncrementable()
-
-  // CHECK-ABI: library: 10
-  // CHECK-BD: client: 10
-  existentialIncrementByOne(&incrementable)
-
-  let int2 = MutableInt(0x7BB7914B)
-  for (i, expectedByte) in [0x4B, 0x91, 0xB7, 0x7B].enumerated() {
-    precondition(int2[byteAt: i] == expectedByte)
-  }
+  // CHECK-ABI: library: [5, 43, 3]
+  // CHECK-BD: client: [5, 43, 3]
+  array.print()
 }
 
 do {
-  let zero = ReferenceInt.zero
-  precondition(zero.value == 0)
+  let empty = ReferenceIntArray.empty
+  precondition(empty.values == [])
 
-  var int = ReferenceInt(42)
+  var array = ReferenceIntArray([7])
 
-  // CHECK-ABI: library: 42
-  // CHECK-BD: client: 42
-  int.print()
+  // CHECK-ABI: library: [7]
+  // CHECK-BD: client: [7]
+  array.print()
 
   do {
-    let copy = int.copy()
-    precondition(int !== copy)
-    precondition(copy.value == 42)
+    let copy = array.copy()
+    precondition(array !== copy)
+    precondition(copy.values == [7])
   }
 
-  precondition(int.increment(by: 2) == 44)
-  precondition(genericIncrement(&int, by: 3) == 47)
-  precondition(int.decrement(by: 46) == 1)
+  array.append(39)
+  genericAppend(&array, 1)
+  let countable = array.toCountable()
+  precondition(existentialCount(countable) == 3)
+  array[1] += 1
+  precondition(array[1] == 40)
 
-  var incrementable: any Incrementable = int.toIncrementable()
-
-  // CHECK-ABI: library: 2
-  // CHECK-BD: client: 2
-  existentialIncrementByOne(&incrementable)
-
-  let int2 = MutableInt(0x08AFAB76)
-  for (i, expectedByte) in [0x76, 0xAB, 0xAF, 0x08].enumerated() {
-    precondition(int2[byteAt: i] == expectedByte)
-  }
+  // CHECK-ABI: library: [7, 40, 1]
+  // CHECK-BD: client: [7, 40, 1]
+  array.print()
 }

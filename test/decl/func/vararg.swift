@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-type-inference-from-defaults
 
 var t1a: (Int...) = (1)
 // expected-error@-1 {{cannot create a variadic tuple}}

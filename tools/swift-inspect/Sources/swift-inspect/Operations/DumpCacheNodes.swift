@@ -21,7 +21,7 @@ internal struct DumpCacheNodes: ParsableCommand {
   var options: UniversalOptions
 
   func run() throws {
-    try inspect(process: options.nameOrPid) { process in
+    try inspect(options: options) { process in
       print("Address", "Tag", "Tag Name", "Size", "Left", "Right", separator: "\t")
       try process.context.allocations.forEach {
         var node: swift_metadata_cache_node_t = swift_metadata_cache_node_t()

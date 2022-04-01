@@ -15,6 +15,7 @@ distributed actor MyDistActor {
   let localOnlyField: SomeClass
 
   init(system: FakeActorSystem) {
+    self.actorSystem = system
     self.localOnlyField = SomeClass()
   }
 }

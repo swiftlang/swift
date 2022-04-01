@@ -88,21 +88,21 @@ func test002() {
   throw #^THROW1^#
 
 // THROW1:      Begin completions
-// THROW1-DAG:  Decl[Enum]/CurrModule:              Error4[#Error4#]; name=Error4{{$}}
-// THROW1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
-// THROW1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
-// THROW1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
-// THROW1-DAG:  Decl[Protocol]/CurrModule/Flair[RareType]: ErrorPro1[#ErrorPro1#]; name=ErrorPro1{{$}}
-// THROW1-DAG:  Decl[FreeFunction]/CurrModule:      getError1()[#Error1#]{{; name=.+$}}
-// THROW1-DAG:  Decl[FreeFunction]/CurrModule:      getNSError()[#NSError#]{{; name=.+$}}
+// THROW1-DAG:  Decl[Enum]/CurrModule/TypeRelation[Convertible]:              Error4[#Error4#]; name=Error4{{$}}
+// THROW1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error3[#Error3#]; name=Error3{{$}}
+// THROW1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error2[#Error2#]; name=Error2{{$}}
+// THROW1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error1[#Error1#]; name=Error1{{$}}
+// THROW1-DAG:  Decl[Protocol]/CurrModule/Flair[RareType]/TypeRelation[Convertible]: ErrorPro1[#ErrorPro1#]; name=ErrorPro1{{$}}
+// THROW1-DAG:  Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]:      getError1()[#Error1#]{{; name=.+$}}
+// THROW1-DAG:  Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]:      getNSError()[#NSError#]{{; name=.+$}}
 
 // If we could prove that there is no way to get to an Error value by
 // starting from these, we could remove them.  But that may be infeasible in
 // the presence of overloaded operators.
 // THROW1-DAG: Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
 // THROW1-LOCAL: Decl[LocalVar]/Local:               text[#String#]; name=text{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local:               e1[#Error1#]; name=e1{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local:               e2[#Error2#]; name=e2{{$}}
+// THROW1-LOCAL: Decl[LocalVar]/Local/TypeRelation[Convertible]:               e1[#Error1#]; name=e1{{$}}
+// THROW1-LOCAL: Decl[LocalVar]/Local/TypeRelation[Convertible]:               e2[#Error2#]; name=e2{{$}}
 }
 
 func test003() {

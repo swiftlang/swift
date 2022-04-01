@@ -120,6 +120,7 @@ struct FakeActorSystem: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -245,7 +246,6 @@ class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
       throw ExecuteDistributedTargetError(message: "Failed to decode of Int??? (for a test)")
     }
 
-
     argumentIndex += 1
     return argument
   }
@@ -263,11 +263,11 @@ class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
 struct FakeResultHandler: DistributedTargetInvocationResultHandler {
   typealias SerializationRequirement = Codable
 
-  func onReturn<Res>(value: Res) async throws {
+  func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print("RETURN: \(value)")
   }
   func onReturnVoid() async throws {
-    print("RETURN VOID:()")
+    print("RETURN VOID: ()")
   }
   func onThrow<Err: Error>(error: Err) async throws {
     print("ERROR: \(error)")
@@ -297,7 +297,7 @@ let expectsDecodeErrorName = "$s4main7GreeterC18expectsDecodeError1vySiSgSgSg_tY
 func test() async throws {
   let system = DefaultDistributedActorSystem()
 
-  let local = Greeter(system: system)
+  let local = Greeter(actorSystem: system)
 
   // act as if we decoded an Invocation:
   var emptyInvocation = FakeInvocationDecoder(args: [])
@@ -308,7 +308,7 @@ func test() async throws {
       invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
-  // CHECK: RETURN: ()
+  // CHECK: RETURN VOID: ()
 
   try await system.executeDistributedTarget(
       on: local,
@@ -370,7 +370,7 @@ func test() async throws {
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var generic2Invocation = system.makeInvocationEncoder()
 
@@ -389,7 +389,7 @@ func test() async throws {
   )
   // CHECK: ---> A = 42, type(of:) = Int
   // CHECK-NEXT: ---> B = Ultimate Question!, type(of:) = String
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var generic3Invocation = system.makeInvocationEncoder()
 
@@ -411,7 +411,7 @@ func test() async throws {
   // CHECK: ---> A = 42, type(of:) = Int
   // CHECK-NEXT: ---> B = ["a", "b", "c"], type(of:) = Array<String>
   // CHECK-NEXT: ---> C = S<Int>(data: 42), type(of:) = S<Int>
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var generic4Invocation = system.makeInvocationEncoder()
 
@@ -433,7 +433,7 @@ func test() async throws {
   // CHECK: ---> A = 42, type(of:) = Int
   // CHECK-NEXT: ---> B = S<Int>(data: 42), type(of:) = S<Int>
   // CHECK-NEXT: ---> C = ["a", "b", "c"], type(of:) = Array<String>
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var generic5Invocation = system.makeInvocationEncoder()
 
@@ -462,7 +462,7 @@ func test() async throws {
   // CHECK-NEXT: ---> B(SER) = data: 42;
   // CHECK-NEXT: ---> C(SER) = Hello, World!;
   // CHECK-NEXT: ---> D(SER) = 0: 0; 1: 42;
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var genericOptInvocation = system.makeInvocationEncoder()
 
@@ -478,7 +478,7 @@ func test() async throws {
     handler: FakeResultHandler()
   )
   // CHECK: ---> T = [0, 42], type(of:) = Optional<Array<Int>>
-  // CHECK-NEXT: RETURN: ()
+  // CHECK-NEXT: RETURN VOID: ()
 
   var decodeErrInvocation = system.makeInvocationEncoder()
 

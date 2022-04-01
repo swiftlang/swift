@@ -331,7 +331,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $C):
   %5 = address_to_pointer %3 : $*Int64 to $Builtin.RawPointer
   // function_ref closure #1 in C.publicProp.materializeForSet
   %6 = function_ref @$s10access_wmo1CC10publicPropSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed C, @thick C.Type) -> ()
-  %7 = thin_function_to_pointer %6 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed C, @thick C.Type) -> () to $Builtin.RawPointer
+  %7 = unchecked_bitwise_cast %6 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed C, @thick C.Type) -> () to $Builtin.RawPointer
   %8 = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %7 : $Builtin.RawPointer
   %9 = tuple (%5 : $Builtin.RawPointer, %8 : $Optional<Builtin.RawPointer>)
   return %9 : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)

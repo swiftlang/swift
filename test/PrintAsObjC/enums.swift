@@ -13,6 +13,13 @@
 // RUN: %check-in-clang %t/enums.WMO.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.WMO.h -include ctypes.h -include CoreFoundation.h
 
+// Ensure that providing the output header path via the supplementary output
+// file map also works.
+
+// RUN: echo "{\"%s\": {\"objc-header\": \"%t/enums-supplemental.h\"}}" > %t-output-file-map.json
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -enable-source-import -typecheck -supplementary-output-file-map %t-output-file-map.json -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
+// RUN: %FileCheck -check-prefix CHECK-SUPPLEMENTAL %s < %t/enums-supplemental.h
+
 // REQUIRES: objc_interop
 
 import Foundation
@@ -22,6 +29,9 @@ import Foundation
 // CHECK-LABEL: enum FooComments : NSInteger;
 // CHECK-LABEL: enum NegativeValues : int16_t;
 // CHECK-LABEL: enum ObjcEnumNamed : NSInteger;
+
+// CHECK-SUPPLEMENTAL: enum NegativeValues : int16_t;
+// CHECK-SUPPLEMENTAL: enum ObjcEnumNamed : NSInteger;
 
 // CHECK-LABEL: @interface AnEnumMethod
 // CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo SWIFT_WARN_UNUSED_RESULT;

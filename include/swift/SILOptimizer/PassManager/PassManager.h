@@ -329,11 +329,7 @@ public:
   ~SILPassManager();
 
   /// Verify all analyses.
-  void verifyAnalyses() const {
-    for (auto *A : Analyses) {
-      A->verify();
-    }
-  }
+  void verifyAnalyses() const;
 
   /// Precompute all analyses.
   void forcePrecomputeAnalyses(SILFunction *F) {
@@ -348,11 +344,7 @@ public:
   /// Discussion: We leave it up to the analyses to decide how to implement
   /// this. If no override is provided the SILAnalysis should just call the
   /// normal verify method.
-  void verifyAnalyses(SILFunction *F) const {
-    for (auto *A : Analyses) {
-      A->verify(F);
-    }
-  }
+  void verifyAnalyses(SILFunction *F) const;
 
   void executePassPipelinePlan(const SILPassPipelinePlan &Plan);
 

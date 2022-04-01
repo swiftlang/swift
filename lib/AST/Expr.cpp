@@ -198,7 +198,8 @@ Expr *Expr::getSemanticsProvidingExpr() {
   return this;
 }
 
-bool Expr::printConstExprValue(llvm::raw_ostream *OS) const {
+bool Expr::printConstExprValue(llvm::raw_ostream *OS,
+                        llvm::function_ref<bool(Expr*)> additionalCheck) const {
   auto print = [&](StringRef text) {
     if (OS) {
       *OS << text;
@@ -242,7 +243,7 @@ bool Expr::printConstExprValue(llvm::raw_ostream *OS) const {
     for (unsigned N = CE->getNumElements(), I = 0; I != N; I ++) {
       auto Ele = CE->getElement(I);
       auto needComma = I + 1 != N;
-      if (!Ele->printConstExprValue(OS)) {
+      if (!Ele->printConstExprValue(OS, additionalCheck)) {
         return false;
       }
       if (needComma)
@@ -257,7 +258,7 @@ bool Expr::printConstExprValue(llvm::raw_ostream *OS) const {
     for (unsigned N = TE->getNumElements(), I = 0; I != N; I ++) {
       auto Ele = TE->getElement(I);
       auto needComma = I + 1 != N;
-      if (!Ele->printConstExprValue(OS)) {
+      if (!Ele->printConstExprValue(OS, additionalCheck)) {
         return false;
       }
       if (needComma)
@@ -267,12 +268,13 @@ bool Expr::printConstExprValue(llvm::raw_ostream *OS) const {
     return true;
   }
   default:
-    return false;
+    return additionalCheck && additionalCheck(const_cast<Expr*>(this));
   }
 }
 
-bool Expr::isSemanticallyConstExpr() const {
-  return printConstExprValue(nullptr);
+bool Expr::isSemanticallyConstExpr(
+    llvm::function_ref<bool(Expr*)> additionalCheck) const {
+  return printConstExprValue(nullptr, additionalCheck);
 }
 
 Expr *Expr::getValueProvidingExpr() {

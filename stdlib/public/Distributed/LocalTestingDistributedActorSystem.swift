@@ -28,6 +28,7 @@ import WinSDK
 @available(SwiftStdlib 5.7, *)
 public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = LocalTestingActorAddress
+  public typealias ResultHandler = LocalTestingInvocationResultHandler
   public typealias InvocationEncoder = LocalTestingInvocationEncoder
   public typealias InvocationDecoder = LocalTestingInvocationDecoder
   public typealias SerializationRequirement = Codable
@@ -169,7 +170,7 @@ public struct LocalTestingInvocationEncoder: DistributedTargetInvocationEncoder 
 }
 
 @available(SwiftStdlib 5.7, *)
-public final class LocalTestingInvocationDecoder : DistributedTargetInvocationDecoder {
+public class LocalTestingInvocationDecoder : DistributedTargetInvocationDecoder {
   public typealias SerializationRequirement = Codable
 
   public func decodeGenericSubstitutions() throws -> [Any.Type] {
@@ -185,6 +186,22 @@ public final class LocalTestingInvocationDecoder : DistributedTargetInvocationDe
   }
 
   public func decodeReturnType() throws -> Any.Type? {
+    fatalError("Attempted to call decoder method in a local-only actor system")
+  }
+}
+
+@available(SwiftStdlib 5.7, *)
+public struct LocalTestingInvocationResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    fatalError("Attempted to call decoder method in a local-only actor system")
+  }
+
+  public func onReturnVoid() async throws {
+    fatalError("Attempted to call decoder method in a local-only actor system")
+  }
+
+  public func onThrow<Err: Error>(error: Err) async throws {
     fatalError("Attempted to call decoder method in a local-only actor system")
   }
 }

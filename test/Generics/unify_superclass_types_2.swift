@@ -38,10 +38,10 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK-RULE-NEXT: Rewrite system: {
 // CHECK-RULE:      - τ_0_0.[P2:X] => τ_0_0.[P1:X]
 // CHECK-RULE:      - τ_0_0.[P1:X].[superclass: Generic<τ_0_0.[P2:A2], String, τ_0_0.[P2:B2]>] => τ_0_0.[P1:X]
-// CHECK-RULE:      - τ_0_0.[P1:X].[superclass: Generic<Int, String, τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
 // CHECK-RULE:      - τ_0_0.[P1:A1].[concrete: String] => τ_0_0.[P1:A1]
-// CHECK-RULE:      - τ_0_0.[P2:A2].[concrete: Int] => τ_0_0.[P2:A2]
 // CHECK-RULE:      - τ_0_0.[P2:B2] => τ_0_0.[P1:B1]
+// CHECK-RULE:      - τ_0_0.[P2:A2].[concrete: Int] => τ_0_0.[P2:A2]
+// CHECK-RULE:      - τ_0_0.[P1:X].[superclass: Generic<Int, String, τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
 // CHECK-RULE:      - τ_0_0.B2 => τ_0_0.[P1:B1]
 // CHECK-RULE:      }
 // CHECK-RULE: Property map: {

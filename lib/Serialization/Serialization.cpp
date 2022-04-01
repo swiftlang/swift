@@ -3898,7 +3898,7 @@ public:
     auto genericSigID = S.addGenericSignatureRef(opaqueDecl->getGenericSignature());
 
     SubstitutionMapID underlyingSubsID = 0;
-    if (auto underlying = opaqueDecl->getUnderlyingTypeSubstitutions())
+    if (auto underlying = opaqueDecl->getUniqueUnderlyingTypeSubstitutions())
       underlyingSubsID = S.addSubstitutionMapRef(*underlying);
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(opaqueDecl->getFormalAccess());

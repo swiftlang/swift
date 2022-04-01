@@ -2335,19 +2335,6 @@ ThinToThickFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
       DebugLoc, Operand, TypeDependentOperands, Ty, forwardingOwnershipKind);
 }
 
-PointerToThinFunctionInst *
-PointerToThinFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                                  SILType Ty, SILFunction &F) {
-  SILModule &Mod = F.getModule();
-  SmallVector<SILValue, 8> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, F, Ty.getASTType());
-  unsigned size =
-    totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
-  void *Buffer = Mod.allocateInst(size, alignof(PointerToThinFunctionInst));
-  return ::new (Buffer) PointerToThinFunctionInst(DebugLoc, Operand,
-                                                  TypeDependentOperands, Ty);
-}
-
 ConvertFunctionInst *ConvertFunctionInst::create(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
     SILFunction *F,

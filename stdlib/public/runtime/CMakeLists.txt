@@ -282,10 +282,13 @@ foreach(sdk ${SWIFT_SDKS})
         endif()
       endif()
       set(libpthread -lpthread)
+      set(concurrency_libs)
       set(android_libraries)
       if(${sdk} STREQUAL ANDROID)
         set(android_libraries -llog)
         set(libpthread)
+      elseif(SWIFT_CONCURRENCY_USES_DISPATCH)
+        set(concurrency_libs "-ldispatch -lBlocksRuntime")
       endif()
 
       set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
@@ -294,6 +297,7 @@ foreach(sdk ${SWIFT_SDKS})
 ${libpthread}
 ${android_libraries}
 -lswiftCore
+${concurrency_libs}
 -lstdc++
 -lm
 -Xlinker -export-dynamic

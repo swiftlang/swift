@@ -10,7 +10,6 @@
 import Distributed
 import def_distributed
 
-func testDoSomethingDistributed(system: FakeActorSystem) {
-  let _: DA = DA(system: system)
+func testDoSomethingDistributed(system: LocalTestingDistributedActorSystem) {
+  let _: DA = DA(actorSystem: system)
 }
-

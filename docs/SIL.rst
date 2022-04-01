@@ -6632,16 +6632,6 @@ passed to a function (materializeForSet) which escapes the closure in a way not
 expressed by the convert's users. The mandatory pass must ensure the lifetime
 in a conservative way.
 
-thin_function_to_pointer
-````````````````````````
-
-TODO
-
-pointer_to_thin_function
-````````````````````````
-
-TODO
-
 classify_bridge_object
 ``````````````````````
 ::

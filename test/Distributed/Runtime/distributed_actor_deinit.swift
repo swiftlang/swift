@@ -15,17 +15,23 @@ import Distributed
 actor A {}
 
 distributed actor DA {
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 }
 
 distributed actor DA_userDefined {
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 
   deinit {}
 }
 
 distributed actor DA_userDefined2 {
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -37,7 +43,9 @@ distributed actor DA_state {
   var name = "Hello"
   var age = 42
 
-  init(system: FakeActorSystem) {}
+  init(system: FakeActorSystem) {
+    self.actorSystem = system
+  }
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -59,6 +67,7 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
   typealias SerializationRequirement = Codable
   typealias InvocationDecoder = FakeDistributedInvocationEncoder
   typealias InvocationEncoder = FakeDistributedInvocationEncoder
+  typealias ResultHandler = FakeResultHandler
 
   var n = 0
 
@@ -141,6 +150,23 @@ class FakeDistributedInvocationEncoder: DistributedTargetInvocationEncoder, Dist
   }
   func decodeErrorType() throws -> Any.Type? {
     nil
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
+
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onReturnVoid() async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onThrow<Err: Error>(error: Err) async throws {
+    fatalError("Not implemented: \(#function)")
   }
 }
 

@@ -24,11 +24,8 @@ common unit testing patterns that is used in this project.
 
 import logging
 import sys
-try:
-    from StringIO import StringIO  # for Python 2
-except ImportError:
-    from io import StringIO  # for Python 3
 from contextlib import contextmanager
+from io import StringIO
 
 
 @contextmanager

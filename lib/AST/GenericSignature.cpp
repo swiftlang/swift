@@ -1067,7 +1067,9 @@ void swift::validateGenericSignature(ASTContext &context,
         GenericSignatureWithError());
 
     // If there were any errors, the signature was invalid.
-    if (newSigWithError.getInt()) {
+    auto errorFlags = newSigWithError.getInt();
+    if (errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements) ||
+        errorFlags.contains(GenericSignatureErrorFlags::CompletionFailed)) {
       context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_valid,
                              sig->getAsString());
     }

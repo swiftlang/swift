@@ -205,6 +205,57 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async16varSimpleTestVaryyYaFTY4_"(i8* swiftasync %0)
 // CHECK: call void @llvm.dbg.value(metadata %T27move_function_dbginfo_async5KlassC** undef, metadata ![[METADATA:[0-9]+]], metadata !DIExpression()), !dbg ![[ADDR_LOC:[0-9]+]]
 // CHECK: call void @llvm.dbg.addr(metadata i8* %0, metadata ![[METADATA]], metadata !DIExpression(DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 8)), !dbg ![[ADDR_LOC]]
+
+// We are not an argument, so no problem here.
+//
+// DWARF: DW_AT_linkage_name	("$s3out16varSimpleTestVaryyYaF")
+//
+// DWARF: DW_AT_linkage_name	("$s3out16varSimpleTestVaryyYaFTY0_")
+// DWARF:    DW_TAG_variable
+// DWARF-NEXT: DW_AT_location
+// DWARF-NEXT: DW_AT_name ("m")
+//
+// DWARF:    DW_TAG_variable
+// DWARF-NEXT: DW_AT_location   (DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
+// DWARF-NEXT: DW_AT_name       ("k")
+//
+// DWARF: DW_AT_linkage_name	("$s3out16varSimpleTestVaryyYaFTQ1_")
+// DWARF:    DW_TAG_variable
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x10)
+// DWARF-NEXT: DW_AT_name ("m")
+//
+// DWARF:    DW_TAG_variable
+// DWARF-NEXT: DW_AT_location   (DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
+// DWARF-NEXT: DW_AT_name       ("k")
+//
+// DWARF: DW_AT_linkage_name	("$s3out16varSimpleTestVaryyYaFTY2_")
+// DWARF:    DW_TAG_variable
+// DWARF-NEXT: DW_AT_location
+// DWARF-NEXT: DW_AT_name ("m")
+//
+// DWARF:    DW_TAG_variable
+// DWARF-NEXT: DW_AT_location   (0x{{[0-9a-f]+}}:
+// DWARF-NEXT:    [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
+// DWARF-NEXT: DW_AT_name       ("k")
+//
+// DWARF: DW_AT_linkage_name  ("$s3out16varSimpleTestVaryyYaFTQ3_")
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location  (DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x10)
+// DWARF-NEXT: DW_AT_name  ("m")
+// K is dead here.
+// DWARF: DW_TAG_variable
+// DWARF-NEXT:    DW_AT_name  ("k")
+//
+// We reinitialize k in 4.
+// DWARF: DW_AT_linkage_name  ("$s3out16varSimpleTestVaryyYaFTY4_")
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location  (DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x10)
+// DWARF-NEXT: DW_AT_name  ("m")
+//
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location  (0x{{[0-9a-f]+}}:
+// DWARF-NEXT: [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
+// DWARF-NEXT: DW_AT_name ("k")
 public func varSimpleTestVar() async {
     var k = Klass()
     k.doSomething()

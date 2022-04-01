@@ -1614,10 +1614,11 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     if (auto attr = proto->getAttrs().getAttribute<ObjCAttr>()) {
       isObjC = objCReasonForObjCAttr(attr);
 
-      // If the protocol is @objc, it may only refine other @objc protocols.
+      // If the protocol is @objc, it may only refine other @objc protocols and
+      // marker protocols.
       // FIXME: Revisit this restriction.
       for (auto inherited : proto->getInheritedProtocols()) {
-        if (!inherited->isObjC()) {
+        if (!inherited->isObjC() && !inherited->isMarkerProtocol()) {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
                           proto->getDeclaredInterfaceType(),
                           inherited->getDeclaredInterfaceType());

@@ -26,11 +26,11 @@ protocol PBad {
 // FIXME: Terrible diagnostics.
 
 protocol PWorse {
-// expected-error@-1 4{{circular reference}}
-// expected-note@-2 6{{through reference here}}
+// expected-error@-1 5{{circular reference}}
+// expected-note@-2 9{{through reference here}}
   typealias A = C
 
   associatedtype T : Self.A
-// expected-note@-1 4{{while resolving type 'Self.A'}}
-// expected-note@-2 4{{through reference here}}
+// expected-note@-1 5{{while resolving type 'Self.A'}}
+// expected-note@-2 5{{through reference here}}
 }

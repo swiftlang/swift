@@ -1546,6 +1546,14 @@ swift::getDisallowedOriginKind(const Decl *decl,
     // Implementation-only imported, cannot be reexported.
     return DisallowedOriginKind::ImplementationOnly;
   } else if ((decl->isSPI() || decl->isAvailableAsSPI()) && !where.isSPI()) {
+    // Allowing unavailable context to use @_spi_available decls.
+    // Decls with @_spi_available aren't hidden entirely from public interfaces,
+    // thus public interfaces may still refer them. Be forgiving here so public
+    // interfaces can compile.
+    if (where.getUnavailablePlatformKind().hasValue() &&
+        decl->isAvailableAsSPI() && !decl->isSPI()) {
+      return DisallowedOriginKind::None;
+    }
     // SPI can only be exported in SPI.
     return where.getDeclContext()->getParentModule() == M ?
       DisallowedOriginKind::SPILocal :

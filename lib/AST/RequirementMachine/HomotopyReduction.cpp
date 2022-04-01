@@ -19,9 +19,11 @@
 // 2) Small enough that no further rules can be deleted without changing the
 //    resulting confluent rewrite system.
 //
-// Redundant rules that are not part of the minimal set are redundant are
-// detected by analyzing the set of rewrite loops computed by the completion
-// procedure. See RewriteLoop.cpp for a discussion of rewrite loops.
+// The main entry point here is RewriteSystem::minimizeRewriteSystem().
+//
+// Redundant rules are detected by analyzing the set of rewrite loops computed
+// by the completion procedure. See RewriteLoop.cpp for a discussion of rewrite
+// loops.
 //
 // If a rewrite rule appears exactly once in a loop and without context, the
 // loop witnesses a redundancy; the rewrite rule is equivalent to traveling
@@ -455,62 +457,6 @@ void RewriteSystem::performHomotopyReduction(
 
     deleteRule(ruleID, replacementPath);
   }
-
-  propagateRedundantRequirementIDs();
-}
-
-void RewriteSystem::normalizeRedundantRules() {
-  llvm::DenseMap<unsigned, unsigned> RedundantRuleMap;
-
-  // A redundant path in the range [0, i-1] might contain rewrite steps naming
-  // rules that subsequently became redundant in the range [i, e-1].
-  //
-  // We back-substitute later rules into earlier paths here.
-  for (unsigned i = 0, e = RedundantRules.size(); i < e; ++i) {
-    // Pre-condition: Redundant paths in the range [i+1, e-1] do not involve
-    // any other redundant rules.
-    unsigned j = e - i - 1;
-
-    // Replace all occurrences of redundant rules with their path at
-    // RedundantRules[i].
-    auto &pair = RedundantRules[j];
-    pair.second.replaceRulesWithPaths(
-        [&](unsigned ruleID) -> RewritePath * {
-          auto found = RedundantRuleMap.find(ruleID);
-          if (found != RedundantRuleMap.end())
-            return &RedundantRules[found->second].second;
-
-          return nullptr;
-        });
-    pair.second.computeNormalForm(*this);
-
-    RedundantRuleMap[RedundantRules[j].first] = j;
-
-    // Post-condition: the path for RedundantRules[i] does not contain any
-    // redundant rules.
-  }
-
-  if (Debug.contains(DebugFlags::RedundantRules)) {
-    llvm::dbgs() << "\nRedundant rules:\n";
-    for (const auto &pair : RedundantRules) {
-      const auto &rule = getRule(pair.first);
-      llvm::dbgs() << "- ("
-                   << rule.getLHS() << " => "
-                   << rule.getRHS() << ") ::== ";
-
-      MutableTerm lhs(rule.getLHS());
-      pair.second.dump(llvm::dbgs(), lhs, *this);
-
-      llvm::dbgs() << "\n";
-
-      if (Debug.contains(DebugFlags::RedundantRulesDetail)) {
-        llvm::dbgs() << "\n";
-        pair.second.dumpLong(llvm::dbgs(), lhs, *this);
-
-        llvm::dbgs() << "\n\n";
-      }
-    }
-  }
 }
 
 /// Use the loops to delete redundant rewrite rules via a series of Tietze
@@ -527,6 +473,7 @@ void RewriteSystem::minimizeRewriteSystem() {
 
   assert(Complete);
   assert(!Minimized);
+  assert(!Frozen);
   Minimized = 1;
 
   propagateExplicitBits();
@@ -644,12 +591,34 @@ void RewriteSystem::minimizeRewriteSystem() {
     return false;
   });
 
-  normalizeRedundantRules();
+  propagateRedundantRequirementIDs();
 
   // Check invariants after homotopy reduction.
   verifyRewriteLoops();
   verifyRedundantConformances(redundantConformances);
   verifyMinimizedRules(redundantConformances);
+
+  if (Debug.contains(DebugFlags::RedundantRules)) {
+    llvm::dbgs() << "\nRedundant rules:\n";
+    for (const auto &pair : RedundantRules) {
+      const auto &rule = getRule(pair.first);
+      llvm::dbgs() << "- ("
+                   << rule.getLHS() << " => "
+                   << rule.getRHS() << ") ::== ";
+
+      MutableTerm lhs(rule.getLHS());
+      pair.second.dump(llvm::dbgs(), lhs, *this);
+
+      llvm::dbgs() << "\n";
+
+      if (Debug.contains(DebugFlags::RedundantRulesDetail)) {
+        llvm::dbgs() << "\n";
+        pair.second.dumpLong(llvm::dbgs(), lhs, *this);
+
+        llvm::dbgs() << "\n\n";
+      }
+    }
+  }
 }
 
 /// Returns flags indicating if the rewrite system has unresolved or
@@ -660,7 +629,7 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
 
   GenericSignatureErrors result;
 
-  for (const auto &rule : Rules) {
+  for (const auto &rule : getLocalRules()) {
     if (rule.isPermanent())
       continue;
 
@@ -670,10 +639,15 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
     if (!rule.isRedundant() &&
         !rule.isProtocolTypeAliasRule() &&
         rule.containsUnresolvedSymbols())
-      result |= GenericSignatureErrorFlags::HasUnresolvedType;
+      result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
     if (rule.isConflicting())
-      result |= GenericSignatureErrorFlags::HasConflict;
+      result |= GenericSignatureErrorFlags::HasInvalidRequirements;
+
+    if (!rule.isRedundant())
+      if (auto property = rule.isPropertyRule())
+        if (property->getKind() == Symbol::Kind::ConcreteConformance)
+          result |= GenericSignatureErrorFlags::HasConcreteConformances;
   }
 
   return result;
@@ -849,7 +823,11 @@ void RewriteSystem::verifyMinimizedRules(
     abort();
   }
 
-  for (const auto &pair : RedundantRules) {
+  // Replacement paths for redundant rules can only reference other redundant
+  // rules if those redundant rules were made redundant later, ie if they
+  // appear later in the array.
+  llvm::DenseSet<unsigned> laterRedundantRules;
+  for (const auto &pair : llvm::reverse(RedundantRules)) {
     const auto &rule = getRule(pair.first);
     if (!rule.isRedundant()) {
       llvm::errs() << "Recorded replacement path for non-redundant rule "
@@ -860,14 +838,19 @@ void RewriteSystem::verifyMinimizedRules(
 
     for (const auto &step : pair.second) {
       if (step.Kind == RewriteStep::Rule) {
-        const auto &rule = getRule(step.getRuleID());
-        if (rule.isRedundant()) {
+        unsigned otherRuleID = step.getRuleID();
+        const auto &otherRule = getRule(otherRuleID);
+        if (otherRule.isRedundant() &&
+            !laterRedundantRules.count(otherRuleID)) {
           llvm::errs() << "Redundant requirement path contains a redundant "
-                          "rule " << rule << "\n";
+                          "rule " << otherRule << "\n";
           dump(llvm::errs());
           abort();
         }
       }
     }
+
+    laterRedundantRules.insert(pair.first);
   }
+
 }

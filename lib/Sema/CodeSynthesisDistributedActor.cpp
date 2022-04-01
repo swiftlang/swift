@@ -55,7 +55,7 @@ static VarDecl *addImplicitDistributedActorIDProperty(
   // ==== Synthesize and add 'id' property to the actor decl
   Type propertyType = getDistributedActorIDType(nominal);
 
-  VarDecl *propDecl = new (C)
+  auto *propDecl = new (C)
       VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
               SourceLoc(), C.Id_id, nominal);
   propDecl->setImplicit();
@@ -76,6 +76,10 @@ static VarDecl *addImplicitDistributedActorIDProperty(
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
       new (C) NonisolatedAttr(/*IsImplicit=*/true));
+  // mark as @_compilerInitialized, since we synthesize the initializing
+  // assignment during SILGen.
+  propDecl->getAttrs().add(
+      new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
 
   nominal->addMember(propDecl);
   nominal->addMember(pbDecl);
@@ -226,7 +230,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   // --- Recording invocation details
   // -- recordGenericSubstitution(s)
-  if (func->isGeneric() || nominal->isGeneric()) {
+  if (thunk->isGeneric() || nominal->isGeneric()) {
     auto recordGenericSubstitutionDecl =
         C.getRecordGenericSubstitutionOnDistributedInvocationEncoder(invocationEncoderDecl);
     assert(recordGenericSubstitutionDecl);
@@ -234,12 +238,13 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         UnresolvedDeclRefExpr::createImplicit(
             C, recordGenericSubstitutionDecl->getName());
 
-    auto sig = func->getGenericSignature();
-    for (auto genParamType : sig.getGenericParams()) {
+    auto signature = thunk->getGenericSignature();
+    for (auto genParamType : signature.getGenericParams()) {
 
+      auto tyExpr = TypeExpr::createImplicit(thunk->mapTypeIntoContext(genParamType), C);
       auto subTypeExpr = new (C) DotSelfExpr(
-          TypeExpr::createImplicit(thunk->mapTypeIntoContext(genParamType), C),
-          sloc, sloc, thunk->mapTypeIntoContext(genParamType));
+          tyExpr,
+          sloc, sloc, tyExpr->getType());
 
       auto recordGenericSubArgsList =
           ArgumentList::forImplicitCallTo(
@@ -374,7 +379,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   // -- recordReturnType
   if (!isVoidReturn) {
     // Result.self
-    auto resultType = func->getResultInterfaceType();
+    // Watch out and always map into thunk context
+    auto resultType = thunk->mapTypeIntoContext(func->getResultInterfaceType());
     auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
     auto *resultTypeExpr =
         new (C) DotSelfExpr(metaTypeRef, sloc, sloc, resultType);
@@ -422,9 +428,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   }
 
   // === Prepare the 'RemoteCallTarget'
-  VarDecl *targetVar =
-      new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
-                      C.Id_target, thunk);
+  auto *targetVar = new (C) VarDecl(
+      /*isStatic=*/false, VarDecl::Introducer::Let, sloc, C.Id_target, thunk);
 
   {
     // --- Mangle the thunk name
@@ -506,7 +511,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     // -- returning: Res.Type
     if (!isVoidReturn) {
       // Result.self
-      auto resultType = func->getResultInterfaceType();
+      auto resultType =
+          func->mapTypeIntoContext(func->getResultInterfaceType());
       auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
       auto *resultTypeExpr =
           new (C) DotSelfExpr(metaTypeRef, sloc, sloc, resultType);
@@ -557,7 +563,7 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     genericParamList = genericParams->clone(DC);
   }
 
-  GenericSignature thunkGenSig =
+  GenericSignature baseSignature =
       buildGenericSignature(C, func->getGenericSignature(),
                             /*addedParameters=*/{},
                             /*addedRequirements=*/{});
@@ -577,9 +583,9 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     }
 
     auto paramDecl = new (C)
-        ParamDecl(SourceLoc(),
-                  /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
-                  /*parameterNameLoc=*/SourceLoc(), paramName, DC);
+         ParamDecl(SourceLoc(),
+                   /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
+                   /*parameterNameLoc=*/SourceLoc(), paramName, DC);
 
     paramDecl->setImplicit(true);
     paramDecl->setSpecifier(funcParam->getSpecifier());
@@ -589,16 +595,14 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   }
   ParameterList *params = ParameterList::create(C, paramDecls); // = funcParams->clone(C);
 
-    auto thunk = FuncDecl::createImplicit(C, swift::StaticSpellingKind::None,
-                           thunkName, SourceLoc(),
-                           /*async=*/true, /*throws=*/true,
-                           genericParamList,
-                           params,
-                           func->getResultInterfaceType(),
-                           DC);
+  auto thunk = FuncDecl::createImplicit(
+      C, swift::StaticSpellingKind::None, thunkName, SourceLoc(),
+      /*async=*/true, /*throws=*/true,
+      genericParamList, params,
+      func->getResultInterfaceType(), DC);
   thunk->setSynthesized(true);
-  thunk->getAttrs().add(new (C) NonisolatedAttr(/*implicit=*/true));
-  thunk->setGenericSignature(thunkGenSig);
+  thunk->getAttrs().add(new (C) NonisolatedAttr(/*isImplicit=*/true));
+  thunk->setGenericSignature(baseSignature);
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
   thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
 
@@ -695,8 +699,7 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
   // Force type-checking the original function, so we can avoid synthesizing
   // the thunks (which would have many of the same errors, if they are caused
   // by a bad source function signature, e.g. missing conformances etc).
-  (void) TypeChecker::typeCheckDecl(distributedTarget);
-  if (distributedTarget->getDiags().hadAnyError()) {
+  if (distributedTarget->getInterfaceType()->hasError()) {
     return nullptr;
   }
 
@@ -734,7 +737,6 @@ VarDecl *GetDistributedActorIDPropertyRequest::evaluate(
 
   return addImplicitDistributedActorIDProperty(classDecl);
 }
-
 
 VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
@@ -783,10 +785,8 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   return nullptr;
 }
 
-NormalProtocolConformance
-*GetDistributedActorImplicitCodableRequest::evaluate(
-    Evaluator &evaluator,
-    NominalTypeDecl *nominal,
+NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *nominal,
     KnownProtocolKind protoKind) const {
   assert(nominal->isDistributedActor());
   assert(protoKind == KnownProtocolKind::Encodable ||

@@ -102,9 +102,17 @@ class RewriteSystem final {
   /// Whether we've minimized the rewrite system.
   unsigned Minimized : 1;
 
+  /// Whether the rewrite system is finalized, immutable, and ready for
+  /// generic signature queries.
+  unsigned Frozen : 1;
+
   /// If set, the completion procedure records rewrite loops describing the
   /// identities among rewrite rules discovered while resolving critical pairs.
   unsigned RecordLoops : 1;
+
+  /// The length of the longest initial rule, used for the MaxRuleLength
+  /// completion non-termination heuristic.
+  unsigned LongestInitialRule : 16;
 
 public:
   explicit RewriteSystem(RewriteContext &ctx);
@@ -130,6 +138,10 @@ public:
                   std::vector<Rule> &&importedRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
                   std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
+
+  unsigned getLongestInitialRule() const {
+    return LongestInitialRule;
+  }
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
     return Protos;
@@ -216,6 +228,11 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
+
+  void computeConflictDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                  SourceLoc signatureLoc,
+                                  const PropertyMap &map,
+                                  TypeArrayView<GenericTypeParamType> genericParams);
 
 private:
   struct CriticalPair {
@@ -359,8 +376,6 @@ private:
   void computeMinimalConformances(
       llvm::DenseSet<unsigned> &redundantConformances);
 
-  void normalizeRedundantRules();
-
 public:
   void recordRewriteLoop(MutableTerm basepoint,
                          RewritePath path);
@@ -397,6 +412,8 @@ private:
       const llvm::DenseSet<unsigned> &redundantConformances) const;
 
 public:
+  void freeze();
+
   void dump(llvm::raw_ostream &out) const;
 };
 

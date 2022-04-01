@@ -302,8 +302,8 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       accessLevel = decl->getEffectiveAccess();
       auto systemTy = getDistributedActorSystemType(classDecl);
 
-      // Create the parameter.
-      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_system, Loc,
+      // Create the parameter. API name is actorSystem, local name is system
+      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_actorSystem, Loc,
                                       ctx.Id_system, decl);
       arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(systemTy);
@@ -331,6 +331,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
   if (ICK == ImplicitConstructorKind::Memberwise) {
     ctor->setIsMemberwiseInitializer();
+    addNonIsolatedToSynthesized(decl, ctor);
   }
 
   // If we are defining a default initializer for a class that has a superclass,
@@ -748,7 +749,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
           return GenericEnvironment::mapTypeIntoContext(
             genericEnv, substType);
         });
-    if (checkResult != RequirementCheckResult::Success)
+    if (checkResult != CheckGenericArgumentsResult::Success)
       return nullptr;
   }
 
@@ -1525,4 +1526,13 @@ void swift::addFixedLayoutAttr(NominalTypeDecl *nominal) {
   }
   // Add `@_fixed_layout` to the nominal.
   nominal->getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
+}
+
+void swift::addNonIsolatedToSynthesized(
+    NominalTypeDecl *nominal, ValueDecl *value) {
+  if (!getActorIsolation(nominal).isActorIsolated())
+    return;
+
+  ASTContext &ctx = nominal->getASTContext();
+  value->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
 }

@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
@@ -168,6 +169,7 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
       DerivedConformance::SynthesizedIntroducer::Var, C.Id_rawValue,
       rawInterfaceType, rawType, /*isStatic=*/false,
       /*isFinal=*/false);
+  addNonIsolatedToSynthesized(enumDecl, propDecl);
 
   // Define the getter.
   auto getterDecl = DerivedConformance::addGetterToReadOnlyDerivedProperty(
@@ -432,7 +434,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
-
+  addNonIsolatedToSynthesized(enumDecl, initDecl);
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
 
   // If the containing module is not resilient, make sure clients can construct

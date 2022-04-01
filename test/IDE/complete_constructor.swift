@@ -361,3 +361,19 @@ func testInitWithUnresolved() {
 // INIT_WITH_UNRESOLVEDTYPE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg2: _#}[')'][#InitWithUnresolved<_>#];
 // INIT_WITH_UNRESOLVEDTYPE_1: End completions
 }
+
+func testIgnoreGenericArgsAfterCompletionToken() {
+  struct IPv4 {}
+
+  public struct HostRecord<IPType> {
+    init(position: inout Int) throws {}
+  }
+
+  func deserializeRecord() throws -> HostRecord<IPv4> {
+    var position = 42
+    return try #^IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN^#HostRecord<IPv4>(position: &position)
+// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN: Begin completions
+// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN-DAG: Decl[Struct]/Local: HostRecord[#HostRecord#];
+// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN: End completions
+  }
+}

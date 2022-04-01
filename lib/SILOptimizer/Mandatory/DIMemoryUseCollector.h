@@ -274,6 +274,10 @@ enum DIUseKind {
   /// The instruction is a store to a member of a larger struct value.
   PartialStore,
 
+  /// This instruction is an init, assignment, or store to a
+  /// @_compilerInitialized field that was _not_ automatically generated
+  BadExplicitStore,
+
   /// An 'inout' argument of a function application.
   InOutArgument,
 

@@ -35,7 +35,7 @@ distributed actor Worker {
   static func main() async throws {
     let system = LocalTestingDistributedActorSystem()
 
-    let actor = Worker(system: system)
+    let actor = Worker(actorSystem: system)
     try await actor.hi() // local calls should still just work
     // CHECK: hi!
   }
