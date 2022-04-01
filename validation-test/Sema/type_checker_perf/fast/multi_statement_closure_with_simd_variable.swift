@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
 // REQUIRES: objc_interop,no_asan
+
 // REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 import simd
 
