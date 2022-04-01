@@ -21,7 +21,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Basic/OptionSet.h"
 #include <memory>
 #include <tuple>
 
@@ -51,6 +51,8 @@ namespace swift {
   class ConstraintSystem;
   class Solution;
   class SolutionApplicationTarget;
+  enum class ConstraintSystemFlags;
+  using ConstraintSystemOptions = OptionSet<ConstraintSystemFlags>;
   }
 
   /// Typecheck binding initializer at \p bindingIndex.
