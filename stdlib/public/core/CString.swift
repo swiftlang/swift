@@ -91,6 +91,13 @@ extension String {
     }
   }
 
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Operate directly on the String")
+  public init(cString nullTerminatedUTF8: String) {
+    self = nullTerminatedUTF8.withCString(String.init(cString:))
+  }
+
   /// Creates a new string by copying and validating the null-terminated UTF-8
   /// data referenced by the given pointer.
   ///
@@ -139,6 +146,13 @@ extension String {
     }) else { return nil }
 
     self = string
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Operate directly on the String")
+  public init?(validatingUTF8 cString: String) {
+    self = cString.withCString(String.init(cString:))
   }
 
   /// Creates a new string by copying the null-terminated data referenced by
@@ -248,6 +262,23 @@ extension String {
     }
   }
 
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Operate directly on the String")
+  public static func decodeCString<Encoding: _UnicodeEncoding>(
+    _ cString: String,
+    as encoding: Encoding.Type,
+    repairingInvalidCodeUnits isRepairing: Bool = true
+  ) -> (result: String, repairsMade: Bool)? {
+    return cString.withCString(encodedAs: encoding) {
+      String.decodeCString(
+        $0, as: encoding, repairingInvalidCodeUnits: isRepairing
+      )
+    }
+  }
+
   /// Creates a string from the null-terminated sequence of bytes at the given
   /// pointer.
   ///
@@ -276,6 +307,20 @@ extension String {
     as sourceEncoding: Encoding.Type
   ) {
     self = String.decodeCString(nullTerminatedCodeUnits, as: sourceEncoding)!.0
+  }
+
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Operate directly on the String")
+  public init<Encoding: _UnicodeEncoding>(
+    decodingCString nullTerminatedCodeUnits: String,
+    as sourceEncoding: Encoding.Type
+  ) {
+    self = nullTerminatedCodeUnits.withCString(encodedAs: sourceEncoding) {
+      String(decodingCString: $0, as: sourceEncoding.self)
+    }
   }
 }
 
