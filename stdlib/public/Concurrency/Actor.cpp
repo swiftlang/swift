@@ -332,6 +332,7 @@ static bool swift_task_isCurrentExecutorImpl(ExecutorRef executor) {
 static unsigned unexpectedExecutorLogLevel = 1;
 
 static void checkUnexpectedExecutorLogLevel(void *context) {
+#if SWIFT_STDLIB_HAS_ENVIRON
   const char *levelStr = getenv("SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL");
   if (!levelStr)
     return;
@@ -339,6 +340,7 @@ static void checkUnexpectedExecutorLogLevel(void *context) {
   long level = strtol(levelStr, nullptr, 0);
   if (level >= 0 && level < 3)
     unexpectedExecutorLogLevel = level;
+#endif // SWIFT_STDLIB_HAS_ENVIRON
 }
 
 SWIFT_CC(swift)
