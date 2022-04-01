@@ -223,6 +223,7 @@ enum class CompletionKind : uint8_t {
   StmtLabel,
   ForEachPatternBeginning,
   TypeAttrBeginning,
+  OptionalBinding,
 };
 
 enum class CodeCompletionDiagnosticSeverity : uint8_t {

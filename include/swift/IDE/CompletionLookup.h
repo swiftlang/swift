@@ -33,12 +33,15 @@
 namespace swift {
 namespace ide {
 
-using DeclFilter = std::function<bool(ValueDecl *, DeclVisibilityKind)>;
+using DeclFilter =
+    std::function<bool(ValueDecl *, DeclVisibilityKind, DynamicLookupInfo)>;
 
 /// A filter that always returns \c true.
-bool DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind);
+bool DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind,
+                   DynamicLookupInfo dynamicLookupInfo);
 
-bool KeyPathFilter(ValueDecl *decl, DeclVisibilityKind);
+bool KeyPathFilter(ValueDecl *decl, DeclVisibilityKind,
+                   DynamicLookupInfo dynamicLookupInfo);
 
 /// Returns \c true only if the completion is happening for top-level
 /// declrarations. i.e.:
@@ -528,7 +531,7 @@ public:
         : Consumer(Consumer), Filter(Filter) {}
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Kind,
                    DynamicLookupInfo dynamicLookupInfo) override {
-      if (Filter(VD, Kind))
+      if (Filter(VD, Kind, dynamicLookupInfo))
         Consumer.foundDecl(VD, Kind, dynamicLookupInfo);
     }
   };
@@ -588,6 +591,8 @@ public:
                                  bool ResultsHaveLeadingDot);
 
   void getStmtLabelCompletions(SourceLoc Loc, bool isContinue);
+
+  void getOptionalBindingCompletions(SourceLoc Loc);
 };
 
 } // end namespace ide
