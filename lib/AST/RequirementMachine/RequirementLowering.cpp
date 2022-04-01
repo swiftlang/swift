@@ -654,20 +654,35 @@ void swift::rewriting::realizeInheritedRequirements(
   }
 }
 
+static bool shouldSuggestConcreteTypeFixit(
+    Type type, AllowConcreteTypePolicy concreteTypePolicy) {
+  switch (concreteTypePolicy) {
+  case AllowConcreteTypePolicy::All:
+    return true;
+
+  case AllowConcreteTypePolicy::AssocTypes:
+    return type->is<DependentMemberType>();
+
+  case AllowConcreteTypePolicy::NestedAssocTypes:
+    if (auto *memberType = type->getAs<DependentMemberType>())
+      return memberType->getBase()->is<DependentMemberType>();
+
+    return false;
+  }
+}
+
 /// Emit diagnostics for the given \c RequirementErrors.
 ///
 /// \param ctx The AST context in which to emit diagnostics.
 /// \param errors The set of requirement diagnostics to be emitted.
-/// \param allowConcreteGenericParams Whether concrete type parameters
-/// are permitted in the generic signature. If true, diagnostics will
-/// offer fix-its to turn invalid type requirements, e.g. T: Int, into
-/// same-type requirements.
+/// \param concreteTypePolicy Whether fix-its should be offered to turn
+/// invalid type requirements, e.g. T: Int, into same-type requirements.
 ///
 /// \returns true if any errors were emitted, and false otherwise (including
 /// when only warnings were emitted).
 bool swift::rewriting::diagnoseRequirementErrors(
     ASTContext &ctx, ArrayRef<RequirementError> errors,
-    bool allowConcreteGenericParams) {
+    AllowConcreteTypePolicy concreteTypePolicy) {
   bool diagnosedError = false;
 
   for (auto error : errors) {
@@ -697,7 +712,7 @@ bool swift::rewriting::diagnoseRequirementErrors(
         return subjectTypeName;
       };
 
-      if (allowConcreteGenericParams) {
+      if (shouldSuggestConcreteTypeFixit(subjectType, concreteTypePolicy)) {
         auto options = PrintOptions::forDiagnosticArguments();
         auto subjectTypeName = subjectType.getString(options);
         auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
@@ -902,7 +917,8 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
   if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
       RequirementMachineMode::Enabled) {
-    diagnoseRequirementErrors(ctx, errors, /*allowConcreteGenericParams=*/false);
+    diagnoseRequirementErrors(ctx, errors,
+                              AllowConcreteTypePolicy::NestedAssocTypes);
   }
 
   return ctx.AllocateCopy(result);
@@ -1175,7 +1191,8 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
 
   if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
       RequirementMachineMode::Enabled) {
-    diagnoseRequirementErrors(ctx, errors, /*allowConcreteGenericParams=*/false);
+    diagnoseRequirementErrors(ctx, errors,
+                              AllowConcreteTypePolicy::NestedAssocTypes);
   }
 
   return ctx.AllocateCopy(result);
