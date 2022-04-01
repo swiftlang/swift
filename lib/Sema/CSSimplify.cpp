@@ -8940,6 +8940,9 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
 
   std::tie(matchVar, matchCall) = *tildeEqualsApplication;
 
+  cs.setType(matchVar, enumTy);
+  cs.setType(EP, enumTy);
+
   // result of ~= operator is always a `Bool`.
   auto target = SolutionApplicationTarget::forExprPattern(
       matchCall, DC, EP, ctx.getBoolDecl()->getDeclaredInterfaceType());
@@ -8968,7 +8971,6 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   // Store the $match variable and binary expression for solution application.
   EP->setMatchVar(matchVar);
   EP->setMatchExpr(matchCall);
-  EP->setType(enumTy);
 
   cs.setSolutionApplicationTarget(pattern, target);
 
