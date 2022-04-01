@@ -19,8 +19,14 @@ public class Base {
 
 public class Derived: Base {
   // CHECK-NOT: "precise": "s:24SuperclassImplementation4BaseC3fooyyF::SYNTHESIZED::s:24SuperclassImplementation7DerivedC"
+
+  // Also skip synthesized constructors
+  // CHECK-NOT: "precise": "s:24SuperclassImplementation7DerivedCACycfc"
 }
 
 public class DerivedDerived: Derived {
   // CHECK-NOT: "precise": "s:24SuperclassImplementation4BaseC3fooyyF::SYNTHESIZED::s:24SuperclassImplementation07DerivedC0C"
+
+  // Also skip synthesized constructors
+  // CHECK-NOT: "precise": "s:24SuperclassImplementation07DerivedC0CACycfc"
 }
