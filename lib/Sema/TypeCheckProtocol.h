@@ -1198,6 +1198,20 @@ private:
                 ConformanceChecker &checker,
                 SmallVectorImpl<InferredTypeWitnessesSolution> &solutions);
 
+  /// We may need to determine a type witness, regardless of the existence of a
+  /// default value for it, e.g. when a 'distributed actor' is looking up its
+  /// 'ID', the default defined in an extension for 'Identifiable' would be
+  /// located using the lookup resolve. This would not be correct, since the
+  /// type actually must be based on the associated 'ActorSystem'.
+  ///
+  /// TODO(distributed): perhaps there is a better way to avoid this mixup?
+  ///   Note though that this issue seems to only manifest in "real" builds
+  ///   involving multiple files/modules, and not in tests within the Swift
+  ///   project itself.
+  bool canAttemptEagerTypeWitnessDerivation(
+      ConformanceChecker &checker,
+      AssociatedTypeDecl *assocType);
+
 public:
   /// Describes a mapping from associated type declarations to their
   /// type witnesses (as interface types).
