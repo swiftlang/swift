@@ -361,8 +361,6 @@ private:
 
   void propagateRedundantRequirementIDs();
 
-  void processConflicts();
-
   using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
                                                        unsigned ruleID)>;
 
