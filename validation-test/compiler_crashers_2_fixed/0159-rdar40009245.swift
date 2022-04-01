@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
 
 protocol P {
     associatedtype A : P where A.X == Self

@@ -122,7 +122,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         originatingDC->getParentModule(),
         outerGenericSignature.getPointer(),
         genericParams,
-        WhereClauseOwner(originatingDC, genericParams),
+        WhereClauseOwner(),
         /*addedRequirements=*/{},
         /*inferenceSources=*/{},
         /*allowConcreteGenericParams=*/false};
@@ -208,6 +208,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   opaqueDecl->copyFormalAccessFrom(originatingDecl);
   if (auto originatingSig = originatingDC->getGenericSignatureOfContext()) {
     opaqueDecl->setGenericSignature(originatingSig);
+  } else {
+    // Avoid kicking off GenericSignatureRequest for the OpaqueTypeDecl.
+    opaqueDecl->setGenericSignature(GenericSignature());
   }
 
   // Resolving in the context of `opaqueDecl` allows type resolution to create
@@ -572,6 +575,8 @@ static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
 GenericSignature
 GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                   GenericContext *GC) const {
+  assert(!isa<OpaqueTypeDecl>(GC));
+
   auto &ctx = GC->getASTContext();
 
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute

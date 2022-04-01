@@ -608,6 +608,41 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 #undef ASSERT_RULE
 }
 
+/// Determine whether this is a redundantly inheritable Objective-C protocol.
+///
+/// A redundantly-inheritable Objective-C protocol is one where we will
+/// silently accept a directly-stated redundant conformance to this protocol,
+/// and emit this protocol in the list of "inherited" protocols. There are
+/// two cases where we allow this:
+///
+//    1) For a protocol defined in Objective-C, so that we will match Clang's
+///      behavior, and
+///   2) For an @objc protocol defined in Swift that directly inherits from
+///      JavaScriptCore's JSExport, which depends on this behavior.
+static bool isRedundantlyInheritableObjCProtocol(const ProtocolDecl *inheritingProto,
+                                                 const ProtocolDecl *proto) {
+  if (!proto->isObjC()) return false;
+
+  // Check the two conditions in which we will suppress the diagnostic and
+  // emit the redundant inheritance.
+  if (!inheritingProto->hasClangNode() && !proto->getName().is("JSExport"))
+    return false;
+
+  // If the inheriting protocol already has @_restatedObjCConformance with
+  // this protocol, we're done.
+  for (auto *attr : inheritingProto->getAttrs()
+                      .getAttributes<RestatedObjCConformanceAttr>()) {
+    if (attr->Proto == proto) return true;
+  }
+
+  // Otherwise, add @_restatedObjCConformance.
+  auto &ctx = proto->getASTContext();
+  const_cast<ProtocolDecl *>(inheritingProto)
+      ->getAttrs().add(new (ctx) RestatedObjCConformanceAttr(
+          const_cast<ProtocolDecl *>(proto)));
+  return true;
+}
+
 /// Computes the set of explicit redundant requirements to
 /// emit warnings for in the source code.
 void RewriteSystem::computeRedundantRequirementDiagnostics(
@@ -689,8 +724,18 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
   auto isRedundantRule = [&](unsigned ruleID) {
     const auto &rule = getRules()[ruleID];
 
-    return (rule.isRedundant() &&
-            nonExplicitNonRedundantRules.count(ruleID) == 0);
+    if (!rule.isRedundant())
+      return false;
+
+    if (nonExplicitNonRedundantRules.count(ruleID) > 0)
+      return false;
+
+    if (rule.isProtocolRefinementRule(Context) &&
+        isRedundantlyInheritableObjCProtocol(rule.getLHS()[0].getProtocol(),
+                                             rule.getLHS()[1].getProtocol()))
+      return false;
+
+    return true;
   };
 
   // Finally walk through the written requirements, diagnosing any that are

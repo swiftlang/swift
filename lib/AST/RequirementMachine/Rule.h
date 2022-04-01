@@ -198,9 +198,11 @@ public:
   }
 
   void markConflicting() {
+    // It's okay to mark a rule as conflicting multiple times.
+    if (Conflicting)
+      return;
+
     assert(!Frozen);
-    // It's okay to mark a rule as conflicting multiple times, but it must not
-    // be a permanent rule.
     assert(!Permanent && "Permanent rule should not conflict with anything");
     Conflicting = true;
   }

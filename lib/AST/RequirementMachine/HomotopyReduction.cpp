@@ -167,30 +167,6 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
   }
 }
 
-/// Process pairs of conflicting rules, marking the more specific rule as
-/// conflicting, which instructs minimization to drop this rule.
-void RewriteSystem::processConflicts() {
-  for (auto pair : ConflictingRules) {
-    auto *existingRule = &getRule(pair.first);
-    auto *newRule = &getRule(pair.second);
-
-    // The identity conformance rule ([P].[P] => [P]) will conflict with
-    // a concrete type requirement in an invalid protocol declaration
-    // where 'Self' is constrained to a type that does not conform to
-    // the protocol. This rule is permanent, so don't mark it as
-    // conflicting in this case.
-
-    if (!existingRule->isIdentityConformanceRule() &&
-        existingRule->getRHS().size() >= newRule->getRHS().size())
-      existingRule->markConflicting();
-    if (!newRule->isIdentityConformanceRule() &&
-        newRule->getRHS().size() >= existingRule->getRHS().size())
-      newRule->markConflicting();
-
-    // FIXME: Diagnose the conflict later.
-  }
-}
-
 /// Find a rule to delete by looking through all loops for rewrite rules appearing
 /// once in empty context. Returns a pair consisting of a loop ID and a rule ID,
 /// otherwise returns None.
@@ -477,7 +453,6 @@ void RewriteSystem::minimizeRewriteSystem() {
   Minimized = 1;
 
   propagateExplicitBits();
-  processConflicts();
 
   if (Context.getASTContext().LangOpts.EnableRequirementMachineLoopNormalization) {
     for (auto &loop : Loops) {
