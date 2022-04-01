@@ -194,7 +194,7 @@ if is_released $toolchain_name; then
 fi
 
 for target in ${targets[@]}; do
-  original_toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-$targets.tar.gz | head -n1))
+  original_toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-$target.tar.gz | head -n1))
   if [[ "$toolchain_name" != "$original_toolchain_name" ]]; then
     tar xfz swift-wasm-$channel-SNAPSHOT-$target.tar.gz
     mv "$original_toolchain_name" "$toolchain_name"
