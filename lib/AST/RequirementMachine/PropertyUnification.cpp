@@ -119,9 +119,37 @@ static void recordRelation(Term key,
   (void) system.addRule(lhs, rhs, &path);
 }
 
+/// Given two property rules that conflict because no concrete type
+/// can satisfy both, mark one or both rules conflicting.
+///
+/// The right hand side of one rule must be a suffix of the other
+/// (in which case the longer of the two rules is conflicting) or
+/// the right hand sides are equal (in which case both will be
+/// conflicting).
 void RewriteSystem::recordConflict(unsigned existingRuleID,
                                    unsigned newRuleID) {
   ConflictingRules.emplace_back(existingRuleID, newRuleID);
+
+  auto &existingRule = getRule(existingRuleID);
+  auto &newRule = getRule(newRuleID);
+
+  if (Debug.contains(DebugFlags::ConflictingRules)) {
+    llvm::dbgs() << "Conflicting rules:\n";
+    llvm::dbgs() << "- " << existingRule << "\n";
+    llvm::dbgs() << "- " << newRule << "\n";
+  }
+
+  // The identity conformance rule ([P].[P] => [P]) will conflict with
+  // a concrete type requirement in an invalid protocol declaration
+  // where 'Self' is constrained to a type that does not conform to
+  // the protocol. This rule is permanent, so don't mark it as
+  // conflicting in this case.
+  if (!existingRule.isIdentityConformanceRule() &&
+      existingRule.getRHS().size() >= newRule.getRHS().size())
+    existingRule.markConflicting();
+  if (!newRule.isIdentityConformanceRule() &&
+      newRule.getRHS().size() >= existingRule.getRHS().size())
+    newRule.markConflicting();
 }
 
 void PropertyMap::addConformanceProperty(
@@ -350,8 +378,10 @@ void PropertyMap::addSuperclassProperty(
     }
 
     auto &req = props->Superclasses[props->SuperclassDecl];
-    for (const auto &pair : req.SuperclassRules)
-      System.recordConflict(pair.second, ruleID);
+    for (const auto &pair : req.SuperclassRules) {
+      if (checkRulePairOnce(pair.second, ruleID))
+        System.recordConflict(pair.second, ruleID);
+    }
   }
 }
 
