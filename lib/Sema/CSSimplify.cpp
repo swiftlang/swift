@@ -8968,7 +8968,7 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   // Store the $match variable and binary expression for solution application.
   EP->setMatchVar(matchVar);
   EP->setMatchExpr(matchCall);
-  EP->setType(enumTy);
+  cs.setType(EP, enumTy);
 
   cs.setSolutionApplicationTarget(pattern, target);
 
