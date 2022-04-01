@@ -125,3 +125,17 @@ func testExplicitConcurrentClosure() {
   }
   let _: String = fn // expected-error{{cannot convert value of type '@Sendable () -> Int' to specified type 'String'}}
 }
+
+class SuperSendable {
+  func runsInBackground(_: @Sendable () -> Void) {}
+  func runsInForeground(_: () -> Void) {} // expected-note {{potential overridden instance method 'runsInForeground' here}}
+  func runnableInBackground() -> @Sendable () -> Void { fatalError() } // expected-note {{potential overridden instance method 'runnableInBackground()' here}}
+  func runnableInForeground() -> () -> Void { fatalError() }
+}
+
+class SubSendable: SuperSendable {
+  override func runsInBackground(_: () -> Void) {}
+  override func runsInForeground(_: @Sendable () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+  override func runnableInBackground() -> () -> Void { fatalError() }  // expected-error {{method does not override any method from its superclass}}
+  override func runnableInForeground() -> @Sendable () -> Void { fatalError() }
+}
