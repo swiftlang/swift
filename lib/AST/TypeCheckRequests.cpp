@@ -340,28 +340,26 @@ void RequirementSignatureRequest::cacheResult(RequirementSignature value) const 
 // Requirement computation.
 //----------------------------------------------------------------------------//
 
-WhereClauseOwner::WhereClauseOwner(GenericContext *genCtx): dc(genCtx) {
-  if (const auto whereClause = genCtx->getTrailingWhereClause())
-    source = whereClause;
-  else
-    source = genCtx->getGenericParams();
-}
+WhereClauseOwner::WhereClauseOwner(GenericContext *genCtx)
+    : dc(genCtx),
+      source(genCtx->getTrailingWhereClause()) {}
 
 WhereClauseOwner::WhereClauseOwner(AssociatedTypeDecl *atd)
     : dc(atd->getInnermostDeclContext()),
       source(atd->getTrailingWhereClause()) {}
 
 SourceLoc WhereClauseOwner::getLoc() const {
-  if (auto where = source.dyn_cast<TrailingWhereClause *>())
+  if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
+    return genericParams->getWhereLoc();
+  } else if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
+    return attr->getLocation();
+  } else if (auto attr = source.dyn_cast<DifferentiableAttr *>()) {
+    return attr->getLocation();
+  } else if (auto where = source.dyn_cast<TrailingWhereClause *>()) {
     return where->getWhereLoc();
+  }
 
-  if (auto attr = source.dyn_cast<SpecializeAttr *>())
-    return attr->getLocation();
-
-  if (auto attr = source.dyn_cast<DifferentiableAttr *>())
-    return attr->getLocation();
-
-  return source.get<GenericParamList *>()->getWhereLoc();
+  return SourceLoc();
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
