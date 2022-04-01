@@ -20,6 +20,9 @@
     },
     {
       "name": "empty-abi-descriptor"
-    }
+    },
+    {
+      "name": "enable-regex-literals"
+    }    
   ]
 }
