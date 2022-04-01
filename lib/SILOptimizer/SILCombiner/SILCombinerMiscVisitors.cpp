@@ -2259,7 +2259,6 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     if (!use || use->getUser() != ARDI)
       return nullptr;
 
-    auto silTy = AI->getType();
     auto storageTy = AI->getType().getASTType();
     // getContiguousArrayStorageType<SomeClass> =>
     //   ContiguousArrayStorage<AnyObject>
