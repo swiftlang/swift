@@ -2867,11 +2867,20 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 
     // Emit a dynamic method branch if the storage decl is an @objc optional
     // requirement, or just a load otherwise.
-    if (property->getAttrs().hasAttribute<OptionalAttr>() &&
-        isa<VarDecl>(property)) {
-      resultRValue = subSGF.emitDynamicMemberRef(
-          loc, baseSubstValue.getValue(), ConcreteDeclRef(property, subs),
-          propertyType, SGFContext());
+    if (property->getAttrs().hasAttribute<OptionalAttr>()) {
+      const auto declRef = ConcreteDeclRef(property, subs);
+
+      if (isa<VarDecl>(property)) {
+        resultRValue =
+            subSGF.emitDynamicMemberRef(loc, baseSubstValue.getValue(), declRef,
+                                        propertyType, SGFContext());
+      } else {
+        assert(isa<SubscriptDecl>(property));
+
+        resultRValue = subSGF.emitDynamicSubscriptGetterApply(
+            loc, baseSubstValue.getValue(), declRef,
+            std::move(subscriptIndices), propertyType, SGFContext());
+      }
     } else {
       resultRValue = subSGF.emitRValueForStorageLoad(
           loc, baseSubstValue, baseType, /*super*/ false, property,
@@ -3635,8 +3644,14 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       baseSubscriptTy = genSubscriptTy->substGenericArgs(subs);
     auto baseSubscriptInterfaceTy = cast<AnyFunctionType>(
       baseSubscriptTy->mapTypeOutOfContext()->getCanonicalType());
+
     auto componentTy = baseSubscriptInterfaceTy.getResult();
-  
+    if (decl->getAttrs().hasAttribute<OptionalAttr>()) {
+      // The component type for an @objc optional requirement needs to be
+      // wrapped in an optional
+      componentTy = OptionalType::get(componentTy)->getCanonicalType();
+    }
+
     SmallVector<IndexTypePair, 4> indexTypes;
     lowerKeyPathSubscriptIndexTypes(*this, indexTypes,
                                     decl, subs,
