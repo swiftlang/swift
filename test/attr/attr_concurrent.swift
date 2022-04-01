@@ -139,3 +139,17 @@ class SubSendable: SuperSendable {
   override func runnableInBackground() -> () -> Void { fatalError() }  // expected-error {{method does not override any method from its superclass}}
   override func runnableInForeground() -> @Sendable () -> Void { fatalError() }
 }
+
+protocol AbstractSendable {
+  func runsInBackground(_: @Sendable () -> Void)
+  func runsInForeground(_: () -> Void) // expected-note {{protocol requires function 'runsInForeground' with type '(() -> Void) -> ()'; do you want to add a stub?}}
+  func runnableInBackground() -> @Sendable () -> Void // expected-note {{protocol requires function 'runnableInBackground()' with type '() -> @Sendable () -> Void'; do you want to add a stub?}}
+  func runnableInForeground() -> () -> Void
+}
+
+struct ConcreteSendable: AbstractSendable { // expected-error {{type 'ConcreteSendable' does not conform to protocol 'AbstractSendable'}}
+  func runsInBackground(_: () -> Void) {}
+  func runsInForeground(_: @Sendable () -> Void) {} // expected-note {{candidate has non-matching type '(@Sendable () -> Void) -> ()'}}
+  func runnableInBackground() -> () -> Void { fatalError() } // expected-note {{candidate has non-matching type '() -> () -> Void'}}
+  func runnableInForeground() -> @Sendable () -> Void { fatalError() }
+}
