@@ -45,6 +45,8 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
+// REQUIRES: executable_test
+
 import Library
 import Resilient
 
