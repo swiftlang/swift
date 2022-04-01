@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference
-// RUN: not %target-swift-frontend -typecheck -enable-experimental-associated-type-inference -dump-type-witness-systems %s 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
+// RUN: not %target-swift-frontend -typecheck -enable-experimental-associated-type-inference -dump-type-witness-systems -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on %s 2>&1 | %FileCheck %s
 
 protocol P1 where A == Never {
   associatedtype A
@@ -60,8 +60,7 @@ protocol P5b: P5a where A == Self {}
 struct S5<X>: P5b {} // OK, A := S5<X>
 
 
-protocol P6 where A == Never { // expected-error {{same-type constraint type 'Never' does not conform to required protocol 'P6'}}
-  // expected-error@+2 {{same-type constraint type 'Never' does not conform to required protocol 'P6'}}
+protocol P6 where A == Never { // expected-error {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A : P6'}}
   // expected-note@+1 {{protocol requires nested type 'A}}
   associatedtype A: P6
 }
@@ -73,8 +72,7 @@ struct S6: P6 {} // expected-error {{type 'S6' does not conform to protocol 'P6'
 protocol P7a where A == Never {
   associatedtype A
 }
-// expected-error@+2 {{'Self.A' cannot be equal to both 'Bool' and 'Never'}}
-// expected-note@+1 {{same-type constraint 'Self.A' == 'Never' implied here}}
+// expected-error@+1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Bool'}}
 protocol P7b: P7a where A == Bool {}
 // CHECK-LABEL: Abstract type witness system for conformance of S7 to P7a: {
 // CHECK-NEXT: A => Never,
@@ -106,10 +104,9 @@ protocol P9b: P9a {
 // CHECK-NEXT: A => Never,
 // CHECK-NEXT: }
 struct S9a: P9b {}
-// expected-error@+3 {{type 'S9b' does not conform to protocol 'P9a'}}
-// expected-error@+2 {{'P9a' requires the types 'S9b.A' (aka 'Bool') and 'Never' be equivalent}}
-// expected-note@+1 {{requirement specified as 'Self.A' == 'Never' [with Self = S9b]}}
-struct S9b: P9b {
+// expected-error@+2 {{type 'S9b' does not conform to protocol 'P9a'}}
+// expected-error@+1 {{'P9a' requires the types 'S9b.A' (aka 'Bool') and 'Never' be equivalent}}
+struct S9b: P9b { // expected-note {{requirement specified as 'Self.A' == 'Never' [with Self = S9b]}}
   typealias A = Bool
 }
 struct S9c: P9b { // OK, S9c.A does not contradict Self.A == Never.
@@ -445,13 +442,11 @@ protocol P28c where A == Never {
   associatedtype A
 }
 protocol Q28a: P28a, P28b {}
-// expected-error@-1 {{'Self.A' cannot be equal to both 'Bool' and 'Int'}}
-// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Bool' and 'Self.A == Int'}}
 protocol Q28b: P28a, P28b, P28c {}
-// expected-error@-1 {{'Self.A' cannot be equal to both 'Bool' and 'Int'}}
-// expected-error@-2 {{'Self.A' cannot be equal to both 'Never' and 'Int'}}
-// expected-note@-3 {{same-type constraint 'Self.A' == 'Int' implied here}}
-// expected-note@-4 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Bool'}}
+// expected-error@-2 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
+// expected-error@-3 {{no type for 'Self.A' can satisfy both 'Self.A == Bool' and 'Self.A == Int'}}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1 to P28a: {
   // CHECK-NEXT: A => (ambiguous),
@@ -481,11 +476,9 @@ protocol P29c where A == B {
   associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
 }
 protocol Q29a: P29a, P29b, P29c {}
-// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
-// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
 protocol Q29b: P29c, P29a, P29b {}
-// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
-// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1 to P29a: {
   // CHECK-NEXT: A => (ambiguous), [[EQUIV_CLASS:0x[0-9a-f]+]]
@@ -517,8 +510,7 @@ protocol P30c where A == B {
   associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
 }
 protocol Q30: P30c, P30a, P30b {}
-// expected-error@-1 {{'Self.A' cannot be equal to both 'Never' and 'Int'}}
-// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P30c: {
   // CHECK-NEXT: A => (ambiguous), [[EQUIV_CLASS:0x[0-9a-f]+]]
@@ -541,8 +533,7 @@ protocol P31c where B == A {
   associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
 }
 protocol Q31: P31c, P31a, P31b {}
-// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
-// expected-note@-2 {{same-type constraint 'Self.B' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P31c: {
   // CHECK-NEXT: A => (ambiguous), [[EQUIV_CLASS:0x[0-9a-f]+]]
@@ -571,10 +562,12 @@ protocol P32e where A == B {
   associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
 }
 protocol Q32: P32e, P32a, P32b, P32c, P32d {}
-// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
-// expected-error@-2 {{'Self.B' cannot be equal to both '()' and 'Int'}}
-// expected-error@-3 {{'Self.A' cannot be equal to both 'Bool' and 'Int'}}
-// expected-note@-4 3 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == ()'}}
+// expected-error@-2 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
+// expected-error@-3 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Bool'}}
+// expected-error@-4 {{no type for 'Self.A' can satisfy both 'Self.A == ()' and 'Self.A == Bool'}}
+// expected-error@-5 {{no type for 'Self.A' can satisfy both 'Self.A == ()' and 'Self.A == Int'}}
+// expected-error@-6 {{no type for 'Self.A' can satisfy both 'Self.A == Bool' and 'Self.A == Int'}}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P32e: {
   // CHECK-NEXT: A => (ambiguous), [[EQUIV_CLASS:0x[0-9a-f]+]]
