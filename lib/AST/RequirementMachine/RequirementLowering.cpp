@@ -725,16 +725,25 @@ bool swift::rewriting::diagnoseRequirementErrors(
       auto requirement = error.requirement;
       auto conflict = error.conflictingRequirement;
 
+      if (requirement.getFirstType()->hasError() ||
+          (requirement.getKind() != RequirementKind::Layout &&
+           requirement.getSecondType()->hasError())) {
+        // Don't emit a cascading error.
+        break;
+      }
+
       if (!conflict) {
-        if (requirement.getFirstType()->hasError() ||
-            requirement.getSecondType()->hasError()) {
-          // Don't emit a cascading error.
-          break;
-        }
         ctx.Diags.diagnose(loc, diag::requires_same_concrete_type,
                            requirement.getFirstType(),
                            requirement.getSecondType());
       } else {
+        if (conflict->getFirstType()->hasError() ||
+            (conflict->getKind() != RequirementKind::Layout &&
+             conflict->getSecondType()->hasError())) {
+          // Don't emit a cascading error.
+          break;
+        }
+
         auto options = PrintOptions::forDiagnosticArguments();
         std::string requirements;
         llvm::raw_string_ostream OS(requirements);
@@ -754,6 +763,13 @@ bool swift::rewriting::diagnoseRequirementErrors(
 
     case RequirementError::Kind::RedundantRequirement: {
       auto requirement = error.requirement;
+      if (requirement.getFirstType()->hasError() ||
+          (requirement.getKind() != RequirementKind::Layout &&
+           requirement.getSecondType()->hasError())) {
+        // Don't emit a cascading error.
+        break;
+      }
+
       switch (requirement.getKind()) {
       case RequirementKind::SameType:
         ctx.Diags.diagnose(loc, diag::redundant_same_type_to_concrete,
