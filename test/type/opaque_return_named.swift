@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-named-opaque-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-named-opaque-types -disable-availability-checking -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
 
 // Tests for experimental extensions to opaque return type support.
 
@@ -133,14 +133,10 @@ struct Generic<T: P1 & Equatable & DefaultInitializable>
     }
   }
 
-  // FIXME: expected-warning@+2{{redundant same-type constraint 'C.Element' == 'T.A'}}
-  // FIXME: expected-note@+1{{previous same-type constraint 'C.Element' == 'T.A' written here}}
   func sameTypeParams() -> <C: Collection where C.Element == T.A> C {
     [ T.A(), T.A() ]
   }
 
-  // FIXME: expected-warning@+2{{redundant same-type constraint 'C.Element' == 'T.A'}}
-  // FIXME: expected-note@+1{{previous same-type constraint 'C.Element' == 'T.A' written here}}
   func sameTypeParamsBad() -> <C: Collection where C.Element == T.A> C {
     [ T() ] // expected-error{{cannot convert value of type 'T' to expected element type 'T.A'}}
   }
