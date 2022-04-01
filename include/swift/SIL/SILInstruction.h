@@ -5241,39 +5241,6 @@ public:
   void setLifetimeGuaranteed() { lifetimeGuaranteed = true; }
 };
 
-/// ThinFunctionToPointerInst - Convert a thin function pointer to a
-/// Builtin.RawPointer.
-class ThinFunctionToPointerInst
-  : public UnaryInstructionBase<SILInstructionKind::ThinFunctionToPointerInst,
-                                ConversionInst>
-{
-  friend SILBuilder;
-
-  ThinFunctionToPointerInst(SILDebugLocation DebugLoc, SILValue operand,
-                            SILType ty)
-      : UnaryInstructionBase(DebugLoc, operand, ty) {}
-};
-
-/// PointerToThinFunctionInst - Convert a Builtin.RawPointer to a thin
-/// function pointer.
-class PointerToThinFunctionInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-          SILInstructionKind::PointerToThinFunctionInst,
-          PointerToThinFunctionInst,
-          ConversionInst> {
-  friend SILBuilder;
-
-  PointerToThinFunctionInst(SILDebugLocation DebugLoc, SILValue operand,
-                            ArrayRef<SILValue> TypeDependentOperands,
-                            SILType ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, operand, TypeDependentOperands, ty) {}
-
-  static PointerToThinFunctionInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F);
-};
-
 /// UpcastInst - Perform a conversion of a class instance to a supertype.
 class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
                              SILInstructionKind::UpcastInst, UpcastInst,
@@ -8417,16 +8384,6 @@ public:
 private:
   std::array<SILSuccessor, 2> DestBBs;
 
-  /// The number of arguments for the True branch.
-  unsigned getNumTrueArgs() const {
-    return SILNode::Bits.CondBranchInst.NumTrueArgs;
-  }
-  /// The number of arguments for the False branch.
-  unsigned getNumFalseArgs() const {
-    return getAllOperands().size() - NumFixedOpers -
-        SILNode::Bits.CondBranchInst.NumTrueArgs;
-  }
-
   CondBranchInst(SILDebugLocation DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
                  ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse,
@@ -8470,6 +8427,16 @@ public:
   ProfileCounter getTrueBBCount() const { return DestBBs[0].getCount(); }
   /// The number of times the False branch was executed.
   ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
+
+  /// The number of arguments for the True branch.
+  unsigned getNumTrueArgs() const {
+    return SILNode::Bits.CondBranchInst.NumTrueArgs;
+  }
+  /// The number of arguments for the False branch.
+  unsigned getNumFalseArgs() const {
+    return getAllOperands().size() - NumFixedOpers -
+        SILNode::Bits.CondBranchInst.NumTrueArgs;
+  }
 
   /// Get the arguments to the true BB.
   OperandValueArrayRef getTrueArgs() const {

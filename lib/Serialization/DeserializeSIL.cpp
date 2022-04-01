@@ -1350,8 +1350,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ObjCExistentialMetatypeToObject)
-  ONEOPERAND_ONETYPE_INST(ThinFunctionToPointer)
-  ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
 

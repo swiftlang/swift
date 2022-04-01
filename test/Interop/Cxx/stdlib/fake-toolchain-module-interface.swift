@@ -9,3 +9,7 @@
 // CHECK: enum FakeNamespace {
 // CHECK:   static func foo(_ x: Int32)
 // CHECK: }
+// CHECK: enum std {
+// CHECK:   typealias size_t = Int
+// CHECK: }
+

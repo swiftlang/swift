@@ -18,6 +18,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
 
+#include "Diagnostics.h"
 #include "PropertyMap.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
@@ -113,6 +114,11 @@ class RequirementMachine final {
   std::pair<CompletionResult, unsigned>
   computeCompletion(RewriteSystem::ValidityPolicy policy);
 
+  void freeze();
+
+  void computeRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                     SourceLoc signatureLoc);
+
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
   void buildRequirementsFromRules(
@@ -159,8 +165,8 @@ public:
   llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
   computeMinimalProtocolRequirements();
 
-  std::vector<Requirement>
-  computeMinimalGenericSignatureRequirements(bool reconstituteSugar);
+  GenericSignature
+  computeMinimalGenericSignature(bool reconstituteSugar);
 
   ArrayRef<Rule> getLocalRules() const;
 

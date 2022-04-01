@@ -16,4 +16,5 @@
 // CHECK: func constRefToTemplate<T>(_ t: T) -> UnsafePointer<T>
 
 // CHECK-NOT: refToDependent
+// CHECK-NOT: refToDependentParam
 // CHECK-NOT: dontImportAtomicRef

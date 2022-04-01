@@ -670,14 +670,43 @@ SWIFT_RUNTIME_EXPORT
 const ExistentialMetatypeMetadata *
 swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 
-/// Fetch a uniqued metadata for an existential type. The array
-/// referenced by \c protocols will be sorted in-place.
+/// Fetch a uniqued metadata for an existential type.
+///
+/// The array referenced by \c protocols will be sorted in-place.
 SWIFT_RUNTIME_EXPORT
 const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
                                  const Metadata *superclassConstraint,
                                  size_t numProtocols,
                                  const ProtocolDescriptorRef *protocols);
+
+/// Fetch unique metadata for an extended existential type.
+///
+/// The shape must not correspond to an existential that could be
+/// represented with ExistentialTypeMetadata.  Its uniquing cache
+/// pointer is guaranteed to be filled after this call.
+SWIFT_RUNTIME_EXPORT
+const ExtendedExistentialTypeMetadata *
+swift_getExtendedExistentialTypeMetadata(
+            const NonUniqueExtendedExistentialTypeShape *shape,
+            const void * const *generalizationArguments);
+
+/// Fetch unique metadata for an extended existential type, given its
+/// known-unique existential shape.  The shape must not correspond to
+/// an existential that could be represented with ExistentialTypeMetadata.
+SWIFT_RUNTIME_EXPORT
+const ExtendedExistentialTypeMetadata *
+swift_getExtendedExistentialTypeMetadata_unique(
+            const ExtendedExistentialTypeShape *shape,
+            const void * const *generalizationArguments);
+
+/// Fetch the unique existential shape for the given non-unique shape.
+/// The shape's uniquing cache pointer is guaranteed to be filled after
+/// this call.
+SWIFT_RUNTIME_EXPORT
+const ExtendedExistentialTypeShape *
+swift_getExtendedExistentialTypeShape(
+            const NonUniqueExtendedExistentialTypeShape *shape);
 
 /// Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with the

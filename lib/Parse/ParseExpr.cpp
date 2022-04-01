@@ -1760,6 +1760,11 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       }
     }
     consumeToken(tok::code_complete);
+    if (canParseAsGenericArgumentList()) {
+      SmallVector<TypeRepr*, 8> args;
+      SourceLoc LAngleLoc, RAngleLoc;
+      parseGenericArguments(args, LAngleLoc, RAngleLoc);
+    }
     return Result;
   }
 

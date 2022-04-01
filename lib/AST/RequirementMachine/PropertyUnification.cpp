@@ -10,10 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This implements the PropertyBag::addProperty() method, which merges layout,
-// superclass and concrete type requirements. This merging can create new rules;
-// property map construction is iterated with the Knuth-Bendix completion
-// procedure until fixed point.
+// This file is the core of the property map construction algorithm.
+//
+// The primary entry point is the PropertyBag::addProperty() method, which
+// unifies multiple layout, superclass and concrete type requirements on a
+// single term.
+//
+// This unification can add new rewrite rules, as well as record rewrite loops
+// relating existing rules together. Property map construction is iterated with
+// the Knuth-Bendix completion procedure until fixed point.
 //
 //===----------------------------------------------------------------------===//
 

@@ -350,3 +350,20 @@ public struct EnumSeq<Base : Seq> : Seq {
     return EnumIter(_base: _base.makeIterator())
   }
 }
+
+extension Collection {
+  func transformEachElement<U>(_ cl: (Element) -> U) -> [U] {
+    return map(cl)
+  }
+}
+
+extension Array where Element == Int {
+  // CHECK-LABEL: sil private [ossa] @$sSa20opaque_values_silgenSiRszlE20incrementEachElementSaySiGyFS2iXEfU_ : {{.*}} {
+  // CHECK:       {{bb[0-9]+}}({{%[^,]+}} : $Int):
+  // CHECK-LABEL: } // end sil function '$sSa20opaque_values_silgenSiRszlE20incrementEachElementSaySiGyFS2iXEfU_'
+  func incrementEachElement() -> [Int] {
+    return transformEachElement { element in
+      return element + 1
+    }
+  }
+}

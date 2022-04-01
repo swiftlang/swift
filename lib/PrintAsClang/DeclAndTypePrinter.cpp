@@ -11,8 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "DeclAndTypePrinter.h"
-#include "CxxSynthesis.h"
+#include "ClangSyntaxPrinter.h"
 #include "PrimitiveTypeMapping.h"
+#include "PrintClangFunction.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -56,27 +57,23 @@ static bool isAnyObjectOrAny(Type type) {
   return type->isAnyObject() || type->isAny();
 }
 
-/// Returns true if \p name matches a keyword in any Clang language mode.
-static bool isClangKeyword(StringRef name) {
-  static const llvm::DenseSet<StringRef> keywords = []{
-    llvm::DenseSet<StringRef> set;
-    // FIXME: clang::IdentifierInfo /nearly/ has the API we need to do this
-    // in a more principled way, but not quite.
-#define KEYWORD(SPELLING, FLAGS) \
-    set.insert(#SPELLING);
-#define CXX_KEYWORD_OPERATOR(SPELLING, TOK) \
-    set.insert(#SPELLING);
-#include "clang/Basic/TokenKinds.def"
-    return set;
-  }();
+// For a given Decl and Type, if the type is not an optional return
+// the type and OTK_None as the optionality. If the type is
+// optional, return the underlying object type, and an optionality
+// that is based on the type but overridden by the return value of
+// isImplicitlyUnwrappedOptional().
+std::pair<Type, OptionalTypeKind>
+DeclAndTypePrinter::getObjectTypeAndOptionality(const ValueDecl *D, Type ty) {
+  OptionalTypeKind kind;
+  if (auto objTy = ty->getReferenceStorageReferent()->getOptionalObjectType()) {
+    kind = OTK_Optional;
+    if (D->isImplicitlyUnwrappedOptional())
+      kind = OTK_ImplicitlyUnwrappedOptional;
 
-  return keywords.contains(name);
-}
+    return {objTy, kind};
+  }
 
-static bool isClangKeyword(Identifier name) {
-  if (name.empty())
-    return false;
-  return isClangKeyword(name.str());
+  return {ty, OTK_None};
 }
 
 namespace {
@@ -98,17 +95,14 @@ static bool looksLikeInitMethod(ObjCSelector selector) {
 }
 
 class DeclAndTypePrinter::Implementation
-  : private DeclVisitor<DeclAndTypePrinter::Implementation>,
-    private TypeVisitor<DeclAndTypePrinter::Implementation, void,
-                        Optional<OptionalTypeKind>>
-{
+    : private DeclVisitor<DeclAndTypePrinter::Implementation>,
+      private TypeVisitor<DeclAndTypePrinter::Implementation, void,
+                          Optional<OptionalTypeKind>>,
+      private ClangSyntaxPrinter {
   using PrinterImpl = Implementation;
   friend ASTVisitor;
   friend TypeVisitor;
 
-  // The output stream is accessible through 'owningPrinter',
-  // but it makes the code simpler to have it here too.
-  raw_ostream &os;
   DeclAndTypePrinter &owningPrinter;
   OutputLanguageMode outputLang;
 
@@ -126,7 +120,7 @@ class DeclAndTypePrinter::Implementation
 public:
   explicit Implementation(raw_ostream &out, DeclAndTypePrinter &owner,
                           OutputLanguageMode outputLang)
-      : os(out), owningPrinter(owner), outputLang(outputLang) {}
+      : ClangSyntaxPrinter(out), owningPrinter(owner), outputLang(outputLang) {}
 
   void print(const Decl *D) {
     PrettyStackTraceDecl trace("printing", D);
@@ -285,17 +279,7 @@ private:
   // isImplicitlyUnwrappedOptional().
   static std::pair<Type, OptionalTypeKind>
   getObjectTypeAndOptionality(const ValueDecl *D, Type ty) {
-    OptionalTypeKind kind;
-    if (auto objTy =
-            ty->getReferenceStorageReferent()->getOptionalObjectType()) {
-      kind = OTK_Optional;
-      if (D->isImplicitlyUnwrappedOptional())
-        kind = OTK_ImplicitlyUnwrappedOptional;
-
-      return {objTy, kind};
-    }
-
-    return {ty, OTK_None};
+    return DeclAndTypePrinter::getObjectTypeAndOptionality(D, ty);
   }
 
   // Ignore other declarations.
@@ -732,8 +716,7 @@ private:
   /// Print the core function declaration for a given function with the given
   /// name.
   void printFunctionDeclAsCFunctionDecl(FuncDecl *FD, StringRef name,
-                                        Type resultTy,
-                                        bool printEmptyParamNames = false) {
+                                        Type resultTy) {
     // The result type may be a partial function type we need to close
     // up later.
     PrintMultiPartType multiPart(*this);
@@ -753,12 +736,8 @@ private:
         Type objTy;
         std::tie(objTy, kind) =
             getObjectTypeAndOptionality(param, param->getInterfaceType());
-        std::string paramName =
-            param->getName().empty() ? "" : param->getName().str().str();
-        if (printEmptyParamNames && paramName.empty()) {
-          llvm::raw_string_ostream os(paramName);
-          os << "_" << index;
-        }
+        StringRef paramName =
+            param->getName().empty() ? "" : param->getName().str();
         print(objTy, kind, paramName, IsFunctionParam);
         ++index;
       });
@@ -845,7 +824,11 @@ private:
     FuncionSwiftABIInformation funcABI(FD, mangler);
 
     os << "SWIFT_EXTERN ";
-    printFunctionDeclAsCFunctionDecl(FD, funcABI.getSymbolName(), resultTy);
+
+    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
+    funcPrinter.printFunctionSignature(
+        FD, funcABI.getSymbolName(), resultTy,
+        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto);
     // Swift functions can't throw exceptions, we can only
     // throw them from C++ when emitting C++ inline thunks for the Swift
     // functions.
@@ -881,9 +864,10 @@ private:
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
     os << "inline ";
-    printFunctionDeclAsCFunctionDecl(FD,
-                                     FD->getName().getBaseIdentifier().get(),
-                                     resultTy, /*printEmptyParamNames=*/true);
+    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.typeMapping);
+    funcPrinter.printFunctionSignature(
+        FD, FD->getName().getBaseIdentifier().get(), resultTy,
+        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk);
     // FIXME: Support throwing exceptions for Swift errors.
     os << " noexcept";
     printFunctionClangAttributes(FD, funcTy);
@@ -897,7 +881,7 @@ private:
       size_t index = 1;
       interleaveComma(*params, os, [&](const ParamDecl *param) {
         if (param->hasName()) {
-          os << param->getName();
+          ClangSyntaxPrinter(os).printIdentifier(param->getName().str());
         } else {
           os << "_" << index;
         }
@@ -1370,55 +1354,6 @@ private:
   /// If a full type is being printed, use print() instead.
   void visitPart(Type ty, Optional<OptionalTypeKind> optionalKind) {
     TypeVisitor::visit(ty, optionalKind);
-  }
-
-  /// Where nullability information should be printed.
-  enum class NullabilityPrintKind {
-    Before,
-    After,
-    ContextSensitive,
-  };
-
-  void printNullability(Optional<OptionalTypeKind> kind,
-                        NullabilityPrintKind printKind
-                          = NullabilityPrintKind::After) {
-    if (!kind)
-      return;
-
-    switch (printKind) {
-    case NullabilityPrintKind::ContextSensitive:
-      switch (*kind) {
-      case OTK_None:
-        os << "nonnull";
-        break;
-      case OTK_Optional:
-        os << "nullable";
-        break;
-      case OTK_ImplicitlyUnwrappedOptional:
-        os << "null_unspecified";
-        break;
-      }
-      break;
-    case NullabilityPrintKind::After:
-      os << ' ';
-      LLVM_FALLTHROUGH;
-    case NullabilityPrintKind::Before:
-      switch (*kind) {
-      case OTK_None:
-        os << "_Nonnull";
-        break;
-      case OTK_Optional:
-        os << "_Nullable";
-        break;
-      case OTK_ImplicitlyUnwrappedOptional:
-        os << "_Null_unspecified";
-        break;
-      }
-      break;
-    }
-
-    if (printKind != NullabilityPrintKind::After)
-      os << ' ';
   }
 
   /// Determine whether this generic Swift nominal type maps to a
@@ -2060,7 +1995,7 @@ private:
   /// visitPart().
 public:
   void print(Type ty, Optional<OptionalTypeKind> optionalKind,
-             std::string name = "",
+             StringRef name = "",
              IsFunctionParam_t isFuncParam = IsNotFunctionParam) {
     PrettyStackTraceType trace(getASTContext(), "printing", ty);
 

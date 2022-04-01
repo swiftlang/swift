@@ -21,7 +21,7 @@ internal struct DumpArrays: ParsableCommand {
   var options: UniversalOptions
 
   func run() throws {
-    try inspect(process: options.nameOrPid) { process in
+    try inspect(options: options) { process in
       print("Address", "Size", "Count", "Is Class", separator: "\t")
       process.iterateHeap { (allocation, size) in
         let metadata: UInt =

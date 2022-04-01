@@ -287,6 +287,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
                                           unsigned maxRuleLength) {
   assert(Initialized);
   assert(!Minimized);
+  assert(!Frozen);
 
   // Complete might already be set, if we're re-running completion after
   // adding new rules in the property map's concrete type unification procedure.
@@ -398,7 +399,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
         continue;
 
       // Check if the new rule is too long.
-      if (Rules.back().getDepth() > maxRuleLength)
+      if (Rules.back().getDepth() > maxRuleLength + getLongestInitialRule())
         return std::make_pair(CompletionResult::MaxRuleLength, Rules.size() - 1);
     }
 

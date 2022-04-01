@@ -338,7 +338,7 @@ func testSwitchCaseWhereExpr1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
-    case (0, 0) where #^SWITCH_CASE_WHERE_EXPR_1?check=COND_COMMON^#
+    case (0, 0) where #^SWITCH_CASE_WHERE_EXPR_1?check=COND_WHERE_COMMON^#
   }
 }
 
@@ -346,7 +346,7 @@ func testSwitchCaseWhereExpr2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
-    case (0, 0) where #^SWITCH_CASE_WHERE_EXPR_2?check=COND_COMMON^#:
+    case (0, 0) where #^SWITCH_CASE_WHERE_EXPR_2?check=COND_WHERE_COMMON^#:
   }
 }
 
@@ -354,7 +354,7 @@ func testSwitchCaseWhereExpr3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
-    case (0, 0) where #^SWITCH_CASE_WHERE_EXPR_3?check=COND_COMMON^# :
+    case (0, 0) where #^SWITCH_CASE_WHERE_EXPR_3?check=COND_WHERE_COMMON^# :
   }
 }
 
@@ -362,7 +362,7 @@ func testSwitchCaseWhereExprI1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
-    case (var i, 0) where #^SWITCH_CASE_WHERE_EXPR_I_1?check=COND_COMMON;check=WITH_I_INT_LOCAL^#
+    case (var i, 0) where #^SWITCH_CASE_WHERE_EXPR_I_1?check=COND_WHERE_COMMON;check=WITH_I_INT_LOCAL^#
   }
 }
 
@@ -370,7 +370,7 @@ func testSwitchCaseWhereExprI2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
-    case (0, var i) where #^SWITCH_CASE_WHERE_EXPR_I_2?check=COND_COMMON;check=WITH_I_INT_LOCAL^#
+    case (0, var i) where #^SWITCH_CASE_WHERE_EXPR_I_2?check=COND_WHERE_COMMON;check=WITH_I_INT_LOCAL^#
   }
 }
 
@@ -378,7 +378,7 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
-    case (var i, var j) where #^SWITCH_CASE_WHERE_EXPR_I_J_1?check=COND_COMMON;check=WITH_I_INT_LOCAL;check=WITH_J_INT^#
+    case (var i, var j) where #^SWITCH_CASE_WHERE_EXPR_I_J_1?check=COND_WHERE_COMMON;check=WITH_I_INT_LOCAL;check=WITH_J_INT^#
   }
 }
 
@@ -393,6 +393,16 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 // COND_COMMON-DAG: Decl[LocalVar]/Local:        localFooObject[#FooStruct#]{{; name=.+$}}
 // COND_COMMON-DAG: Decl[Struct]/CurrModule:     FooStruct[#FooStruct#]{{; name=.+$}}
 // COND_COMMON: End completions
+
+// COND_WHERE_COMMON: Begin completions
+// COND_WHERE_COMMON-DAG: Literal[Boolean]/None/TypeRelation[Identical]: true[#Bool#]{{; name=.+$}}
+// COND_WHERE_COMMON-DAG: Literal[Boolean]/None/TypeRelation[Identical]: false[#Bool#]{{; name=.+$}}
+// COND_WHERE_COMMON-DAG: Decl[LocalVar]/Local:        fooObject[#FooStruct#]{{; name=.+$}}
+// COND_WHERE_COMMON-DAG: Decl[LocalVar]/Local:        localInt[#Int#]{{; name=.+$}}
+// COND_WHERE_COMMON-DAG: Decl[LocalVar]/Local:        localFooObject[#FooStruct#]{{; name=.+$}}
+// COND_WHERE_COMMON-DAG: Decl[Struct]/CurrModule:     FooStruct[#FooStruct#]{{; name=.+$}}
+// COND_WHERE_COMMON: End completions
+
 
 // COND-WITH-RELATION: Begin completions
 // COND-WITH-RELATION-DAG: Literal[Boolean]/None/TypeRelation[Identical]: true[#Bool#]{{; name=.+$}}

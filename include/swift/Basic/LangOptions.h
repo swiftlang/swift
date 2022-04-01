@@ -343,9 +343,6 @@ namespace swift {
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 
-    /// Enable experimental 'distributed' actors and functions.
-    bool EnableExperimentalDistributed = true;
-
     /// Enable experimental 'move only' features.
     bool EnableExperimentalMoveOnly = false;
 
@@ -354,6 +351,10 @@ namespace swift {
 
     /// Enable variadic generics.
     bool EnableExperimentalVariadicGenerics = false;
+
+    /// Enable experimental associated type inference using type witness
+    /// systems.
+    bool EnableExperimentalAssociatedTypeInference = false;
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
@@ -532,21 +533,25 @@ namespace swift {
     /// Enable the new experimental generic signature minimization algorithm
     /// for abstract generic signatures.
     RequirementMachineMode RequirementMachineAbstractSignatures =
-        RequirementMachineMode::Verify;
+        RequirementMachineMode::Enabled;
 
     /// Enable the new experimental generic signature minimization algorithm
     /// for user-written generic signatures.
     RequirementMachineMode RequirementMachineInferredSignatures =
         RequirementMachineMode::Verify;
 
-    /// Disable preprocessing pass to eliminate conformance requirements
+    /// Enable preprocessing pass to eliminate conformance requirements
     /// on generic parameters which are made concrete. Usually you want this
     /// enabled. It can be disabled for debugging and testing.
     bool EnableRequirementMachineConcreteContraction = true;
 
-    /// Enable the stronger minimization algorithm. This is just for debugging;
-    /// if you have a testcase which requires this, please submit a bug report.
-    bool EnableRequirementMachineLoopNormalization = false;
+    /// Enable the stronger minimization algorithm. Usually you want this
+    /// enabled. It can be disabled for debugging and testing.
+    bool EnableRequirementMachineLoopNormalization = true;
+
+    /// Enable reuse of requirement machines for minimization. Usually you want
+    /// this enabled. It can be disabled for debugging and testing.
+    bool EnableRequirementMachineReuse = true;
 
     /// Enable experimental, more correct support for opaque result types as
     /// concrete types. This will sometimes fail to produce a convergent
@@ -823,7 +828,7 @@ namespace swift {
     bool DisableOverlayModules = false;
 
     /// When set, import SPI_AVAILABLE symbols with Swift SPI attribtues.
-    bool EnableClangSPI = false;
+    bool EnableClangSPI = true;
 
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;

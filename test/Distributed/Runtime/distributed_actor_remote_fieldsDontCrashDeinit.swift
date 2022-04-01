@@ -23,6 +23,7 @@ distributed actor SomeSpecificDistributedActor {
   init(name: String, system: FakeActorSystem) {
     self.name = name
     self.surname = "Surname"
+    self.actorSystem = system
     self.age = 42
   }
 

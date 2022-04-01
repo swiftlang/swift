@@ -126,18 +126,30 @@ import _Concurrency
 // CHECK: @MainActor @objc protocol TripleMainActor {
 
 // CHECK-LABEL: class NXSender :
-// CHECK-NEXT: func sendAny(_ obj: Sendable)
-// CHECK-NEXT: func sendOptionalAny(_ obj: Sendable?)
-// CHECK-NEXT: func sendSendable(_ sendable: SendableClass & Sendable)
-// CHECK-NEXT: func sendSendableSubclasses(_ sendableSubclass: NonSendableClass & Sendable)
-// CHECK-NEXT: func sendProto(_ obj: LabellyProtocol & Sendable)
-// CHECK-NEXT: func sendProtos(_ obj: LabellyProtocol & ObjCClub & Sendable)
-// CHECK-NEXT: func sendAnyArray(_ array: [Sendable])
-// CHECK-NEXT: func sendGeneric(_ generic: GenericObject<SendableClass> & Sendable)
-// CHECK-NEXT: func sendPtr(_ val: UnsafeMutableRawPointer)
-// CHECK-NEXT: func sendStringArray(_ obj: [String])
-// CHECK-NEXT: func sendAnyTypedef(_ obj: Sendable)
-// CHECK-NEXT: func sendAnyTypedefs(_ objs: [Sendable])
-// CHECK-NEXT: func sendBlockTypedef(_ block: @escaping @Sendable (Any) -> Void)
-// CHECK-NEXT: func sendBlockTypedefs(_ blocks: [@Sendable @convention(block) (Any) -> Void])
-// CHECK-NEXT: func sendUnbound(_ array: [Sendable])
+// CHECK: func sendAny(_ obj: Sendable) -> Sendable
+// CHECK: func sendOptionalAny(_ obj: Sendable?) -> Sendable?
+// CHECK: func sendSendable(_ sendable: SendableClass & Sendable) -> SendableClass & Sendable
+// CHECK: func sendSendableSubclasses(_ sendableSubclass: NonSendableClass & Sendable) -> NonSendableClass & Sendable
+// CHECK: func sendProto(_ obj: LabellyProtocol & Sendable) -> LabellyProtocol & Sendable
+// CHECK: func sendProtos(_ obj: LabellyProtocol & ObjCClub & Sendable) -> LabellyProtocol & ObjCClub & Sendable
+// CHECK: func sendAnyArray(_ array: [Sendable]) -> [Sendable]
+// CHECK: func sendGeneric(_ generic: GenericObject<SendableClass> & Sendable) -> GenericObject<SendableClass> & Sendable
+// CHECK: func sendPtr(_ val: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer
+// CHECK: func sendStringArray(_ obj: [String]) -> [String]
+// CHECK: func sendAnyTypedef(_ obj: Sendable) -> Sendable
+// CHECK: func sendAnyTypedefs(_ objs: [Sendable]) -> [Sendable]
+// CHECK: func sendBlockTypedef(_ block: @escaping @Sendable (Any) -> Void) -> @Sendable (Any) -> Void
+// CHECK: func sendBlockTypedefs(_ blocks: [@Sendable @convention(block) (Any) -> Void]) -> [@Sendable @convention(block) (Any) -> Void]
+// CHECK: func sendUnbound(_ array: [Sendable]) -> [Sendable]
+// CHECK: var sendableProp: Sendable
+// CHECK: }
+
+// CHECK: func NXSendFunc(_ arg: Sendable) -> Sendable
+// CHECK: var NXSendGlobal: Sendable
+
+// CHECK-LABEL: struct StructWithSendableContents
+// FIXME: `Unmanaged` should support `AnyObject & Sendable`.
+// CHECK: var sendableField: Unmanaged<AnyObject>
+// FIXME: Should be imported as Unmanaged!
+// CHECK: var sendableIndirectField: Sendable & AnyObject
+// CHECK: var sendableComputed: Sendable { get }

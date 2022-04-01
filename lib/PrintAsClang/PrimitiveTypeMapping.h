@@ -30,23 +30,37 @@ class TypeDecl;
 /// but to something like `intptr_t` or `swift::Int` for C and C++ declarations.
 class PrimitiveTypeMapping {
 public:
-  struct ObjCClangTypeInfo {
+  struct ClangTypeInfo {
     StringRef name;
     bool canBeNullable;
   };
 
   /// Returns the Objective-C type name and nullability for the given Swift
   /// primitive type declaration, or \c None if no such type name exists.
-  Optional<ObjCClangTypeInfo> getKnownObjCTypeInfo(const TypeDecl *typeDecl);
+  Optional<ClangTypeInfo> getKnownObjCTypeInfo(const TypeDecl *typeDecl);
+
+  /// Returns the C type name and nullability for the given Swift
+  /// primitive type declaration, or \c None if no such type name exists.
+  Optional<ClangTypeInfo> getKnownCTypeInfo(const TypeDecl *typeDecl);
+
+  /// Returns the C++ type name and nullability for the given Swift
+  /// primitive type declaration, or \c None if no such type name exists.
+  Optional<ClangTypeInfo> getKnownCxxTypeInfo(const TypeDecl *typeDecl);
 
 private:
   void initialize(ASTContext &ctx);
 
-  struct ClangTypeInfo {
+  struct FullClangTypeInfo {
     // The Objective-C name of the Swift type.
     StringRef objcName;
+    // The C name of the Swift type.
+    Optional<StringRef> cName;
+    // The C++ name of the Swift type.
+    Optional<StringRef> cxxName;
     bool canBeNullable;
   };
+
+  FullClangTypeInfo *getMappedTypeInfoOrNull(const TypeDecl *typeDecl);
 
   /// A map from {Module, TypeName} pairs to {C name, C nullability} pairs.
   ///
@@ -54,7 +68,7 @@ private:
   /// translated directly by the ObjC printer instead of structurally, allowing
   /// it to do things like map 'Int' to 'NSInteger' and 'Float' to 'float'.
   /// In some sense it's the reverse of the ClangImporter's MappedTypes.def.
-  llvm::DenseMap<std::pair<Identifier, Identifier>, ClangTypeInfo>
+  llvm::DenseMap<std::pair<Identifier, Identifier>, FullClangTypeInfo>
       mappedTypeNames;
 };
 

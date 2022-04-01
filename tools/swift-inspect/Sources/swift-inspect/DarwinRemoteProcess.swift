@@ -113,13 +113,24 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     }
   }
 
-  init?(processId: ProcessIdentifier) {
+  init?(processId: ProcessIdentifier, forkCorpse: Bool) {
     var task: task_t = task_t()
-    let result = task_for_pid(mach_task_self_, processId, &task)
-    guard result == KERN_SUCCESS else {
-      print("unable to get task for pid \(processId): \(String(cString: mach_error_string(result))) (0x\(String(result, radix: 16)))")
+    let taskResult = task_for_pid(mach_task_self_, processId, &task)
+    guard taskResult == KERN_SUCCESS else {
+      print("unable to get task for pid \(processId): \(String(cString: mach_error_string(taskResult))) \(hex: taskResult)")
       return nil
     }
+
+    if forkCorpse {
+      var corpse = task_t()
+      let corpseResult = task_generate_corpse(task, &corpse)
+      if corpseResult == KERN_SUCCESS {
+        task = corpse
+      } else {
+        print("unable to fork corpse for pid \(processId): \(String(cString: mach_error_string(corpseResult))) \(hex: corpseResult)")
+      }
+    }
+
     self.task = task
 
     self.symbolicator = CSSymbolicatorCreateWithTask(self.task)

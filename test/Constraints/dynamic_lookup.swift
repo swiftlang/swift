@@ -207,7 +207,12 @@ class Z4<T> where T : AnyObject { }
 
 // Don't allow one to call instance methods on the Type via
 // dynamic method lookup.
-type(of: obj).foo!(obj)(5) // expected-error{{instance member 'foo' cannot be used on type 'Id' (aka 'AnyObject')}}
+type(of: obj).foo!(obj)(5)
+// expected-error@-1 {{instance member 'foo' cannot be used on type 'Id' (aka 'AnyObject')}}
+// expected-error@-2 {{cannot force unwrap value of non-optional type '(Id) -> ((Int) -> ())?' (aka '(AnyObject) -> Optional<(Int) -> ()>')}}
+// expected-error@-3 {{value of optional type '((Int) -> ())?' must be unwrapped to a value of type '(Int) -> ()'}}
+// expected-note@-4 {{coalesce using '??'}}
+// expected-note@-5 {{force-unwrap using '!'}}
 
 // Checked casts to AnyObject
 var p: P = Y()

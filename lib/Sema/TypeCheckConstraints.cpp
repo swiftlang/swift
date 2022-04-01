@@ -433,7 +433,11 @@ TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             DeclContext *DC, Type paramType,
                                             bool isAutoClosure) {
-  assert(paramType && !paramType->hasError());
+  // During normal type checking we don't type check the parameter default if
+  // the param has an error type. For code completion, we also type check the
+  // parameter default because it might contain the code completion token.
+  assert(paramType &&
+         (!paramType->hasError() || DC->getASTContext().CompletionCallback));
 
   auto &ctx = DC->getASTContext();
 
@@ -462,6 +466,11 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
     // If inference is disabled, fail.
     if (!ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments)
+      return Type();
+
+    // Caller-side defaults are always type-checked based on the concrete
+    // type of the argument deduced at a particular call site.
+    if (isa<MagicIdentifierLiteralExpr>(defaultValue))
       return Type();
 
     // Parameter type doesn't have any generic parameters mentioned
@@ -610,6 +619,12 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
         // Unrelated requirement.
         if (!containsTypes(lhsTy, genericParameters) &&
             !containsTypes(rhsTy, genericParameters))
+          continue;
+
+        // If both sides are dependent members, that's okay because types
+        // don't flow from member to the base e.g. `T.Element == U.Element`.
+        if (lhsTy->is<DependentMemberType>() &&
+            rhsTy->is<DependentMemberType>())
           continue;
 
         // Allow a subset of generic same-type requirements that only mention

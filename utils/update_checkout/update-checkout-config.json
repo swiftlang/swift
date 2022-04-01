@@ -122,7 +122,7 @@
                 "swift-cmark-gfm": "gfm",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
-                "swift-experimental-string-processing": "dev/5"
+                "swift-experimental-string-processing": "swift/main"
             }
         },
        "main": {

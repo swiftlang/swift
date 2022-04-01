@@ -5,6 +5,29 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0345][]:
+
+  It is now possible to unwrap optional variables with a shorthand syntax that
+  shadows the existing declaration. For example, the following:
+  
+  ```swift
+  let foo: String? = "hello world"
+  
+  if let foo {
+    print(foo) // prints "hello world"
+  }
+  ```
+  
+  is equivalent to:
+  
+  ```swift
+  let foo: String? = "hello world"
+  
+  if let foo = foo {
+    print(foo) // prints "hello world"
+  }
+  ```
+
 * [SE-0340][]:
 
   It is now possible to make declarations unavailable from use in asynchronous
@@ -9095,6 +9118,7 @@ Swift 1.0
 [SE-0336]: <https://github.com/apple/swift-evolution/blob/main/proposals/0336-distributed-actor-isolation.md>
 [SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
 [SE-0340]: <https://github.com/apple/swift-evolution/blob/main/proposals/0340-swift-noasync.md>
+[SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

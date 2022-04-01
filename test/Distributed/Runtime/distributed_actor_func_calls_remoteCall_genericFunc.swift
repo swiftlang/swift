@@ -32,10 +32,16 @@ distributed actor Greeter {
 
 }
 
+distributed actor GenericGreeter<Greeting: Sendable & Codable> {
+  distributed func echo(greeting: Greeting) -> Greeting {
+    greeting
+  }
+}
+
 func test() async throws {
   let system = DefaultDistributedActorSystem()
 
-  let local = Greeter(system: system)
+  let local = Greeter(actorSystem: system)
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   let r1 = try await ref.generic("Caplin")
@@ -62,6 +68,18 @@ func test() async throws {
   // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.generic2(strict:_:_:), invocation:FakeInvocationEncoder(genericSubs: [Swift.String, Swift.Int], arguments: [2.0, "Caplin", [1, 2, 3]], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
   print("reply: \(r2)")
   // CHECK: reply: Caplin
+
+  let gen = GenericGreeter<String>(actorSystem: system)
+  let r3 = try await gen.echo(greeting: "Hello generics!")
+  print("reply: \(r3)")
+  // CHECK: reply: Hello generics!
+
+  let genRef = try GenericGreeter<String>.resolve(id: gen.id, using: system)
+  let r32 = try await genRef.echo(greeting: "Hello generics!")
+  // CHECK: > encode generic sub: Swift.String
+  // CHECK: > encode return type: Swift.String
+  print("reply: \(r32)")
+  // CHECK: reply: Hello generics!
 }
 
 @main struct Main {

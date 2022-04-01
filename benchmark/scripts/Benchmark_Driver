@@ -408,12 +408,7 @@ class MarkdownReportHandler(logging.StreamHandler):
         msg = self.format(record)
         stream = self.stream
         try:
-            # In Python 2 Unicode strings have a special type
-            unicode_type = unicode
-        except NameError:
-            unicode_type = str
-        try:
-            if isinstance(msg, unicode_type) and getattr(stream, "encoding", None):
+            if isinstance(msg, str) and getattr(stream, "encoding", None):
                 stream.write(msg.encode(stream.encoding))
             else:
                 stream.write(msg)

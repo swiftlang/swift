@@ -89,10 +89,10 @@ WARNING(clang_error_code_must_be_sendable,none,
         "cannot make error code type '%0' non-sendable because Swift errors "
         "are always sendable", (StringRef))
 
-WARNING(clang_param_ignored_sendable_attr,none,
-        "cannot make parameter '%0' sendable type %1 cannot be made sendable "
-        "by adding '@Sendable' or '& Sendable'",
-        (StringRef, Type))
+WARNING(clang_ignored_sendable_attr,none,
+        "cannot make type %0 sendable because '@Sendable' and '& Sendable' "
+        "cannot be added to it",
+        (Type))
 NOTE(clang_param_should_be_implicitly_sendable,none,
      "parameter should be implicitly 'Sendable' because it is a completion "
      "handler", ())

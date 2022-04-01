@@ -844,12 +844,6 @@ namespace {
     bool visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *X) {
       return true;
     }
-    bool visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
-      return true;
-    }
-    bool visitPointerToThinFunctionInst(PointerToThinFunctionInst *X) {
-      return true;
-    }
 
     bool visitObjCProtocolInst(ObjCProtocolInst *RHS) {
       auto *X = cast<ObjCProtocolInst>(LHS);

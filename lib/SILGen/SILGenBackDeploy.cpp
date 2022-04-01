@@ -92,8 +92,38 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
   auto subs = SGF.F.getForwardingSubstitutionMap();
   SmallVector<SILValue, 4> directResults;
 
+  // If the function is a coroutine, we need to use 'begin_apply'.
+  if (silFnType->isCoroutine()) {
+    assert(!silFnType->hasErrorResult() && "throwing coroutine?");
+
+    // Apply the coroutine, yield the result, and finally branch to either the
+    // terminal return or unwind basic block via intermediate basic blocks. The
+    // intermediates are needed to avoid forming critical edges.
+    SILBasicBlock *resumeBB = SGF.createBasicBlock();
+    SILBasicBlock *unwindBB = SGF.createBasicBlock();
+
+    auto *apply = SGF.B.createBeginApply(loc, functionRef, subs, params);
+    SmallVector<SILValue, 4> rawResults;
+    for (auto result : apply->getAllResults())
+      rawResults.push_back(result);
+
+    auto token = rawResults.pop_back_val();
+    SGF.B.createEndApply(loc, token);
+    SGF.B.createYield(loc, rawResults, resumeBB, unwindBB);
+
+    // Emit resume block.
+    SGF.B.emitBlock(resumeBB);
+    SGF.B.createBranch(loc, SGF.ReturnDest.getBlock());
+
+    // Emit unwind block.
+    SGF.B.emitBlock(unwindBB);
+    SGF.B.createBranch(loc, SGF.CoroutineUnwindDest.getBlock());
+    return;
+  }
+
+  // Use try_apply for functions that throw.
   if (silFnType->hasErrorResult()) {
-    // Apply a throwing function and forward the results and the error to the
+    // Apply the throwing function and forward the results and the error to the
     // return/throw blocks via intermediate basic blocks. The intermediates
     // are needed to avoid forming critical edges.
     SILBasicBlock *normalBB = SGF.createBasicBlock();
@@ -115,14 +145,15 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
     extractAllElements(result, loc, SGF.B, directResults);
 
     SGF.B.createBranch(loc, SGF.ReturnDest.getBlock(), directResults);
-  } else {
-    // Apply a non-throwing function and forward its results straight to the
-    // return block.
-    auto *apply = SGF.B.createApply(loc, functionRef, subs, params);
-    extractAllElements(apply, loc, SGF.B, directResults);
-
-    SGF.B.createBranch(loc, SGF.ReturnDest.getBlock(), directResults);
+    return;
   }
+
+  // The original function is neither throwing nor a couroutine. Apply it and
+  // forward its results straight to the return block.
+  auto *apply = SGF.B.createApply(loc, functionRef, subs, params);
+  extractAllElements(apply, loc, SGF.B, directResults);
+
+  SGF.B.createBranch(loc, SGF.ReturnDest.getBlock(), directResults);
 }
 
 void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {

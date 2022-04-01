@@ -74,6 +74,7 @@ func testSelector(_ c1: C1, p1: P1, obj: AnyObject) {
   // Interesting expressions that refer to methods.
   _ = #selector(Swift.AnyObject.method1)
   _ = #selector(AnyObject.method1!)
+  // expected-error@-1 {{cannot force unwrap value of non-optional type '(AnyObject) -> ((A, B) -> ())?'}}
   _ = #selector(obj.getC1?().method1)
 
   // Initializers

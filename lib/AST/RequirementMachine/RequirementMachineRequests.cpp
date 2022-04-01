@@ -13,8 +13,70 @@
 // This file implements the main entry points for computing minimized generic
 // signatures using the requirement machine via the request evaluator.
 //
+// There are three requests:
+//
+// - RequirementSignatureRequest computes protocol requirement signatures from
+//   user-written requirements.
+// - AbstractGenericSignatureRequest computes minimal generic signatures from a
+//   set of abstract Requirements.
+// - InferredGenericSignatureRequst computes minimal generic signatures from a
+//   set of user-written requirements on a parsed generic declaration.
+//
+// Each request begins by constructing some desugared requirements using the
+// entry points in RequirementLowering.cpp.
+//
+// The desugared requirements are fed into a new requirement machine instance,
+// which is then asked to produce a minimal set of rewrite rules. These rules
+// are converted into minimal canonical Requirements using the entry points in
+// RuleBuilder.cpp.
+//
 // The actual logic for finding a minimal set of rewrite rules is implemented in
 // HomotopyReduction.cpp and MinimalConformances.cpp.
+//
+// Routines for constructing Requirements from Rules are implemented in
+// RequirementBuilder.cpp.
+//
+// This process is actually iterated to implement "concrete equivalence class
+// splitting", a compatibility behavior to produce the same results as the
+// GenericSignatureBuilder in certain esoteric edge cases:
+//
+//           ------------------------
+//          / Desugared Requirement /
+//          ------------------------
+//                     |
+//                     |  +---------------------+
+//                     |  |                     |
+//                     v  v                     |
+//              +-------------+                 |
+//              | RuleBuilder |                 |
+//              +-------------+                 |
+//                     |                        |
+//                     v                        |
+//             +--------------+                 |
+//             | Minimization |                 |
+//             +--------------+                 |
+//                     |                        |
+//                     v                        |
+//          +--------------------+              |
+//          | RequirementBuilder |              |
+//          +--------------------+              |
+//                     |                        |
+//                     v                        |
+//               --------------                 |
+//              / Requirement /                 |
+//              --------------                  |
+//                     |                        |
+//                     v                        |
+//  +------------------------------------+      |
+//  | Split concrete equivalence classes |  ----+
+//  +------------------------------------+
+//                     |
+//                     v
+//               --------------
+//              / Requirement /
+//              --------------
+//
+// This transformation is described in splitConcreteEquivalenceClasses() below.
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,6 +90,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include <memory>
 #include <vector>
@@ -214,9 +277,15 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
                                 ctx.AllocateCopy(typeAliases));
   }
 
+  auto &rewriteCtx = ctx.getRewriteContext();
+
   // We build requirement signatures for all protocols in a strongly connected
   // component at the same time.
-  auto component = ctx.getRewriteContext().getProtocolComponent(proto);
+  auto component = rewriteCtx.startComputingRequirementSignatures(proto);
+
+  SWIFT_DEFER {
+    rewriteCtx.finishComputingRequirementSignatures(proto);
+  };
 
   // Collect user-written requirements from the protocols in this connected
   // component.
@@ -230,13 +299,33 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       requirements.push_back({req, SourceLoc(), /*inferred=*/false});
   }
 
+  if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+    rewriteCtx.beginTimer("RequirementSignatureRequest");
+    llvm::dbgs() << "[";
+    for (auto *proto : component)
+      llvm::dbgs() << " " << proto->getName();
+    llvm::dbgs() << " ]\n";
+  }
+
+  SWIFT_DEFER {
+    if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+      rewriteCtx.endTimer("RequirementSignatureRequest");
+      llvm::dbgs() << "[";
+      for (auto *proto : component)
+        llvm::dbgs() << " " << proto->getName();
+      llvm::dbgs() << " ]\n";
+    }
+  };
+
   unsigned attempt = 0;
   for (;;) {
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
-        ctx.getRewriteContext()));
+        rewriteCtx));
 
     auto status = machine->initWithProtocolWrittenRequirements(component, protos);
+
+    // If completion failed, diagnose an error and return a dummy signature.
     if (status.first != CompletionResult::Success) {
       // All we can do at this point is diagnose and give each protocol an empty
       // requirement signature.
@@ -263,7 +352,10 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
     auto minimalRequirements = machine->computeMinimalProtocolRequirements();
 
-    if (!machine->getErrors()) {
+    // Don't bother splitting concrete equivalence classes if there were invalid
+    // requirements, because the signature is not going to be ABI anyway.
+    if (!machine->getErrors().contains(
+          GenericSignatureErrorFlags::HasInvalidRequirements)) {
       if (shouldSplitConcreteEquivalenceClasses(minimalRequirements, machine.get())) {
         ++attempt;
         splitConcreteEquivalenceClasses(ctx, minimalRequirements,
@@ -282,6 +374,8 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       llvm::dbgs() << "\nRequirement signatures:\n";
     }
 
+    // Cache the requirement signatures for all other protocols in this
+    // connected component.
     for (const auto &pair : minimalRequirements) {
       auto *otherProto = pair.first;
       const auto &reqs = pair.second;
@@ -312,12 +406,21 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       }
     }
 
+    // Diagnose redundant requirements and conflicting requirements.
     if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
         RequirementMachineMode::Enabled) {
       SmallVector<RequirementError, 4> errors;
-      machine->System.computeRedundantRequirementDiagnostics(errors);
+      machine->computeRequirementDiagnostics(errors, proto->getLoc());
       diagnoseRequirementErrors(ctx, errors,
                                 /*allowConcreteGenericParams=*/false);
+    }
+
+    if (!machine->getErrors()) {
+      // If this signature was minimized without errors or non-redundant
+      // concrete conformances, we can re-use the requirement machine for
+      // subsequent queries, instead of building a new requirement machine
+      // from the minimized signature.
+      rewriteCtx.installRequirementMachine(proto, std::move(machine));
     }
 
     // Return the result for the specific protocol this request was kicked off on.
@@ -326,9 +429,11 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 }
 
 /// Builds the top-level generic signature requirements for this rewrite system.
-std::vector<Requirement>
-RequirementMachine::computeMinimalGenericSignatureRequirements(
+GenericSignature
+RequirementMachine::computeMinimalGenericSignature(
     bool reconstituteSugar) {
+  assert(!Sig &&
+         "Already computed minimal generic signature");
   assert(System.getProtocols().empty() &&
          "Not a top-level generic signature rewrite system");
   assert(!Params.empty() &&
@@ -350,7 +455,14 @@ RequirementMachine::computeMinimalGenericSignatureRequirements(
                              reconstituteSugar, reqs, aliases);
   assert(aliases.empty());
 
-  return reqs;
+  auto sig = GenericSignature::get(getGenericParams(), reqs);
+
+  // Remember the signature for generic signature queries. In particular,
+  // getConformanceAccessPath() needs the current requirement machine's
+  // generic signature.
+  Sig = sig.getCanonicalSignature();
+
+  return sig;
 }
 
 /// Check whether the inputs to the \c AbstractGenericSignatureRequest are
@@ -468,6 +580,8 @@ AbstractGenericSignatureRequestRQM::evaluate(
         canSignatureResult.getInt());
   }
 
+  // Convert the input Requirements into StructuralRequirements by adding
+  // empty source locations.
   SmallVector<StructuralRequirement, 4> requirements;
   for (auto req : baseSignature.getRequirements())
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
@@ -494,12 +608,19 @@ AbstractGenericSignatureRequestRQM::evaluate(
       requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
   }
 
+  auto &rewriteCtx = ctx.getRewriteContext();
+
+  if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+    rewriteCtx.beginTimer("AbstractGenericSignatureRequest");
+    llvm::dbgs() << "\n";
+  }
+
   // Preprocess requirements to eliminate conformances on generic parameters
   // which are made concrete.
   if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
     SmallVector<StructuralRequirement, 4> contractedRequirements;
     if (performConcreteContraction(requirements, contractedRequirements,
-                                   ctx.getRewriteContext().getDebugOptions()
+                                   rewriteCtx.getDebugOptions()
                                       .contains(DebugFlags::ConcreteContraction))) {
       std::swap(contractedRequirements, requirements);
     }
@@ -509,7 +630,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
   for (;;) {
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
-        ctx.getRewriteContext()));
+        rewriteCtx));
 
     auto status =
         machine->initWithWrittenRequirements(genericParams, requirements);
@@ -517,14 +638,13 @@ AbstractGenericSignatureRequestRQM::evaluate(
 
     // We pass reconstituteSugar=false to ensure that if the original
     // requirements were canonical, the final signature remains canonical.
-    auto minimalRequirements =
-      machine->computeMinimalGenericSignatureRequirements(
+    auto result = machine->computeMinimalGenericSignature(
           /*reconstituteSugar=*/false);
-
-    auto result = GenericSignature::get(genericParams, minimalRequirements);
     auto errorFlags = machine->getErrors();
 
-    if (!errorFlags) {
+    // Don't bother splitting concrete equivalence classes if there were invalid
+    // requirements, because the signature is not going to be ABI anyway.
+    if (!errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements)) {
       if (shouldSplitConcreteEquivalenceClasses(result.getRequirements(),
                                                 /*proto=*/nullptr,
                                                 machine.get())) {
@@ -535,9 +655,26 @@ AbstractGenericSignatureRequestRQM::evaluate(
                                         requirements, attempt);
         continue;
       }
+    }
 
+    if (!errorFlags) {
+      // If this signature was minimized without errors or non-redundant
+      // concrete conformances, we can re-use the requirement machine for
+      // subsequent queries, instead of building a new requirement machine
+      // from the minimized signature. Do this before verify(), which
+      // performs queries.
+      rewriteCtx.installRequirementMachine(result.getCanonicalSignature(),
+                                           std::move(machine));
+    }
+
+    if (!errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements)) {
       // Check invariants.
       result.verify();
+    }
+
+    if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+      rewriteCtx.endTimer("AbstractGenericSignatureRequest");
+      llvm::dbgs() << result << "\n";
     }
 
     return GenericSignatureWithError(result, errorFlags);
@@ -617,6 +754,8 @@ InferredGenericSignatureRequestRQM::evaluate(
     }
   }
 
+  // Realize all requirements in the free-standing 'where' clause, if there
+  // is one.
   if (whereClause) {
     if (loc.isInvalid())
       loc = whereClause.getLoc();
@@ -641,12 +780,23 @@ InferredGenericSignatureRequestRQM::evaluate(
   for (const auto &req : addedRequirements)
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/true});
 
+  auto &rewriteCtx = ctx.getRewriteContext();
+
+  if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+    rewriteCtx.beginTimer("InferredGenericSignatureRequest");
+
+    llvm::dbgs() << "@ ";
+    auto &sourceMgr = ctx.SourceMgr;
+    loc.print(llvm::dbgs(), sourceMgr);
+    llvm::dbgs() << "\n";
+  }
+
   // Preprocess requirements to eliminate conformances on generic parameters
   // which are made concrete.
   if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
     SmallVector<StructuralRequirement, 4> contractedRequirements;
     if (performConcreteContraction(requirements, contractedRequirements,
-                                   ctx.getRewriteContext().getDebugOptions()
+                                   rewriteCtx.getDebugOptions()
                                       .contains(DebugFlags::ConcreteContraction))) {
       std::swap(contractedRequirements, requirements);
     }
@@ -656,10 +806,12 @@ InferredGenericSignatureRequestRQM::evaluate(
   for (;;) {
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
-        ctx.getRewriteContext()));
+        rewriteCtx));
 
     auto status =
         machine->initWithWrittenRequirements(genericParams, requirements);
+
+    // If completion failed, diagnose an error and return a dummy signature.
     if (status.first != CompletionResult::Success) {
       ctx.Diags.diagnose(loc,
                          diag::requirement_machine_completion_failed,
@@ -673,27 +825,33 @@ InferredGenericSignatureRequestRQM::evaluate(
 
       auto result = GenericSignature::get(genericParams,
                                           parentSig.getRequirements());
+
+      if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+        rewriteCtx.endTimer("InferredGenericSignatureRequest");
+        llvm::dbgs() << result << "\n";
+      }
+
       return GenericSignatureWithError(
           result, GenericSignatureErrorFlags::CompletionFailed);
     }
 
-    auto minimalRequirements =
-      machine->computeMinimalGenericSignatureRequirements(
+    auto result = machine->computeMinimalGenericSignature(
           /*reconstituteSugar=*/true);
-
-    auto result = GenericSignature::get(genericParams, minimalRequirements);
     auto errorFlags = machine->getErrors();
 
+    // Diagnose redundant requirements and conflicting requirements.
     if (attempt == 0 &&
         ctx.LangOpts.RequirementMachineInferredSignatures ==
         RequirementMachineMode::Enabled) {
-      machine->System.computeRedundantRequirementDiagnostics(errors);
+      machine->computeRequirementDiagnostics(errors, loc);
       diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
     }
 
     // FIXME: Handle allowConcreteGenericParams
 
-    if (!errorFlags) {
+    // Don't bother splitting concrete equivalence classes if there were invalid
+    // requirements, because the signature is not going to be ABI anyway.
+    if (!errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements)) {
       // Check if we need to rebuild the signature.
       if (shouldSplitConcreteEquivalenceClasses(result.getRequirements(),
                                                 /*proto=*/nullptr,
@@ -705,9 +863,26 @@ InferredGenericSignatureRequestRQM::evaluate(
                                         requirements, attempt);
         continue;
       }
+    }
 
+    if (!errorFlags) {
+      // If this signature was minimized without errors or non-redundant
+      // concrete conformances, we can re-use the requirement machine for
+      // subsequent queries, instead of building a new requirement machine
+      // from the minimized signature. Do this before verify(), which
+      // performs queries.
+      rewriteCtx.installRequirementMachine(result.getCanonicalSignature(),
+                                           std::move(machine));
+    }
+
+    if (!errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements)) {
       // Check invariants.
       result.verify();
+    }
+
+    if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
+      rewriteCtx.endTimer("InferredGenericSignatureRequest");
+      llvm::dbgs() << result << "\n";
     }
 
     return GenericSignatureWithError(result, errorFlags);

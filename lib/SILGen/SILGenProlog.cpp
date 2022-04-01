@@ -78,8 +78,9 @@ public:
         SGF.SGM.Types.getLoweredType(t, TypeExpansionContext::minimal());
     argType = argType.getCategoryType(argTypeConv.getCategory());
 
-    if (isInOut
-        || orig.getParameterConvention(SGF.SGM.Types) == AbstractionPattern::Indirect)
+    if (isInOut || (orig.getParameterConvention(SGF.SGM.Types) ==
+                        AbstractionPattern::Indirect &&
+                    SGF.SGM.M.useLoweredAddresses()))
       argType = argType.getCategoryType(SILValueCategory::Address);
 
     // Pop the next parameter info.

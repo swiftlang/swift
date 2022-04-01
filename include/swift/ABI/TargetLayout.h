@@ -109,6 +109,11 @@ struct InProcess {
   using CompactFunctionPointer =
       swift::RelativeDirectPointer<T, Nullable, Offset>;
 #endif
+
+  template<typename T>
+  T *getStrippedSignedPointer(const T *pointer) const {
+    return swift_ptrauth_strip(pointer);
+  }
 };
 
 /// Represents a pointer in another address space.
@@ -169,6 +174,10 @@ struct External {
 
   template <typename T, bool Nullable = true, typename Offset = int32_t>
   using CompactFunctionPointer = int32_t;
+
+  StoredPointer getStrippedSignedPointer(const StoredSignedPointer pointer) const {
+    return swift_ptrauth_strip(pointer);
+  }
 };
 
 template <typename Runtime, typename T>

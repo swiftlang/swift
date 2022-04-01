@@ -35,7 +35,8 @@ struct ConcreteConforms: Conforms {
   typealias T = Int
 }
 struct BadConcreteConforms: Conforms {
-  // expected-error@-1 {{type 'BadConcreteConforms.T' (aka 'String') does not conform to protocol 'Foo'}}
+// expected-error@-1 {{type 'BadConcreteConforms' does not conform to protocol 'Conforms}}
+// expected-error@-2 {{type 'BadConcreteConforms.T' (aka 'String') does not conform to protocol 'Foo'}}
   typealias T = String
 }
 
@@ -47,8 +48,10 @@ struct ConcreteSameType: SameType {
   typealias T = Int
   typealias U = Int
 }
-struct BadConcreteSameType: SameType { // expected-error{{'SameType' requires the types 'BadConcreteSameType.T' (aka 'Int') and 'BadConcreteSameType.U' (aka 'Float') be equivalent}}
-	// expected-note@-1{{requirement specified as 'Self.T' == 'Self.U' [with Self = BadConcreteSameType]}}
+struct BadConcreteSameType: SameType {
+  // expected-error@-1 {{type 'BadConcreteSameType' does not conform to protocol 'SameType'}}
+  // expected-error@-2 {{'SameType' requires the types 'BadConcreteSameType.T' (aka 'Int') and 'BadConcreteSameType.U' (aka 'Float') be equivalent}}
+	// expected-note@-3 {{requirement specified as 'Self.T' == 'Self.U' [with Self = BadConcreteSameType]}}
   typealias T = Int
   typealias U = Float
 }
@@ -63,7 +66,8 @@ struct ConcreteNestedConforms: NestedConforms {
   typealias U = ConcreteParent
 }
 struct BadConcreteNestedConforms: NestedConforms {
-  // expected-error@-1 {{type 'ConcreteParentNonFoo2.T' (aka 'Float') does not conform to protocol 'Foo2'}}
+// expected-error@-1 {{type 'BadConcreteNestedConforms' does not conform to protocol 'NestedConforms'}}
+// expected-error@-2 {{type 'ConcreteParentNonFoo2.T' (aka 'Float') does not conform to protocol 'Foo2'}}
   typealias U = ConcreteParentNonFoo2
 }
 

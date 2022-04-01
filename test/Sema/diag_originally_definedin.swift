@@ -8,7 +8,7 @@ public func foo() {}
 @available(macOS 10.13, *)
 @_originallyDefinedIn(module: "original", OSX 10.12) // expected-error {{symbols are moved to the current module before they were available in the OSs}}
 public class C {
-  @_originallyDefinedIn(module: "original", OSX 10.13) // expected-error {{@_originallyDefinedIn is only applicable to top-level decl}}
+  @_originallyDefinedIn(module: "original", OSX 10.13) // expected-error {{'@_originallyDefinedIn' is only applicable to top-level decl}}
   public func foo() {}
 }
 

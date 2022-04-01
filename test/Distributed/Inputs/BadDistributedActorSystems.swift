@@ -349,7 +349,7 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
   }
 
   // FIXME(distributed): can we return void here?
-  public func onReturn<Res>(value: Res) async throws {
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print(" << onReturn: \(value)")
     storeReturn(value)
   }

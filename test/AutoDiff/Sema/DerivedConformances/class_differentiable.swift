@@ -434,7 +434,7 @@ final class TangentVectorWB: DummyAdditiveArithmetic, Differentiable {
 }
 // expected-error @+3 {{'Differentiable' requires the types 'VectorSpaceTypeAlias.TangentVector' (aka 'TangentVectorWB') and 'TangentVectorWB.TangentVector' be equivalent}}
 // expected-note @+2 {{requirement specified as 'Self.TangentVector' == 'Self.TangentVector.TangentVector' [with Self = VectorSpaceTypeAlias]}}
-// expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 2 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}} FIXME: Duplicate error
 final class VectorSpaceTypeAlias: DummyAdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float

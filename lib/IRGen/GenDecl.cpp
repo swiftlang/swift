@@ -5340,6 +5340,22 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   return address;
 }
 
+/// Can not treat a treat the layout of a class as resilient if the current
+///    class is defined in an external module and
+///    not publically accessible (e.g private or internal).
+/// This would normally not happen except if we compile theClass's module with
+/// enable-testing.
+static bool shouldTreatClassAsFragileBecauseOfEnableTesting(ClassDecl *D,
+                                                            IRGenModule &IGM) {
+    if (!D)
+      return false;
+
+    return D->getModuleContext() != IGM.getSwiftModule() &&
+           !D->getFormalAccessScope(/*useDC=*/nullptr,
+                                  /*treatUsableFromInlineAsPublic=*/true)
+           .isPublic();
+}
+
 /// Do we have to use resilient access patterns when working with this
 /// declaration?
 ///
@@ -5349,13 +5365,21 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D,
-                              ResilienceExpansion expansion) {
+                              ResilienceExpansion expansion,
+                              ClassDecl *asViewedFromRootClass) {
+  assert(!asViewedFromRootClass || isa<ClassDecl>(D));
+
   if (D->getModuleContext()->getBypassResilience())
     return false;
   if (expansion == ResilienceExpansion::Maximal &&
       Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
   }
+
+  if (shouldTreatClassAsFragileBecauseOfEnableTesting(asViewedFromRootClass,
+                                                      *this))
+    return false;
+
   return D->isResilient(getSwiftModule(), expansion);
 }
 
@@ -5365,11 +5389,17 @@ bool IRGenModule::isResilient(NominalTypeDecl *D,
 /// For classes, this means that virtual method calls use dispatch thunks
 /// rather than accessing metadata members directly.
 bool IRGenModule::hasResilientMetadata(ClassDecl *D,
-                                       ResilienceExpansion expansion) {
+                                       ResilienceExpansion expansion,
+                                       ClassDecl *asViewedFromRootClass) {
   if (expansion == ResilienceExpansion::Maximal &&
       Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
   }
+
+  if (shouldTreatClassAsFragileBecauseOfEnableTesting(asViewedFromRootClass,
+                                                      *this))
+    return false;
+
   return D->hasResilientMetadata(getSwiftModule(), expansion);
 }
 

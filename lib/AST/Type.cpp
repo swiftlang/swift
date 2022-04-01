@@ -3638,7 +3638,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
     return maybeOpaqueType;
   }
 
-  auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
+  auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying subsitution.
   if (!subs.hasValue())
@@ -3749,7 +3749,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
     return abstractRef;
   }
 
-  auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
+  auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying subsitution.
   if (!subs.hasValue())
@@ -4308,11 +4308,11 @@ operator()(CanType dependentType, Type conformingReplacementType,
 ProtocolConformanceRef MakeAbstractConformanceForGenericType::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
-  assert((conformingReplacementType->is<ErrorType>()
-          || conformingReplacementType->is<SubstitutableType>()
-          || conformingReplacementType->is<DependentMemberType>()
-          || conformingReplacementType->is<TypeVariableType>())
-         && "replacement requires looking up a concrete conformance");
+  assert((conformingReplacementType->is<ErrorType>() ||
+          conformingReplacementType->is<SubstitutableType>() ||
+          conformingReplacementType->is<DependentMemberType>() ||
+          conformingReplacementType->hasTypeVariable()) &&
+         "replacement requires looking up a concrete conformance");
   // A class-constrained archetype might conform to the protocol
   // concretely.
   if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {

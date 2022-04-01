@@ -699,6 +699,28 @@ bb4:
   return %5 : $Int32
 }
 
+// CHECK-LABEL: @dontCrashWithOptionalNone
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %6 = apply %5() : $@convention(thin) () -> ()
+// CHECK-NEXT:      %4 = ref_element_addr [immutable] %3 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+sil @dontCrashWithOptionalNone : $@convention(thin) () -> () {
+bb0:
+  %26 = enum $Optional<X>, #Optional.none!enumelt
+  switch_enum %26 : $Optional<X>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
+bb1:
+  br bb3
+bb2:
+  %68 = unchecked_enum_data %26 : $Optional<X>, #Optional.some!enumelt
+  %1 = ref_element_addr [immutable] %68 : $X, #X.a
+  %5 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %6 = apply %5() : $@convention(thin) () -> ()
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: @testLoadTake
 // CHECK:      PAIR #0.
 // CHECK-NEXT:   %2 = load [take] %0 : $*C

@@ -232,9 +232,6 @@ public:
   Type getTypeForTerm(const MutableTerm &term,
                       TypeArrayView<GenericTypeParamType> genericParams) const;
 
-  Type getRelativeTypeForTerm(
-                      const MutableTerm &term, const MutableTerm &prefix) const;
-
   Type getTypeFromSubstitutionSchema(
                       Type schema,
                       ArrayRef<Term> substitutions,

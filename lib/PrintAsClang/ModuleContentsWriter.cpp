@@ -12,7 +12,7 @@
 
 #include "ModuleContentsWriter.h"
 
-#include "CxxSynthesis.h"
+#include "ClangSyntaxPrinter.h"
 #include "DeclAndTypePrinter.h"
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
@@ -642,26 +642,34 @@ swift::printModuleContentsAsObjC(raw_ostream &os,
 void swift::printModuleContentsAsCxx(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     ModuleDecl &M) {
-  using cxx_synthesis::CxxPrinter;
+  std::string moduleContentsBuf;
+  llvm::raw_string_ostream moduleOS{moduleContentsBuf};
+  std::string modulePrologueBuf;
+  llvm::raw_string_ostream prologueOS{modulePrologueBuf};
+
+  ModuleWriter(moduleOS, prologueOS, imports, M, getRequiredAccess(M),
+               OutputLanguageMode::Cxx)
+      .write();
+
+  // FIXME: refactor.
+  if (!prologueOS.str().empty()) {
+    os << "#endif\n";
+    os << "#ifdef __cplusplus\n";
+    os << "namespace ";
+    M.ValueDecl::getName().print(os);
+    os << " {\n";
+    os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
+    os << "#endif\n\n";
+
+    os << prologueOS.str();
+
+    os << "\n#ifdef __cplusplus\n";
+    os << "}\n";
+    os << "}\n";
+  }
+
   // Construct a C++ namespace for the module.
-  CxxPrinter(os).printNamespace(
+  ClangSyntaxPrinter(os).printNamespace(
       [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
-      [&](raw_ostream &os) {
-        std::string moduleContentsBuf;
-        llvm::raw_string_ostream moduleOS{moduleContentsBuf};
-        std::string modulePrologueBuf;
-        llvm::raw_string_ostream prologueOS{modulePrologueBuf};
-
-        ModuleWriter(moduleOS, prologueOS, imports, M, getRequiredAccess(M),
-                     OutputLanguageMode::Cxx)
-            .write();
-
-        // The module's prologue contains implementation details,
-        // like extern "C" symbols for the referenced Swift functions.
-        CxxPrinter(os).printNamespace(
-            cxx_synthesis::getCxxImplNamespaceName(),
-            [&](raw_ostream &os) { os << prologueOS.str(); });
-
-        os << moduleOS.str();
-      });
+      [&](raw_ostream &os) { os << moduleOS.str(); });
 }

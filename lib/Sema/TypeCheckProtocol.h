@@ -100,6 +100,35 @@ CheckTypeWitnessResult checkTypeWitness(Type type,
                                         const NormalProtocolConformance *Conf,
                                         SubstOptions options = None);
 
+/// A type witness inferred without the aid of a specific potential
+/// value witness.
+class AbstractTypeWitness {
+  AssociatedTypeDecl *AssocType;
+  Type TheType;
+
+  /// The defaulted associated type that was used to infer this type witness.
+  /// Need not necessarilly match \c AssocType, but their names must.
+  AssociatedTypeDecl *DefaultedAssocType;
+
+public:
+  AbstractTypeWitness(AssociatedTypeDecl *AssocType, Type TheType,
+                      AssociatedTypeDecl *DefaultedAssocType = nullptr)
+      : AssocType(AssocType), TheType(TheType),
+        DefaultedAssocType(DefaultedAssocType) {
+    assert(AssocType && TheType);
+    assert(!DefaultedAssocType ||
+           (AssocType->getName() == DefaultedAssocType->getName()));
+  }
+
+  AssociatedTypeDecl *getAssocType() const { return AssocType; }
+
+  Type getType() const { return TheType; }
+
+  AssociatedTypeDecl *getDefaultedAssocType() const {
+    return DefaultedAssocType;
+  }
+};
+
 /// The set of associated types that have been inferred by matching
 /// the given value witness to its corresponding requirement.
 struct InferredAssociatedTypesByWitness {
@@ -916,7 +945,7 @@ class TypeWitnessSystem final {
   struct TypeWitnessCandidate final {
     /// The defaulted associated type declaration correlating with this
     /// candidate, if present.
-    const AssociatedTypeDecl *DefaultedAssocType;
+    AssociatedTypeDecl *DefaultedAssocType;
 
     /// The equivalence class of this candidate.
     EquivalenceClass *EquivClass;
@@ -944,7 +973,7 @@ public:
 
   /// Get the defaulted associated type relating to the resolved type witness
   /// for the associated type with the given name, if present.
-  const AssociatedTypeDecl *getDefaultedAssocType(Identifier name) const;
+  AssociatedTypeDecl *getDefaultedAssocType(Identifier name) const;
 
   /// Record a type witness for the given associated type name.
   ///
@@ -958,8 +987,7 @@ public:
   /// defines the given default type.
   ///
   /// \note This need not lead to the resolution of a type witness.
-  void addDefaultTypeWitness(Type type,
-                             const AssociatedTypeDecl *defaultedAssocType);
+  void addDefaultTypeWitness(Type type, AssociatedTypeDecl *defaultedAssocType);
 
   /// Record the given same-type requirement, if regarded of interest to
   /// the system.
@@ -1076,15 +1104,23 @@ private:
     ConformanceChecker &checker,
     const llvm::SetVector<AssociatedTypeDecl *> &assocTypes);
 
+  /// Compute a "fixed" type witness for an associated type, e.g.,
+  /// if the refined protocol requires it to be equivalent to some other type.
+  Type computeFixedTypeWitness(AssociatedTypeDecl *assocType);
+
   /// Compute the default type witness from an associated type default,
   /// if there is one.
-  Optional<std::pair<AssociatedTypeDecl *, Type>>
+  Optional<AbstractTypeWitness>
   computeDefaultTypeWitness(AssociatedTypeDecl *assocType) const;
 
   /// Compute the "derived" type witness for an associated type that is
   /// known to the compiler.
   std::pair<Type, TypeDecl *>
   computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
+
+  /// Compute a type witness without using a specific potential witness.
+  Optional<AbstractTypeWitness>
+  computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Collect abstract type witnesses and feed them to the given system.
   void collectAbstractTypeWitnesses(

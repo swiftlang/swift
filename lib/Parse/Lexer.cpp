@@ -20,7 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/ExperimentalRegexBridging.h"
+#include "swift/Parse/RegexParserBridging.h"
 #include "swift/Syntax/Trivia.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
@@ -34,7 +34,7 @@
 #include <limits>
 
 // Regex lexing delivered via libSwift.
-#include "swift/Parse/ExperimentalRegexBridging.h"
+#include "swift/Parse/RegexParserBridging.h"
 static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
 void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
   regexLiteralLexingFn = fn;

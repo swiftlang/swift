@@ -2048,7 +2048,7 @@ namespace {
     void addUnderlyingTypeAndConformances() {
       auto sig = O->getOpaqueInterfaceGenericSignature();
       auto contextSig = O->getGenericSignature().getCanonicalSignature();
-      auto subs = *O->getUnderlyingTypeSubstitutions();
+      auto subs = *O->getUniqueUnderlyingTypeSubstitutions();
 
       // Add the underlying types for each generic parameter.
       for (auto genericParam : O->getOpaqueGenericParams()) {
@@ -5619,6 +5619,12 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
                                                    llvm::Function *function,
                                                    LinkEntity entity,
                                                    Size size) {
+  auto afp = cast<llvm::GlobalVariable>(IGM.getAddrOfAsyncFunctionPointer(entity));
+  if (IGM.isAsyncFunctionPointerMarkedForPadding(afp)) {
+    size = std::max(size,
+                    NumWords_AsyncLet * IGM.getPointerSize());
+  }
+  
   ConstantInitBuilder initBuilder(IGM);
   ConstantStructBuilder builder(
       initBuilder.beginStruct(IGM.AsyncFunctionPointerTy));
