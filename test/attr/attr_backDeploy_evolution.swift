@@ -30,14 +30,7 @@
 //
 
 // REQUIRES: executable_test
-// REQUIRES: VENDOR=apple
-
-// This test doesn't behave as expected on some deployment targets because
-// the minimum OS versions accepted by the linker are later than the deployment
-// targets given to the compiler invocation, and therefore symbols that need
-// to be weak linked for the test to function are not.
-// UNSUPPORTED: OS=ios && CPU=arm64e
-// UNSUPPORTED: OS=watchos && CPU=x86_64
+// REQUIRES: OS=macosx
 
 // ---- (0) Prepare SDK
 // RUN: %empty-directory(%t)
@@ -49,21 +42,21 @@
 // RUN: %target-build-swift-dylib(%t/SDK_ABI/Frameworks/BackDeployHelper.framework/BackDeployHelper) \
 // RUN:   -emit-module-path %t/SDK_ABI/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:   -module-name BackDeployHelper -emit-module %S/Inputs/BackDeployHelper.swift \
-// RUN:   -Xfrontend -target -Xfrontend %target-next-stable-abi-triple \
+// RUN:   -target %target-cpu-apple-macosx10.15 \
 // RUN:   -Xfrontend -define-availability \
-// RUN:     -Xfrontend 'BackDeploy 1.0:macOS 10.14.3, iOS 12.1, tvOS 12.1, watchOS 5.1' \
+// RUN:     -Xfrontend 'BackDeploy 1.0:macOS 10.14.3' \
 // RUN:   -Xfrontend -define-availability \
-// RUN:     -Xfrontend 'BackDeploy 2.0:macOS 10.15, iOS 13, tvOS 13, watchOS 6' \
+// RUN:     -Xfrontend 'BackDeploy 2.0:macOS 10.15' \
 // RUN:   -Xlinker -install_name -Xlinker @rpath/BackDeployHelper.framework/BackDeployHelper \
 // RUN:   -enable-library-evolution
 
 // ---- (2) Build executable
 // RUN: %target-build-swift -emit-executable %s -g -o %t/test_ABI \
-// RUN:   -Xfrontend -target -Xfrontend %target-pre-stable-abi-triple \
+// RUN:   -target %target-cpu-apple-macosx10.14.3 \
 // RUN:   -Xfrontend -define-availability \
-// RUN:     -Xfrontend 'BackDeploy 1.0:macOS 10.14.3, iOS 12.1, tvOS 12.1, watchOS 5.1' \
+// RUN:     -Xfrontend 'BackDeploy 1.0:macOS 10.14.3' \
 // RUN:   -Xfrontend -define-availability \
-// RUN:     -Xfrontend 'BackDeploy 2.0:macOS 10.15, iOS 13, tvOS 13, watchOS 6' \
+// RUN:     -Xfrontend 'BackDeploy 2.0:macOS 10.15' \
 // RUN:   -F %t/SDK_ABI/Frameworks/ -framework BackDeployHelper \
 // RUN:   %target-rpath(@executable_path/SDK_ABI/Frameworks)
 
@@ -76,21 +69,21 @@
 // RUN: %target-build-swift-dylib(%t/SDK_BD/Frameworks/BackDeployHelper.framework/BackDeployHelper) \
 // RUN:   -emit-module-path %t/SDK_BD/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:   -module-name BackDeployHelper -emit-module %S/Inputs/BackDeployHelper.swift \
-// RUN:   -Xfrontend -target -Xfrontend %target-next-stable-abi-triple \
+// RUN:   -target %target-cpu-apple-macosx10.15 \
 // RUN:   -Xfrontend -define-availability \
-// RUN:     -Xfrontend 'BackDeploy 1.0:macOS 10.14.3, iOS 12.1, tvOS 12.1, watchOS 5.1' \
+// RUN:     -Xfrontend 'BackDeploy 1.0:macOS 10.14.3' \
 // RUN:   -Xfrontend -define-availability \
-// RUN:     -Xfrontend 'BackDeploy 2.0:macOS 999.0, iOS 999.0, watchOS 999.0, tvOS 999.0' \
+// RUN:     -Xfrontend 'BackDeploy 2.0:macOS 999.0' \
 // RUN:   -Xlinker -install_name -Xlinker @rpath/BackDeployHelper.framework/BackDeployHelper \
 // RUN:   -enable-library-evolution
 
 // ---- (5) Build executable
 // RUN: %target-build-swift -emit-executable %s -g -o %t/test_BD \
-// RUN:   -Xfrontend -target -Xfrontend %target-next-stable-abi-triple \
+// RUN:   -target %target-cpu-apple-macosx10.14.3 \
 // RUN:   -Xfrontend -define-availability \
-// RUN:     -Xfrontend 'BackDeploy 1.0:macOS 10.14.3, iOS 12.1, tvOS 12.1, watchOS 5.1' \
+// RUN:     -Xfrontend 'BackDeploy 1.0:macOS 10.14.3' \
 // RUN:   -Xfrontend -define-availability \
-// RUN:     -Xfrontend 'BackDeploy 2.0:macOS 999.0, iOS 999.0, watchOS 999.0, tvOS 999.0' \
+// RUN:     -Xfrontend 'BackDeploy 2.0:macOS 999.0' \
 // RUN:   -F %t/SDK_BD/Frameworks/ -framework BackDeployHelper \
 // RUN:   %target-rpath(@executable_path/SDK_BD/Frameworks)
 
@@ -103,11 +96,11 @@
 // RUN: %target-build-swift-dylib(%t/SDK_BD/Frameworks/BackDeployHelper.framework/BackDeployHelper) \
 // RUN:   -emit-module-path %t/SDK_BD/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:   -module-name BackDeployHelper -emit-module %S/Inputs/BackDeployHelper.swift \
-// RUN:   -Xfrontend -target -Xfrontend %target-next-stable-abi-triple \
+// RUN:   -target %target-cpu-apple-macosx10.15 \
 // RUN:   -Xfrontend -define-availability \
-// RUN:     -Xfrontend 'BackDeploy 1.0:macOS 10.14.3, iOS 12.1, tvOS 12.1, watchOS 5.1' \
+// RUN:     -Xfrontend 'BackDeploy 1.0:macOS 10.14.3' \
 // RUN:   -Xfrontend -define-availability \
-// RUN:     -Xfrontend 'BackDeploy 2.0:macOS 999.0, iOS 999.0, watchOS 999.0, tvOS 999.0' \
+// RUN:     -Xfrontend 'BackDeploy 2.0:macOS 999.0' \
 // RUN:   -Xlinker -install_name -Xlinker @rpath/BackDeployHelper.framework/BackDeployHelper \
 // RUN:   -enable-library-evolution -DSTRIP_V2_APIS
 
