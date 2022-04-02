@@ -25,6 +25,7 @@
 #include "swift/SIL/SILType.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/RecordLayout.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
@@ -378,6 +379,7 @@ namespace irgen {
 namespace {
   class SignatureExpansion {
     IRGenModule &IGM;
+    const clang::Decl *D;
     CanSILFunctionType FnType;
   public:
     SmallVector<llvm::Type*, 8> ParamIRTypes;
@@ -393,8 +395,8 @@ namespace {
     FunctionPointerKind FnKind;
 
     SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType,
-                       FunctionPointerKind fnKind)
-        : IGM(IGM), FnType(fnType), FnKind(fnKind) {
+                       FunctionPointerKind fnKind, const clang::Decl *decl)
+        : IGM(IGM), FnType(fnType), FnKind(fnKind), D(decl) {
     }
 
     /// Expand the components of the primary entrypoint of the function type.
@@ -1352,7 +1354,9 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   }
 
   // Generate function info for this signature.
-  auto extInfo = clang::FunctionType::ExtInfo();
+  clang::FunctionType::ExtInfo extInfo{};
+  if (const auto *FD = dyn_cast_or_null<clang::FunctionDecl>(D))
+    extInfo = FD->getFunctionType()->getExtInfo();
   auto &FI = clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
                                              clangResultTy, paramTys, extInfo,
                                              clang::CodeGen::RequiredArgs::All);
@@ -1894,8 +1898,10 @@ Signature SignatureExpansion::getSignature() {
            (FnType->getLanguage() == SILFunctionLanguage::C) &&
          "C function type without C function info");
 
-  auto callingConv =
-      expandCallingConv(IGM, FnType->getRepresentation(), FnType->isAsync());
+  auto callingConv = ForeignInfo.ClangInfo
+                        ? ForeignInfo.ClangInfo->getEffectiveCallingConvention()
+                        : expandCallingConv(IGM, FnType->getRepresentation(),
+                                            FnType->isAsync());
 
   Signature result;
   result.Type = llvmType;
@@ -1924,9 +1930,10 @@ Signature SignatureExpansion::getSignature() {
 
 Signature Signature::getUncached(IRGenModule &IGM,
                                  CanSILFunctionType formalType,
-                                 FunctionPointerKind fpKind) {
+                                 FunctionPointerKind fpKind,
+                                 const clang::Decl *decl) {
   GenericContextScope scope(IGM, formalType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, formalType, fpKind);
+  SignatureExpansion expansion(IGM, formalType, fpKind, decl);
   expansion.expandFunctionType();
   return expansion.getSignature();
 }
@@ -1934,7 +1941,7 @@ Signature Signature::getUncached(IRGenModule &IGM,
 Signature Signature::forCoroutineContinuation(IRGenModule &IGM,
                                               CanSILFunctionType fnType) {
   assert(fnType->isCoroutine());
-  SignatureExpansion expansion(IGM, fnType, FunctionPointerKind(fnType));
+  SignatureExpansion expansion(IGM, fnType, FunctionPointerKind(fnType), NULL);
   expansion.expandCoroutineContinuationType();
   return expansion.getSignature();
 }
@@ -1943,7 +1950,7 @@ Signature Signature::forAsyncReturn(IRGenModule &IGM,
                                     CanSILFunctionType fnType) {
   assert(fnType->isAsync());
   GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, fnType, FunctionPointerKind(fnType));
+  SignatureExpansion expansion(IGM, fnType, FunctionPointerKind(fnType), NULL);
   expansion.expandAsyncReturnType();
   return expansion.getSignature();
 }
@@ -1952,7 +1959,7 @@ Signature Signature::forAsyncAwait(IRGenModule &IGM, CanSILFunctionType fnType,
                                    FunctionPointerKind fnKind) {
   assert(fnType->isAsync());
   GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, fnType, fnKind);
+  SignatureExpansion expansion(IGM, fnType, fnKind, nullptr);
   expansion.expandAsyncAwaitType();
   return expansion.getSignature();
 }
@@ -1961,7 +1968,7 @@ Signature Signature::forAsyncEntry(IRGenModule &IGM, CanSILFunctionType fnType,
                                    FunctionPointerKind fnKind) {
   assert(fnType->isAsync());
   GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, fnType, fnKind);
+  SignatureExpansion expansion(IGM, fnType, fnKind, nullptr);
   expansion.expandAsyncEntryType();
   return expansion.getSignature();
 }

@@ -126,7 +126,8 @@ public:
   /// IRGenModule::getSignature(CanSILFunctionType), which is what
   /// clients should generally be using.
   static Signature getUncached(IRGenModule &IGM, CanSILFunctionType formalType,
-                               FunctionPointerKind kind);
+                               FunctionPointerKind kind,
+                               const clang::Decl *decl);
 
   /// Compute the signature of a coroutine's continuation function.
   static Signature forCoroutineContinuation(IRGenModule &IGM,
