@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-disable-pass=alloc-stack-hoisting -g -emit-ir -o - %s | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-disable-pass=alloc-stack-hoisting -g -c %s -o %t/out.o
+// RUN: %target-swift-frontend -parse-as-library -g -emit-ir -o - %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -g -c %s -o %t/out.o
 // RUN: %llvm-dwarfdump --show-children %t/out.o | %FileCheck -check-prefix=DWARF %s
 
 // This test checks that:
@@ -13,7 +13,7 @@
 // We only run this on macOS right now since we would need to pattern match
 // slightly differently on other platforms.
 // REQUIRES: OS=macosx
-// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=x86_64 || CPU=arm64
 // REQUIRES: optimized_stdlib
 
 //////////////////
@@ -65,7 +65,7 @@ public var falseValue: Bool { false }
 // DWARF-NEXT: DW_AT_external	(true)
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(DW_OP_fbreg
+// DWARF-NEXT: DW_AT_location	(
 // DWARF-NEXT: DW_AT_name	("m")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
@@ -120,7 +120,7 @@ public func copyableValueTest() {
 // DWARF-NEXT: DW_AT_type	(
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(DW_OP_fbreg
+// DWARF-NEXT: DW_AT_location	(
 // DWARF-NEXT: DW_AT_name	("m")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
@@ -150,7 +150,7 @@ public func copyableArgTest(_ k: __owned Klass) {
 // DWARF-NEXT: DW_AT_external	(
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(DW_OP_fbreg -24)
+// DWARF-NEXT: DW_AT_location	(
 // DWARF-NEXT: DW_AT_name	("m")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
@@ -205,7 +205,7 @@ public func copyableVarTest() {
 // DWARF-NEXT: DW_AT_type	(
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(DW_OP_fbreg -24)
+// DWARF-NEXT: DW_AT_location	(
 // DWARF-NEXT: DW_AT_name	("m")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
@@ -219,10 +219,7 @@ public func copyableVarArgTest(_ k: inout Klass) {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo20addressOnlyValueTestyyxAA1PRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.P)
-// CHECK: @llvm.dbg.declare(metadata %swift.type** %T1,
-// CHECK: @llvm.dbg.declare(metadata %swift.opaque** %x.debug,
-// CHECK: @llvm.dbg.declare(metadata i8** %m.debug,
-// CHECK: @llvm.dbg.addr(metadata i8** %k.debug, metadata ![[K_ADDR_LET_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: @llvm.dbg.addr(metadata %swift.opaque** %k.debug, metadata ![[K_ADDR_LET_METADATA:[0-9]+]], metadata !DIExpression()), !dbg ![[ADDR_LOC:[0-9]*]]
 // CHECK-NEXT: br
 // CHECK: @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[K_ADDR_LET_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
 // CHECK: ret void
@@ -312,13 +309,10 @@ public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo18addressOnlyVarTestyyxAA1PRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.P)
-// CHECK: @llvm.dbg.declare(metadata %swift.type** %T1,
-// CHECK: @llvm.dbg.declare(metadata %swift.opaque** %x.debug,
-// CHECK: @llvm.dbg.declare(metadata i8** %m.debug,
-// CHECK: @llvm.dbg.addr(metadata i8** %k.debug, metadata ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: @llvm.dbg.addr(metadata %swift.opaque** %k.debug, metadata ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], metadata !DIExpression()), !dbg ![[ADDR_LOC:[0-9]*]]
 // CHECK-NEXT: br
 // CHECK: @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[K_ADDRONLY_VAR_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
-// CHECK: @llvm.dbg.addr(metadata i8** %k.debug, metadata ![[K_ADDRONLY_VAR_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK: @llvm.dbg.addr(metadata %swift.opaque** %k.debug, metadata ![[K_ADDRONLY_VAR_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
 // CHECK-NEXT: br
 // CHECK: ret void
 // CHECK-NEXT: }
@@ -344,13 +338,6 @@ public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
 // DWARF-NEXT: DW_AT_artificial        (true)
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (
-// DWARF-NEXT: DW_AT_name      ("m")
-// DWARF-NEXT: DW_AT_decl_file (
-// DWARF-NEXT: DW_AT_decl_line (
-// DWARF-NEXT: DW_AT_type      (
-//
-// DWARF: DW_TAG_variable
 // DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
 // DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
 // TODO: Missing def in dbg info here.
@@ -369,9 +356,6 @@ public func addressOnlyVarTest<T : P>(_ x: T) {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo21addressOnlyVarArgTestyyxz_xtAA1PRzlF"(
-// CHECK: call void @llvm.dbg.declare(metadata %swift.type** %T1,
-// CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %x.debug,
-// CHECK: call void @llvm.dbg.declare(metadata i8** %m.debug,
 // CHECK: call void @llvm.dbg.addr(metadata %swift.opaque** %k.debug, metadata ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
 // CHECK-NEXT: br
 // CHECK: @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[K_ADDRONLY_VAR_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
@@ -408,13 +392,6 @@ public func addressOnlyVarTest<T : P>(_ x: T) {
 // DWARF-NEXT: DW_AT_name      ("$\317\204_0_0")
 // DWARF-NEXT: DW_AT_type      (
 // DWARF-NEXT: DW_AT_artificial        (true)
-//
-// DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (
-// DWARF-NEXT: DW_AT_name      ("m")
-// DWARF-NEXT: DW_AT_decl_file (
-// DWARF-NEXT: DW_AT_decl_line (
-// DWARF-NEXT: DW_AT_type      (
 public func addressOnlyVarArgTest<T : P>(_ k: inout T, _ x: T) {
     k.doSomething()
     let m = _move(k)
