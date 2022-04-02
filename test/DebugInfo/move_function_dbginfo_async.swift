@@ -13,7 +13,7 @@
 // We only run this on macOS right now since we would need to pattern match
 // slightly differently on other platforms.
 // REQUIRES: OS=macosx
-// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=x86_64 || CPU=arm64
 // REQUIRES: optimized_stdlib
 
 //////////////////
@@ -60,20 +60,20 @@ public func forceSplit() async {}
 
 // DWARF:  DW_AT_linkage_name	("$s3out13letSimpleTestyyxnYalF")
 // DWARF:  DW_TAG_formal_parameter
-// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value([[ASYNC_REG:DW_OP_.*]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
 // DWARF-NEXT:  DW_AT_name ("msg")
 //
 // DWARF:  DW_AT_linkage_name	("$s3out13letSimpleTestyyxnYalFTQ0_")
 // DWARF:  DW_AT_name	("letSimpleTest")
 // DWARF:  DW_TAG_formal_parameter
-// DWARF-NEXT:  DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_deref, DW_OP_plus_uconst 0x[[MSG_LOC:[a-f0-9]+]], DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT:  DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x[[MSG_LOC:[a-f0-9]+]], DW_OP_plus_uconst 0x8, DW_OP_deref)
 // DWARF-NEXT:  DW_AT_name	("msg")
 //
 // DWARF: DW_AT_linkage_name	("$s3out13letSimpleTestyyxnYalFTY1_")
 // DWARF: DW_AT_name	("letSimpleTest")
 // DWARF: DW_TAG_formal_parameter
 // DWARF: DW_AT_location	(0x{{[a-f0-9]+}}:
-// DWARF-NEXT:            [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT:            [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref)
 // DWARF-NEXT:            DW_AT_name	("msg")
 public func letSimpleTest<T>(_ msg: __owned T) async {
     await forceSplit()
@@ -116,20 +116,20 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // DWARF: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalF")
 // DWARF: DW_AT_name	("varSimpleTest")
 // DWARF: DW_TAG_formal_parameter
-// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref)
 // DWARF-NEXT: DW_AT_name ("msg")
 //
 // DWARF: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalFTQ0_")
 // DWARF: DW_AT_name	("varSimpleTest")
 // DWARF: DW_TAG_formal_parameter
-// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_deref, DW_OP_plus_uconst 0x[[MSG_LOC:[a-f0-9]+]], DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x[[MSG_LOC:[a-f0-9]+]], DW_OP_plus_uconst 0x8, DW_OP_deref)
 // DWARF-NEXT: DW_AT_name	("msg")
 //
 // DWARF: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalFTY1_")
 // DWARF: DW_AT_name	("varSimpleTest")
 // DWARF: DW_TAG_formal_parameter
 // DWARF-NEXT: DW_AT_location	(0x{{[a-f0-9]+}}:
-// DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref)
 // DWARF-NEXT: DW_AT_name	("msg")
 //
 // We were just moved and are not reinit yet. This is caused by us hopping twice
@@ -151,9 +151,9 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // DWARF: DW_TAG_formal_parameter
 // DWARF: DW_AT_location	(0x{{[a-f0-9]+}}:
 // DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}):
-// DWARF-SAME:        DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref
+// DWARF-SAME:        DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref
 // DWARF-NEXT:    [0x{{[a-f0-9]+}}, 0x{{[a-f0-9]+}}):
-// DWARF-SAME:        DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref
+// DWARF-SAME:        DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref
 // DWARF-NEXT: DW_AT_name	("msg")
 //
 // We did not move the value again here, so we just get a normal entry value for
@@ -162,13 +162,13 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // DWARF: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalFTQ4_")
 // DWARF: DW_AT_name	("varSimpleTest")
 // DWARF: DW_TAG_formal_parameter
-// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_deref, DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref)
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x[[MSG_LOC]], DW_OP_plus_uconst 0x8, DW_OP_deref)
 // DWARF-NEXT: DW_AT_name	("msg")
 //
 // DWARF: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalFTY5_")
 // DWARF: DW_AT_name	("varSimpleTest")
 // DWARF: DW_TAG_formal_parameter
-// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref
 // DWARF-NEXT: DW_AT_name	("msg")
 
 // Change name to varSimpleTestArg
@@ -219,7 +219,7 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 // DWARF: DW_AT_linkage_name	("$s3out16varSimpleTestVaryyYaFTY0_")
 //
 // DWARF:    DW_TAG_variable
-// DWARF-NEXT: DW_AT_location   (DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
+// DWARF-NEXT: DW_AT_location   (DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
 // DWARF-NEXT: DW_AT_name       ("k")
 //
 // DWARF:    DW_TAG_variable
@@ -229,17 +229,17 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 // DWARF: DW_AT_linkage_name	("$s3out16varSimpleTestVaryyYaFTQ1_")
 //
 // DWARF:    DW_TAG_variable
-// DWARF-NEXT: DW_AT_location   (DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
+// DWARF-NEXT: DW_AT_location   (DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
 // DWARF-NEXT: DW_AT_name       ("k")
 //
 // DWARF:    DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x10)
+// DWARF-NEXT: DW_AT_location	(DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x10)
 // DWARF-NEXT: DW_AT_name ("m")
 //
 // DWARF: DW_AT_linkage_name	("$s3out16varSimpleTestVaryyYaFTY2_")
 // DWARF:    DW_TAG_variable
 // DWARF-NEXT: DW_AT_location   (0x{{[0-9a-f]+}}:
-// DWARF-NEXT:    [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
+// DWARF-NEXT:    [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
 // DWARF-NEXT: DW_AT_name       ("k")
 // DWARF:    DW_TAG_variable
 // DWARF-NEXT: DW_AT_location
@@ -247,7 +247,7 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 //
 // DWARF: DW_AT_linkage_name  ("$s3out16varSimpleTestVaryyYaFTQ3_")
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x10)
+// DWARF-NEXT: DW_AT_location  (DW_OP_entry_value([[ASYNC_REG]]), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x10)
 // DWARF-NEXT: DW_AT_name  ("m")
 // K is dead here.
 // DWARF: DW_TAG_variable
@@ -257,11 +257,8 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 // DWARF: DW_AT_linkage_name  ("$s3out16varSimpleTestVaryyYaFTY4_")
 // DWARF: DW_TAG_variable
 // DWARF-NEXT: DW_AT_location  (0x{{[0-9a-f]+}}:
-// DWARF-NEXT: [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
+// DWARF-NEXT: [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
 // DWARF-NEXT: DW_AT_name ("k")
-// DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (DW_OP_entry_value(DW_OP_reg14 R14), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x10)
-// DWARF-NEXT: DW_AT_name  ("m")
 public func varSimpleTestVar() async {
     var k = Klass()
     k.doSomething()

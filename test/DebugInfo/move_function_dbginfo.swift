@@ -13,7 +13,7 @@
 // We only run this on macOS right now since we would need to pattern match
 // slightly differently on other platforms.
 // REQUIRES: OS=macosx
-// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=x86_64 || CPU=arm64
 // REQUIRES: optimized_stdlib
 
 //////////////////
@@ -65,7 +65,7 @@ public var falseValue: Bool { false }
 // DWARF-NEXT: DW_AT_external	(true)
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(DW_OP_fbreg
+// DWARF-NEXT: DW_AT_location	(
 // DWARF-NEXT: DW_AT_name	("m")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
@@ -120,7 +120,7 @@ public func copyableValueTest() {
 // DWARF-NEXT: DW_AT_type	(
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(DW_OP_fbreg
+// DWARF-NEXT: DW_AT_location	(
 // DWARF-NEXT: DW_AT_name	("m")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
@@ -150,7 +150,7 @@ public func copyableArgTest(_ k: __owned Klass) {
 // DWARF-NEXT: DW_AT_external	(
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(DW_OP_fbreg -24)
+// DWARF-NEXT: DW_AT_location	(
 // DWARF-NEXT: DW_AT_name	("m")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
@@ -205,7 +205,7 @@ public func copyableVarTest() {
 // DWARF-NEXT: DW_AT_type	(
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(DW_OP_fbreg -24)
+// DWARF-NEXT: DW_AT_location	(
 // DWARF-NEXT: DW_AT_name	("m")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
