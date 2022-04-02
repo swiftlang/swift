@@ -598,7 +598,13 @@ bool ConcreteContraction::performConcreteContraction(
     // Otherwise, desugar the requirement again, since we might now have a
     // requirement where the left hand side is not a type parameter.
     SmallVector<Requirement, 4> reqs;
-    desugarRequirement(substReq, req.loc, reqs, errors);
+    if (req.inferred) {
+      SmallVector<RequirementError, 4> discardErrors;
+      desugarRequirement(substReq, SourceLoc(), reqs, discardErrors);
+    } else {
+      desugarRequirement(substReq, req.loc, reqs, errors);
+    }
+
     for (auto desugaredReq : reqs) {
       if (Debug) {
         llvm::dbgs() << "@@ Desugared requirement: ";
