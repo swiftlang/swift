@@ -938,7 +938,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
 ///
 /// Decoders should provide types conforming to `UnkeyedDecodingContainer` for
 /// their format.
-public protocol KeyedDecodingContainerProtocol<Key> {
+public protocol KeyedDecodingContainerProtocol {
   associatedtype Key: CodingKey
 
   /// The path of coding keys taken to get to this point in decoding.
