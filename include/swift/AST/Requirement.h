@@ -42,10 +42,13 @@ public:
   Requirement(RequirementKind kind, Type first, LayoutConstraint second)
     : RequirementBase(kind, first, second) {}
 
-  /// Whether this requirement is in its canonical form.
+  /// Whether this requirement's types contain ErrorTypes.
+  bool hasError() const;
+
+  /// Whether this requirement is written with canonical types.
   bool isCanonical() const;
 
-  /// Get the canonical form of this requirement.
+  /// Canonicalize the types in this requirement.
   Requirement getCanonical() const;
 
   /// Subst the types involved in this requirement.
