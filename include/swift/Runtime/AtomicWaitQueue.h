@@ -424,6 +424,10 @@ public:
   private:
     template <class... Args>
     static Impl *createNewQueue(Args &&...args) {
+#if !defined(__cpp_aligned_new)
+      static_assert(std::alignment_of<Impl>::value <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
+                    "type is over-aligned for non-alignment aware operator new");
+#endif
       auto queue = new Impl(std::forward<Args>(args)...);
       queue->WaitQueueLock.lock();
       return queue;
