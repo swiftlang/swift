@@ -199,6 +199,7 @@ cmake -B S:\b\1 ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
+  -D LLVM_ENABLE_PDB=YES ^
 
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
@@ -217,11 +218,11 @@ cmake -B S:\b\1 ^
 cmake --build S:\b\1
 ```
 
-> **NOTE:** If you want to profile the Swift compiler, you may need to link it with debug information.  You can enable this by specifying `-D LLVM_ENABLE_PDB=YES`.
+> **NOTE:** Flag `-D LLVM_ENABLE_PDB=YES` enables LLVM to emit PDB files, which is useful for debugging on Windows.  However, linking with debug information is very memory-intensive and may drastically slow down the linking process.  A single link job is possible to consume upwards of 10 GiB of RAM.  You can append `-D LLVM_PARALLEL_LINK_JOBS=N` and `-D SWIFT_PARALLEL_LINK_JOBS=N` to reduce the number of parallel link operations to `N` which should help reduce the memory pressure.
 >
-> Linking with debug information is very memory-intensive and may drastically slow down the linking process.  A single link job is possible to consume upwards of 10 GiB of RAM.  You can append `-D LLVM_PARALLEL_LINK_JOBS=N` to reduce the number of parallel link operations to `N` which should help reduce the memory pressure.
+> For host with less than 32 GiB of RAM, you may need to disable PDB support by stripping this option, to avoid running into OOM.
 
-> **NOTE:** By default, we enables all the experimental features in Swift by `-D SWIFT_ENABLE_EXPERIMENTAL_{FEATURE}=YES`.  Notice that `Concurrency` is an accepted language feature that should be enabled for Swift 5.5+.
+> **NOTE:** By default, we enables all the experimental features in Swift by `-D SWIFT_ENABLE_EXPERIMENTAL_{FEATURE}=YES`.  Notice that `Concurrency` is an accepted language feature that is supposed be enabled for Swift 5.5+.
 
 Test Swift:
 
@@ -235,7 +236,7 @@ cmake --build S:\b\1 --target check-swift
 ```cmd
 cmake -B S:\b\2 ^
   -C S:\swift\cmake\caches\Runtime-Windows-x86_64.cmake ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
 
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
@@ -271,7 +272,7 @@ cmake --build S:\b\2
 
 ```cmd
 cmake -B S:\b\3 ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
 
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
@@ -303,7 +304,7 @@ cmake --build S:\b\3 --target test
 
 ```cmd
 cmake -B S:\b\4 ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
 
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
@@ -327,7 +328,7 @@ cmake --build S:\b\4
 
 ```cmd
 cmake -B S:\b\5 ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
 
   -D CMAKE_MT=mt ^
@@ -361,7 +362,7 @@ cmake --build S:\b\5 --target check-xctest
 
 ```cmd
 cmake -B S:\b\4 ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\sdk\usr ^
 
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
@@ -394,7 +395,7 @@ cmake --build S:\b\4 --target test
 
 ```cmd
 cmake -B S:\b\6 ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
   -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
@@ -582,7 +583,7 @@ cmake --build S:\b\7\IndexStoreDB
 ```cmd
 cmake -B S:\b\8 ^
   -D BUILD_SHARED_LIBS=YES ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
@@ -609,7 +610,7 @@ cmake --build S:\b\8
 ```cmd
 cmake -B S:\b\9 ^
   -D BUILD_SHARED_LIBS=YES ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
@@ -638,7 +639,7 @@ cmake --build S:\b\9
 ```cmd
 cmake -B S:\b\10 ^
   -D BUILD_SHARED_LIBS=YES ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
@@ -669,7 +670,7 @@ cmake --build S:\b\10
 ```cmd
 cmake -B S:\b\11 ^
   -D BUILD_SHARED_LIBS=YES ^
-  -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
