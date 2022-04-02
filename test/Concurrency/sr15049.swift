@@ -19,7 +19,7 @@ func testAsyncSequence1Sendable<Seq: AsyncSequence>(_ seq: Seq) async throws whe
    async let _ = seq.reduce(0) { $0 + $1 } // OK
 }
 
-// TODO(diagnostics): Add a tailored wording for implicit autoclosure captures in sendable warnings, because 
+// TODO(diagnostics) [SR-16092]: Add a tailored wording for implicit autoclosure captures in sendable warnings, because 
 // from user perspective there is no closure capture, so diagnostic can be confusing.
 func testAsyncSequenceTypedPattern<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.Element == Int {
    async let result: Int = seq.reduce(0) { $0 + $1 } // OK
