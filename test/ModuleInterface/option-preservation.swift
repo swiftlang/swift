@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -enable-library-evolution -emit-module-interface-path %t.swiftinterface -module-name t %s -target-min-inlining-version 42 -emit-module -o /dev/null -Onone -enforce-exclusivity=unchecked -autolink-force-load
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module-interface-path %t.swiftinterface -module-name t %s -target-min-inlining-version 42 -emit-module -o /dev/null -Onone -enforce-exclusivity=unchecked -autolink-force-load -enable-regex-literals
 // RUN: %FileCheck %s < %t.swiftinterface -check-prefix=CHECK-SWIFTINTERFACE
 //
 // CHECK-SWIFTINTERFACE: swift-module-flags:
@@ -10,6 +10,7 @@
 // CHECK-SWIFTINTERFACE-SAME: -autolink-force-load
 // CHECK-SWIFTINTERFACE: swift-module-flags-ignorable:
 // CHECK-SWIFTINTERFACE-SAME: -target-min-inlining-version 42
+// CHECK-SWIFTINTERFACE-SAME: -enable-regex-literals
 
 // Make sure flags show up when filelists are enabled
 
