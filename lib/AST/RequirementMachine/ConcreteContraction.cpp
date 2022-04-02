@@ -381,6 +381,13 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
 
   case RequirementKind::Layout: {
     auto substFirstType = substTypeParameter(firstType);
+    if (!substFirstType->isTypeParameter() &&
+        !substFirstType->satisfiesClassConstraint() &&
+        req.getLayoutConstraint()->isClass()) {
+      // If the concrete type doesn't satisfy the layout constraint,
+      // leave it unsubstituted so that we produce a better diagnostic.
+      return req;
+    }
 
     return Requirement(req.getKind(),
                        substFirstType,
