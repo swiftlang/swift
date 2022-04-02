@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -o -
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -o - -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
 
 protocol P1 { }
 

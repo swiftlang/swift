@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures -requirement-machine-protocol-signatures=verify %s 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: redundant_protocol_refinement.(file).Base@

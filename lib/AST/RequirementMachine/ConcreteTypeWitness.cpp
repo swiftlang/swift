@@ -568,7 +568,7 @@ void PropertyMap::inferConditionalRequirements(
       llvm::dbgs() << "\n";
     }
 
-    desugarRequirement(req, desugaredRequirements, errors);
+    desugarRequirement(req, SourceLoc(), desugaredRequirements, errors);
   }
 
   // Now, convert desugared conditional requirements to rules.

@@ -38,7 +38,7 @@ namespace rewriting {
 // documentation
 // comments.
 
-void desugarRequirement(Requirement req,
+void desugarRequirement(Requirement req, SourceLoc loc,
                         SmallVectorImpl<Requirement> &result,
                         SmallVectorImpl<RequirementError> &errors);
 
@@ -78,6 +78,7 @@ bool diagnoseRequirementErrors(ASTContext &ctx,
 bool performConcreteContraction(
     ArrayRef<StructuralRequirement> requirements,
     SmallVectorImpl<StructuralRequirement> &result,
+    SmallVectorImpl<RequirementError> &errors,
     bool debug);
 
 } // end namespace rewriting

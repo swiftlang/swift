@@ -666,51 +666,59 @@ void PropertyMap::checkConcreteTypeRequirements() {
       auto concreteType = pair.first;
       unsigned concreteTypeRule = pair.second;
 
-      // A rule (T.[concrete: C] => T) where C is a class type induces a rule
-      // (T.[superclass: C] => T).
-      if (concreteType.getConcreteType()->getClassOrBoundGenericClass()) {
-        auto superclassSymbol = Symbol::forSuperclass(
-            concreteType.getConcreteType(),
-            concreteType.getSubstitutions(),
-            Context);
-
-        recordRelation(props->getKey(), concreteTypeRule,
-                       superclassSymbol, System, debug);
-
       // If the concrete type is not a class and we have a superclass
       // requirement, we have a conflict.
-      } else if (props->hasSuperclassBound()) {
+      if (!concreteType.getConcreteType()->getClassOrBoundGenericClass() &&
+          props->hasSuperclassBound()) {
         const auto &req = props->getSuperclassRequirement();
         for (auto pair : req.SuperclassRules) {
-          System.recordConflict(concreteTypeRule, pair.second);
+          if (checkRulePairOnce(concreteTypeRule, pair.second))
+            System.recordConflict(concreteTypeRule, pair.second);
         }
       }
 
-      // A rule (T.[concrete: C] => T) where C is a class type induces a rule
-      // (T.[layout: L] => T), where L is either AnyObject or _NativeObject.
-      if (concreteType.getConcreteType()->satisfiesClassConstraint()) {
-        Type superclassType = concreteType.getConcreteType();
-        if (!superclassType->getClassOrBoundGenericClass())
-          superclassType = superclassType->getSuperclass();
+      if (checkRuleOnce(concreteTypeRule)) {
+        if (concreteType.getConcreteType()->getClassOrBoundGenericClass()) {
+          // A rule (T.[concrete: C] => T) where C is a class type induces a rule
+          // (T.[superclass: C] => T).
+          auto superclassSymbol = Symbol::forSuperclass(
+              concreteType.getConcreteType(),
+              concreteType.getSubstitutions(),
+              Context);
 
-        auto layoutConstraint = LayoutConstraintKind::Class;
-        if (superclassType)
-          if (auto *classDecl = superclassType->getClassOrBoundGenericClass())
-            layoutConstraint = classDecl->getLayoutConstraintKind();
+          recordRelation(props->getKey(), concreteTypeRule,
+                         superclassSymbol, System, debug);
+        }
 
-        auto layout =
-            LayoutConstraint::getLayoutConstraint(
-              layoutConstraint, Context.getASTContext());
-        auto layoutSymbol = Symbol::forLayout(layout, Context);
+        // A rule (T.[concrete: C] => T) where C is a class type induces a rule
+        // (T.[layout: L] => T), where L is either AnyObject or _NativeObject.
+        if (concreteType.getConcreteType()->satisfiesClassConstraint()) {
+          Type superclassType = concreteType.getConcreteType();
+          if (!superclassType->getClassOrBoundGenericClass())
+            superclassType = superclassType->getSuperclass();
 
-        recordRelation(props->getKey(), concreteTypeRule,
-                       layoutSymbol, System, debug);
+          auto layoutConstraint = LayoutConstraintKind::Class;
+          if (superclassType)
+            if (auto *classDecl = superclassType->getClassOrBoundGenericClass())
+              layoutConstraint = classDecl->getLayoutConstraintKind();
+
+          auto layout =
+              LayoutConstraint::getLayoutConstraint(
+                layoutConstraint, Context.getASTContext());
+          auto layoutSymbol = Symbol::forLayout(layout, Context);
+
+          recordRelation(props->getKey(), concreteTypeRule,
+                         layoutSymbol, System, debug);
+        }
+      }
 
       // If the concrete type does not satisfy a class layout constraint and
       // we have such a layout requirement, we have a conflict.
-      } else if (props->LayoutRule &&
-                 props->Layout->isClass()) {
-        System.recordConflict(concreteTypeRule, *props->LayoutRule);
+      if (!concreteType.getConcreteType()->satisfiesClassConstraint() &&
+          props->LayoutRule &&
+          props->Layout->isClass()) {
+        if (checkRulePairOnce(concreteTypeRule, *props->LayoutRule))
+          System.recordConflict(concreteTypeRule, *props->LayoutRule);
       }
     }
   }
