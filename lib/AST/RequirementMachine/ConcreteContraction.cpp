@@ -182,7 +182,8 @@ public:
 
   bool performConcreteContraction(
       ArrayRef<StructuralRequirement> requirements,
-      SmallVectorImpl<StructuralRequirement> &result);
+      SmallVectorImpl<StructuralRequirement> &result,
+      SmallVectorImpl<RequirementError> &errors);
 };
 
 }  // end namespace
@@ -380,6 +381,13 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
 
   case RequirementKind::Layout: {
     auto substFirstType = substTypeParameter(firstType);
+    if (!substFirstType->isTypeParameter() &&
+        !substFirstType->satisfiesClassConstraint() &&
+        req.getLayoutConstraint()->isClass()) {
+      // If the concrete type doesn't satisfy the layout constraint,
+      // leave it unsubstituted so that we produce a better diagnostic.
+      return req;
+    }
 
     return Requirement(req.getKind(),
                        substFirstType,
@@ -464,7 +472,8 @@ bool ConcreteContraction::preserveSameTypeRequirement(
 /// original \p requirements.
 bool ConcreteContraction::performConcreteContraction(
     ArrayRef<StructuralRequirement> requirements,
-    SmallVectorImpl<StructuralRequirement> &result) {
+    SmallVectorImpl<StructuralRequirement> &result,
+    SmallVectorImpl<RequirementError> &errors) {
 
   // Phase 1 - collect concrete type and superclass requirements where the
   // subject type is a generic parameter.
@@ -577,7 +586,37 @@ bool ConcreteContraction::performConcreteContraction(
       llvm::dbgs() << "\n";
     }
 
-    if (preserveSameTypeRequirement(req.req)) {
+    // Substitute the requirement.
+    auto substReq = substRequirement(req.req);
+
+    if (Debug) {
+      llvm::dbgs() << "@ Substituted requirement: ";
+      substReq.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+
+    // Otherwise, desugar the requirement again, since we might now have a
+    // requirement where the left hand side is not a type parameter.
+    SmallVector<Requirement, 4> reqs;
+    if (req.inferred) {
+      SmallVector<RequirementError, 4> discardErrors;
+      desugarRequirement(substReq, SourceLoc(), reqs, discardErrors);
+    } else {
+      desugarRequirement(substReq, req.loc, reqs, errors);
+    }
+
+    for (auto desugaredReq : reqs) {
+      if (Debug) {
+        llvm::dbgs() << "@@ Desugared requirement: ";
+        desugaredReq.dump(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      }
+      result.push_back({desugaredReq, req.loc, req.inferred});
+    }
+
+    if (preserveSameTypeRequirement(req.req) &&
+        (!req.req.getFirstType()->isEqual(substReq.getFirstType()) ||
+         !req.req.getSecondType()->isEqual(substReq.getSecondType()))) {
       if (Debug) {
         llvm::dbgs() << "@ Preserving original requirement: ";
         req.req.dump(llvm::dbgs());
@@ -587,44 +626,6 @@ bool ConcreteContraction::performConcreteContraction(
       // Make the duplicated requirement 'inferred' so that we don't diagnose
       // it as redundant.
       result.push_back({req.req, SourceLoc(), /*inferred=*/true});
-    }
-
-    // Substitute the requirement.
-    Optional<Requirement> substReq = substRequirement(req.req);
-
-    // If substitution failed, we have a conflict; bail out here so that we can
-    // diagnose the conflict later.
-    if (!substReq) {
-      if (Debug) {
-        llvm::dbgs() << "@ Concrete contraction cannot proceed; requirement ";
-        llvm::dbgs() << "substitution failed:\n";
-        req.req.dump(llvm::dbgs());
-        llvm::dbgs() << "\n";
-      }
-
-      continue;
-    }
-
-    if (Debug) {
-      llvm::dbgs() << "@ Substituted requirement: ";
-      substReq->dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-
-    // Otherwise, desugar the requirement again, since we might now have a
-    // requirement where the left hand side is not a type parameter.
-    //
-    // FIXME: Do we need to check for errors? Right now they're just ignored.
-    SmallVector<Requirement, 4> reqs;
-    SmallVector<RequirementError, 1> errors;
-    desugarRequirement(*substReq, reqs, errors);
-    for (auto desugaredReq : reqs) {
-      if (Debug) {
-        llvm::dbgs() << "@@ Desugared requirement: ";
-        desugaredReq.dump(llvm::dbgs());
-        llvm::dbgs() << "\n";
-      }
-      result.push_back({desugaredReq, req.loc, req.inferred});
     }
   }
 
@@ -647,7 +648,9 @@ bool ConcreteContraction::performConcreteContraction(
 bool swift::rewriting::performConcreteContraction(
     ArrayRef<StructuralRequirement> requirements,
     SmallVectorImpl<StructuralRequirement> &result,
+    SmallVectorImpl<RequirementError> &errors,
     bool debug) {
   ConcreteContraction concreteContraction(debug);
-  return concreteContraction.performConcreteContraction(requirements, result);
+  return concreteContraction.performConcreteContraction(
+      requirements, result, errors);
 }

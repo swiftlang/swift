@@ -42,9 +42,11 @@ public class FinalD : Q {
 
 // CHECK-LABEL: Generic signature: <T where T : C>
 public func takesBoth1<T>(_: T) where T : P, T : C {}
+// expected-warning@-1 {{redundant conformance constraint 'C' : 'P'}}
 
 // CHECK-LABEL: Generic signature: <U where U : C>
 public func takesBoth2<U>(_: U) where U : C, U : P {}
+// expected-warning@-1 {{redundant conformance constraint 'C' : 'P'}}
 
 // 'Self' can also occur inside of a concrete type or superclass requirement.
 public class G<T> {}

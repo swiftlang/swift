@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: conditional_requirement_inference_in_protocol.(file).Good@
 // CHECK-LABEL: Requirement signature: <Self where Self.[Good]T == [Self.[Good]U], Self.[Good]U : Equatable>

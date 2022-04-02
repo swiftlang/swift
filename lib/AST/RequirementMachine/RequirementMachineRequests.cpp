@@ -603,7 +603,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
   // which is what the RuleBuilder expects.
   for (auto req : addedRequirements) {
     SmallVector<Requirement, 2> reqs;
-    desugarRequirement(req, reqs, errors);
+    desugarRequirement(req, SourceLoc(), reqs, errors);
     for (auto req : reqs)
       requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
   }
@@ -619,9 +619,10 @@ AbstractGenericSignatureRequestRQM::evaluate(
   // which are made concrete.
   if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
     SmallVector<StructuralRequirement, 4> contractedRequirements;
+    bool debug = rewriteCtx.getDebugOptions()
+                           .contains(DebugFlags::ConcreteContraction);
     if (performConcreteContraction(requirements, contractedRequirements,
-                                   rewriteCtx.getDebugOptions()
-                                      .contains(DebugFlags::ConcreteContraction))) {
+                                   errors, debug)) {
       std::swap(contractedRequirements, requirements);
     }
   }
@@ -795,9 +796,10 @@ InferredGenericSignatureRequestRQM::evaluate(
   // which are made concrete.
   if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
     SmallVector<StructuralRequirement, 4> contractedRequirements;
+    bool debug = rewriteCtx.getDebugOptions()
+                           .contains(DebugFlags::ConcreteContraction);
     if (performConcreteContraction(requirements, contractedRequirements,
-                                   rewriteCtx.getDebugOptions()
-                                      .contains(DebugFlags::ConcreteContraction))) {
+                                   errors, debug)) {
       std::swap(contractedRequirements, requirements);
     }
   }
