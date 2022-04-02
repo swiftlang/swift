@@ -1,8 +1,8 @@
 # Building Swift on Windows
 
-Visual Studio 2017 or newer is needed to build Swift on Windows, while VS2019 is recommended and currently used for CI.  The free Community edition is sufficient to build Swift, and we're assuming host and target to be both x64.
+Visual Studio 2019 or newer is needed to build Swift on Windows, while VS2022 is recommended and currently used for CI.  The free Community edition is sufficient to build Swift, and we're assuming host and target to be both x64.
 
-The commands below (with the exception of installing Visual Studio) must be entered in the **x64 Native Tools Command Prompt for VS2019** (or VS2017, VS2022 depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to locate tools and resources for the correct target platform.
+The commands below (with the exception of installing Visual Studio) must be entered in the **x64 Native Tools Command Prompt for VS2022** (or VS2019 depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to locate tools and resources for the correct target platform.
 
 > **NOTE:** This guide is intended for toolchain developers who wants to develop or build Swift on their own machine.  For building and packaging a standard toolchain, please refer to [`build-windows-toolchain.bat`](../utils/build-windows-toolchain.bat).
 
@@ -15,30 +15,20 @@ From **Settings** app, go to *Update & Security*.  In the *For developers* tab, 
 An easy way to get the tools to build Swift is using the [Visual Studio installer](https://www.visualstudio.com/downloads/). The following command installs all needed Visual Studio components as well as Python, Git, CMake and Ninja:
 
 ```cmd
-curl.exe -sOL https://aka.ms/vs/16/release/vs_community.exe
+curl.exe -sOL https://aka.ms/vs/17/release/vs_community.exe
 vs_community ^
   --add Component.CPython39.x64 ^
   --add Microsoft.VisualStudio.Component.Git ^
   --add Microsoft.VisualStudio.Component.VC.ATL ^
   --add Microsoft.VisualStudio.Component.VC.CMake.Project ^
   --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
-  --add Microsoft.VisualStudio.Component.Windows10SDK.19041
+  --add Microsoft.VisualStudio.Component.Windows11SDK.22000
 del /q vs_community.exe
 ```
 
-> **NOTE:** For anyone who wants to use Visual Studio 2022, you can simply replace version number `16` with `17` in the installer URL.
+> **NOTE:** For anyone who wants to use Visual Studio 2019, you can simply replace version number `17` with `16` in the installer URL.
 
-> **NOTE:** The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.  For anyone using VS installer in GUI, please check it out.
-
-### Configure Python
-
-If you are building a debug version of Swift, you should also install the Python debug binaries.
-
-1. In the Windows settings, go to *Add and Remove Programs*
-2. Select the *Python 3.9.x (64-bit)* entry
-3. Click *Modify*, then *Yes*, then *Modify* again and then *Next*
-4. Select *Download debug binaries (requires VS 2017 or later)*
-5. Click *Install*
+> **NOTE:** The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2022) helps in finding the component name given its ID for Visual Studio 2022.  For anyone using VS installer in GUI, please check it out.
 
 ### Set up `vcpkg`
 
@@ -100,7 +90,7 @@ mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Pla
 
 ## Build a minimal Swift toolchain
 
-A minimal Swift toolchain comes with neither optional features nor SwiftPM stuffs, and is useful for playing with the compiler or language itself.
+A minimal Swift toolchain does not include optional features or SwiftPM stuffs, and may be useful for playing with the compiler or language itself.
 
 ```cmd
 cmake -B S:\b\1 ^
