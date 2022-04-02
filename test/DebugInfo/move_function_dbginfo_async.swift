@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -Xllvm -sil-disable-pass=alloc-stack-hoisting -g -emit-ir -o - %s | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -Xllvm -sil-disable-pass=alloc-stack-hoisting -g -c %s -o %t/out.o
+// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -emit-ir -o - %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -c %s -o %t/out.o
 // RUN: %llvm-dwarfdump --show-children %t/out.o | %FileCheck -check-prefix=DWARF %s
 
 // This test checks that:
@@ -97,7 +97,7 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // CHECK: entryresume.1:
 // CHECK:   call void @llvm.dbg.addr(metadata i8* %0, metadata ![[METADATA:[0-9]+]], metadata !DIExpression(DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 8, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]+]]
 // CHECK:   call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
-// CHECK:   musttail call swifttailcc void @"$s27move_function_dbginfo_async10forceSplityyYaF"(%swift.context* swiftasync %34)
+// CHECK:   musttail call swifttailcc void @"$s27move_function_dbginfo_async10forceSplityyYaF"(%swift.context* swiftasync
 // CHECK-NEXT: ret void
 // CHECK-NEXT: }
 //
