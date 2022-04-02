@@ -304,7 +304,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
       if (conformance.isConcrete()) {
         // Introduce conditional requirements if the conformance is concrete.
         for (auto req : conformance.getConcrete()->getConditionalRequirements()) {
-          desugarRequirement(req, result, errors);
+          desugarRequirement(req, loc, result, errors);
         }
       }
 
@@ -324,7 +324,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
     paramType->getRequirements(subjectType, reqs);
 
     for (const auto &req : reqs)
-      desugarRequirement(req, result, errors);
+      desugarRequirement(req, loc, result, errors);
 
     return;
   }
@@ -352,7 +352,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
 /// composition, into zero or more "proper" requirements which can then be
 /// converted into rewrite rules by the RuleBuilder.
 void
-swift::rewriting::desugarRequirement(Requirement req,
+swift::rewriting::desugarRequirement(Requirement req, SourceLoc loc,
                                      SmallVectorImpl<Requirement> &result,
                                      SmallVectorImpl<RequirementError> &errors) {
   auto firstType = req.getFirstType();
@@ -360,22 +360,22 @@ swift::rewriting::desugarRequirement(Requirement req,
   switch (req.getKind()) {
   case RequirementKind::Conformance:
     desugarConformanceRequirement(firstType, req.getSecondType(),
-                                  SourceLoc(), result, errors);
+                                  loc, result, errors);
     break;
 
   case RequirementKind::Superclass:
     desugarSuperclassRequirement(firstType, req.getSecondType(),
-                                 SourceLoc(), result, errors);
+                                 loc, result, errors);
     break;
 
   case RequirementKind::Layout:
     desugarLayoutRequirement(firstType, req.getLayoutConstraint(),
-                             SourceLoc(), result, errors);
+                             loc, result, errors);
     break;
 
   case RequirementKind::SameType:
     desugarSameTypeRequirement(firstType, req.getSecondType(),
-                               SourceLoc(), result, errors);
+                               loc, result, errors);
     break;
   }
 }
@@ -435,7 +435,7 @@ struct InferRequirementsWalker : public TypeWalker {
       auto subMap = typeAlias->getSubstitutionMap();
       for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
         if (auto req = rawReq.subst(subMap))
-          desugarRequirement(*req, reqs, errors);
+          desugarRequirement(*req, SourceLoc(), reqs, errors);
       }
 
       return Action::Continue;
@@ -455,7 +455,7 @@ struct InferRequirementsWalker : public TypeWalker {
         auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
           Requirement req(RequirementKind::Conformance, type,
                           protocol->getDeclaredInterfaceType());
-          desugarRequirement(req, reqs, errors);
+          desugarRequirement(req, SourceLoc(), reqs, errors);
         };
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
@@ -463,7 +463,7 @@ struct InferRequirementsWalker : public TypeWalker {
               ->castTo<DependentMemberType>()
               ->substBaseType(module, firstType);
           Requirement req(RequirementKind::SameType, firstType, secondType);
-          desugarRequirement(req, reqs, errors);
+          desugarRequirement(req, SourceLoc(), reqs, errors);
         };
         auto *tangentVectorAssocType =
             differentiableProtocol->getAssociatedType(ctx.Id_TangentVector);
@@ -502,7 +502,7 @@ struct InferRequirementsWalker : public TypeWalker {
     // FIXME: Inaccurate TypeReprs.
     for (const auto &rawReq : genericSig.getRequirements()) {
       if (auto req = rawReq.subst(subMap))
-        desugarRequirement(*req, reqs, errors);
+        desugarRequirement(*req, SourceLoc(), reqs, errors);
     }
 
     return Action::Continue;
