@@ -506,9 +506,20 @@ struct TargetMethodDescriptor {
   MethodDescriptorFlags Flags;
 
   /// The method implementation.
-  TargetRelativeDirectPointer<Runtime, void> Impl;
+  union {
+    TargetCompactFunctionPointer<Runtime, void> Impl;
+    TargetRelativeDirectPointer<Runtime, void> AsyncImpl;
+  };
 
   // TODO: add method types or anything else needed for reflection.
+
+  void *getImpl() const {
+    if (Flags.isAsync()) {
+      return AsyncImpl.get();
+    } else {
+      return Impl.get();
+    }
+  }
 };
 
 using MethodDescriptor = TargetMethodDescriptor<InProcess>;
@@ -578,7 +589,20 @@ struct TargetMethodOverrideDescriptor {
   TargetRelativeMethodDescriptorPointer<Runtime> Method;
 
   /// The implementation of the override.
-  TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> Impl;
+  union {
+    TargetCompactFunctionPointer<Runtime, void, /*nullable*/ true> Impl;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> AsyncImpl;
+  };
+
+  void *getImpl() const {
+    auto *baseMethod = Method.get();
+    assert(baseMethod && "no base method");
+    if (baseMethod->Flags.isAsync()) {
+      return AsyncImpl.get();
+    } else {
+      return Impl.get();
+    }
+  }
 };
 
 /// Header for a class vtable override descriptor. This is a variable-sized
@@ -1523,7 +1547,18 @@ struct TargetProtocolRequirement {
   // TODO: name, type
 
   /// The optional default implementation of the protocol.
-  RelativeDirectPointer<void, /*nullable*/ true> DefaultImplementation;
+  union {
+    TargetCompactFunctionPointer<Runtime, void, /*nullable*/ true> DefaultFuncImplementation;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> DefaultImplementation;
+  };
+
+  void *getDefaultImplementation() const {
+    if (Flags.isFunctionImpl()) {
+      return DefaultFuncImplementation.get();
+    } else {
+      return DefaultImplementation.get();
+    }
+  }
 };
 
 using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
@@ -2170,7 +2205,18 @@ using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 template <typename Runtime>
 struct TargetResilientWitness {
   TargetRelativeProtocolRequirementPointer<Runtime> Requirement;
-  RelativeDirectPointer<void> Witness;
+  union {
+    TargetRelativeDirectPointer<Runtime, void> Impl;
+    TargetCompactFunctionPointer<Runtime, void> FuncImpl;
+  };
+
+  void *getWitness(ProtocolRequirementFlags flags) const {
+    if (flags.isFunctionImpl()) {
+      return FuncImpl.get();
+    } else {
+      return Impl.get();
+    }
+  }
 };
 using ResilientWitness = TargetResilientWitness<InProcess>;
 
@@ -2233,10 +2279,13 @@ struct TargetGenericWitnessTable {
   uint16_t WitnessTablePrivateSizeInWordsAndRequiresInstantiation;
 
   /// The instantiation function, which is called after the template is copied.
-  RelativeDirectPointer<void(TargetWitnessTable<Runtime> *instantiatedTable,
-                             const TargetMetadata<Runtime> *type,
-                             const void * const *instantiationArgs),
-                        /*nullable*/ true> Instantiator;
+  TargetCompactFunctionPointer<
+      Runtime,
+      void(TargetWitnessTable<Runtime> *instantiatedTable,
+           const TargetMetadata<Runtime> *type,
+           const void *const *instantiationArgs),
+      /*nullable*/ true>
+      Instantiator;
 
   using PrivateDataType = void *[swift::NumGenericMetadataPrivateDataWords];
 
@@ -2968,12 +3017,12 @@ using MetadataCompleter =
 template <typename Runtime>
 struct TargetGenericMetadataPattern {
   /// The function to call to instantiate the template.
-  TargetRelativeDirectPointer<Runtime, MetadataInstantiator>
+  TargetCompactFunctionPointer<Runtime, MetadataInstantiator>
     InstantiationFunction;
 
   /// The function to call to complete the instantiation.  If this is null,
   /// the instantiation function must always generate complete metadata.
-  TargetRelativeDirectPointer<Runtime, MetadataCompleter, /*nullable*/ true>
+  TargetCompactFunctionPointer<Runtime, MetadataCompleter, /*nullable*/ true>
     CompletionFunction;
 
   /// Flags describing the layout of this instantiation pattern.
@@ -3080,10 +3129,10 @@ struct TargetGenericClassMetadataPattern final :
   using TargetGenericMetadataPattern<Runtime>::PatternFlags;
 
   /// The heap-destructor function.
-  TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
+  TargetCompactFunctionPointer<Runtime, HeapObjectDestroyer> Destroy;
 
   /// The ivar-destructor function.
-  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer, /*nullable*/ true>
+  TargetCompactFunctionPointer<Runtime, ClassIVarDestroyer, /*nullable*/ true>
     IVarDestroyer;
 
   /// The class flags.
@@ -3284,7 +3333,7 @@ private:
 template <typename Runtime>
 struct TargetForeignMetadataInitialization {
   /// The completion function.  The pattern will always be null.
-  TargetRelativeDirectPointer<Runtime, MetadataCompleter, /*nullable*/ true>
+  TargetCompactFunctionPointer<Runtime, MetadataCompleter, /*nullable*/ true>
     CompletionFunction;
 };
 
@@ -3329,14 +3378,14 @@ struct TargetResilientClassMetadataPattern {
   ///
   /// If this is null, the runtime instead calls swift_relocateClassMetadata(),
   /// passing in the class descriptor and this pattern.
-  TargetRelativeDirectPointer<Runtime, MetadataRelocator, /*nullable*/ true>
+  TargetCompactFunctionPointer<Runtime, MetadataRelocator, /*nullable*/ true>
     RelocationFunction;
 
   /// The heap-destructor function.
-  TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
+  TargetCompactFunctionPointer<Runtime, HeapObjectDestroyer> Destroy;
 
   /// The ivar-destructor function.
-  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer, /*nullable*/ true>
+  TargetCompactFunctionPointer<Runtime, ClassIVarDestroyer, /*nullable*/ true>
     IVarDestroyer;
 
   /// The class flags.
@@ -3380,7 +3429,7 @@ struct TargetSingletonMetadataInitialization {
 
   /// The completion function.  The pattern will always be null, even
   /// for a resilient class.
-  TargetRelativeDirectPointer<Runtime, MetadataCompleter>
+  TargetCompactFunctionPointer<Runtime, MetadataCompleter>
     CompletionFunction;
 
   bool hasResilientClassPattern(
@@ -3409,7 +3458,7 @@ struct TargetCanonicalSpecializedMetadatasListEntry {
 
 template <typename Runtime>
 struct TargetCanonicalSpecializedMetadataAccessorsListEntry {
-  TargetRelativeDirectPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false> accessor;
+  TargetCompactFunctionPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false> accessor;
 };
 
 template <typename Runtime>
@@ -3429,7 +3478,7 @@ public:
   /// The function type here is a stand-in. You should use getAccessFunction()
   /// to wrap the function pointer in an accessor that uses the proper calling
   /// convention for a given number of arguments.
-  TargetRelativeDirectPointer<Runtime, MetadataResponse(...),
+  TargetCompactFunctionPointer<Runtime, MetadataResponse(...),
                               /*Nullable*/ true> AccessFunctionPtr;
   
   /// A pointer to the field descriptor for the type, if any.
@@ -3694,7 +3743,7 @@ public:
   using MetadataListEntry = 
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
   using MetadataAccessor = 
-    TargetRelativeDirectPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false>;
+    TargetCompactFunctionPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false>;
   using MetadataAccessorListEntry =
       TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>;
   using MetadataCachingOnceToken =
@@ -4495,11 +4544,22 @@ class DynamicReplacementDescriptor {
                           DynamicReplacementKey *
                               __ptrauth_swift_dynamic_replacement_key>>
       replacedFunctionKey;
-  RelativeDirectPointer<void, false> replacementFunction;
+  union {
+    TargetCompactFunctionPointer<InProcess, void, false> replacementFunction;
+    TargetRelativeDirectPointer<InProcess, void, false> replacementAsyncFunction;
+  };
   RelativeDirectPointer<DynamicReplacementChainEntry, false> chainEntry;
   uint32_t flags;
 
   enum : uint32_t { EnableChainingMask = 0x1 };
+
+  void *getReplacementFunction() const {
+    if (replacedFunctionKey->isAsync()) {
+      return replacementAsyncFunction.get();
+    } else {
+      return replacementFunction.get();
+    }
+  }
 
 public:
   /// Enable this replacement by changing the function's replacement chain's
