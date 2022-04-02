@@ -269,6 +269,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
+  if(SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER)
+    list(APPEND result "-D" "SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER")
+  endif()
+
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY")
   endif()
@@ -467,11 +471,6 @@ function(_compile_swift_files
         "${SWIFTFILE_ARCHITECTURE}" STREQUAL "x86_64")
       list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
     endif()
-  endif()
-
-  # The standard library and overlays are built with the Requirement Machine enabled.
-  if(SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-requirement-machine-inferred-signatures=verify")
   endif()
 
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.

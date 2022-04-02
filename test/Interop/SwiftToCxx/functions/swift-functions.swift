@@ -45,6 +45,6 @@ public func passTwoIntReturnIntNoArgLabelParamName(_ x2: CInt, _ y2: CInt) -> CI
 
 public func passVoidReturnVoid() { print("passVoidReturnVoid") }
 
-// CHECK: inline void passVoidReturnVoid(void) noexcept {
+// CHECK: inline void passVoidReturnVoid() noexcept {
 // CHECK: return _impl::$s9Functions014passVoidReturnC0yyF();
 // CHECK: }

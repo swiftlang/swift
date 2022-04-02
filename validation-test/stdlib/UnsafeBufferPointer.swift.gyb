@@ -181,6 +181,8 @@ ${SelfName}TestSuite.test("nilBaseAddress") {
 
 % if IsMutable:
 ${SelfName}TestSuite.test("copyFromEmptyBuffer") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+
 % if IsRaw:
   var memory: UnsafeMutableRawPointer
   let empty = UnsafeRawBufferPointer(start: nil, count: 0)
@@ -453,9 +455,7 @@ UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable
 }
 
 UnsafeMutableRawBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable") {
-  guard #available(SwiftStdlib 5.7, *) else {
-    return
-  }
+  guard #available(SwiftStdlib 5.7, *) else { return }
 
   for test in subscriptRangeTests {
     let c = test.collection.map({ UInt8($0.value/1000) })

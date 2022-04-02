@@ -1933,7 +1933,16 @@ static CanSILFunctionType getSILFunctionType(
   }
 
   // Map 'throws' to the appropriate error convention.
-  if (substFnInterfaceType->getExtInfo().isThrowing() && !foreignInfo.error &&
+  // Give the type an error argument whether the substituted type semantically
+  // `throws` or if the abstraction pattern specifies a Swift function type
+  // that also throws. This prevents the need for a second possibly-thunking
+  // conversion when using a non-throwing function in more abstract throwing
+  // context.
+  bool isThrowing = substFnInterfaceType->getExtInfo().isThrowing();
+  if (auto origFnType = origType.getAs<AnyFunctionType>()) {
+    isThrowing |= origFnType->getExtInfo().isThrowing();
+  }
+  if (isThrowing && !foreignInfo.error &&
       !foreignInfo.async) {
     assert(!origType.isForeign()
            && "using native Swift error convention for foreign type!");

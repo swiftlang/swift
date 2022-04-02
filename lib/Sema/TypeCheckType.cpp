@@ -518,28 +518,32 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   const auto subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
   const auto genericSig = decl->getGenericSignature();
 
-  const auto result =
-    TypeChecker::checkGenericArguments(
-        module, loc, noteLoc,
-        decl->getDeclaredInterfaceType(),
-        genericSig.getGenericParams(),
-        genericSig.getRequirements(),
-        [&](SubstitutableType *type) -> Type {
-          auto result = QueryTypeSubstitutionMap{subMap}(type);
-          if (result->hasTypeParameter()) {
-            if (contextSig) {
-              auto *genericEnv = contextSig.getGenericEnvironment();
-              return genericEnv->mapTypeIntoContext(result);
-            }
-          }
-          return result;
-        });
+  const auto substitutions = [&](SubstitutableType *type) -> Type {
+    auto result = QueryTypeSubstitutionMap{subMap}(type);
+    if (result->hasTypeParameter()) {
+      if (contextSig) {
+        auto *genericEnv = contextSig.getGenericEnvironment();
+        return genericEnv->mapTypeIntoContext(result);
+      }
+    }
+    return result;
+  };
 
+  const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
+      module, genericSig.getRequirements(), substitutions);
   switch (result) {
-  case RequirementCheckResult::Failure:
-  case RequirementCheckResult::SubstitutionFailure:
+  case CheckGenericArgumentsResult::RequirementFailure:
+    if (loc.isValid()) {
+      TypeChecker::diagnoseRequirementFailure(
+          result.getRequirementFailureInfo(), loc, noteLoc,
+          decl->getDeclaredInterfaceType(), genericSig.getGenericParams(),
+          substitutions, module);
+    }
+
     return false;
-  case RequirementCheckResult::Success:
+  case CheckGenericArgumentsResult::SubstitutionFailure:
+    return false;
+  case CheckGenericArgumentsResult::Success:
     return true;
   }
   llvm_unreachable("invalid requirement check type");
@@ -949,26 +953,32 @@ Type TypeResolution::applyUnboundGenericArguments(
       noteLoc = loc;
 
     auto genericSig = decl->getGenericSignature();
-    auto result = TypeChecker::checkGenericArguments(
-        module, loc, noteLoc,
-        UnboundGenericType::get(decl, parentTy, getASTContext()),
-        genericSig.getGenericParams(), genericSig.getRequirements(),
-        [&](SubstitutableType *type) -> Type {
-          auto result = QueryTypeSubstitutionMap{subs}(type);
-          if (result->hasTypeParameter()) {
-            if (const auto contextSig = getGenericSignature()) {
-              auto *genericEnv = contextSig.getGenericEnvironment();
-              return genericEnv->mapTypeIntoContext(result);
-            }
-          }
-          return result;
-        });
+    const auto substitutions = [&](SubstitutableType *type) -> Type {
+      auto result = QueryTypeSubstitutionMap{subs}(type);
+      if (result->hasTypeParameter()) {
+        if (const auto contextSig = getGenericSignature()) {
+          auto *genericEnv = contextSig.getGenericEnvironment();
+          return genericEnv->mapTypeIntoContext(result);
+        }
+      }
+      return result;
+    };
 
+    const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
+        module, genericSig.getRequirements(), substitutions);
     switch (result) {
-    case RequirementCheckResult::Failure:
-    case RequirementCheckResult::SubstitutionFailure:
+    case CheckGenericArgumentsResult::RequirementFailure:
+      if (loc.isValid()) {
+        TypeChecker::diagnoseRequirementFailure(
+            result.getRequirementFailureInfo(), loc, noteLoc,
+            UnboundGenericType::get(decl, parentTy, getASTContext()),
+            genericSig.getGenericParams(), substitutions, module);
+      }
+
+      LLVM_FALLTHROUGH;
+    case CheckGenericArgumentsResult::SubstitutionFailure:
       return ErrorType::get(getASTContext());
-    case RequirementCheckResult::Success:
+    case CheckGenericArgumentsResult::Success:
       break;
     }
   }

@@ -198,3 +198,122 @@ func inferred6<T : P11>(_: T) where T.Y : Hashable, T.Z == Set<T.X>, T.X == T.Y 
 func typeMatcherSugar<T>(_: T) where Array<Int> == Array<T>, Array<Int> == Array<T> {}
 // expected-warning@-1 2{{redundant same-type constraint 'Array<Int>' == 'Array<T>'}}
 // expected-warning@-2{{redundant same-type constraint 'T' == 'Int'}}
+
+// MARK: - Conflict diagnostics
+
+protocol ProtoAlias1 {
+  typealias A1 = Int
+}
+
+protocol ProtoAlias2 {
+  typealias A2 = String
+}
+
+func basicConflict<T: ProtoAlias1 & ProtoAlias2>(_:T) where T.A1 == T.A2 {}
+// expected-error@-1{{no type for 'T.A1' can satisfy both 'T.A1 == String' and 'T.A1 == Int'}}
+
+protocol RequiresAnyObject {
+  associatedtype A: AnyObject
+}
+
+protocol RequiresConformance {
+  associatedtype A: P
+}
+
+class Super {}
+protocol RequiresSuperclass {
+  associatedtype A: Super
+}
+
+func testMissingRequirements() {
+  struct S {}
+  func conflict1<T: RequiresAnyObject>(_: T) where T.A == S {}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A == S' and 'T.A : AnyObject'}}
+
+  func conflict2<T: RequiresConformance>(_: T) where T.A == C {}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A == C' and 'T.A : P'}}
+
+  class C {}
+  func conflict3<T: RequiresSuperclass>(_: T) where T.A == C {}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A : C' and 'T.A : Super'}}
+
+  func conflict4<T: RequiresSuperclass>(_: T) where T.A: C {}
+  // expected-error@-1{{no type for 'T.A' can satisfy both 'T.A : C' and 'T.A : Super'}}
+}
+
+protocol Fooable {
+  associatedtype Foo
+  var foo: Foo { get }
+}
+
+protocol Barrable {
+  associatedtype Bar: Fooable
+  var bar: Bar { get }
+}
+
+protocol Concrete { associatedtype X where X == Int }
+
+func sameTypeConflicts() {
+
+  struct X {}
+  struct Y: Fooable {
+    typealias Foo = X
+    var foo: X { return X() }
+  }
+  struct Z: Barrable {
+    typealias Bar = Y
+    var bar: Y { return Y() }
+  }
+
+  // expected-error@+1{{no type for 'T.Foo' can satisfy both 'T.Foo == X' and 'T.Foo == Y'}}
+  func fail1<
+    T: Fooable, U: Fooable
+  >(_ t: T, u: U) -> (X, Y)
+    where T.Foo == X, U.Foo == Y, T.Foo == U.Foo {
+    fatalError()
+  }
+
+  // expected-error@+1{{no type for 'T.Foo' can satisfy both 'T.Foo == Y' and 'T.Foo == X'}}
+  func fail2<
+    T: Fooable, U: Fooable
+  >(_ t: T, u: U) -> (X, Y)
+    where T.Foo == U.Foo, T.Foo == X, U.Foo == Y {
+    fatalError()
+  }
+
+  // expected-error@+1{{no type for 'T.Bar' can satisfy both 'T.Bar == X' and 'T.Bar : Fooable'}}
+  func fail3<T: Barrable>(_ t: T) -> X
+    where T.Bar == X {
+    fatalError()
+  }
+
+  // expected-error@+1{{no type for 'T.Bar.Foo' can satisfy both 'T.Bar.Foo == X' and 'T.Bar.Foo == Z'}}
+  func fail4<T: Barrable>(_ t: T) -> (Y, Z)
+    where
+    T.Bar == Y,
+    T.Bar.Foo == Z {
+    fatalError()
+  }
+
+  // expected-error@+1{{no type for 'T.Bar.Foo' can satisfy both 'T.Bar.Foo == X' and 'T.Bar.Foo == Z'}}
+  func fail5<T: Barrable>(_ t: T) -> (Y, Z)
+    where
+    T.Bar.Foo == Z,
+    T.Bar == Y {
+    fatalError()
+  }
+
+  // expected-error@+1{{no type for 'T.X' can satisfy both 'T.X == String' and 'T.X == Int'}}
+  func fail6<U, T: Concrete>(_: U, _: T) where T.X == String {}
+
+  struct G<T> {}
+
+  // expected-error@+1{{no type for 'T.X' can satisfy both 'T.X == G<U.Foo>' and 'T.X == Int'}}
+  func fail7<U: Fooable, T: Concrete>(_: U, _: T) where T.X == G<U.Foo> {}
+
+  // expected-error@+1{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
+  func fail8<T, U: Fooable>(_: U, _: T) where T == G<U.Foo>, T == Int {}
+
+  // expected-error@+1{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
+  func fail9<T, U: Fooable>(_: U, _: T) where T == Int, T == G<U.Foo> {}
+}

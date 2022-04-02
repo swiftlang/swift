@@ -3005,7 +3005,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
             return getSubstitution(type);
           });
 
-    if (result != RequirementCheckResult::Success) {
+    if (result != CheckGenericArgumentsResult::Success) {
       unviable.push_back(
           std::make_tuple(init, UnviableReason::UnsatisfiedRequirements,
                           genericParamType));

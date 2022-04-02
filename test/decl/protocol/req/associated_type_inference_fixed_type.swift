@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
 
 protocol P1 where A == Never {
   associatedtype A
@@ -41,8 +41,7 @@ protocol P5b: P5a where A == Self {}
 struct S5<X>: P5b {} // OK, A := S5<X>
 
 
-protocol P6 where A == Never { // expected-error {{same-type constraint type 'Never' does not conform to required protocol 'P6'}}
-  // expected-error@+2 {{same-type constraint type 'Never' does not conform to required protocol 'P6'}}
+protocol P6 where A == Never { // expected-error {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A : P6'}}
   // expected-note@+1 {{protocol requires nested type 'A}}
   associatedtype A: P6
 }
@@ -51,8 +50,7 @@ struct S6: P6 {} // expected-error {{type 'S6' does not conform to protocol 'P6'
 protocol P7a where A == Never {
   associatedtype A
 }
-// expected-error@+2 {{'Self.A' cannot be equal to both 'Bool' and 'Never'}}
-// expected-note@+1 {{same-type constraint 'Self.A' == 'Never' implied here}}
+// expected-error@+1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Bool'}}
 protocol P7b: P7a where A == Bool {}
 struct S7: P7b {}
 
@@ -66,6 +64,7 @@ do {
   struct Conformer: P8a, P8b {}
   // expected-error@-1 {{'P8b' requires the types 'Conformer.A' (aka 'Never') and 'Bool' be equivalent}}
   // expected-note@-2 {{requirement specified as 'Self.A' == 'Bool' [with Self = Conformer]}}
+  // expected-error@-3 {{type 'Conformer' does not conform to protocol 'P8b'}}
 }
 
 protocol P9a where A == Never {
@@ -75,6 +74,7 @@ protocol P9b: P9a {
   associatedtype A
 }
 struct S9a: P9b {}
+// expected-error@+3 {{type 'S9b' does not conform to protocol 'P9a'}}
 // expected-error@+2 {{'P9a' requires the types 'S9b.A' (aka 'Bool') and 'Never' be equivalent}}
 // expected-note@+1 {{requirement specified as 'Self.A' == 'Never' [with Self = S9b]}}
 struct S9b: P9b {
@@ -94,6 +94,7 @@ extension P10b {
 }
 // FIXME: 'P10 extension.A' should not be considered a viable type witness;
 //  instead, the compiler should infer A := Never and synthesize S10.A.
+// expected-error@+3 {{type 'S10' does not conform to protocol 'P10a'}}
 // expected-error@+2 {{'P10a' requires the types 'S10.A' (aka 'Bool') and 'Never' be equivalent}}
 // expected-note@+1 {{requirement specified as 'Self.A' == 'Never' [with Self = S10]}}
 struct S10: P10b, P10a {}
@@ -312,24 +313,24 @@ protocol P28c where A == Never {
   associatedtype A
 }
 protocol Q28a: P28a, P28b {}
-// expected-error@-1 {{'Self.A' cannot be equal to both 'Bool' and 'Int'}}
-// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Bool' and 'Self.A == Int'}}
 protocol Q28b: P28a, P28b, P28c {}
-// expected-error@-1 {{'Self.A' cannot be equal to both 'Bool' and 'Int'}}
-// expected-error@-2 {{'Self.A' cannot be equal to both 'Never' and 'Int'}}
-// expected-note@-3 {{same-type constraint 'Self.A' == 'Int' implied here}}
-// expected-note@-4 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Bool'}}
+// expected-error@-2 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
+// expected-error@-3 {{no type for 'Self.A' can satisfy both 'Self.A == Bool' and 'Self.A == Int'}}
 do {
   struct Conformer1: Q28a {}
   // expected-error@-1 {{'P28b' requires the types 'Conformer1.A' (aka 'Int') and 'Bool' be equivalent}}
   // expected-note@-2 {{requirement specified as 'Self.A' == 'Bool' [with Self = Conformer1]}}
+  // expected-error@-3 {{type 'Conformer1' does not conform to protocol 'P28b'}}
 
   struct Conformer2: Q28b {}
   // expected-error@-1 {{'P28c' requires the types 'Conformer2.A' (aka 'Int') and 'Never' be equivalent}}
   // expected-error@-2 {{'P28b' requires the types 'Conformer2.A' (aka 'Int') and 'Bool' be equivalent}}
   // expected-note@-3 {{requirement specified as 'Self.A' == 'Never' [with Self = Conformer2]}}
   // expected-note@-4 {{requirement specified as 'Self.A' == 'Bool' [with Self = Conformer2]}}
-
+  // expected-error@-5 {{type 'Conformer2' does not conform to protocol 'P28b'}}
+  // expected-error@-6 {{type 'Conformer2' does not conform to protocol 'P28c'}}
 }
 
 protocol P29a where A == Int {
@@ -344,15 +345,14 @@ protocol P29c where A == B {
   associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
 }
 protocol Q29a: P29a, P29b, P29c {}
-// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
-// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
 protocol Q29b: P29c, P29a, P29b {}
-// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
-// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
 do {
   struct Conformer1: Q29a {}
   // expected-error@-1 {{'P29b' requires the types 'Conformer1.B' (aka 'Int') and 'Never' be equivalent}}
   // expected-note@-2 {{requirement specified as 'Self.B' == 'Never' [with Self = Conformer1]}}
+  // expected-error@-3 {{type 'Conformer1' does not conform to protocol 'P29b'}}
 
 
   struct Conformer2: Q29b {}
@@ -372,8 +372,7 @@ protocol P30c where A == B {
   associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
 }
 protocol Q30: P30c, P30a, P30b {}
-// expected-error@-1 {{'Self.A' cannot be equal to both 'Never' and 'Int'}}
-// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
 do {
   struct Conformer: Q30 {}
   // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P30a'}}
@@ -392,8 +391,7 @@ protocol P31c where B == A {
   associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
 }
 protocol Q31: P31c, P31a, P31b {}
-// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
-// expected-note@-2 {{same-type constraint 'Self.B' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
 do {
   struct Conformer: Q31 {}
   // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P31a'}}
@@ -418,10 +416,12 @@ protocol P32e where A == B {
   associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
 }
 protocol Q32: P32e, P32a, P32b, P32c, P32d {}
-// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
-// expected-error@-2 {{'Self.B' cannot be equal to both '()' and 'Int'}}
-// expected-error@-3 {{'Self.A' cannot be equal to both 'Bool' and 'Int'}}
-// expected-note@-4 3 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-error@-1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == ()'}}
+// expected-error@-2 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Bool'}}
+// expected-error@-3 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Int'}}
+// expected-error@-4 {{no type for 'Self.A' can satisfy both 'Self.A == Bool' and 'Self.A == Int'}}
+// expected-error@-5 {{no type for 'Self.A' can satisfy both 'Self.A == ()' and 'Self.A == Int'}}
+// expected-error@-6 {{no type for 'Self.A' can satisfy both 'Self.A == ()' and 'Self.A == Bool'}}
 do {
   struct Conformer: Q32 {}
   // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P32a'}}

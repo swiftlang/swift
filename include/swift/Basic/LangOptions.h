@@ -531,17 +531,17 @@ namespace swift {
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.
     RequirementMachineMode RequirementMachineProtocolSignatures =
-        RequirementMachineMode::Verify;
+        RequirementMachineMode::Enabled;
 
     /// Enable the new experimental generic signature minimization algorithm
     /// for abstract generic signatures.
     RequirementMachineMode RequirementMachineAbstractSignatures =
-        RequirementMachineMode::Verify;
+        RequirementMachineMode::Enabled;
 
     /// Enable the new experimental generic signature minimization algorithm
     /// for user-written generic signatures.
     RequirementMachineMode RequirementMachineInferredSignatures =
-        RequirementMachineMode::Verify;
+        RequirementMachineMode::Enabled;
 
     /// Enable preprocessing pass to eliminate conformance requirements
     /// on generic parameters which are made concrete. Usually you want this
@@ -563,6 +563,9 @@ namespace swift {
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
+
+    /// Enables `/.../` syntax regular-expression literals
+    bool EnableForwardSlashRegexLiterals = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -831,7 +834,7 @@ namespace swift {
     bool DisableOverlayModules = false;
 
     /// When set, import SPI_AVAILABLE symbols with Swift SPI attribtues.
-    bool EnableClangSPI = false;
+    bool EnableClangSPI = true;
 
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;

@@ -1169,3 +1169,22 @@ bb1(%3 : @owned $(T, Int, Int, T)):
 bb2(%9 : $Error):
   throw %9 : $Error
 }
+
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast :
+// CHECK: bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
+// CHECK:   [[STK:%.*]] = alloc_stack $T
+// CHECK:   copy_addr %1 to [initialization] [[STK]] : $*T
+// CHECK:   [[CAST:%.*]] = unchecked_addr_cast [[STK]] : $*T to $*U
+// CHECK:   copy_addr [[CAST]] to [initialization] %0 : $*U
+// CHECK:   destroy_addr [[STK]] : $*T
+// CHECK:   dealloc_stack [[STK]] : $*T
+// CHECK-LABEL: } // end sil function 'test_unchecked_bitwise_cast'
+sil hidden [ossa] @test_unchecked_bitwise_cast : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
+bb0(%0 : @guaranteed $T, %1 : $@thick U.Type):
+  %4 = copy_value %0 : $T
+  %5 = unchecked_bitwise_cast %4 : $T to $U
+  %6 = copy_value %5 : $U
+  destroy_value %4 : $T
+  return %6 : $U
+}
+

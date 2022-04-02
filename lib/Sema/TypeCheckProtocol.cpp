@@ -4942,19 +4942,12 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   auto proto = Conformance->getProtocol();
   auto &diags = proto->getASTContext().Diags;
 
-  auto DC = Conformance->getDeclContext();
+  auto *const module = DC->getParentModule();
   auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, substitutingType, ProtocolConformanceRef(Conformance));
 
   auto reqSig = proto->getRequirementSignature().getRequirements();
-
-  auto result = TypeChecker::checkGenericArguments(
-      DC->getParentModule(), Loc, Loc,
-      // FIXME: maybe this should be the conformance's type
-      proto->getDeclaredInterfaceType(),
-      { proto->getSelfInterfaceType() },
-      reqSig, QuerySubstitutionMap{substitutions});
 
   // Non-final classes should not be able to conform to protocols with a
   // same-type requirement on 'Self', since such a conformance would no
@@ -4970,23 +4963,31 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     }
   }
 
+  const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
+      module, reqSig, QuerySubstitutionMap{substitutions});
   switch (result) {
-  case RequirementCheckResult::Success:
+  case CheckGenericArgumentsResult::Success:
     // Go on to check exportability.
     break;
 
-  case RequirementCheckResult::Failure:
-    Conformance->setInvalid();
-    return;
-
-  case RequirementCheckResult::SubstitutionFailure:
+  case CheckGenericArgumentsResult::RequirementFailure:
+  case CheckGenericArgumentsResult::SubstitutionFailure:
     // Diagnose the failure generically.
     // FIXME: Would be nice to give some more context here!
     if (!Conformance->isInvalid()) {
       diags.diagnose(Loc, diag::type_does_not_conform,
                      Adoptee,
                      Proto->getDeclaredInterfaceType());
+
+      if (result == CheckGenericArgumentsResult::RequirementFailure) {
+        TypeChecker::diagnoseRequirementFailure(
+            result.getRequirementFailureInfo(), Loc, Loc,
+            proto->getDeclaredInterfaceType(), {proto->getSelfInterfaceType()},
+            QuerySubstitutionMap{substitutions}, module);
+      }
+
       Conformance->setInvalid();
+      AlreadyComplained = true;
     }
     return;
   }
@@ -5678,11 +5679,11 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
         M, *condReqs,
         [](SubstitutableType *dependentType) { return Type(dependentType); });
     switch (conditionalCheckResult) {
-    case RequirementCheckResult::Success:
+    case CheckGenericArgumentsResult::Success:
       break;
 
-    case RequirementCheckResult::Failure:
-    case RequirementCheckResult::SubstitutionFailure:
+    case CheckGenericArgumentsResult::RequirementFailure:
+    case CheckGenericArgumentsResult::SubstitutionFailure:
       return ProtocolConformanceRef::forInvalid();
     }
   }

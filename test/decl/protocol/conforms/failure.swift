@@ -247,3 +247,17 @@ do {
     typealias A = Bool // expected-note {{possibly intended match 'Conformer.A' (aka 'Bool') does not conform to 'Sequence'}}
   }
 }
+
+class Class13 {}
+protocol P13a {
+  associatedtype A
+}
+protocol P13b: P13a where A: Class13 {}
+do {
+  struct Conformer: P13b {
+    // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P13b'}}
+    // expected-error@-2 {{'P13b' requires that 'Conformer.A' (aka 'Array<Bool>') inherit from 'Class13'}}
+    // expected-note@-3 {{requirement specified as 'Self.A' : 'Class13' [with Self = Conformer]}}
+    typealias A = Array<Bool>
+  }
+}

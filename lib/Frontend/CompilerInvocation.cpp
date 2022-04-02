@@ -1006,6 +1006,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_requirement_machine_reuse))
     Opts.EnableRequirementMachineReuse = false;
 
+  if (Args.hasArg(OPT_enable_regex_literals))
+    Opts.EnableForwardSlashRegexLiterals = true;
+
   if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
     Opts.EnableRequirementMachineOpaqueArchetypes = true;
 
@@ -1196,7 +1199,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
-  Opts.EnableClangSPI |= Args.hasArg(OPT_enable_clang_spi);
+  Opts.EnableClangSPI = !Args.hasArg(OPT_disable_clang_spi);
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
 
@@ -2154,6 +2157,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // AsyncFunctionPointer data block.  Force the use of indirect
   // AsyncFunctionPointer access.
   Opts.IndirectAsyncFunctionPointer = Triple.isOSBinFormatCOFF();
+
+  // On some Harvard architectures that allow sliding code and data address space
+  // offsets independently, it's impossible to make direct relative reference to
+  // code from data because the relative offset between them is not representable.
+  // Use absolute function references instead of relative ones on such targets.
+  // TODO(katei): This is a short-term solution until the WebAssembly target stabilizes
+  // PIC and 64-bit specifications and toolchain support.
+  Opts.CompactAbsoluteFunctionPointer = Triple.isOSBinFormatWasm();
 
   if (Args.hasArg(OPT_disable_legacy_type_info)) {
     Opts.DisableLegacyTypeInfo = true;

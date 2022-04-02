@@ -1516,7 +1516,8 @@ public:
     for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
       assert(expected->hasName());
       auto prev = expected->getParentVarDecl();
-      auto type = solution.resolveInterfaceType(solution.getType(prev));
+      auto type = solution.resolveInterfaceType(
+          solution.getType(prev)->mapTypeOutOfContext());
       expected->setInterfaceType(type);
     }
 

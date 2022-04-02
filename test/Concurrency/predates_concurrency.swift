@@ -126,3 +126,29 @@ func aFailedExperiment(@_unsafeSendable _ body: @escaping () -> Void) { }
 
 func anothingFailedExperiment(@_unsafeMainActor _ body: @escaping () -> Void) { }
 // expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of @preconcurrency}}
+
+// ---------------------------------------------------------------------------
+// Random bugs
+// ---------------------------------------------------------------------------
+
+public enum StringPlacement : Sendable {
+  public typealias StringPosition = @Sendable (_: [String]) -> Int
+
+  @preconcurrency
+  public static func position(before string: String) -> StringPosition {
+    return { _ in 0 }
+  }
+
+  @preconcurrency
+  public static func position(after string: String) -> StringPosition {
+    return { _ in 0 }
+  }
+}
+
+func testStringPlacement() {
+  let fn1 = StringPlacement.position(before: "Test")
+  let _: Int = fn1   // expected-error{{cannot convert value of type '([String]) -> Int' to specified type 'Int'}}
+
+  let fn2 = StringPlacement.position(before:)
+  let _: Int = fn2 // expected-error{{cannot convert value of type '(String) -> ([String]) -> Int' to specified type 'Int'}}
+}

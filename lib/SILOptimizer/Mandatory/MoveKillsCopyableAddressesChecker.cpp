@@ -1539,7 +1539,9 @@ bool DataflowState::cleanupAllDestroyAddr(
     // Make sure to create a new debug_value for the reinit value.
     if (addressDebugInst) {
       if (auto varInfo = addressDebugInst.getVarInfo()) {
-        SILBuilderWithScope reinitBuilder(*reinit);
+        // We need to always insert /after/ the reinit since the value will not
+        // be defined before the value.
+        SILBuilderWithScope reinitBuilder((*reinit)->getNextInstruction());
         reinitBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
         reinitBuilder.createDebugValue(
             addressDebugInst.inst->getLoc(), address, *varInfo, false,

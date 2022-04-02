@@ -621,6 +621,12 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
             !containsTypes(rhsTy, genericParameters))
           continue;
 
+        // If both sides are dependent members, that's okay because types
+        // don't flow from member to the base e.g. `T.Element == U.Element`.
+        if (lhsTy->is<DependentMemberType>() &&
+            rhsTy->is<DependentMemberType>())
+          continue;
+
         // Allow a subset of generic same-type requirements that only mention
         // "in scope" generic parameters e.g. `T.X == Int` or `T == U.Z`
         if (!containsGenericParamsExcluding(lhsTy, genericParameters) &&

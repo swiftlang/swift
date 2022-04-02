@@ -302,6 +302,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
   endif()
 
+  if(SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER)
+    list(APPEND result "-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER=1")
+  endif()
+
   if(SWIFT_STDLIB_STABLE_ABI)
     list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=1")
   else()
@@ -1214,7 +1218,7 @@ function(add_swift_target_library_single target name)
 
   set(library_search_subdir "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
   set(library_search_directories
-      "${lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}"
+      "${lib_dir}/${output_sub_dir}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
 

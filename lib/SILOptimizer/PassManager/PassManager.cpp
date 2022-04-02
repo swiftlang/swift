@@ -726,6 +726,24 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   }
 }
 
+void SILPassManager::verifyAnalyses() const {
+  if (Mod->getOptions().VerifyNone)
+    return;
+
+  for (auto *A : Analyses) {
+    A->verify();
+  }
+}
+
+void SILPassManager::verifyAnalyses(SILFunction *F) const {
+  if (Mod->getOptions().VerifyNone)
+    return;
+    
+  for (auto *A : Analyses) {
+    A->verify(F);
+  }
+}
+
 void SILPassManager::executePassPipelinePlan(const SILPassPipelinePlan &Plan) {
   for (const SILPassPipeline &Pipeline : Plan.getPipelines()) {
     setStageName(Pipeline.Name);

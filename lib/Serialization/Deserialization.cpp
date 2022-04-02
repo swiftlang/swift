@@ -3567,11 +3567,13 @@ public:
     auto genericSig = MF.getGenericSignature(genericSigID);
     if (genericSig)
       opaqueDecl->setGenericSignature(genericSig);
+    else
+      opaqueDecl->setGenericSignature(GenericSignature());
     if (underlyingTypeSubsID) {
       auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError)
         return subMapOrError.takeError();
-      opaqueDecl->setUnderlyingTypeSubstitutions(subMapOrError.get());
+      opaqueDecl->setUniqueUnderlyingTypeSubstitutions(subMapOrError.get());
     }
     return opaqueDecl;
   }

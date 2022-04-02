@@ -13,6 +13,11 @@
 // This file implements the final step in generic signature minimization,
 // building requirements from a set of minimal, canonical rewrite rules.
 //
+// The main entry point is RequirementMachine::buildRequirementsFromRules(),
+// called from the RequirementSignatureRequest, AbstractGenericSignatureRequest
+// and InferredGenericSignatureRequest requests defined in
+// RequirementMachineRequests.cpp.
+//
 //===----------------------------------------------------------------------===//
 
 #include "RequirementMachine.h"

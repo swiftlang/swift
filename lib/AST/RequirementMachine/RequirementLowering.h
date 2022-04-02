@@ -38,7 +38,7 @@ namespace rewriting {
 // documentation
 // comments.
 
-void desugarRequirement(Requirement req,
+void desugarRequirement(Requirement req, SourceLoc loc,
                         SmallVectorImpl<Requirement> &result,
                         SmallVectorImpl<RequirementError> &errors);
 
@@ -55,14 +55,30 @@ void realizeInheritedRequirements(TypeDecl *decl, Type type,
                                   SmallVectorImpl<StructuralRequirement> &result,
                                   SmallVectorImpl<RequirementError> &errors);
 
+/// Policy for the fixit that transforms 'T : S' where 'S' is not a protocol
+/// or a class into 'T == S'.
+enum AllowConcreteTypePolicy {
+  /// Any type parameter can be concrete.
+  All,
+
+  /// Only associated types can be concrete.
+  AssocTypes,
+
+  /// Only nested associated types can be concrete. This is for protocols,
+  /// where we don't want to suggest making an associated type member of
+  /// 'Self' concrete.
+  NestedAssocTypes
+};
+
 bool diagnoseRequirementErrors(ASTContext &ctx,
                                ArrayRef<RequirementError> errors,
-                               bool allowConcreteGenericParams);
+                               AllowConcreteTypePolicy concreteTypePolicy);
 
 // Defined in ConcreteContraction.cpp.
 bool performConcreteContraction(
     ArrayRef<StructuralRequirement> requirements,
     SmallVectorImpl<StructuralRequirement> &result,
+    SmallVectorImpl<RequirementError> &errors,
     bool debug);
 
 } // end namespace rewriting

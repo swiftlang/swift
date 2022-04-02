@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file is the public API of the demangler library.
-// Tools which use the demangler library (like lldb) must include this - and
-// only this - header file.
+// Provides the demangling library with its own error handling functions.
+// This is necessary because it isn't always linked with the runtime, so
+// it can't use the runtime's error handling.
 //
 //===----------------------------------------------------------------------===//
 
@@ -33,11 +33,14 @@
 #include <android/log.h>
 #endif
 
-#if SWIFT_DEMANGLE_USE_RUNTIME_ERRORS
-#include "swift/Runtime/Debug.h"
-#endif
+#if SWIFT_HAVE_CRASHREPORTERCLIENT
+#include <atomic>
+#include <malloc/malloc.h>
 
-#if !SWIFT_DEMANGLE_USE_RUNTIME_ERRORS
+#include "swift/Runtime/Atomic.h"
+
+#include "CrashReporter.h"
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
 // -- Declarations -----------------------------------------------------------
 
@@ -53,77 +56,39 @@ static int demangle_asprintf(char **strp, const char *format, ...);
 
 // -- Crash reporter integration ---------------------------------------------
 
-#if SWIFT_HAVE_CRASHREPORTERCLIENT
-#include <malloc/malloc.h>
-#include <pthread.h>
-
-#define CRASHREPORTER_ANNOTATIONS_VERSION 5
-#define CRASHREPORTER_ANNOTATIONS_SECTION "__crash_info"
-
-struct crashreporter_annotations_t {
-  uint64_t version;          // unsigned long
-  uint64_t message;          // char *
-  uint64_t signature_string; // char *
-  uint64_t backtrace;        // char *
-  uint64_t message2;         // char *
-  uint64_t thread;           // uint64_t
-  uint64_t dialog_mode;      // unsigned int
-  uint64_t abort_cause;      // unsigned int
-};
-
-// Instead of linking to CrashReporterClient.a (because it complicates the
-// build system), define the only symbol from that static archive ourselves.
-//
-// The layout of this struct is CrashReporter ABI, so there are no ABI concerns
-// here.
-extern "C" {
-SWIFT_LIBRARY_VISIBILITY
-struct crashreporter_annotations_t gCRAnnotations __attribute__((
-    __section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
-    CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
-}
-
-static inline void CRSetCrashLogMessage(const char *message) {
-  gCRAnnotations.message = reinterpret_cast<uint64_t>(message);
-}
-
-static inline const char *CRGetCrashLogMessage() {
-  return reinterpret_cast<const char *>(gCRAnnotations.message);
-}
-
 // Report a message to any forthcoming crash log.
 static void reportOnCrash(uint32_t flags, const char *message) {
-  // We must use an "unsafe" mutex in this pathway since the normal "safe"
-  // mutex calls fatal when an error is detected and fatal ends up
-  // calling us. In other words we could get infinite recursion if the
-  // mutex errors.
-  static pthread_mutex_t crashlogLock = PTHREAD_MUTEX_INITIALIZER;
+#if SWIFT_HAVE_CRASHREPORTERCLIENT
+  char *oldMessage = nullptr;
+  char *newMessage = nullptr;
 
-  pthread_mutex_lock(&crashlogLock);
+  oldMessage = std::atomic_load_explicit(
+    (volatile std::atomic<char *> *)&gCRAnnotations.message,
+    SWIFT_MEMORY_ORDER_CONSUME);
 
-  char *oldMessage = const_cast<char *>(CRGetCrashLogMessage());
-  char *newMessage;
-  if (oldMessage) {
-    demangle_asprintf(&newMessage, "%s%s", oldMessage, message);
-    if (malloc_size(oldMessage))
-      free(oldMessage);
-  } else {
-    newMessage = strdup(message);
-  }
+  do {
+    if (newMessage) {
+      free(newMessage);
+      newMessage = nullptr;
+    }
 
-  CRSetCrashLogMessage(newMessage);
+    if (oldMessage) {
+      demangle_asprintf(&newMessage, "%s%s", oldMessage, message);
+    } else {
+      newMessage = strdup(message);
+    }
+  } while (!std::atomic_compare_exchange_strong_explicit(
+             (volatile std::atomic<char *> *)&gCRAnnotations.message,
+             &oldMessage, newMessage,
+             std::memory_order_release,
+             SWIFT_MEMORY_ORDER_CONSUME));
 
-  pthread_mutex_unlock(&crashlogLock);
-}
-
+  if (oldMessage && malloc_size(oldMessage))
+    free(oldMessage);
 #else
-static void
-
-reportOnCrash(uint32_t flags, const char *message) {
   // empty
-}
-
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
+}
 
 // -- Utility functions ------------------------------------------------------
 
@@ -219,8 +184,6 @@ static void demangleWarn(uint32_t flags, const char *format, va_list val) {
   free(message);
 }
 
-#endif // !SWIFT_DEMANGLE_USE_RUNTIME_ERRORS
-
 // -- Public API -------------------------------------------------------------
 
 namespace swift {
@@ -243,19 +206,11 @@ void warn(uint32_t flags, const char *format, ...) {
 }
 
 SWIFT_NORETURN void fatalv(uint32_t flags, const char *format, va_list val) {
-#if SWIFT_DEMANGLE_USE_RUNTIME_ERRORS
-  swift::fatalErrorv(flags, format, val);
-#else
   demangleFatal(flags, format, val);
-#endif
 }
 
 void warnv(uint32_t flags, const char *format, va_list val) {
-#if SWIFT_DEMANGLE_USE_RUNTIME_ERRORS
-  swift::warningv(flags, format, val);
-#else
   demangleWarn(flags, format, val);
-#endif
 }
 
 SWIFT_END_INLINE_NAMESPACE

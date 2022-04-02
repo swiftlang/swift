@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
 
+// XFAIL: *
+
 import NonMemberOutOfLine
 
 public func add(_ lhs: LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> LoadableIntWrapper { lhs + rhs }

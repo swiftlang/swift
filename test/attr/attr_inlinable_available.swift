@@ -226,7 +226,6 @@ public func deployedUseAfterDeploymentTarget(
 
 //
 // Uses in inlinable functions are based on the minimum inlining target
-// (i.e. the first ABI-stable version, in this case)
 //
 
 @inlinable public func inlinedUseNoAvailable( // expected-note 8 {{add @available attribute}}

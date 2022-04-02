@@ -3638,7 +3638,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
     return maybeOpaqueType;
   }
 
-  auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
+  auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying subsitution.
   if (!subs.hasValue())
@@ -3749,7 +3749,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
     return abstractRef;
   }
 
-  auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
+  auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying subsitution.
   if (!subs.hasValue())

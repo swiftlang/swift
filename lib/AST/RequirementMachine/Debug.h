@@ -72,6 +72,9 @@ enum class DebugFlags : unsigned {
 
   /// Print a trace of requirement machines constructed and how long each took.
   Timers = (1<<16),
+
+  /// Print conflicting rules.
+  ConflictingRules = (1<<17),
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

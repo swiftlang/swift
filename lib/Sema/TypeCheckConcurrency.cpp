@@ -1475,9 +1475,6 @@ namespace {
 
     /// Check closure captures for Sendable violations.
     void checkClosureCaptures(AbstractClosureExpr *closure) {
-      if (!isSendableClosure(closure, /*forActorIsolation=*/false))
-        return;
-
       SmallVector<CapturedValue, 2> captures;
       closure->getCaptureInfo().getLocalCaptures(captures);
       for (const auto &capture : captures) {
@@ -1486,7 +1483,12 @@ namespace {
         if (capture.isOpaqueValue())
           continue;
 
+        // If the closure won't execute concurrently with the context in
+        // which the declaration occurred, it's okay.
         auto decl = capture.getDecl();
+        if (!mayExecuteConcurrentlyWith(closure, decl->getDeclContext()))
+          continue;
+
         Type type = getDeclContext()
             ->mapTypeIntoContext(decl->getInterfaceType())
             ->getReferenceStorageReferent();

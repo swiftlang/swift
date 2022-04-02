@@ -30,6 +30,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -803,6 +804,11 @@ static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
                               llvm::cl::desc("Enable experimental distributed actors and functions"),
                               llvm::cl::init(false));
+
+static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
+    "enable-experimental-string-processing",
+    llvm::cl::desc("Enable experimental string processing"),
+    llvm::cl::init(false));
 
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
@@ -4116,6 +4122,7 @@ void anchorForGetMainExecutable() {}
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  initializeSwiftModules();
 
   if (argc > 1) {
     // Handle integrated test tools which do not use
@@ -4269,6 +4276,9 @@ int main(int argc, char *argv[]) {
   }
   if (options::EnableExperimentalNamedOpaqueTypes) {
     InitInvok.getLangOptions().EnableExperimentalNamedOpaqueTypes = true;
+  }
+  if (options::EnableExperimentalStringProcessing) {
+    InitInvok.getLangOptions().EnableExperimentalStringProcessing= true;
   }
 
   if (!options::Triple.empty())

@@ -16,3 +16,15 @@ public let d: SPIInterface2 // expected-error{{cannot use class 'SPIInterface2' 
 public func inlinableUsingSPI() {
   SharedInterface.foo() // expected-error{{class method 'foo()' cannot be used in an '@inlinable' function because it is an SPI imported from 'SPIContainer'}}
 }
+
+@available(macOS, unavailable)
+public let e: SPIInterface2
+
+@available(iOS, unavailable)
+public let f: SPIInterface2 // expected-error{{cannot use class 'SPIInterface2' here; it is an SPI imported from 'SPIContainer'}}
+
+@inlinable
+@available(macOS, unavailable)
+public func inlinableUnavailableUsingSPI() {
+  SharedInterface.foo()
+}

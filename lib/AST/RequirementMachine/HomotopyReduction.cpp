@@ -19,9 +19,11 @@
 // 2) Small enough that no further rules can be deleted without changing the
 //    resulting confluent rewrite system.
 //
-// Redundant rules that are not part of the minimal set are redundant are
-// detected by analyzing the set of rewrite loops computed by the completion
-// procedure. See RewriteLoop.cpp for a discussion of rewrite loops.
+// The main entry point here is RewriteSystem::minimizeRewriteSystem().
+//
+// Redundant rules are detected by analyzing the set of rewrite loops computed
+// by the completion procedure. See RewriteLoop.cpp for a discussion of rewrite
+// loops.
 //
 // If a rewrite rule appears exactly once in a loop and without context, the
 // loop witnesses a redundancy; the rewrite rule is equivalent to traveling
@@ -162,30 +164,6 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
 
   if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
     llvm::dbgs() << "\n}\n";
-  }
-}
-
-/// Process pairs of conflicting rules, marking the more specific rule as
-/// conflicting, which instructs minimization to drop this rule.
-void RewriteSystem::processConflicts() {
-  for (auto pair : ConflictingRules) {
-    auto *existingRule = &getRule(pair.first);
-    auto *newRule = &getRule(pair.second);
-
-    // The identity conformance rule ([P].[P] => [P]) will conflict with
-    // a concrete type requirement in an invalid protocol declaration
-    // where 'Self' is constrained to a type that does not conform to
-    // the protocol. This rule is permanent, so don't mark it as
-    // conflicting in this case.
-
-    if (!existingRule->isIdentityConformanceRule() &&
-        existingRule->getRHS().size() >= newRule->getRHS().size())
-      existingRule->markConflicting();
-    if (!newRule->isIdentityConformanceRule() &&
-        newRule->getRHS().size() >= existingRule->getRHS().size())
-      newRule->markConflicting();
-
-    // FIXME: Diagnose the conflict later.
   }
 }
 
@@ -475,7 +453,6 @@ void RewriteSystem::minimizeRewriteSystem() {
   Minimized = 1;
 
   propagateExplicitBits();
-  processConflicts();
 
   if (Context.getASTContext().LangOpts.EnableRequirementMachineLoopNormalization) {
     for (auto &loop : Loops) {

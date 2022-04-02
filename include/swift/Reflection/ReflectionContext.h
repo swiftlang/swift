@@ -1306,6 +1306,8 @@ public:
     case ExistentialMetatypeValueWitnessTablesTag:
     case ExistentialMetatypesTag:
     case ExistentialTypesTag:
+    case ExtendedExistentialTypesTag:
+    case ExtendedExistentialTypeShapesTag:
     case OpaqueExistentialValueWitnessTablesTag:
     case ClassExistentialValueWitnessTablesTag:
     case ForeignWitnessTablesTag:

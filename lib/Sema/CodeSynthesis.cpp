@@ -749,7 +749,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
           return GenericEnvironment::mapTypeIntoContext(
             genericEnv, substType);
         });
-    if (checkResult != RequirementCheckResult::Success)
+    if (checkResult != CheckGenericArgumentsResult::Success)
       return nullptr;
   }
 

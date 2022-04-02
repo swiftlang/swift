@@ -1061,8 +1061,12 @@ public:
     std::vector<const TypeRef *> GenericParams;
     for (auto Param : BG->getGenericParams())
       GenericParams.push_back(visit(Param));
+    auto parent = BG->getParent();
+    if (parent) {
+      parent = ThickenMetatype(Builder).visit(parent);
+    }
     return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
-                                       GenericParams);
+                                       GenericParams, parent);
   }
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {

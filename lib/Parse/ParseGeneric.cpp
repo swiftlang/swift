@@ -195,8 +195,6 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   if (GenericParams == nullptr || GenericParams->getWhereLoc().isInvalid())
     return;
 
-
-
   auto WhereRangeInsideBrackets = GenericParams->getWhereClauseSourceRange();
 
   // Move everything immediately following the last generic parameter

@@ -18,13 +18,7 @@ import os
 import sys
 import time
 import unittest
-
-try:
-    # for Python 2
-    from StringIO import StringIO
-except ImportError:
-    # for Python 3
-    from io import StringIO
+from io import StringIO
 
 from compare_perf_tests import PerformanceTestResult
 

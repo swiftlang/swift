@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 public protocol P1 {
   associatedtype X

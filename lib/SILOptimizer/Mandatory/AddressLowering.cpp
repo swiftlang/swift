@@ -798,6 +798,8 @@ static Operand *getProjectedDefOperand(SILValue value) {
 /// is address-only, then the operand must be address-only and therefore must
 /// mapped to ValueStorage.
 ///
+/// If \p value is an unchecked_bitwise_cast, then return the cast operand.
+///
 /// open_existential_value must reuse storage because the boxed value is shared
 /// with other instances of the existential. An explicit copy is needed to
 /// obtain an owned value.
@@ -812,6 +814,7 @@ static Operand *getReusedStorageOperand(SILValue value) {
   case ValueKind::OpenExistentialValueInst:
   case ValueKind::OpenExistentialBoxValueInst:
   case ValueKind::UncheckedEnumDataInst:
+  case ValueKind::UncheckedBitwiseCastInst:
     return &cast<SingleValueInstruction>(value)->getOperandRef(0);
 
   case ValueKind::SILPhiArgument: {
@@ -2551,9 +2554,16 @@ protected:
   // Extract from an opaque tuple.
   void visitTupleExtractInst(TupleExtractInst *extractInst);
 
-  void visitUncheckedBitwiseCast(UncheckedBitwiseCastInst *uncheckedCastInst) {
-    // FIXME: Unimplemented
-    llvm::report_fatal_error("Unimplemented UncheckedBitwiseCast use.");
+  void
+  visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCastInst) {
+    SILValue srcVal = uncheckedCastInst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    auto destAddr = builder.createUncheckedAddrCast(
+        uncheckedCastInst->getLoc(), srcAddr,
+        uncheckedCastInst->getType().getAddressType());
+
+    markRewritten(uncheckedCastInst, destAddr);
   }
 
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *enumDataInst);

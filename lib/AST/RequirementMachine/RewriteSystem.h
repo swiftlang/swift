@@ -229,6 +229,11 @@ public:
 
   void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
 
+  void computeConflictDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                  SourceLoc signatureLoc,
+                                  const PropertyMap &map,
+                                  TypeArrayView<GenericTypeParamType> genericParams);
+
 private:
   struct CriticalPair {
     MutableTerm LHS;
@@ -355,8 +360,6 @@ private:
   void propagateExplicitBits();
 
   void propagateRedundantRequirementIDs();
-
-  void processConflicts();
 
   using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
                                                        unsigned ruleID)>;
