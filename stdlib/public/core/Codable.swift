@@ -183,7 +183,7 @@ public protocol Decoder {
 ///
 /// Encoders should provide types conforming to
 /// `KeyedEncodingContainerProtocol` for their format.
-public protocol KeyedEncodingContainerProtocol<Key> {
+public protocol KeyedEncodingContainerProtocol {
   associatedtype Key: CodingKey
 
   /// The path of coding keys taken to get to this point in encoding.
