@@ -24,7 +24,7 @@ namespace swift {
 
 /// A compact unconditional absolute function pointer that can fit in a 32-bit
 /// integer.
-/// As a trade-off compared to relative pointers, this has load-time overhead in PIC 
+/// As a trade-off compared to relative pointers, this has load-time overhead in PIC
 /// and is only available on 32-bit targets.
 template <typename T>
 class AbsoluteFunctionPointer {
