@@ -3523,6 +3523,48 @@ Type Solution::simplifyType(Type type) const {
   return resolvedType;
 }
 
+Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
+  auto &CS = getConstraintSystem();
+
+  // First, instantiate all type variables that we know, but don't replace
+  // placeholders by unresolved types.
+  Ty = CS.simplifyTypeImpl(Ty, [this](TypeVariableType *typeVar) -> Type {
+    return getFixedType(typeVar);
+  });
+
+  // Next, replace all placeholders by type variables. We know that all type
+  // variables now in the type originate from placeholders.
+  Ty = Ty.transform([](Type type) -> Type {
+    if (auto *placeholder = type->getAs<PlaceholderType>()) {
+      if (auto *typeVar =
+              placeholder->getOriginator().dyn_cast<TypeVariableType *>()) {
+        return typeVar;
+      }
+    }
+
+    return type;
+  });
+
+  // Replace all type variables (which must come from placeholders) by their
+  // generic parameters. Because we call into simplifyTypeImpl
+  Ty = CS.simplifyTypeImpl(Ty, [](TypeVariableType *typeVar) -> Type {
+    if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+      // Code completion depends on generic parameter type being
+      // represented in terms of `ArchetypeType` since it's easy
+      // to extract protocol requirements from it.
+      if (auto *GPD = GP->getDecl()) {
+        return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
+      }
+    }
+    return typeVar;
+  });
+
+  // Remove any remaining type variables and placeholders
+  Ty = simplifyType(Ty);
+
+  return Ty->getRValueType();
+}
+
 size_t Solution::getTotalMemory() const {
   return sizeof(*this) + typeBindings.getMemorySize() +
          overloadChoices.getMemorySize() +
