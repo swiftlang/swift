@@ -1275,6 +1275,9 @@ public:
     if (ArgInfo.isBefore(argIdx)) {
       return false;
     }
+    if (argIdx == 0 && ArgInfo.completionIdx == 0) {
+      return false;
+    }
     return ArgumentFailureTracker::extraArgument(argIdx);
   }
 
@@ -1825,7 +1828,6 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       auto *argExpr = getArgumentExpr(locator.getAnchor(), argIdx);
       if (param.isAutoClosure() && !isSynthesizedArgument(argument)) {
         auto &ctx = cs.getASTContext();
-        auto *fnType = paramTy->castTo<FunctionType>();
 
         // If this is a call to a function with a closure argument and the
         // parameter is an autoclosure, let's just increment the score here
@@ -1845,7 +1847,9 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         if (ctx.isSwiftVersionAtLeast(5) || !isAutoClosureArgument(argExpr)) {
           // In Swift >= 5 mode there is no @autoclosure forwarding,
           // so let's match result types.
-          paramTy = fnType->getResult();
+          if (auto *fnType = paramTy->getAs<FunctionType>()) {
+            paramTy = fnType->getResult();
+          }
         } else {
           // Matching @autoclosure argument to @autoclosure parameter
           // directly would mean introducting a function conversion
