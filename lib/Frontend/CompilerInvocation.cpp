@@ -1197,7 +1197,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
-  Opts.EnableClangSPI = !Args.hasArg(OPT_disable_clang_spi);
+  if (Args.hasArg(OPT_disable_clang_spi)) {
+    Opts.EnableClangSPI = false;
+  }
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
 

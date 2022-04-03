@@ -1493,6 +1493,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     }
   }
 
+  subClangImporterOpts.EnableClangSPI = clangImporterOpts.EnableClangSPI;
+  if (!subClangImporterOpts.EnableClangSPI) {
+    GenericArgs.push_back("-disable-clang-spi");
+  }
+
   // Tell the genericSubInvocation to serialize dependency hashes if asked to do
   // so.
   auto &frontendOpts = genericSubInvocation.getFrontendOptions();
