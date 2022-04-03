@@ -391,10 +391,14 @@ Test Foundation:
 cmake --build S:\b\4 --target test
 ```
 
-### 6. LLBuild
+### 6. Tool dependencies
+
+> **NOTE:** We're building the following libraries without tests here because they're independent packages that are directly or indirectly depended by Swift Driver, SwiftPM or SourceKit-LSP.  For developing these libraries, use SwiftPM instead.
+
+#### LLBuild (Used by Swift Driver, SwiftPM and SourceKit-LSP)
 
 ```cmd
-cmake -B S:\b\6 ^
+cmake -B S:\b\6\LLBuild ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
 
@@ -417,23 +421,13 @@ cmake -B S:\b\6 ^
   -G Ninja ^
   -S S:\llbuild
 
-cmake --build S:\b\6
+cmake --build S:\b\6\LLBuild
 ```
-
-Test LLBuild:
-
-```cmd
-cmake --build S:\b\6 --target test
-```
-
-### 7. Toolchain dependencies
-
-We're building the following libraries with `Release` preset and without tests here because they're independent packages that are directly or indirectly depended by Swift Driver, SwiftPM or SourceKit-LSP.  For developing these libraries, use SwiftPM instead.
 
 #### Yams (used by Swift Driver)
 
 ```cmd
-cmake -B S:\b\7\Yams ^
+cmake -B S:\b\6\Yams ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
@@ -453,13 +447,13 @@ cmake -B S:\b\7\Yams ^
   -G Ninja ^
   -S S:\yams
 
-cmake --build S:\b\7\Yams
+cmake --build S:\b\6\Yams
 ```
 
 #### Argument Parser (used by Swift Driver and SwiftPM)
 
 ```cmd
-cmake -B S:\b\7\ArgumentParser ^
+cmake -B S:\b\6\ArgumentParser ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
@@ -477,13 +471,13 @@ cmake -B S:\b\7\ArgumentParser ^
   -G Ninja ^
   -S S:\swift-argument-parser
 
-cmake --build S:\b\7\ArgumentParser
+cmake --build S:\b\6\ArgumentParser
 ```
 
 #### Swift System (used by Swift Driver and SwiftPM)
 
 ```cmd
-cmake -B S:\b\7\SwiftSystem ^
+cmake -B S:\b\6\SwiftSystem ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
@@ -499,13 +493,13 @@ cmake -B S:\b\7\SwiftSystem ^
   -G Ninja ^
   -S S:\swift-system
 
-cmake --build S:\b\7\SwiftSystem
+cmake --build S:\b\6\SwiftSystem
 ```
 
 #### Swift Crypto (used by SwiftPM)
 
 ```cmd
-cmake -B S:\b\7\SwiftCrypto ^
+cmake -B S:\b\6\SwiftCrypto ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
@@ -523,13 +517,13 @@ cmake -B S:\b\7\SwiftCrypto ^
   -G Ninja ^
   -S S:\swift-crypto
 
-cmake --build S:\b\7\SwiftCrypto
+cmake --build S:\b\6\SwiftCrypto
 ```
 
 #### Swift Collections (used by SwiftPM)
 
 ```cmd
-cmake -B S:\b\7\SwiftCollections ^
+cmake -B S:\b\6\SwiftCollections ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
@@ -547,13 +541,13 @@ cmake -B S:\b\7\SwiftCollections ^
   -G Ninja ^
   -S S:\swift-collections
 
-cmake --build S:\b\7\SwiftCollections
+cmake --build S:\b\6\SwiftCollections
 ```
 
 #### IndexStoreDB (used by SourceKit-LSP)
 
 ```cmd
-cmake -B S:\b\7\IndexStoreDB ^
+cmake -B S:\b\6\IndexStoreDB ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
@@ -575,10 +569,37 @@ cmake -B S:\b\7\IndexStoreDB ^
   -G Ninja ^
   -S S:\indexstore-db
 
-cmake --build S:\b\7\IndexStoreDB
+cmake --build S:\b\6\IndexStoreDB
 ```
 
-### 8. TSC (without tests)
+### 7. TSC (without tests)
+
+```cmd
+cmake -B S:\b\7 ^
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
+
+  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
+  -D dispatch_DIR=S:\b\3\cmake\modules ^
+  -D Foundation_DIR=S:\b\4\cmake\modules ^
+  -D SwiftSystem_DIR=S:\b\6\SwiftSystem\cmake\modules ^
+
+  -D CMAKE_TOOLCHAIN_FILE=S:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+
+  -G Ninja ^
+  -S S:\swift-tools-support-core
+
+cmake --build S:\b\7
+```
+
+### 8. Swift Driver (without tests)
 
 ```cmd
 cmake -B S:\b\8 ^
@@ -595,17 +616,19 @@ cmake -B S:\b\8 ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D dispatch_DIR=S:\b\3\cmake\modules ^
   -D Foundation_DIR=S:\b\4\cmake\modules ^
-  -D SwiftSystem_DIR=S:\b\7\SwiftSystem\cmake\modules ^
-
-  -D CMAKE_TOOLCHAIN_FILE=S:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+  -D LLBuild_DIR=S:\b\6\LLBuild\cmake\modules ^
+  -D Yams_DIR=S:\b\6\Yams\cmake\modules ^
+  -D SwiftSystem_DIR=S:\b\6\SwiftSystem\cmake\modules ^
+  -D ArgumentParser_DIR=S:\b\6\ArgumentParser\cmake\modules ^
+  -D TSC_DIR=S:\b\7\cmake\modules ^
 
   -G Ninja ^
-  -S S:\swift-tools-support-core
+  -S S:\swift-driver
 
 cmake --build S:\b\8
 ```
 
-### 9. Swift Driver (without tests)
+### 9. SwiftPM (without tests)
 
 ```cmd
 cmake -B S:\b\9 ^
@@ -622,19 +645,21 @@ cmake -B S:\b\9 ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D dispatch_DIR=S:\b\3\cmake\modules ^
   -D Foundation_DIR=S:\b\4\cmake\modules ^
-  -D LLBuild_DIR=S:\b\6\cmake\modules ^
-  -D Yams_DIR=S:\b\7\Yams\cmake\modules ^
-  -D SwiftSystem_DIR=S:\b\7\SwiftSystem\cmake\modules ^
-  -D ArgumentParser_DIR=S:\b\7\ArgumentParser\cmake\modules ^
-  -D TSC_DIR=S:\b\8\cmake\modules ^
+  -D LLBuild_DIR=S:\b\6\LLBuild\cmake\modules ^
+  -D SwiftSystem_DIR=S:\b\6\SwiftSystem\cmake\modules ^
+  -D ArgumentParser_DIR=S:\b\6\ArgumentParser\cmake\modules ^
+  -D SwiftCrypto_DIR=S:\b\6\SwiftCrypto\cmake\modules ^
+  -D SwiftCollections_DIR=S:\b\6\SwiftCollections\cmake\modules ^
+  -D TSC_DIR=S:\b\7\cmake\modules ^
+  -D SwiftDriver_DIR=S:\b\8\cmake\modules ^
 
   -G Ninja ^
-  -S S:\swift-driver
+  -S S:\swiftpm
 
 cmake --build S:\b\9
 ```
 
-### 10. SwiftPM (without tests)
+### 10. SourceKit-LSP (without tests)
 
 ```cmd
 cmake -B S:\b\10 ^
@@ -651,49 +676,18 @@ cmake -B S:\b\10 ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D dispatch_DIR=S:\b\3\cmake\modules ^
   -D Foundation_DIR=S:\b\4\cmake\modules ^
-  -D LLBuild_DIR=S:\b\6\cmake\modules ^
-  -D SwiftSystem_DIR=S:\b\7\SwiftSystem\cmake\modules ^
-  -D ArgumentParser_DIR=S:\b\7\ArgumentParser\cmake\modules ^
-  -D SwiftCrypto_DIR=S:\b\7\SwiftCrypto\cmake\modules ^
-  -D SwiftCollections_DIR=S:\b\7\SwiftCollections\cmake\modules ^
-  -D TSC_DIR=S:\b\8\cmake\modules ^
-  -D SwiftDriver_DIR=S:\b\9\cmake\modules ^
-
-  -G Ninja ^
-  -S S:\swiftpm
-
-cmake --build S:\b\10
-```
-
-### 11. SourceKit-LSP (without tests)
-
-```cmd
-cmake -B S:\b\11 ^
-  -D BUILD_SHARED_LIBS=YES ^
-  -D CMAKE_BUILD_TYPE=Release ^
-  -D CMAKE_INSTALL_PREFIX=S:\b\toolchain\usr ^
-
-  -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-
-  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
-  -D dispatch_DIR=S:\b\3\cmake\modules ^
-  -D Foundation_DIR=S:\b\4\cmake\modules ^
-  -D LLBuild_DIR=S:\b\6\cmake\modules ^
-  -D SwiftSystem_DIR=S:\b\7\SwiftSystem\cmake\modules ^
-  -D ArgumentParser_DIR=S:\b\7\ArgumentParser\cmake\modules ^
-  -D SwiftCollections_DIR=S:\b\7\SwiftCollections\cmake\modules ^
-  -D IndexStoreDB_DIR=S:\b\7\IndexStoreDB\cmake\modules ^
-  -D TSC_DIR=S:\b\8\cmake\modules ^
-  -D SwiftPM_DIR=S:\b\10\cmake\modules ^
+  -D LLBuild_DIR=S:\b\6\LLBuild\cmake\modules ^
+  -D SwiftSystem_DIR=S:\b\6\SwiftSystem\cmake\modules ^
+  -D ArgumentParser_DIR=S:\b\6\ArgumentParser\cmake\modules ^
+  -D SwiftCollections_DIR=S:\b\6\SwiftCollections\cmake\modules ^
+  -D IndexStoreDB_DIR=S:\b\6\IndexStoreDB\cmake\modules ^
+  -D TSC_DIR=S:\b\7\cmake\modules ^
+  -D SwiftPM_DIR=S:\b\9\cmake\modules ^
 
   -G Ninja ^
   -S S:\sourcekit-lsp
 
-cmake --build S:\b\11
+cmake --build S:\b\10
 ```
 
 ## Use the toolchain and SDK
@@ -768,18 +762,18 @@ move /Y S:\b\sdk\usr\lib\swift\windows\*.lib S:\b\sdk\usr\lib\swift\windows\x86_
 ### Swift developer tools
 
 ```cmd
-cmake --build S:\b\6 --target install
-cmake --build S:\b\7\Yams --target install
-cmake --build S:\b\7\ArgumentParser --target install
-cmake --build S:\b\7\SwiftSystem --target install
-cmake --build S:\b\7\SwiftCrypto --target install
-cmake --build S:\b\7\SwiftCollections --target install
-cmake --build S:\b\7\IndexStoreDB --target install
+cmake --build S:\b\6\LLBuild --target install
+cmake --build S:\b\6\Yams --target install
+cmake --build S:\b\6\ArgumentParser --target install
+cmake --build S:\b\6\SwiftSystem --target install
+cmake --build S:\b\6\SwiftCrypto --target install
+cmake --build S:\b\6\SwiftCollections --target install
+cmake --build S:\b\6\IndexStoreDB --target install
+cmake --build S:\b\7 --target install
 cmake --build S:\b\8 --target install
 cmake --build S:\b\9 --target install
 cmake --build S:\b\10 --target install
-cmake --build S:\b\11 --target install
-copy /Y S:\b\8\bin\sqlite3.dll S:\b\toolchain\usr\bin
+copy /Y S:\b\7\bin\sqlite3.dll S:\b\toolchain\usr\bin
 ```
 
 To use Swift Driver in place of the old driver (default since Swift 5.7):
