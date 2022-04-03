@@ -78,11 +78,7 @@ void ExprTypeCheckCompletionCallback::sawSolutionImpl(
   bool IsAsync = isContextAsync(S, DC);
 
   llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
-  for (auto NT : S.nodeTypes) {
-    if (auto VD = dyn_cast_or_null<VarDecl>(NT.first.dyn_cast<Decl *>())) {
-      SolutionSpecificVarTypes[VD] = S.simplifyType(NT.second);
-    }
-  }
+  getSolutionSpecificVarTypes(S, SolutionSpecificVarTypes);
 
   addResult(ImplicitReturn, IsAsync, SolutionSpecificVarTypes);
   addExpectedType(ExpectedTy);

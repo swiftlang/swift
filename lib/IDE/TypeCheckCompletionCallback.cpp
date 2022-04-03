@@ -51,47 +51,8 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
 
   Type Result;
 
-  // To aid code completion, we need to attempt to convert type placeholders
-  // back into underlying generic parameters if possible, since type
-  // of the code completion expression is used as "expected" (or contextual)
-  // type so it's helpful to know what requirements it has to filter
-  // the list of possible member candidates e.g.
-  //
-  // \code
-  // func test<T: P>(_: [T]) {}
-  //
-  // test(42.#^MEMBERS^#)
-  // \code
-  //
-  // It's impossible to resolve `T` in this case but code completion
-  // expression should still have a type of `[T]` instead of `[<<hole>>]`
-  // because it helps to produce correct contextual member list based on
-  // a conformance requirement associated with generic parameter `T`.
   if (isExpr<CodeCompletionExpr>(Node)) {
-    auto completionTy = S.getType(Node).transform([&](Type type) -> Type {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        return S.getFixedType(typeVar);
-      return type;
-    });
-
-    Result = S.simplifyType(completionTy.transform([&](Type type) {
-      if (auto *placeholder = type->getAs<PlaceholderType>()) {
-        if (auto *typeVar =
-                placeholder->getOriginator().dyn_cast<TypeVariableType *>()) {
-          if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-            // Code completion depends on generic parameter type being
-            // represented in terms of `ArchetypeType` since it's easy
-            // to extract protocol requirements from it.
-            if (auto *GPD = GP->getDecl())
-              return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
-          }
-        }
-
-        return Type(CS.getASTContext().TheUnresolvedType);
-      }
-
-      return type;
-    }));
+    Result = S.simplifyTypeForCodeCompletion(S.getType(Node));
   } else {
     Result = S.getResolvedType(Node);
   }
@@ -162,6 +123,17 @@ Type swift::ide::getPatternMatchType(const constraints::Solution &S, Expr *E) {
     }
   }
   return nullptr;
+}
+
+void swift::ide::getSolutionSpecificVarTypes(
+    const constraints::Solution &S,
+    llvm::SmallDenseMap<const VarDecl *, Type> &Result) {
+  assert(Result.empty());
+  for (auto NT : S.nodeTypes) {
+    if (auto VD = dyn_cast_or_null<VarDecl>(NT.first.dyn_cast<Decl *>())) {
+      Result[VD] = S.simplifyType(NT.second);
+    }
+  }
 }
 
 bool swift::ide::isImplicitSingleExpressionReturn(ConstraintSystem &CS,

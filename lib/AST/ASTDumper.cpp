@@ -3826,17 +3826,20 @@ namespace {
     void printAnyFunctionTypeCommon(AnyFunctionType *T, StringRef label,
                                     StringRef name) {
       printCommon(label, name);
-      SILFunctionType::Representation representation =
-        T->getExtInfo().getSILRepresentation();
 
-      if (representation != SILFunctionType::Representation::Thick)
-        printField("representation",
-                   getSILFunctionTypeRepresentationString(representation));
+      if (T->hasExtInfo()) {
+        SILFunctionType::Representation representation =
+            T->getExtInfo().getSILRepresentation();
 
-      printFlag(!T->isNoEscape(), "escaping");
-      printFlag(T->isSendable(), "Sendable");
-      printFlag(T->isAsync(), "async");
-      printFlag(T->isThrowing(), "throws");
+        if (representation != SILFunctionType::Representation::Thick) {
+          printField("representation",
+                     getSILFunctionTypeRepresentationString(representation));
+        }
+        printFlag(!T->isNoEscape(), "escaping");
+        printFlag(T->isSendable(), "Sendable");
+        printFlag(T->isAsync(), "async");
+        printFlag(T->isThrowing(), "throws");
+      }
 
       if (Type globalActor = T->getGlobalActor()) {
         printField("global_actor", globalActor.getString());

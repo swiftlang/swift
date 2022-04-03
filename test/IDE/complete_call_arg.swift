@@ -1317,7 +1317,7 @@ func testPlaceholderNoBetterThanArchetype() {
   }
 // PLACEHOLDER_NO_BETTER_THAN_ARCHETYPE_1:     Begin completions, 2 items
 // PLACEHOLDER_NO_BETTER_THAN_ARCHETYPE_1-DAG: Pattern/Local/Flair[ArgLabels]:     {#footer: String#}[#String#];
-// PLACEHOLDER_NO_BETTER_THAN_ARCHETYPE_1-DAG: Pattern/Local/Flair[ArgLabels]:     {#content: () -> _##() -> _#}[#() -> _#];
+// PLACEHOLDER_NO_BETTER_THAN_ARCHETYPE_1-DAG: Pattern/Local/Flair[ArgLabels]:     {#content: () -> Content##() -> Content#}[#() -> Content#];
 // PLACEHOLDER_NO_BETTER_THAN_ARCHETYPE_1:     End completions
 
   Section(header: TectionHeaderView(text: "abc"), #^PLACEHOLDER_NO_BETTER_THAN_ARCHETYPE_2?check=PLACEHOLDER_NO_BETTER_THAN_ARCHETYPE_1^#)
