@@ -88,34 +88,6 @@ mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Pla
 
 > **WARNING:** Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing "More > Run As Administrator", and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
-## Build a minimal Swift toolchain
-
-A minimal Swift toolchain does not include optional features or SwiftPM stuffs, and may be useful for playing with the compiler or language itself.
-
-```cmd
-cmake -B S:\b\1 ^
-  -C S:\swift\cmake\caches\Windows-x86_64.cmake ^
-  -D CMAKE_BUILD_TYPE=Release ^
-  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
-  -D CMAKE_C_COMPILER=cl.exe ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy /source-charset:utf-8 /execution-charset:utf-8" ^
-  -D CMAKE_CXX_COMPILER=cl.exe ^
-  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy /utf-8" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
-  -D LLVM_APPEND_VC_REV=NO ^
-  -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
-  -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
-  -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
-  -G Ninja ^
-  -S S:\llvm-project\llvm
-
-cmake --build S:\b\1
-cmake --build S:\b\1 --target install
-```
-
 ## Build for development
 
 The following guide will get you through the building process of a complete Swift debug toolchain.
