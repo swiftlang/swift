@@ -1005,6 +1005,12 @@ bool ConstraintSystem::isInResultBuilderContext(ClosureExpr *closure) const {
   if (!closure->hasSingleExpressionBody()) {
     auto *DC = closure->getParent();
     do {
+      // Result builder is applied to a function/getter body.
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+        if (resultBuilderTransformed.count(AFD))
+          return true;
+      }
+
       if (auto *parentClosure = dyn_cast<ClosureExpr>(DC)) {
         if (resultBuilderTransformed.count(parentClosure))
           return true;
