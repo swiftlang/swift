@@ -72,6 +72,18 @@ extension String {
     ).0
   }
 
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated)
+  public init(cString nullTerminatedUTF8: inout CChar) {
+    guard nullTerminatedUTF8 == 0 else {
+      _preconditionFailure(
+        "input of String.init(cString:) must be null-terminated"
+      )
+    }
+    self = ""
+  }
+
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
   /// by the given pointer.
   ///
@@ -96,6 +108,18 @@ extension String {
   @available(*, deprecated, message: "Operate directly on the String")
   public init(cString nullTerminatedUTF8: String) {
     self = nullTerminatedUTF8.withCString(String.init(cString:))
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated)
+  public init(cString nullTerminatedUTF8: inout UInt8) {
+    guard nullTerminatedUTF8 == 0 else {
+      _preconditionFailure(
+        "input of String.init(cString:) must be null-terminated"
+      )
+    }
+    self = ""
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8
@@ -153,6 +177,18 @@ extension String {
   @available(*, deprecated, message: "Operate directly on the String")
   public init?(validatingUTF8 cString: String) {
     self = cString.withCString(String.init(cString:))
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated)
+  public init?(validatingUTF8 cString: inout CChar) {
+    guard cString == 0 else {
+      _preconditionFailure(
+        "input of String.init(validatingUTF8:) must be null-terminated"
+      )
+    }
+    self = ""
   }
 
   /// Creates a new string by copying the null-terminated data referenced by
@@ -279,6 +315,24 @@ extension String {
     }
   }
 
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated)
+  public static func decodeCString<Encoding: _UnicodeEncoding>(
+    _ cString: inout Encoding.CodeUnit,
+    as encoding: Encoding.Type,
+    repairingInvalidCodeUnits isRepairing: Bool = true
+  ) -> (result: String, repairsMade: Bool)? {
+    guard cString == 0 else {
+      _preconditionFailure(
+        "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
+      )
+    }
+    return ("", false)
+  }
+
   /// Creates a string from the null-terminated sequence of bytes at the given
   /// pointer.
   ///
@@ -321,6 +375,22 @@ extension String {
     self = nullTerminatedCodeUnits.withCString(encodedAs: sourceEncoding) {
       String(decodingCString: $0, as: sourceEncoding.self)
     }
+  }
+
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable // Fold away specializations
+  @_alwaysEmitIntoClient
+  public init<Encoding: Unicode.Encoding>(
+    decodingCString nullTerminatedCodeUnits: inout Encoding.CodeUnit,
+    as sourceEncoding: Encoding.Type
+  ) {
+    guard nullTerminatedCodeUnits == 0 else {
+      _preconditionFailure(
+        "input of String.init(decodingCString:as:) must be null-terminated"
+      )
+    }
+    self = ""
   }
 }
 
