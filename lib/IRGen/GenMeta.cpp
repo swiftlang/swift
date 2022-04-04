@@ -2044,39 +2044,19 @@ namespace {
       addGenericSignature();
       addUnderlyingTypeAndConformances();
     }
-    
-    void addUnderlyingTypeAndConformances() {
-      auto sig = O->getOpaqueInterfaceGenericSignature();
-      auto contextSig = O->getGenericSignature().getCanonicalSignature();
-      auto subs = *O->getUniqueUnderlyingTypeSubstitutions();
 
-      // Add the underlying types for each generic parameter.
-      for (auto genericParam : O->getOpaqueGenericParams()) {
-        auto underlyingType = Type(genericParam).subst(subs)->getCanonicalType(sig);
-        B.addRelativeAddress(
-            IGM.getTypeRef(underlyingType, contextSig,
-            MangledTypeRefRole::Metadata).first);
+    void addUnderlyingTypeAndConformances() {
+      for (unsigned index : indices(O->getOpaqueGenericParams())) {
+        B.addRelativeAddress(getUnderlyingTypeRef(index));
       }
 
-      // Add witness tables for each of the conformance requirements.
+      auto sig = O->getOpaqueInterfaceGenericSignature();
       for (const auto &req : sig.getRequirements()) {
-        auto proto = requiresWitnessTable(req);
-        if (!proto)
-          continue;
-
-        auto underlyingDependentType = req.getFirstType()->getCanonicalType();
-        auto underlyingType = underlyingDependentType.subst(subs)
-            ->getCanonicalType();
-        auto underlyingConformance =
-            subs.lookupConformance(underlyingDependentType, proto);
-        auto witnessTableRef = IGM.emitWitnessTableRefString(
-                                          underlyingType, underlyingConformance,
-                                          contextSig,
-                                          /*setLowBit*/ false);
-        B.addRelativeAddress(witnessTableRef);
+        if (auto *proto = requiresWitnessTable(req))
+          B.addRelativeAddress(getWitnessTableRef(req, proto));
       }
     }
-    
+
     bool isUniqueDescriptor() {
       switch (LinkEntity::forOpaqueTypeDescriptor(O)
                 .getLinkage(NotForDefinition)) {
@@ -2152,6 +2132,326 @@ namespace {
 
       return O->getOpaqueGenericParams().size() + numWitnessTables;
     }
+
+  private:
+    llvm::Constant *getUnderlyingTypeRef(unsigned opaqueParamIdx) const {
+
+      // If this opaque declaration has a unique set of substitutions,
+      // we can simply emit a direct type reference.
+      if (auto unique = O->getUniqueUnderlyingTypeSubstitutions()) {
+        auto sig = O->getOpaqueInterfaceGenericSignature();
+        auto contextSig = O->getGenericSignature().getCanonicalSignature();
+
+        auto *genericParam = O->getOpaqueGenericParams()[opaqueParamIdx];
+        auto underlyingType =
+            Type(genericParam).subst(*unique)->getCanonicalType(sig);
+        return IGM
+            .getTypeRef(underlyingType, contextSig,
+                        MangledTypeRefRole::Metadata)
+            .first;
+      }
+
+      // Otherwise, we have to go through a metadata accessor to
+      // fetch underlying type at runtime.
+
+      // There are one or more underlying types with limited
+      // availability and one universally available one. This
+      // requires us to build a metadata accessor.
+      auto substitutionSet = O->getConditionallyAvailableSubstitutions();
+      assert(!substitutionSet.empty());
+
+      UnderlyingTypeAccessor accessor(IGM, O, opaqueParamIdx);
+      return accessor.emit(substitutionSet);
+    }
+
+    llvm::Constant *getWitnessTableRef(const Requirement &req,
+                                       ProtocolDecl *protocol) {
+      auto contextSig = O->getGenericSignature().getCanonicalSignature();
+      auto underlyingDependentType = req.getFirstType()->getCanonicalType();
+
+      if (auto unique = O->getUniqueUnderlyingTypeSubstitutions()) {
+        auto underlyingType =
+            underlyingDependentType.subst(*unique)->getCanonicalType();
+        auto underlyingConformance =
+            unique->lookupConformance(underlyingDependentType, protocol);
+
+        return IGM.emitWitnessTableRefString(underlyingType,
+                                             underlyingConformance, contextSig,
+                                             /*setLowBit*/ false);
+      }
+
+      WitnessTableAccessor accessor(IGM, O, req, protocol);
+      return accessor.emit(O->getConditionallyAvailableSubstitutions());
+    }
+
+    class AbstractMetadataAccessor {
+    protected:
+      IRGenModule &IGM;
+
+      /// The opaque type declaration for this accessor.
+      OpaqueTypeDecl *O;
+
+    public:
+      AbstractMetadataAccessor(IRGenModule &IGM, OpaqueTypeDecl *O)
+          : IGM(IGM), O(O) {}
+
+      virtual ~AbstractMetadataAccessor() {}
+
+      /// The unique symbol this accessor would be reachable by at runtime.
+      virtual std::string getSymbol() const = 0;
+
+      /// The result type for this accessor. This type would have
+      /// to match a type produced by \c getResultValue.
+      virtual llvm::Type *getResultType() const = 0;
+
+      /// Produce a result value based on the given set of substitutions.
+      virtual llvm::Value *
+      getResultValue(IRGenFunction &IGF, GenericEnvironment *genericEnv,
+                     SubstitutionMap substitutions) const = 0;
+
+      llvm::Constant *
+      emit(ArrayRef<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+               substitutionSet) {
+        auto getInt32Constant =
+            [&](Optional<unsigned> value) -> llvm::ConstantInt * {
+          return llvm::ConstantInt::get(IGM.Int32Ty, value.getValueOr(0));
+        };
+
+        auto symbol = getSymbol();
+
+        auto *accessor = getAccessorFn(symbol);
+        {
+          IRGenFunction IGF(IGM, accessor);
+
+          if (IGM.DebugInfo)
+            IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
+
+          auto signature = O->getGenericSignature().getCanonicalSignature();
+          auto *genericEnv = signature.getGenericEnvironment();
+
+          // Prepare contextual replacements.
+          {
+            SmallVector<GenericRequirement, 4> requirements;
+
+            enumerateGenericSignatureRequirements(
+                signature,
+                [&](GenericRequirement req) { requirements.push_back(req); });
+
+            auto bindingsBufPtr = IGF.collectParameters().claimNext();
+
+            bindFromGenericRequirementsBuffer(
+                IGF, requirements,
+                Address(bindingsBufPtr, IGM.getPointerAlignment()),
+                MetadataState::Complete, [&](CanType t) {
+                  return genericEnv ? genericEnv->mapTypeIntoContext(t)
+                                          ->getCanonicalType()
+                                    : t;
+                });
+          }
+
+          SmallVector<llvm::BasicBlock *, 4> conditionalTypes;
+
+          // Pre-allocate a basic block per condition, so there it's
+          // possible to jump between conditions.
+          for (unsigned index : indices(substitutionSet)) {
+            conditionalTypes.push_back(
+                IGF.createBasicBlock((index < substitutionSet.size() - 1)
+                                         ? "conditional-" + llvm::utostr(index)
+                                         : "universal"));
+          }
+
+          // Jump straight to the first conditional type block.
+          IGF.Builder.CreateBr(conditionalTypes.front());
+
+          // For each conditionally available substitution
+          // (the last one is universal):
+          //  - check all of the conditions via `isOSVersionAtLeast`
+          //  - if all checks are true - emit a return of a result value.
+          for (unsigned i = 0; i < substitutionSet.size() - 1; ++i) {
+            auto *underlyingTy = substitutionSet[i];
+
+            IGF.Builder.emitBlock(conditionalTypes[i]);
+
+            auto returnTypeBB =
+                IGF.createBasicBlock("result-" + llvm::utostr(i));
+
+            // Emit a #available condition check, if it's `false` -
+            // jump to the next conditionally available type.
+            auto conditions = underlyingTy->getAvailability();
+
+            SmallVector<llvm::BasicBlock *, 4> conditionBlocks;
+            for (unsigned condIndex : indices(conditions)) {
+              // cond-<type_idx>-<cond_index>
+              conditionBlocks.push_back(IGF.createBasicBlock(
+                  "cond-" + llvm::utostr(i) + "-" + llvm::utostr(condIndex)));
+            }
+
+            // Jump to the first condition.
+            IGF.Builder.CreateBr(conditionBlocks.front());
+
+            for (unsigned condIndex : indices(conditions)) {
+              const auto &condition = conditions[condIndex];
+
+              assert(condition.hasLowerEndpoint());
+
+              auto version = condition.getLowerEndpoint();
+              auto *major = getInt32Constant(version.getMajor());
+              auto *minor = getInt32Constant(version.getMinor());
+              auto *patch = getInt32Constant(version.getSubminor());
+
+              IGF.Builder.emitBlock(conditionBlocks[condIndex]);
+
+              auto isAtLeast =
+                  IGF.emitTargetOSVersionAtLeastCall(major, minor, patch);
+
+              auto success = IGF.Builder.CreateICmpNE(
+                  isAtLeast, llvm::Constant::getNullValue(IGM.Int32Ty));
+
+              auto nextCondOrRet = condIndex == conditions.size() - 1
+                                       ? returnTypeBB
+                                       : conditionBlocks[condIndex + 1];
+
+              IGF.Builder.CreateCondBr(success, nextCondOrRet,
+                                       conditionalTypes[i + 1]);
+            }
+
+            {
+              IGF.Builder.emitBlock(returnTypeBB);
+              IGF.Builder.CreateRet(getResultValue(
+                  IGF, genericEnv, underlyingTy->getSubstitutions()));
+            }
+          }
+
+          IGF.Builder.emitBlock(conditionalTypes.back());
+          auto universal = substitutionSet.back();
+
+          assert(universal->getAvailability().size() == 1 &&
+                 universal->getAvailability()[0].isEmpty());
+
+          IGF.Builder.CreateRet(
+              getResultValue(IGF, genericEnv, universal->getSubstitutions()));
+        }
+
+        return getAddrOfMetadataAccessor(symbol, accessor);
+      }
+
+    private:
+      llvm::Function *getAccessorFn(std::string symbol) const {
+        auto fnTy = llvm::FunctionType::get(getResultType(), {IGM.Int8PtrTy},
+                                            /*vararg*/ false);
+
+        auto *accessor = llvm::Function::Create(
+            fnTy, llvm::GlobalValue::PrivateLinkage, symbol, IGM.getModule());
+
+        accessor->setAttributes(IGM.constructInitialAttributes());
+
+        return accessor;
+      }
+
+      llvm::Constant *
+      getAddrOfMetadataAccessor(std::string symbol,
+                                llvm::Function *accessor) const {
+        return IGM.getAddrOfStringForMetadataRef(
+            symbol, /*align*/ 2,
+            /*low bit*/ false, [&](ConstantInitBuilder &B) {
+              // Form the mangled name with its relative reference.
+              auto S = B.beginStruct();
+
+              S.setPacked(true);
+              S.add(llvm::ConstantInt::get(IGM.Int8Ty, 255));
+              S.add(llvm::ConstantInt::get(IGM.Int8Ty, 9));
+              S.addRelativeAddress(accessor);
+
+              // And a null terminator!
+              S.addInt(IGM.Int8Ty, 0);
+
+              return S.finishAndCreateFuture();
+            });
+      }
+    };
+
+    class UnderlyingTypeAccessor final : public AbstractMetadataAccessor {
+      /// The index of the generic parameter accessor is going
+      /// to retrieve the underlying type for.
+      unsigned OpaqueParamIndex;
+
+    public:
+      UnderlyingTypeAccessor(IRGenModule &IGM, OpaqueTypeDecl *O,
+                             unsigned opaqueParamIndex)
+          : AbstractMetadataAccessor(IGM, O),
+            OpaqueParamIndex(opaqueParamIndex) {}
+
+      std::string getSymbol() const override {
+        IRGenMangler mangler;
+        return mangler.mangleSymbolNameForUnderlyingTypeAccessorString(
+            O, OpaqueParamIndex);
+      }
+
+      llvm::Type *getResultType() const override {
+        return IGM.TypeMetadataPtrTy;
+      }
+
+      llvm::Value *
+      getResultValue(IRGenFunction &IGF, GenericEnvironment *genericEnv,
+                     SubstitutionMap substitutions) const override {
+        auto type =
+            Type(O->getOpaqueGenericParams()[OpaqueParamIndex])
+                .subst(substitutions)
+                ->getCanonicalType(O->getOpaqueInterfaceGenericSignature());
+
+        type = genericEnv
+                   ? genericEnv->mapTypeIntoContext(type)->getCanonicalType()
+                   : type;
+
+        return IGF.emitTypeMetadataRef(type);
+      }
+    };
+
+    class WitnessTableAccessor final : public AbstractMetadataAccessor {
+      /// The requirement itself.
+      const Requirement &R;
+
+      /// Protocol requirement.
+      ProtocolDecl *P;
+
+    public:
+      WitnessTableAccessor(IRGenModule &IGM, OpaqueTypeDecl *O,
+                           const Requirement &requirement, ProtocolDecl *P)
+          : AbstractMetadataAccessor(IGM, O), R(requirement), P(P) {}
+
+      std::string getSymbol() const override {
+        IRGenMangler mangler;
+        return mangler.mangleSymbolNameForUnderlyingWitnessTableAccessorString(
+            O, R, P);
+      }
+
+      llvm::Type *getResultType() const override {
+        return IGM.WitnessTablePtrTy;
+      }
+
+      llvm::Value *
+      getResultValue(IRGenFunction &IGF, GenericEnvironment *genericEnv,
+                     SubstitutionMap substitutions) const override {
+        auto underlyingDependentType = R.getFirstType()->getCanonicalType();
+
+        auto underlyingType =
+            underlyingDependentType.subst(substitutions)->getCanonicalType();
+        auto underlyingConformance =
+            substitutions.lookupConformance(underlyingDependentType, P);
+
+        if (underlyingType->hasTypeParameter()) {
+          auto sig = genericEnv->getGenericSignature();
+          underlyingConformance = underlyingConformance.subst(
+              underlyingType, QueryInterfaceTypeSubstitutions(genericEnv),
+              LookUpConformanceInSignature(sig.getPointer()));
+
+          underlyingType = genericEnv->mapTypeIntoContext(underlyingType)
+                               ->getCanonicalType();
+        }
+
+        return emitWitnessTableRef(IGF, underlyingType, underlyingConformance);
+      }
+    };
   };
 } // end anonymous namespace
 

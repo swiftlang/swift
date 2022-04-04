@@ -613,6 +613,13 @@ public:
                                            CanType type,
                                            ProtocolConformanceRef conformance);
 
+  std::string
+  mangleSymbolNameForUnderlyingTypeAccessorString(OpaqueTypeDecl *opaque,
+                                                  unsigned index);
+
+  std::string mangleSymbolNameForUnderlyingWitnessTableAccessorString(
+      OpaqueTypeDecl *opaque, const Requirement &req, ProtocolDecl *protocol);
+
   std::string mangleSymbolNameForGenericEnvironment(
                                                 CanGenericSignature genericSig);
 protected:
