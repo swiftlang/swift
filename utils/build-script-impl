@@ -266,6 +266,7 @@ components=(
   libdispatch
   libicu
   libxml2
+  zlib
   llbuild
   lldb
   llvm
@@ -2542,6 +2543,30 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBXML2_BUILD_ARGS=()
                 fi
 
+                if [[ ! "${SKIP_BUILD_ZLIB}" ]]; then
+                    BASE_INSTALL_DIR="$(get_host_install_destdir ${host})"
+                    ZLIB_HEADERS="${BASE_INSTALL_DIR}/usr/include"
+                    # Note: On Windows, the spelling is 'zlibstatic.lib',
+                    #       so if this is ported to python, that case will need
+                    #       to be handled.
+                    ZLIB_LIBRARY="${BASE_INSTALL_DIR}/usr/lib/libz.a"
+
+                    if [[ -z "${DRY_RUN}" && ! -d "${ZLIB_HEADERS}" ]]; then
+                        echo "Error: '${ZLIB_HEADERS}' does not exist" 1>&2
+                        exit 1
+                    fi
+
+                    if [[ -z "${DRY_RUN}" && ! -e "${ZLIB_LIBRARY}" ]]; then
+                        echo "Error: '${ZLIB_LIBRARY}' does not exist" 1>&2
+                        exit 1
+                    fi
+
+                    ZLIB_BUILD_ARGS=(
+                        -DZLIB_INCLUDE_DIR:PATH="${ZLIB_HEADERS}"
+                        -DZLIB_LIBRARY:PATH="${ZLIB_LIBRARY}"
+                    )
+                fi
+
                 if [[ "${SKIP_CLEAN_FOUNDATION}" == "0" ]]
                 then
                   # The Swift project might have been changed, but CMake might
@@ -2569,6 +2594,8 @@ for host in "${ALL_HOSTS[@]}"; do
                   ${LIBICU_BUILD_ARGS[@]}
 
                   ${LIBXML2_BUILD_ARGS[@]}
+
+                  ${ZLIB_BUILD_ARGS[@]}
 
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=$(build_directory ${host} libdispatch)

@@ -38,6 +38,7 @@ from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
+from .zlib import Zlib
 
 __all__ = [
     'BackDeployConcurrency',
@@ -48,6 +49,7 @@ __all__ = [
     'LibDispatch',
     'LibICU',
     'LibXML2',
+    'Zlib',
     'LLBuild',
     'LLDB',
     'LLVM',

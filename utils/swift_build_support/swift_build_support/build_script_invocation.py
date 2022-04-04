@@ -255,7 +255,8 @@ class BuildScriptInvocation(object):
             (args.build_libcxx, "libcxx"),
             (args.build_libdispatch, "libdispatch"),
             (args.build_libicu, "libicu"),
-            (args.build_libxml2, 'libxml2')
+            (args.build_libxml2, 'libxml2'),
+            (args.build_zlib, 'zlib')
         ]
         for (should_build, string_name) in conditional_subproject_configs:
             if not should_build and not self.args.infer_dependencies:
@@ -544,6 +545,9 @@ class BuildScriptInvocation(object):
 
         builder.add_product(products.LibXML2,
                             is_enabled=self.args.build_libxml2)
+
+        builder.add_product(products.zlib.Zlib,
+                            is_enabled=self.args.build_zlib)
 
         # Begin a build-script-impl pipeline for handling the compiler toolchain
         # and a subset of the tools that we build. We build these in this manner

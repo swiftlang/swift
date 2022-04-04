@@ -18,6 +18,7 @@ from . import libxml2
 from . import llvm
 from . import product
 from . import swift
+from . import zlib
 
 
 class Foundation(product.Product):
@@ -53,7 +54,8 @@ class Foundation(product.Product):
                 libicu.LibICU,
                 swift.Swift,
                 libdispatch.LibDispatch,
-                libxml2.LibXML2]
+                libxml2.LibXML2,
+                zlib.Zlib]
 
     @classmethod
     def is_nondarwin_only_build_product(cls):

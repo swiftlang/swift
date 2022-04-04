@@ -93,6 +93,9 @@ def _apply_default_arguments(args):
     if args.libxml2_build_variant is None:
         args.libxml2_build_variant = args.build_variant
 
+    if args.zlib_build_variant is None:
+        args.zlib_build_variant = args.build_variant
+
     # Assertions are enabled by default.
     if args.assertions is None:
         args.assertions = True
@@ -715,6 +718,9 @@ def create_argument_parser():
     option('--static-libxml2', toggle_true('build_libxml2'), default=False,
            help='build static libxml2')
 
+    option('--static-zlib', toggle_true('build_zlib'), default=False,
+           help='build static zlib')
+
     option('--playgroundsupport', toggle_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
     option('--install-playgroundsupport',
@@ -830,6 +836,9 @@ def create_argument_parser():
            const='Debug',
            help='build the Debug variant of libxml2')
 
+    option('--debug-zlib', store('zlib_build_variant'),
+           const='Debug',
+           help='build the Debug variant of zlib')
 
     # -------------------------------------------------------------------------
     # Assertions group
@@ -1265,6 +1274,8 @@ def create_argument_parser():
            help='skip building swift')
     option('--skip-build-libxml2', toggle_false('build_libxml2'),
            help='skip building libxml2')
+    option('--skip-build-zlib', toggle_false('build_zlib'),
+           help='skip building zlib')
 
     # We need to list --skip-test-swift explicitly because otherwise argparse
     # will auto-expand arguments like --skip-test-swift to the only known
@@ -1344,6 +1355,7 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /swift-corelibs-libdispatch (optional)
                      /icu                        (optional)
                      /libxml2                    (optional)
+                     /zlib                       (optional)
 
 SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
                   Defaults to "$SWIFT_SOURCE_ROOT/build/".
