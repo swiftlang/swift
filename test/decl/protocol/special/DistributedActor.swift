@@ -23,6 +23,17 @@ class X: Identifiable {
   }
 }
 
+protocol DAP: DistributedActor {
+  // should work as expected, synthesis not triggering
+  func test()
+}
+
+extension DAP where ActorSystem.ActorID == String {
+  func test() {
+    _ = self.id == ""
+  }
+}
+
 distributed actor D2 {
   // expected-error@-1{{actor 'D2' has no initializers}}
   let actorSystem: String
