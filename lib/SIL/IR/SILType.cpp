@@ -174,7 +174,8 @@ std::string SILType::getAsString() const {
   return OS.str();
 }
 
-bool SILType::isPointerSizeAndAligned() {
+bool SILType::isPointerSizeAndAligned(SILModule &M,
+                                      ResilienceExpansion expansion) const {
   auto &C = getASTContext();
   if (isHeapObjectReferenceType()
       || getASTType()->isEqual(C.TheRawPointerType)) {
@@ -183,6 +184,10 @@ bool SILType::isPointerSizeAndAligned() {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getASTType()))
     return intTy->getWidth().isPointerWidth();
 
+  if (auto underlyingField = getSingletonAggregateFieldType(M, expansion)) {
+    return underlyingField.isPointerSizeAndAligned(M, expansion);
+  }
+  
   return false;
 }
 
@@ -765,4 +770,80 @@ SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) {
     return SILType();
   return ::getSILBoxFieldType(f->getTypeExpansionContext(), boxTy,
                               f->getModule().Types, field);
+}
+
+SILType
+SILType::getSingletonAggregateFieldType(SILModule &M,
+                                        ResilienceExpansion expansion) const {
+  if (auto tuple = getAs<TupleType>()) {
+    if (tuple->getNumElements() == 1) {
+      return getTupleElementType(0);
+    }
+  }
+
+  if (auto structDecl = getStructOrBoundGenericStruct()) {
+    // If the struct has to be accessed resiliently from this resilience domain,
+    // we can't assume anything about its layout.
+    if (structDecl->isResilient(M.getSwiftModule(), expansion)) {
+      return SILType();
+    }
+
+    // C ABI wackiness may cause a single-field struct to have different layout
+    // from its field.
+    if (structDecl->hasUnreferenceableStorage()
+        || structDecl->hasClangNode()) {
+      return SILType();
+    }
+
+    // A single-field struct with custom alignment has different layout from its
+    // field.
+    if (structDecl->getAttrs().hasAttribute<AlignmentAttr>()) {
+      return SILType();
+    }
+
+    // If there's only one stored property, we have the layout of its field.
+    auto allFields = structDecl->getStoredProperties();
+    
+    if (allFields.size() == 1) {
+      auto fieldTy = getFieldType(
+          allFields[0], M,
+          TypeExpansionContext(expansion, M.getSwiftModule(),
+                               M.isWholeModule()));
+      if (!M.isTypeABIAccessible(fieldTy,
+                       TypeExpansionContext::maximalResilienceExpansionOnly())){
+        return SILType();
+      }
+      return fieldTy;
+    }
+
+    return SILType();
+  }
+
+  if (auto enumDecl = getEnumOrBoundGenericEnum()) {
+    // If the enum has to be accessed resiliently from this resilience domain,
+    // we can't assume anything about its layout.
+    if (enumDecl->isResilient(M.getSwiftModule(), expansion)) {
+      return SILType();
+    }
+
+    auto allCases = enumDecl->getAllElements();
+    
+    auto theCase = allCases.begin();
+    if (!allCases.empty() && std::next(theCase) == allCases.end()
+        && (*theCase)->hasAssociatedValues()) {
+      auto enumEltTy = getEnumElementType(
+          *theCase, M,
+          TypeExpansionContext(expansion, M.getSwiftModule(),
+                               M.isWholeModule()));
+      if (!M.isTypeABIAccessible(enumEltTy,
+                       TypeExpansionContext::maximalResilienceExpansionOnly())){
+        return SILType();
+      }
+      return enumEltTy;
+    }
+
+    return SILType();
+  }
+
+  return SILType();
 }

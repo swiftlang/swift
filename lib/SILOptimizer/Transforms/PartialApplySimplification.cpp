@@ -136,7 +136,9 @@ class PartialApplySimplificationPass : public SILModuleTransform {
 ///     sized strictly less than one word
 ///   - the argument ownership convention matches the callee convention of the
 ///     resulting function
-static bool isSimplePartialApply(CanSILFunctionType calleeTy,
+static bool isSimplePartialApply(SILModule &M,
+                                 CanSILFunctionType calleeTy,
+                                 TypeExpansionContext context,
                                  unsigned numPartiallyAppliedArgs,
                                  bool isOnStack) {
   if (calleeTy->isPolymorphic()) {
@@ -165,9 +167,13 @@ static bool isSimplePartialApply(CanSILFunctionType calleeTy,
       return true;
         
     case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Unowned:
-      // TODO: Handle word-sized direct arguments.
-      return false;
+    case ParameterConvention::Direct_Unowned: {
+      auto argTy = contextParam.getArgumentType(M, calleeTy, context);
+      return SILType::getPrimitiveObjectType(argTy)
+        .isPointerSizeAndAligned(M, context.getResilienceExpansion());
+      // TODO: If we're running as an IRGen pass, use IRGen's version of
+      // `isPointerSizeAndAligned` as a more accurate check.
+    }
     
     // +1 arguments need a thunk to stage a copy for the callee to consume.
     case ParameterConvention::Direct_Owned:
@@ -191,7 +197,9 @@ static bool isSimplePartialApply(CanSILFunctionType calleeTy,
 }
 
 static bool isSimplePartialApply(PartialApplyInst *i) {
-  return isSimplePartialApply(i->getCallee()->getType().castTo<SILFunctionType>(),
+  return isSimplePartialApply(i->getModule(),
+                              i->getCallee()->getType().castTo<SILFunctionType>(),
+                              i->getFunction()->getTypeExpansionContext(),
                               i->getNumArguments(),
                               i->isOnStack());
 }
@@ -312,7 +320,9 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
   // Would the partial application become simple with a mere convention change?
   auto calleeTyAsMethod = callee->getLoweredFunctionType()
     ->getWithRepresentation(SILFunctionTypeRepresentation::Method);
-  if (isSimplePartialApply(calleeTyAsMethod,
+  if (isSimplePartialApply(callee->getModule(),
+                           calleeTyAsMethod,
+                           examplePA->getFunction()->getTypeExpansionContext(),
                            examplePA->getNumArguments(),
                            examplePA->isOnStack())) {
     return rewriteKnownCalleeConventionOnly(callee, pa, examplePA,
