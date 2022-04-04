@@ -2560,6 +2560,37 @@ protected:
     markRewritten(uncheckedCastInst, destAddr);
   }
 
+  void visitUnconditionalCheckedCastInst(
+      UnconditionalCheckedCastInst *uncondCheckedCast) {
+    SILValue srcVal = uncondCheckedCast->getOperand();
+    assert(srcVal->getType().isAddressOnly(*pass.function));
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    if (uncondCheckedCast->getType().isAddressOnly(*pass.function)) {
+      // When cast destination has address only type, use the storage address
+      SILValue destAddr = addrMat.materializeAddress(uncondCheckedCast);
+      markRewritten(uncondCheckedCast, destAddr);
+      builder.createUnconditionalCheckedCastAddr(
+          uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+          destAddr, destAddr->getType().getASTType());
+      return;
+    }
+    // For loadable cast destination type, create a stack temporary
+    SILValue destAddr = builder.createAllocStack(uncondCheckedCast->getLoc(),
+                                                 uncondCheckedCast->getType());
+    builder.createUnconditionalCheckedCastAddr(
+        uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+        destAddr, destAddr->getType().getASTType());
+    auto nextBuilder =
+        pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
+    auto dest = nextBuilder.createLoad(
+        uncondCheckedCast->getLoc(), destAddr,
+        destAddr->getType().isTrivial(*uncondCheckedCast->getFunction())
+            ? LoadOwnershipQualifier::Trivial
+            : LoadOwnershipQualifier::Copy);
+    nextBuilder.createDeallocStack(uncondCheckedCast->getLoc(), destAddr);
+    uncondCheckedCast->replaceAllUsesWith(dest);
+  }
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *enumDataInst);
 };
 } // end anonymous namespace
@@ -2978,6 +3009,29 @@ protected:
     // separate storage. So there's no need to delete its alloc_stack.
     assert(!storage.storageAddress || storage.storageAddress == addr);
     storage.storageAddress = addr;
+  }
+
+  void visitUnconditionalCheckedCastInst(
+      UnconditionalCheckedCastInst *uncondCheckedCast) {
+    SILValue srcVal = uncondCheckedCast->getOperand();
+    assert(srcVal->getType().isLoadable(*pass.function));
+    assert(uncondCheckedCast->getType().isAddressOnly(*pass.function));
+
+    // Create a stack temporary to store the srcVal
+    SILValue srcAddr = builder.createAllocStack(uncondCheckedCast->getLoc(),
+                                                srcVal->getType());
+    builder.createStore(uncondCheckedCast->getLoc(), srcVal, srcAddr,
+                        srcVal->getType().isTrivial(*srcVal->getFunction())
+                            ? StoreOwnershipQualifier::Trivial
+                            : StoreOwnershipQualifier::Init);
+    // Use the storage address as destination
+    SILValue destAddr = addrMat.materializeAddress(uncondCheckedCast);
+    builder.createUnconditionalCheckedCastAddr(
+        uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+        destAddr, destAddr->getType().getASTType());
+
+    pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator())
+        .createDeallocStack(uncondCheckedCast->getLoc(), srcAddr);
   }
 };
 } // end anonymous namespace

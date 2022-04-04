@@ -1188,3 +1188,58 @@ bb0(%0 : @guaranteed $T, %1 : $@thick U.Type):
   return %6 : $U
 }
 
+// CHECK-LABEL: sil hidden [ossa] @test_unconditional_checked_cast1 : $@convention(thin) <T> (Builtin.Int64) -> @out T {
+// CHECK: bb0(%0 : $*T, %1 : $Builtin.Int64):
+// CHECK:   [[INT:%.*]] = alloc_stack $Builtin.Int64
+// CHECK:   store %1 to [trivial] [[INT]] : $*Builtin.Int64
+// CHECK:   unconditional_checked_cast_addr Builtin.Int64 in [[INT]] : $*Builtin.Int64 to T in %0 : $*T
+// CHECK:   %5 = tuple ()
+// CHECK:   dealloc_stack %2 : $*Builtin.Int64
+// CHECK:   return %5 : $()
+// CHECK: } // end sil function 'test_unconditional_checked_cast1'
+sil hidden [ossa] @test_unconditional_checked_cast1 : $@convention(thin) <T> (Int) -> @out T {
+bb0(%0 : $Int):
+  %2 = unconditional_checked_cast %0 : $Int to T
+  return %2 : $T
+}
+
+// CHECK: sil hidden [ossa] @test_unconditional_checked_cast2 : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int64 {
+// CHECK: bb0(%0 : $*T):
+// CHECK:   [[SRC:%.*]] = alloc_stack $T
+// CHECK:   copy_addr %0 to [initialization] [[SRC]] : $*T
+// CHECK:   [[INT:%.*]] = alloc_stack $Builtin.Int64
+// CHECK:   unconditional_checked_cast_addr T in [[SRC]] : $*T to Builtin.Int64 in [[INT]] : $*Builtin.Int64
+// CHECK:   [[RES:%.*]] = load [trivial] [[INT]] : $*Builtin.Int64
+// CHECK:   return [[RES]] : $Builtin.Int64
+// CHECK: } // end sil function 'test_unconditional_checked_cast2'
+sil hidden [ossa] @test_unconditional_checked_cast2 : $@convention(thin) <T> (@in_guaranteed T) -> Int {
+bb0(%0 : @guaranteed $T):
+  %2 = copy_value %0 : $T
+  %3 = unconditional_checked_cast %2 : $T to Int
+  return %3 : $Int
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_unconditional_checked_cast3 : $@convention(thin) <T, U> (@in_guaranteed T) -> @out U {
+// CHECK: bb0(%0 : $*U, %1 : $*T):
+// CHECK:   [[TTMP:%.*]] = alloc_stack $T
+// CHECK:   [[UTMP:%.*]] = alloc_stack [lexical] $U
+// CHECK:   copy_addr %1 to [initialization] [[TTMP]] : $*T
+// CHECK:   unconditional_checked_cast_addr T in [[TTMP]] : $*T to U in [[UTMP]] : $*U
+// CHECK:   copy_addr [[UTMP]] to [initialization] %0 : $*U
+// CHECK:   destroy_addr [[UTMP]] : $*U
+// CHECK:   %8 = tuple ()
+// CHECK:   dealloc_stack [[UTMP]] : $*U
+// CHECK:   dealloc_stack [[TTMP]] : $*T
+// CHECK:   return %8 : $()
+// CHECK-LABEL: } // end sil function 'test_unconditional_checked_cast3'
+sil hidden [ossa] @test_unconditional_checked_cast3 : $@convention(thin) <T, U> (@in_guaranteed T) -> @out U {
+bb0(%0 : @guaranteed $T):
+  %2 = copy_value %0 : $T
+  %3 = unconditional_checked_cast %2 : $T to U
+  %4 = begin_borrow [lexical] %3 : $U
+  %6 = copy_value %4 : $U
+  end_borrow %4 : $U
+  destroy_value %3 : $U
+  return %6 : $U
+}
+
