@@ -422,6 +422,10 @@ def disable_implicit_distributed_module_import : Flag<["-"],
   "disable-implicit-distributed-module-import">,
   HelpText<"Disable the implicit import of the Distributed module.">;
 
+def disable_implicit_string_processing_module_import : Flag<["-"],
+  "disable-implicit-string-processing-module-import">,
+  HelpText<"Disable the implicit import of the _StringProcessing module.">;
+
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
