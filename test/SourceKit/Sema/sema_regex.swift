@@ -1,5 +1,5 @@
 public func retRegex() -> Regex<Substring> {
-  re'foo'
+  #/foo/#
 }
 
 // REQUIRES: swift_in_compiler
