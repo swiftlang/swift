@@ -12,8 +12,7 @@
 
 import SwiftShims
 
-@_spi(_Unicode)
-public typealias ScalarAndNormData = (
+internal typealias ScalarAndNormData = (
   scalar: Unicode.Scalar,
   normData: Unicode._NormData
 )
@@ -46,8 +45,7 @@ extension Unicode {
   //      a scalar with a CCC value of 100, unless there are normalization
   //      boundaries between them.
   //
-  @_spi(_Unicode)
-  public struct _NormData {
+  internal struct _NormData {
     var rawValue: UInt16
 
     var ccc: UInt8 {

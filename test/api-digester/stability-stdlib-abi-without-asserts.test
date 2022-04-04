@@ -90,11 +90,4 @@ Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
 
-// These APIs have been marked @_spi(_Unicode) and SPI is not part of our ABI.
-Struct Unicode._NFC is a new API without @available attribute
-Struct Unicode._NFD is a new API without @available attribute
-Struct Unicode._NormData is a new API without @available attribute
-Var StringProtocol._nfc is a new API without @available attribute
-Var StringProtocol._nfd is a new API without @available attribute
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

@@ -13,15 +13,13 @@
 import SwiftShims
 
 extension Unicode {
-  @_spi(_Unicode)
-  public struct _NFC<S: StringProtocol> {
+  internal struct _InternalNFC<S: StringProtocol> {
     let base: S
   }
 }
 
-extension Unicode._NFC {
-  @_spi(_Unicode)
-  public struct Iterator {
+extension Unicode._InternalNFC {
+  internal struct Iterator {
     var buffer = Unicode._NormDataBuffer()
 
     // This is our starter that is currently being composed with other scalars
@@ -32,11 +30,11 @@ extension Unicode._NFC {
     // we continue to try and compose following scalars with this composee.
     var composee: Unicode.Scalar? = nil
 
-    var iterator: Unicode._NFD<S>.Iterator
+    var iterator: Unicode._InternalNFD<S>.Iterator
   }
 }
 
-extension Unicode._NFC.Iterator: IteratorProtocol {
+extension Unicode._InternalNFC.Iterator: IteratorProtocol {
   internal func compose(
     _ x: Unicode.Scalar,
     and y: Unicode.Scalar
@@ -100,8 +98,7 @@ extension Unicode._NFC.Iterator: IteratorProtocol {
     }
   }
 
-  @_spi(_Unicode)
-  public mutating func next() -> Unicode.Scalar? {
+  internal mutating func next() -> Unicode.Scalar? {
     // Empty out our buffer before attempting to compose anything with our new
     // composee.
     if let nextBuffered = buffer.next() {
@@ -213,16 +210,14 @@ extension Unicode._NFC.Iterator: IteratorProtocol {
   }
 }
 
-extension Unicode._NFC: Sequence {
-  @_spi(_Unicode)
-  public func makeIterator() -> Iterator {
-    Iterator(iterator: base._nfd.makeIterator())
+extension Unicode._InternalNFC: Sequence {
+  internal func makeIterator() -> Iterator {
+    Iterator(iterator: base._internalNFD.makeIterator())
   }
 }
 
 extension StringProtocol {
-  @_spi(_Unicode)
-  public var _nfc: Unicode._NFC<Self> {
-    Unicode._NFC(base: self)
+  internal var _internalNFC: Unicode._InternalNFC<Self> {
+    Unicode._InternalNFC(base: self)
   }
 }
