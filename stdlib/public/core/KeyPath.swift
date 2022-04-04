@@ -1764,7 +1764,7 @@ internal struct KeyPathBuffer {
     internal mutating func pushRaw(size: Int, alignment: Int)
         -> UnsafeMutableRawBufferPointer {
       var baseAddress = buffer.baseAddress.unsafelyUnwrapped
-      var misalign = Int(bitPattern: baseAddress) % alignment
+      var misalign = Int(bitPattern: baseAddress) & (alignment - 1)
       if misalign != 0 {
         misalign = alignment - misalign
         baseAddress = baseAddress.advanced(by: misalign)
@@ -3252,7 +3252,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
   ) {
     let alignment = MemoryLayout<T>.alignment
     var baseAddress = destData.baseAddress.unsafelyUnwrapped
-    var misalign = Int(bitPattern: baseAddress) % alignment
+    var misalign = Int(bitPattern: baseAddress) & (alignment - 1)
     if misalign != 0 {
       misalign = alignment - misalign
       baseAddress = baseAddress.advanced(by: misalign)
