@@ -346,7 +346,7 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 
 SmallVector<unsigned, 1>
 RewritePath::getRulesInEmptyContext(const MutableTerm &term,
-                                    const RewriteSystem &system) {
+                                    const RewriteSystem &system) const {
   // Rules appearing in empty context (possibly more than once).
   llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
   // The number of times each rule appears (with or without context).
