@@ -3053,7 +3053,7 @@ and the second one eliminating an $\namesym{AnyObject}$ layout symbol:
 
 \section{Generic Parameters}\label{genericparamsym}
 \index{generic parameter symbol}
-So far, I've only shown you how to build rewrite rules from requirements in the requirement signature of some protocol $\proto{P}$. When lowering a type parameter, the protocol $\genericparam{Self}$ type lowers to the protocol symbol $\protosym{P}$. Once such a rewrite system is built, queries can be performed against the protocol generic signature $\gensig{\genericparam{Self}}{\genericparam{Self}\colon\proto{P}}$. When lowering parameters and requirements in an arbitary generic signature, generic parameter types instead become generic parameter symbols.
+So far, I've only shown you how to build rewrite rules from requirements in the requirement signature of some protocol $\proto{P}$. When lowering a type parameter, the protocol $\genericparam{Self}$ type lowers to the protocol symbol $\protosym{P}$. Once such a rewrite system is built, queries can be performed against the protocol generic signature $\gensig{\genericparam{Self}}{\genericparam{Self}\colon\proto{P}}$. When lowering parameters and requirements in an arbitrary generic signature, generic parameter types instead become generic parameter symbols.
 
 Generic parameter symbols should only ever appear as the initial symbol in a term. While the rewrite system would have no trouble with terms where generic parameter symbols appear elsewhere in the abstract, they don't actually make sense semantically, since they do not correspond to valid Swift type parameter types.
 
