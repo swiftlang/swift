@@ -280,6 +280,30 @@ CStringTests.test("String.cString.with.String.input") {
   expectTrue(str.isEmpty)
 }
 
+CStringTests.test("String.cString.with.inout.UInt8.conversion") {
+  var c = UInt8.zero
+  var str = String(cString: &c)
+  expectTrue(str.isEmpty)
+  c = 100
+  expectCrashLater(
+    withMessage: "input of String.init(cString:) must be null-terminated"
+  )
+  str = String(cString: &c)
+  expectUnreachable()
+}
+
+CStringTests.test("String.cString.with.inout.CChar.conversion") {
+  var c = CChar.zero
+  var str = String(cString: &c)
+  expectTrue(str.isEmpty)
+  c = 100
+  expectCrashLater(
+    withMessage: "input of String.init(cString:) must be null-terminated"
+  )
+  str = String(cString: &c)
+  expectUnreachable()
+}
+
 CStringTests.test("String.validatingUTF8.with.Array.input") {
   do {
     let (u8p, dealloc) = getASCIIUTF8()
@@ -315,6 +339,19 @@ CStringTests.test("String.validatingUTF8.with.String.input") {
   str = String(validatingUTF8: "")
   expectNotNil(str)
   expectEqual(str?.isEmpty, true)
+}
+
+CStringTests.test("String.validatingUTF8.with.inout.conversion") {
+  var c = CChar.zero
+  var str = String(validatingUTF8: &c)
+  expectNotNil(str)
+  expectEqual(str?.isEmpty, true)
+  c = 100
+  expectCrashLater(
+    withMessage: "input of String.init(validatingUTF8:) must be null-terminated"
+  )
+  str = String(validatingUTF8: &c)
+  expectUnreachable()
 }
 
 CStringTests.test("String.decodeCString.with.Array.input") {
@@ -359,7 +396,23 @@ CStringTests.test("String.decodeCString.with.String.input") {
   expectEqual(result?.result.isEmpty, true)
 }
 
-CStringTests.test("String.decodingCString.with.Array.input") {
+CStringTests.test("String.decodeCString.with.inout.conversion") {
+  var c = Unicode.UTF8.CodeUnit.zero
+  var result = String.decodeCString(
+    &c, as: Unicode.UTF8.self, repairingInvalidCodeUnits: true
+  )
+  expectNotNil(result)
+  expectEqual(result?.result.isEmpty, true)
+  expectEqual(result?.repairsMade, false)
+  c = 100
+  expectCrashLater(
+    withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
+  )
+  result = String.decodeCString(&c, as: Unicode.UTF8.self)
+  expectUnreachable()
+}
+
+CStringTests.test("String.init.decodingCString.with.Array.input") {
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
@@ -391,6 +444,18 @@ CStringTests.test("String.init.decodingCString.with.String.input") {
   }
   str = String(decodingCString: "", as: Unicode.UTF8.self)
   expectTrue(str.isEmpty)
+}
+
+CStringTests.test("String.init.decodingCString.with.inout.conversion") {
+  var c = Unicode.UTF8.CodeUnit.zero
+  var str = String(decodingCString: &c, as: Unicode.UTF8.self)
+  expectEqual(str.isEmpty, true)
+  c = 100
+  expectCrashLater(
+    withMessage: "input of String.init(decodingCString:as:) must be null-terminated"
+  )
+  str = String(decodingCString: &c, as: Unicode.UTF8.self)
+  expectUnreachable()
 }
 
 runAllTests()
