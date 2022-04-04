@@ -1213,9 +1213,9 @@ public:
   parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
 
   ParserStatus parsePrimaryAssociatedTypes(
-      SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes);
+      SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames);
   ParserStatus parsePrimaryAssociatedTypeList(
-      SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes);
+      SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 

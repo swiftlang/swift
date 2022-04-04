@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-sil -enable-parameterized-protocol-types -O -o - | %FileCheck %s
 
-public protocol P<T> {}
+public protocol P<T> {
+  associatedtype T
+}
 public protocol Q: P where T == Int {}
 public struct X: Q {
   public typealias T = Int

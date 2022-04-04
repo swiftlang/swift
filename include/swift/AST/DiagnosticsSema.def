@@ -3770,14 +3770,19 @@ ERROR(not_a_generic_definition,none,
       "cannot specialize a non-generic definition", ())
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
+ERROR(protocol_declares_unknown_primary_assoc_type,none,
+      "an associated type named %0 must be declared in the protocol %1 or a protocol it inherits",
+      (Identifier, Type))
+ERROR(protocol_declares_duplicate_primary_assoc_type,none,
+      "duplicate primary associated type name %0", (Identifier))
 ERROR(parameterized_protocol_not_supported,none,
-      "protocol type with generic arguments can only be used as a generic constraint", ())
+      "protocol type with type arguments can only be used as a generic constraint", ())
 ERROR(protocol_does_not_have_primary_assoc_type,none,
       "cannot specialize protocol type %0", (Type))
-ERROR(parameterized_protocol_too_many_type_arguments,none,
-      "protocol type %0 can specialized with too many type parameters "
-      "(got %1, but expected at most %2)",
-      (Type, unsigned, unsigned))
+ERROR(parameterized_protocol_type_argument_count_mismatch,none,
+      "protocol type %0 specialized with %select{too many|too few}3 type arguments "
+      "(got %1, but expected %2)",
+      (Type, unsigned, unsigned, unsigned))
 ERROR(cannot_specialize_self,none,
       "cannot specialize 'Self'", ())
 NOTE(specialize_explicit_type_instead,none,

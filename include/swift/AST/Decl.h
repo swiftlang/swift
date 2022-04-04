@@ -506,11 +506,6 @@ protected:
     IsOpaqueType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AssociatedTypeDecl, AbstractTypeParamDecl, 1,
-    /// Whether this is a primary associated type.
-    IsPrimary : 1
-  );
-
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
@@ -3272,14 +3267,6 @@ public:
                      LazyMemberLoader *definitionResolver,
                      uint64_t resolverData);
 
-  bool isPrimary() const {
-    return Bits.AssociatedTypeDecl.IsPrimary;
-  }
-
-  void setPrimary() {
-    Bits.AssociatedTypeDecl.IsPrimary = true;
-  }
-
   /// Get the protocol in which this associated type is declared.
   ProtocolDecl *getProtocol() const {
     return cast<ProtocolDecl>(getDeclContext());
@@ -4363,6 +4350,8 @@ enum class KnownDerivableProtocolKind : uint8_t {
   DistributedActorSystem,
 };
 
+using PrimaryAssociatedTypeName = std::pair<Identifier, SourceLoc>;
+
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
@@ -4379,6 +4368,7 @@ enum class KnownDerivableProtocolKind : uint8_t {
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
+  ArrayRef<PrimaryAssociatedTypeName> PrimaryAssociatedTypeNames;
   ArrayRef<ProtocolDecl *> InheritedProtocols;
   ArrayRef<AssociatedTypeDecl *> AssociatedTypes;
 
@@ -4460,7 +4450,9 @@ class ProtocolDecl final : public NominalTypeDecl {
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
-               Identifier Name, ArrayRef<InheritedEntry> Inherited,
+               Identifier Name,
+               ArrayRef<PrimaryAssociatedTypeName> PrimaryAssociatedTypeNames,
+               ArrayRef<InheritedEntry> Inherited,
                TrailingWhereClause *TrailingWhere);
 
   using Decl::getASTContext;
@@ -4485,6 +4477,13 @@ public:
   /// saves loading the set of members in cases where there's no possibility of
   /// a protocol having nested types (ObjC protocols).
   ArrayRef<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
+
+  /// Returns the list of primary associated type names. These are the associated
+  /// types that is parametrized with same-type requirements in a
+  /// parametrized protocol type of the form SomeProtocol<Arg1, Arg2...>.
+  ArrayRef<PrimaryAssociatedTypeName> getPrimaryAssociatedTypeNames() const {
+    return PrimaryAssociatedTypeNames;
+  }
 
   /// Returns the list of primary associated types. These are the associated
   /// types that is parametrized with same-type requirements in a
