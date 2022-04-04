@@ -132,8 +132,10 @@ protocol Collection<Element, Index> : Sequence {
 }
 
 func testCollectionBad1<T : Collection<String>>(_: T) {}
+// expected-error@-1 {{protocol type 'Collection' specialized with too few type arguments (got 1, but expected 2)}}
+
 func testCollectionBad2<T : Collection<String, Int, Float>>(_: T) {}
-// expected-error@-1 {{protocol type 'Collection' can specialized with too many type parameters (got 3, but expected at most 2)}}
+// expected-error@-1 {{protocol type 'Collection' specialized with too many type arguments (got 3, but expected 2)}}
 
 // CHECK-LABEL: .testCollectionGood@
 // CHECK-NEXT: Generic signature: <T where T : Collection, T.[Sequence]Element == String, T.[Collection]Index == Int>
@@ -181,10 +183,10 @@ extension Sequence<Int> {
 /// Cannot use parameterized protocol as the type of a value
 
 func takesSequenceOfInt1(_: Sequence<Int>) {}
-// expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
+// expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
 
 func returnsSequenceOfInt1() -> Sequence<Int> {}
-// expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
+// expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
 
 func takesSequenceOfInt2(_: any Sequence<Int>) {}
 
@@ -192,7 +194,7 @@ func returnsSequenceOfInt2() -> any Sequence<Int> {}
 
 func typeExpr() {
   _ = Sequence<Int>.self
-  // expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
+  // expected-error@-1 {{protocol type with type arguments can only be used as a generic constraint}}
 }
 
 /// Not supported as a protocol composition term for now

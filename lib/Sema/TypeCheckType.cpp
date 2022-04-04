@@ -649,9 +649,11 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 
       auto genericArgs = generic->getGenericArgs();
 
-      if (genericArgs.size() > assocTypes.size()) {
-        diags.diagnose(loc, diag::parameterized_protocol_too_many_type_arguments,
-                       protoType, genericArgs.size(), assocTypes.size());
+      if (genericArgs.size() != assocTypes.size()) {
+        diags.diagnose(loc,
+                       diag::parameterized_protocol_type_argument_count_mismatch,
+                       protoType, genericArgs.size(), assocTypes.size(),
+                       (genericArgs.size() < assocTypes.size()) ? 1 : 0);
 
         return ErrorType::get(ctx);
       }
