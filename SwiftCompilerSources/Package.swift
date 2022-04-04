@@ -28,9 +28,16 @@ let package = Package(
     .target(
       name: "_RegexParser",
       dependencies: [],
-      swiftSettings: [SwiftSetting.unsafeFlags([
+      swiftSettings: [
+        .unsafeFlags([
           "-I", "../include/swift",
-          "-cross-module-optimization"
+          "-cross-module-optimization",
+        ]),
+        // Workaround until `_RegexParser` is imported as implementation-only
+        // by `_StringProcessing`.
+        .unsafeFlags([
+          "-Xfrontend",
+          "-disable-implicit-string-processing-module-import"
         ])]),
     .target(
       name: "Optimizer",

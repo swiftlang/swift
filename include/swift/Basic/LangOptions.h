@@ -363,6 +363,9 @@ namespace swift {
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;
 
+    /// Disable the implicit import of the _StringProcessing module.
+    bool DisableImplicitStringProcessingModuleImport = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
