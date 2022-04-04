@@ -599,6 +599,17 @@ bool ConcreteContraction::performConcreteContraction(
     // requirement where the left hand side is not a type parameter.
     SmallVector<Requirement, 4> reqs;
     if (req.inferred) {
+      // Discard errors from desugaring a substituted requirement that
+      // was inferred. For example, if we have something like
+      //
+      //   <T, U where T == Int, U == Set<T>>
+      //
+      // The inferred requirement 'T : Hashable' from 'Set<>' will
+      // be substituted with 'T == Int' to get 'Int : Hashable'.
+      //
+      // Desugaring will diagnose a redundant conformance requirement,
+      // but we want to ignore that, since the user did not explicitly
+      // write 'Int : Hashable' (or 'T : Hashable') anywhere.
       SmallVector<RequirementError, 4> discardErrors;
       desugarRequirement(substReq, SourceLoc(), reqs, discardErrors);
     } else {
