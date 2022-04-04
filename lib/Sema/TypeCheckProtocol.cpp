@@ -6911,6 +6911,15 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
+  case KnownDerivableProtocolKind::Identifiable:
+    if (derived.Nominal->isDistributedActor()) {
+      return derived.deriveDistributedActor(Requirement);
+    } else {
+      // No synthesis is required for other types; we should only end up
+      // attempting synthesis if the nominal was a distributed actor.
+      llvm_unreachable("Identifiable is synthesized for distributed actors");
+    }
+
   case KnownDerivableProtocolKind::DistributedActor:
     return derived.deriveDistributedActor(Requirement);
   case KnownDerivableProtocolKind::DistributedActorSystem:
@@ -6946,6 +6955,12 @@ TypeChecker::deriveTypeWitness(DeclContext *DC,
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   case KnownProtocolKind::DistributedActor:
+    return derived.deriveDistributedActor(AssocType);
+  case KnownProtocolKind::Identifiable:
+    // Identifiable only has derivation logic for distributed actors,
+    // because how it depends on the ActorSystem the actor is associated with.
+    // If the nominal wasn't a distributed actor, we should not end up here,
+    // but either way, then we'd return null (fail derivation).
     return derived.deriveDistributedActor(AssocType);
   default:
     return std::make_pair(nullptr, nullptr);

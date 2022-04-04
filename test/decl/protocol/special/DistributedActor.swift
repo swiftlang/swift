@@ -7,8 +7,31 @@ import Distributed
 /// Use the existential wrapper as the default actor system.
 typealias DefaultDistributedActorSystem = LocalTestingDistributedActorSystem
 
+distributed actor D0 {
+  typealias ActorSystem = LocalTestingDistributedActorSystem
+  var x: Int = 17
+}
+
 distributed actor D1 {
   var x: Int = 17
+}
+
+class X: Identifiable {
+  // should work as expected, synthesis not triggering
+  func test() {
+    let _: ObjectIdentifier = self.id
+  }
+}
+
+protocol DAP: DistributedActor {
+  // should work as expected, synthesis not triggering
+  func test()
+}
+
+extension DAP where ActorSystem.ActorID == String {
+  func test() {
+    _ = self.id == ""
+  }
 }
 
 distributed actor D2 {
@@ -20,37 +43,24 @@ distributed actor D2 {
 }
 
 distributed actor D3 {
-  // expected-error@-1{{type 'D3' does not conform to protocol 'Identifiable'}}
-  // expected-error@-2{{type 'D3' does not conform to protocol 'DistributedActor'}}
-  // Codable synthesis also will fail since the ID mismatch:
-  // expected-error@-4{{type 'D3' does not conform to protocol 'Decodable'}}
-  // expected-error@-5{{type 'D3' does not conform to protocol 'Encodable'}}
-
   var id: Int { 0 }
   // expected-error@-1{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
-  // expected-error@-2{{invalid redeclaration of synthesized property 'id'}}
-  // expected-note@-3{{matching requirement 'id' to this declaration inferred associated type to 'Int'}}
+  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'id'}}
 }
 
 struct OtherActorIdentity: Sendable, Hashable, Codable {}
 
 distributed actor D4 {
   // expected-error@-1{{actor 'D4' has no initializers}}
-  // expected-error@-2{{type 'D4' does not conform to protocol 'DistributedActor'}}
-  // expected-error@-3{{type 'D4' does not conform to protocol 'Identifiable'}}
-  // Codable synthesis also will fail since the ID errors:
-  // expected-error@-5{{type 'D4' does not conform to protocol 'Decodable'}}
-  // expected-error@-6{{type 'D4' does not conform to protocol 'Encodable'}}
 
   let actorSystem: String
   // expected-error@-1{{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
-  // expected-error@-2 {{invalid redeclaration of synthesized property 'actorSystem'}}
+  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'actorSystem'}}
   // expected-note@-3{{stored property 'actorSystem' without initial value prevents synthesized initializers}}
   let id: OtherActorIdentity
   // expected-error@-1{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
-  // expected-error@-2{{invalid redeclaration of synthesized property 'id'}}
+  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'id'}}
   // expected-note@-3{{stored property 'id' without initial value prevents synthesized initializers}}
-  // expected-note@-4{{matching requirement 'id' to this declaration inferred associated type to 'OtherActorIdentity'}}
 }
 
 protocol P1: DistributedActor {
