@@ -880,6 +880,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 
   std::tie(matchVar, matchCall) = *tildeEqualsApplication;
 
+  matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
+
   // Result of `~=` should always be a boolean.
   auto contextualTy = Context.getBoolDecl()->getDeclaredInterfaceType();
   auto target = SolutionApplicationTarget::forExprPattern(matchCall, DC, EP,
@@ -908,7 +910,6 @@ TypeChecker::synthesizeTildeEqualsOperatorApplication(ExprPattern *EP,
   auto *matchVar =
       new (Context) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
                             EP->getLoc(), Context.Id_PatternMatchVar, DC);
-  matchVar->setInterfaceType(enumType->mapTypeOutOfContext());
 
   matchVar->setImplicit();
 

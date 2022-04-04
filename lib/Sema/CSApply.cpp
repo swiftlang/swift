@@ -8774,7 +8774,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     if (auto *enumElement = dyn_cast<EnumElementPattern>(info.pattern)) {
       if (auto target = cs.getSolutionApplicationTarget(enumElement)) {
         auto *EP = target->getExprPattern();
-        auto enumType = solution.simplifyType(EP->getType());
+        auto enumType = solution.getResolvedType(EP);
 
         auto *matchCall = target->getAsExpr();
 
