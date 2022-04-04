@@ -225,5 +225,113 @@ CStringTests.test("Substring.withCString") {
   }
 }
 
+CStringTests.test("String.cString.with.Array.UInt8.input") {
+  do {
+    let (u8p, dealloc) = getASCIIUTF8()
+    defer { dealloc() }
+    let cstr = UnsafePointer(u8p)
+    let buffer = UnsafeBufferPointer(start: cstr, count: getUTF8Length(u8p)+1)
+    let str = String(cString: Array(buffer))
+    str.withCString {
+      $0.withMemoryRebound(to: UInt8.self, capacity: buffer.count) {
+        expectEqualCString(u8p, $0)
+      }
+    }
+  }
+  // no need to test every case; that is covered in other tests
+  expectCrashLater(
+    withMessage: "input of String.init(cString:) must be null-terminated"
+  )
+  _ = String(cString: [] as [UInt8])
+  expectUnreachable()
+}
+
+CStringTests.test("String.cString.with.Array.CChar.input") {
+  do {
+    let (u8p, dealloc) = getASCIIUTF8()
+    defer { dealloc() }
+    let cstr = UnsafeRawPointer(u8p).assumingMemoryBound(to: CChar.self)
+    let buffer = UnsafeBufferPointer(start: cstr, count: getUTF8Length(u8p)+1)
+    let str = String(cString: Array(buffer))
+    str.withCString {
+      $0.withMemoryRebound(to: UInt8.self, capacity: buffer.count) {
+        expectEqualCString(u8p, $0)
+      }
+    }
+  }
+  // no need to test every case; that is covered in other tests
+  expectCrashLater(
+    withMessage: "input of String.init(cString:) must be null-terminated"
+  )
+  _ = String(cString: [] as [CChar])
+  expectUnreachable()
+}
+
+CStringTests.test("String.validatingUTF8.with.Array.input") {
+  do {
+    let (u8p, dealloc) = getASCIIUTF8()
+    defer { dealloc() }
+    let cstr = UnsafeRawPointer(u8p).assumingMemoryBound(to: CChar.self)
+    let buffer = UnsafeBufferPointer(start: cstr, count: getUTF8Length(u8p)+1)
+    let str = String(validatingUTF8: Array(buffer))
+    expectNotNil(str)
+    str?.withCString {
+      $0.withMemoryRebound(to: UInt8.self, capacity: buffer.count) {
+        expectEqualCString(u8p, $0)
+      }
+    }
+  }
+  // no need to test every case; that is covered in other tests
+  expectCrashLater(
+    withMessage: "input of String.init(validatingUTF8:) must be null-terminated"
+  )
+  _ = String(validatingUTF8: [])
+  expectUnreachable()
+}
+
+CStringTests.test("String.decodeCString.with.Array.input") {
+  do {
+    let (u8p, dealloc) = getASCIIUTF8()
+    defer { dealloc() }
+    let cstr = UnsafeRawPointer(u8p).assumingMemoryBound(to: Unicode.UTF8.CodeUnit.self)
+    let buffer = UnsafeBufferPointer(start: cstr, count: getUTF8Length(u8p)+1)
+    let result = String.decodeCString(Array(buffer), as: Unicode.UTF8.self)
+    expectNotNil(result)
+    expectEqual(result?.repairsMade, false)
+    result?.result.withCString {
+      $0.withMemoryRebound(to: UInt8.self, capacity: buffer.count) {
+        expectEqualCString(u8p, $0)
+      }
+    }
+  }
+  // no need to test every case; that is covered in other tests
+  expectCrashLater(
+    withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
+  )
+  _ = String.decodeCString([], as: Unicode.UTF8.self)
+  expectUnreachable()
+}
+
+CStringTests.test("String.decodingCString.with.Array.input") {
+  do {
+    let (u8p, dealloc) = getASCIIUTF8()
+    defer { dealloc() }
+    let cstr = UnsafeRawPointer(u8p).assumingMemoryBound(to: Unicode.UTF8.CodeUnit.self)
+    let buffer = UnsafeBufferPointer(start: cstr, count: getUTF8Length(u8p)+1)
+    let str = String(decodingCString: Array(buffer), as: Unicode.UTF8.self)
+    str.withCString {
+      $0.withMemoryRebound(to: UInt8.self, capacity: buffer.count) {
+        expectEqualCString(u8p, $0)
+      }
+    }
+  }
+  // no need to test every case; that is covered in other tests
+  expectCrashLater(
+    withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
+  )
+  _ = String(decodingCString: [], as: Unicode.UTF8.self)
+  expectUnreachable()
+}
+
 runAllTests()
 
