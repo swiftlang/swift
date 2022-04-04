@@ -136,7 +136,7 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
       continue;
 
     MutableTerm lhs(rule.getLHS());
-    for (auto ruleID : rewritePath.getRulesInEmptyContext(lhs, *this)) {
+    for (auto ruleID : rewritePath.findRulesAppearingOnceInEmptyContext(lhs, *this)) {
       auto &replacement = Rules[ruleID];
       if (!replacement.isPermanent()) {
         // If the replacement rule already has a requirementID, overwrite
