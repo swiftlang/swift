@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend -disable-availability-checking -emit-ir -enable-parameterized-protocol-types %s
 
-protocol P<X: P, Y: P> {
+protocol P<X, Y> {
+  associatedtype X : P
+  associatedtype Y : P
+
   var x: X { get }
   var y: Y { get }
 }
@@ -8,6 +11,7 @@ protocol P<X: P, Y: P> {
 extension Int: P {
   typealias X = Int
   typealias Y = Int
+
   var x: X { 0 }
   var y: X { 0 }
 }

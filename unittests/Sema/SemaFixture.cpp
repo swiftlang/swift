@@ -116,7 +116,9 @@ ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
                                        Type parent) {
   auto *PD = new (Context)
       ProtocolDecl(DC, SourceLoc(), SourceLoc(),
-                   Context.getIdentifier(protocolName), /*Inherited=*/{},
+                   Context.getIdentifier(protocolName),
+                   /*PrimaryAssociatedTypeNames=*/{},
+                   /*Inherited=*/{},
                    /*trailingWhere=*/nullptr);
   PD->setImplicit();
 

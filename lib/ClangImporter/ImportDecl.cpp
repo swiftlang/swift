@@ -5677,7 +5677,8 @@ namespace {
       auto result = Impl.createDeclWithClangNode<ProtocolDecl>(
           decl, AccessLevel::Public, dc,
           Impl.importSourceLoc(decl->getBeginLoc()),
-          Impl.importSourceLoc(decl->getLocation()), name, None,
+          Impl.importSourceLoc(decl->getLocation()), name,
+          ArrayRef<PrimaryAssociatedTypeName>(), None,
           /*TrailingWhere=*/nullptr);
 
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));

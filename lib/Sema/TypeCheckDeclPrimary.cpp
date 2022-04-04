@@ -2648,9 +2648,13 @@ public:
     checkUnsupportedNestedType(PD);
 
     // Check for circular inheritance within the protocol.
-    (void)PD->hasCircularInheritedProtocols();
+    (void) PD->hasCircularInheritedProtocols();
 
     TypeChecker::checkDeclAttributes(PD);
+
+    // Check that all named primary associated types are valid.
+    if (!PD->getPrimaryAssociatedTypeNames().empty())
+      (void) PD->getPrimaryAssociatedTypes();
 
     // Explicity compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
