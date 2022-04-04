@@ -1,8 +1,16 @@
 // RUN: %target-swift-emit-silgen -module-name parameterized -enable-parameterized-protocol-types %s | %FileCheck %s
 
-protocol P<T, U, V> {}
+protocol P<T, U, V> {
+  associatedtype T
+  associatedtype U
+  associatedtype V
+}
 
-protocol Q<X, Y, Z> : P {}
+protocol Q<X, Y, Z> : P {
+  associatedtype X
+  associatedtype Y
+  associatedtype Z
+}
 
 struct S: Q {
   typealias T = Int

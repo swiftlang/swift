@@ -11,16 +11,26 @@ protocol Invalid1<> {}
 protocol Invalid2<A B> {}
 // expected-error@-1 {{expected '>' to complete primary associated type list}}
 // expected-note@-2 {{to match this opening '<'}}
+// expected-error@-3 {{an associated type named 'A' must be declared in the protocol 'Invalid2' or a protocol it inherits}}
 
 protocol Invalid3<Element, +> {}
 // expected-error@-1 {{expected an identifier to name primary associated type}}
 // expected-error@-2 {{expected '>' to complete primary associated type list}}
 // expected-note@-3 {{to match this opening '<'}}
+// expected-error@-4 {{an associated type named 'Element' must be declared in the protocol 'Invalid3' or a protocol it inherits}}
 
+protocol Invalid4<Element> {}
+// expected-error@-1 {{an associated type named 'Element' must be declared in the protocol 'Invalid4' or a protocol it inherits}}
+
+protocol Invalid5<Element, Element> {
+// expected-error@-1 {{duplicate primary associated type name 'Element'}}
+  associatedtype Element
+}
 
 /// Test semantics
 
 protocol Sequence<Element> {
+  associatedtype Element
   // expected-note@-1 {{protocol requires nested type 'Element'; do you want to add it?}}
 }
 
@@ -32,7 +42,9 @@ extension Sequence {
 
 struct ConcreteSequence<Element> : Sequence {}
 
-protocol EquatableSequence<Element : Equatable> {}
+protocol EquatableSequence<Element> {
+  associatedtype Element : Equatable
+}
 
 struct ConcreteEquatableSequence<Element : Equatable> : EquatableSequence {}
 
@@ -82,6 +94,8 @@ protocol SequenceWrapperProtocol {
 // CHECK-LABEL: .Recursive@
 // CHECK-NEXT: Requirement signature: <Self where Self.[Recursive]B == Self.[Recursive]D.[Recursive]B, Self.[Recursive]C == Self.[Recursive]D.[Recursive]C, Self.[Recursive]D : Recursive>
 protocol Recursive<B, C> {
+  associatedtype B
+  associatedtype C
   associatedtype D: Recursive<B, C> = Self
 }
 
@@ -113,15 +127,17 @@ protocol SequenceWrapperProtocol2 {
 
 
 /// Multiple primary associated types
-protocol Collection<Element, Index> {}
+protocol Collection<Element, Index> : Sequence {
+  associatedtype Index
+}
 
-// CHECK-LABEL: .testCollection1@
-// CHECK-NEXT: Generic signature: <T where T : Collection, T.[Collection]Element == String>
-func testCollection1<T : Collection<String>>(_: T) {}
+func testCollectionBad1<T : Collection<String>>(_: T) {}
+func testCollectionBad2<T : Collection<String, Int, Float>>(_: T) {}
+// expected-error@-1 {{protocol type 'Collection' can specialized with too many type parameters (got 3, but expected at most 2)}}
 
-// CHECK-LABEL: .testCollection2@
-// CHECK-NEXT: Generic signature: <T where T : Collection, T.[Collection]Element == String, T.[Collection]Index == Int>
-func testCollection2<T : Collection<String, Int>>(_: T) {}
+// CHECK-LABEL: .testCollectionGood@
+// CHECK-NEXT: Generic signature: <T where T : Collection, T.[Sequence]Element == String, T.[Collection]Index == Int>
+func testCollectionGood<T : Collection<String, Int>>(_: T) {}
 
 
 /// Parametrized protocol in opaque result type
@@ -189,6 +205,9 @@ func protocolCompositionNotSupported(_: SomeProto & Sequence<Int>) {}
 /// More regression tests
 
 protocol DoubleWide<X, Y> {
+  associatedtype X
+  associatedtype Y
+
   var x: X { get }
   var y: Y { get }
 }
@@ -196,6 +215,7 @@ protocol DoubleWide<X, Y> {
 extension Int: DoubleWide {
   typealias X = Int
   typealias Y = Int
+
   var x: X { 0 }
   var y: X { 0 }
 }
@@ -218,9 +238,12 @@ func erase<T>(_ x: ConcreteSequence<T>) -> any Sequence<T> {
   return x as any Sequence<T>
 }
 
-protocol Sponge<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z> {}
+protocol Sponge<A, B> {
+  associatedtype A
+  associatedtype B
+}
 
-func saturation(_ dry: any Sponge, _ wet: any Sponge<Int, Int, Int, Int, Int, Int>) {
+func saturation(_ dry: any Sponge, _ wet: any Sponge<Int, Int>) {
   _ = dry as any Sponge<Int, Int>
   // expected-error@-1 {{'any Sponge' is not convertible to 'any Sponge<Int, Int>'}}
   // expected-note@-2 {{did you mean to use 'as!' to force downcast?}}
@@ -228,5 +251,6 @@ func saturation(_ dry: any Sponge, _ wet: any Sponge<Int, Int, Int, Int, Int, In
 
   _ = wet as any Sponge<Int, Int> // Ok
   _ = wet as any Sponge // Ok
-  _ = wet as any Sponge<String> // expected-error {{cannot convert value of type 'any Sponge<Int, Int, Int, Int, Int, Int>' to type 'any Sponge<String>' in coercion}}
+  _ = wet as any Sponge<String, String> // expected-error {{'any Sponge<Int, Int>' is not convertible to 'any Sponge<String, String>'}}
+  // expected-note@-1 {{did you mean to use 'as!' to force downcast?}}
 }

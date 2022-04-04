@@ -3770,6 +3770,11 @@ ERROR(not_a_generic_definition,none,
       "cannot specialize a non-generic definition", ())
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
+ERROR(protocol_declares_unknown_primary_assoc_type,none,
+      "an associated type named %0 must be declared in the protocol %1 or a protocol it inherits",
+      (Identifier, Type))
+ERROR(protocol_declares_duplicate_primary_assoc_type,none,
+      "duplicate primary associated type name %0", (Identifier))
 ERROR(parameterized_protocol_not_supported,none,
       "protocol type with generic arguments can only be used as a generic constraint", ())
 ERROR(protocol_does_not_have_primary_assoc_type,none,
