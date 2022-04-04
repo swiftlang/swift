@@ -267,6 +267,19 @@ CStringTests.test("String.cString.with.Array.CChar.input") {
   expectUnreachable()
 }
 
+CStringTests.test("String.cString.with.String.input") {
+  let (u8p, dealloc) = getASCIIUTF8()
+  defer { dealloc() }
+  var str = String(cString: "ab")
+  str.withCString {
+    $0.withMemoryRebound(to: UInt8.self, capacity: getUTF8Length(u8p)+1) {
+      expectEqualCString(u8p, $0)
+    }
+  }
+  str = String(cString: "")
+  expectTrue(str.isEmpty)
+}
+
 CStringTests.test("String.validatingUTF8.with.Array.input") {
   do {
     let (u8p, dealloc) = getASCIIUTF8()
@@ -287,6 +300,21 @@ CStringTests.test("String.validatingUTF8.with.Array.input") {
   )
   _ = String(validatingUTF8: [])
   expectUnreachable()
+}
+
+CStringTests.test("String.validatingUTF8.with.String.input") {
+  let (u8p, dealloc) = getASCIIUTF8()
+  defer { dealloc() }
+  var str = String(validatingUTF8: "ab")
+  expectNotNil(str)
+  str?.withCString {
+    $0.withMemoryRebound(to: UInt8.self, capacity: getUTF8Length(u8p)+1) {
+      expectEqualCString(u8p, $0)
+    }
+  }
+  str = String(validatingUTF8: "")
+  expectNotNil(str)
+  expectEqual(str?.isEmpty, true)
 }
 
 CStringTests.test("String.decodeCString.with.Array.input") {
@@ -312,6 +340,25 @@ CStringTests.test("String.decodeCString.with.Array.input") {
   expectUnreachable()
 }
 
+CStringTests.test("String.decodeCString.with.String.input") {
+  let (u8p, dealloc) = getASCIIUTF8()
+  defer { dealloc() }
+  var result = String.decodeCString(
+    "ab", as: Unicode.UTF8.self, repairingInvalidCodeUnits: true
+  )
+  expectNotNil(result)
+  expectEqual(result?.repairsMade, false)
+  result?.result.withCString {
+    $0.withMemoryRebound(to: UInt8.self, capacity: getUTF8Length(u8p)+1) {
+      expectEqualCString(u8p, $0)
+    }
+  }
+  result = String.decodeCString("", as: Unicode.UTF8.self)
+  expectNotNil(result)
+  expectEqual(result?.repairsMade, false)
+  expectEqual(result?.result.isEmpty, true)
+}
+
 CStringTests.test("String.decodingCString.with.Array.input") {
   do {
     let (u8p, dealloc) = getASCIIUTF8()
@@ -331,6 +378,19 @@ CStringTests.test("String.decodingCString.with.Array.input") {
   )
   _ = String(decodingCString: [], as: Unicode.UTF8.self)
   expectUnreachable()
+}
+
+CStringTests.test("String.init.decodingCString.with.String.input") {
+  let (u8p, dealloc) = getASCIIUTF8()
+  defer { dealloc() }
+  var str = String(decodingCString: "ab", as: Unicode.UTF8.self)
+  str.withCString {
+    $0.withMemoryRebound(to: UInt8.self, capacity: getUTF8Length(u8p)+1) {
+      expectEqualCString(u8p, $0)
+    }
+  }
+  str = String(decodingCString: "", as: Unicode.UTF8.self)
+  expectTrue(str.isEmpty)
 }
 
 runAllTests()
