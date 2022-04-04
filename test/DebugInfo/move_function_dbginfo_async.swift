@@ -256,6 +256,9 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 // We reinitialize k in 4.
 // DWARF: DW_AT_linkage_name  ("$s3out16varSimpleTestVaryyYaFTY4_")
 // DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location  (DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x10)
+// DWARF-NEXT: DW_AT_name  ("m")
+// DWARF: DW_TAG_variable
 // DWARF-NEXT: DW_AT_location  (0x{{[0-9a-f]+}}:
 // DWARF-NEXT: [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_entry_value([[ASYNC_REG]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
 // DWARF-NEXT: DW_AT_name ("k")
