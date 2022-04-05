@@ -2582,7 +2582,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
       } else if (Tok.isAny(tok::identifier, tok::kw_self, tok::code_complete) &&
-                 peekToken().isAny(tok::equal, tok::comma, tok::r_square)) {
+                 peekToken().isAny(tok::equal, tok::comma, tok::r_square,
+                                   tok::period)) {
         // "x = 42", "x," and "x]" are all strong captures of x.
       } else {
         diagnose(Tok, diag::expected_capture_specifier);
@@ -2626,8 +2627,20 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         // It is a common error to try to capture a nested field instead of just
         // a local name, reject it with a specific error message.
         if (Tok.isAny(tok::period, tok::exclaim_postfix,tok::question_postfix)){
-          diagnose(Tok, diag::cannot_capture_fields);
-          skipUntil(tok::comma, tok::r_square);
+          auto diag = diagnose(Tok, diag::cannot_capture_fields);
+          while (peekToken().isNot(tok::comma, tok::r_square, tok::eof,
+                                   tok::kw_in, tok::r_brace,
+                                   tok::pound_endif, tok::pound_else,
+                                   tok::pound_elseif))
+            consumeToken();
+          if (Tok.isKeyword() || Tok.isContextualDeclKeyword()) {
+            StringRef name = Tok.getText();
+            diag.fixItInsert(nameLoc, ("`" + name + "` = ").str());
+          } else if (Tok.is(tok::identifier)) {
+            StringRef name = Tok.getRawText();
+            diag.fixItInsert(nameLoc, (name + " = ").str());
+          }
+          skipSingle(); // Advance to the comma or r_square
           continue;
         }
 
