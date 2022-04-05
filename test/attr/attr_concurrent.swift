@@ -128,15 +128,15 @@ func testExplicitConcurrentClosure() {
 
 class SuperSendable {
   func runsInBackground(_: @Sendable () -> Void) {}
-  func runsInForeground(_: () -> Void) {} // expected-note {{potential overridden instance method 'runsInForeground' here}}
-  func runnableInBackground() -> @Sendable () -> Void { fatalError() } // expected-note {{potential overridden instance method 'runnableInBackground()' here}}
+  func runsInForeground(_: () -> Void) {} // expected-note {{overridden declaration is here}}
+  func runnableInBackground() -> @Sendable () -> Void { fatalError() } // expected-note {{overridden declaration is here}}
   func runnableInForeground() -> () -> Void { fatalError() }
 }
 
 class SubSendable: SuperSendable {
   override func runsInBackground(_: () -> Void) {}
-  override func runsInForeground(_: @Sendable () -> Void) {} // expected-error {{method does not override any method from its superclass}}
-  override func runnableInBackground() -> () -> Void { fatalError() }  // expected-error {{method does not override any method from its superclass}}
+  override func runsInForeground(_: @Sendable () -> Void) {} // expected-warning {{declaration 'runsInForeground' has a type with different sendability from any potential overrides; this is an error in Swift 6}}
+  override func runnableInBackground() -> () -> Void { fatalError() }  // expected-warning {{declaration 'runnableInBackground()' has a type with different sendability from any potential overrides; this is an error in Swift 6}}
   override func runnableInForeground() -> @Sendable () -> Void { fatalError() }
 }
 

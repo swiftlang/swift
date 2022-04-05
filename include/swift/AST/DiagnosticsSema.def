@@ -2602,6 +2602,9 @@ WARNING(generic_param_usable_from_inline_warn,none,
 ERROR(override_multiple_decls_base,none,
       "declaration %0 cannot override more than one superclass declaration",
       (DeclName))
+ERROR(override_sendability_mismatch,none,
+      "declaration %0 has a type with different sendability from any potential "
+      "overrides", (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument labels from any potential "
       "overrides", (DeclName))

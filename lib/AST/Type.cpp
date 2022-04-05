@@ -3174,6 +3174,11 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
       ext1 = ext1.withConcurrent(false);
   }
 
+  if (matchMode.contains(TypeMatchFlags::IgnoreFunctionSendability)) {
+    ext1 = ext1.withConcurrent(false);
+    ext2 = ext2.withConcurrent(false);
+  }
+
   // If specified, allow an escaping function parameter to override a
   // non-escaping function parameter when the parameter is optional.
   // Note that this is checking 'ext2' rather than 'ext1' because parameters
