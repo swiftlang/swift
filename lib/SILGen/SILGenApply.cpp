@@ -1085,9 +1085,14 @@ public:
   void visitDeclRefExpr(DeclRefExpr *e) {
     auto subs = e->getDeclRef().getSubstitutions();
 
+    fprintf(stderr, "[%s:%d] (%s) declref ========================================\n", __FILE__, __LINE__, __FUNCTION__);
+    e->dump();
+
     // If this is a direct reference to a vardecl, just emit its value directly.
     // Recursive references to callable declarations are allowed.
-    if (isa<VarDecl>(e->getDecl())) {
+    if (auto var = dyn_cast<VarDecl>(e->getDecl())) {
+      fprintf(stderr, "[%s:%d] (%s) VAR:::::\n", __FILE__, __LINE__, __FUNCTION__);
+      var->dump();
       visitExpr(e);
       return;
     }
@@ -1121,6 +1126,7 @@ public:
     // Otherwise, we have a statically-dispatched call.
     SILDeclRef constant = SILDeclRef(e->getDecl());
 
+    // TODO(distributed): need to do the same when it is a computed get-property
     /// Some special handling may be necessary for thunks:
     if (callSite && callSite->shouldApplyDistributedThunk()) {
       if (auto distributedThunk = cast<AbstractFunctionDecl>(e->getDecl())->getDistributedThunk()) {

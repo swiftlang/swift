@@ -1529,6 +1529,10 @@ namespace {
         bool setDistributedThunk = false) {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
 
+      if (setDistributedThunk) {
+        fprintf(stderr, "[%s:%d] (%s) SET CALL THUNK\n", __FILE__, __LINE__, __FUNCTION__);
+      }
+
       const auto End = applyStack.rend();
       for (auto I = applyStack.rbegin(); I != End; ++I)
         if (auto call = dyn_cast<CallExpr>(*I)) {
@@ -2216,8 +2220,11 @@ namespace {
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
         // Cannot reference properties or subscripts of distributed actors.
-        if (isDistributed && !checkDistributedAccess(declLoc, decl, context))
+        auto distributedAccess = checkDistributedAccess(declLoc, decl, context);
+        if (isDistributed &&
+            (distributedAccess && !distributedAccess->second)) {
           return AsyncMarkingResult::NotDistributed;
+        }
 
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
           if (usageEnv(declRef) == VarRefUseEnv::Read) {
@@ -2234,6 +2241,21 @@ namespace {
               return AsyncMarkingResult::SyncContext;
 
             lookupExpr->setImplicitlyAsync(target);
+
+            if (auto memberRef = dyn_cast<MemberRefExpr>(lookupExpr)) {
+              // a distributed computed property access is implicitly throwing
+              // and async
+              if (distributedAccess && distributedAccess->second) {
+                auto usesDistributedThunk =
+                    distributedAccess && distributedAccess->second;
+                memberRef->setImplicitlyThrows(usesDistributedThunk);
+                memberRef->setShouldApplyDistributedThunk(
+                    usesDistributedThunk);
+                fprintf(stderr, "[%s:%d] (%s) SET SHOULD USE THUNK\n", __FILE__, __LINE__, __FUNCTION__);
+                memberRef->dump();
+              }
+            }
+
             result = AsyncMarkingResult::FoundAsync;
           }
         }
@@ -2269,6 +2291,7 @@ namespace {
       }
 
       // Set up an implicit async call.
+      fprintf(stderr, "[%s:%d] (%s) Set up an implicit async call. = %d\n", __FILE__, __LINE__, __FUNCTION__, isAsyncCall);
       if (isAsyncCall) {
         // If we're calling to a distributed actor, make sure the function
         // is actually 'distributed'.
@@ -2283,8 +2306,11 @@ namespace {
 
         // Mark call as implicitly 'async', and also potentially as
         // throwing and using a distributed thunk.
+        fprintf(stderr, "[%s:%d] (%s) markNearestCallAsImplicitly; async = %d, thunk = %d\n", __FILE__, __LINE__, __FUNCTION__, setThrows, usesDistributedThunk);
         markNearestCallAsImplicitly(
-            /*setAsync=*/target, setThrows, usesDistributedThunk);
+            /*setAsync=*/target,
+            setThrows,
+            usesDistributedThunk);
         result = AsyncMarkingResult::FoundAsync;
       }
 
@@ -2995,6 +3021,7 @@ namespace {
           if (auto access = checkDistributedAccess(memberLoc, member, context)){
             // This is a distributed access, so mark it as throwing or
             // using a distributed thunk as appropriate.
+            fprintf(stderr, "[%s:%d] (%s) markNearestCallAsImplicitly; async = %d, thunk = %d\n", __FILE__, __LINE__, __FUNCTION__, access->first, access->second);
             markNearestCallAsImplicitly(None, access->first, access->second);
           } else {
             return true;
