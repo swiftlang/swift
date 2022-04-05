@@ -349,9 +349,6 @@ namespace swift {
     /// Enable experimental 'move only' features.
     bool EnableExperimentalMoveOnly = false;
 
-    /// Enable experimental pairwise `buildBlock` for result builders.
-    bool EnableExperimentalPairwiseBuildBlock = false;
-
     /// Enable variadic generics.
     bool EnableExperimentalVariadicGenerics = false;
 

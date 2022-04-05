@@ -3327,9 +3327,7 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
   bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
       nominal->getDeclaredType(), nominal, ctx.Id_buildBlock,
       /*argLabels=*/{}, &potentialMatches);
-  bool isBuildPartialBlockFeatureEnabled =
-      ctx.LangOpts.EnableExperimentalPairwiseBuildBlock;
-  bool supportsBuildPartialBlock = isBuildPartialBlockFeatureEnabled &&
+  bool supportsBuildPartialBlock =
       TypeChecker::typeSupportsBuilderOp(
           nominal->getDeclaredType(), nominal,
           ctx.Id_buildPartialBlock,
@@ -3343,9 +3341,7 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
     {
       auto diag = diagnose(
           nominal->getLoc(),
-          isBuildPartialBlockFeatureEnabled
-              ? diag::result_builder_static_buildblock_or_buildpartialblock
-              : diag::result_builder_static_buildblock);
+          diag::result_builder_static_buildblock_or_buildpartialblock);
 
       // If there were no close matches, propose adding a stub.
       SourceLoc buildInsertionLoc;
