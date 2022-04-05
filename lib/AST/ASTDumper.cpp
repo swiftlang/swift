@@ -1048,6 +1048,9 @@ namespace {
 
     void visitAccessorDecl(AccessorDecl *AD) {
       printCommonFD(AD, "accessor_decl");
+      if (AD->isDistributed()) {
+        OS << " distributed";
+      }
       OS << " " << getAccessorKindString(AD->getAccessorKind());
       OS << "_for=" << AD->getStorage()->getName();
       printAbstractFunctionDecl(AD);

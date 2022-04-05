@@ -2149,15 +2149,7 @@ namespace {
     Optional<std::pair<bool, bool>>
     checkDistributedAccess(SourceLoc declLoc, ValueDecl *decl,
                            Expr *context) {
-      // Cannot reference properties or subscripts of distributed actors.
-      if (isPropOrSubscript(decl)) {
-        ctx.Diags.diagnose(
-            declLoc, diag::distributed_actor_isolated_non_self_reference,
-            decl->getDescriptiveKind(), decl->getName());
-        noteIsolatedActorMember(decl, context);
-        return None;
-      }
-
+      // If base of the call is 'local' we permit skip distributed checks.
       if (auto baseSelf = findReferencedBaseSelf(context)) {
         if (baseSelf->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
         return std::make_pair(
@@ -2166,20 +2158,48 @@ namespace {
         }
       }
 
-      // Check that we have a distributed function.
-      auto func = dyn_cast<AbstractFunctionDecl>(decl);
-      if (!func || !func->isDistributed()) {
-        ctx.Diags.diagnose(declLoc,
-                           diag::distributed_actor_isolated_method)
-          .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
+      // Cannot reference subscripts, or stored properties.
+      auto var = dyn_cast<VarDecl>(decl);
+      if (isa<SubscriptDecl>(decl) || var) {
+        // But computed distributed properties are okay,
+        // and treated the same as a distributed func.
+        if (var && var->isDistributed()) {
+          fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+          var->dump();
+          bool explicitlyThrowing = false;
+          if (auto getter = var->getAccessor(swift::AccessorKind::Get)) {
+            explicitlyThrowing = getter->hasThrows();
+          }
+          return std::make_pair(
+              /*setThrows*/!explicitlyThrowing,
+              /*isDistributedThunk=*/true);
+        }
 
+        // otherwise it was a normal property or subscript and therefore illegal
+        ctx.Diags.diagnose(
+            declLoc, diag::distributed_actor_isolated_non_self_reference,
+            decl->getDescriptiveKind(), decl->getName());
         noteIsolatedActorMember(decl, context);
         return None;
       }
 
-      return std::make_pair(
-          /*setThrows=*/!func->hasThrows(),
-          /*isDistributedThunk=*/true);
+      // Check that we have a distributed function or computed property.
+      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+        if (!func->isDistributed()) {
+          ctx.Diags.diagnose(declLoc,
+                             diag::distributed_actor_isolated_method)
+            .fixItInsert(decl->getAttributeInsertionLoc(true), "distributed ");
+
+          noteIsolatedActorMember(decl, context);
+          return None;
+        }
+
+        return std::make_pair(
+            /*setThrows=*/!func->hasThrows(),
+            /*isDistributedThunk=*/true);
+      }
+
+      return std::make_pair(/*setThrows=*/false, /*distributedThunk=*/false);
     }
 
     /// Attempts to identify and mark a valid cross-actor use of a synchronous
