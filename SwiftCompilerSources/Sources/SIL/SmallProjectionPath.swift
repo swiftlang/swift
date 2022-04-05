@@ -42,7 +42,7 @@ public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, 
   /// The physical representation of the path. The path components are stored in
   /// reverse order: the first path component is stored in the lowest bits (LSB),
   /// the last component is stored in the highest bits (MSB).
-  /// Each pass component consists of zero or more "index-overflow" bytes followed
+  /// Each path component consists of zero or more "index-overflow" bytes followed
   /// by the "index-kind" main byte (from LSB to MSB).
   ///
   /// index overflow byte:    bit-nr:  | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
@@ -70,10 +70,10 @@ public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, 
     case classField     = 0x4 // A concrete class field: syntax e.g. `c1`
     case tailElements   = 0x5 // A tail allocated element of a class: syntax `ct`
     case anyValueFields = 0x6 // Any number of any value fields (struct, tuple, enum): syntax `v**`
-    case anyClassField  = 0x7 // Any class field, including tail elements: syntax `c*`
-    
+
     // "Large" kinds: starting from here the low 3 bits must be 1.
     // This and all following kinds (we'll add in the future) cannot have a field index.
+    case anyClassField  = 0x7 // Any class field, including tail elements: syntax `c*`    
     case anything       = 0xf // Any number of any fields: syntax `**`
 
     public var isValueField: Bool {
@@ -180,7 +180,10 @@ public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, 
     assert(kind != .anything || bytes == 0, "'anything' only allowed in last path component")
     var idx = index
     var b = bytes
-    if (b >> 56) != 0 { return Self(.anything) }
+    if (b >> 56) != 0 {
+      // Overflow
+      return Self(.anything)
+    }
     b = (b << 8) | UInt64(((idx & 0xf) << 4) | (kind.rawValue << 1))
     idx >>= 4
     while idx != 0 {
@@ -242,10 +245,34 @@ public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, 
   /// returns true for `v**.c3`
   /// returns true for `**`
   /// returns false for `s0.c3` (because e.g. `s1` would not match)
-  public var matchesAllValueFields: Bool {
+  public var topMatchesAnyValueField: Bool {
     switch top.kind {
       case .anyValueFields, .anything: return true
       default: return false
+    }
+  }
+
+  /// Returns true if the path does not have any class projections.
+  /// For example:
+  /// returns true for `v**`
+  /// returns false for `c0`
+  /// returns false for `**` (because '**' can have any number of class projections)
+  public var hasNoClassProjection: Bool {
+    return matches(pattern: Self(.anyValueFields))
+  }
+
+  /// Returns true if the path has at least one class projection.
+  /// For example:
+  /// returns false for `v**`
+  /// returns true for `v**.c0.s1.v**`
+  /// returns false for `**` (because '**' can have zero class projections)
+  public var hasClassProjection: Bool {
+    var p = self
+    while true {
+      let (k, _, numBits) = p.top
+      if k == .root { return false }
+      if k.isClassField { return true }
+      p = p.pop(numBits: numBits)
     }
   }
 
@@ -262,7 +289,35 @@ public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, 
       p = p.pop(numBits: numBits)
     }
   }
-  
+
+  /// Pops the last class projection and all following value fields from the tail of the path.
+  /// For example:
+  ///    `s0.e2.3.c4.s1` -> `s0.e2.3`
+  ///    `v**.c1.c4.s1`  -> `v**.c1`
+  ///    `c1.**`         -> `c1.**` (because it's unknown how many class projections are in `**`)
+  public func popLastClassAndValuesFromTail() -> SmallProjectionPath {
+    var p = self
+    var totalBits = 0
+    var neededBits = 0
+    while true {
+      let (k, _, numBits) = p.top
+      if k == .root { break }
+      if k.isClassField {
+        neededBits = totalBits
+        totalBits += numBits
+      } else {
+        totalBits += numBits
+        if !k.isValueField {
+          // k is `anything`
+          neededBits = totalBits
+        }
+      }
+      p = p.pop(numBits: numBits)
+    }
+    if neededBits == 64 { return self }
+    return SmallProjectionPath(bytes: bytes & ((1 << neededBits) - 1))
+  }
+
   /// Returns true if this path matches a pattern path.
   ///
   /// Formally speaking:
@@ -460,6 +515,8 @@ extension SmallProjectionPath {
     parsing()
     merging()
     matching()
+    predicates()
+    path2path()
   
     func basicPushPop() {
       let p1 = SmallProjectionPath(.structField, index: 3)
@@ -568,6 +625,53 @@ extension SmallProjectionPath {
       let rhs = try! rhsParser.parseProjectionPathFromSIL()
       let result = lhs.matches(pattern: rhs)
       precondition(result == expect)
+    }
+
+    func predicates() {
+      testPredicate("v**.c3", \.topMatchesAnyValueField, expect: true)
+      testPredicate("**",     \.topMatchesAnyValueField, expect: true)
+      testPredicate("s0.c3",  \.topMatchesAnyValueField, expect: false)
+
+      testPredicate("v**", \.hasNoClassProjection, expect: true)
+      testPredicate("c0",  \.hasNoClassProjection, expect: false)
+      testPredicate("1",   \.hasNoClassProjection, expect: true)
+      testPredicate("**",  \.hasNoClassProjection, expect: false)
+
+      testPredicate("v**",           \.hasClassProjection, expect: false)
+      testPredicate("v**.c0.s1.v**", \.hasClassProjection, expect: true)
+      testPredicate("c0.**",         \.hasClassProjection, expect: true)
+      testPredicate("c0.c1",         \.hasClassProjection, expect: true)
+      testPredicate("ct",            \.hasClassProjection, expect: true)
+      testPredicate("s0",            \.hasClassProjection, expect: false)
+    }
+
+    func testPredicate(_ pathStr: String, _ property: (SmallProjectionPath) -> Bool, expect: Bool) {
+      var parser = StringParser(pathStr)
+      let path = try! parser.parseProjectionPathFromSIL()
+      let result = property(path)
+      precondition(result == expect)
+    }
+    
+    func path2path() {
+      testPath2Path("s0.e2.3.c4.s1", { $0.popAllValueFields() }, expect: "c4.s1")
+      testPath2Path("v**.c4.s1",     { $0.popAllValueFields() }, expect: "c4.s1")
+      testPath2Path("**",            { $0.popAllValueFields() }, expect: "**")
+
+      testPath2Path("s0.e2.3.c4.s1.e2.v**.**", { $0.popLastClassAndValuesFromTail() }, expect: "s0.e2.3.c4.s1.e2.v**.**")
+      testPath2Path("s0.c2.3.c4.s1",           { $0.popLastClassAndValuesFromTail() }, expect: "s0.c2.3")
+      testPath2Path("v**.c*.s1",               { $0.popLastClassAndValuesFromTail() }, expect: "v**")
+      testPath2Path("s1.ct.v**",               { $0.popLastClassAndValuesFromTail() }, expect: "s1")
+      testPath2Path("c0.c1.c2",                { $0.popLastClassAndValuesFromTail() }, expect: "c0.c1")
+      testPath2Path("**",                      { $0.popLastClassAndValuesFromTail() }, expect: "**")
+    }
+
+    func testPath2Path(_ pathStr: String, _ transform: (SmallProjectionPath) -> SmallProjectionPath, expect: String) {
+      var parser = StringParser(pathStr)
+      let path = try! parser.parseProjectionPathFromSIL()
+      var expectParser = StringParser(expect)
+      let expectPath = try! expectParser.parseProjectionPathFromSIL()
+      let result = transform(path)
+      precondition(result == expectPath)
     }
   }
 }
