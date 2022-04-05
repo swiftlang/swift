@@ -28,7 +28,7 @@ func dumpIndices(_ string: String) {
     let char = string[i]
     print("  \(i) -> \(String(reflecting: char))")
   }
-  print("Unicode Scalars:")
+  print("Scalars:")
   string.unicodeScalars.indices.forEach { i in
     let scalar = string.unicodeScalars[i]
     let value = String(scalar.value, radix: 16, uppercase: true)
@@ -978,19 +978,20 @@ suite.test("Substring.replaceSubrange index validation")
           let sm = scalarMap[m]!.index
           let sn = scalarMap[n]!.index
 
+          let replacement = "x"
+
+          var _expected = "".unicodeScalars
+          _expected += string.unicodeScalars[si ..< sm]
+          _expected += replacement.unicodeScalars
+          _expected += string.unicodeScalars[sn ..< sj]
+          let expected = String(_expected)[...]
+
           // Check Substring.replaceSubrange(_:with:)
           do {
-            let replacement = "x"
-
-            var expected = "".unicodeScalars
-            expected += string.unicodeScalars[si ..< sm]
-            expected += replacement.unicodeScalars
-            expected += string.unicodeScalars[sn ..< sj]
-
             var actual = substring
-            actual.replaceSubrange(m ..< n, with: replacement)
+            actual.replaceSubrange(m ..< n, with: Array(replacement))
 
-            expectEqual(actual, Substring(expected[...]),
+            expectEqual(actual, expected,
               """
               string: \(string.debugDescription)
               i:      \(i)
@@ -1002,27 +1003,17 @@ suite.test("Substring.replaceSubrange index validation")
 
           // Check String.unicodeScalars.replaceSubrange(_:with:)
           do {
-            let replacement = "x".unicodeScalars
-
-            var expected = "".unicodeScalars
-            expected += string.unicodeScalars[si ..< sm]
-            expected += replacement
-            expected += string.unicodeScalars[sn ..< sj]
-
             var actual = substring
-            actual.unicodeScalars.replaceSubrange(m ..< n, with: replacement)
+            actual.unicodeScalars.replaceSubrange(
+              m ..< n, with: Array(replacement.unicodeScalars))
 
-            expectEqual(actual, Substring(expected[...]),
+            expectEqual(actual, expected,
               """
               string: \(string.debugDescription)
               i:      \(i)
               j:      \(j)
               m:      \(m)
               n:      \(n)
-              substring.startIndex: \(substring.startIndex)
-              substring.endIndex:   \(substring.endIndex)
-              actual.startIndex: \(actual.startIndex)
-              actual.endIndex:   \(actual.endIndex)
               """)
           }
         }
