@@ -97,3 +97,28 @@ tuplify(true) { b in
     // expected-note@-1{{add 'if #available' version check}}
   }
 }
+
+@resultBuilder
+struct PairwiseBuilder {
+  @available(SwiftStdlib 5.6, *)
+  static func buildPartialBlock(first: Int) -> Int { fatalError() }
+  @available(SwiftStdlib 5.6, *)
+  static func buildPartialBlock(accumulated: Int, next: Int) -> Int { fatalError() }
+}
+
+@available(SwiftStdlib 5.5, *)
+func caller1_PairwiseBuilder() {
+  // expected-error @+1 {{result builder 'PairwiseBuilder' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @PairwiseBuilder var x: Int {
+    1
+    1
+    1
+  }
+  if #available(SwiftStdlib 5.6, *) {
+    @PairwiseBuilder var y: Int {
+      1
+      1
+      1
+    }
+  }
+}
