@@ -50,6 +50,7 @@
     "UnicodeParser.swift",
     "UnicodeScalar.swift",
     "UnicodeScalarProperties.swift",
+    "UnicodeSPI.swift",
     "UnavailableStringAPIs.swift",
     "UnmanagedOpaqueString.swift",
     "UnmanagedString.swift",
