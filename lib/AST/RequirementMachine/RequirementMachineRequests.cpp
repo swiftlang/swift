@@ -685,7 +685,6 @@ AbstractGenericSignatureRequestRQM::evaluate(
 GenericSignatureWithError
 InferredGenericSignatureRequestRQM::evaluate(
         Evaluator &evaluator,
-        ModuleDecl *parentModule,
         const GenericSignatureImpl *parentSigImpl,
         GenericParamList *genericParamList,
         WhereClauseOwner whereClause,
@@ -693,8 +692,6 @@ InferredGenericSignatureRequestRQM::evaluate(
         SmallVector<TypeLoc, 2> inferenceSources,
         bool allowConcreteGenericParams) const {
   GenericSignature parentSig(parentSigImpl);
-
-  auto &ctx = parentModule->getASTContext();
 
   SmallVector<GenericTypeParamType *, 4> genericParams(
       parentSig.getGenericParams().begin(),
@@ -705,9 +702,12 @@ InferredGenericSignatureRequestRQM::evaluate(
   for (const auto &req : parentSig.getRequirements())
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
 
+  DeclContext *lookupDC = nullptr;
+
   const auto visitRequirement = [&](const Requirement &req,
                                     RequirementRepr *reqRepr) {
-    realizeRequirement(req, reqRepr, parentModule, requirements, errors);
+    realizeRequirement(lookupDC, req, reqRepr, /*inferRequirements=*/true,
+                       requirements, errors);
     return false;
   };
 
@@ -738,11 +738,12 @@ InferredGenericSignatureRequestRQM::evaluate(
                              ->castTo<GenericTypeParamType>();
         genericParams.push_back(gpType);
 
-        realizeInheritedRequirements(gpDecl, gpType, parentModule,
+        realizeInheritedRequirements(gpDecl, gpType,
+                                     /*inferRequirements=*/true,
                                      requirements, errors);
       }
 
-      auto *lookupDC = (*gpList->begin())->getDeclContext();
+      lookupDC = (*gpList->begin())->getDeclContext();
 
       // Add the generic parameter list's 'where' clause to the builder.
       //
@@ -758,6 +759,8 @@ InferredGenericSignatureRequestRQM::evaluate(
   // Realize all requirements in the free-standing 'where' clause, if there
   // is one.
   if (whereClause) {
+    lookupDC = whereClause.dc;
+
     if (loc.isInvalid())
       loc = whereClause.getLoc();
 
@@ -766,13 +769,16 @@ InferredGenericSignatureRequestRQM::evaluate(
         visitRequirement);
   }
 
+  auto *moduleForInference = lookupDC->getParentModule();
+
   // Perform requirement inference from function parameter and result
   // types and such.
   for (auto sourcePair : inferenceSources) {
     auto *typeRepr = sourcePair.getTypeRepr();
     auto loc = typeRepr ? typeRepr->getStartLoc() : SourceLoc();
 
-    inferRequirements(sourcePair.getType(), loc, parentModule, requirements);
+    inferRequirements(sourcePair.getType(), loc, moduleForInference,
+                      requirements);
   }
 
   // Finish by adding any remaining requirements. This is used to introduce
@@ -781,6 +787,7 @@ InferredGenericSignatureRequestRQM::evaluate(
   for (const auto &req : addedRequirements)
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/true});
 
+  auto &ctx = moduleForInference->getASTContext();
   auto &rewriteCtx = ctx.getRewriteContext();
 
   if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {

@@ -8464,7 +8464,6 @@ InferredGenericSignatureRequest::evaluate(
     return evaluateOrDefault(
         ctx.evaluator,
         InferredGenericSignatureRequestRQM{
-          parentModule,
           parentSig,
           genericParams,
           whereClause,
