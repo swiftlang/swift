@@ -25,6 +25,7 @@ toolchain as a one-off, there are a couple of differences:
 - [Editing code](#editing-code)
   - [Setting up your fork](#setting-up-your-fork)
   - [First time Xcode setup](#first-time-xcode-setup)
+  - [Other IDEs setup](#other-ides-setup)
   - [Editing](#editing)
   - [Incremental builds with Ninja](#incremental-builds-with-ninja)
   - [Incremental builds with Xcode](#incremental-builds-with-xcode)
@@ -357,6 +358,28 @@ select the following schemes:
   on the commandline for more fine-grained control over which exact tests are
   run.
 <!-- TODO: Insert SourceKit/stdlib specific instructions? -->
+
+### Other IDEs setup
+
+You can also use other editors and IDEs to work on Swift.
+
+#### IntelliJ CLion
+
+CLion supports CMake and Ninja. In order to configure it properly, build the swift project first using the `build-script`, then open the `swift` directory with CLion and proceed to project settings (`cmd + ,`).
+
+In project settings, locate `Build, Execution, Deployment > CMake`. You will need to create a new profile named `RelWithDebInfoAssert` (or `Debug` if going to point it at the debug build). Enter the following information:
+
+- Name: mirror the name of the build configuration here, e.g. `RelWithDebInfoAssert` or `Debug`
+- Build type: This corresponds to `CMAKE_BUILD_TYPE` so should be e.g. `RelWithDebInfoAssert` or `Debug`
+    - latest versions of the IDE suggest valid values here. Generally `RelWithDebInfoAssert` is a good one to work with
+- Toolchain: Default should be fine
+- Generator: Ninja
+- CMake options:
+    - `-D SWIFT_PATH_TO_CMARK_BUILD=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/cmark-macosx-arm64 -D LLVM_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/llvm -D Clang_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/clang -D CMAKE_BUILD_TYPE=RelWithDebInfoAssert -G Ninja -S .`
+    - replace the `SOME_PATH` to the path where your `swift-project` directory is
+    - the CMAKE_BUILD_TYPE should match the build configuration name, so if you named this profile `RelWithDebInfo` the CMAKE_BUILD_TYPE should also be `RelWithDebInfo`
+
+With this done, CLion should be able to successfully import the project and have full autocomplete and code navigation powers.
 
 ### Editing
 
