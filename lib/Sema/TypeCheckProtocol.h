@@ -189,6 +189,10 @@ enum class MatchKind : uint8_t {
   /// The witness has fewer effects than the requirement, which is okay.
   FewerEffects,
 
+  /// The witness is @Sendable and the requirement is not. Okay in certain
+  /// language modes.
+  RequiresNonSendable,
+
   /// There is a difference in optionality.
   OptionalityConflict,
 
@@ -474,6 +478,7 @@ struct RequirementMatch {
     switch(Kind) {
     case MatchKind::ExactMatch:
     case MatchKind::FewerEffects:
+    case MatchKind::RequiresNonSendable:
       return true;
 
     case MatchKind::OptionalityConflict:
@@ -510,6 +515,7 @@ struct RequirementMatch {
     switch(Kind) {
     case MatchKind::ExactMatch:
     case MatchKind::FewerEffects:
+    case MatchKind::RequiresNonSendable:
     case MatchKind::OptionalityConflict:
     case MatchKind::RenamedMatch:
       return true;
@@ -545,6 +551,7 @@ struct RequirementMatch {
     switch(Kind) {
     case MatchKind::ExactMatch:
     case MatchKind::FewerEffects:
+    case MatchKind::RequiresNonSendable:
     case MatchKind::RenamedMatch:
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
