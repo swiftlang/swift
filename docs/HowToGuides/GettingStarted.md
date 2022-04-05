@@ -379,6 +379,8 @@ In project settings, locate `Build, Execution, Deployment > CMake`. You will nee
     - replace the `SOME_PATH` to the path where your `swift-project` directory is
     - the CMAKE_BUILD_TYPE should match the build configuration name, so if you named this profile `RelWithDebInfo` the CMAKE_BUILD_TYPE should also be `RelWithDebInfo`
 
+With this done CLion should be able to successfully import the project and have full autocomplete and code navigation powers.
+
 ### Editing
 
 Make changes to the code as appropriate. Implement a shiny new feature!
