@@ -74,7 +74,7 @@ extension String {
 
   @inlinable
   @_alwaysEmitIntoClient
-  @available(*, deprecated)
+  @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init(cString nullTerminatedUTF8: inout CChar) {
     guard nullTerminatedUTF8 == 0 else {
       _preconditionFailure(
@@ -105,14 +105,14 @@ extension String {
 
   @inlinable
   @_alwaysEmitIntoClient
-  @available(*, deprecated, message: "Operate directly on the String")
+  @available(*, deprecated, message: "Use a copy of the String argument")
   public init(cString nullTerminatedUTF8: String) {
     self = nullTerminatedUTF8.withCString(String.init(cString:))
   }
 
   @inlinable
   @_alwaysEmitIntoClient
-  @available(*, deprecated)
+  @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init(cString nullTerminatedUTF8: inout UInt8) {
     guard nullTerminatedUTF8 == 0 else {
       _preconditionFailure(
@@ -174,14 +174,14 @@ extension String {
 
   @inlinable
   @_alwaysEmitIntoClient
-  @available(*, deprecated, message: "Operate directly on the String")
+  @available(*, deprecated, message: "Use a copy of the String argument")
   public init?(validatingUTF8 cString: String) {
     self = cString.withCString(String.init(cString:))
   }
 
   @inlinable
   @_alwaysEmitIntoClient
-  @available(*, deprecated)
+  @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init?(validatingUTF8 cString: inout CChar) {
     guard cString == 0 else {
       _preconditionFailure(
@@ -302,7 +302,7 @@ extension String {
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable
   @_alwaysEmitIntoClient
-  @available(*, deprecated, message: "Operate directly on the String")
+  @available(*, deprecated, message: "Use a copy of the String argument")
   public static func decodeCString<Encoding: _UnicodeEncoding>(
     _ cString: String,
     as encoding: Encoding.Type,
@@ -319,7 +319,7 @@ extension String {
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable
   @_alwaysEmitIntoClient
-  @available(*, deprecated)
+  @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public static func decodeCString<Encoding: _UnicodeEncoding>(
     _ cString: inout Encoding.CodeUnit,
     as encoding: Encoding.Type,
@@ -367,7 +367,7 @@ extension String {
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable
   @_alwaysEmitIntoClient
-  @available(*, deprecated, message: "Operate directly on the String")
+  @available(*, deprecated, message: "Use a copy of the String argument")
   public init<Encoding: _UnicodeEncoding>(
     decodingCString nullTerminatedCodeUnits: String,
     as sourceEncoding: Encoding.Type
@@ -381,7 +381,7 @@ extension String {
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable // Fold away specializations
   @_alwaysEmitIntoClient
-  @available(*, deprecated)
+  @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: inout Encoding.CodeUnit,
     as sourceEncoding: Encoding.Type
