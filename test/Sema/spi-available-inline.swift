@@ -1,6 +1,6 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx11.9
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx11.9 -library-level api
 
 @_spi_available(macOS 10.4, *)
 public class MacOSSPIClass { public init() {} }
