@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
-// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -o - -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -o - -requirement-machine-inferred-signatures=on
 
 protocol P1 { }
 
@@ -13,7 +13,6 @@ protocol P2 {
 protocol P3 : P2 { }
 
 struct S0<M: P3> where M.Assoc: P1 { } // expected-warning{{redundant conformance constraint 'M.Assoc' : 'P1'}}
-// expected-note@-1{{conformance constraint 'M.Assoc' : 'P1' implied here}}
 
 struct ConformsToP1: P1 { }
 
