@@ -1381,8 +1381,7 @@ struct RequirementPrintLocation {
 /// function does: asking "where should this requirement be printed?" and then
 /// callers check if the location is the ATD.
 static RequirementPrintLocation
-bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req,
-                             PrintOptions opts, bool inheritanceClause) {
+bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
   auto protoSelf = proto->getProtocolSelfType();
   // Returns the most relevant decl within proto connected to outerType (or null
   // if one doesn't exist), and whether the type is an "direct use",
@@ -1414,16 +1413,6 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req,
     // If we didn't find anything, relevantDecl and foundType will be null, as
     // desired.
     auto directUse = foundType && outerType->isEqual(foundType);
-
-    // Prefer to attach requirements to associated type declarations,
-    // unless the associated type is a primary associated type and
-    // we're printing primary associated types using the new syntax.
-    if (!directUse &&
-        relevantDecl &&
-        opts.PrintPrimaryAssociatedTypes &&
-        isa<AssociatedTypeDecl>(relevantDecl) &&
-        cast<AssociatedTypeDecl>(relevantDecl)->isPrimary())
-      relevantDecl = proto;
 
     return std::make_pair(relevantDecl, directUse);
   };
@@ -1495,8 +1484,7 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
           return false;
         }
 
-        auto location = bestRequirementPrintLocation(proto, req, Options,
-                                                     /*inheritanceClause=*/true);
+        auto location = bestRequirementPrintLocation(proto, req);
         return location.AttachedTo == attachingTo && !location.InWhereClause;
       });
 }
@@ -1511,8 +1499,7 @@ void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                             proto->getRequirementSignature().getRequirements()),
       flags,
       [&](const Requirement &req) {
-        auto location = bestRequirementPrintLocation(proto, req, Options,
-                                                     /*inheritanceClause=*/false);
+        auto location = bestRequirementPrintLocation(proto, req);
         return location.AttachedTo == attachingTo && location.InWhereClause;
       });
 }
@@ -3557,14 +3544,6 @@ void PrintAST::printPrimaryAssociatedTypes(ProtocolDecl *decl) {
                                       assocType);
         Printer.printName(assocType->getName(),
                           PrintNameContext::GenericParameter);
-
-        printInheritedFromRequirementSignature(decl, assocType);
-
-        if (assocType->hasDefaultDefinitionType()) {
-          Printer << " = ";
-          assocType->getDefaultDefinitionType().print(Printer, Options);
-        }
-
         Printer.printStructurePost(PrintStructureKind::GenericParameter,
                                    assocType);
       },
@@ -5090,14 +5069,6 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
 
   if (isa<IfConfigDecl>(this)) {
     return PO.PrintIfConfig;
-  }
-
-  if (auto *ATD = dyn_cast<AssociatedTypeDecl>(this)) {
-    // If PO.PrintPrimaryAssociatedTypes is on, primary associated
-    // types are printed as part of the protocol declaration itself,
-    // so skip them here.
-    if (ATD->isPrimary() && PO.PrintPrimaryAssociatedTypes)
-      return false;
   }
 
   // Print everything else.

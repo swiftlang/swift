@@ -795,6 +795,11 @@ DisableImplicitConcurrencyImport("disable-implicit-concurrency-module-import",
                                  llvm::cl::desc("Disable implicit import of _Concurrency module"),
                                  llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+DisableImplicitStringProcessingImport("disable-implicit-string-processing-module-import",
+                                      llvm::cl::desc("Disable implicit import of _StringProcessing module"),
+                                      llvm::cl::init(false));
+
 static llvm::cl::opt<bool> EnableExperimentalNamedOpaqueTypes(
     "enable-experimental-named-opaque-types",
     llvm::cl::desc("Enable experimental support for named opaque result types"),
@@ -4275,6 +4280,9 @@ int main(int argc, char *argv[]) {
   }
   if (options::DisableImplicitConcurrencyImport) {
     InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
+  }
+  if (options::DisableImplicitStringProcessingImport) {
+    InitInvok.getLangOptions().DisableImplicitStringProcessingModuleImport = true;
   }
   if (options::EnableExperimentalNamedOpaqueTypes) {
     InitInvok.getLangOptions().EnableExperimentalNamedOpaqueTypes = true;

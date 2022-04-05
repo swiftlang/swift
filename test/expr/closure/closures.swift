@@ -301,6 +301,8 @@ enum ImplicitSelfAllowedInEnum {
 
 class SomeClass {
   var field : SomeClass?
+  var `class` : SomeClass?
+  var `in`: Int = 0
   func foo() -> Int {}
 }
 
@@ -341,8 +343,30 @@ extension SomeClass {
     doStuff { [weak xyz = self.field] in xyz!.foo() }
 
     // rdar://16889886 - Assert when trying to weak capture a property of self in a lazy closure
-    // FIXME: We should probably offer a fix-it to the field capture error and suppress the 'implicit self' error. https://bugs.swift.org/browse/SR-11634
-    doStuff { [weak self.field] in field!.foo() }   // expected-error {{fields may only be captured by assigning to a specific name}} expected-error {{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}} {{36-36=self.}} expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+    doStuff { [weak self.field] in field!.foo() }
+    // expected-error@-1{{fields may only be captured by assigning to a specific name}}{{21-21=field = }}
+    // expected-error@-2{{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-3{{reference 'self.' explicitly}} {{36-36=self.}}
+    // expected-note@-4{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+
+    doStuff { [self.field] in field!.foo() }
+    // expected-error@-1{{fields may only be captured by assigning to a specific name}}{{16-16=field = }}
+    // expected-error@-2{{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-3{{reference 'self.' explicitly}} {{31-31=self.}}
+    // expected-note@-4{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+
+    doStuff { [self.field!.foo()] in 32 }
+    //expected-error@-1{{fields may only be captured by assigning to a specific name}}
+
+    doStuff { [self.class] in self.class!.foo() }
+    //expected-error@-1{{fields may only be captured by assigning to a specific name}}{{16-16=`class` = }}
+
+    doStuff { [self.`in`] in `in` }
+    //expected-note@-1{{capture 'self' explicitly to enable implicit 'self' in this closure}}
+    //expected-error@-2{{fields may only be captured by assigning to a specific name}}{{16-16=`in` = }}
+    //expected-error@-3{{reference to property 'in' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    //expected-note@-4{{reference 'self.' explicitly}}
+
     // expected-warning @+1 {{variable 'self' was written to, but never read}}
     doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
 

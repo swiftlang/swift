@@ -910,5 +910,17 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
       out << "\n";
     }
   }
+  if (!WrittenRequirements.empty()) {
+    out << "Written requirements: {\n";
+
+    for (unsigned reqID : indices(WrittenRequirements)) {
+      out << " - ID: " << reqID << " - ";
+      const auto &requirement = WrittenRequirements[reqID];
+      requirement.req.dump(out);
+      out << " at ";
+      requirement.loc.print(out, Context.getASTContext().SourceMgr);
+      out << "\n";
+    }
+  }
   out << "}\n";
 }

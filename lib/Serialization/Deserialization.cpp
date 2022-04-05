@@ -2777,13 +2777,11 @@ public:
     TypeID defaultDefinitionID;
     bool isImplicit;
     ArrayRef<uint64_t> rawOverriddenIDs;
-    bool isPrimary;
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
                                                       defaultDefinitionID,
                                                       isImplicit,
-                                                      isPrimary,
                                                       rawOverriddenIDs);
 
     auto DC = MF.getDeclContext(contextID);
@@ -2817,9 +2815,6 @@ public:
       }
     }
     assocType->setOverriddenDecls(overriddenAssocTypes);
-
-    if (isPrimary)
-      assocType->setPrimary();
 
     return assocType;
   }
@@ -3666,8 +3661,10 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto proto = MF.createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(), name,
-                                             None, /*TrailingWhere=*/nullptr);
+    auto proto = MF.createDecl<ProtocolDecl>(
+        DC, SourceLoc(), SourceLoc(), name,
+        ArrayRef<PrimaryAssociatedTypeName>(), None,
+        /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
