@@ -113,9 +113,8 @@ public struct Substring: Sendable {
   @usableFromInline // This used to be @inlinable before 5.7
   @available(*, deprecated) // Use `init(_unchecked:)` in new code.
   internal init(_ slice: Slice<String>) {
-    let r = slice.base._guts.validateScalarRange(
-      slice.startIndex ..< slice.endIndex)
-    self._slice = Slice(base: slice.base, bounds: r)
+    let r = slice._base._guts.validateScalarRange(slice._bounds)
+    self._slice = Slice(base: slice._base, bounds: r)
     _invariantCheck()
   }
 
@@ -137,19 +136,13 @@ extension Substring {
   public var base: String { return _slice._base }
 
   @inlinable @inline(__always)
-  internal var _wholeGuts: _StringGuts { return _slice._base._guts }
+  internal var _wholeGuts: _StringGuts { _slice._base._guts }
 
   @inlinable @inline(__always)
-  internal var _offsetRange: Range<Int> {
-    let lower = _slice._startIndex._encodedOffset
-    let upper = _slice._endIndex._encodedOffset
-    return Range(_uncheckedBounds: (lower, upper))
-  }
+  internal var _offsetRange: Range<Int> { _slice._bounds._encodedOffsetRange }
 
   @inlinable @inline(__always)
-  internal var _bounds: Range<Index> {
-    Range(_uncheckedBounds: (startIndex, endIndex))
-  }
+  internal var _bounds: Range<Index> { _slice._bounds }
 }
 
 extension Substring {
@@ -746,9 +739,7 @@ extension Substring {
     internal var _base: String.UTF8View { _slice._base }
 
     @_alwaysEmitIntoClient @inline(__always)
-    internal var _bounds: Range<Index> {
-      Range(_uncheckedBounds: (_slice._startIndex, _slice._endIndex))
-    }
+    internal var _bounds: Range<Index> { _slice._bounds }
   }
 }
 
@@ -912,9 +903,7 @@ extension Substring {
     internal var _base: String.UTF16View { _slice._base }
 
     @_alwaysEmitIntoClient @inline(__always)
-    internal var _bounds: Range<Index> {
-      Range(_uncheckedBounds: (_slice._startIndex, _slice._endIndex))
-    }
+    internal var _bounds: Range<Index> { _slice._bounds }
   }
 }
 
@@ -1075,21 +1064,15 @@ extension Substring {
 }
 
 extension Substring.UnicodeScalarView {
-  @_alwaysEmitIntoClient
-  @inline(__always)
+  @_alwaysEmitIntoClient @inline(__always)
   internal var _wholeGuts: _StringGuts { _slice._base._guts }
 
   @inline(__always)
-  internal var _offsetRange: Range<Int> {
-    let lower = _slice._startIndex._encodedOffset
-    let upper = _slice._endIndex._encodedOffset
-    return Range(_uncheckedBounds: (lower, upper))
-  }
+  internal var _offsetRange: Range<Int> { _slice._bounds._encodedOffsetRange }
 
   @_alwaysEmitIntoClient
   @inline(__always)
-  internal var _bounds: Range<Index> {
-    Range(_uncheckedBounds: (startIndex, endIndex))
+  internal var _bounds: Range<Index> { _slice._bounds }
   }
 }
 
