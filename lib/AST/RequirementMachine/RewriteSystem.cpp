@@ -761,6 +761,9 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
 
     // If all rules derived from this structural requirement are redundant,
     // then the requirement is unnecessary in the source code.
+    //
+    // This means the rules derived from this requirement were all
+    // determined to be redundant by homotopy reduction.
     const auto &ruleIDs = pairIt->second;
     if (llvm::all_of(ruleIDs, isRedundantRule)) {
       auto requirement = WrittenRequirements[requirementID];

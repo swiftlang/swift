@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
 
 class Left // expected-error {{'Left' inherits from itself}} expected-note {{through reference here}}
     : Right.Hand { // expected-note {{through reference here}}
