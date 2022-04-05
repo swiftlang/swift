@@ -1054,7 +1054,6 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     Error = "compilation setup failed";
     return nullptr;
   }
-  CompIns.getASTContext().CancellationFlag = CancellationFlag;
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
     TracedOp.start(TraceInfo);
