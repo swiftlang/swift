@@ -1397,20 +1397,31 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
                           CurDeclContext, CompletionContext, Consumer);
     return true;
   }
-  case CompletionKind::StmtOrExpr:
+  case CompletionKind::AccessorBeginning:
   case CompletionKind::ForEachSequence:
-  case CompletionKind::PostfixExprBeginning: {
-    assert(CodeCompleteTokenExpr);
+  case CompletionKind::PostfixExprBeginning:
+  case CompletionKind::StmtOrExpr: {
     assert(CurDeclContext);
 
     ExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
                                            CurDeclContext);
-    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
-        Context.CompletionCallback, &Lookup);
-    typeCheckContextAt(CurDeclContext, CompletionLoc);
+    if (CodeCompleteTokenExpr) {
+      // 'CodeCompletionTokenExpr == nullptr' happens when completing e.g.
+      //   var x: Int {
+      //     get { ... }
+      //     #^COMPLETE^#
+      //   }
+      // In this case we don't want to provide any expression results. We still
+      // need to have a TypeCheckCompletionCallback so we can call
+      // deliverResults on it to deliver the keyword results from the completion
+      // context's result sink to the consumer.
+      llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+          Context.CompletionCallback, &Lookup);
+      typeCheckContextAt(CurDeclContext, CompletionLoc);
 
-    if (!Lookup.gotCallback()) {
-      Lookup.fallbackTypeCheck(CurDeclContext);
+      if (!Lookup.gotCallback()) {
+        Lookup.fallbackTypeCheck(CurDeclContext);
+      }
     }
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
@@ -1564,6 +1575,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::ForEachSequence:
   case CompletionKind::PostfixExprBeginning:
   case CompletionKind::AfterPoundExpr:
+  case CompletionKind::AccessorBeginning:
     llvm_unreachable("should be already handled");
     return;
 
@@ -1677,16 +1689,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
                                             P.Context, CurDeclContext,
                                             ParsedKeywords, introducerLoc);
     OverrideLookup.getOverrideCompletions(SourceLoc());
-    break;
-  }
-
-  case CompletionKind::AccessorBeginning: {
-    if (isa<AccessorDecl>(ParsedDecl)) {
-      ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-      Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                              ContextInfo.isImplicitSingleExpressionReturn());
-      DoPostfixExprBeginning();
-    }
     break;
   }
 
