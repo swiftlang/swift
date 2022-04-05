@@ -987,7 +987,7 @@ extension _StringGutsSlice {
       }
     }
 
-    for scalar in String(_guts)._nfc {
+    for scalar in String(_guts)._internalNFC {
       try scalar.withUTF8CodeUnits {
         for byte in $0 {
           try f(byte)
