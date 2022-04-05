@@ -160,7 +160,7 @@
                 "swift-experimental-string-processing": "swift/main"
             }
         },
-        "release/5.6": {
+        "release/5.7": {
             "aliases": ["release/5.7", "swift/release/5.7"],
             "repos": {
                 "llvm-project": "swift/release/5.7",
