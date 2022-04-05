@@ -1650,9 +1650,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *onceBuiltin =
       cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("once")));
   auto blockParam = onceBuiltin->getParameters()->get(1);
-  auto *type = blockParam->getType()->castTo<FunctionType>();
-  Type initType = FunctionType::get({}, TupleType::getEmpty(C),
-                                    type->getExtInfo());
+  auto *initType = blockParam->getType()->castTo<FunctionType>();
   auto initSILType = cast<SILFunctionType>(
       Types.getLoweredRValueType(TypeExpansionContext::minimal(), initType));
 
