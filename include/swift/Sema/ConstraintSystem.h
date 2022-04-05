@@ -1515,6 +1515,10 @@ enum class ConstraintSystemFlags {
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
   UseClangFunctionTypes = 0x80,
+
+  /// When set, nominal typedecl contexts are asynchronous contexts.
+  /// This is set while searching for the main function
+  ConsiderNominalTypeContextsAsync = 0x100,
 };
 
 /// Options that affect the constraint system as a whole.

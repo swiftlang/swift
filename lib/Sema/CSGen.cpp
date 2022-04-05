@@ -4421,9 +4421,10 @@ getMemberDecls(InterestedMemberKind Kind) {
 }
 
 ResolvedMemberResult
-swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
+swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name,
+                          ConstraintSystemOptions Options) {
   ResolvedMemberResult Result;
-  ConstraintSystem CS(&DC, None);
+  ConstraintSystem CS(&DC, Options);
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(

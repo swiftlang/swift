@@ -1,8 +1,16 @@
 // RUN: %target-swift-emit-silgen -module-name parameterized -enable-parameterized-protocol-types %s | %FileCheck %s
 
-protocol P<T, U, V> {}
+protocol P<T, U, V> {
+  associatedtype T
+  associatedtype U
+  associatedtype V
+}
 
-protocol Q<X, Y, Z> : P {}
+protocol Q<X, Y, Z> : P {
+  associatedtype X
+  associatedtype Y
+  associatedtype Z
+}
 
 struct S: Q {
   typealias T = Int
@@ -36,48 +44,16 @@ func upupupupcast(_ x: S) -> any P {
   // CHECK: store [[CONCRETE_VAL]] to [trivial] [[INIT_INT_STRING_FLOAT]] : $*S
   // CHECK: [[OPEN_INT_STRING_FLOAT:%.*]] = open_existential_addr immutable_access %3 : $*P<Int, String, Float> to $*[[OPENED_P_INT_STRING_FLOAT:@opened(.*) P<Int, String, Float>]]
 
-  // CHECK: [[P_INT_STRING:%.*]] = alloc_stack $P<Int, String>
-  // CHECK: [[INIT_INT_STRING:%.*]] = init_existential_addr [[P_INT_STRING]] : $*P<Int, String>, $[[OPENED_P_INT_STRING_FLOAT]]
-  // CHECK: copy_addr [[OPEN_INT_STRING_FLOAT]] to [initialization] [[INIT_INT_STRING]] : $*[[OPENED_P_INT_STRING_FLOAT]]
-  // CHECK: [[OPEN_INT_STRING:%.*]] = open_existential_addr immutable_access [[P_INT_STRING]] : $*P<Int, String> to $*[[OPENED_P_INT_STRING:@opened(.*) P<Int, String>]]
-
-  // CHECK: [[P_INT:%.*]] = alloc_stack $P<Int>
-  // CHECK: [[INIT_INT:%.*]] = init_existential_addr [[P_INT]] : $*P<Int>, $[[OPENED_P_INT_STRING]]
-  // CHECK: copy_addr [[OPEN_INT_STRING]] to [initialization] [[INIT_INT]] : $*[[OPENED_P_INT_STRING]]
-  // CHECK: [[OPEN_INT:%.*]] = open_existential_addr immutable_access [[P_INT]] : $*P<Int> to $*[[OPENED_P_INT:@opened(.*) P<Int>]]
-
-  // CHECK: [[RESULT_INIT:%.*]] = init_existential_addr [[RESULT_PARAM]] : $*P, $[[OPENED_P_INT]]
-  // CHECK: copy_addr [[OPEN_INT]] to [initialization] [[RESULT_INIT]] : $*[[OPENED_P_INT]]
-  return x as any P<Int, String, Float> as any P<Int, String> as any P<Int> as any P
+  // CHECK: [[RESULT_INIT:%.*]] = init_existential_addr [[RESULT_PARAM]] : $*P, $[[OPENED_P_INT_STRING_FLOAT]]
+  // CHECK: copy_addr [[OPEN_INT_STRING_FLOAT]] to [initialization] [[RESULT_INIT]] : $*[[OPENED_P_INT_STRING_FLOAT]]
+  return x as any P<Int, String, Float> as any P
 }
 
 func use(_ k: (S) -> Void) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s13parameterized11upcastInputyyF : $@convention(thin) () -> () {
 func upcastInput() {
-  // CHECK: [[INT_STRING_FN:%.*]] = function_ref @$s13parameterized11upcastInputyyFyAA1P_pySiSSXPXEfU_ : $@convention(thin) (@in_guaranteed P<Int, String>) -> ()
-  // CHECK: [[NOESCAPE_INT_STRING_FN:%.*]] = convert_function [[INT_STRING_FN]] : $@convention(thin) (@in_guaranteed P<Int, String>) -> () to $@convention(thin) @noescape (@in_guaranteed P<Int, String>) -> ()
-  // CHECK: [[THICK_INT_STRING_FN:%.*]] = thin_to_thick_function [[NOESCAPE_INT_STRING_FN]] : $@convention(thin) @noescape (@in_guaranteed P<Int, String>) -> () to $@noescape @callee_guaranteed (@in_guaranteed P<Int, String>) -> ()
-  // CHECK: [[S_TO_INT_STRING_THUNK_FN:%.*]] = function_ref @$s13parameterized1P_pySiSSXPIgn_AA1SVIegy_TR : $@convention(thin) (S, @noescape @callee_guaranteed (@in_guaranteed P<Int, String>) -> ()) -> ()
-  // CHECK: [[PARTIAL_INT_STRING_THUNK_FN:%.*]] = partial_apply [callee_guaranteed] [[S_TO_INT_STRING_THUNK_FN]]([[THICK_INT_STRING_FN]]) : $@convention(thin) (S, @noescape @callee_guaranteed (@in_guaranteed P<Int, String>) -> ()) -> ()
-  // CHECK: [[NOESCAPE_INT_STRING_THUNK_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_INT_STRING_THUNK_FN]] : $@callee_guaranteed (S) -> () to $@noescape @callee_guaranteed (S) -> ()
-  // CHECK: [[USE_FN:%.*]] = function_ref @$s13parameterized3useyyyAA1SVXEF : $@convention(thin) (@noescape @callee_guaranteed (S) -> ()) -> ()
-  // CHECK: {{%.*}} = apply [[USE_FN]]([[NOESCAPE_INT_STRING_THUNK_FN]]) : $@convention(thin) (@noescape @callee_guaranteed (S) -> ()) -> ()
-
-  use({ (p: any P<Int, String>) -> Void in })
-
-  // CHECK: [[INT_FN:%.*]] = function_ref @$s13parameterized11upcastInputyyFyAA1P_pySiXPXEfU0_ : $@convention(thin) (@in_guaranteed P<Int>) -> ()
-  // CHECK: [[NOESCAPE_INT_FN:%.*]] = convert_function [[INT_FN]] : $@convention(thin) (@in_guaranteed P<Int>) -> () to $@convention(thin) @noescape (@in_guaranteed P<Int>) -> ()
-  // CHECK: [[THICK_INT_FN:%.*]] = thin_to_thick_function [[NOESCAPE_INT_FN]] : $@convention(thin) @noescape (@in_guaranteed P<Int>) -> () to $@noescape @callee_guaranteed (@in_guaranteed P<Int>) -> ()
-  // CHECK: [[S_TO_INT_THUNK_FN:%.*]] = function_ref @$s13parameterized1P_pySiXPIgn_AA1SVIegy_TR : $@convention(thin) (S, @noescape @callee_guaranteed (@in_guaranteed P<Int>) -> ()) -> ()
-  // CHECK: [[PARTIAL_INT_THUNK_FN:%.*]] = partial_apply [callee_guaranteed] [[S_TO_INT_THUNK_FN]]([[THICK_INT_FN]]) : $@convention(thin) (S, @noescape @callee_guaranteed (@in_guaranteed P<Int>) -> ()) -> ()
-  // CHECK: [[NOESCAPE_INT_THUNK_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_INT_THUNK_FN]] : $@callee_guaranteed (S) -> () to $@noescape @callee_guaranteed (S) -> ()
-  // CHECK: [[USE_FN:%.*]] = function_ref @$s13parameterized3useyyyAA1SVXEF : $@convention(thin) (@noescape @callee_guaranteed (S) -> ()) -> ()
-  // CHECK: {{%.*}} = apply [[USE_FN]]([[NOESCAPE_INT_THUNK_FN]]) : $@convention(thin) (@noescape @callee_guaranteed (S) -> ()) -> ()
-
-  use({ (p: any P<Int>) -> Void in })
-
-  // CHECK: [[P_FN:%.*]] = function_ref @$s13parameterized11upcastInputyyFyAA1P_pXEfU1_ : $@convention(thin) (@in_guaranteed P) -> ()
+  // CHECK: [[P_FN:%.*]] = function_ref @$s13parameterized11upcastInputyyFyAA1P_pXEfU_ : $@convention(thin) (@in_guaranteed P) -> ()
   // CHECK: [[NOESCAPE_P_FN:%.*]] = convert_function [[P_FN]] : $@convention(thin) (@in_guaranteed P) -> () to $@convention(thin) @noescape (@in_guaranteed P) -> ()
   // CHECK: [[THICK_P_FN:%.*]] = thin_to_thick_function [[NOESCAPE_P_FN]] : $@convention(thin) @noescape (@in_guaranteed P) -> () to $@noescape @callee_guaranteed (@in_guaranteed P) -> ()
   // CHECK: [[S_TO_P_THUNK_FN:%.*]] = function_ref @$s13parameterized1P_pIgn_AA1SVIegy_TR : $@convention(thin) (S, @noescape @callee_guaranteed (@in_guaranteed P) -> ()) -> ()

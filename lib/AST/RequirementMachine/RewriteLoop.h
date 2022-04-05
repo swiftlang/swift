@@ -411,8 +411,9 @@ public:
 
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
-  SmallVector<unsigned, 1> getRulesInEmptyContext(const MutableTerm &term,
-                                                  const RewriteSystem &system);
+  SmallVector<unsigned, 1>
+  findRulesAppearingOnceInEmptyContext(const MutableTerm &term,
+                                       const RewriteSystem &system) const;
 
   void invert();
 

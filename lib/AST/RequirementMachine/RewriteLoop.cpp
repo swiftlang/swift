@@ -345,8 +345,8 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 }
 
 SmallVector<unsigned, 1>
-RewritePath::getRulesInEmptyContext(const MutableTerm &term,
-                                    const RewriteSystem &system) {
+RewritePath::findRulesAppearingOnceInEmptyContext(const MutableTerm &term,
+                                                  const RewriteSystem &system) const {
   // Rules appearing in empty context (possibly more than once).
   llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
   // The number of times each rule appears (with or without context).
@@ -485,7 +485,8 @@ void RewriteLoop::recompute(const RewriteSystem &system) {
     evaluator.apply(step, system);
   }
 
-  RulesInEmptyContext = Path.getRulesInEmptyContext(Basepoint, system);
+  RulesInEmptyContext =
+      Path.findRulesAppearingOnceInEmptyContext(Basepoint, system);
 }
 
 /// A rewrite rule is redundant if it appears exactly once in a loop

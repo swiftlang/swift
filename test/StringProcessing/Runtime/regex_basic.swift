@@ -12,7 +12,7 @@ extension String {
     file: String = #file,
     line: UInt = #line
   ) -> Regex<T>.Match {
-    guard let result = match(regex) else {
+    guard let result = matchWhole(regex) else {
       expectUnreachable("Failed match", file: file, line: line)
       fatalError()
     }
@@ -35,7 +35,9 @@ RegexBasicTests.test("Basic") {
 RegexBasicTests.test("Modern") {
   let input = "aabccd"
 
-  let match1 = input.expectMatch(#|a a  bc c /*hello*/ .|#)
+  let match1 = input.expectMatch(#/
+    a a  bc c (?#hello) . # comment
+  /#)
   expectEqual("aabccd", match1.0)
   expectTrue("aabccd" == match1.output)
 }

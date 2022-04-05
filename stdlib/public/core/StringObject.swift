@@ -56,6 +56,11 @@
   can compile to a fused check-and-branch, even if that burns part of the
   encoding space.
 
+  On Android AArch64, we cannot use the top byte for large strings because it is
+  reserved by the OS for memory tagging since Android 11, so shift the
+  discriminator to the second byte instead. This burns one more byte on small
+  strings.
+
   On 32-bit platforms, we store an explicit discriminator (as a UInt8) with the
   same encoding as above, placed in the high bits. E.g. `b62` above is in
   `_discriminator`'s `b6`.
@@ -111,8 +116,13 @@ internal struct _StringObject {
 
   @inlinable @inline(__always)
   init(count: Int, variant: Variant, discriminator: UInt64, flags: UInt16) {
+#if os(Android) && arch(arm64)
+    _internalInvariant(discriminator & 0x00FF_0000_0000_0000 == discriminator,
+      "only the second byte can carry the discriminator and small count on Android AArch64")
+#else
     _internalInvariant(discriminator & 0xFF00_0000_0000_0000 == discriminator,
       "only the top byte can carry the discriminator and small count")
+#endif
 
     self._count = count
     self._variant = variant
@@ -349,7 +359,13 @@ extension _StringObject.Nibbles {
 extension _StringObject.Nibbles {
   // Mask for address bits, i.e. non-discriminator and non-extra high bits
   @inlinable @inline(__always)
-  static internal var largeAddressMask: UInt64 { return 0x0FFF_FFFF_FFFF_FFFF }
+  static internal var largeAddressMask: UInt64 {
+#if os(Android) && arch(arm64)
+    return 0xFF0F_FFFF_FFFF_FFFF
+#else
+    return 0x0FFF_FFFF_FFFF_FFFF
+#endif
+  }
 
   // Mask for address bits, i.e. non-discriminator and non-extra high bits
   @inlinable @inline(__always)
@@ -360,20 +376,32 @@ extension _StringObject.Nibbles {
   // Discriminator for small strings
   @inlinable @inline(__always)
   internal static func small(isASCII: Bool) -> UInt64 {
+#if os(Android) && arch(arm64)
+    return isASCII ? 0x00E0_0000_0000_0000 : 0x00A0_0000_0000_0000
+#else
     return isASCII ? 0xE000_0000_0000_0000 : 0xA000_0000_0000_0000
+#endif
   }
 
   // Discriminator for small strings
   @inlinable @inline(__always)
   internal static func small(withCount count: Int, isASCII: Bool) -> UInt64 {
     _internalInvariant(count <= _SmallString.capacity)
+#if os(Android) && arch(arm64)
+    return small(isASCII: isASCII) | UInt64(truncatingIfNeeded: count) &<< 48
+#else
     return small(isASCII: isASCII) | UInt64(truncatingIfNeeded: count) &<< 56
+#endif
   }
 
   // Discriminator for large, immortal, swift-native strings
   @inlinable @inline(__always)
   internal static func largeImmortal() -> UInt64 {
+#if os(Android) && arch(arm64)
+    return 0x0080_0000_0000_0000
+#else
     return 0x8000_0000_0000_0000
+#endif
   }
 
   // Discriminator for large, mortal (i.e. managed), swift-native strings
@@ -397,7 +425,11 @@ extension _StringObject {
 
   @inlinable @inline(__always)
   internal var isImmortal: Bool {
+#if os(Android) && arch(arm64)
+    return (discriminatedObjectRawBits & 0x0080_0000_0000_0000) != 0
+#else
     return (discriminatedObjectRawBits & 0x8000_0000_0000_0000) != 0
+#endif
   }
 
   @inlinable @inline(__always)
@@ -405,7 +437,11 @@ extension _StringObject {
 
   @inlinable @inline(__always)
   internal var isSmall: Bool {
+#if os(Android) && arch(arm64)
+    return (discriminatedObjectRawBits & 0x0020_0000_0000_0000) != 0
+#else
     return (discriminatedObjectRawBits & 0x2000_0000_0000_0000) != 0
+#endif
   }
 
   @inlinable @inline(__always)
@@ -419,7 +455,11 @@ extension _StringObject {
   //     - Non-Cocoa shared strings
   @inlinable @inline(__always)
   internal var providesFastUTF8: Bool {
+#if os(Android) && arch(arm64)
+    return (discriminatedObjectRawBits & 0x0010_0000_0000_0000) == 0
+#else
     return (discriminatedObjectRawBits & 0x1000_0000_0000_0000) == 0
+#endif
   }
 
   @inlinable @inline(__always)
@@ -429,16 +469,26 @@ extension _StringObject {
   // conforms to `_AbstractStringStorage`
   @inline(__always)
   internal var hasStorage: Bool {
+#if os(Android) && arch(arm64)
+    return (discriminatedObjectRawBits & 0x00F0_0000_0000_0000) == 0
+#else
     return (discriminatedObjectRawBits & 0xF000_0000_0000_0000) == 0
+#endif
   }
 
   // Whether we are a mortal, native (tail-allocated) string
   @inline(__always)
   internal var hasNativeStorage: Bool {
+#if os(Android) && arch(arm64)
+    // Android uses the same logic as explained below for other platforms,
+    // except isSmall is at b53, so shift it to b61 first before proceeding.
+    let bits = ~(discriminatedObjectRawBits << 8) & self._countAndFlagsBits
+#else
     // b61 on the object means isSmall, and on countAndFlags means
     // isNativelyStored. We just need to check that b61 is 0 on the object and 1
     // on countAndFlags.
     let bits = ~discriminatedObjectRawBits & self._countAndFlagsBits
+#endif
     let result = bits & 0x2000_0000_0000_0000 != 0
     _internalInvariant(!result || hasStorage, "native storage needs storage")
     return result
@@ -466,7 +516,11 @@ extension _StringObject {
   @inline(__always)
   internal var largeIsCocoa: Bool {
     _internalInvariant(isLarge)
+#if os(Android) && arch(arm64)
+    return (discriminatedObjectRawBits & 0x0040_0000_0000_0000) != 0
+#else
     return (discriminatedObjectRawBits & 0x4000_0000_0000_0000) != 0
+#endif
   }
 
   // Whether this string is in one of our fastest representations:
@@ -535,7 +589,11 @@ extension _StringObject {
 
   @inlinable
   internal static func getSmallCount(fromRaw x: UInt64) -> Int {
+#if os(Android) && arch(arm64)
+    return Int(truncatingIfNeeded: (x & 0x000F_0000_0000_0000) &>> 48)
+#else
     return Int(truncatingIfNeeded: (x & 0x0F00_0000_0000_0000) &>> 56)
+#endif
   }
 
   @inlinable @inline(__always)
@@ -546,7 +604,11 @@ extension _StringObject {
 
   @inlinable
   internal static func getSmallIsASCII(fromRaw x: UInt64) -> Bool {
+#if os(Android) && arch(arm64)
+    return x & 0x0040_0000_0000_0000 != 0
+#else
     return x & 0x4000_0000_0000_0000 != 0
+#endif
   }
   @inlinable @inline(__always)
   internal var smallIsASCII: Bool {
