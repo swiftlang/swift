@@ -142,14 +142,14 @@ class SubSendable: SuperSendable {
 
 protocol AbstractSendable {
   func runsInBackground(_: @Sendable () -> Void)
-  func runsInForeground(_: () -> Void) // expected-note {{protocol requires function 'runsInForeground' with type '(() -> Void) -> ()'; do you want to add a stub?}}
-  func runnableInBackground() -> @Sendable () -> Void // expected-note {{protocol requires function 'runnableInBackground()' with type '() -> @Sendable () -> Void'; do you want to add a stub?}}
+  func runsInForeground(_: () -> Void) // expected-note {{expected sendability to match requirement here}}
+  func runnableInBackground() -> @Sendable () -> Void // expected-note {{expected sendability to match requirement here}}
   func runnableInForeground() -> () -> Void
 }
 
-struct ConcreteSendable: AbstractSendable { // expected-error {{type 'ConcreteSendable' does not conform to protocol 'AbstractSendable'}}
+struct ConcreteSendable: AbstractSendable {
   func runsInBackground(_: () -> Void) {}
-  func runsInForeground(_: @Sendable () -> Void) {} // expected-note {{candidate has non-matching type '(@Sendable () -> Void) -> ()'}}
-  func runnableInBackground() -> () -> Void { fatalError() } // expected-note {{candidate has non-matching type '() -> () -> Void'}}
+  func runsInForeground(_: @Sendable () -> Void) {} // expected-warning {{sendability of function types in instance method 'runsInForeground' does not match requirement in protocol 'AbstractSendable'; this is an error in Swift 6}}
+  func runnableInBackground() -> () -> Void { fatalError() } // expected-warning {{sendability of function types in instance method 'runnableInBackground()' does not match requirement in protocol 'AbstractSendable'; this is an error in Swift 6}}
   func runnableInForeground() -> @Sendable () -> Void { fatalError() }
 }
