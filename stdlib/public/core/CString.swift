@@ -381,6 +381,7 @@ extension String {
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable // Fold away specializations
   @_alwaysEmitIntoClient
+  @available(*, deprecated)
   public init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: inout Encoding.CodeUnit,
     as sourceEncoding: Encoding.Type
