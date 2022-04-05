@@ -40,6 +40,7 @@ jobs:
             run_e2e_test: true
             build_hello_wasm: true
             clean_build_dir: false
+            free_disk_space: true
 
           - build_os: ubuntu-20.04
             agent_query: ubuntu-20.04
@@ -49,6 +50,7 @@ jobs:
             run_e2e_test: true
             build_hello_wasm: true
             clean_build_dir: false
+            free_disk_space: true
 
           - build_os: ubuntu-20.04
             agent_query: [ubuntu20.04, ARM64]
@@ -93,7 +95,7 @@ jobs:
           rm -rf /usr/share/swift/
 
       - name: Free disk space
-        if: ${{ (matrix.build_os == 'ubuntu-20.04' || matrix.build_os == 'ubuntu-18.04') && matrix.agent_query == null }}
+        if: ${{ matrix.free_disk_space }}
         run: |
           df -h
           sudo apt-get purge libgcc-9-dev gcc-9 libstdc++-9-dev libgcc-10-dev gcc-10 libstdc++-10-dev clang-6.0 llvm-6.0
