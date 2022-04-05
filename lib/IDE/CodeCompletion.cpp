@@ -274,6 +274,7 @@ public:
   void completeStmtLabel(StmtKind ParentKind) override;
   void completeForEachPatternBeginning(bool hasTry, bool hasAwait) override;
   void completeTypeAttrBeginning() override;
+  void completeOptionalBinding() override;
 
   void doneParsing() override;
 
@@ -625,6 +626,11 @@ void CodeCompletionCallbacksImpl::completeForEachPatternBeginning(
     ParsedKeywords.emplace_back("await");
 }
 
+void CodeCompletionCallbacksImpl::completeOptionalBinding() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::OptionalBinding;
+}
+
 void CodeCompletionCallbacksImpl::completeTypeAttrBeginning() {
   CurDeclContext = P.CurDeclContext;
   Kind = CompletionKind::TypeAttrBeginning;
@@ -907,6 +913,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::PrecedenceGroup:
   case CompletionKind::StmtLabel:
   case CompletionKind::TypeAttrBeginning:
+  case CompletionKind::OptionalBinding:
     break;
 
   case CompletionKind::EffectsSpecifier: {
@@ -1888,6 +1895,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
 
   }
+  case CompletionKind::OptionalBinding: {
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    Lookup.getOptionalBindingCompletions(Loc);
+    break;
+  }
+
   case CompletionKind::AfterIfStmtElse:
   case CompletionKind::CaseStmtKeyword:
   case CompletionKind::EffectsSpecifier:
