@@ -1050,7 +1050,6 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     Error = "compilation setup failed";
     return nullptr;
   }
-  CompIns.getASTContext().CancellationFlag = CancellationFlag;
   if (CompIns.loadStdlibIfNeeded()) {
     LOG_WARN_FUNC("Loading the stdlib failed");
     Error = "Loading the stdlib failed";
