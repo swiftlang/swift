@@ -1050,6 +1050,7 @@ extension Substring {
       _unchecked base: String.UnicodeScalarView, bounds: Range<Index>
     ) {
       _slice = Slice(base: base, bounds: bounds)
+      _invariantCheck()
     }
 
     /// Creates an instance that slices `base` at `_bounds`.
@@ -1073,7 +1074,25 @@ extension Substring.UnicodeScalarView {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal var _bounds: Range<Index> { _slice._bounds }
+}
+
+extension Substring.UnicodeScalarView {
+  #if !INTERNAL_CHECKS_ENABLED
+  @_alwaysEmitIntoClient @inline(__always)
+  internal func _invariantCheck() {}
+  #else
+  @_alwaysEmitIntoClient
+  @inline(never) @_effects(releasenone)
+  internal func _invariantCheck() {
+    _internalInvariant(endIndex <= _wholeGuts.endIndex)
+    _internalInvariant(
+      _wholeGuts.hasMatchingEncoding(startIndex) &&
+      _wholeGuts.hasMatchingEncoding(endIndex))
+    _internalInvariant(
+      startIndex._isScalarAligned && endIndex._isScalarAligned)
+    _slice._base._invariantCheck()
   }
+  #endif // INTERNAL_CHECKS_ENABLED
 }
 
 extension Substring.UnicodeScalarView: BidirectionalCollection {

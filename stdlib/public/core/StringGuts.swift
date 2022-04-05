@@ -357,6 +357,7 @@ extension _StringGuts {
   /// index, but it is guaranteed to never incorrectly return false. If all
   /// loaded binaries were built in 5.7+, then this method is guaranteed to
   /// always return the correct value.
+  @_alwaysEmitIntoClient
   internal func hasMatchingEncoding(_ i: String.Index) -> Bool {
     (isForeign && i._canBeUTF16) || (!isForeign && i._canBeUTF8)
   }
