@@ -894,7 +894,7 @@ bool CompletionLookup::hasInterestingDefaultValue(const ParamDecl *param) {
   }
 }
 
-bool CompletionLookup::addItemWithoutDefaultArgs(
+bool CompletionLookup::shouldAddItemWithoutDefaultArgs(
     const AbstractFunctionDecl *func) {
   if (!func || !Sink.addCallWithNoDefaultArgs)
     return false;
@@ -1189,7 +1189,7 @@ void CompletionLookup::addFunctionCallPattern(
     if (isImplicitlyCurriedInstanceMethod) {
       addPattern({AFD->getImplicitSelfDecl()}, /*includeDefaultArgs=*/true);
     } else {
-      if (addItemWithoutDefaultArgs(AFD))
+      if (shouldAddItemWithoutDefaultArgs(AFD))
         addPattern(AFD->getParameters()->getArray(),
                    /*includeDefaultArgs=*/false);
       addPattern(AFD->getParameters()->getArray(),
@@ -1385,7 +1385,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     if (trivialTrailingClosure)
       addMethodImpl(/*includeDefaultArgs=*/false,
                     /*trivialTrailingClosure=*/true);
-    if (addItemWithoutDefaultArgs(FD))
+    if (shouldAddItemWithoutDefaultArgs(FD))
       addMethodImpl(/*includeDefaultArgs=*/false);
     addMethodImpl(/*includeDefaultArgs=*/true);
   }
@@ -1475,7 +1475,7 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
     }
   };
 
-  if (ConstructorType && addItemWithoutDefaultArgs(CD))
+  if (ConstructorType && shouldAddItemWithoutDefaultArgs(CD))
     addConstructorImpl(/*includeDefaultArgs=*/false);
   addConstructorImpl();
 }
