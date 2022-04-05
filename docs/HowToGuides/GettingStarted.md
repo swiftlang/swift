@@ -365,7 +365,7 @@ You can also use other editors and IDEs to work on Swift.
 
 #### IntelliJ CLion
 
-CLion supports CMake and Ninja. In order to configure it property, build the swift project first using the `build-script`, then open the `swift` directory with CLion and proceed to project settings (`cmd + ,`).
+CLion supports CMake and Ninja. In order to configure it properly, build the swift project first using the `build-script`, then open the `swift` directory with CLion and proceed to project settings (`cmd + ,`).
 
 In project settings, locate `Build, Execution, Deployment > CMake`. You will need to create a new profile named `RelWithDebInfoAssert` (or `Debug` if going to point it at the debug build). Enter the following information:
 
@@ -379,7 +379,7 @@ In project settings, locate `Build, Execution, Deployment > CMake`. You will nee
     - replace the `SOME_PATH` to the path where your `swift-project` directory is
     - the CMAKE_BUILD_TYPE should match the build configuration name, so if you named this profile `RelWithDebInfo` the CMAKE_BUILD_TYPE should also be `RelWithDebInfo`
 
-With this done CLion should be able to successfully import the project and have full autocomplete and code navigation powers.
+With this done, CLion should be able to successfully import the project and have full autocomplete and code navigation powers.
 
 ### Editing
 
