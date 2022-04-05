@@ -1371,3 +1371,20 @@ func testDynamicMemberSubscriptLookup() {
 // DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: index[#Int#]; name=index
 // DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<Binding<MyStruct>, Value>#}[']'][#Value#]; name=keyPath:
 // DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP: End completions
+
+func testVarInitializedByCallingClosure() {
+  struct MyBundle {
+    func vrl(forResource: String, withExtension: String?)
+  }
+
+  struct Foo {
+    private lazy var calculatorContext: Void = {
+      let Bundle_main = MyBundle()
+      Bundle_main.vrl(forResource: "turnips", #^VAR_INITIALIZED_BY_CALLING_CLOSURE^#withExtension: "js")
+    }()
+  }
+
+// VAR_INITIALIZED_BY_CALLING_CLOSURE: Begin completions, 1 items
+// VAR_INITIALIZED_BY_CALLING_CLOSURE-DAG: Pattern/Local/Flair[ArgLabels]:     {#withExtension: String?#}[#String?#];
+// VAR_INITIALIZED_BY_CALLING_CLOSURE: End completions
+}
