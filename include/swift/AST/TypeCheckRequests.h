@@ -604,7 +604,6 @@ struct WhereClauseOwner {
     return !(lhs == rhs);
   }
 
-public:
   /// Retrieve the array of requirements.
   MutableArrayRef<RequirementRepr> getRequirements() const;
 
@@ -1903,8 +1902,7 @@ public:
 /// InferredGenericSignatureRequest.
 class InferredGenericSignatureRequestRQM :
     public SimpleRequest<InferredGenericSignatureRequestRQM,
-                         GenericSignatureWithError (ModuleDecl *,
-                                                    const GenericSignatureImpl *,
+                         GenericSignatureWithError (const GenericSignatureImpl *,
                                                     GenericParamList *,
                                                     WhereClauseOwner,
                                                     SmallVector<Requirement, 2>,
@@ -1920,7 +1918,6 @@ private:
   // Evaluation.
   GenericSignatureWithError
   evaluate(Evaluator &evaluator,
-           ModuleDecl *parentModule,
            const GenericSignatureImpl *baseSignature,
            GenericParamList *genericParams,
            WhereClauseOwner whereClause,

@@ -45,13 +45,14 @@ void desugarRequirement(Requirement req, SourceLoc loc,
 void inferRequirements(Type type, SourceLoc loc, ModuleDecl *module,
                        SmallVectorImpl<StructuralRequirement> &result);
 
-void realizeRequirement(Requirement req, RequirementRepr *reqRepr,
-                        ModuleDecl *moduleForInference,
+void realizeRequirement(DeclContext *dc,
+                        Requirement req, RequirementRepr *reqRepr,
+                        bool shouldInferRequirements,
                         SmallVectorImpl<StructuralRequirement> &result,
                         SmallVectorImpl<RequirementError> &errors);
 
 void realizeInheritedRequirements(TypeDecl *decl, Type type,
-                                  ModuleDecl *moduleForInference,
+                                  bool shouldInferRequirements,
                                   SmallVectorImpl<StructuralRequirement> &result,
                                   SmallVectorImpl<RequirementError> &errors);
 
