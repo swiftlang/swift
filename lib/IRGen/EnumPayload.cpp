@@ -285,6 +285,24 @@ void EnumPayload::emitSwitch(IRGenFunction &IGF,
     return;
   }
 
+  if (mask.getBitWidth() > IGF.IGM.getPointerSize().getValueInBits() * 2) {
+    for (int index = 0, size = cases.size(); index < size; ++index) {
+      auto &c = cases[index];
+      auto *cmp = emitCompare(IGF, mask, c.first);
+      llvm::BasicBlock *elseBlock;
+      if (index < size - 1) {
+        elseBlock = IGF.createBasicBlock("");
+      } else {
+        elseBlock = dflt.getPointer();
+      }
+      IGF.Builder.CreateCondBr(cmp, c.second, elseBlock);
+      if (index < size - 1) {
+        IGF.Builder.emitBlock(elseBlock);
+      }
+    }
+    return;
+  }
+
   // Otherwise emit a switch statement.
   auto &C = IGF.IGM.getLLVMContext();
   unsigned numBits = mask.countPopulation();

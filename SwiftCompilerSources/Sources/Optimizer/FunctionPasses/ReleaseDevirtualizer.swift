@@ -82,7 +82,7 @@ private func tryDevirtualizeReleaseOfObject(
 
   let type = allocRefInstruction.type
 
-  guard let dealloc = context.getDestructor(ofClass: type) else {
+  guard let dealloc = context.calleeAnalysis.getDestructor(ofExactType: type) else {
     return
   }
 
