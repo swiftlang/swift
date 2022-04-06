@@ -1410,6 +1410,8 @@ void ConstraintSystem::print(raw_ostream &out) const {
       out << " [inout allowed]";
     if (tv->getImpl().canBindToNoEscape())
       out << " [noescape allowed]";
+    if (tv->getImpl().canBindToHole())
+      out << " [hole allowed]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
