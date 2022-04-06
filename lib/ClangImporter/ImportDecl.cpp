@@ -3600,12 +3600,23 @@ namespace {
             if(cxxOperatorKind != clang::OverloadedOperatorKind::OO_None &&
                 cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call &&
                 cxxOperatorKind != clang::OverloadedOperatorKind::OO_Subscript) {
+
               auto d = makeOperator(MD, cxxMethod);
-              d->dump();
               result->addMember(d);
               result->addMemberToLookupTable(d);
-              recordMemberInContext(MD->getDeclContext(), d);
+
+              result->addMemberToLookupTable(member);
+
+              // Make a note that we've imported this method into this context.
+              recordMemberInContext(d, result);
+
+              Impl.addAlternateDecl(MD, d);
+
+              Impl.markUnavailable(MD, "use - operator");
+              // Make the actual member operator private.
+              MD->overwriteAccess(AccessLevel::Private);
             }
+
             if (cxxMethod->getDeclName().isIdentifier()) {
               auto &mutableFuncPtrs = Impl.cxxMethods[cxxMethod->getName()].second;
               if(mutableFuncPtrs.contains(cxxMethod)) {
@@ -8098,28 +8109,33 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   ASTContext &ctx = afd->getASTContext();
 
   auto funcDecl = cast<FuncDecl>(afd);
-  auto methodDecl = static_cast<FuncDecl *>(context); /* Swift verison of CXXMethod */
+  auto methodDecl = static_cast<FuncDecl *>(context); /* Swift version of CXXMethod */
 
   SmallVector<Expr *, 8> forwardingParams;
-  for (auto param : *funcDecl->getParameters()) {
-    auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
-                                              /*Implicit=*/true);
-    paramRefExpr->setType(param->getType());
-    forwardingParams.push_back(paramRefExpr);
+
+  // We start from +1 since the first param is our lhs. All other params are forwarded
+  for(auto itr = funcDecl->getParameters()->begin() + 1; itr != funcDecl->getParameters()->end(); itr++) {
+      auto param = *itr;
+      auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
+      paramRefExpr->setType(param->getType());
+      forwardingParams.push_back(paramRefExpr);
   }
 
   auto methodExpr = new (ctx) DeclRefExpr(methodDecl, DeclNameLoc(), /*implicit*/ true);
+  methodExpr->setType(methodDecl->getInterfaceType());
 
-  auto *selfDecl = methodDecl->getImplicitSelfDecl();
-  auto selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/ true);
-  selfExpr->setType(selfDecl->getType());
-  auto dotCallExpr = DotSyntaxCallExpr::create(ctx, methodExpr, SourceLoc(), selfExpr);
-  dotCallExpr->setType(methodDecl->getInterfaceType());
+  // Lhs parameter
+  auto baseParam = funcDecl->getParameters()->front();
+  auto baseExpr = new (ctx) DeclRefExpr(baseParam, DeclNameLoc(), /*implicit*/ true);
+  baseExpr->setType(baseParam->getType());
+  auto dotCallExpr = DotSyntaxCallExpr::create(ctx, methodExpr, SourceLoc(), baseExpr);
+  dotCallExpr->setType(methodDecl->getMethodInterfaceType());
   dotCallExpr->setThrows(false);
 
   auto *argList = ArgumentList::forImplicitUnlabeled(ctx, forwardingParams);
   auto callExpr = CallExpr::createImplicit(ctx, dotCallExpr, argList);
   callExpr->setType(funcDecl->getResultInterfaceType());
+  callExpr->setThrows(false);
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), callExpr,
                                          /*implicit=*/true);
@@ -8141,14 +8157,12 @@ FuncDecl *SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod, clang::CXXM
 
   auto parentCtx = operatorMethod->getDeclContext();
 
-  auto lhsId = ctx.getIdentifier("lhs");
   auto lhsParam = new (ctx)
       ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-                lhsId, parentCtx);
+                ctx.getIdentifier("lhs"), parentCtx);
 
-  lhsParam->setInterfaceType(parentCtx->getSelfInterfaceType());
+  lhsParam->setInterfaceType(operatorMethod->getDeclContext()->getSelfInterfaceType());
 
-  lhsParam->setSpecifier(ParamSpecifier::Default);
   if (operatorMethod->isMutating()) {
     // This implicitly makes the parameter indirect.
     lhsParam->setSpecifier(ParamSpecifier::InOut);
@@ -8160,17 +8174,17 @@ FuncDecl *SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod, clang::CXXM
   newParams.push_back(lhsParam);
 
   for(auto param : *paramList) {
-    newParams.push_back(param);
+      newParams.push_back(param);
   }
 
   auto newParamList = ParameterList::create(ctx, newParams);
 
   auto oldArgNames = operatorMethod->getName().getArgumentNames();
   SmallVector<Identifier, 4> newArgNames;
-  newArgNames.push_back(lhsId);
+  newArgNames.push_back(Identifier());
 
   for(auto id : oldArgNames) {
-    newArgNames.push_back(id);
+      newArgNames.push_back(id);
   }
 
   auto opDeclName = DeclName(ctx, opId, {newArgNames.begin(), newArgNames.end()});
@@ -8182,7 +8196,7 @@ FuncDecl *SwiftDeclConverter::makeOperator(FuncDecl *operatorMethod, clang::CXXM
       false, false,
       genericParamList, ParameterList::create(ctx, newParams),
       operatorMethod->getResultInterfaceType(),
-      operatorMethod->getDeclContext()
+      parentCtx
       );
 
   topLevelStaticFuncDecl->setAccess(AccessLevel::Public);

@@ -4112,8 +4112,10 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
   // For operators we have to look up static member functions in addition to the
   // top-level function lookup below.
   if (name.isOperator()) {
-//      llvm::dbgs() << name.getBaseName().getIdentifier().str() << "\n";
-    for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
+    auto declBaseName = SwiftContext.LangOpts.EnableCXXInterop
+            ? name.getBaseName()
+            : DeclBaseName(SwiftContext.getIdentifier("__operatorMinus"));
+    for (auto entry : table.lookupMemberOperators( declBaseName)) {
       if (isVisibleClangEntry(entry)) {
         if (auto decl = dyn_cast_or_null<ValueDecl>(
                 importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {

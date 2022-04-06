@@ -105,7 +105,7 @@ public:
     if (isEditorPlaceholder())
       return false;
     if ((unsigned char)Pointer[0] < 0x80)
-      return ((unsigned char)Pointer[0]);
+      return isOperatorStartCodePoint((unsigned char)Pointer[0]);
 
     // Handle the high unicode case out of line.
     return isOperatorSlow();

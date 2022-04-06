@@ -799,7 +799,7 @@ SwiftLookupTable::lookupMemberOperators(SerializedSwiftName baseName) {
   SmallVector<clang::NamedDecl *, 4> result;
 
   // Find the lookup table entry for this base name.
-  auto known = findOrCreate(LookupTable, baseName,
+    auto known = findOrCreate(LookupTable, baseName,
                             [](auto &results, auto &Reader, auto Name) {
                               return (void)Reader.lookup(Name, results);
                             });
