@@ -45,8 +45,9 @@ extension String {
   /// - Parameter nullTerminatedUTF8: A pointer to a null-terminated UTF-8 code sequence.
   public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
-    self = String._fromUTF8Repairing(
-      UnsafeBufferPointer(start: nullTerminatedUTF8._asUInt8, count: len)).0
+    self = nullTerminatedUTF8.withMemoryRebound(to: UInt8.self, capacity: len) {
+      String._fromUTF8Repairing(UnsafeBufferPointer(start: $0, count: len)).0
+    }
   }
 
   @inlinable
@@ -150,8 +151,9 @@ extension String {
   /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: cString)
-    guard let str = String._tryFromUTF8(
-      UnsafeBufferPointer(start: cString._asUInt8, count: len))
+    guard let str = cString.withMemoryRebound(to: UInt8.self, capacity: len, {
+      String._tryFromUTF8(UnsafeBufferPointer(start: $0, count: len))
+    })
     else { return nil }
 
     self = str
@@ -165,9 +167,10 @@ extension String {
         "input of String.init(validatingUTF8:) must be null-terminated"
       )
     }
-    guard let string = cString.prefix(length).withUnsafeBytes({
-      String._tryFromUTF8($0.assumingMemoryBound(to: UInt8.self))
-    }) else { return nil }
+    guard let string = cString.prefix(length).withUnsafeBufferPointer({
+      $0.withMemoryRebound(to: UInt8.self, String._tryFromUTF8(_:))
+    })
+    else { return nil }
 
     self = string
   }
