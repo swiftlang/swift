@@ -1391,19 +1391,6 @@ void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
   castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
 }
 
-OptionalBridgedFunction PassContext_getDestructor(BridgedPassContext context,
-                                                  BridgedType type) {
-  auto *cd = castToSILType(type).getClassOrBoundGenericClass();
-  assert(cd && "no class type allocated with alloc_ref");
-
-  auto *pm = castToPassInvocation(context)->getPassManager();
-  // Find the destructor of the type.
-  auto *destructor = cd->getDestructor();
-  SILDeclRef deallocRef(destructor, SILDeclRef::Kind::Deallocator);
-
-  return {pm->getModule()->lookUpFunction(deallocRef)};
-}
-
 BridgedSubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
                                       BridgedType bridgedType) {
