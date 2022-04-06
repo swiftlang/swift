@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
