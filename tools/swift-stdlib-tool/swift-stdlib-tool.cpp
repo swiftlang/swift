@@ -604,7 +604,7 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
   magic = *(uint32_t *)buffer;
   if (magic == FAT_MAGIC || magic == FAT_CIGAM) {
     struct fat_header *fh;
-    uint32_t fat_magic, fat_nfat_arch;
+    uint32_t fat_nfat_arch;
     struct fat_arch *archs;
     uint32_t i;
 
@@ -613,7 +613,6 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
     }
 
     fh = (struct fat_header *)buffer;
-    fat_magic = OSSwapBigToHostInt32(fh->magic);
     fat_nfat_arch = OSSwapBigToHostInt32(fh->nfat_arch);
 
     size_t fat_arch_size;
@@ -645,14 +644,10 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
 
     for (i = 0; i < fat_nfat_arch; i++) {
       int ret;
-      uint32_t arch_cputype, arch_cpusubtype, arch_offset, arch_size,
-          arch_align;
+      uint32_t arch_offset, arch_size;
 
-      arch_cputype = OSSwapBigToHostInt32(archs[i].cputype);
-      arch_cpusubtype = OSSwapBigToHostInt32(archs[i].cpusubtype);
       arch_offset = OSSwapBigToHostInt32(archs[i].offset);
       arch_size = OSSwapBigToHostInt32(archs[i].size);
-      arch_align = OSSwapBigToHostInt32(archs[i].align);
 
       /* Check that slice data is after all fat headers and archs */
       if (arch_offset < fat_arch_size) {
