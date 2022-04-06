@@ -58,7 +58,6 @@ __swift_uint32_t _swift_stdlib_getComposition(__swift_uint32_t x,
 // Grapheme Breaking
 //===----------------------------------------------------------------------===//
 
-
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar);
 
@@ -100,6 +99,14 @@ __swift_uint16_t _swift_stdlib_getAge(__swift_uint32_t scalar);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getGeneralCategory(__swift_uint32_t scalar);
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint8_t _swift_stdlib_getScript(__swift_uint32_t scalar);
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const __swift_uint8_t *_swift_stdlib_getScriptExtensions(
+                                                        __swift_uint32_t scalar,
+                                                        __swift_uint8_t *count);
 
 #ifdef __cplusplus
 } // extern "C"
