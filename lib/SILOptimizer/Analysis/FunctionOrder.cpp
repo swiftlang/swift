@@ -40,10 +40,13 @@ void BottomUpFunctionOrder::DFS(SILFunction *Start) {
   for (auto &B : *Start) {
     for (auto &I : B) {
       auto FAS = FullApplySite::isa(&I);
-      if (!FAS && !isa<StrongReleaseInst>(&I) && !isa<ReleaseValueInst>(&I))
+      if (!FAS && !isa<StrongReleaseInst>(&I) && !isa<ReleaseValueInst>(&I) &&
+                  !isa<DestroyValueInst>(&I))
         continue;
 
-      auto Callees = FAS ? BCA->getCalleeList(FAS) : BCA->getCalleeList(&I);
+      auto Callees = FAS ? BCA->getCalleeList(FAS)
+                         : BCA->getDestructors(I.getOperand(0)->getType(),
+                                               /*isExactType*/ false);
       for (auto *CalleeFn : Callees) {
         // If not yet visited, visit the callee.
         if (DFSNum.find(CalleeFn) == DFSNum.end()) {

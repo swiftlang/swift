@@ -147,7 +147,7 @@ public:
 
   /// Return the list of callees that can potentially be called at the
   /// given instruction. E.g. it could be destructors.
-  CalleeList getCalleeList(SILInstruction *I) const;
+  CalleeList getDestructors(SILType type, bool isExactType) const;
 
   CalleeList getCalleeList(SILDeclRef Decl) const;
 
@@ -224,9 +224,9 @@ public:
     return Cache->getCalleeListOfValue(callee);
   }
 
-  CalleeList getCalleeList(SILInstruction *I) {
+  CalleeList getDestructors(SILType type, bool isExactType) {
     updateCache();
-    return Cache->getCalleeList(I);
+    return Cache->getDestructors(type, isExactType);
   }
 };
 
