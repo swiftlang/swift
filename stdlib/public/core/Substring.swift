@@ -257,23 +257,26 @@ extension Substring: StringProtocol {
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(startingAt: i)
-    let nextOffset = i._encodedOffset &+ stride
-    _internalInvariant(nextOffset <= endIndex._encodedOffset)
+
+    // Make sure a cached stride cannot lead us beyond the substring's end
+    // index. (This can happen if the substring's end isn't `Character`
+    // aligned.)
+    let nextOffset = Swift.min(
+      i._encodedOffset &+ stride,
+      endIndex._encodedOffset)
     let nextIndex = Index(_encodedOffset: nextOffset)._scalarAligned
     let nextStride = _characterStride(startingAt: nextIndex)
 
     var r = Index(
       encodedOffset: nextOffset, characterStride: nextStride)._scalarAligned
 
-    if
-      // Don't set the `_isCharacterAligned` bit in indices of exotic substrings
-      // whose startIndex isn't aligned on a grapheme cluster boundary. (Their
-      // grapheme breaks may not match with those in `base`.)
-      _startIsCharacterAligned,
-      // Likewise if this is the last character in a substring ending on a
-      // partial grapheme cluster.
-      _endIsCharacterAligned || nextOffset + nextStride < endIndex._encodedOffset
-    {
+    // Don't set the `_isCharacterAligned` bit in indices of exotic substrings
+    // whose startIndex isn't aligned on a grapheme cluster boundary. (Their
+    // grapheme breaks may not match with those in `base`.)
+    //
+    // Note that we don't need to care about whether the end index is aligned
+    // here.
+    if _startIsCharacterAligned {
       r = r._characterAligned
     }
 
@@ -446,9 +449,13 @@ extension Substring: StringProtocol {
     // Note: SE-0180 requires us not to round `i` down to the nearest whole
     // `Character` boundary.
     let i = _validateScalarIndex(i)
-    let distance = _characterStride(startingAt: i)
+    let stride = _characterStride(startingAt: i)
+    // Don't let the subscript return data outside this substring.
+    let endOffset = Swift.min(
+      i._encodedOffset &+ stride,
+      endIndex._encodedOffset)
     return _wholeGuts.errorCorrectedCharacter(
-      startingAt: i._encodedOffset, endingAt: i._encodedOffset &+ distance)
+      startingAt: i._encodedOffset, endingAt: endOffset)
   }
 
   public mutating func replaceSubrange<C>(
@@ -588,30 +595,43 @@ extension Substring: StringProtocol {
 }
 
 extension Substring {
+  /// Return the length of the extended grapheme cluster that begins at `i`.
+  ///
+  /// This method assumes that `i` starts a new grapheme cluster; it does not
+  /// verify that this is actually the case. If it isn't, then the return value
+  /// reflects grapheme breaking results as if the string started at `i`,
+  /// ignoring every preceding scalar.
+  ///
+  /// - Parameter `i`: An index within the bounds of this substring.
   internal func _characterStride(startingAt i: Index) -> Int {
     _internalInvariant(i._isScalarAligned)
     _internalInvariant(i._encodedOffset <= _wholeGuts.count)
 
-    // Implicit precondition: `i` must be `Character`-aligned within this
-    // substring, even if it doesn't have the corresponding flag set.
-
-    // If the index has a character stride, we are therefore free to use it.
-    if let d = i.characterStride {
-      // However, make sure a cached stride cannot lead us beyond the
-      // substring's end index. This can happen if the substring's end isn't
-      // also `Character` aligned, and someone passes us an index that comes
-      // from the base string.
-      return Swift.min(d, endIndex._encodedOffset &- i._encodedOffset)
-    }
+    // If the index has a character stride, it reflects the stride assuming that
+    // it addresses a `Character` boundary, which is exactly what we want.
+    if let d = i.characterStride { return d }
 
     if i._encodedOffset == endIndex._encodedOffset { return 0 }
 
-    // If we don't have cached information, we can simply invoke the forward-only
-    // grapheme breaking algorithm.
-    return _wholeGuts._opaqueCharacterStride(
-      startingAt: i._encodedOffset, in: _offsetRange)
+    // If we don't have cached information, we can simply invoke the
+    // forward-only grapheme breaking algorithm. Note that this ignores the
+    // Substring bounds; this is okay because this method never looks back at
+    // preceding scalars, so it will place the boundary at the right position in
+    // the substring. The reported stride may go above the end index, but that
+    // case is handled in the caller.
+    return _wholeGuts._opaqueCharacterStride(startingAt: i._encodedOffset)
   }
 
+  
+  /// Return the length of the extended grapheme cluster that ends with, or
+  /// includes, `i`.
+  ///
+  /// This method does not assume that `i` addresses a grapheme cluster
+  /// boundary; it looks back as far as necessary within the substring to find
+  /// the right boundary location, stopping at the start index to prevent
+  /// results that are inconsistent with `_characterStride(startingAt:)`.
+  ///
+  /// - Parameter `i`: An index within the bounds of this substring.
   internal func _characterStride(endingAt i: Index) -> Int {
     // Implicit precondition: `i` must be `Character`-aligned within this
     // substring, even if it doesn't have the corresponding flag set.

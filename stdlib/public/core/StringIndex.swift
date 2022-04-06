@@ -37,8 +37,11 @@ isn't frozen.
 
 <resilience barrier>
 
-- grapheme cache: A 6-bit value remembering the distance to the next grapheme
-boundary.
+- grapheme cache: A 6-bit value remembering the distance to the next extended
+  grapheme cluster boundary, or 0 if unknown. The value stored (if any) must be
+  calculated assuming that the index addresses a boundary itself, i.e., without
+  looking back at scalars preceding the index. (Substrings that don't start on a
+  `Character` boundary heavily rely on this.)
 
 - reserved: 4 unused bits available for future flags etc. The meaning of each
   bit may change between stdlib versions. These must be set to zero if
@@ -317,8 +320,8 @@ extension String.Index {
 // Note that `startIndex` and `endIndex` have fully inlinable implementations.
 // This means that when code built on older releases runs on 5.7, this bit may
 // not be set on these, even though they are always `Character`-aligned. This is
-// fine -- `index(after:)` and `index(before:)` do the right thing with
-// minimal/no performance loss.
+// fine -- `index(after:)` and `index(before:)` still do the right thing with
+// minimal/no performance loss. (The start/end index is handled specially.)
 extension String.Index {
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)

@@ -486,8 +486,7 @@ extension _StringGuts {
 
       // Get the character stride in the entire string, not just the substring.
       // (Characters in a substring may end beyond the bounds of it.)
-      let newStride = _opaqueCharacterStride(
-        startingAt: utf8StartOffset, in: utf8StartOffset ..< count)
+      let newStride = _opaqueCharacterStride(startingAt: utf8StartOffset)
 
       startIndex = String.Index(
         encodedOffset: utf8StartOffset,
@@ -526,9 +525,7 @@ extension _StringGuts {
     if oldRange.lowerBound <= oldBounds.lowerBound &+ oldStride {
       // Get the character stride in the entire string, not just the substring.
       // (Characters in a substring may end beyond the bounds of it.)
-      let newStride = _opaqueCharacterStride(
-        startingAt: newBounds.lowerBound,
-        in: newBounds.lowerBound ..< self.count)
+      let newStride = _opaqueCharacterStride(startingAt: newBounds.lowerBound)
       var newStart = String.Index(
         encodedOffset: newBounds.lowerBound,
         characterStride: newStride
