@@ -976,6 +976,20 @@ bool TypeBase::isAnyObject() {
   return canTy.getExistentialLayout().isAnyObject();
 }
 
+// Distinguish between class-bound types that might be AnyObject vs other
+// class-bound types. Only types that are potentially AnyObject might have a
+// transparent runtime type wrapper like __SwiftValue. This must look through
+// all optional types because dynamic casting sees through them.
+bool TypeBase::isPotentiallyAnyObject() {
+  Type unwrappedTy = lookThroughAllOptionalTypes();
+  if (auto archetype = unwrappedTy->getAs<ArchetypeType>()) {
+    // Does archetype have any requirements that contradict AnyObject?
+    // 'T : AnyObject' requires a layout constraint, not a conformance.
+    return archetype->getConformsTo().empty() && !archetype->getSuperclass();
+  }
+  return unwrappedTy->isAnyObject();
+}
+
 bool ExistentialLayout::isErrorExistential() const {
   auto protocols = getProtocols();
   return (!hasExplicitAnyObject &&
