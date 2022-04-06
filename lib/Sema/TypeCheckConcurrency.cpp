@@ -413,20 +413,32 @@ Type swift::getExplicitGlobalActor(ClosureExpr *closure) {
 /// nonisolated or it is accessed from within the same module.
 static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
                                   VarDecl *var,
-                                  ActorIsolation &varIsolation) {
+                                  const ActorIsolation &varIsolation) {
   // must be immutable
   if (!var->isLet())
     return false;
 
-  // if nonisolated, it's OK
-  if (varIsolation == ActorIsolation::Independent)
+  switch (varIsolation) {
+  case ActorIsolation::Independent:
+  case ActorIsolation::Unspecified:
+    // if nonisolated, it's OK
     return true;
 
-  // Otherwise, if it's in the same module then it's OK too.
-  if (fromModule == var->getDeclContext()->getParentModule())
-    return true;
+  case ActorIsolation::ActorInstance:
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe:
+    // If it's explicitly 'nonisolated', it's okay.
+    if (var->getAttrs().hasAttribute<NonisolatedAttr>())
+      return true;
 
-  return false;
+    // If it's distributed, it's not okay.
+    if (auto nominalParent = var->getDeclContext()->getSelfNominalTypeDecl())
+      if (nominalParent->isDistributedActor())
+        return false;
+
+    // If it's actor-isolated but in the same module, then it's OK too.
+    return (fromModule == var->getDeclContext()->getParentModule());
+  }
 }
 
 bool swift::isLetAccessibleAnywhere(const ModuleDecl *fromModule,
@@ -1296,74 +1308,347 @@ static NominalTypeDecl *getSelfActorDecl(const DeclContext *dc) {
   return nominal && nominal->isActor() ? nominal : nullptr;
 }
 
-namespace {
-  /// Describes a referenced actor variable and whether it is isolated.
-  struct ReferencedActor {
-    /// Describes whether the actor variable is isolated or, if it is not
-    /// isolated, why it is not isolated.
-    enum Kind {
-      /// It is isolated.
-      Isolated = 0,
+ReferencedActor ReferencedActor::forGlobalActor(VarDecl *actor,
+                                                bool isPotentiallyIsolated,
+                                                Type globalActor) {
+  Kind kind = isMainActor(globalActor) ? MainActor : GlobalActor;
+  return ReferencedActor(actor, isPotentiallyIsolated, kind, globalActor);
+}
 
-      /// It is not an isolated parameter at all.
-      NonIsolatedParameter,
+bool ReferencedActor::isKnownToBeLocal() const {
+  switch (kind) {
+  case GlobalActor:
+  case AsyncLet:
+  case MainActor:
+  case NonIsolatedAutoclosure:
+  case NonIsolatedContext:
+  case NonIsolatedParameter:
+  case SendableFunction:
+  case SendableClosure:
+    if (isPotentiallyIsolated)
+      return true;
 
-      // It is within a Sendable function.
-      SendableFunction,
+    return actor && actor->isKnownToBeLocal();
 
-      // It is within a Sendable closure.
-      SendableClosure,
+  case Isolated:
+    return true;
+  }
+}
 
-      // It is within an 'async let' initializer.
-      AsyncLet,
+static AbstractFunctionDecl const *
+isActorInitOrDeInitContext(const DeclContext *dc) {
+  return swift::isActorInitOrDeInitContext(
+      dc, [](const AbstractClosureExpr *closure) {
+        return isSendableClosure(closure, /*forActorIsolation=*/false);
+      });
+}
 
-      // It is within a global actor.
-      GlobalActor,
+static bool isStoredProperty(ValueDecl const *member) {
+  if (auto *var = dyn_cast<VarDecl>(member))
+    if (var->hasStorage() && var->isInstanceMember())
+      return true;
+  return false;
+}
 
-      // It is within the main actor.
-      MainActor,
+/// Based on the former escaping-use restriction, which was replaced by
+/// flow-isolation. We need this to support backwards compatability in the
+/// type-checker for programs prior to Swift 6.
+/// \param fn either a constructor or destructor of an actor.
+static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
+  assert(fn->getDeclContext()->getSelfClassDecl()->isAnyActor());
+  assert(isa<ConstructorDecl>(fn) || isa<DestructorDecl>(fn));
 
-      // It is within a nonisolated context.
-      NonIsolatedContext,
+  // according to today's isolation, determine whether it use to have the
+  // escaping-use restriction
+  switch (getActorIsolation(fn).getKind()) {
+    case ActorIsolation::Independent:
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      // convenience inits did not have the restriction.
+      if (auto *ctor = dyn_cast<ConstructorDecl>(fn))
+        if (ctor->isConvenienceInit())
+          return false;
 
-      // It is within a nonisolated autoclosure argument. This is primarily here
-      // to aid in giving specific diagnostics, because autoclosures are not
-      // always easy for programmers to notice.
-      NonIsolatedAutoclosure
-    };
+      break; // goto basic case
 
-    VarDecl * const actor;
-    /// The outer scope is known to be running on an actor.
-    /// We may be isolated to the actor or not, depending on the exact expression
-    const bool isPotentiallyIsolated;
-    const Kind kind;
-    const Type globalActor;
+    case ActorIsolation::ActorInstance:
+      // none of these had the restriction affect them.
+      assert(fn->hasAsync());
+      return false;
 
-    ReferencedActor(VarDecl *actor, bool isPotentiallyIsolated, Kind kind, Type globalActor = Type())
-      : actor(actor),
-        isPotentiallyIsolated(isPotentiallyIsolated),
-        kind(kind),
-        globalActor(globalActor) {}
-
-    static ReferencedActor forGlobalActor(VarDecl *actor,
-                                          bool isPotentiallyIsolated,
-                                          Type globalActor) {
-      Kind kind = isMainActor(globalActor) ? MainActor : GlobalActor;
-      return ReferencedActor(actor, isPotentiallyIsolated, kind, globalActor);
-    }
-
-    bool isIsolated() const { return kind == Isolated; }
-
-    /// Whether the variable is the "self" of an actor method.
-    bool isActorSelf() const {
-      if (!actor)
-        return false;
-      return actor->isActorSelf();
-    }
-
-    explicit operator bool() const { return isIsolated(); }
+    case ActorIsolation::Unspecified:
+      // this is basically just objc-marked inits.
+      break;
   };
 
+  return !(fn->hasAsync()); // basic case: not async = had restriction.
+}
+
+/// Note that the given actor member is isolated.
+static void noteIsolatedActorMember(
+    ValueDecl const* decl, Optional<VarRefUseEnv> useKind) {
+  // detect if it is a distributed actor, to provide better isolation notes
+
+  auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
+  bool isDistributedActor = false;
+  if (nominal) isDistributedActor = nominal->isDistributedActor();
+
+  // FIXME: Make this diagnostic more sensitive to the isolation context of
+  // the declaration.
+  if (isDistributedActor) {
+    if (isa<VarDecl>(decl)) {
+      // Distributed actor properties are never accessible externally.
+      decl->diagnose(diag::distributed_actor_isolated_property,
+                     decl->getDescriptiveKind(), decl->getName(),
+                     nominal->getName());
+    } else {
+      // it's a function or subscript
+      decl->diagnose(diag::note_distributed_actor_isolated_method,
+                     decl->getDescriptiveKind(),
+                     decl->getName());
+    }
+  } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    func->diagnose(diag::actor_isolated_sync_func,
+      decl->getDescriptiveKind(),
+      decl->getName());
+
+    // was it an attempt to mutate an actor instance's isolated state?
+  } else if (useKind) {
+    if (*useKind == VarRefUseEnv::Read)
+      decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
+    else
+      decl->diagnose(diag::actor_mutable_state, decl->getDescriptiveKind());
+
+  } else {
+    decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
+  }
+}
+
+/// An ad-hoc check specific to member isolation checking. assumed to be
+/// queried when a self-member is being accessed in a context which is not
+/// isolated to self. The "special permission" is part of a backwards
+/// compatability with actor inits and deinits that maintains the
+/// permissive nature of the escaping-use restriction, which was only
+/// staged in as a warning. See implementation for more details.
+///
+/// \returns true if this access in the given context should be allowed
+/// in Sema, with the side-effect of emitting a warning as needed.
+/// If false is returned, then the "special permission" was not granted.
+static bool memberAccessHasSpecialPermissionInSwift5(DeclContext const *refCxt,
+                                    ReferencedActor &baseActor,
+                                    ValueDecl const *member,
+                                    SourceLoc memberLoc,
+                                    Optional<VarRefUseEnv> useKind) {
+  // no need for this in Swift 6+
+  if (refCxt->getASTContext().isSwiftVersionAtLeast(6))
+    return false;
+
+  // must be an access to an instance member.
+  if (!member->isInstanceMember())
+    return false;
+
+  // In the history of actor initializers prior to Swift 6, self-isolated
+  // members could be referenced from any init or deinit, even a synchronous
+  // one, with no diagnostics at all.
+  //
+  // When the escaping-use restriction came into place for the release of
+  // 5.5, it was implemented as a warning and only applied to initializers,
+  // which stated that it would become an error in Swift 6.
+  //
+  // Once 5.6 was released, we also added restrictions in the deinits of
+  // actors, at least for accessing members other than stored properties.
+  //
+  // Later on, for 5.7 we introduced flow-isolation as part of SE-327 for
+  // both inits and deinits. This meant that stored property accesses now
+  // are only sometimes going to be problematic. This change also brought
+  // official changes in isolation for the inits and deinits to handle the
+  // the non-stored-property members. Since those isolation changes are
+  // currently in place, the purpose of the code below is to override the
+  // isolation checking, so that the now-mismatched isolation on member
+  // access is still permitted, but with a warning stating that it will
+  // be rejected in Swift 6.
+  //
+  // In the checking below, we let stored-property accesses go ignored,
+  // so that flow-isolation can warn about them only if needed. This helps
+  // prevent needless warnings on property accesses that will actually be OK
+  // with flow-isolation in the future.
+  if (auto oldFn = isActorInitOrDeInitContext(refCxt)) {
+    auto oldFnMut = const_cast<AbstractFunctionDecl*>(oldFn);
+
+    // If function did not have the escaping-use restriction, then it gets
+    // no special permissions here.
+    if (!wasLegacyEscapingUseRestriction(oldFnMut))
+      return false;
+
+    // At this point, the special permission will be granted. But, we
+    // need to warn now about this permission being taken away in Swift 6
+    // for specific kinds of non-stored-property member accesses:
+
+    // If the context in which we consider the access matches between the
+    // old (escaping-use restriction) and new (flow-isolation) contexts,
+    // and it is a stored property, then permit it here without any warning.
+    // Later, flow-isolation pass will check and emit a warning if needed.
+    if (refCxt == oldFn && isStoredProperty(member))
+      return true;
+
+    // Otherwise, it's definitely going to be illegal, so warn and permit.
+    auto &diags = refCxt->getASTContext().Diags;
+    auto useKindInt = static_cast<unsigned>(
+        useKind.getValueOr(VarRefUseEnv::Read));
+
+    diags.diagnose(
+        memberLoc, diag::actor_isolated_non_self_reference,
+        member->getDescriptiveKind(),
+        member->getName(),
+        useKindInt,
+        baseActor.kind,
+        baseActor.globalActor,
+        getActorIsolation(const_cast<ValueDecl *>(member)))
+    .warnUntilSwiftVersion(6);
+
+    noteIsolatedActorMember(member, useKind);
+    return true;
+  }
+
+  return false;
+}
+
+/// To support flow-isolation, some member accesses in inits / deinits
+/// must be permitted, despite the isolation of 'self' not being
+/// correct in Sema.
+///
+/// \param refCxt the context in which the member reference happens.
+/// \param baseActor the actor referenced in the base of the member access.
+/// \param member the declaration corresponding to the accessed member.
+/// \param memberLoc the source location of the reference to the member.
+///
+/// \returns true iff the member access is permitted in Sema because it will
+/// be verified later by flow-isolation.
+static bool checkedByFlowIsolation(DeclContext const *refCxt,
+                                   ReferencedActor &baseActor,
+                                   ValueDecl const *member,
+                                   SourceLoc memberLoc,
+                                   Optional<VarRefUseEnv> useKind) {
+
+  // base of member reference must be `self`
+  if (!baseActor.isSelf())
+    return false;
+
+  // Must be directly in an init/deinit that uses flow-isolation,
+  // or a defer within such a functions.
+  //
+  // NOTE: once flow-isolation can analyze calls to arbitrary local
+  // functions, we should be using isActorInitOrDeInitContext instead
+  // of this ugly loop.
+  AbstractFunctionDecl const* fnDecl = nullptr;
+  while (true) {
+    fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(refCxt->getAsDecl());
+    if (!fnDecl)
+      break;
+
+    // go up one level if this context is a defer.
+    if (auto *d = dyn_cast<FuncDecl>(fnDecl)) {
+      if (d->isDeferBody()) {
+        refCxt = refCxt->getParent();
+        continue;
+      }
+    }
+    break;
+  }
+
+  if (memberAccessHasSpecialPermissionInSwift5(refCxt, baseActor, member,
+                                               memberLoc, useKind))
+    return true; // then permit it now.
+
+  if (!usesFlowSensitiveIsolation(fnDecl))
+    return false;
+
+  // Stored properties are definitely OK.
+  if (isStoredProperty(member))
+    return true;
+
+  return false;
+}
+
+/// Get the actor isolation of the innermost relevant context.
+static ActorIsolation getInnermostIsolatedContext(const DeclContext *dc) {
+  // Retrieve the actor isolation of the context.
+  auto mutableDC = const_cast<DeclContext *>(dc);
+  switch (auto isolation = getActorIsolationOfContext(mutableDC)) {
+  case ActorIsolation::ActorInstance:
+  case ActorIsolation::Independent:
+  case ActorIsolation::Unspecified:
+    return isolation;
+
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe:
+    return ActorIsolation::forGlobalActor(
+        dc->mapTypeIntoContext(isolation.getGlobalActor()),
+        isolation == ActorIsolation::GlobalActorUnsafe)
+          .withPreconcurrency(isolation.preconcurrency());
+  }
+}
+
+/// Determine whether this declaration is always accessed asynchronously.
+static bool isAsyncDecl(ConcreteDeclRef declRef) {
+  auto decl = declRef.getDecl();
+
+  // An async function is asynchronously accessed.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+    return func->hasAsync();
+
+  // A computed property or subscript that has an 'async' getter
+  // is asynchronously accessed.
+  if (auto storageDecl = dyn_cast<AbstractStorageDecl>(decl)) {
+    if (auto effectfulGetter = storageDecl->getEffectfulGetAccessor())
+      return effectfulGetter->hasAsync();
+  }
+
+  return false;
+}
+
+static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
+  auto fn = dyn_cast<FuncDecl>(dc);
+  if (!fn) return nullptr;
+  if (fn->isDeferBody())
+    return findAnnotatableFunction(fn->getDeclContext());
+  return fn;
+}
+
+/// Note when the enclosing context could be put on a global actor.
+static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
+  // If we are in a synchronous function on the global actor,
+  // suggest annotating with the global actor itself.
+  if (auto fn = findAnnotatableFunction(dc)) {
+    // Suppress this for accesssors because you can't change the
+    // actor isolation of an individual accessor.  Arguably we could
+    // add this to the entire storage declaration, though.
+    // Suppress this for async functions out of caution; but don't
+    // suppress it if we looked through a defer.
+    if (!isa<AccessorDecl>(fn) &&
+        (!fn->isAsyncContext() || fn != dc)) {
+      switch (getActorIsolation(fn)) {
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
+      case ActorIsolation::Independent:
+        return;
+
+      case ActorIsolation::Unspecified:
+        fn->diagnose(diag::note_add_globalactor_to_function,
+            globalActor->getWithoutParens().getString(),
+            fn->getDescriptiveKind(),
+            fn->getName(),
+            globalActor)
+          .fixItInsert(fn->getAttributeInsertionLoc(false),
+            diag::insert_globalactor_attr, globalActor);
+          return;
+      }
+    }
+  }
+}
+
+namespace {
   /// Check for adherence to the actor isolation rules, emitting errors
   /// when actor-isolated declarations are used in an unsafe manner.
   class ActorIsolationChecker : public ASTWalker {
@@ -1388,14 +1673,6 @@ namespace {
     /// an inout expr.
     llvm::SmallDenseMap<MutableVarSource, MutableVarParent, 4>
       mutableLocalVarParent;
-
-    /// The values for each case in this enum correspond to %select numbers
-    /// in a diagnostic, so be sure to update it if you add new cases.
-    enum class VarRefUseEnv {
-      Read = 0,
-      Mutating = 1,
-      Inout = 2 // means Mutating; having a separate kind helps diagnostics
-    };
 
     static bool isPropOrSubscript(ValueDecl const* decl) {
       return isa<VarDecl>(decl) || isa<SubscriptDecl>(decl);
@@ -1923,16 +2200,6 @@ namespace {
       return ReferencedActor(var, isPotentiallyIsolated, ReferencedActor::NonIsolatedParameter);
     }
 
-    /// If the expression is a reference to `self`, the `self` declaration.
-    VarDecl *getReferencedSelf(Expr *expr) {
-      if (auto selfVar = getReferencedParamOrCapture(expr))
-        if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
-          return selfVar;
-
-      // Not a self reference.
-      return nullptr;
-    }
-
     VarDecl *findReferencedBaseSelf(Expr *expr) {
       if (auto selfVar = getReferencedParamOrCapture(expr))
         if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
@@ -1966,86 +2233,10 @@ namespace {
       return nullptr;
     }
 
-    static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
-      auto fn = dyn_cast<FuncDecl>(dc);
-      if (!fn) return nullptr;
-      if (fn->isDeferBody())
-        return findAnnotatableFunction(fn->getDeclContext());
-      return fn;
-    }
-
-    /// Note when the enclosing context could be put on a global actor.
-    void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
-      // If we are in a synchronous function on the global actor,
-      // suggest annotating with the global actor itself.
-      if (auto fn = findAnnotatableFunction(dc)) {
-        // Suppress this for accesssors because you can't change the
-        // actor isolation of an individual accessor.  Arguably we could
-        // add this to the entire storage declaration, though.
-        // Suppress this for async functions out of caution; but don't
-        // suppress it if we looked through a defer.
-        if (!isa<AccessorDecl>(fn) &&
-            (!fn->isAsyncContext() || fn != dc)) {
-          switch (getActorIsolation(fn)) {
-          case ActorIsolation::ActorInstance:
-          case ActorIsolation::GlobalActor:
-          case ActorIsolation::GlobalActorUnsafe:
-          case ActorIsolation::Independent:
-            return;
-
-          case ActorIsolation::Unspecified:
-            fn->diagnose(diag::note_add_globalactor_to_function,
-                globalActor->getWithoutParens().getString(),
-                fn->getDescriptiveKind(),
-                fn->getName(),
-                globalActor)
-              .fixItInsert(fn->getAttributeInsertionLoc(false),
-                diag::insert_globalactor_attr, globalActor);
-              return;
-          }
-        }
-      }
-    }
-
     /// Note that the given actor member is isolated.
     /// @param context is allowed to be null if no context is appropriate.
     void noteIsolatedActorMember(ValueDecl const* decl, Expr *context) {
-      // detect if it is a distributed actor, to provide better isolation notes
-
-      auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
-      bool isDistributedActor = false;
-      if (nominal) isDistributedActor = nominal->isDistributedActor();
-
-      // FIXME: Make this diagnostic more sensitive to the isolation context of
-      // the declaration.
-      if (isDistributedActor) {
-        if (isa<VarDecl>(decl)) {
-          // Distributed actor properties are never accessible externally.
-          decl->diagnose(diag::distributed_actor_isolated_property,
-                         decl->getDescriptiveKind(), decl->getName(),
-                         nominal->getName());
-        } else {
-          // it's a function or subscript
-          decl->diagnose(diag::note_distributed_actor_isolated_method,
-                         decl->getDescriptiveKind(),
-                         decl->getName());
-        }
-      } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        func->diagnose(diag::actor_isolated_sync_func,
-          decl->getDescriptiveKind(),
-          decl->getName());
-
-        // was it an attempt to mutate an actor instance's isolated state?
-      } else if (auto environment = kindOfUsage(decl, context)) {
-
-        if (environment.getValue() == VarRefUseEnv::Read)
-          decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
-        else
-          decl->diagnose(diag::actor_mutable_state, decl->getDescriptiveKind());
-
-      } else {
-        decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
-      }
+      ::noteIsolatedActorMember(decl, kindOfUsage(decl, context));
     }
 
     // Retrieve the nearest enclosing actor context.
@@ -2172,24 +2363,6 @@ namespace {
       };
       arg->getSubExpr()->forEachChildExpr(expressionWalker);
       return result;
-    }
-
-    /// Get the actor isolation of the innermost relevant context.
-    ActorIsolation getInnermostIsolatedContext(DeclContext *dc) {
-      // Retrieve the actor isolation of the context.
-      switch (auto isolation = getActorIsolationOfContext(dc)) {
-      case ActorIsolation::ActorInstance:
-      case ActorIsolation::Independent:
-      case ActorIsolation::Unspecified:
-        return isolation;
-
-      case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
-        return ActorIsolation::forGlobalActor(
-            dc->mapTypeIntoContext(isolation.getGlobalActor()),
-            isolation == ActorIsolation::GlobalActorUnsafe)
-              .withPreconcurrency(isolation.preconcurrency());
-      }
     }
 
     enum class AsyncMarkingResult {
@@ -2763,201 +2936,6 @@ namespace {
       return diagnosed;
     }
 
-    static AbstractFunctionDecl const *
-    isActorInitOrDeInitContext(const DeclContext *dc) {
-      return ::isActorInitOrDeInitContext(
-          dc, [](const AbstractClosureExpr *closure) {
-            return isSendableClosure(closure, /*forActorIsolation=*/false);
-          });
-    }
-
-    static bool isStoredProperty(ValueDecl const *member) {
-      if (auto *var = dyn_cast<VarDecl>(member))
-        if (var->hasStorage() && var->isInstanceMember())
-          return true;
-      return false;
-    }
-
-    /// Based on the former escaping-use restriction, which was replaced by
-    /// flow-isolation. We need this to support backwards compatability in the
-    /// type-checker for programs prior to Swift 6.
-    /// \param fn either a constructor or destructor of an actor.
-    static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
-      assert(fn->getDeclContext()->getSelfClassDecl()->isAnyActor());
-      assert(isa<ConstructorDecl>(fn) || isa<DestructorDecl>(fn));
-
-      // according to today's isolation, determine whether it use to have the
-      // escaping-use restriction
-      switch (getActorIsolation(fn).getKind()) {
-        case ActorIsolation::Independent:
-        case ActorIsolation::GlobalActor:
-        case ActorIsolation::GlobalActorUnsafe:
-          // convenience inits did not have the restriction.
-          if (auto *ctor = dyn_cast<ConstructorDecl>(fn))
-            if (ctor->isConvenienceInit())
-              return false;
-
-          break; // goto basic case
-
-        case ActorIsolation::ActorInstance:
-          // none of these had the restriction affect them.
-          assert(fn->hasAsync());
-          return false;
-
-        case ActorIsolation::Unspecified:
-          // this is basically just objc-marked inits.
-          break;
-      };
-
-      return !(fn->hasAsync()); // basic case: not async = had restriction.
-    }
-
-    /// An ad-hoc check specific to member isolation checking. assumed to be
-    /// queried when a self-member is being accessed in a context which is not
-    /// isolated to self. The "special permission" is part of a backwards
-    /// compatability with actor inits and deinits that maintains the
-    /// permissive nature of the escaping-use restriction, which was only
-    /// staged in as a warning. See implementation for more details.
-    ///
-    /// \returns true if this access in the given context should be allowed
-    /// in Sema, with the side-effect of emitting a warning as needed.
-    /// If false is returned, then the "special permission" was not granted.
-    bool memberAccessHasSpecialPermissionInSwift5(DeclContext const *refCxt,
-                                        ReferencedActor &baseActor,
-                                        ValueDecl const *member,
-                                        SourceLoc memberLoc,
-                                        Expr *exprCxt) {
-      // no need for this in Swift 6+
-      if (refCxt->getASTContext().isSwiftVersionAtLeast(6))
-        return false;
-
-      // must be an access to an instance member.
-      if (!member->isInstanceMember())
-        return false;
-
-      // In the history of actor initializers prior to Swift 6, self-isolated
-      // members could be referenced from any init or deinit, even a synchronous
-      // one, with no diagnostics at all.
-      //
-      // When the escaping-use restriction came into place for the release of
-      // 5.5, it was implemented as a warning and only applied to initializers,
-      // which stated that it would become an error in Swift 6.
-      //
-      // Once 5.6 was released, we also added restrictions in the deinits of
-      // actors, at least for accessing members other than stored properties.
-      //
-      // Later on, for 5.7 we introduced flow-isolation as part of SE-327 for
-      // both inits and deinits. This meant that stored property accesses now
-      // are only sometimes going to be problematic. This change also brought
-      // official changes in isolation for the inits and deinits to handle the
-      // the non-stored-property members. Since those isolation changes are
-      // currently in place, the purpose of the code below is to override the
-      // isolation checking, so that the now-mismatched isolation on member
-      // access is still permitted, but with a warning stating that it will
-      // be rejected in Swift 6.
-      //
-      // In the checking below, we let stored-property accesses go ignored,
-      // so that flow-isolation can warn about them only if needed. This helps
-      // prevent needless warnings on property accesses that will actually be OK
-      // with flow-isolation in the future.
-      if (auto oldFn = isActorInitOrDeInitContext(refCxt)) {
-        auto oldFnMut = const_cast<AbstractFunctionDecl*>(oldFn);
-
-        // If function did not have the escaping-use restriction, then it gets
-        // no special permissions here.
-        if (!wasLegacyEscapingUseRestriction(oldFnMut))
-          return false;
-
-        // At this point, the special permission will be granted. But, we
-        // need to warn now about this permission being taken away in Swift 6
-        // for specific kinds of non-stored-property member accesses:
-
-        // If the context in which we consider the access matches between the
-        // old (escaping-use restriction) and new (flow-isolation) contexts,
-        // and it is a stored property, then permit it here without any warning.
-        // Later, flow-isolation pass will check and emit a warning if needed.
-        if (refCxt == oldFn && isStoredProperty(member))
-          return true;
-
-
-        // Otherwise, it's definitely going to be illegal, so warn and permit.
-        auto &diags = refCxt->getASTContext().Diags;
-        auto useKind = static_cast<unsigned>(
-            kindOfUsage(member, exprCxt).getValueOr(VarRefUseEnv::Read));
-
-        diags.diagnose(
-            memberLoc, diag::actor_isolated_non_self_reference,
-            member->getDescriptiveKind(),
-            member->getName(),
-            useKind,
-            baseActor.kind - 1,
-            baseActor.globalActor)
-        .warnUntilSwiftVersion(6);
-
-        noteIsolatedActorMember(member, exprCxt);
-        return true;
-      }
-
-      return false;
-    }
-
-    /// To support flow-isolation, some member accesses in inits / deinits
-    /// must be permitted, despite the isolation of 'self' not being
-    /// correct in Sema.
-    ///
-    /// \param refCxt the context in which the member reference happens.
-    /// \param baseActor the actor referenced in the base of the member access.
-    /// \param member the declaration corresponding to the accessed member.
-    /// \param memberLoc the source location of the reference to the member.
-    ///
-    /// \returns true iff the member access is permitted in Sema because it will
-    /// be verified later by flow-isolation.
-    bool checkedByFlowIsolation(DeclContext const *refCxt,
-                                ReferencedActor &baseActor,
-                                ValueDecl const *member,
-                                SourceLoc memberLoc,
-                                Expr *exprCxt) {
-
-      // base of member reference must be `self`
-      if (!baseActor.isActorSelf())
-        return false;
-
-      // Must be directly in an init/deinit that uses flow-isolation,
-      // or a defer within such a functions.
-      //
-      // NOTE: once flow-isolation can analyze calls to arbitrary local
-      // functions, we should be using isActorInitOrDeInitContext instead
-      // of this ugly loop.
-      AbstractFunctionDecl const* fnDecl = nullptr;
-      while (true) {
-        fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(refCxt->getAsDecl());
-        if (!fnDecl)
-          break;
-
-        // go up one level if this context is a defer.
-        if (auto *d = dyn_cast<FuncDecl>(fnDecl)) {
-          if (d->isDeferBody()) {
-            refCxt = refCxt->getParent();
-            continue;
-          }
-        }
-        break;
-      }
-
-      if (memberAccessHasSpecialPermissionInSwift5(refCxt, baseActor, member,
-                                                   memberLoc, exprCxt))
-        return true; // then permit it now.
-
-      if (!usesFlowSensitiveIsolation(fnDecl))
-        return false;
-
-      // Stored properties are definitely OK.
-      if (isStoredProperty(member))
-          return true;
-
-      return false;
-    }
-
     /// Check a reference to a local or global.
     bool checkNonMemberReference(
         ConcreteDeclRef valueRef, SourceLoc loc, DeclRefExpr *declRefExpr) {
@@ -3008,92 +2986,75 @@ namespace {
         return false;
 
       auto member = memberRef.getDecl();
-      switch (auto isolation =
-                  ActorIsolationRestriction::forDeclaration(
-                    memberRef, getDeclContext())) {
-      case ActorIsolationRestriction::Unrestricted:
+      auto isolatedActor = getIsolatedActor(base);
+      auto result = ActorReferenceResult::forReference(
+          memberRef, memberLoc, getDeclContext(),
+          kindOfUsage(member, context), isolatedActor);
+      switch (result) {
+      case ActorReferenceResult::SameConcurrencyDomain:
         return false;
 
-      case ActorIsolationRestriction::CrossActorSelf: {
-        // If a cross-actor reference is to an isolated actor, it's not
-        // crossing actors.
-        auto isolatedActor = getIsolatedActor(base);
-        if (isolatedActor)
-          return false;
+      case ActorReferenceResult::ExitsActorToNonisolated:
+        // FIXME: SE-0338 would trigger Sendable checks here.
+        return false;
 
-        // For now, cross-actor self reference to a member is OK from an actor's
-        // init or deinit. Later, flow-isolation will check unsafe references.
-        if (isActorInitOrDeInitContext(getDeclContext()))
-          return false;
-
-        // If we have a distributed actor that might be remote, check that
-        // we are referencing a properly-distributed member.
-        bool performDistributedChecks =
-            isolation.getActorType()->isDistributedActor() &&
-            !isolatedActor.isPotentiallyIsolated &&
-            !isa<ConstructorDecl>(member) &&
-            !member->getAttrs().hasAttribute<KnownToBeLocalAttr>();
-        if (performDistributedChecks) {
-          if (auto access = checkDistributedAccess(memberLoc, member, context)){
-            // This is a distributed access, so mark it as throwing or
-            // using a distributed thunk as appropriate.
-            markNearestCallAsImplicitly(None, access->first, access->second);
-          } else {
-            return true;
-          }
-        }
-
-        return diagnoseNonSendableTypesInReference(
-            memberRef, getDeclContext(), memberLoc,
-            SendableCheckReason::CrossActor);
+      case ActorReferenceResult::EntersActor:
+        // Handle all of the checking below.
+        break;
       }
 
-      case ActorIsolationRestriction::ActorSelf: {
-        // Check whether the base is a reference to an isolated actor instance.
-        // If so, there's nothing more to check.
-        auto isolatedActor = getIsolatedActor(base);
-        if (isolatedActor)
-          return false;
+      // A partial application of a global-actor-isolated member is always
+      // okay, because the global actor is part of the resulting function
+      // type.
+      if (partialApply && result.isolation.isGlobalActor())
+        return false;
 
-        // Some initializers and deinitializers have special permission to
-        // access an isolated member on `self`. If that case applies, then we
-        // can skip checking.
-        if (checkedByFlowIsolation(getDeclContext(), isolatedActor,
-                                          member, memberLoc, context))
-          return false;
+      // A call to a global-actor-isolated function is diagnosed elsewhere.
+      if (!partialApply && result.isolation.isGlobalActor() &&
+          isa<AbstractFunctionDecl>(member))
+        return false;
 
-        // An escaping partial application of something that is part of
-        // the actor's isolated state is never permitted.
-        if (partialApply && partialApply->isEscaping) {
-          ctx.Diags.diagnose(
-              memberLoc, diag::actor_isolated_partial_apply,
-              member->getDescriptiveKind(),
-              member->getName());
-          return true;
-        }
+      // An escaping partial application of something that is part of
+      // the actor's isolated state is never permitted.
+      if (partialApply && partialApply->isEscaping && !isAsyncDecl(memberRef)) {
+        ctx.Diags.diagnose(
+            memberLoc, diag::actor_isolated_partial_apply,
+            member->getDescriptiveKind(),
+            member->getName());
+        return true;
+      }
 
-        // Try implicit asynchronous access.
-        bool isDistributed = isolation.getActorType()->isDistributedActor() &&
-            !isolatedActor.isPotentiallyIsolated;
-        auto implicitAsyncResult = tryMarkImplicitlyAsync(
-            memberLoc, memberRef, context,
-            ImplicitActorHopTarget::forInstanceSelf(),
-            isDistributed);
+      // If we do not need any async/throws/distributed checks, just perform
+      // Sendable checking and we're done.
+      if (!result.options) {
+        return diagnoseNonSendableTypesInReference(
+                   memberRef, getDeclContext(), memberLoc,
+                   SendableCheckReason::CrossActor);
+      }
 
-        switch (implicitAsyncResult) {
-        case AsyncMarkingResult::FoundAsync:
-          return false;
+      // Some combination of implicit async/throws/distributed is required.
+      bool isDistributed = result.options.contains(
+          ActorReferenceResult::Flags::Distributed);
 
-        case AsyncMarkingResult::NotSendable:
-        case AsyncMarkingResult::NotDistributed:
-          return true;
+      // Determine the actor hop.
+      ImplicitActorHopTarget target = result.isolation.isGlobalActor()
+          ? ImplicitActorHopTarget::forGlobalActor(
+              result.isolation.getGlobalActor())
+          : ImplicitActorHopTarget::forInstanceSelf();
+      auto implicitAsyncResult = tryMarkImplicitlyAsync(
+          memberLoc, memberRef, context, target, isDistributed);
+      switch (implicitAsyncResult) {
+      case AsyncMarkingResult::FoundAsync:
+        // Success! We're done.
+        return false;
 
-        case AsyncMarkingResult::NotFound:
-        case AsyncMarkingResult::SyncContext:
-          // Diagnose below.
-          break;
-        }
+      case AsyncMarkingResult::NotDistributed:
+      case AsyncMarkingResult::NotSendable:
+        // Failed, but diagnostics have already been emitted.
+        return true;
 
+      case AsyncMarkingResult::SyncContext:
+      case AsyncMarkingResult::NotFound:
         // Complain about access outside of the isolation domain.
         auto useKind = static_cast<unsigned>(
             kindOfUsage(member, context).getValueOr(VarRefUseEnv::Read));
@@ -3103,49 +3064,20 @@ namespace {
             member->getDescriptiveKind(),
             member->getName(),
             useKind,
-            isolatedActor.kind - 1,
-            isolatedActor.globalActor);
+            isolatedActor.kind,
+            isolatedActor.globalActor,
+            result.isolation);
 
         noteIsolatedActorMember(member, context);
-        // FIXME: If isolatedActor has a variable in it, refer to that with
-        // more detail?
-        return true;
-      }
 
-      case ActorIsolationRestriction::GlobalActorUnsafe:
-        // Only complain if we're in code that's adopted concurrency features.
-        if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
-          return false;
-
-        LLVM_FALLTHROUGH;
-
-      case ActorIsolationRestriction::GlobalActor: {
-        const bool isInitDeInit = isa<ConstructorDecl>(getDeclContext()) ||
-                                  isa<DestructorDecl>(getDeclContext());
-        // If we are within an initializer or deinitilizer and are referencing a
-        // stored property on "self", we are not crossing actors.
-        if (isInitDeInit && isa<VarDecl>(member) &&
-            cast<VarDecl>(member)->hasStorage() && getReferencedSelf(base))
-          return false;
-        return checkGlobalActorReference(
-            memberRef, memberLoc, isolation.getGlobalActor(),
-            isolation.isCrossActor, context);
-      }
-      case ActorIsolationRestriction::Unsafe:
-        // This case is hit when passing actor state inout to functions in some
-        // cases. The error is emitted by diagnoseInOutArg.
-        auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
-        if (nominal && nominal->isDistributedActor()) {
-          auto funcDecl = dyn_cast<AbstractFunctionDecl>(member);
-          if (funcDecl && !funcDecl->isStatic()) {
-            member->diagnose(diag::distributed_actor_isolated_method);
-            return true;
-          }
+        if (result.isolation.isGlobalActor()) {
+          noteGlobalActorOnContext(
+              const_cast<DeclContext *>(getDeclContext()),
+              result.isolation.getGlobalActor());
         }
 
-        return false;
+        return true;
       }
-      llvm_unreachable("unhandled actor isolation kind!");
     }
 
     // Attempt to resolve the global actor type of a closure.
@@ -4951,13 +4883,11 @@ AbstractFunctionDecl const *swift::isActorInitOrDeInitContext(
       // Non-Sendable local functions are considered part of the enclosing
       // context.
       if (func->getDeclContext()->isLocalContext()) {
-        if (auto fnType = func->getInterfaceType()->getAs<AnyFunctionType>()) {
-          if (fnType->isSendable())
-            return nullptr;
+        if (func->isSendable())
+          return nullptr;
 
-          dc = dc->getParent();
-          continue;
-        }
+        dc = dc->getParent();
+        continue;
       }
     }
 
@@ -5021,4 +4951,262 @@ bool swift::isPotentiallyIsolatedActor(
     return var->isSelfParamCaptureIsolated();
 
   return false;
+}
+
+/// Determine the actor isolation used when we are referencing the given
+/// declaration.
+static ActorIsolation getActorIsolationForReference(
+    ValueDecl *decl, const DeclContext *fromDC) {
+  auto declIsolation = getActorIsolation(decl);
+
+  // If the isolation is "unsafe" global actor isolation, adjust it based on
+  // context itself. For contexts that require strict checking, treat it as
+  // global actor isolation. Otherwise, treat it as unspecified isolation.
+  if (declIsolation == ActorIsolation::GlobalActorUnsafe) {
+    if (contextRequiresStrictConcurrencyChecking(
+            fromDC,
+            [](const AbstractClosureExpr *closure) {
+              return closure->getType();
+            })) {
+      declIsolation = ActorIsolation::forGlobalActor(
+          declIsolation.getGlobalActor(), /*unsafe=*/false);
+    } else {
+      declIsolation = ActorIsolation::forUnspecified();
+    }
+  }
+
+  // A constructor that is not explicitly 'nonisolated' is treated as
+  // isolated from the perspective of the referencer.
+  if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+    // If the constructor is part of an actor, references to it are treated
+    // as needing to enter the actor.
+    if (auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl()) {
+      if (nominal->isAnyActor())
+        return ActorIsolation::forActorInstance(nominal);
+    }
+
+    // Fall through to treat initializers like any other declaration.
+  }
+
+  // A 'nonisolated let' within an actor is treated as isolated from the
+  // perspective of the referencer.
+  //
+  // FIXME: getActorIsolation(decl) should treat these as isolated.
+  // FIXME: Expand this out to local variables?
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    if (var->isLet() && isStoredProperty(var) &&
+        declIsolation.isIndependent()) {
+      if (auto nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
+        if (nominal->isAnyActor())
+          return ActorIsolation::forActorInstance(nominal);
+
+        auto nominalIsolation = getActorIsolation(nominal);
+        if (nominalIsolation.isGlobalActor())
+          return getActorIsolationForReference(nominal, fromDC);
+      }
+    }
+  }
+
+  return declIsolation;
+}
+
+/// Determine whether this declaration always throws.
+static bool isThrowsDecl(ConcreteDeclRef declRef) {
+  auto decl = declRef.getDecl();
+
+  // An async function is asynchronously accessed.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+    return func->hasThrows();
+
+  // A computed property or subscript that has an 'async' getter
+  // is asynchronously accessed.
+  if (auto storageDecl = dyn_cast<AbstractStorageDecl>(decl)) {
+    if (auto effectfulGetter = storageDecl->getEffectfulGetAccessor())
+      return effectfulGetter->hasThrows();
+  }
+
+  return false;
+}
+
+/// Determine whether the given value can be accessed across actors
+/// without requiring async promotion.
+///
+/// \param value The value we are checking.
+/// \param isolation The actor isolation of the value.
+/// \param fromDC The context where we are performing the access.
+static bool isAccessibleAcrossActorsWithoutAsyncPromotion(
+    ValueDecl *value, const ActorIsolation &isolation,
+    const DeclContext *fromDC, Optional<ReferencedActor> actorInstance) {
+  switch (value->getKind()) {
+  case DeclKind::AssociatedType:
+  case DeclKind::Class:
+  case DeclKind::Enum:
+  case DeclKind::Extension:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::OpaqueType:
+  case DeclKind::Protocol:
+  case DeclKind::Struct:
+  case DeclKind::TypeAlias:
+    return true;
+
+  case DeclKind::EnumCase:
+  case DeclKind::EnumElement:
+    // Type-level entities are always accessible across actors.
+    return true;
+
+  case DeclKind::IfConfig:
+  case DeclKind::Import:
+  case DeclKind::InfixOperator:
+  case DeclKind::MissingMember:
+  case DeclKind::Module:
+  case DeclKind::PatternBinding:
+  case DeclKind::PostfixOperator:
+  case DeclKind::PoundDiagnostic:
+  case DeclKind::PrecedenceGroup:
+  case DeclKind::PrefixOperator:
+  case DeclKind::TopLevelCode:
+    // Non-value entities are always accessible across actors.
+    return true;
+
+  case DeclKind::Destructor:
+    // Destructors are always accessible across actors.
+    return true;
+
+  case DeclKind::Constructor:
+    // Initializers are accessible across actors unless they are global-actor
+    // qualified.
+    switch (isolation) {
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::Independent:
+    case ActorIsolation::Unspecified:
+      return true;
+
+    case ActorIsolation::GlobalActorUnsafe:
+    case ActorIsolation::GlobalActor:
+      return false;
+    }
+
+  case DeclKind::Param:
+  case DeclKind::Var:
+    // 'let' declarations are immutable, so some of them can be accessed across
+    // actors.
+    return varIsSafeAcrossActors(
+        fromDC->getParentModule(), cast<VarDecl>(value), isolation);
+
+  case DeclKind::Accessor:
+  case DeclKind::Func:
+  case DeclKind::Subscript:
+    return false;
+  }
+}
+
+ActorReferenceResult ActorReferenceResult::forSameConcurrencyDomain(
+    ActorIsolation isolation) {
+  return ActorReferenceResult{SameConcurrencyDomain, None, isolation};
+}
+
+ActorReferenceResult ActorReferenceResult::forEntersActor(
+    ActorIsolation isolation, Options options) {
+  return ActorReferenceResult{EntersActor, options, isolation};
+}
+
+ActorReferenceResult ActorReferenceResult::forExitsActorToNonisolated(
+    ActorIsolation isolation) {
+  return ActorReferenceResult{ExitsActorToNonisolated, None, isolation};
+}
+
+ActorReferenceResult ActorReferenceResult::forReference(
+    ConcreteDeclRef declRef, SourceLoc declRefLoc, const DeclContext *fromDC,
+    Optional<VarRefUseEnv> useKind,
+    Optional<ReferencedActor> actorInstance) {
+  // Compute the isolation of the declaration, adjusted for references.
+  auto declIsolation = getActorIsolationForReference(declRef.getDecl(), fromDC);
+  if (auto subs = declRef.getSubstitutions())
+    declIsolation = declIsolation.subst(subs);
+
+  // Compute the isolation of the context.
+  auto contextIsolation = getInnermostIsolatedContext(fromDC);
+
+  // When the declaration is not actor-isolated, it can always be accessed
+  // directly.
+  if (!declIsolation.isActorIsolated()) {
+    // If the declaration is asynchronous and we are in an actor-isolated
+    // context (of any kind), then we exit the actor to the nonisolated context.
+    if (isAsyncDecl(declRef) && contextIsolation.isActorIsolated())
+      return forExitsActorToNonisolated(contextIsolation);
+
+    // Otherwise, we stay in the same concurrency domain, whether on an actor
+    // or in a task.
+    return forSameConcurrencyDomain(declIsolation);
+  }
+
+  // The declaration we are accessing is actor-isolated. First, check whether
+  // we are on the same actor already.
+  if (actorInstance && declIsolation == ActorIsolation::ActorInstance) {
+    // If this instance is isolated, we're in the same concurrency domain.
+    if (actorInstance->isIsolated())
+      return forSameConcurrencyDomain(declIsolation);
+  } else if (contextIsolation == declIsolation) {
+    // The context isolation matches, so we are in the same concurrency
+    // domain.
+    return forSameConcurrencyDomain(declIsolation);
+  }
+
+  // If there is an instance and it is checked by flow isolation, treat it
+  // as being in the same concurrency domain.
+  if (actorInstance &&
+      checkedByFlowIsolation(
+          fromDC, *actorInstance, declRef.getDecl(), declRefLoc, useKind))
+    return forSameConcurrencyDomain(declIsolation);
+
+  // If we are delegating to another initializer, treat them as being in the
+  // same concurrency domain.
+  // FIXME: This has a lot of overlap with both the stored-property checks
+  // below and the flow-isolation checks above.
+  if (actorInstance && actorInstance->isSelf() &&
+      isa<ConstructorDecl>(declRef.getDecl()) &&
+      isa<ConstructorDecl>(fromDC))
+    return forSameConcurrencyDomain(declIsolation);
+
+  // If there is an instance that corresponds to 'self',
+  // we are in a constructor or destructor, and we have a stored property of
+  // global-actor-qualified type, pretend we are in the same concurrency
+  // domain.
+  // FIXME: This is an odd carve-out that probably shouldn't have been allowed.
+  // It should at the very least be diagnosed, and either subsumed by flow
+  // isolation or banned outright.
+  // FIXME: At the very least, we should consistently use
+  // isActorInitOrDeInitContext here, but it only wants to think about actors.
+  if (actorInstance && actorInstance->isSelf() &&
+      isStoredProperty(declRef.getDecl()) &&
+      declIsolation.isGlobalActor() &&
+      (isa<ConstructorDecl>(fromDC) || isa<DestructorDecl>(fromDC)))
+    return forSameConcurrencyDomain(declIsolation);
+
+  // At this point, we are accessing the target from outside the actor.
+  // First, check whether it is something that can be accessed directly,
+  // without any kind of promotion.
+  if (isAccessibleAcrossActorsWithoutAsyncPromotion(
+          declRef.getDecl(), declIsolation, fromDC, actorInstance))
+    return forEntersActor(declIsolation, None);
+
+  // This is a cross-actor reference, so determine what adjustments we need
+  // to perform.
+  Options options = None;
+
+  // If the declaration isn't asynchronous, promote to async.
+  if (!isAsyncDecl(declRef))
+    options |= Flags::AsyncPromotion;
+
+  // If the declaration is isolated to a distributed actor and we are not
+  // guaranteed to be on the same node, adjustments for a distributed call.
+  if (declIsolation.isDistributedActor() &&
+      !(actorInstance && actorInstance->isKnownToBeLocal())) {
+    options |= Flags::Distributed;
+
+    if (!isThrowsDecl(declRef))
+      options |= Flags::ThrowsPromotion;
+  }
+
+  return forEntersActor(declIsolation, options);
 }

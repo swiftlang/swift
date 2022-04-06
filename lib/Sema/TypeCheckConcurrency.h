@@ -222,6 +222,151 @@ bool contextRequiresStrictConcurrencyChecking(
     const DeclContext *dc,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
 
+/// Describes a referenced actor variable and whether it is isolated.
+struct ReferencedActor {
+  /// Describes whether the actor variable is isolated or, if it is not
+  /// isolated, why it is not isolated.
+  enum Kind {
+    /// It is isolated.
+    Isolated = 0,
+
+    /// It is not an isolated parameter at all.
+    NonIsolatedParameter,
+
+    // It is within a Sendable function.
+    SendableFunction,
+
+    // It is within a Sendable closure.
+    SendableClosure,
+
+    // It is within an 'async let' initializer.
+    AsyncLet,
+
+    // It is within a global actor.
+    GlobalActor,
+
+    // It is within the main actor.
+    MainActor,
+
+    // It is within a nonisolated context.
+    NonIsolatedContext,
+
+    // It is within a nonisolated autoclosure argument. This is primarily here
+    // to aid in giving specific diagnostics, because autoclosures are not
+    // always easy for programmers to notice.
+    NonIsolatedAutoclosure
+  };
+
+  VarDecl * const actor;
+  /// The outer scope is known to be running on an actor.
+  /// We may be isolated to the actor or not, depending on the exact expression
+  const bool isPotentiallyIsolated;
+  const Kind kind;
+  const Type globalActor;
+
+  ReferencedActor(VarDecl *actor, bool isPotentiallyIsolated, Kind kind, Type globalActor = Type())
+    : actor(actor),
+      isPotentiallyIsolated(isPotentiallyIsolated),
+      kind(kind),
+      globalActor(globalActor) {}
+
+  static ReferencedActor forGlobalActor(VarDecl *actor,
+                                        bool isPotentiallyIsolated,
+                                        Type globalActor);
+
+  bool isIsolated() const { return kind == Isolated; }
+
+  /// Whether the variable is "self" or a capture therefore.
+  bool isSelf() const {
+    if (!actor)
+      return false;
+
+    return actor->isSelfParameter() || actor->isSelfParamCapture();
+  }
+
+  /// Whether the referenced actor is known to be local.
+  bool isKnownToBeLocal() const;
+
+  explicit operator bool() const { return isIsolated(); }
+};
+
+/// The values for each case in this enum correspond to %select numbers
+/// in a diagnostic, so be sure to update it if you add new cases.
+enum class VarRefUseEnv {
+  Read = 0,
+  Mutating = 1,
+  Inout = 2 // means Mutating; having a separate kind helps diagnostics
+};
+
+/// Describes the result of referencing a declaration.
+struct ActorReferenceResult {
+  enum Kind: uint8_t {
+    /// The declaration being referenced is within the same concurrency
+    /// domain as where the reference occurs, so no checking is required.
+    SameConcurrencyDomain,
+    /// Using the declaration requires entering a new actor, which might also
+    /// mean switching away from the current actor.
+    EntersActor,
+    /// Using the declaration means leaving the current actor, exiting to
+    /// a nonisolated context.
+    ExitsActorToNonisolated,
+  };
+
+  /// Flags describing any additional adjustments or requirements when
+  /// accessing the declaration.
+  enum class Flags: uint8_t {
+    /// A synchronous declaration must be accessed asynchronously to enter its
+    /// actor.
+    AsyncPromotion = 1 << 0,
+
+    /// A non-throwing declaration that is potentially being accessed from
+    /// another node, and can therefore throw an error due to transport
+    /// failure.
+    ThrowsPromotion = 1 << 1,
+
+    /// The declaration is being accessed from outside the actor and
+    /// potentially from a different node, so it must be marked 'distributed'.
+    Distributed = 1 << 2,
+  };
+
+  using Options = OptionSet<Flags>;
+
+  const Kind kind;
+  const Options options;
+  const ActorIsolation isolation;
+
+private:
+  static ActorReferenceResult forSameConcurrencyDomain(
+      ActorIsolation isolation);
+
+  static ActorReferenceResult forEntersActor(
+      ActorIsolation isolation, Options options);
+
+  static ActorReferenceResult forExitsActorToNonisolated(
+      ActorIsolation isolation);
+
+public:
+  /// Determine what happens when referencing the given declaration from the
+  /// given declaration context.
+  ///
+  ///
+  /// \param declRef The declaration that is being referenced.
+  ///
+  /// \param fromDC The declaration context from which the reference occurs.
+  ///
+  /// \param actorInstance When not \c None, the actor instance value that is
+  /// provided when referencing the declaration. This can be either the base
+  /// of a member access or a parameter passed to a function.
+  static ActorReferenceResult forReference(
+      ConcreteDeclRef declRef,
+      SourceLoc declRefLoc,
+      const DeclContext *fromDC,
+      Optional<VarRefUseEnv> useKind,
+      Optional<ReferencedActor> actorInstance = None);
+
+  operator Kind() const { return kind; }
+};
+
 /// Diagnose the presence of any non-sendable types when referencing a
 /// given declaration from a particular declaration context.
 ///

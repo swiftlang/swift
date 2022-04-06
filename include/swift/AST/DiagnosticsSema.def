@@ -4558,13 +4558,16 @@ ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
       "explicitly defined", ())
 ERROR(actor_isolated_non_self_reference,none,
-        "actor-isolated %0 %1 can not be "
+        "%5 %0 %1 can not be "
         "%select{referenced|mutated|used 'inout'}2 "
-        "%select{on a non-isolated actor instance|"
+        "%select{on a different actor instance|"
+        "on a non-isolated actor instance|"
         "from a Sendable function|from a Sendable closure|"
         "from an 'async let' initializer|from global actor %4|"
-        "from the main actor|from a non-isolated context|from a non-isolated autoclosure}3",
-        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
+        "from the main actor|from a non-isolated context|"
+        "from a non-isolated autoclosure}3",
+        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type,
+         ActorIsolation))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %0 %1 can not be accessed from a "
       "non-isolated context",

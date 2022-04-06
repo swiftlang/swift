@@ -7892,6 +7892,9 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
       }))
     return false;
 
+  if (actor->isKnownToBeLocal())
+    return false;
+  
   bool isInAsyncLetInitializer = target && target->isAsyncLetInitializer();
 
   auto isActorInitOrDeInitContext = [&](const DeclContext *dc) {
