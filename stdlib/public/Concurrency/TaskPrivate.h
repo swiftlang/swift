@@ -525,10 +525,12 @@ public:
 #endif
 static_assert(sizeof(ActiveTaskStatus) == ACTIVE_TASK_STATUS_SIZE,
   "ActiveTaskStatus is of incorrect size");
-static_assert(sizeof(std::atomic<ActiveTaskStatus>) == sizeof(ActiveTaskStatus),
-              "ActiveTaskStatus is misaligned");
+#if !defined(_WIN64)
 static_assert(sizeof(swift::atomic<ActiveTaskStatus>) == sizeof(std::atomic<ActiveTaskStatus>),
-              "swift::atomic and std::atomic are unaligned");
+              "swift::atomic pads std::atomic, memory aliasing invariants violated");
+#endif
+static_assert(sizeof(swift::atomic<ActiveTaskStatus>) == sizeof(ActiveTaskStatus),
+              "swift::atomic pads ActiveTaskStatus, memory aliasing invariants violated");
 
 /// The size of an allocator slab. We want the full allocation to fit into a
 /// 1024-byte malloc quantum. We subtract off the slab header size, plus a
