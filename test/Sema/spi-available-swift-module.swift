@@ -1,4 +1,5 @@
 // REQUIRES: OS=ios
+// REQUIRES: rdar91325474
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/macos)
 // RUN: %empty-directory(%t/ios)
