@@ -15,7 +15,9 @@ set(swift_string_processing_link_libraries
   swift_RegexParser)
 
 file(GLOB_RECURSE _STRING_PROCESSING_SOURCES
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_StringProcessing/*.swift")
+  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_StringProcessing/*.swift"
+  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_CUnicode/*.h"
+  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_CUnicode/*.c")
 set(STRING_PROCESSING_SOURCES)
 foreach(source ${_STRING_PROCESSING_SOURCES})
   file(TO_CMAKE_PATH "${source}" source)

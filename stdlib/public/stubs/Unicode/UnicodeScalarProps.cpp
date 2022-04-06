@@ -490,7 +490,7 @@ __swift_uint8_t _swift_stdlib_getScript(__swift_uint32_t scalar) {
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const __swift_uint8_t *_swift_stdlib_getScriptExtensions(__swift_uint32_t scalar,
-                                                      __swift_uint8_t *count) {
+                                                       __swift_uint8_t *count) {
 #if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
   swift::swift_abortDisabledUnicodeSupport();
 #else

@@ -133,7 +133,7 @@ extension Substring {
 extension Unicode.Scalar.Properties {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
-  public var script: UInt8 {
+  public var _script: UInt8 {
     let rawValue = _swift_stdlib_getScript(_scalar.value)
 
     _internalInvariant(rawValue != .max, "Unknown script rawValue")
@@ -143,23 +143,23 @@ extension Unicode.Scalar.Properties {
 
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
-  public var scriptExtensions: [UInt8] {
+  public var _scriptExtensions: [UInt8] {
     var count: UInt8 = 0
     let pointer = _swift_stdlib_getScriptExtensions(_scalar.value, &count)
 
     guard let pointer = pointer else {
-      return [script]
+      return [_script]
     }
 
     var result: [UInt8] = []
     result.reserveCapacity(Int(count))
 
     for i in 0 ..< count {
-      let script = pointer[Int(i)]
+      let rawValue = pointer[Int(i)]
 
-      _internalInvariant(script != .max, "Unknown script rawValue")
+      _internalInvariant(rawValue != .max, "Unknown script rawValue")
 
-      result.append(script)
+      result.append(rawValue)
     }
 
     return result
