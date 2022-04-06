@@ -49,6 +49,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/inplace_function.h"
 #include "swift/SIL/SILInstruction.h"
 #include <functional>
 
@@ -72,7 +73,7 @@ struct InstModCallbacks {
   /// A function that is called to notify that a new function was created.
   ///
   /// Default implementation is a no-op, but we still mark madeChange.
-  std::function<void(SILInstruction *newlyCreatedInst)> createdNewInstFunc;
+  stdext::inplace_function<void(SILInstruction *newlyCreatedInst)> createdNewInstFunc;
 
   /// A function sets the value in \p use to be \p newValue.
   ///
@@ -83,7 +84,7 @@ struct InstModCallbacks {
   ///
   /// This can have compile-time implications and should be avoided
   /// whenever possible in favor of more structured optimization passes.
-  std::function<void(Operand *use, SILValue newValue)> setUseValueFunc;
+  stdext::inplace_function<void(Operand *use, SILValue newValue)> setUseValueFunc;
 
   /// A function that takes in an instruction and deletes the inst.
   ///
@@ -110,7 +111,7 @@ struct InstModCallbacks {
   /// SILModule::scheduleForDeletion(); there's no longer a good use case for
   /// calling eraseFromParent() within this callback. Rewrite all clients
   /// without doing the instruction deletion within the callback.
-  std::function<void(SILInstruction *instToDelete)> deleteInstFunc;
+  stdext::inplace_function<void(SILInstruction *instToDelete)> deleteInstFunc;
 
   /// If non-null, called before a salient instruction is deleted or has its
   /// references dropped. If null, no-op.
@@ -129,7 +130,7 @@ struct InstModCallbacks {
   /// This is used in rare circumstances to update an optimization worklist. It
   /// should be avoided whenever possible in favor of more structured
   /// optimization passes.
-  std::function<void(SILInstruction *instThatWillBeDeleted)>
+  stdext::inplace_function<void(SILInstruction *instThatWillBeDeleted)>
       notifyWillBeDeletedFunc;
 
   /// A boolean that tracks if any of our callbacks were ever called.

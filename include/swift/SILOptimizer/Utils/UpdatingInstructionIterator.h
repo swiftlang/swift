@@ -34,6 +34,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_UPDATINGINSTRUCTIONITERATOR_H
 #define SWIFT_SILOPTIMIZER_UTILS_UPDATINGINSTRUCTIONITERATOR_H
 
+#include "swift/Basic/inplace_function.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -169,8 +170,8 @@ class UpdatingInstructionIteratorRegistry {
   SmallVector<UpdatingInstructionIterator *, 4> forwardIterators;
   SmallVector<UpdatingReverseInstructionIterator *, 4> reverseIterators;
 
-  std::function<void(SILInstruction *)> chainedDelete;
-  std::function<void(SILInstruction *)> chainedNew;
+  stdext::inplace_function<void(SILInstruction *)> chainedDelete;
+  stdext::inplace_function<void(SILInstruction *)> chainedNew;
 
   /// Callbacks used when adding/deleting instructions.
   InstModCallbacks callbacks;
