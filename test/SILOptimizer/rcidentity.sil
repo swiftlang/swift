@@ -8,7 +8,7 @@ import Builtin
 
 typealias AnyObject = Builtin.AnyObject
 
-protocol FakeAnyObject : class {}
+protocol FakeAnyObject : AnyObject {}
 
 class C : FakeAnyObject {
   init()
@@ -58,7 +58,8 @@ enum E1 {
 // Tests //
 ///////////
 
-// Make sure that we see all the way through the chain of casts that %9 has an RCIdentity of %0 and that %12 is really the partial apply.
+// Make sure that we see all the way through the chain of casts that %9 has
+// an RCIdentity of %0 and that %12 is really the partial apply.
 // CHECK-LABEL: @test_rcid_preserving_casts@
 // CHECK: RESULT #9: 9 = 0
 // CHECK: RESULT #12: 12 = 11

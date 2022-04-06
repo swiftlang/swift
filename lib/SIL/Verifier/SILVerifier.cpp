@@ -3994,8 +3994,7 @@ public:
     }
   }
 
-  void verifyCheckedCast(bool isExact, SILType fromTy, SILType toTy,
-                         bool isOpaque = false) {
+  void verifyCheckedCast(bool isExact, SILType fromTy, SILType toTy) {
     // Verify common invariants.
     require(fromTy.isObject() && toTy.isObject(),
             "value checked cast src and dest must be objects");
@@ -4003,8 +4002,8 @@ public:
     auto fromCanTy = fromTy.getASTType();
     auto toCanTy = toTy.getASTType();
 
-    require(isOpaque || canUseScalarCheckedCastInstructions(F.getModule(),
-                                                            fromCanTy, toCanTy),
+    require(canSILUseScalarCheckedCastInstructions(F.getModule(),
+                                                   fromCanTy, toCanTy),
             "invalid value checked cast src or dest types");
 
     // Peel off metatypes. If two types are checked-cast-able, so are their
