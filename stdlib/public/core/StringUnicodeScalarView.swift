@@ -379,7 +379,7 @@ extension String.UnicodeScalarView: RangeReplaceableCollection {
   /// string.
   ///
   /// - Parameters:
-  ///   - bounds: The range of elements to replace. The bounds of the range
+  ///   - subrange: The range of elements to replace. The bounds of the range
   ///     must be valid indices of the view.
   ///   - newElements: The new Unicode scalar values to add to the string.
   ///
@@ -388,18 +388,12 @@ extension String.UnicodeScalarView: RangeReplaceableCollection {
   ///   removes elements at the end of the string, the complexity is O(*n*),
   ///   where *n* is equal to `bounds.count`.
   public mutating func replaceSubrange<C>(
-    _ bounds: Range<Index>,
+    _ subrange: Range<Index>,
     with newElements: C
   ) where C: Collection, C.Element == Unicode.Scalar {
-    // TODO(String performance): Skip extra String and Array allocation
-    let bounds = _guts.validateScalarRange(bounds)
-    let utf8Replacement = newElements.flatMap { String($0).utf8 }
-    let replacement = utf8Replacement.withUnsafeBufferPointer {
-      return String._uncheckedFromUTF8($0)
-    }
-    var copy = String(_guts)
-    copy.replaceSubrange(bounds, with: replacement)
-    self = copy.unicodeScalars
+    let subrange = _guts.validateScalarRange(subrange)
+    _guts.replaceSubrange(subrange, with: newElements)
+    _invariantCheck()
   }
 }
 
