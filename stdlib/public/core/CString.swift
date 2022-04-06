@@ -42,11 +42,46 @@ extension String {
   ///     }
   ///     // Prints "Caf�"
   ///
-  /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
-  public init(cString: UnsafePointer<CChar>) {
-    let len = UTF8._nullCodeUnitOffset(in: cString)
+  /// - Parameter nullTerminatedUTF8: A pointer to a null-terminated UTF-8 code sequence.
+  public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
+    let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     self = String._fromUTF8Repairing(
-      UnsafeBufferPointer(start: cString._asUInt8, count: len)).0
+      UnsafeBufferPointer(start: nullTerminatedUTF8._asUInt8, count: len)).0
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  public init(cString nullTerminatedUTF8: [CChar]) {
+    self = nullTerminatedUTF8.withUnsafeBytes {
+      String(_checkingCString: $0.assumingMemoryBound(to: UInt8.self))
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  private init(_checkingCString bytes: UnsafeBufferPointer<UInt8>) {
+    guard let length = bytes.firstIndex(of: 0) else {
+      _preconditionFailure(
+        "input of String.init(cString:) must be null-terminated"
+      )
+    }
+    self = String._fromUTF8Repairing(
+      UnsafeBufferPointer(
+        start: bytes.baseAddress._unsafelyUnwrappedUnchecked,
+        count: length
+      )
+    ).0
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
+  public init(cString nullTerminatedUTF8: inout CChar) {
+    guard nullTerminatedUTF8 == 0 else {
+      _preconditionFailure(
+        "input of String.init(cString:) must be null-terminated"
+      )
+    }
+    self = ""
   }
 
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
@@ -54,10 +89,37 @@ extension String {
   ///
   /// This is identical to `init(cString: UnsafePointer<CChar>)` but operates on
   /// an unsigned sequence of bytes.
-  public init(cString: UnsafePointer<UInt8>) {
-    let len = UTF8._nullCodeUnitOffset(in: cString)
+  public init(cString nullTerminatedUTF8: UnsafePointer<UInt8>) {
+    let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     self = String._fromUTF8Repairing(
-      UnsafeBufferPointer(start: cString, count: len)).0
+      UnsafeBufferPointer(start: nullTerminatedUTF8, count: len)).0
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  public init(cString nullTerminatedUTF8: [UInt8]) {
+    self = nullTerminatedUTF8.withUnsafeBufferPointer {
+      String(_checkingCString: $0)
+    }
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Use a copy of the String argument")
+  public init(cString nullTerminatedUTF8: String) {
+    self = nullTerminatedUTF8.withCString(String.init(cString:))
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
+  public init(cString nullTerminatedUTF8: inout UInt8) {
+    guard nullTerminatedUTF8 == 0 else {
+      _preconditionFailure(
+        "input of String.init(cString:) must be null-terminated"
+      )
+    }
+    self = ""
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8
@@ -93,6 +155,40 @@ extension String {
     else { return nil }
 
     self = str
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  public init?(validatingUTF8 cString: [CChar]) {
+    guard let length = cString.firstIndex(of: 0) else {
+      _preconditionFailure(
+        "input of String.init(validatingUTF8:) must be null-terminated"
+      )
+    }
+    guard let string = cString.prefix(length).withUnsafeBytes({
+      String._tryFromUTF8($0.assumingMemoryBound(to: UInt8.self))
+    }) else { return nil }
+
+    self = string
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Use a copy of the String argument")
+  public init?(validatingUTF8 cString: String) {
+    self = cString.withCString(String.init(cString:))
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
+  public init?(validatingUTF8 cString: inout CChar) {
+    guard cString == 0 else {
+      _preconditionFailure(
+        "input of String.init(validatingUTF8:) must be null-terminated"
+      )
+    }
+    self = ""
   }
 
   /// Creates a new string by copying the null-terminated data referenced by
@@ -166,6 +262,77 @@ extension String {
     return String._fromCodeUnits(
       codeUnits, encoding: encoding, repair: isRepairing)
   }
+
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable // Fold away specializations
+  @_alwaysEmitIntoClient
+  public static func decodeCString<Encoding: _UnicodeEncoding>(
+    _ cString: [Encoding.CodeUnit],
+    as encoding: Encoding.Type,
+    repairingInvalidCodeUnits isRepairing: Bool = true
+  ) -> (result: String, repairsMade: Bool)? {
+    guard let length = cString.firstIndex(of: 0) else {
+      _preconditionFailure(
+        "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
+      )
+    }
+
+    if _fastPath(encoding == Unicode.UTF8.self) {
+      return cString.prefix(length).withUnsafeBytes {
+        buf -> (result: String, repairsMade: Bool)? in
+        let codeUnits = buf.assumingMemoryBound(to: UInt8.self)
+        if isRepairing {
+          return String._fromUTF8Repairing(codeUnits)
+        }
+        else if let str = String._tryFromUTF8(codeUnits) {
+          return (str, false)
+        }
+        return nil
+      }
+    }
+
+    return cString.prefix(length).withUnsafeBufferPointer {
+      buf -> (result: String, repairsMade: Bool)? in
+      String._fromCodeUnits(buf, encoding: encoding, repair: isRepairing)
+    }
+  }
+
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Use a copy of the String argument")
+  public static func decodeCString<Encoding: _UnicodeEncoding>(
+    _ cString: String,
+    as encoding: Encoding.Type,
+    repairingInvalidCodeUnits isRepairing: Bool = true
+  ) -> (result: String, repairsMade: Bool)? {
+    return cString.withCString(encodedAs: encoding) {
+      String.decodeCString(
+        $0, as: encoding, repairingInvalidCodeUnits: isRepairing
+      )
+    }
+  }
+
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
+  public static func decodeCString<Encoding: _UnicodeEncoding>(
+    _ cString: inout Encoding.CodeUnit,
+    as encoding: Encoding.Type,
+    repairingInvalidCodeUnits isRepairing: Bool = true
+  ) -> (result: String, repairsMade: Bool)? {
+    guard cString == 0 else {
+      _preconditionFailure(
+        "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
+      )
+    }
+    return ("", false)
+  }
+
   /// Creates a string from the null-terminated sequence of bytes at the given
   /// pointer.
   ///
@@ -179,10 +346,52 @@ extension String {
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable // Fold away specializations
   public init<Encoding: Unicode.Encoding>(
-    decodingCString ptr: UnsafePointer<Encoding.CodeUnit>,
+    decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type
   ) {
-    self = String.decodeCString(ptr, as: sourceEncoding)!.0
+    self = String.decodeCString(nullTerminatedCodeUnits, as: sourceEncoding)!.0
+  }
+
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable // Fold away specializations
+  @_alwaysEmitIntoClient
+  public init<Encoding: Unicode.Encoding>(
+    decodingCString nullTerminatedCodeUnits: [Encoding.CodeUnit],
+    as sourceEncoding: Encoding.Type
+  ) {
+    self = String.decodeCString(nullTerminatedCodeUnits, as: sourceEncoding)!.0
+  }
+
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Use a copy of the String argument")
+  public init<Encoding: _UnicodeEncoding>(
+    decodingCString nullTerminatedCodeUnits: String,
+    as sourceEncoding: Encoding.Type
+  ) {
+    self = nullTerminatedCodeUnits.withCString(encodedAs: sourceEncoding) {
+      String(decodingCString: $0, as: sourceEncoding.self)
+    }
+  }
+
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
+  @inlinable // Fold away specializations
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
+  public init<Encoding: Unicode.Encoding>(
+    decodingCString nullTerminatedCodeUnits: inout Encoding.CodeUnit,
+    as sourceEncoding: Encoding.Type
+  ) {
+    guard nullTerminatedCodeUnits == 0 else {
+      _preconditionFailure(
+        "input of String.init(decodingCString:as:) must be null-terminated"
+      )
+    }
+    self = ""
   }
 }
 
