@@ -11,10 +11,29 @@ import Foundation
 
 let StringGraphemeBreaking = TestSuite("StringGraphemeBreaking")
 
+extension String {
+  var backwardsCount: Int {
+    var c = 0
+    var index = endIndex
+    while index != startIndex {
+      c += 1
+      formIndex(before: &index)
+    }
+    return c
+  }
+}
+
 if #available(SwiftStdlib 5.6, *) {
   StringGraphemeBreaking.test("grapheme breaking") {
     for graphemeBreakTest in graphemeBreakTests {
-      expectEqual(graphemeBreakTest.1, graphemeBreakTest.0.count)
+      expectEqual(
+        graphemeBreakTest.1,
+        graphemeBreakTest.0.count,
+        "string: \(String(reflecting: graphemeBreakTest.0))")
+      expectEqual(
+        graphemeBreakTest.1,
+        graphemeBreakTest.0.backwardsCount,
+        "string: \(String(reflecting: graphemeBreakTest.0))")
     }
   }
 }
@@ -80,7 +99,12 @@ if #available(SwiftStdlib 5.6, *) {
       let test = foreignTest as String
 
       expectTrue(test._guts._isForeign())
-      expectEqual(graphemeBreakTest.1, test.count)
+      expectEqual(
+        graphemeBreakTest.1, test.count,
+        "string: \(String(reflecting: graphemeBreakTest.0))")
+      expectEqual(
+        graphemeBreakTest.1, test.backwardsCount,
+        "string: \(String(reflecting: graphemeBreakTest.0))")
     }
   }
 }
