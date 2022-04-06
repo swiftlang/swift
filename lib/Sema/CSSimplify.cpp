@@ -1780,7 +1780,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     if (parameterBindings[paramIdx].empty() && callee) {
       auto &ctx = cs.getASTContext();
 
-      if (ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments) {
+      // Type inference from default value expressions.
+      {
         auto *paramList = getParameterList(callee);
         if (!paramList)
           continue;
