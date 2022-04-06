@@ -2903,6 +2903,10 @@ public:
     UniqueUnderlyingType = subs;
   }
 
+  bool hasConditionallyAvailableSubstitutions() const {
+    return ConditionallyAvailableTypes.hasValue();
+  }
+
   ArrayRef<ConditionallyAvailableSubstitutions *>
   getConditionallyAvailableSubstitutions() const {
     assert(ConditionallyAvailableTypes);
