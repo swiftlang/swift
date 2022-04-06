@@ -30,6 +30,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -794,6 +795,11 @@ DisableImplicitConcurrencyImport("disable-implicit-concurrency-module-import",
                                  llvm::cl::desc("Disable implicit import of _Concurrency module"),
                                  llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+DisableImplicitStringProcessingImport("disable-implicit-string-processing-module-import",
+                                      llvm::cl::desc("Disable implicit import of _StringProcessing module"),
+                                      llvm::cl::init(false));
+
 static llvm::cl::opt<bool> EnableExperimentalNamedOpaqueTypes(
     "enable-experimental-named-opaque-types",
     llvm::cl::desc("Enable experimental support for named opaque result types"),
@@ -803,6 +809,11 @@ static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
                               llvm::cl::desc("Enable experimental distributed actors and functions"),
                               llvm::cl::init(false));
+
+static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
+    "enable-experimental-string-processing",
+    llvm::cl::desc("Enable experimental string processing"),
+    llvm::cl::init(false));
 
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
@@ -1623,6 +1634,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   llvm::errs() << "----\n";
   if (!FailedTokens.empty()) {
     llvm::errs() << "Unexpected failures: ";
+    llvm::sort(FailedTokens);
     llvm::interleave(
         FailedTokens, [&](StringRef name) { llvm::errs() << name; },
         [&]() { llvm::errs() << ", "; });
@@ -1630,6 +1642,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   }
   if (!UPassTokens.empty()) {
     llvm::errs() << "Unexpected passes: ";
+    llvm::sort(UPassTokens);
     llvm::interleave(
         UPassTokens, [&](StringRef name) { llvm::errs() << name; },
         [&]() { llvm::errs() << ", "; });
@@ -4116,6 +4129,7 @@ void anchorForGetMainExecutable() {}
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  initializeSwiftModules();
 
   if (argc > 1) {
     // Handle integrated test tools which do not use
@@ -4267,15 +4281,14 @@ int main(int argc, char *argv[]) {
   if (options::DisableImplicitConcurrencyImport) {
     InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
   }
+  if (options::DisableImplicitStringProcessingImport) {
+    InitInvok.getLangOptions().DisableImplicitStringProcessingModuleImport = true;
+  }
   if (options::EnableExperimentalNamedOpaqueTypes) {
     InitInvok.getLangOptions().EnableExperimentalNamedOpaqueTypes = true;
   }
-
-  if (options::EnableExperimentalDistributed) {
-    // distributed implies concurrency features:
-    InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
-    // enable 'distributed' parsing and features
-    InitInvok.getLangOptions().EnableExperimentalDistributed = true;
+  if (options::EnableExperimentalStringProcessing) {
+    InitInvok.getLangOptions().EnableExperimentalStringProcessing= true;
   }
 
   if (!options::Triple.empty())

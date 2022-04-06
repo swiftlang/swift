@@ -11,7 +11,7 @@ let package = Package(
     .library(
       name: "Swift",
       type: .static,
-      targets: ["SIL", "Optimizer", "ExperimentalRegex"]),
+      targets: ["SIL", "Optimizer", "_RegexParser"]),
   ],
   dependencies: [
   ],
@@ -26,15 +26,22 @@ let package = Package(
           "-cross-module-optimization"
         ])]),
     .target(
-      name: "ExperimentalRegex",
+      name: "_RegexParser",
       dependencies: [],
-      swiftSettings: [SwiftSetting.unsafeFlags([
+      swiftSettings: [
+        .unsafeFlags([
           "-I", "../include/swift",
-          "-cross-module-optimization"
+          "-cross-module-optimization",
+        ]),
+        // Workaround until `_RegexParser` is imported as implementation-only
+        // by `_StringProcessing`.
+        .unsafeFlags([
+          "-Xfrontend",
+          "-disable-implicit-string-processing-module-import"
         ])]),
     .target(
       name: "Optimizer",
-      dependencies: ["SIL", "ExperimentalRegex"],
+      dependencies: ["SIL", "_RegexParser"],
       swiftSettings: [SwiftSetting.unsafeFlags([
           "-I", "../include/swift",
           "-cross-module-optimization"

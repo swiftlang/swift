@@ -33,24 +33,24 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
   takesDerived(T.X.self, T.A2.self)
 }
 
-// CHECK-LABEL: Requirement machine for <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2>
+// CHECK-LABEL: Requirement machine for fresh signature < T >
 // CHECK-NEXT: Rewrite system: {
 // CHECK:      - [P1:X].[superclass: Base<[P1:A1]>] => [P1:X] [explicit]
+// CHECK:      - [P1:X].[layout: _NativeClass] => [P1:X]
 // CHECK:      - [P2:X].[superclass: Derived<[P2:A2]>] => [P2:X] [explicit]
+// CHECK:      - [P2:X].[layout: _NativeClass] => [P2:X]
 // CHECK:      - τ_0_0.[P2:X] => τ_0_0.[P1:X]
 // CHECK:      - τ_0_0.[P1:X].[superclass: Derived<τ_0_0.[P2:A2]>] => τ_0_0.[P1:X]
-// CHECK:      - [P1:X].[layout: _NativeClass] => [P1:X]
-// CHECK:      - [P2:X].[layout: _NativeClass] => [P2:X]
 // CHECK:      - τ_0_0.[P1:X].[superclass: Base<τ_0_0.[P2:A2].[Q:T]>] => τ_0_0.[P1:X]
 // CHECK:      - τ_0_0.[P2:A2].[Q:T] => τ_0_0.[P1:A1]
 // CHECK-NEXT: }
 // CHECK: Property map: {
 // CHECK-NEXT:   [P1] => { conforms_to: [P1] }
-// CHECK-NEXT:   [P2] => { conforms_to: [P2] }
-// CHECK-NEXT:   [Q] => { conforms_to: [Q] }
 // CHECK-NEXT:   [P1:X] => { layout: _NativeClass superclass: [superclass: Base<[P1:A1]>] }
-// CHECK-NEXT:   [P2:A2] => { conforms_to: [Q] }
+// CHECK-NEXT:   [P2] => { conforms_to: [P2] }
 // CHECK-NEXT:   [P2:X] => { layout: _NativeClass superclass: [superclass: Derived<[P2:A2]>] }
+// CHECK-NEXT:   [P2:A2] => { conforms_to: [Q] }
+// CHECK-NEXT:   [Q] => { conforms_to: [Q] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P1 P2] }
 // CHECK-NEXT:   τ_0_0.[P1:X] => { layout: _NativeClass superclass: [superclass: Derived<τ_0_0.[P2:A2]>] }
 // CHECK-NEXT: }

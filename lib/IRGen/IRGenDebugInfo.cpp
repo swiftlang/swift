@@ -15,10 +15,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "debug-info"
+
 #include "IRGenDebugInfo.h"
 #include "GenOpaque.h"
 #include "GenStruct.h"
 #include "GenType.h"
+#include "IRBuilder.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -49,6 +51,7 @@
 #include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Config/config.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -2655,6 +2658,67 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   }
 }
 
+namespace {
+
+/// A helper struct that is used by emitDbgIntrinsic to factor redundant code.
+struct DbgIntrinsicEmitter {
+  PointerUnion<llvm::BasicBlock *, llvm::Instruction *> InsertPt;
+  irgen::IRBuilder &IRBuilder;
+  llvm::DIBuilder &DIBuilder;
+  AddrDbgInstrKind ForceDbgDeclare;
+
+  /// Initialize the emitter and initialize the emitter to assume that it is
+  /// going to insert an llvm.dbg.declare or an llvm.dbg.addr either at the
+  /// current "generalized insertion point" of the IRBuilder. The "generalized
+  /// insertion point" is
+  DbgIntrinsicEmitter(irgen::IRBuilder &IRBuilder, llvm::DIBuilder &DIBuilder,
+                      AddrDbgInstrKind ForceDebugDeclare)
+      : InsertPt(), IRBuilder(IRBuilder), DIBuilder(DIBuilder),
+        ForceDbgDeclare(ForceDebugDeclare) {
+    auto *ParentBB = IRBuilder.GetInsertBlock();
+    auto InsertBefore = IRBuilder.GetInsertPoint();
+
+    if (InsertBefore != ParentBB->end())
+      InsertPt = &*InsertBefore;
+    else
+      InsertPt = ParentBB;
+  }
+
+  ///
+
+  llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                            llvm::DIExpression *Expr,
+                            const llvm::DILocation *DL) {
+    if (auto *Inst = InsertPt.dyn_cast<llvm::Instruction *>()) {
+      return insert(Addr, VarInfo, Expr, DL, Inst);
+    } else {
+      return insert(Addr, VarInfo, Expr, DL,
+                    InsertPt.get<llvm::BasicBlock *>());
+    }
+  }
+
+  llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                            llvm::DIExpression *Expr,
+                            const llvm::DILocation *DL,
+                            llvm::Instruction *InsertBefore) {
+    if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
+      return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, InsertBefore);
+    return DIBuilder.insertDbgAddrIntrinsic(Addr, VarInfo, Expr, DL,
+                                            InsertBefore);
+  }
+
+  llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                            llvm::DIExpression *Expr,
+                            const llvm::DILocation *DL,
+                            llvm::BasicBlock *Block) {
+    if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
+      return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
+    return DIBuilder.insertDbgAddrIntrinsic(Addr, VarInfo, Expr, DL, Block);
+  }
+};
+
+} // namespace
+
 void IRGenDebugInfoImpl::emitDbgIntrinsic(
     IRBuilder &Builder, llvm::Value *Storage, llvm::DILocalVariable *Var,
     llvm::DIExpression *Expr, unsigned Line, unsigned Col,
@@ -2687,73 +2751,94 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     }
   }
 
-  struct DbgInserter {
-    llvm::DIBuilder &builder;
-    AddrDbgInstrKind forceDbgDeclare;
+  auto *ParentBlock = Builder.GetInsertBlock();
 
-    llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
-                              llvm::DIExpression *Expr,
-                              const llvm::DILocation *DL,
-                              llvm::Instruction *InsertBefore) {
-      if (forceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
-        return builder.insertDeclare(Addr, VarInfo, Expr, DL, InsertBefore);
-      return builder.insertDbgAddrIntrinsic(Addr, VarInfo, Expr, DL,
-                                            InsertBefore);
-    }
+  // First before we do anything, check if we have an Undef. In this case, we
+  // /always/ emit an llvm.dbg.value of undef.
+  // If we have undef, always emit a llvm.dbg.value in the current position.
+  if (isa<llvm::UndefValue>(Storage)) {
+    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock);
+    return;
+  }
 
-    llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
-                              llvm::DIExpression *Expr,
-                              const llvm::DILocation *DL,
-                              llvm::BasicBlock *Block) {
-      if (forceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
-        return builder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
-      return builder.insertDbgAddrIntrinsic(Addr, VarInfo, Expr, DL, Block);
-    }
-  };
-  DbgInserter inserter{DBuilder, AddrDInstKind};
+  DbgIntrinsicEmitter inserter{Builder, DBuilder, AddrDInstKind};
 
   // If we have a single alloca...
   if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {
-    auto *ParentBB = Builder.GetInsertBlock();
     auto InsertBefore = Builder.GetInsertPoint();
 
     if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare) {
-      ParentBB = Alloca->getParent();
+      ParentBlock = Alloca->getParent();
       InsertBefore = std::next(Alloca->getIterator());
     }
 
-    if (InsertBefore != ParentBB->end()) {
+    if (InsertBefore != ParentBlock->end()) {
       inserter.insert(Alloca, Var, Expr, DL, &*InsertBefore);
     } else {
-      inserter.insert(Alloca, Var, Expr, DL, ParentBB);
+      inserter.insert(Alloca, Var, Expr, DL, ParentBlock);
     }
     return;
   }
 
-  auto *BB = Builder.GetInsertBlock();
   if ((isa<llvm::IntrinsicInst>(Storage) &&
        cast<llvm::IntrinsicInst>(Storage)->getIntrinsicID() ==
            llvm::Intrinsic::coro_alloca_get)) {
-    inserter.insert(Storage, Var, Expr, DL, BB);
+    inserter.insert(Storage, Var, Expr, DL, ParentBlock);
     return;
   }
 
   if (InCoroContext) {
-    // Function arguments in async functions are emitted without a shadow copy
-    // (that would interfer with coroutine splitting) but with a dbg.declare to
-    // give CoroSplit.cpp license to emit a shadow copy for them pointing inside
-    // the Swift Context argument that is valid throughout the function.
-    auto &EntryBlock = BB->getParent()->getEntryBlock();
-    if (auto *InsertBefore = &*EntryBlock.getFirstInsertionPt())
+    PointerUnion<llvm::BasicBlock *, llvm::Instruction *> InsertPt;
+
+    // If we have a dbg.declare, we are relying on a contract with the coroutine
+    // splitter that in split coroutines we always create debug info for values
+    // in the coroutine context by creating a llvm.dbg.declare for the variable
+    // in the entry block of each funclet.
+    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare) {
+      // Function arguments in async functions are emitted without a shadow copy
+      // (that would interfer with coroutine splitting) but with a
+      // llvm.dbg.declare to give CoroSplit.cpp license to emit a shadow copy
+      // for them pointing inside the Swift Context argument that is valid
+      // throughout the function.
+      auto &EntryBlock = ParentBlock->getParent()->getEntryBlock();
+      if (auto *InsertBefore = &*EntryBlock.getFirstInsertionPt()) {
+        InsertPt = InsertBefore;
+      } else {
+        InsertPt = &EntryBlock;
+      }
+    } else {
+      // For llvm.dbg.addr, we just want to insert the intrinsic at the current
+      // insertion point. This is because our contract with the coroutine
+      // splitter is that the coroutine splitter just needs to emit the
+      // llvm.dbg.addr where we placed them. It shouldn't move them or do
+      // anything special with it. Instead, we have previously inserted extra
+      // debug_value clones previously after each instruction at the SIL level
+      // that corresponds with a funclet edge. This operation effectively sets
+      // up the rest of the pipeline to be stupid and just emit the
+      // llvm.dbg.addr in the correct places. This is done by the SILOptimizer
+      // pass DebugInfoCanonicalizer.
+      auto InsertBefore = Builder.GetInsertPoint();
+      if (InsertBefore != ParentBlock->end()) {
+        InsertPt = &*InsertBefore;
+      } else {
+        InsertPt = ParentBlock;
+      }
+    }
+
+    // Ok, we now have our insert pt. Call the appropriate operations.
+    assert(InsertPt);
+    if (auto *InsertBefore = InsertPt.dyn_cast<llvm::Instruction *>()) {
       inserter.insert(Storage, Var, Expr, DL, InsertBefore);
-    else
-      inserter.insert(Storage, Var, Expr, DL, &EntryBlock);
+    } else {
+      inserter.insert(Storage, Var, Expr, DL,
+                      InsertPt.get<llvm::BasicBlock *>());
+    }
     return;
   }
 
   // Insert a dbg.value at the current insertion point.
   if (isa<llvm::Argument>(Storage) && !Var->getArg() &&
-      BB->getFirstNonPHIOrDbg())
+      ParentBlock->getFirstNonPHIOrDbg())
     // SelectionDAGISel only generates debug info for a dbg.value
     // that is associated with a llvm::Argument if either its !DIVariable
     // is marked as argument or there is no non-debug intrinsic instruction
@@ -2762,9 +2847,9 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // need to make sure that dbg.value is before any non-phi / no-dbg
     // instruction.
     DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL,
-                                     BB->getFirstNonPHIOrDbg());
+                                     ParentBlock->getFirstNonPHIOrDbg());
   else
-    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
+    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock);
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(

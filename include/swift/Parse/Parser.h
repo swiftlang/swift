@@ -748,14 +748,6 @@ public:
       Context.LangOpts.ParseForSyntaxTreeOnly;
   }
 
-  /// Returns true to indicate that experimental 'distributed actor' syntax
-  /// should be parsed if the parser is only a syntax tree or if the user has
-  /// passed the `-enable-experimental-distributed' flag to the frontend.
-  bool shouldParseExperimentalDistributed() const {
-    return Context.LangOpts.EnableExperimentalDistributed ||
-      Context.LangOpts.ParseForSyntaxTreeOnly;
-  }
-
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -902,6 +894,22 @@ public:
   /// literal and their locations will not precede the location of a missing
   /// close brace.
   SourceLoc getErrorOrMissingLoc() const;
+
+  enum class ParseListItemResult {
+    /// There are more list items to parse.
+    Continue,
+    /// The list ended inside a string literal interpolation context.
+    FinishedInStringInterpolation,
+    /// The list ended for another reason.
+    Finished,
+  };
+
+  /// Parses a single item from a comma separated list and updates `Status`.
+  ParseListItemResult
+  parseListItem(ParserStatus &Status, tok RightK, SourceLoc LeftLoc,
+                SourceLoc &RightLoc, bool AllowSepAfterLast,
+                SyntaxKind ElementKind,
+                llvm::function_ref<ParserStatus()> callback);
 
   /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
@@ -1078,6 +1086,10 @@ public:
   ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
                                                       SourceLoc Loc);
 
+  /// Parse the @_backDeploy attribute.
+  bool parseBackDeployAttribute(DeclAttributes &Attributes, StringRef AttrName,
+                                SourceLoc AtLoc, SourceLoc Loc);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   PatternBindingInitializer *&initContext,
@@ -1201,7 +1213,9 @@ public:
   parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
 
   ParserStatus parsePrimaryAssociatedTypes(
-      SmallVectorImpl<AssociatedTypeDecl *> &AssocTypes);
+      SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames);
+  ParserStatus parsePrimaryAssociatedTypeList(
+      SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 

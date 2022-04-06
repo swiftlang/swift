@@ -480,7 +480,7 @@ static bool isInterestingTypealias(Type type) {
   else
     return false;
 
-  if (aliasDecl->getUnderlyingType()->isVoid())
+  if (type->isVoid())
     return false;
 
   // The 'Swift.AnyObject' typealias is not 'interesting'.

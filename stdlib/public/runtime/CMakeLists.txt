@@ -32,6 +32,7 @@ set(swift_runtime_sources
     AutoDiffSupport.cpp
     Bincompat.cpp
     Casting.cpp
+    CrashReporter.cpp
     CygwinPort.cpp
     Demangle.cpp
     DynamicCast.cpp
@@ -209,10 +210,13 @@ foreach(sdk ${SWIFT_SDKS})
     if(${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF)
       string(TOLOWER "${sdk}" lowercase_sdk)
       set(libpthread -lpthread)
+      set(concurrency_libs)
       set(android_libraries)
       if(${sdk} STREQUAL ANDROID)
         set(android_libraries -llog)
         set(libpthread)
+      elseif(SWIFT_CONCURRENCY_USES_DISPATCH)
+        set(concurrency_libs "-ldispatch -lBlocksRuntime")
       endif()
 
       set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
@@ -221,6 +225,7 @@ foreach(sdk ${SWIFT_SDKS})
 ${libpthread}
 ${android_libraries}
 -lswiftCore
+${concurrency_libs}
 -lstdc++
 -lm
 -Xlinker -export-dynamic

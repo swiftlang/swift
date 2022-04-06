@@ -1,5 +1,4 @@
 // RUN: %target-swift-emit-silgen %s -requirement-machine-abstract-signatures=on | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -requirement-machine-abstract-signatures=on -disable-requirement-machine-concrete-contraction | %FileCheck %s
 
 public protocol P {
   associatedtype A : Q where A.B == Self

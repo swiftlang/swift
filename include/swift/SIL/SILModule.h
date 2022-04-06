@@ -307,6 +307,12 @@ private:
   /// The stage of processing this module is at.
   SILStage Stage;
 
+  /// True if SIL conventions force address-only to be passed by address.
+  ///
+  /// Used for bootstrapping the AddressLowering pass. This should eventually
+  /// be inferred from the SIL stage to be true only when Stage == Lowered.
+  bool loweredAddresses;
+
   /// The set of deserialization notification handlers.
   DeserializationNotificationHandlerSet deserializationNotificationHandlers;
 
@@ -344,6 +350,10 @@ private:
 
   /// The options passed into this SILModule.
   const SILOptions &Options;
+
+  /// The number of functions created in this module, which will be the index of
+  /// the next function.
+  unsigned nextFunctionIndex = 0;
 
   /// Set if the SILModule was serialized already. It is used
   /// to ensure that the module is serialized only once.
@@ -448,6 +458,12 @@ public:
 
   /// Called after an instruction is moved from one function to another.
   void notifyMovedInstruction(SILInstruction *inst, SILFunction *fromFunction);
+
+  unsigned getNewFunctionIndex() { return nextFunctionIndex++; }
+
+  // This may be larger that the number of live functions in the 'functions'
+  // linked list because it includes the indices of zombie functions.
+  unsigned getNumFunctionIndices() const { return nextFunctionIndex; }
 
   /// Set a serialization action.
   void setSerializeSILAction(ActionCallback SerializeSILAction);
@@ -796,6 +812,11 @@ public:
     Stage = s;
   }
 
+  /// True if SIL conventions force address-only to be passed by address.
+  bool useLoweredAddresses() const { return loweredAddresses; }
+
+  void setLoweredAddresses(bool val) { loweredAddresses = val; }
+
   llvm::IndexedInstrProfReader *getPGOReader() const { return PGOReader.get(); }
 
   void setPGOReader(std::unique_ptr<llvm::IndexedInstrProfReader> IPR) {
@@ -962,15 +983,13 @@ inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
     // entirely.
     return LexicalLifetimes != LexicalLifetimesOption::Off;
   case SILStage::Canonical:
+  case SILStage::Lowered:
     // In Canonical SIL, lexical markers are used to ensure that object
     // lifetimes do not get observably shortened from the end of a lexical
     // scope.  That behavior only occurs when lexical lifetimes is (fully)
     // enabled.  (When only diagnostic markers are enabled, the markers are
     // stripped as part of lowering from raw to canonical SIL.)
     return LexicalLifetimes == LexicalLifetimesOption::On;
-  case SILStage::Lowered:
-    // We do not support OSSA in Lowered SIL, so this is always false.
-    return false;
   }
 }
 

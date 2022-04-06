@@ -1614,10 +1614,11 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     if (auto attr = proto->getAttrs().getAttribute<ObjCAttr>()) {
       isObjC = objCReasonForObjCAttr(attr);
 
-      // If the protocol is @objc, it may only refine other @objc protocols.
+      // If the protocol is @objc, it may only refine other @objc protocols and
+      // marker protocols.
       // FIXME: Revisit this restriction.
       for (auto inherited : proto->getInheritedProtocols()) {
-        if (!inherited->isObjC()) {
+        if (!inherited->isObjC() && !inherited->isMarkerProtocol()) {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
                           proto->getDeclaredInterfaceType(),
                           inherited->getDeclaredInterfaceType());
@@ -2008,9 +2009,9 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
       }
     }
 
-    // Record the method in the class, if it's a member of one.
-    if (auto classDecl = D->getDeclContext()->getSelfClassDecl()) {
-      classDecl->recordObjCMethod(method, selector);
+    // Record the method in the type, if it's a member of one.
+    if (auto tyDecl = D->getDeclContext()->getSelfNominalTypeDecl()) {
+      tyDecl->recordObjCMethod(method, selector);
     }
 
     // Record the method in the source file.
@@ -2406,11 +2407,11 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
 /// Retrieve the source file for the given Objective-C member conflict.
 static TinyPtrVector<AbstractFunctionDecl *>
 getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
-  ClassDecl *classDecl = std::get<0>(conflict);
+  NominalTypeDecl *typeDecl = std::get<0>(conflict);
   ObjCSelector selector = std::get<1>(conflict);
   bool isInstanceMethod = std::get<2>(conflict);
 
-  return classDecl->lookupDirect(selector, isInstanceMethod);
+  return typeDecl->lookupDirect(selector, isInstanceMethod);
 }
 
 static ObjCAttr *getObjCAttrIfFromAccessNote(ValueDecl *VD) {
@@ -2447,6 +2448,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
   // Diagnose each conflict.
   bool anyConflicts = false;
   for (const auto &conflict : localConflicts) {
+    NominalTypeDecl *tyDecl = std::get<0>(conflict);
     ObjCSelector selector = std::get<1>(conflict);
 
     auto methods = getObjCMethodConflictDecls(conflict);
@@ -2529,6 +2531,9 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      diagInfo.first, diagInfo.second,
                                      origDiagInfo.first, origDiagInfo.second,
                                      selector);
+
+      // Protocols weren't checked for selector conflicts in 5.0.
+      diag.warnUntilSwiftVersionIf(!isa<ClassDecl>(tyDecl), 6);
 
       auto objcAttr = getObjCAttrIfFromAccessNote(conflictingDecl);
       swift::softenIfAccessNote(conflictingDecl, objcAttr, diag);

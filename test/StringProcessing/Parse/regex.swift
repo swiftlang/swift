@@ -2,21 +2,18 @@
 // REQUIRES: swift_in_compiler
 
 _ = #/abc/#
-_ = #|abc|#
-_ = re'abc'
+_ = ##/abc/##
 
 func foo<T>(_ x: T...) {}
-foo(#/abc/#, #|abc|#, re'abc')
+foo(#/abc/#, ##/abc/##)
 
-let arr = [#/abc/#, #|abc|#, re'abc']
+let arr = [#/abc/#, ##/abc/##]
 
 _ = #/\w+/#.self
-_ = #|\w+|#.self
-_ = re'\w+'.self
+_ = ##/\w+/##.self
 
 _ = #/#/\/\#\\/#
-_ = #|#|\|\#\\|#
-_ = re're\r\e\'\\'
+_ = ##/#|\|\#\\/##
 
 _ = (#/[*/#, #/+]/#, #/.]/#)
 // expected-error@-1 {{cannot parse regular expression: quantifier '+' must appear after expression}}

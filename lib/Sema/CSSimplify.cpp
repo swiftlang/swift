@@ -66,6 +66,15 @@ bool MatchCallArgumentListener::relabelArguments(ArrayRef<Identifier> newNames){
   return true;
 }
 
+bool MatchCallArgumentListener::shouldClaimArgDuringRecovery(unsigned argIdx) {
+  return true;
+}
+
+bool MatchCallArgumentListener::canClaimArgIgnoringNameMismatch(
+    const AnyFunctionType::Param &arg) {
+  return false;
+}
+
 /// Produce a score (smaller is better) comparing a parameter name and
 /// potentially-typo'd argument name.
 ///
@@ -254,6 +263,15 @@ static bool anyParameterRequiresArgument(
   return false;
 }
 
+static bool isCodeCompletionTypeVar(Type type) {
+  if (auto *TVT = type->getAs<TypeVariableType>()) {
+    if (TVT->getImpl().isCodeCompletionToken()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static bool matchCallArgumentsImpl(
     SmallVectorImpl<AnyFunctionType::Param> &args,
     ArrayRef<AnyFunctionType::Param> params,
@@ -340,7 +358,10 @@ static bool matchCallArgumentsImpl(
 
     // Go hunting for an unclaimed argument whose name does match.
     Optional<unsigned> claimedWithSameName;
+    unsigned firstArgIdx = nextArgIdx;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
+      auto argLabel = args[i].getLabel();
+      bool claimIgnoringNameMismatch = false;
 
       if (!args[i].matchParameterLabel(paramLabel)) {
         // If this is an attempt to claim additional unlabeled arguments
@@ -348,9 +369,15 @@ static bool matchCallArgumentsImpl(
         if (forVariadic)
           return None;
 
-        // Otherwise we can continue trying to find argument which
-        // matches parameter with or without label.
-        continue;
+        if ((i == firstArgIdx || ignoreNameMismatch) &&
+            listener.canClaimArgIgnoringNameMismatch(args[i])) {
+          // Avoid triggering relabelling fixes about the completion arg.
+          claimIgnoringNameMismatch = true;
+        } else {
+          // Otherwise we can continue trying to find argument which
+          // matches parameter with or without label.
+          continue;
+        }
       }
 
       // Skip claimed arguments.
@@ -374,14 +401,14 @@ static bool matchCallArgumentsImpl(
         // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
         // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
         // ```
-        if (args[i].getLabel().empty())
+        if (argLabel.empty() && !claimIgnoringNameMismatch)
           continue;
 
         potentiallyOutOfOrder = true;
       }
 
       // Claim it.
-      return claim(paramLabel, i);
+      return claim(paramLabel, i, claimIgnoringNameMismatch);
     }
 
     // If we're not supposed to attempt any fixes, we're done.
@@ -585,6 +612,10 @@ static bool matchCallArgumentsImpl(
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
     for (auto argIdx : indices(args)) {
       if (claimedArgs[argIdx]) continue;
+
+      if (!listener.shouldClaimArgDuringRecovery(argIdx))
+        continue;
+
       if (!args[argIdx].getLabel().empty())
         unclaimedNamedArgs.push_back(argIdx);
     }
@@ -661,6 +692,9 @@ static bool matchCallArgumentsImpl(
           continue;
 
         bindNextParameter(paramIdx, nextArgIdx, true);
+
+        if (!listener.shouldClaimArgDuringRecovery(nextArgIdx))
+          continue;
       }
     }
 
@@ -674,10 +708,13 @@ static bool matchCallArgumentsImpl(
           continue;
 
         // If parameter has a default value, we don't really
-        // now if label doesn't match because it's incorrect
+        // know if label doesn't match because it's incorrect
         // or argument belongs to some other parameter, so
         // we just leave this parameter unfulfilled.
         if (paramInfo.hasDefaultArgument(i))
+          continue;
+
+        if (!listener.shouldClaimArgDuringRecovery(i))
           continue;
 
         // Looks like there was no parameter claimed at the same
@@ -783,8 +820,8 @@ static bool matchCallArgumentsImpl(
       for (const auto &binding : parameterBindings) {
         paramToArgMap.push_back(argIdx);
         // Ignore argument bindings that were synthesized due to missing args.
-         argIdx += llvm::count_if(
-             binding, [numArgs](unsigned argIdx) { return argIdx < numArgs; });
+        argIdx += llvm::count_if(
+            binding, [numArgs](unsigned argIdx) { return argIdx < numArgs; });
       }
     }
 
@@ -994,35 +1031,32 @@ constraints::matchCallArguments(
   };
 }
 
-struct CompletionArgInfo {
-  unsigned completionIdx;
-  Optional<unsigned> firstTrailingIdx;
-
-  bool isAllowableMissingArg(unsigned argInsertIdx,
-                             AnyFunctionType::Param param) {
-    // If the argument is before or at the index of the argument containing the
-    // completion, the user would likely have already written it if they
-    // intended this overload.
-    if (completionIdx >= argInsertIdx)
-      return false;
-
-    // If the argument is after the first trailing closure, the user can only
-    // continue on to write more trailing arguments, so only allow this overload
-    // if the missing argument is of function type.
-    if (firstTrailingIdx && argInsertIdx > *firstTrailingIdx) {
-      if (param.isInOut())
-        return false;
-
-      Type expectedTy = param.getPlainType()->lookThroughAllOptionalTypes();
-      return expectedTy->is<FunctionType>() || expectedTy->isAny() ||
-          expectedTy->isTypeVariableOrMember();
-    }
-    return true;
+bool CompletionArgInfo::allowsMissingArgAt(unsigned argInsertIdx,
+                                           AnyFunctionType::Param param) {
+  // If the argument is before or at the index of the argument containing the
+  // completion, the user would likely have already written it if they
+  // intended this overload.
+  if (completionIdx >= argInsertIdx) {
+    return false;
   }
-};
 
-static Optional<CompletionArgInfo>
-getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
+  // If the argument is after the first trailing closure, the user can only
+  // continue on to write more trailing arguments, so only allow this overload
+  // if the missing argument is of function type.
+  if (firstTrailingIdx && argInsertIdx > *firstTrailingIdx) {
+    if (param.isInOut()) {
+      return false;
+    }
+
+    Type expectedTy = param.getPlainType()->lookThroughAllOptionalTypes();
+    return expectedTy->is<FunctionType>() || expectedTy->isAny() ||
+           expectedTy->isTypeVariableOrMember();
+  }
+  return true;
+}
+
+Optional<CompletionArgInfo>
+constraints::getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
   auto *exprAnchor = getAsExpr(anchor);
   if (!exprAnchor)
     return None;
@@ -1033,20 +1067,46 @@ getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
 
   for (unsigned i : indices(*args)) {
     if (CS.containsCodeCompletionLoc(args->getExpr(i)))
-      return CompletionArgInfo{i, args->getFirstTrailingClosureIndex()};
+      return CompletionArgInfo{i, args->getFirstTrailingClosureIndex(),
+                               args->size()};
   }
   return None;
 }
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
+protected:
   ConstraintSystem &CS;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
   ArrayRef<AnyFunctionType::Param> Parameters;
   ConstraintLocatorBuilder Locator;
 
+private:
   SmallVector<SynthesizedArg, 4> MissingArguments;
   SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArguments;
-  Optional<CompletionArgInfo> CompletionArgInfo;
+
+protected:
+  /// Synthesizes an argument that is intended to match against a missing
+  /// argument for the parameter at \p paramIdx.
+  /// \returns The index of the new argument in \c Arguments.
+  unsigned synthesizeArgument(unsigned paramIdx,
+                              bool isAfterCodeCompletionLoc) {
+    const auto &param = Parameters[paramIdx];
+
+    unsigned newArgIdx = Arguments.size();
+    auto *argLoc = CS.getConstraintLocator(
+        Locator, {LocatorPathElt::ApplyArgToParam(newArgIdx, paramIdx,
+                                                  param.getParameterFlags()),
+                  LocatorPathElt::SynthesizedArgument(
+                      newArgIdx, isAfterCodeCompletionLoc)});
+
+    auto *argType = CS.createTypeVariable(
+        argLoc, TVO_CanBindToInOut | TVO_CanBindToLValue |
+                    TVO_CanBindToNoEscape | TVO_CanBindToHole);
+
+    auto synthesizedArg = param.withType(argType);
+    Arguments.push_back(synthesizedArg);
+    return newArgIdx;
+  }
 
 public:
   ArgumentFailureTracker(ConstraintSystem &cs,
@@ -1070,36 +1130,9 @@ public:
     if (!CS.shouldAttemptFixes())
       return None;
 
-    const auto &param = Parameters[paramIdx];
-
-    unsigned newArgIdx = Arguments.size();
-
-    bool isAfterCodeCompletionLoc = false;
-    if (CS.isForCodeCompletion()) {
-      if (!CompletionArgInfo)
-        CompletionArgInfo = getCompletionArgInfo(Locator.getAnchor(), CS);
-      isAfterCodeCompletionLoc = CompletionArgInfo &&
-        CompletionArgInfo->isAllowableMissingArg(argInsertIdx, param);
-    }
-
-    auto *argLoc = CS.getConstraintLocator(
-        Locator, {LocatorPathElt::ApplyArgToParam(newArgIdx, paramIdx,
-                                                  param.getParameterFlags()),
-                  LocatorPathElt::SynthesizedArgument(newArgIdx, isAfterCodeCompletionLoc)});
-
-    auto *argType =
-        CS.createTypeVariable(argLoc, TVO_CanBindToInOut | TVO_CanBindToLValue |
-                                      TVO_CanBindToNoEscape | TVO_CanBindToHole);
-
-    auto synthesizedArg = param.withType(argType);
-    Arguments.push_back(synthesizedArg);
-
-    // When solving for code completion, if any argument contains the
-    // completion location, later arguments shouldn't be considered missing
-    // (causing the solution to have a worse score) as the user just hasn't
-    // written them yet. Early exit to avoid recording them in this case.
-    if (isAfterCodeCompletionLoc)
-      return newArgIdx;
+    unsigned newArgIdx =
+        synthesizeArgument(paramIdx, /*isAfterCodeCompletionLoc=*/false);
+    auto synthesizedArg = Arguments[newArgIdx];
 
     MissingArguments.push_back(SynthesizedArg{paramIdx, synthesizedArg});
 
@@ -1210,6 +1243,67 @@ public:
   ArrayRef<std::pair<unsigned, AnyFunctionType::Param>>
   getExtraneousArguments() const {
     return ExtraArguments;
+  }
+};
+
+/// Ignores any failures after the code comletion token.
+class CompletionArgumentTracker : public ArgumentFailureTracker {
+  struct CompletionArgInfo ArgInfo;
+
+public:
+  CompletionArgumentTracker(ConstraintSystem &cs,
+                            SmallVectorImpl<AnyFunctionType::Param> &args,
+                            ArrayRef<AnyFunctionType::Param> params,
+                            ConstraintLocatorBuilder locator,
+                            struct CompletionArgInfo ArgInfo)
+      : ArgumentFailureTracker(cs, args, params, locator), ArgInfo(ArgInfo) {}
+
+  Optional<unsigned> missingArgument(unsigned paramIdx,
+                                     unsigned argInsertIdx) override {
+    // When solving for code completion, if any argument contains the
+    // completion location, later arguments shouldn't be considered missing
+    // (causing the solution to have a worse score) as the user just hasn't
+    // written them yet. Early exit to avoid recording them in this case.
+    if (ArgInfo.allowsMissingArgAt(argInsertIdx, Parameters[paramIdx])) {
+      return synthesizeArgument(paramIdx, /*isAfterCodeCompletionLoc=*/true);
+    }
+
+    return ArgumentFailureTracker::missingArgument(paramIdx, argInsertIdx);
+  }
+
+  bool extraArgument(unsigned argIdx) override {
+    if (ArgInfo.isBefore(argIdx)) {
+      return false;
+    }
+    if (argIdx == 0 && ArgInfo.completionIdx == 0) {
+      return false;
+    }
+    return ArgumentFailureTracker::extraArgument(argIdx);
+  }
+
+  bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx,
+                          ArrayRef<ParamBinding> bindings) override {
+    if (ArgInfo.isBefore(argIdx)) {
+      return false;
+    }
+
+    return ArgumentFailureTracker::outOfOrderArgument(argIdx, prevArgIdx,
+                                                      bindings);
+  }
+
+  bool shouldClaimArgDuringRecovery(unsigned argIdx) override {
+    return !ArgInfo.isBefore(argIdx);
+  }
+
+  bool
+  canClaimArgIgnoringNameMismatch(const AnyFunctionType::Param &arg) override {
+    if (!isCodeCompletionTypeVar(arg.getPlainType())) {
+      return false;
+    }
+    if (!arg.getLabel().empty()) {
+      return false;
+    }
+    return true;
   }
 };
 
@@ -1341,12 +1435,13 @@ namespace {
 /// \param argTy The type of the argument.
 ///
 /// \returns If the argument type is existential and opening it can bind a
-/// generic parameter in the callee, returns the type variable (from the
-/// opened parameter type) the existential type that needs to be opened
-/// (from the argument type), and the adjustements that need to be applied to
-/// the existential type after it is opened.
+/// generic parameter in the callee, returns the generic parameter, type
+/// variable (from the opened parameter type) the existential type that needs
+/// to be opened (from the argument type), and the adjustements that need to be
+/// applied to the existential type after it is opened.
 static Optional<
-    std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
+    std::tuple<GenericTypeParamType *, TypeVariableType *, Type,
+               OpenedExistentialAdjustments>>
 shouldOpenExistentialCallArgument(
     ValueDecl *callee, unsigned paramIdx, Type paramTy, Type argTy,
     Expr *argExpr, ConstraintSystem &cs) {
@@ -1386,9 +1481,9 @@ shouldOpenExistentialCallArgument(
   // An argument expression that explicitly coerces to an existential
   // disables the implicit opening of the existential.
   if (argExpr) {
-    if (auto argCoercion = dyn_cast<CoerceExpr>(
+    if (auto argCast = dyn_cast<ExplicitCastExpr>(
             argExpr->getSemanticsProvidingExpr())) {
-      if (auto typeRepr = argCoercion->getCastTypeRepr()) {
+      if (auto typeRepr = argCast->getCastTypeRepr()) {
         if (auto toType = cs.getType(typeRepr)) {
           if (toType->isAnyExistentialType())
             return None;
@@ -1450,6 +1545,31 @@ shouldOpenExistentialCallArgument(
           genericSig.getGenericParams().back()->getDepth())
     return None;
 
+  // If the existential argument conforms to all of protocol requirements on
+  // the formal parameter's type, don't open.
+  // If all of the conformance requirements on the formal parameter's type
+  // are self-conforming, don't open.
+  {
+    Type existentialObjectType;
+    if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
+      existentialObjectType = existentialMetaTy->getInstanceType();
+    else
+      existentialObjectType = argTy;
+    auto module = cs.DC->getParentModule();
+    bool containsNonSelfConformance = false;
+    for (auto proto : genericSig->getRequiredProtocols(genericParam)) {
+      auto conformance = module->lookupExistentialConformance(
+          existentialObjectType, proto);
+      if (conformance.isInvalid()) {
+        containsNonSelfConformance = true;
+        break;
+      }
+    }
+
+    if (!containsNonSelfConformance)
+      return None;
+  }
+
   // Ensure that the formal parameter is only used in covariant positions,
   // because it won't match anywhere else.
   auto referenceInfo = findGenericParameterReferences(
@@ -1460,7 +1580,7 @@ shouldOpenExistentialCallArgument(
       referenceInfo.assocTypeRef > TypePosition::Covariant)
     return None;
 
-  return std::make_tuple(paramTypeVar, argTy, adjustments);
+  return std::make_tuple(genericParam, paramTypeVar, argTy, adjustments);
 }
 
 // Match the argument of a call to the parameter.
@@ -1541,11 +1661,23 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       TrailingClosureMatching::Forward;
 
   {
-    ArgumentFailureTracker listener(cs, argsWithLabels, params, locator);
+    std::unique_ptr<ArgumentFailureTracker> listener;
+    if (cs.isForCodeCompletion()) {
+      if (auto completionInfo = getCompletionArgInfo(locator.getAnchor(), cs)) {
+        listener = std::make_unique<CompletionArgumentTracker>(
+            cs, argsWithLabels, params, locator, *completionInfo);
+      }
+    }
+    if (!listener) {
+      // We didn't create an argument tracker for code completion. Create a
+      // normal one.
+      listener = std::make_unique<ArgumentFailureTracker>(cs, argsWithLabels,
+                                                          params, locator);
+    }
     auto callArgumentMatch = constraints::matchCallArguments(
         argsWithLabels, params, paramInfo,
         argList->getFirstTrailingClosureIndex(), cs.shouldAttemptFixes(),
-        listener, trailingClosureMatching);
+        *listener, trailingClosureMatching);
     if (!callArgumentMatch)
       return cs.getTypeMatchFailure(locator);
 
@@ -1572,7 +1704,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // Take the parameter bindings we selected.
     parameterBindings = std::move(callArgumentMatch->parameterBindings);
 
-    auto extraArguments = listener.getExtraneousArguments();
+    auto extraArguments = listener->getExtraneousArguments();
     if (!extraArguments.empty()) {
       if (RemoveExtraneousArguments::isMinMaxNameShadowing(cs, locator))
         return cs.getTypeMatchFailure(locator);
@@ -1614,7 +1746,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // We pull these out special because variadic parameters ban lots of
     // the more interesting typing constructs called out below like
     // inout and @autoclosure.
-    if (paramInfo.isVariadicGenericParameter(paramIdx)) {
+    if (cs.getASTContext().LangOpts.EnableExperimentalVariadicGenerics &&
+        paramInfo.isVariadicGenericParameter(paramIdx)) {
       auto *PET = paramTy->castTo<PackExpansionType>();
       OpenTypeSequenceElements openTypeSequence{cs, PET};
       for (auto argIdx : parameterBindings[paramIdx]) {
@@ -1644,16 +1777,23 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // If type inference from default arguments is enabled, let's
     // add a constraint from the parameter if necessary, otherwise
     // there is nothing to do but move to the next parameter.
-    if (parameterBindings[paramIdx].empty()) {
+    if (parameterBindings[paramIdx].empty() && callee) {
       auto &ctx = cs.getASTContext();
 
       if (ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments) {
         auto *paramList = getParameterList(callee);
-        auto *PD = paramList->get(paramIdx);
+        if (!paramList)
+          continue;
 
         // There is nothing to infer if parameter doesn't have any
         // generic parameters in its type.
+        auto *PD = paramList->get(paramIdx);
         if (!PD->getInterfaceType()->hasTypeParameter())
+          continue;
+
+        // The type of the default value is going to be determined
+        // based on a type deduced for the parameter at this call site.
+        if (PD->hasCallerSideDefaultExpr())
           continue;
 
         auto defaultExprType = PD->getTypeOfDefaultExpr();
@@ -1688,7 +1828,6 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       auto *argExpr = getArgumentExpr(locator.getAnchor(), argIdx);
       if (param.isAutoClosure() && !isSynthesizedArgument(argument)) {
         auto &ctx = cs.getASTContext();
-        auto *fnType = paramTy->castTo<FunctionType>();
 
         // If this is a call to a function with a closure argument and the
         // parameter is an autoclosure, let's just increment the score here
@@ -1708,7 +1847,9 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         if (ctx.isSwiftVersionAtLeast(5) || !isAutoClosureArgument(argExpr)) {
           // In Swift >= 5 mode there is no @autoclosure forwarding,
           // so let's match result types.
-          paramTy = fnType->getResult();
+          if (auto *fnType = paramTy->getAs<FunctionType>()) {
+            paramTy = fnType->getResult();
+          }
         } else {
           // Matching @autoclosure argument to @autoclosure parameter
           // directly would mean introducting a function conversion
@@ -1727,15 +1868,29 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
             cs, cs.getConstraintLocator(loc)));
       }
 
+      // Type-erase any opened existentials from subsequent parameter types
+      // unless the argument itself is a generic function, which could handle
+      // the opened existentials.
+      if (!openedExistentials.empty() && paramTy->hasTypeVariable() &&
+          !cs.isArgumentGenericFunction(argTy, argExpr)) {
+        for (const auto &opened : openedExistentials) {
+          paramTy = typeEraseOpenedExistentialReference(
+              paramTy, opened.second->getExistentialType(), opened.first,
+              TypePosition::Contravariant);
+        }
+      }
+
       // If the argument is an existential type and the parameter is generic,
       // consider opening the existential type.
       if (auto existentialArg = shouldOpenExistentialCallArgument(
               callee, paramIdx, paramTy, argTy, argExpr, cs)) {
         // My kingdom for a decent "if let" in C++.
+        GenericTypeParamType *openedGenericParam;
         TypeVariableType *openedTypeVar;
         Type existentialType;
         OpenedExistentialAdjustments adjustments;
-        std::tie(openedTypeVar, existentialType, adjustments) = *existentialArg;
+        std::tie(openedGenericParam, openedTypeVar, existentialType,
+                 adjustments) = *existentialArg;
 
         OpenedArchetypeType *opened;
         std::tie(argTy, opened) = cs.openExistentialType(
@@ -1823,14 +1978,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         auto *locator = cs.getConstraintLocator(loc);
         SourceRange range;
         // simplify locator so the anchor is the exact argument.
-        locator = simplifyLocator(cs, locator, range);
-        if (locator->getPath().empty() &&
-            locator->getAnchor().isExpr(ExprKind::UnresolvedMemberChainResult)) {
-          locator =
-            cs.getConstraintLocator(cast<UnresolvedMemberChainResultExpr>(
-              locator->getAnchor().get<Expr*>())->getChainBase());
-        }
-        cs.recordFix(NotCompileTimeConst::create(cs, paramTy, locator));
+        cs.recordFix(NotCompileTimeConst::create(cs, paramTy,
+          simplifyLocator(cs, locator, range)));
       }
 
       cs.addConstraint(
@@ -3407,7 +3556,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
           if (last.is<LocatorPathElt::ApplyArgToParam>()) {
             auto *fix = AllowArgumentMismatch::create(
-                *this, type1, proto, getConstraintLocator(locator));
+                *this, type1, proto, getConstraintLocator(anchor, path));
 
             // Impact is 2 here because there are two failures
             // 1 - missing conformance and 2 - incorrect argument type.
@@ -3443,14 +3592,14 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
         if (isExpr<CoerceExpr>(anchor)) {
           auto *fix = ContextualMismatch::create(
-              *this, type1, type2, getConstraintLocator(locator));
+              *this, type1, type2, getConstraintLocator(anchor, path));
           if (recordFix(fix))
             return getTypeMatchFailure(locator);
           break;
         }
 
         auto *fix = MissingConformance::forContextual(
-            *this, type1, proto, getConstraintLocator(locator));
+            *this, type1, proto, getConstraintLocator(anchor, path));
 
         if (recordFix(fix))
           return getTypeMatchFailure(locator);
@@ -4154,6 +4303,12 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
 
   auto currArgIdx =
       locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>().getArgIdx();
+
+  // Argument is extraneous and has been re-ordered to match one
+  // of two parameter types.
+  if (currArgIdx >= 2)
+    return false;
+
   auto otherArgIdx = currArgIdx == 0 ? 1 : 0;
 
   auto argType = cs.getType(argument);
@@ -4721,6 +4876,27 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::ApplyArgToParam: {
     auto loc = getConstraintLocator(locator);
+
+    // If this type mismatch is associated with a synthesized argument,
+    // let's just ignore it because the main problem is the absence of
+    // the argument.
+    if (auto applyLoc = elt.getAs<LocatorPathElt::ApplyArgToParam>()) {
+      if (auto *argumentList = getArgumentList(loc)) {
+        // This is either synthesized argument or a default value.
+        if (applyLoc->getArgIdx() >= argumentList->size()) {
+          auto *calleeLoc = getCalleeLocator(loc);
+          auto overload = findSelectedOverloadFor(calleeLoc);
+          // If this cannot be a default value matching, let's ignore.
+          if (!(overload && overload->choice.isDecl()))
+            return true;
+
+          if (!getParameterList(overload->choice.getDecl())
+                   ->get(applyLoc->getParamIdx())
+                   ->getTypeOfDefaultExpr())
+            return true;
+        }
+      }
+    }
 
     // Don't attempt to fix an argument being passed to a
     // _OptionalNilComparisonType parameter. Such an overload should only take
@@ -7329,13 +7505,20 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   // we need to store the difference as a signed integer.
   int extraOptionals = fromOptionals.size() - toOptionals.size();
 
-  // "from" expression could be a type variable with value-to-optional
-  // restrictions that we have to account for optionality mismatch.
+  // "from" expression could be a type variable wrapped in an optional e.g.
+  // Optional<$T0>. So when that is the case we have to add this additional
+  // optionality levels to from type.
   const auto subExprType = cs.getType(castExpr->getSubExpr());
-  if (cs.hasConversionRestriction(fromType, subExprType,
-                                  ConversionRestrictionKind::ValueToOptional)) {
-    extraOptionals++;
-    origFromType = OptionalType::get(origFromType);
+  if (subExprType->getOptionalObjectType()) {
+    SmallVector<Type, 4> subExprOptionals;
+    const auto unwrappedSubExprType =
+        subExprType->lookThroughAllOptionalTypes(subExprOptionals);
+    if (unwrappedSubExprType->is<TypeVariableType>()) {
+      extraOptionals += subExprOptionals.size();
+      for (size_t i = 0; i != subExprOptionals.size(); ++i) {
+        origFromType = OptionalType::get(origFromType);
+      }
+    }
   }
 
   // Removing the optionality from to type when the force cast expr is an IUO.
@@ -7718,14 +7901,14 @@ static bool isForKeyPathSubscript(ConstraintSystem &cs,
   return false;
 }
 
-static bool isForKeyPathSubscriptWithoutLabel(ConstraintSystem &cs,
-                                              ConstraintLocator *locator) {
+static bool mayBeForKeyPathSubscriptWithoutLabel(ConstraintSystem &cs,
+                                                 ConstraintLocator *locator) {
   if (!locator || !locator->getAnchor())
     return false;
 
   if (auto *SE = getAsExpr<SubscriptExpr>(locator->getAnchor())) {
     if (auto *unary = SE->getArgs()->getUnlabeledUnaryExpr())
-      return isa<KeyPathExpr>(unary);
+      return isa<KeyPathExpr>(unary) || isa<CodeCompletionExpr>(unary);
   }
   return false;
 }
@@ -7861,8 +8044,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // subscript without a `keyPath:` label. Add it to the result so that it
   // can be caught by the missing argument label checking later.
   if (isForKeyPathSubscript(*this, memberLocator) ||
-      (isForKeyPathSubscriptWithoutLabel(*this, memberLocator)
-       && includeInaccessibleMembers)) {
+      (mayBeForKeyPathSubscriptWithoutLabel(*this, memberLocator) &&
+       includeInaccessibleMembers)) {
     if (baseTy->isAnyObject()) {
       result.addUnviable(
           OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication),
@@ -8010,8 +8193,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     if (decl->isRecursiveValidation())
       return;
 
-    // If the result is invalid, skip it.
-    if (decl->isInvalid()) {
+    // If the result is invalid, skip it unless solving for code completion
+    // For code completion include the result because we can partially match
+    // against function types that only have one parameter with error type.
+    if (decl->isInvalid() && !isForCodeCompletion()) {
       result.markErrorAlreadyDiagnosed();
       return;
     }
@@ -8759,6 +8944,9 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
 
   std::tie(matchVar, matchCall) = *tildeEqualsApplication;
 
+  cs.setType(matchVar, enumTy);
+  cs.setType(EP, enumTy);
+
   // result of ~= operator is always a `Bool`.
   auto target = SolutionApplicationTarget::forExprPattern(
       matchCall, DC, EP, ctx.getBoolDecl()->getDeclaredInterfaceType());
@@ -8787,7 +8975,6 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   // Store the $match variable and binary expression for solution application.
   EP->setMatchVar(matchVar);
   EP->setMatchExpr(matchCall);
-  EP->setType(enumTy);
 
   cs.setSolutionApplicationTarget(pattern, target);
 
@@ -9811,6 +9998,9 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
+  SolutionApplicationTarget target(closure, contextualType);
+  setSolutionApplicationTarget(closure, target);
+
   // Generate constraints from the body of this closure.
   return !generateConstraints(closure);
 }
@@ -10554,7 +10744,17 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return matchTypes(resultTy, valueTy, ConstraintKind::Bind,
                       subflags, locator);
   }
-  
+
+  if (keyPathTy->isPlaceholder()) {
+    if (rootTy->hasTypeVariable()) {
+      recordAnyTypeVarAsPotentialHole(rootTy);
+    }
+    if (valueTy->hasTypeVariable()) {
+      recordAnyTypeVarAsPotentialHole(valueTy);
+    }
+    return SolutionKind::Solved;
+  }
+
   if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
     // We have the key path type. Match it to the other ends of the constraint.
     auto kpRootTy = bgt->getGenericArgs()[0];
@@ -10655,8 +10855,12 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
   // Don't attempt to filter overloads when solving for code completion
   // because presence of code completion token means that any call
   // could be malformed e.g. missing arguments e.g. `foo([.#^MEMBER^#`
-  if (isForCodeCompletion())
-    return false;
+  if (isForCodeCompletion()) {
+    bool ArgContainsCCTypeVar = Type(argFnType).findIf(isCodeCompletionTypeVar);
+    if (ArgContainsCCTypeVar || isCodeCompletionTypeVar(fnTypeVar)) {
+      return false;
+    }
+  }
 
   if (shouldAttemptFixes()) {
     auto arguments = argFnType->getParams();
@@ -11198,7 +11402,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     if (result2->hasTypeVariable() && !openedExistentials.empty()) {
       for (const auto &opened : openedExistentials) {
         result2 = typeEraseOpenedExistentialReference(
-            result2, opened.second->getExistentialType(), opened.first, DC);
+            result2, opened.second->getExistentialType(), opened.first,
+            TypePosition::Covariant);
       }
     }
 
@@ -12352,6 +12557,16 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
       << "(attempting fix ";
     fix->print(log);
     log << ")\n";
+  }
+
+  if (hasArgumentsIgnoredForCodeCompletion()) {
+    // Avoid simplifying the locator if the constraint system didn't ignore any
+    // arguments.
+    auto argExpr = simplifyLocatorToAnchor(fix->getLocator());
+    if (isArgumentIgnoredForCodeCompletion(getAsExpr<Expr>(argExpr))) {
+      // The argument was ignored. Don't record any fixes for it.
+      return false;
+    }
   }
 
   // Record the fix.

@@ -3608,8 +3608,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::RefTo##Name##Inst:                                  \
   case SILInstructionKind::Name##ToRefInst:
 #include "swift/AST/ReferenceStorage.def"
-  case SILInstructionKind::ThinFunctionToPointerInst:
-  case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::ThickToObjCMetatypeInst:
   case SILInstructionKind::ObjCToThickMetatypeInst:
@@ -3717,12 +3715,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.create##Name##ToRef(InstLoc, Val, Ty);                       \
     break;
 #include "swift/AST/ReferenceStorage.def"
-    case SILInstructionKind::ThinFunctionToPointerInst:
-      ResultVal = B.createThinFunctionToPointer(InstLoc, Val, Ty);
-      break;
-    case SILInstructionKind::PointerToThinFunctionInst:
-      ResultVal = B.createPointerToThinFunction(InstLoc, Val, Ty);
-      break;
     case SILInstructionKind::ThinToThickFunctionInst:
       ResultVal =
           B.createThinToThickFunction(InstLoc, Val, Ty, forwardingOwnership);
@@ -3849,19 +3841,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         InstLoc, SourceAddr, SourceType, DestAddr, TargetType);
     break;
 
-  case SILInstructionKind::UnconditionalCheckedCastValueInst: {
-    if (parseASTType(SourceType) || parseVerbatim("in") ||
-        parseTypedValueRef(Val, B) || parseVerbatim("to") ||
-        parseASTType(TargetType) || parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    auto opaque = Lowering::AbstractionPattern::getOpaque();
-    ResultVal = B.createUnconditionalCheckedCastValue(
-        InstLoc, Val, SourceType, F->getLoweredType(opaque, TargetType),
-        TargetType);
-    break;
-  }
-
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") ||
         parseASTType(TargetType))
@@ -3902,21 +3881,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         getBBForReference(FailureBBName, FailureBBLoc), forwardingOwnership);
     break;
   }
-  case SILInstructionKind::CheckedCastValueBranchInst: {
-    if (parseASTType(SourceType) || parseVerbatim("in")
-        || parseTypedValueRef(Val, B) || parseVerbatim("to")
-        || parseASTType(TargetType) || parseConditionalBranchDestinations()
-        || parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    auto opaque = Lowering::AbstractionPattern::getOpaque();
-    ResultVal = B.createCheckedCastValueBranch(
-        InstLoc, Val, SourceType, F->getLoweredType(opaque, TargetType),
-        TargetType, getBBForReference(SuccessBBName, SuccessBBLoc),
-        getBBForReference(FailureBBName, FailureBBLoc));
-    break;
-  }
-
   case SILInstructionKind::MarkUninitializedInst: {
     if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "["))
       return true;
@@ -6535,6 +6499,9 @@ bool SILParserState::parseDeclSILStage(Parser &P) {
   }
   
   M.setStage(stage);
+  if (M.getOptions().EnableSILOpaqueValues) {
+    M.setLoweredAddresses(stage != SILStage::Raw);
+  }
   DidParseSILStage = true;
   return false;
 }

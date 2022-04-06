@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -requirement-machine-inferred-signatures=on
 
 class B { 
   init() {} 
@@ -679,4 +679,17 @@ func test_SR_15562() {
     foo[baz] as! Int += 1 // expected-warning{{forced cast from 'Int?' to 'Int' only unwraps optionals; did you mean to use '!'?}}
     // expected-error@-1{{left side of mutating operator has immutable type 'Int'}}
   }
+}
+
+// SR-16058
+extension Dictionary {
+  func SR16058(_: Key) -> Value?? { nil }
+}
+func SR_16058_tests() { 
+  let dict: [Int: String?] = [:]
+  let foo: Int? = 1
+  let _: String? = foo.flatMap { dict[$0] } as? String  // OK
+
+  // More than one optionality wrapping
+  let _: String? = foo.flatMap { dict.SR16058(_: $0) } as? String // OK
 }

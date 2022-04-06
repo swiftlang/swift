@@ -93,9 +93,12 @@ static bool isRequirement(Node::Kind kind) {
 
 void swift::Demangle::failAssert(const char *file, unsigned line,
                                  NodePointer node, const char *expr) {
-  fprintf(stderr, "%s:%u: assertion failed for Node %p: %s", file, line, node,
-          expr);
-  abort();
+  std::string treeStr = getNodeTreeAsString(node);
+
+  fatal(0,
+        "%s:%u: assertion failed for Node %p: %s\n"
+        "%s:%u: Node %p is:\n%s\n",
+        file, line, node, expr, file, line, node, treeStr.c_str());
 }
 
 bool swift::Demangle::isContext(Node::Kind kind) {
@@ -338,7 +341,7 @@ Node::iterator Node::end() const {
 }
 
 void Node::addChild(NodePointer Child, NodeFactory &Factory) {
-  assert(Child);
+  DEMANGLER_ALWAYS_ASSERT(Child, this);
   switch (NodePayloadKind) {
     case PayloadKind::None:
       InlineChildren[0] = Child;
@@ -748,7 +751,7 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
   NodePointer resolved = nullptr;
   if (SymbolicReferenceResolver)
     resolved = SymbolicReferenceResolver(kind, direct, value, at);
-    
+
   // With no resolver, or a resolver that failed, refuse to demangle further.
   if (!resolved)
     return nullptr;

@@ -367,7 +367,6 @@ protected:
 
   UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 1,
                    WithoutActuallyEscaping : 1);
-  UIWTDOB_BITFIELD_EMPTY(PointerToThinFunctionInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UpcastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UncheckedRefCastInst, ConversionInst);
@@ -375,7 +374,6 @@ protected:
   UIWTDOB_BITFIELD_EMPTY(UncheckedTrivialBitCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UncheckedBitwiseCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(ThinToThickFunctionInst, ConversionInst);
-  UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastValueInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(InitExistentialAddrInst, SingleValueInstruction);
   UIWTDOB_BITFIELD_EMPTY(InitExistentialValueInst, SingleValueInstruction);
   UIWTDOB_BITFIELD_EMPTY(InitExistentialRefInst, SingleValueInstruction);
@@ -383,7 +381,6 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(TermInst, SILInstruction);
   UIWTDOB_BITFIELD_EMPTY(CheckedCastBranchInst, SingleValueInstruction);
-  UIWTDOB_BITFIELD_EMPTY(CheckedCastValueBranchInst, SingleValueInstruction);
 
   // Ensure that BranchInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(BranchInst, TermInst);

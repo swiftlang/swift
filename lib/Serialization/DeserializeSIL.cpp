@@ -1350,8 +1350,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ObjCExistentialMetatypeToObject)
-  ONEOPERAND_ONETYPE_INST(ThinFunctionToPointer)
-  ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
 
@@ -2621,36 +2619,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Builder.createCheckedCastBranch(Loc, isExact, op, targetLoweredType,
                                         targetFormalType, successBB, failureBB,
                                         forwardingOwnership);
-    break;
-  }
-  case SILInstructionKind::CheckedCastValueBranchInst: {
-    CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
-    SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
-                                        (SILValueCategory)ListOfValues[3], Fn);
-    SILValue op = getLocalValue(ListOfValues[1], srcLoweredType);
-    SILType targetLoweredType =
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    CanType targetFormalType =
-        MF->getType(ListOfValues[4])->getCanonicalType();
-    auto *successBB = getBBForReference(Fn, ListOfValues[5]);
-    auto *failureBB = getBBForReference(Fn, ListOfValues[6]);
-
-    ResultInst = Builder.createCheckedCastValueBranch(
-        Loc, op, srcFormalType, targetLoweredType, targetFormalType, successBB,
-        failureBB);
-    break;
-  }
-  case SILInstructionKind::UnconditionalCheckedCastValueInst: {
-    CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
-    SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
-                                      (SILValueCategory)ListOfValues[3], Fn);
-    SILValue src = getLocalValue(ListOfValues[1], srcLoweredType);
-
-    SILType targetLoweredType =
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    CanType targetFormalType = MF->getType(ListOfValues[4])->getCanonicalType();
-    ResultInst = Builder.createUnconditionalCheckedCastValue(
-        Loc, src, srcFormalType, targetLoweredType, targetFormalType);
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {

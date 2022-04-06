@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 678; // remove shared_external linkage
+const uint16_t SWIFTMODULE_VERSION_MINOR = 683; // Remove associatedtype primary bit
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1234,7 +1234,6 @@ namespace decls_block {
     DeclContextIDField,  // context decl
     TypeIDField,         // default definition
     BCFixed<1>,          // implicit flag
-    BCFixed<1>,          // is primary
     BCArray<DeclIDField> // overridden associated types
   >;
 
@@ -1916,6 +1915,7 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCFixed<1>, // is unconditionally unavailable?
     BCFixed<1>, // is unconditionally deprecated?
+    BCFixed<1>, // is unavailable from async?
     BCFixed<1>, // is this PackageDescription version-specific kind?
     BCFixed<1>, // is SPI?
     BC_AVAIL_TUPLE, // Introduced

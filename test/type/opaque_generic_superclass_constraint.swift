@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -emit-ir -verify -requirement-machine-abstract-signatures=verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-ir -verify %s
 
 // rdar://problem/53318811
 

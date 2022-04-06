@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
 
 protocol he where A : B { // expected-error {{cannot find type 'A' in scope}}
   // expected-error@-1 {{cannot find type 'B' in scope}}

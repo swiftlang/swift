@@ -106,88 +106,6 @@ SWIFT_RUNTIME_EXPORT
 OpaqueValue *swift_copyPOD(OpaqueValue *dest,
                            OpaqueValue *src,
                            const Metadata *self);
- 
-/// A value-witness table with enum entry points.
-/// These entry points are available only if the HasEnumWitnesses flag bit is
-/// set in the 'flags' field.
-struct EnumValueWitnessTable : ValueWitnessTable {
-#define WANT_ONLY_ENUM_VALUE_WITNESSES
-#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
-  ValueWitnessTypes::LOWER_ID LOWER_ID;
-#define FUNCTION_VALUE_WITNESS(LOWER_ID, UPPER_ID, RET, PARAMS) \
-  ValueWitnessTypes::LOWER_ID LOWER_ID;
-
-#include "swift/ABI/ValueWitness.def"
-
-  constexpr EnumValueWitnessTable()
-    : ValueWitnessTable{},
-      getEnumTag(nullptr),
-      destructiveProjectEnumData(nullptr),
-      destructiveInjectEnumTag(nullptr) {}
-  constexpr EnumValueWitnessTable(
-          const ValueWitnessTable &base,
-          ValueWitnessTypes::getEnumTagUnsigned getEnumTag,
-          ValueWitnessTypes::destructiveProjectEnumDataUnsigned
-            destructiveProjectEnumData,
-          ValueWitnessTypes::destructiveInjectEnumTagUnsigned
-            destructiveInjectEnumTag)
-    : ValueWitnessTable(base),
-      getEnumTag(getEnumTag),
-      destructiveProjectEnumData(destructiveProjectEnumData),
-      destructiveInjectEnumTag(destructiveInjectEnumTag) {}
-
-  static bool classof(const ValueWitnessTable *table) {
-    return table->flags.hasEnumWitnesses();
-  }
-};
-
-/// A type layout record. This is the subset of the value witness table that is
-/// necessary to perform dependent layout of generic value types. It excludes
-/// the value witness functions and includes only the size, alignment,
-/// extra inhabitants, and miscellaneous flags about the type.
-struct TypeLayout {
-  ValueWitnessTypes::size size;
-  ValueWitnessTypes::stride stride;
-  ValueWitnessTypes::flags flags;
-  ValueWitnessTypes::extraInhabitantCount extraInhabitantCount;
-
-private:
-  void _static_assert_layout();
-public:
-  TypeLayout() = default;
-  constexpr TypeLayout(ValueWitnessTypes::size size,
-                       ValueWitnessTypes::stride stride,
-                       ValueWitnessTypes::flags flags,
-                       ValueWitnessTypes::extraInhabitantCount xiCount)
-    : size(size), stride(stride), flags(flags), extraInhabitantCount(xiCount) {}
-
-  const TypeLayout *getTypeLayout() const { return this; }
-
-  /// The number of extra inhabitants, that is, bit patterns that do not form
-  /// valid values of the type, in this type's binary representation.
-  unsigned getNumExtraInhabitants() const {
-    return extraInhabitantCount;
-  }
-
-  bool hasExtraInhabitants() const {
-    return extraInhabitantCount != 0;
-  }
-};
-
-inline void TypeLayout::_static_assert_layout() {
-  #define CHECK_TYPE_LAYOUT_OFFSET(FIELD)                               \
-    static_assert(offsetof(ValueWitnessTable, FIELD)                    \
-                    - offsetof(ValueWitnessTable, size)                 \
-                  == offsetof(TypeLayout, FIELD),                       \
-                  "layout of " #FIELD " in TypeLayout doesn't match "   \
-                  "value witness table")
-  CHECK_TYPE_LAYOUT_OFFSET(size);
-  CHECK_TYPE_LAYOUT_OFFSET(flags);
-  CHECK_TYPE_LAYOUT_OFFSET(extraInhabitantCount);
-  CHECK_TYPE_LAYOUT_OFFSET(stride);
-
-  #undef CHECK_TYPE_LAYOUT_OFFSET
-}
 
 template <>
 inline void ValueWitnessTable::publishLayout(const TypeLayout &layout) {
@@ -208,12 +126,6 @@ inline void ValueWitnessTable::publishLayout(const TypeLayout &layout) {
 
 template <> inline bool ValueWitnessTable::checkIsComplete() const {
   return !flags.isIncomplete();
-}
-
-template <>
-inline const EnumValueWitnessTable *ValueWitnessTable::_asEVWT() const {
-  assert(EnumValueWitnessTable::classof(this));
-  return static_cast<const EnumValueWitnessTable *>(this);
 }
 
 // Standard value-witness tables.
@@ -758,14 +670,43 @@ SWIFT_RUNTIME_EXPORT
 const ExistentialMetatypeMetadata *
 swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 
-/// Fetch a uniqued metadata for an existential type. The array
-/// referenced by \c protocols will be sorted in-place.
+/// Fetch a uniqued metadata for an existential type.
+///
+/// The array referenced by \c protocols will be sorted in-place.
 SWIFT_RUNTIME_EXPORT
 const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
                                  const Metadata *superclassConstraint,
                                  size_t numProtocols,
                                  const ProtocolDescriptorRef *protocols);
+
+/// Fetch unique metadata for an extended existential type.
+///
+/// The shape must not correspond to an existential that could be
+/// represented with ExistentialTypeMetadata.  Its uniquing cache
+/// pointer is guaranteed to be filled after this call.
+SWIFT_RUNTIME_EXPORT
+const ExtendedExistentialTypeMetadata *
+swift_getExtendedExistentialTypeMetadata(
+            const NonUniqueExtendedExistentialTypeShape *shape,
+            const void * const *generalizationArguments);
+
+/// Fetch unique metadata for an extended existential type, given its
+/// known-unique existential shape.  The shape must not correspond to
+/// an existential that could be represented with ExistentialTypeMetadata.
+SWIFT_RUNTIME_EXPORT
+const ExtendedExistentialTypeMetadata *
+swift_getExtendedExistentialTypeMetadata_unique(
+            const ExtendedExistentialTypeShape *shape,
+            const void * const *generalizationArguments);
+
+/// Fetch the unique existential shape for the given non-unique shape.
+/// The shape's uniquing cache pointer is guaranteed to be filled after
+/// this call.
+SWIFT_RUNTIME_EXPORT
+const ExtendedExistentialTypeShape *
+swift_getExtendedExistentialTypeShape(
+            const NonUniqueExtendedExistentialTypeShape *shape);
 
 /// Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with the

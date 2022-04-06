@@ -2,6 +2,8 @@
 //
 // REQUIRES: executable_test
 
+// XFAIL: *
+
 import NonMemberInline
 import StdlibUnittest
 

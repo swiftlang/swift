@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-typecheck-verify-swift
 
 enum Term<S> where S: Sequence, S.Iterator.Element == Term {
 // expected-error@-1 *{{generic enum 'Term' has self-referential generic requirements}}

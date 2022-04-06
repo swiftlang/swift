@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 
 struct MissingRemoteCall: DistributedActorSystem {
   // expected-error@-1{{struct 'MissingRemoteCall' is missing witness for protocol requirement 'remoteCall'}}
@@ -17,6 +17,7 @@ struct MissingRemoteCall: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -47,6 +48,7 @@ struct MissingRemoteCall_missing_makeInvocationEncoder: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -106,6 +108,7 @@ struct Error_wrongReturn: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -139,7 +142,7 @@ struct Error_wrongReturn: DistributedActorSystem {
     Act.ID == ActorID,
     Err: Error,
     Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   public func remoteCall<Act, Err, Res>(
@@ -153,7 +156,7 @@ struct Error_wrongReturn: DistributedActorSystem {
     Act.ID == ActorID,
     Err: Error,
     Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   public func remoteCallVoid<Act, Err>(
@@ -165,7 +168,7 @@ struct Error_wrongReturn: DistributedActorSystem {
     where Act: DistributedActor,
     Act.ID == ActorID,
     Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 }
 
@@ -180,6 +183,7 @@ struct BadRemoteCall_param: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocationDecoder
   typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -209,7 +213,7 @@ struct BadRemoteCall_param: DistributedActorSystem {
     Act.ID == ActorID,
     Err: Error,
     Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   public func remoteCallVoid<Act, Err>(
@@ -221,7 +225,7 @@ struct BadRemoteCall_param: DistributedActorSystem {
     where Act: DistributedActor,
     Act.ID == ActorID,
     Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 }
 
@@ -230,6 +234,7 @@ public struct BadRemoteCall_notPublic: DistributedActorSystem {
   public typealias InvocationDecoder = PublicFakeInvocationDecoder
   public typealias InvocationEncoder = PublicFakeInvocationEncoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeResultHandler
 
   public func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -260,7 +265,7 @@ public struct BadRemoteCall_notPublic: DistributedActorSystem {
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   // expected-error@+1{{method 'remoteCallVoid(on:target:invocation:throwing:)' must be as accessible as its enclosing type because it matches a requirement in protocol 'DistributedActorSystem'}}
@@ -273,7 +278,7 @@ public struct BadRemoteCall_notPublic: DistributedActorSystem {
     where Act: DistributedActor,
     Act.ID == ActorID,
     Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 }
 
@@ -285,6 +290,7 @@ public struct BadRemoteCall_badResultConformance: DistributedActorSystem {
   public typealias InvocationDecoder = PublicFakeInvocationDecoder
   public typealias InvocationEncoder = PublicFakeInvocationEncoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeResultHandler
 
   public func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -314,7 +320,7 @@ public struct BadRemoteCall_badResultConformance: DistributedActorSystem {
           Act.ID == ActorID,
           Err: Error,
           Res: SomeProtocol { // ERROR: bad, this must be SerializationRequirement
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   public func remoteCallVoid<Act, Err>(
@@ -326,7 +332,7 @@ public struct BadRemoteCall_badResultConformance: DistributedActorSystem {
     where Act: DistributedActor,
     Act.ID == ActorID,
     Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 }
 
@@ -337,6 +343,7 @@ struct BadRemoteCall_largeSerializationRequirement: DistributedActorSystem {
   typealias InvocationDecoder = LargeSerializationReqFakeInvocationDecoder
   typealias InvocationEncoder = LargeSerializationReqFakeInvocationEncoder
   typealias SerializationRequirement = Codable & SomeProtocol
+  typealias ResultHandler = LargeSerializationReqFakeInvocationResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -366,7 +373,7 @@ struct BadRemoteCall_largeSerializationRequirement: DistributedActorSystem {
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   func remoteCallVoid<Act, Err>(
@@ -378,7 +385,7 @@ struct BadRemoteCall_largeSerializationRequirement: DistributedActorSystem {
     where Act: DistributedActor,
     Act.ID == ActorID,
     Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 }
 
@@ -390,6 +397,7 @@ struct BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition: Distr
   typealias InvocationDecoder = LargeSerializationReqFakeInvocationDecoder
   typealias InvocationEncoder = LargeSerializationReqFakeInvocationEncoder
   typealias SerializationRequirement = Codable & SomeProtocol
+  typealias ResultHandler = LargeSerializationReqFakeInvocationResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -419,7 +427,7 @@ struct BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition: Distr
           Act.ID == ActorID,
           Err: Error,
           Res: SomeProtocol { // ERROR: missing Codable!!!
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   func remoteCallVoid<Act, Err>(
@@ -431,7 +439,7 @@ struct BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition: Distr
     where Act: DistributedActor,
     Act.ID == ActorID,
     Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 }
 
@@ -440,6 +448,7 @@ struct BadRemoteCall_anySerializationRequirement: DistributedActorSystem {
   typealias InvocationDecoder = AnyInvocationDecoder
   typealias InvocationEncoder = AnyInvocationEncoder
   typealias SerializationRequirement = Any // !!
+  typealias ResultHandler = AnyResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
     throws -> Act? where Act: DistributedActor {
@@ -469,7 +478,7 @@ struct BadRemoteCall_anySerializationRequirement: DistributedActorSystem {
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   func remoteCallVoid<Act, Err>(
@@ -481,7 +490,7 @@ struct BadRemoteCall_anySerializationRequirement: DistributedActorSystem {
     where Act: DistributedActor,
     Act.ID == ActorID,
     Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 }
 
@@ -500,7 +509,7 @@ struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
@@ -510,7 +519,7 @@ struct AnyInvocationEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Any
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
@@ -520,7 +529,7 @@ struct LargeSerializationReqFakeInvocationEncoder: DistributedTargetInvocationEn
   typealias SerializationRequirement = Codable & SomeProtocol
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
@@ -530,7 +539,7 @@ public struct PublicFakeInvocationEncoder: DistributedTargetInvocationEncoder {
   public typealias SerializationRequirement = Codable
 
   public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  public mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  public mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   public mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   public mutating func doneRecording() throws {}
@@ -542,7 +551,7 @@ struct FakeInvocationEncoder_missing_recordArgument: DistributedTargetInvocation
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  // MISSING: mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  // MISSING: mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
@@ -566,19 +575,18 @@ struct FakeInvocationEncoder_missing_recordReturnType: DistributedTargetInvocati
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   // MISSING: mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
 }
 
 struct FakeInvocationEncoder_missing_recordErrorType: DistributedTargetInvocationEncoder {
-  //expected-error@-1{{struct 'FakeInvocationEncoder_missing_recordErrorType' is missing witness for protocol requirement 'recordErrorType'}}
-  //expected-note@-2{{protocol 'FakeInvocationEncoder_missing_recordErrorType' requires function 'recordErrorType' with signature:}}
+  //expected-error@-1{{type 'FakeInvocationEncoder_missing_recordErrorType' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   // MISSING: mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
@@ -597,6 +605,17 @@ struct FakeInvocationEncoder_recordArgument_wrongType: DistributedTargetInvocati
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
 }
+struct FakeInvocationEncoder_recordArgument_missingMutating: DistributedTargetInvocationEncoder {
+  //expected-error@-1{{struct 'FakeInvocationEncoder_recordArgument_missingMutating' is missing witness for protocol requirement 'recordArgument'}}
+  //expected-note@-2{{protocol 'FakeInvocationEncoder_recordArgument_missingMutating' requires function 'recordArgument' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
 
 struct FakeInvocationEncoder_recordResultType_wrongType: DistributedTargetInvocationEncoder {
   //expected-error@-1{{struct 'FakeInvocationEncoder_recordResultType_wrongType' is missing witness for protocol requirement 'recordReturnType'}}
@@ -604,7 +623,7 @@ struct FakeInvocationEncoder_recordResultType_wrongType: DistributedTargetInvoca
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(s: String, _ resultType: R.Type) throws {} // BAD
   mutating func recordReturnType<R: SomeProtocol>(_ resultType: R.Type) throws {} // BAD
   mutating func recordReturnType<R: SerializationRequirement>(badName: R.Type) throws {} // BAD
@@ -613,15 +632,15 @@ struct FakeInvocationEncoder_recordResultType_wrongType: DistributedTargetInvoca
 }
 
 struct FakeInvocationEncoder_recordErrorType_wrongType: DistributedTargetInvocationEncoder {
-  //expected-error@-1{{struct 'FakeInvocationEncoder_recordErrorType_wrongType' is missing witness for protocol requirement 'recordErrorType'}}
-  //expected-note@-2{{protocol 'FakeInvocationEncoder_recordErrorType_wrongType' requires function 'recordErrorType' with signature:}}
+  //expected-error@-1{{type 'FakeInvocationEncoder_recordErrorType_wrongType' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(BadName type: E.Type) throws {} // BAD
   mutating func recordErrorType<E: SerializationRequirement>(_ type: E.Type) throws {} // BAD
+  //expected-note@-1{{candidate has non-matching type '<E> (E.Type) throws -> ()'}}
   mutating func doneRecording() throws {}
 }
 
@@ -686,10 +705,37 @@ final class PublicFakeInvocationDecoder_badBadProtoRequirement: DistributedTarge
   func decodeErrorType() throws -> Any.Type? { nil }
 }
 
-struct FakeResultHandler: DistributedTargetInvocationResultHandler {
-  typealias SerializationRequirement = Codable
+public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
 
-  func onReturn<Res>(value: Res) async throws {
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    print("RETURN: \(value)")
+  }
+  public func onReturnVoid() async throws {
+    print("RETURN VOID")
+  }
+  public func onThrow<Err: Error>(error: Err) async throws {
+    print("ERROR: \(error)")
+  }
+}
+
+struct AnyResultHandler: DistributedTargetInvocationResultHandler {
+  typealias SerializationRequirement = Any
+
+  func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    print("RETURN: \(value)")
+  }
+  func onReturnVoid() async throws {
+    print("RETURN VOID")
+  }
+  func onThrow<Err: Error>(error: Err) async throws {
+    print("ERROR: \(error)")
+  }
+}
+struct LargeSerializationReqFakeInvocationResultHandler: DistributedTargetInvocationResultHandler {
+  typealias SerializationRequirement = Codable & SomeProtocol
+
+  func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print("RETURN: \(value)")
   }
   func onReturnVoid() async throws {
@@ -700,10 +746,29 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
   }
 }
 
+struct BadResultHandler_missingOnReturn: DistributedTargetInvocationResultHandler {
+  // expected-error@-1{{struct 'BadResultHandler_missingOnReturn' is missing witness for protocol requirement 'onReturn'}}
+  // expected-note@-2{{protocol 'BadResultHandler_missingOnReturn' requires function 'onReturn' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  // func onReturn<Res: SerializationRequirement>(value: Res) async throws {} // MISSING
+  func onReturnVoid() async throws {}
+  func onThrow<Err: Error>(error: Err) async throws {}
+}
+struct BadResultHandler_missingRequirement: DistributedTargetInvocationResultHandler {
+  // expected-error@-1{{struct 'BadResultHandler_missingRequirement' is missing witness for protocol requirement 'onReturn'}}
+  // expected-note@-2{{protocol 'BadResultHandler_missingRequirement' requires function 'onReturn' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  func onReturn<Success>(value: Success) async throws {} // MISSING : Codable
+  func onReturnVoid() async throws {}
+  func onThrow<Err: Error>(error: Err) async throws {}
+}
+
 public struct PublicFakeResultHandler: DistributedTargetInvocationResultHandler {
   public typealias SerializationRequirement = Codable
 
-  public func onReturn<Res>(value: Res) async throws {
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print("RETURN: \(value)")
   }
   public func onReturnVoid() async throws {

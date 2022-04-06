@@ -679,8 +679,12 @@ bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
   if (D->getModuleContext()->getName() != M.getName() && !Walker.isFromExportedImportedModule(D)) {
     return false;
   }
-  
-  if (!isa<ValueDecl>(D)) {
+
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (VD->getOverriddenDecl() && D->isImplicit()) {
+      return false;
+    }
+  } else {
     return false;
   }
   return !isImplicitlyPrivate(cast<ValueDecl>(D)) 

@@ -355,6 +355,41 @@ std::string IRGenMangler::mangleSymbolNameForMangledConformanceAccessorString(
   return finalize();
 }
 
+std::string IRGenMangler::mangleSymbolNameForUnderlyingTypeAccessorString(
+    OpaqueTypeDecl *opaque, unsigned index) {
+  beginManglingWithoutPrefix();
+  Buffer << "get_underlying_type_ref ";
+
+  appendContextOf(opaque);
+  appendOpaqueDeclName(opaque);
+
+  if (index == 0) {
+    appendOperator("Qr");
+  } else {
+    appendOperator("QR", Index(index));
+  }
+
+  return finalize();
+}
+
+std::string
+IRGenMangler::mangleSymbolNameForUnderlyingWitnessTableAccessorString(
+    OpaqueTypeDecl *opaque, const Requirement &req, ProtocolDecl *protocol) {
+  beginManglingWithoutPrefix();
+  Buffer << "get_underlying_witness ";
+
+  appendContextOf(opaque);
+  appendOpaqueDeclName(opaque);
+
+  appendType(req.getFirstType()->getCanonicalType(), opaque->getGenericSignature());
+
+  appendProtocolName(protocol);
+
+  appendOperator("HC");
+
+  return finalize();
+}
+
 std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
                                               CanGenericSignature genericSig) {
   beginManglingWithoutPrefix();

@@ -1008,6 +1008,13 @@ public:
       auto *TI = predBB->getTerminator();
       if (F.hasOwnership()) {
         require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
+
+        // Address-only values are potentially unmovable when borrowed. See also
+        // checkOwnershipForwardingInst. A phi implies a move of its arguments
+        // because they can't necessarilly all reuse the same storage.
+        require((!arg->getType().isAddressOnly(F)
+                 || arg->getOwnershipKind() != OwnershipKind::Guaranteed),
+                "Guaranteed address-only phi not allowed--implies a copy");
       } else {
         // FIXME: when critical edges are removed and cond_br arguments are
         // disallowed, only allow BranchInst.
@@ -1269,10 +1276,11 @@ public:
       checkOwnershipForwardingTermInst(term);
     }
 
-    // Address-only values are potentially move-only, and unmovable if they are
-    // borrowed. Ensure that guaranteed address-only values are forwarded with
-    // the same representation. Non-destructive projection is
-    // allowed. Aggregation and destructive disaggregation is not allowed.
+    // Address-only values are potentially unmovable when borrowed. Ensure that
+    // guaranteed address-only values are forwarded with the same
+    // representation. Non-destructive projection is allowed. Aggregation and
+    // destructive disaggregation is not allowed. See SIL.rst, Forwarding
+    // Addres-Only Values.
     if (ownership == OwnershipKind::Guaranteed
         && OwnershipForwardingMixin::isAddressOnly(i)) {
       require(OwnershipForwardingMixin::hasSameRepresentation(i),
@@ -3366,8 +3374,9 @@ public:
             "method does not have a witness table entry");
   }
 
-  // Get the expected type of a dynamic method reference.
-  SILType getDynamicMethodType(SILType selfType, SILDeclRef method) {
+  /// Verify the given type of a dynamic or @objc optional method reference.
+  bool verifyDynamicMethodType(CanSILFunctionType verifiedTy, SILType selfType,
+                               SILDeclRef method) {
     auto &C = F.getASTContext();
 
     // The type of the dynamic method must match the usual type of the method,
@@ -3386,28 +3395,50 @@ public:
     }
     assert(!methodTy->isPolymorphic());
 
-    // Replace Self parameter with type of 'self' at the call site.
-    auto params = methodTy->getParameters();
-    SmallVector<SILParameterInfo, 4>
-      dynParams(params.begin(), params.end() - 1);
-    dynParams.push_back(SILParameterInfo(selfType.getASTType(),
-                                         params.back().getConvention()));
+    // Assume the parameter conventions are correct.
+    SmallVector<SILParameterInfo, 4> params;
+    {
+      const auto actualParams = methodTy->getParameters();
+      const auto verifiedParams = verifiedTy->getParameters();
+      if (actualParams.size() != verifiedParams.size())
+        return false;
 
-    auto results = methodTy->getResults();
-    SmallVector<SILResultInfo, 4> dynResults(results.begin(), results.end());    
+      for (const auto idx : indices(actualParams)) {
+        params.push_back(actualParams[idx].getWithConvention(
+            verifiedParams[idx].getConvention()));
+      }
+    }
 
-    // If the method returns Self, substitute AnyObject for the result type.
+    // Have the 'self' parameter assume the type of 'self' at the call site.
+    params.back() = params.back().getWithInterfaceType(selfType.getASTType());
+
+    // Assume the result conventions are correct.
+    SmallVector<SILResultInfo, 4> results;
+    {
+      const auto actualResults = methodTy->getResults();
+      const auto verifiedResults = verifiedTy->getResults();
+      if (actualResults.size() != verifiedResults.size())
+        return false;
+
+      for (const auto idx : indices(actualResults)) {
+        results.push_back(actualResults[idx].getWithConvention(
+            verifiedResults[idx].getConvention()));
+      }
+    }
+
+    // If the method returns dynamic Self, substitute AnyObject for the
+    // result type.
     if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
       if (fnDecl->hasDynamicSelfResult()) {
         auto anyObjectTy = C.getAnyObjectType();
-        for (auto &dynResult : dynResults) {
+        for (auto &result : results) {
           auto newResultTy =
-              dynResult
+              result
                   .getReturnValueType(F.getModule(), methodTy,
                                       F.getTypeExpansionContext())
                   ->replaceCovariantResultType(anyObjectTy, 0);
-          dynResult = SILResultInfo(newResultTy->getCanonicalType(),
-                                    dynResult.getConvention());
+          result = SILResultInfo(newResultTy->getCanonicalType(),
+                                 result.getConvention());
         }
       }
     }
@@ -3416,13 +3447,14 @@ public:
                                      methodTy->getExtInfo(),
                                      methodTy->getCoroutineKind(),
                                      methodTy->getCalleeConvention(),
-                                     dynParams,
+                                     params,
                                      methodTy->getYields(),
-                                     dynResults,
+                                     results,
                                      methodTy->getOptionalErrorResult(),
                                      SubstitutionMap(), SubstitutionMap(),
                                      F.getASTContext());
-    return SILType::getPrimitiveObjectType(fnTy);
+
+    return fnTy->isBindableTo(verifiedTy);
   }
 
   /// Visitor class that checks whether a given decl ref has an entry in the
@@ -4017,13 +4049,6 @@ public:
     verifyOpenedArchetype(CI, CI->getType().getASTType());
   }
 
-  void checkUnconditionalCheckedCastValueInst(
-      UnconditionalCheckedCastValueInst *CI) {
-    verifyCheckedCast(/*exact*/ false, CI->getOperand()->getType(),
-                      CI->getType(), true);
-    verifyOpenedArchetype(CI, CI->getType().getASTType());
-  }
-
   // Make sure that opcodes handled by isRCIdentityPreservingCast cannot cast
   // from a trivial to a reference type. Such a cast may dynamically
   // instantiate a new reference-counted object.
@@ -4125,25 +4150,6 @@ public:
               "Failure dest of checked_cast_br must not take any argument in "
               "non-ownership qualified sil");
     }
-  }
-
-  void checkCheckedCastValueBranchInst(CheckedCastValueBranchInst *CBI) {
-    verifyCheckedCast(false,
-                      CBI->getSourceLoweredType(),
-                      CBI->getTargetLoweredType(),
-                      true);
-    verifyOpenedArchetype(CBI, CBI->getTargetFormalType());
-
-    require(CBI->getSuccessBB()->args_size() == 1,
-            "success dest of checked_cast_value_br must take one argument");
-    requireSameType(
-        CBI->getSuccessBB()->args_begin()[0]->getType(),
-        CBI->getTargetLoweredType(),
-        "success dest block argument of checked_cast_value_br must match "
-        "type of cast");
-    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
-            "failure dest of checked_cast_value_br in unqualified ownership "
-            "sil must take no arguments");
   }
 
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
@@ -4433,34 +4439,6 @@ public:
               "convert_escape_to_noescape [not_guaranteed] not "
               "allowed after mandatory passes");
     }
-  }
-
-  void checkThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
-    auto opTI = requireObjectType(SILFunctionType, CI->getOperand(),
-                                  "thin_function_to_pointer operand");
-    requireObjectType(BuiltinRawPointerType, CI,
-                      "thin_function_to_pointer result");
-
-    auto rep = opTI->getRepresentation();
-    require(rep == SILFunctionTypeRepresentation::Thin ||
-            rep == SILFunctionTypeRepresentation::Method ||
-            rep == SILFunctionTypeRepresentation::WitnessMethod,
-            "thin_function_to_pointer only works on thin, method or "
-            "witness_method functions");
-  }
-
-  void checkPointerToThinFunctionInst(PointerToThinFunctionInst *CI) {
-    auto resultTI = requireObjectType(SILFunctionType, CI,
-                                      "pointer_to_thin_function result");
-    requireObjectType(BuiltinRawPointerType, CI->getOperand(),
-                      "pointer_to_thin_function operand");
-
-    auto rep = resultTI->getRepresentation();
-    require(rep == SILFunctionTypeRepresentation::Thin ||
-            rep == SILFunctionTypeRepresentation::Method ||
-            rep == SILFunctionTypeRepresentation::WitnessMethod,
-            "pointer_to_thin_function only works on thin, method or "
-            "witness_method functions");
   }
 
   void checkCondFailInst(CondFailInst *CFI) {
@@ -4899,9 +4877,8 @@ public:
             "true bb for dynamic_method_br must take an argument");
 
     auto bbArgTy = DMBI->getHasMethodBB()->args_begin()[0]->getType();
-    require(getDynamicMethodType(operandType, DMBI->getMember())
-              .getASTType()
-              ->isBindableTo(bbArgTy.getASTType()),
+    require(verifyDynamicMethodType(cast<SILFunctionType>(bbArgTy.getASTType()),
+                                    operandType, DMBI->getMember()),
             "bb argument for dynamic_method_br must be of the method's type");
   }
 

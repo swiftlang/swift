@@ -1,5 +1,7 @@
 
 add_swift_host_library(swiftIDE STATIC
+  AfterPoundExprCompletion.cpp
+  ArgumentCompletion.cpp
   CodeCompletion.cpp
   CodeCompletionCache.cpp
   CodeCompletionContext.cpp
@@ -19,6 +21,7 @@ add_swift_host_library(swiftIDE STATIC
   ConformingMethodList.cpp
   DependencyChecking.cpp
   DotExprCompletion.cpp
+  ExprCompletion.cpp
   ExprContextAnalysis.cpp
   Formatting.cpp
   FuzzyStringMatcher.cpp
@@ -28,6 +31,7 @@ add_swift_host_library(swiftIDE STATIC
   REPLCodeCompletion.cpp
   SwiftSourceDocInfo.cpp
   SyntaxModel.cpp
+  TypeCheckCompletionCallback.cpp
   UnresolvedMemberCompletion.cpp
   Utils.cpp
   IDETypeChecking.cpp

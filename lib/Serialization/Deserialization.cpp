@@ -2777,13 +2777,11 @@ public:
     TypeID defaultDefinitionID;
     bool isImplicit;
     ArrayRef<uint64_t> rawOverriddenIDs;
-    bool isPrimary;
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
                                                       defaultDefinitionID,
                                                       isImplicit,
-                                                      isPrimary,
                                                       rawOverriddenIDs);
 
     auto DC = MF.getDeclContext(contextID);
@@ -2817,9 +2815,6 @@ public:
       }
     }
     assocType->setOverriddenDecls(overriddenAssocTypes);
-
-    if (isPrimary)
-      assocType->setPrimary();
 
     return assocType;
   }
@@ -3567,11 +3562,13 @@ public:
     auto genericSig = MF.getGenericSignature(genericSigID);
     if (genericSig)
       opaqueDecl->setGenericSignature(genericSig);
+    else
+      opaqueDecl->setGenericSignature(GenericSignature());
     if (underlyingTypeSubsID) {
       auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError)
         return subMapOrError.takeError();
-      opaqueDecl->setUnderlyingTypeSubstitutions(subMapOrError.get());
+      opaqueDecl->setUniqueUnderlyingTypeSubstitutions(subMapOrError.get());
     }
     return opaqueDecl;
   }
@@ -3664,8 +3661,10 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto proto = MF.createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(), name,
-                                             None, /*TrailingWhere=*/nullptr);
+    auto proto = MF.createDecl<ProtocolDecl>(
+        DC, SourceLoc(), SourceLoc(), name,
+        ArrayRef<PrimaryAssociatedTypeName>(), None,
+        /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
@@ -4361,6 +4360,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   bool isImplicit;
   bool isUnavailable;
   bool isDeprecated;
+  bool isNoAsync;
   bool isPackageDescriptionVersionSpecific;
   bool isSPI;
   DEF_VER_TUPLE_PIECES(Introduced);
@@ -4371,7 +4371,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
 
   // Decode the record, pulling the version tuple information.
   serialization::decls_block::AvailableDeclAttrLayout::readRecord(
-      scratch, isImplicit, isUnavailable, isDeprecated,
+      scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync,
       isPackageDescriptionVersionSpecific, isSPI, LIST_VER_TUPLE_PIECES(Introduced),
       LIST_VER_TUPLE_PIECES(Deprecated), LIST_VER_TUPLE_PIECES(Obsoleted),
       platform, renameDeclID, messageSize, renameSize);
@@ -4394,6 +4394,8 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
   else if (isDeprecated)
     platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
+  else if (isNoAsync)
+    platformAgnostic = PlatformAgnosticAvailabilityKind::NoAsync;
   else if (((PlatformKind)platform) == PlatformKind::none &&
            (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()))
     platformAgnostic =

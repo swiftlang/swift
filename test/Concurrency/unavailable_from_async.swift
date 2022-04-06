@@ -64,11 +64,13 @@ func makeAsyncClosuresSynchronously(bop: inout Bop) -> (() async -> Void) {
     bop.foo()     // expected-warning@:9{{'foo' is unavailable from asynchronous contexts}}
     bop.muppet()  // expected-warning@:9{{'muppet' is unavailable from asynchronous contexts}}
     unavailableFunction() // expected-warning@:5{{'unavailableFunction' is unavailable from asynchronous contexts}}
+    noasyncFunction() // expected-error@:5{{'noasyncFunction' is unavailable from asynchronous contexts}}
 
     // Can use them from synchronous closures
     _ = { Bop() }()
     _ = { bop.foo() }()
     _ = { bop.muppet() }()
+    _ = { noasyncFunction() }()
 
     // Unavailable global function
     foo()         // expected-warning{{'foo' is unavailable from asynchronous contexts}}
@@ -87,6 +89,7 @@ func asyncFunc() async { // expected-error{{asynchronous global function 'asyncF
   bop.foo()     // expected-warning@:7{{'foo' is unavailable from asynchronous contexts}}
   bop.muppet()  // expected-warning@:7{{'muppet' is unavailable from asynchronous contexts}}
   unavailableFunction() // expected-warning@:3{{'unavailableFunction' is unavailable from asynchronous contexts}}
+  noasyncFunction() // expected-error@:3{{'noasyncFunction' is unavailable from asynchronous contexts}}
 
   // Unavailable global function
   foo()         // expected-warning{{'foo' is unavailable from asynchronous contexts}}
@@ -101,6 +104,7 @@ func asyncFunc() async { // expected-error{{asynchronous global function 'asyncF
     bop.foo()
     bop.muppet()
     unavailableFunction()
+    noasyncFunction()
 
     _ = { () async -> Void in
       // Check Unavailable things inside of a nested async closure
@@ -109,6 +113,7 @@ func asyncFunc() async { // expected-error{{asynchronous global function 'asyncF
       bop.muppet()    // expected-warning@:11{{'muppet' is unavailable from asynchronous contexts}}
       _ = Bop()       // expected-warning@:11{{'init' is unavailable from asynchronous contexts; Use Bop(a: Int) instead}}
       unavailableFunction() // expected-warning@:7{{'unavailableFunction' is unavailable from asynchronous contexts}}
+      noasyncFunction() // expected-error@:7{{'noasyncFunction' is unavailable from asynchronous contexts}}
     }
   }
 
@@ -118,6 +123,7 @@ func asyncFunc() async { // expected-error{{asynchronous global function 'asyncF
     bop.foo()     // expected-warning@:9{{'foo' is unavailable from asynchronous contexts}}
     bop.muppet()  // expected-warning@:9{{'muppet' is unavailable from asynchronous contexts}}
     unavailableFunction() // expected-warning@:5{{'unavailableFunction' is unavailable from asynchronous contexts}}
+    noasyncFunction() // expected-error@:5{{'noasyncFunction' is unavailable from asynchronous contexts}}
 
     _ = {
       foo()

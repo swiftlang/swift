@@ -269,6 +269,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
+  if(SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER)
+    list(APPEND result "-D" "SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER")
+  endif()
+
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY")
   endif()
@@ -299,6 +303,10 @@ function(_add_target_variant_swift_compile_flags
   
   if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
     list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_UNICODE_DATA")
+  endif()
+  
+  if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
+    list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_VECTOR_TYPES")
   endif()
 
   if(SWIFT_STDLIB_HAS_COMMANDLINE)

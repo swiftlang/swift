@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface %s -module-name AccessFilter
+// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface %s -module-name AccessFilter -requirement-machine-inferred-signatures=on
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.swiftinterface
 
@@ -245,12 +245,12 @@ internal typealias InternalAlias_BAD = PublicAliasBase
 
 internal typealias ReallyInternalAlias_BAD = ReallyInternalAliasBase_BAD
 
-// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.PublicAlias {{[{]$}}
+// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.PublicAliasBase {{[{]$}}
 extension GenericStruct where T == PublicAlias {
   // CHECK-NEXT: public func constrainedToPublicAlias(){{$}}
   public func constrainedToPublicAlias() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.UFIAlias {{[{]$}}
+// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.PublicAliasBase {{[{]$}}
 extension GenericStruct where T == UFIAlias {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIAlias(){{$}}

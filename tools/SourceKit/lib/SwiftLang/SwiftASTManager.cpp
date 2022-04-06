@@ -1054,7 +1054,6 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     Error = "compilation setup failed";
     return nullptr;
   }
-  CompIns.getASTContext().CancellationFlag = CancellationFlag;
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
     TracedOp.start(TraceInfo);
@@ -1208,15 +1207,28 @@ void ASTProducer::enqueueConsumer(
   // this synchronously since all results will be delivered async anyway.
   auto This = shared_from_this();
   BuildOperationsQueue.dispatch([Consumer, FileSystem, Mgr, This]() {
+    // The passed in filesystem does not have overlays resolved. Make sure to
+    // do so before performing any file operations.
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS = FileSystem;
+    const InvocationOptions &InvocOpts = This->InvokRef->Impl.Opts;
+    const CompilerInvocation &ActualInvoc = InvocOpts.Invok;
+    auto ExpectedOverlay =
+        ActualInvoc.getSearchPathOptions().makeOverlayFileSystem(FileSystem);
+    if (ExpectedOverlay) {
+      FS = std::move(ExpectedOverlay.get());
+    } else {
+      llvm::consumeError(ExpectedOverlay.takeError());
+    }
+
     if (auto BuildOp =
-            This->getBuildOperationForConsumer(Consumer, FileSystem, Mgr)) {
+            This->getBuildOperationForConsumer(Consumer, FS, Mgr)) {
       bool WasAdded = BuildOp->addConsumer(Consumer);
       if (!WasAdded) {
         // The build operation was cancelled after the call to
         // getBuildOperationForConsumer but before the consumer could be
         // added. This should be an absolute edge case. Let's just try
         // again.
-        This->enqueueConsumer(Consumer, FileSystem, Mgr);
+        This->enqueueConsumer(Consumer, FS, Mgr);
       }
     } else {
       auto WeakThis = std::weak_ptr<ASTProducer>(This);
@@ -1229,8 +1241,9 @@ void ASTProducer::enqueueConsumer(
           Mgr->Impl.ASTCache.set(This->InvokRef->Impl.Key, This);
         }
       };
+
       ASTBuildOperationRef NewBuildOp = std::make_shared<ASTBuildOperation>(
-          FileSystem, This->InvokRef, Mgr, DidFinishCallback);
+          FS, This->InvokRef, Mgr, DidFinishCallback);
       This->BuildOperations.push_back(NewBuildOp);
       bool WasAdded = NewBuildOp->addConsumer(Consumer);
       assert(WasAdded && "Consumer wasn't added to a new build operation "

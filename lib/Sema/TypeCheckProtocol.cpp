@@ -29,6 +29,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -4941,19 +4942,12 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   auto proto = Conformance->getProtocol();
   auto &diags = proto->getASTContext().Diags;
 
-  auto DC = Conformance->getDeclContext();
+  auto *const module = DC->getParentModule();
   auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, substitutingType, ProtocolConformanceRef(Conformance));
 
   auto reqSig = proto->getRequirementSignature().getRequirements();
-
-  auto result = TypeChecker::checkGenericArguments(
-      DC->getParentModule(), Loc, Loc,
-      // FIXME: maybe this should be the conformance's type
-      proto->getDeclaredInterfaceType(),
-      { proto->getSelfInterfaceType() },
-      reqSig, QuerySubstitutionMap{substitutions});
 
   // Non-final classes should not be able to conform to protocols with a
   // same-type requirement on 'Self', since such a conformance would no
@@ -4969,23 +4963,31 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     }
   }
 
+  const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
+      module, reqSig, QuerySubstitutionMap{substitutions});
   switch (result) {
-  case RequirementCheckResult::Success:
+  case CheckGenericArgumentsResult::Success:
     // Go on to check exportability.
     break;
 
-  case RequirementCheckResult::Failure:
-    Conformance->setInvalid();
-    return;
-
-  case RequirementCheckResult::SubstitutionFailure:
+  case CheckGenericArgumentsResult::RequirementFailure:
+  case CheckGenericArgumentsResult::SubstitutionFailure:
     // Diagnose the failure generically.
     // FIXME: Would be nice to give some more context here!
     if (!Conformance->isInvalid()) {
       diags.diagnose(Loc, diag::type_does_not_conform,
                      Adoptee,
                      Proto->getDeclaredInterfaceType());
+
+      if (result == CheckGenericArgumentsResult::RequirementFailure) {
+        TypeChecker::diagnoseRequirementFailure(
+            result.getRequirementFailureInfo(), Loc, Loc,
+            proto->getDeclaredInterfaceType(), {proto->getSelfInterfaceType()},
+            QuerySubstitutionMap{substitutions}, module);
+      }
+
       Conformance->setInvalid();
+      AlreadyComplained = true;
     }
     return;
   }
@@ -5475,6 +5477,28 @@ void swift::diagnoseConformanceFailure(Type T,
     return;
   }
 
+  // Special case: a distributed actor conformance often can fail because of
+  // a missing ActorSystem (or DefaultDistributedActorSystem) typealias.
+  // In this case, the "normal" errors are an avalanche of errors related to
+  // missing things in the actor that don't help users diagnose the root problem.
+  // Instead, we want to suggest adding the typealias.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
+    auto nominal = T->getNominalOrBoundGenericNominal();
+    if (!nominal)
+      return;
+
+    // If it is missing the ActorSystem type, suggest adding it:
+    auto systemTy = getDistributedActorSystemType(/*actor=*/nominal);
+    if (!systemTy || systemTy->hasError()) {
+      diags.diagnose(ComplainLoc,
+                     diag::distributed_actor_conformance_missing_system_type,
+                     nominal->getName());
+      diags.diagnose(nominal->getStartLoc(),
+                     diag::note_distributed_actor_system_can_be_defined_using_defaultdistributedactorsystem);
+      return;
+    }
+  }
+
   // Special case: for enums with a raw type, explain that the failing
   // conformance to RawRepresentable was inferred.
   if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
@@ -5655,11 +5679,11 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
         M, *condReqs,
         [](SubstitutableType *dependentType) { return Type(dependentType); });
     switch (conditionalCheckResult) {
-    case RequirementCheckResult::Success:
+    case CheckGenericArgumentsResult::Success:
       break;
 
-    case RequirementCheckResult::Failure:
-    case RequirementCheckResult::SubstitutionFailure:
+    case CheckGenericArgumentsResult::RequirementFailure:
+    case CheckGenericArgumentsResult::SubstitutionFailure:
       return ProtocolConformanceRef::forInvalid();
     }
   }
@@ -6887,8 +6911,19 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
+  case KnownDerivableProtocolKind::Identifiable:
+    if (derived.Nominal->isDistributedActor()) {
+      return derived.deriveDistributedActor(Requirement);
+    } else {
+      // No synthesis is required for other types; we should only end up
+      // attempting synthesis if the nominal was a distributed actor.
+      llvm_unreachable("Identifiable is synthesized for distributed actors");
+    }
+
   case KnownDerivableProtocolKind::DistributedActor:
     return derived.deriveDistributedActor(Requirement);
+  case KnownDerivableProtocolKind::DistributedActorSystem:
+    return derived.deriveDistributedActorSystem(Requirement);
 
   case KnownDerivableProtocolKind::OptionSet:
       llvm_unreachable(
@@ -6920,6 +6955,12 @@ TypeChecker::deriveTypeWitness(DeclContext *DC,
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   case KnownProtocolKind::DistributedActor:
+    return derived.deriveDistributedActor(AssocType);
+  case KnownProtocolKind::Identifiable:
+    // Identifiable only has derivation logic for distributed actors,
+    // because how it depends on the ActorSystem the actor is associated with.
+    // If the nominal wasn't a distributed actor, we should not end up here,
+    // but either way, then we'd return null (fail derivation).
     return derived.deriveDistributedActor(AssocType);
   default:
     return std::make_pair(nullptr, nullptr);

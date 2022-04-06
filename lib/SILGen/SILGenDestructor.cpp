@@ -10,13 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ArgumentScope.h"
+#include "RValue.h"
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
-#include "RValue.h"
-#include "ArgumentScope.h"
+#include "SwitchEnumBuilder.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/TypeLowering.h"
+#include "llvm/ADT/SmallSet.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -219,6 +221,142 @@ void SILGenFunction::destroyClassMember(SILLocation cleanupLoc,
   }
 }
 
+/// Finds stored properties that have the same type as `cd` and thus form
+/// a recursive structure.
+///
+/// Example:
+///
+///   class Node<T> {
+///     let element: T
+///     let next: Node<T>?
+///   }
+///
+/// In the above example `next` is a recursive link and would be recognized
+/// by this function and added to the result set.
+static void findRecursiveLinks(ClassDecl *cd,
+                               llvm::SmallSetVector<VarDecl *, 4> &result) {
+  auto selfTy = cd->getDeclaredInterfaceType();
+
+  // Collect all stored properties that would form a recursive structure,
+  // so we can remove the recursion and prevent the call stack from
+  // overflowing.
+  for (VarDecl *vd : cd->getStoredProperties()) {
+    auto Ty = vd->getInterfaceType()->getOptionalObjectType();
+    if (Ty && Ty->getCanonicalType() == selfTy->getCanonicalType()) {
+      result.insert(vd);
+    }
+  }
+
+  // NOTE: Right now we only optimize linear recursion, so if there is more
+  // than one stored property of the same type, clear out the set and don't
+  // perform any recursion optimization.
+  if (result.size() > 1) {
+    result.clear();
+  }
+}
+
+void SILGenFunction::emitRecursiveChainDestruction(ManagedValue selfValue,
+                                                   ClassDecl *cd,
+                                                   VarDecl *recursiveLink,
+                                                   CleanupLocation cleanupLoc) {
+  auto selfTy = F.mapTypeIntoContext(cd->getDeclaredInterfaceType());
+
+  auto selfTyLowered = getTypeLowering(selfTy).getLoweredType();
+
+  SILBasicBlock *cleanBB = createBasicBlock();
+  SILBasicBlock *noneBB = createBasicBlock();
+  SILBasicBlock *notUniqueBB = createBasicBlock();
+  SILBasicBlock *uniqueBB = createBasicBlock();
+  SILBasicBlock *someBB = createBasicBlock();
+  SILBasicBlock *loopBB = createBasicBlock();
+
+  // var iter = self.link
+  // self.link = nil
+  auto Ty = getTypeLowering(F.mapTypeIntoContext(recursiveLink->getInterfaceType())).getLoweredType();
+  auto optionalNone = B.createOptionalNone(cleanupLoc, Ty);
+  SILValue varAddr =
+    B.createRefElementAddr(cleanupLoc, selfValue.getValue(), recursiveLink,
+                           Ty.getAddressType());
+  auto *iterAddr = B.createAllocStack(cleanupLoc, Ty);
+  SILValue addr = B.createBeginAccess(
+    cleanupLoc, varAddr, SILAccessKind::Modify, SILAccessEnforcement::Static,
+    true /*noNestedConflict*/, false /*fromBuiltin*/);
+  SILValue iter = B.createLoad(cleanupLoc, addr, LoadOwnershipQualifier::Take);
+  B.createStore(cleanupLoc, optionalNone, addr, StoreOwnershipQualifier::Init);
+  B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
+  B.createStore(cleanupLoc, iter, iterAddr, StoreOwnershipQualifier::Init);
+
+  B.createBranch(cleanupLoc, loopBB);
+
+  // while iter != nil {
+  {
+    B.emitBlock(loopBB);
+    auto iterBorrow =
+        ManagedValue::forUnmanaged(iterAddr).borrow(*this, cleanupLoc);
+    SwitchEnumBuilder switchBuilder(B, cleanupLoc, iterBorrow);
+    switchBuilder.addOptionalSomeCase(someBB);
+    switchBuilder.addOptionalNoneCase(noneBB);
+    std::move(switchBuilder).emit();
+  }
+
+  // if isKnownUniquelyReferenced(&iter) {
+  {
+    B.emitBlock(someBB);
+    auto isUnique = B.createIsUnique(cleanupLoc, iterAddr);
+    B.createCondBranch(cleanupLoc, isUnique, uniqueBB, notUniqueBB);
+  }
+
+  // we have a uniquely referenced link, so we need to deinit
+  {
+    B.emitBlock(uniqueBB);
+
+    // let tail = iter.unsafelyUnwrapped.next
+    // iter = tail
+    SILValue iterBorrow = B.createLoadBorrow(cleanupLoc, iterAddr);
+    auto *link = B.createUncheckedEnumData(
+        cleanupLoc, iterBorrow, getASTContext().getOptionalSomeDecl(),
+        selfTyLowered);
+
+    varAddr = B.createRefElementAddr(cleanupLoc, link, recursiveLink,
+                                     Ty.getAddressType());
+
+    addr = B.createBeginAccess(
+        cleanupLoc, varAddr, SILAccessKind::Read, SILAccessEnforcement::Static,
+        true /* noNestedConflict */, false /*fromBuiltin*/);
+
+    // The deinit of `iter` will decrement the ref count of the field
+    // containing the next element and potentially leading to its
+    // deinitialization, causing the recursion. The prevent that,
+    // we `load [copy]` here to ensure the object stays alive until
+    // we explicitly release it in the next step of the iteration.
+    iter = B.createLoad(cleanupLoc, addr, LoadOwnershipQualifier::Copy);
+    B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
+    B.createEndBorrow(cleanupLoc, iterBorrow);
+
+    B.createStore(cleanupLoc, iter, iterAddr, StoreOwnershipQualifier::Assign);
+
+    B.createBranch(cleanupLoc, loopBB);
+  }
+
+  // the next link in the chain is not unique, so we are done here
+  {
+    B.emitBlock(notUniqueBB);
+    B.createBranch(cleanupLoc, cleanBB);
+  }
+
+  // we reached the end of the chain
+  {
+    B.emitBlock(noneBB);
+    B.createBranch(cleanupLoc, cleanBB);
+  }
+
+  {
+    B.emitBlock(cleanBB);
+    B.createDestroyAddr(cleanupLoc, iterAddr);
+    B.createDeallocStack(cleanupLoc, iterAddr);
+  }
+}
+
 void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
                                                 ClassDecl *cd,
                                                 CleanupLocation cleanupLoc) {
@@ -231,10 +369,10 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
   /// For other cases, the basic blocks are not necessary and the destructor
   /// can just emit all the normal destruction code right into the current block.
   // If set, used as the basic block for the destroying of all members.
-  SILBasicBlock* normalMemberDestroyBB = nullptr;
+  SILBasicBlock *normalMemberDestroyBB = nullptr;
   // If set, used as the basic block after members have been destroyed,
   // and we're ready to perform final cleanups before returning.
-  SILBasicBlock* finishBB = nullptr;
+  SILBasicBlock *finishBB = nullptr;
 
   /// A distributed actor may be 'remote' in which case there is no need to
   /// destroy "all" members, because they never had storage to begin with.
@@ -247,13 +385,29 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
                                                finishBB);
   }
 
+  // Before we destroy all fields, we check if any of them are
+  // recursively the same type as `self`, so we can iteratively
+  // deinitialize them, to prevent deep recursion and potential
+  // stack overflows.
+
+  llvm::SmallSetVector<VarDecl *, 4> recursiveLinks;
+  findRecursiveLinks(cd, recursiveLinks);
+
   /// Destroy all members.
   {
     if (normalMemberDestroyBB)
       B.emitBlock(normalMemberDestroyBB);
 
-    for (VarDecl *vd : cd->getStoredProperties())
+    for (VarDecl *vd : cd->getStoredProperties()) {
+      if (recursiveLinks.contains(vd))
+        continue;
       destroyClassMember(cleanupLoc, selfValue, vd);
+    }
+
+    if (!recursiveLinks.empty()) {
+      assert(recursiveLinks.size() == 1 && "Only linear recursion supported.");
+      emitRecursiveChainDestruction(selfValue, cd, recursiveLinks[0], cleanupLoc);
+    }
 
     if (finishBB)
       B.createBranch(cleanupLoc, finishBB);

@@ -157,8 +157,66 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
       return false;
     }
 
-    // Add the pair (X, TYV).
-    pairs.emplace_back(x, tyv, path);
+    // If X == TUW for some W, then the critical pair is (TUW, TYV),
+    // and we have
+    // - lhs == (TUV => TUW)
+    // - rhs == (U => Y).
+    //
+    // We explicitly apply the rewrite step (Y => U) to the beginning of the
+    // rewrite path, transforming the critical pair to (TYW, TYV).
+    //
+    // In particular, if V == W.[P] for some protocol P, then we in fact have
+    // a property rule and a same-type rule:
+    //
+    // - lhs == (TUW.[P] => TUW)
+    // - rhs == (U => Y)
+    //
+    // Without this hack, the critical pair would be:
+    //
+    // (TUW => TYW.[P])
+    //
+    // With this hack, the critical pair becomes:
+    //
+    // (TYW.[P] => TYW)
+    //
+    // This ensures that the newly-added rule is itself a property rule;
+    // otherwise, this would only be the case if addRule() reduced TUW
+    // into TYW without immediately reducing some subterm of TUW first.
+    //
+    // While completion will eventually simplify all such rules down into
+    // property rules, their existance in the first place breaks subtle
+    // invariants in the minimal conformances algorithm, which expects
+    // homotopy generators describing redundant protocol conformance rules
+    // to have a certain structure.
+    if (t.size() + rhs.getLHS().size() <= x.size() &&
+        std::equal(rhs.getLHS().begin(),
+                   rhs.getLHS().end(),
+                   x.begin() + t.size())) {
+      // We have a path from TUW to TYV. Invert to get a path from TYV to
+      // TUW.
+      path.invert();
+
+      // Compute the term W.
+      MutableTerm w(x.begin() + t.size() + rhs.getLHS().size(), x.end());
+
+      // Now add a rewrite step T.(U => Y).W to get a path from TYV to
+      // TYW.
+      path.add(RewriteStep::forRewriteRule(/*startOffset=*/t.size(),
+                                           /*endOffset=*/w.size(),
+                                           getRuleID(rhs),
+                                           /*inverse=*/false));
+
+      // Compute the term TYW.
+      MutableTerm tyw(t);
+      tyw.append(rhs.getRHS());
+      tyw.append(w);
+
+      // Add the pair (TYV, TYW).
+      pairs.emplace_back(tyv, tyw, path);
+    } else {
+      // Add the pair (X, TYV).
+      pairs.emplace_back(x, tyv, path);
+    }
   } else {
     // lhs == TU -> X, rhs == UV -> Y.
 
@@ -217,7 +275,7 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     // - lhs == (TU -> X)
     // - rhs == (UV -> UW).
     //
-    // We explicitly apply the rewrite step (TU = X) to the rewrite path,
+    // We explicitly apply the rewrite step (TU => X) to the rewrite path,
     // transforming the critical pair to (XV, XW).
     //
     // In particular, if T == X, U == [P] for some protocol P, and
@@ -229,15 +287,15 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     //
     // Without this hack, the critical pair would be:
     //
-    // (T.w.[p] => T.[P].w)
+    // (T.W.[p] => T.[P].W)
     //
     // With this hack, the critical pair becomes:
     //
-    // (T.w.[p] => T.w)
+    // (T.W.[p] => T.W)
     //
     // This ensures that the newly-added rule is itself a property rule;
-    // otherwise, this would only be the case if addRule() reduced T.[P].w
-    // into T.w without immediately reducing some subterm of T first.
+    // otherwise, this would only be the case if addRule() reduced T.[P].W
+    // into T.W without immediately reducing some subterm of T first.
     //
     // While completion will eventually simplify all such rules down into
     // property rules, their existance in the first place breaks subtle
@@ -287,6 +345,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
                                           unsigned maxRuleLength) {
   assert(Initialized);
   assert(!Minimized);
+  assert(!Frozen);
 
   // Complete might already be set, if we're re-running completion after
   // adding new rules in the property map's concrete type unification procedure.
@@ -301,7 +360,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
     ruleCount = Rules.size();
 
     // For every rule, looking for other rules that overlap with this rule.
-    for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
+    for (unsigned i = FirstLocalRule, e = Rules.size(); i < e; ++i) {
       const auto &lhs = getRule(i);
       if (lhs.isLHSSimplified() ||
           lhs.isRHSSimplified() ||
@@ -391,14 +450,14 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
 
     for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.
-      if (Rules.size() > maxRuleCount)
+      if (getLocalRules().size() > maxRuleCount)
         return std::make_pair(CompletionResult::MaxRuleCount, Rules.size() - 1);
 
       if (!addRule(pair.LHS, pair.RHS, &pair.Path))
         continue;
 
       // Check if the new rule is too long.
-      if (Rules.back().getDepth() > maxRuleLength)
+      if (Rules.back().getDepth() > maxRuleLength + getLongestInitialRule())
         return std::make_pair(CompletionResult::MaxRuleLength, Rules.size() - 1);
     }
 

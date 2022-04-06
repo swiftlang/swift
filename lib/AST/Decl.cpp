@@ -386,6 +386,12 @@ Decl::getBackDeployBeforeOSVersion(PlatformKind Kind) const {
       }
     }
   }
+
+  // Accessors may inherit `@_backDeploy`.
+  if (getKind() == DeclKind::Accessor) {
+    return cast<AccessorDecl>(this)->getStorage()->getBackDeployBeforeOSVersion(Kind);
+  }
+
   return None;
 }
 
@@ -4042,9 +4048,16 @@ GenericParameterReferenceInfo swift::findGenericParameterReferences(
             sig, genericParam, param.getPlainType(), TypePosition::Invariant);
         continue;
       }
+
+      // Parameters are contravariant, but if we're prior to the skipped
+      // parameter treat them as invariant because we're not allowed to
+      // reference the parameter at all.
+      TypePosition position = TypePosition::Contravariant;
+      if (skipParamIndex && paramIdx < *skipParamIndex)
+        position = TypePosition::Invariant;
+
       inputInfo |= ::findGenericParameterReferences(
-          sig, genericParam, param.getParameterType(),
-          TypePosition::Contravariant);
+          sig, genericParam, param.getParameterType(), position);
     }
 
     // A covariant Self result inside a parameter will not be bona fide.
@@ -4544,9 +4557,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        TrailingWhereClause *trailingWhere)
     : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
-      TrailingWhere(trailingWhere) {
-  Bits.AssociatedTypeDecl.IsPrimary = 0;
-}
+      TrailingWhere(trailingWhere) {}
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
@@ -5292,11 +5303,13 @@ bool EnumDecl::hasCircularRawValue() const {
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
+                           ArrayRef<PrimaryAssociatedTypeName> PrimaryAssociatedTypeNames,
                            ArrayRef<InheritedEntry> Inherited,
                            TrailingWhereClause *TrailingWhere)
     : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
                       nullptr),
-      ProtocolLoc(ProtocolLoc) {
+      ProtocolLoc(ProtocolLoc),
+      PrimaryAssociatedTypeNames(PrimaryAssociatedTypeNames) {
   Bits.ProtocolDecl.RequiresClassValid = false;
   Bits.ProtocolDecl.RequiresClass = false;
   Bits.ProtocolDecl.ExistentialConformsToSelfValid = false;
@@ -5563,7 +5576,7 @@ void ProtocolDecl::computeKnownProtocolKind() const {
       !module->getName().is("Foundation") &&
       !module->getName().is("_Differentiation") &&
       !module->getName().is("_Concurrency") &&
-      !module->getName().is("_Distributed")) {
+      !module->getName().is("Distributed")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -5609,10 +5622,14 @@ Optional<KnownDerivableProtocolKind>
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
+  case KnownProtocolKind::Identifiable:
+    return KnownDerivableProtocolKind::Identifiable;
   case KnownProtocolKind::Actor:
     return KnownDerivableProtocolKind::Actor;
   case KnownProtocolKind::DistributedActor:
     return KnownDerivableProtocolKind::DistributedActor;
+  case KnownProtocolKind::DistributedActorSystem:
+    return KnownDerivableProtocolKind::DistributedActorSystem;
   default: return None;
   }
 }
@@ -6367,6 +6384,19 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   return true;
 }
 
+bool VarDecl::isLet() const {
+  // An awful hack that stabilizes the value of 'isLet' for ParamDecl instances.
+  //
+  // All of the callers in SIL are actually looking for the semantic
+  // "is immutable" predicate (present on ParamDecl) and should be migrated to
+  // a high-level request. Once this is done, all callers of the introducer and
+  // specifier setters can be removed.
+  if (auto *PD = dyn_cast<ParamDecl>(this)) {
+    return PD->isImmutable();
+  }
+  return getIntroducer() == Introducer::Let;
+}
+
 bool VarDecl::isAsyncLet() const {
   return getAttrs().hasAttribute<AsyncAttr>();
 }
@@ -6804,6 +6834,32 @@ ParamDecl *ParamDecl::clone(const ASTContext &Ctx, ParamDecl *PD) {
   return Clone;
 }
 
+ParamDecl *
+ParamDecl::createImplicit(ASTContext &Context, SourceLoc specifierLoc,
+                          SourceLoc argumentNameLoc, Identifier argumentName,
+                          SourceLoc parameterNameLoc, Identifier parameterName,
+                          Type interfaceType, DeclContext *Parent,
+                          ParamSpecifier specifier) {
+  auto decl =
+      new (Context) ParamDecl(specifierLoc, argumentNameLoc, argumentName,
+                              parameterNameLoc, parameterName, Parent);
+  decl->setImplicit();
+  // implicit ParamDecls must have a specifier set
+  decl->setSpecifier(specifier);
+  decl->setInterfaceType(interfaceType);
+  return decl;
+}
+
+ParamDecl *ParamDecl::createImplicit(ASTContext &Context,
+                                     Identifier argumentName,
+                                     Identifier parameterName,
+                                     Type interfaceType, DeclContext *Parent,
+                                     ParamSpecifier specifier) {
+  return ParamDecl::createImplicit(Context, SourceLoc(), SourceLoc(),
+                                   argumentName, SourceLoc(), parameterName,
+                                   interfaceType, Parent, specifier);
+}
+
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());
@@ -7012,6 +7068,10 @@ Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
 
 Type ParamDecl::getTypeOfDefaultExpr() const {
   auto &ctx = getASTContext();
+
+  // If this is a caller-side default, the type is determined based on
+  // a particular call site.
+  assert(!hasCallerSideDefaultExpr());
 
   if (Type type = evaluateOrDefault(
           ctx.evaluator,
@@ -7475,6 +7535,18 @@ ParameterList *swift::getParameterList(ValueDecl *source) {
   return nullptr;
 }
 
+ParameterList *swift::getParameterList(DeclContext *source) {
+  if (auto *D = source->getAsDecl()) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      return getParameterList(VD);
+    }
+  } else if (auto *CE = dyn_cast<AbstractClosureExpr>(source)) {
+    return CE->getParameters();
+  }
+
+  return nullptr;
+}
+
 const ParamDecl *swift::getParameterAt(const ValueDecl *source,
                                        unsigned index) {
   if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
@@ -7514,9 +7586,10 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
     // rename parameter, falling back to the first with a rename. Note that
     // `getAttrs` is in reverse source order, so the last attribute is the
     // first in source
-    if (!attr->Rename.empty() && (attr->Platform == PlatformKind::none ||
-                                  !avAttr))
+    if (!attr->Rename.empty() &&
+        (attr->Platform == PlatformKind::none || !avAttr) && !attr->isNoAsync()) {
       avAttr = attr;
+    }
   }
 
   auto *renamedDecl = evaluateOrDefault(
@@ -7649,7 +7722,16 @@ bool AbstractFunctionDecl::isSendable() const {
 }
 
 bool AbstractFunctionDecl::isBackDeployed() const {
-  return getAttrs().hasAttribute<BackDeployAttr>();
+  if (getAttrs().hasAttribute<BackDeployAttr>())
+    return true;
+
+  // Property and subscript accessors inherit the attribute.
+  if (auto *AD = dyn_cast<AccessorDecl>(this)) {
+    if (AD->getStorage()->getAttrs().hasAttribute<BackDeployAttr>())
+      return true;
+  }
+
+  return false;
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
@@ -8103,6 +8185,23 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
 
   OpaqueReturnTypeIdentifier = getASTContext().getIdentifier(mangleBuf);
   return OpaqueReturnTypeIdentifier;
+}
+
+void OpaqueTypeDecl::setConditionallyAvailableSubstitutions(
+    ArrayRef<ConditionallyAvailableSubstitutions *> substitutions) {
+  assert(!ConditionallyAvailableTypes &&
+         "resetting conditionally available substitutions?!");
+  ConditionallyAvailableTypes = getASTContext().AllocateCopy(substitutions);
+}
+
+OpaqueTypeDecl::ConditionallyAvailableSubstitutions *
+OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+    ASTContext &ctx, ArrayRef<VersionRange> availabilityContext,
+    SubstitutionMap substitutions) {
+  auto size = totalSizeToAlloc<VersionRange>(availabilityContext.size());
+  auto mem = ctx.Allocate(size, alignof(ConditionallyAvailableSubstitutions));
+  return new (mem)
+      ConditionallyAvailableSubstitutions(availabilityContext, substitutions);
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {
@@ -9016,24 +9115,9 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dc->getAsDecl()))
     return getActorIsolation(vd);
 
-  // In the context of the initializing or default-value expression of a
-  // stored property, the isolation varies between global and type members:
-  //   - For a static stored property, the isolation matches the VarDecl.
-  //   - For a field of a nominal type, the expression is not isolated.
-  // Without this distinction, a nominal can have non-async initializers
-  // with various kinds of isolation, so an impossible constraint can be
-  // created. See SE-0327 for details.
-  if (auto *var = dc->getNonLocalVarDecl()) {
-
-    // Isolation officially changes, as described above, in Swift 6+
-    if (dc->getASTContext().isSwiftVersionAtLeast(6) &&
-        var->isInstanceMember() &&
-        !var->getAttrs().hasAttribute<LazyAttr>()) {
-      return ActorIsolation::forUnspecified();
-    }
-
+  if (auto *var = dc->getNonLocalVarDecl())
      return getActorIsolation(var);
-  }
+
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
     switch (auto isolation = closure->getActorIsolation()) {
@@ -9060,9 +9144,11 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   }
 
   if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
-    if (dc->isAsyncContext()) {
+    if (dc->isAsyncContext() || dc->getASTContext().LangOpts.WarnConcurrency) {
       if (Type mainActor = dc->getASTContext().getMainActorType())
-        return ActorIsolation::forGlobalActor(mainActor, /*unsafe=*/false);
+        return ActorIsolation::forGlobalActor(
+            mainActor,
+            /*unsafe=*/!dc->getASTContext().isSwiftVersionAtLeast(6));
     }
   }
 

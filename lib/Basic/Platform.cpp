@@ -80,15 +80,24 @@ bool swift::triplesAreValidForZippering(const llvm::Triple &target,
 }
 
 const Optional<llvm::VersionTuple>
-swift::minimumABIStableOSVersionForTriple(const llvm::Triple &triple) {
+swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
   if (triple.isMacOSX())
-    return llvm::VersionTuple(10, 14, 4);
+    return llvm::VersionTuple(10, 10, 0);
 
-  if (triple.isiOS() /* including tvOS */)
-    return llvm::VersionTuple(12, 2);
+  // Mac Catalyst was introduced with an iOS deployment target of 13.1.
+  if (tripleIsMacCatalystEnvironment(triple))
+    return llvm::VersionTuple(13, 1);
+  
+  // Note: this must come before checking iOS since that returns true for
+  // both iOS and tvOS.
+  if (triple.isTvOS())
+    return llvm::VersionTuple(9, 0);
+
+  if (triple.isiOS())
+    return llvm::VersionTuple(8, 0);
 
   if (triple.isWatchOS())
-    return llvm::VersionTuple(5, 2);
+    return llvm::VersionTuple(2, 0);
 
   return None;
 }
@@ -128,6 +137,7 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
 
     if (tripleIsiOSSimulator(triple))
       return DarwinPlatformKind::IPhoneOSSimulator;
+
     return DarwinPlatformKind::IPhoneOS;
   }
 

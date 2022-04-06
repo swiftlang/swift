@@ -301,6 +301,9 @@ struct PrintOptions {
   /// Whether to print generic requirements in a where clause.
   bool PrintGenericRequirements = true;
 
+  /// Suppress emitting @available(*, noasync)
+  bool SuppressNoAsyncAvailabilityAttr = false;
+
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.

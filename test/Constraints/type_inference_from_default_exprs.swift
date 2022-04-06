@@ -167,3 +167,35 @@ func main() {
   takesRectangle(.init())
   // expected-error@-1 {{cannot convert default value of type 'Rectangle' to expected argument type 'Circle' for parameter #0}}
 }
+
+func test_magic_defaults() {
+  func with_magic(_: Int = #function) {} // expected-error {{default argument value of type 'String' cannot be converted to type 'Int'}}
+  func generic_with_magic<T>(_: T = #line) -> T {} // expected-error {{default argument value of type 'Int' cannot be converted to type 'T'}}
+
+  let _ = with_magic()
+  let _: String = generic_with_magic()
+}
+
+// SR-16069
+func test_allow_same_type_between_dependent_types() {
+  struct Default : P {
+    typealias X = Int
+  }
+
+  struct Other : P {
+    typealias X = Int
+  }
+
+  struct S<T: P> {
+    func test<U: P>(_: U = Default()) where U.X == T.X { // expected-note {{where 'T.X' = 'String', 'U.X' = 'Default.X' (aka 'Int')}}
+    }
+  }
+
+  func test_ok<T: P>(s: S<T>) where T.X == Int {
+    s.test() // Ok: U == Default
+  }
+
+  func test_bad<T: P>(s: S<T>) where T.X == String {
+    s.test() // expected-error {{instance method 'test' requires the types 'String' and 'Default.X' (aka 'Int') be equivalent}}
+  }
+}

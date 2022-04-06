@@ -266,11 +266,10 @@ public:
   void clearInsertionPoint() { BB = nullptr; }
 
   /// setInsertionPoint - Set the insertion point.
-  void setInsertionPoint(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt) {
+  void setInsertionPoint(SILBasicBlock *BB, SILBasicBlock::iterator insertPt) {
     this->BB = BB;
-    this->InsertPt = InsertPt;
-    if (InsertPt == BB->end())
-      return;
+    this->InsertPt = insertPt;
+    assert(insertPt == BB->end() || insertPt->getParent() == BB);
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
@@ -1061,18 +1060,6 @@ public:
         lifetimeGuaranteed));
   }
 
-  ThinFunctionToPointerInst *
-  createThinFunctionToPointer(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (getModule()) ThinFunctionToPointerInst(
-        getSILDebugLocation(Loc), Op, Ty));
-  }
-
-  PointerToThinFunctionInst *
-  createPointerToThinFunction(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(PointerToThinFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction()));
-  }
-
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty) {
     return createUpcast(Loc, Op, Ty, Op.getOwnershipKind());
   }
@@ -1313,16 +1300,6 @@ public:
     return insert(UnconditionalCheckedCastAddrInst::create(
         getSILDebugLocation(Loc), src, sourceFormalType,
         dest, targetFormalType, getFunction()));
-  }
-
-  UnconditionalCheckedCastValueInst *
-  createUnconditionalCheckedCastValue(SILLocation Loc,
-                                      SILValue op, CanType srcFormalTy,
-                                      SILType destLoweredTy,
-                                      CanType destFormalTy) {
-    return insert(UnconditionalCheckedCastValueInst::create(
-        getSILDebugLocation(Loc), op, srcFormalTy,
-        destLoweredTy, destFormalTy, getFunction()));
   }
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
@@ -2324,18 +2301,6 @@ public:
                           ValueOwnershipKind forwardingOwnershipKind,
                           ProfileCounter Target1Count = ProfileCounter(),
                           ProfileCounter Target2Count = ProfileCounter());
-
-  CheckedCastValueBranchInst *
-  createCheckedCastValueBranch(SILLocation Loc,
-                               SILValue op, CanType srcFormalTy,
-                               SILType destLoweredTy,
-                               CanType destFormalTy,
-                               SILBasicBlock *successBB,
-                               SILBasicBlock *failureBB) {
-    return insertTerminator(CheckedCastValueBranchInst::create(
-        getSILDebugLocation(Loc), op, srcFormalTy,
-        destLoweredTy, destFormalTy, successBB, failureBB, getFunction()));
-  }
 
   CheckedCastAddrBranchInst *
   createCheckedCastAddrBranch(SILLocation Loc, CastConsumptionKind consumption,

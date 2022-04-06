@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors-disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
@@ -10,7 +10,7 @@
 // FIXME: Test is temporary disabled (no way to debug)
 // REQUIRES: fix
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 @available(SwiftStdlib 5.5, *)
@@ -76,6 +76,10 @@ public distributed actor MyActor {
   distributed func complex(_: [Int], _: Obj, _: String?, _: LargeStruct) -> LargeStruct {
     fatalError()
   }
+
+  // Make sure that Sendable doesn't show up in the mangled name
+  distributed func generic<T: Codable & Sendable>(_: T) {
+  }
 }
 
 @available(SwiftStdlib 5.7, *)
@@ -121,6 +125,12 @@ public distributed actor MyOtherActor {
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic SaySiG_____SSSg__________AD______pIetMHgggngrzo_ 27distributed_actor_accessors3ObjC AA11LargeStructV AA7MyActorC s5ErrorP"
 // CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTETFTu" to i{{32|64}})
+// CHECK-SAME: , section ".sw5acfn$B", {{.*}}
+
+/// -> `MyActor.generic`
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC7genericyyxYaKSeRzSERzlFTEHF" = private constant
+// CHECK-SAME: @"symbolic x___________pSeRzSERzlIetMHngzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7genericyyxYaKSeRzSERzlFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section ".sw5acfn$B", {{.*}}
 
 /// -> `MyOtherActor.empty`

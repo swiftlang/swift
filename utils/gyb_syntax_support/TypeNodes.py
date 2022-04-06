@@ -77,12 +77,12 @@ TYPE_NODES = [
              Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
-    # some type -> some 'type'
-    Node('SomeType', kind='Type',
+    # constrained-sugar-type -> ('some'|'any') type
+    Node('ConstrainedSugarType', kind='Type',
          children=[
-             Child('SomeSpecifier', kind='IdentifierToken',
+             Child('SomeOrAnySpecifier', kind='IdentifierToken',
                    classification='Keyword',
-                   text_choices=['some']),
+                   text_choices=['some', 'any']),
              Child('BaseType', kind='Type'),
          ]),
 

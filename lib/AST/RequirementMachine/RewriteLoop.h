@@ -219,11 +219,11 @@ struct RewriteStep {
 
   /// The size of the left whisker, which is the position within the term where
   /// the rule is being applied. In A.(X => Y).B, this is |A|=1.
-  unsigned StartOffset : 16;
+  unsigned StartOffset : 13;
 
   /// The size of the right whisker, which is the length of the remaining suffix
   /// after the rule is applied. In A.(X => Y).B, this is |B|=1.
-  unsigned EndOffset : 16;
+  unsigned EndOffset : 13;
 
   /// If Kind is Rule, the index of the rule in the rewrite system.
   ///
@@ -407,7 +407,13 @@ public:
 
   RewritePath splitCycleAtRule(unsigned ruleID) const;
 
+  bool replaceRulesWithPaths(llvm::function_ref<const RewritePath *(unsigned)> fn);
+
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
+
+  SmallVector<unsigned, 1>
+  findRulesAppearingOnceInEmptyContext(const MutableTerm &term,
+                                       const RewriteSystem &system) const;
 
   void invert();
 
@@ -418,7 +424,7 @@ public:
 
   bool computeLeftCanonicalForm(const RewriteSystem &system);
 
-  void computeNormalForm(const RewriteSystem &system);
+  bool computeNormalForm(const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out,
             MutableTerm term,
@@ -454,6 +460,9 @@ private:
   /// Cached value for getDecomposeCount().
   unsigned DecomposeCount : 15;
 
+  /// Cached value for hasConcreteTypeAliasRule().
+  unsigned HasConcreteTypeAliasRule : 1;
+
   /// A useful loop contains at least one rule in empty context, even if that
   /// rule appears multiple times or also in non-empty context. The only loops
   /// that are elimination candidates contain a rule in empty context *exactly
@@ -475,6 +484,7 @@ public:
     : Basepoint(basepoint), Path(path) {
     ProjectionCount = 0;
     DecomposeCount = 0;
+    HasConcreteTypeAliasRule = 0;
     Useful = 0;
     Deleted = 0;
 
@@ -505,6 +515,8 @@ public:
   unsigned getProjectionCount(const RewriteSystem &system) const;
 
   unsigned getDecomposeCount(const RewriteSystem &system) const;
+
+  bool hasConcreteTypeAliasRule(const RewriteSystem &system) const;
 
   void findProtocolConformanceRules(
       llvm::SmallDenseMap<const ProtocolDecl *,

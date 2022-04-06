@@ -39,6 +39,8 @@ struct SwiftDbgAddrBlockSplitter : FunctionPass {
 bool SwiftDbgAddrBlockSplitter::runOnFunction(Function &fn) {
   SmallVector<Instruction *, 32> breakBlockPoints;
 
+  // If we are in the first block,
+
   for (auto &block : fn) {
     for (auto &inst : block) {
       if (isa<DbgAddrIntrinsic>(&inst)) {

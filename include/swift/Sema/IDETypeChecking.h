@@ -21,6 +21,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/OptionSet.h"
 #include <memory>
 #include <tuple>
 
@@ -50,6 +51,8 @@ namespace swift {
   class ConstraintSystem;
   class Solution;
   class SolutionApplicationTarget;
+  enum class ConstraintSystemFlags;
+  using ConstraintSystemOptions = OptionSet<ConstraintSystemFlags>;
   }
 
   /// Typecheck binding initializer at \p bindingIndex.
@@ -93,8 +96,9 @@ namespace swift {
   /// Unlike other member lookup functions, \c swift::resolveValueMember()
   /// should be used when you want to look up declarations with the same name as
   /// one you already have.
-  ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
-                                         DeclName Name);
+  ResolvedMemberResult
+  resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name,
+                     constraints::ConstraintSystemOptions Options = {});
 
   /// Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
@@ -158,20 +162,6 @@ namespace swift {
   bool typeCheckForCodeCompletion(
       constraints::SolutionApplicationTarget &target, bool needsPrecheck,
       llvm::function_ref<void(const constraints::Solution &)> callback);
-
-  Type getTypeForCompletion(const constraints::Solution &S, Expr *E);
-
-  /// Whether the given completion expression is the only expression in its
-  /// containing closure or function body and its value is implicitly returned.
-  ///
-  /// If these conditions are met, code completion needs to avoid penalizing
-  /// completion results that don't match the expected return type when
-  /// computing type relations, as since no return statement was explicitly
-  /// written by the user, it's possible they intend the single expression not
-  /// as the return value but merely the first entry in a multi-statement body
-  /// they just haven't finished writing yet.
-  bool isImplicitSingleExpressionReturn(constraints::ConstraintSystem &CS,
-                                        Expr *CompletionExpr);
 
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);

@@ -49,9 +49,9 @@
 // CHECK:   throw [[RETHROW_BB_ARG]] : $Error
 
 // -- Original definition of throwingFunc()
-// CHECK-LABEL: sil [serialized] [available 10.51] [ossa] @$s11back_deploy12throwingFuncyyKF : $@convention(thin) () -> @error Error
+// CHECK-LABEL: sil [available 10.51] [ossa] @$s11back_deploy12throwingFuncyyKF : $@convention(thin) () -> @error Error
 @available(macOS 10.51, *)
-@_backDeploy(macOS 10.52)
+@_backDeploy(before: macOS 10.52)
 public func throwingFunc() throws {}
 
 // CHECK-LABEL: sil hidden [available 10.51] [ossa] @$s11back_deploy6calleryyKF : $@convention(thin) () -> @error Error

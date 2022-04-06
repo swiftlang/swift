@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -requirement-machine-protocol-signatures=off -requirement-machine-abstract-signatures=on
-
-// TODO: Get this to pass with  -requirement-machine-protocol-signatures=on.
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -requirement-machine-abstract-signatures=on
 
 //===----------------------------------------------------------------------===//
 // Use of protocols with Self or associated type requirements
@@ -805,7 +803,7 @@ do {
     let _: any Class<Struct<Bool>.Inner> & ConcreteAssocTypes =
       arg[
         // FIXME: Sema thinks (any ConcreteAssocTypes).self is a function ref.
-        // expected-warning@+1 {{protocol 'ConcreteAssocTypes' as a type must be explicitly marked as 'any'}}
+        // expected-warning@+1 {{use of protocol 'ConcreteAssocTypes' as a type must be written 'any ConcreteAssocTypes'}}
         subscript4: Struct<Bool>(), ConcreteAssocTypes.self, { true }
       ]
   }

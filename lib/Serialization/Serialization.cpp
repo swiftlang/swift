@@ -203,7 +203,8 @@ namespace {
     int32_t getNameDataForBase(const NominalTypeDecl *nominal,
                                StringRef *dataToWrite = nullptr) {
       if (nominal->getDeclContext()->isModuleScopeContext())
-        return -Serializer.addContainingModuleRef(nominal->getDeclContext());
+        return -Serializer.addContainingModuleRef(nominal->getDeclContext(),
+                                                  /*ignoreExport=*/false);
 
       auto &mangledName = MangledNameCache[nominal];
       if (mangledName.empty())
@@ -727,7 +728,8 @@ IdentifierID Serializer::addFilename(StringRef filename) {
   return addUniquedString(filename).second;
 }
 
-IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC) {
+IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC,
+                                                bool ignoreExport) {
   assert(!isa<ModuleDecl>(DC) &&
          "References should be to things within modules");
   const FileUnit *file = cast<FileUnit>(DC->getModuleScopeContext());
@@ -746,8 +748,19 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC) {
 
   auto exportedModuleName = file->getExportedModuleName();
   assert(!exportedModuleName.empty());
-  auto exportedModuleID = M->getASTContext().getIdentifier(exportedModuleName);
-  return addDeclBaseNameRef(exportedModuleID);
+  auto moduleID = M->getASTContext().getIdentifier(exportedModuleName);
+  if (ignoreExport) {
+    auto realModuleName = M->getRealName().str();
+    assert(!realModuleName.empty());
+    if (realModuleName != exportedModuleName) {
+      // Still register the exported name as it can be referenced
+      // from the lookup tables.
+      addDeclBaseNameRef(moduleID);
+
+      moduleID = M->getASTContext().getIdentifier(realModuleName);
+    }
+  }
+  return addDeclBaseNameRef(moduleID);
 }
 
 IdentifierID Serializer::addModuleRef(const ModuleDecl *module) {
@@ -1632,7 +1645,8 @@ Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
         abbrCode,
         addDeclRef(normal->getProtocol()),
         addDeclRef(normal->getType()->getAnyNominal()),
-        addContainingModuleRef(normal->getDeclContext()));
+        addContainingModuleRef(normal->getDeclContext(),
+                               /*ignoreExport=*/true));
     }
     break;
   }
@@ -1831,7 +1845,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::FileUnit:
     abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
     XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                           addContainingModuleRef(DC), pathLen);
+                           addContainingModuleRef(DC, /*ignoreExport=*/true),
+                           pathLen);
     break;
 
   case DeclContextKind::GenericTypeDecl: {
@@ -1883,7 +1898,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       genericSig = ext->getGenericSignature().getCanonicalSignature();
     }
     XRefExtensionPathPieceLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addContainingModuleRef(DC),
+        Out, ScratchRecord, abbrCode,
+        addContainingModuleRef(DC, /*ignoreExport=*/true),
         addGenericSignatureRef(genericSig));
     break;
   }
@@ -2580,6 +2596,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isImplicit(),
           theAttr->isUnconditionallyUnavailable(),
           theAttr->isUnconditionallyDeprecated(),
+          theAttr->isNoAsync(),
           theAttr->isPackageDescriptionVersionSpecific(),
           theAttr->IsSPI,
           LIST_VER_TUPLE_PIECES(Introduced),
@@ -2703,10 +2720,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_Custom: {
       auto abbrCode = S.DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
       auto theAttr = cast<CustomAttr>(DA);
+      auto typeID = S.addTypeRef(theAttr->getType());
+      if (!typeID && !S.allowCompilerErrors()) {
+        llvm::PrettyStackTraceString message("CustomAttr has no type");
+        abort();
+      }
       CustomDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                        theAttr->isImplicit(),
-                                       S.addTypeRef(theAttr->getType()),
-                                       theAttr->isArgUnsafe());
+                                       typeID, theAttr->isArgUnsafe());
       return;
     }
 
@@ -3466,7 +3487,6 @@ public:
       contextID.getOpaqueValue(),
       S.addTypeRef(assocType->getDefaultDefinitionType()),
       assocType->isImplicit(),
-      assocType->isPrimary(),
       overriddenAssocTypeIDs);
   }
 
@@ -3877,7 +3897,7 @@ public:
     auto genericSigID = S.addGenericSignatureRef(opaqueDecl->getGenericSignature());
 
     SubstitutionMapID underlyingSubsID = 0;
-    if (auto underlying = opaqueDecl->getUnderlyingTypeSubstitutions())
+    if (auto underlying = opaqueDecl->getUniqueUnderlyingTypeSubstitutions())
       underlyingSubsID = S.addSubstitutionMapRef(*underlying);
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(opaqueDecl->getFormalAccess());

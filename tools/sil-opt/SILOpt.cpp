@@ -130,7 +130,7 @@ static llvm::cl::opt<llvm::cl::boolOrDefault>
 
 static llvm::cl::opt<llvm::cl::boolOrDefault> EnableExperimentalMoveOnly(
     "enable-experimental-move-only", llvm::cl::init(llvm::cl::BOU_UNSET),
-    llvm::cl::desc("Enable experimental distributed actors."));
+    llvm::cl::desc("Enable experimental move-only semantics."));
 
 static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
@@ -559,8 +559,6 @@ int main(int argc, char **argv) {
   }
   Invocation.getLangOptions().EnableExperimentalConcurrency =
     EnableExperimentalConcurrency;
-  Invocation.getLangOptions().EnableExperimentalDistributed =
-    EnableExperimentalDistributed;
   Optional<bool> enableExperimentalMoveOnly =
       toOptionalBool(EnableExperimentalMoveOnly);
   if (enableExperimentalMoveOnly)
@@ -570,8 +568,6 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
     DisableObjCInterop ? false : llvm::Triple(Target).isOSDarwin();
-
-  Invocation.getLangOptions().EnableSILOpaqueValues = EnableSILOpaqueValues;
 
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(PassRemarksPassed);
@@ -634,6 +630,7 @@ int main(int argc, char **argv) {
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = EnableOSSAModules;
+  SILOpts.EnableSILOpaqueValues = EnableSILOpaqueValues;
 
   if (CopyPropagationState) {
     SILOpts.CopyPropagation = *CopyPropagationState;

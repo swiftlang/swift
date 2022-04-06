@@ -231,10 +231,6 @@ bb0:
   unmanaged_to_ref undef : $@sil_unmanaged C to $C
   // CHECK: convert_function undef : $(D) -> () to $(C) -> ()
   convert_function undef : $(D) -> () to $(C) -> ()
-  // CHECK: thin_function_to_pointer undef : $@convention(thin) () -> () to $Builtin.RawPointer
-  thin_function_to_pointer undef : $@convention(thin) () -> () to $Builtin.RawPointer
-  // CHECK: pointer_to_thin_function undef : $Builtin.RawPointer to $@convention(thin) () -> ()
-  pointer_to_thin_function undef : $Builtin.RawPointer to $@convention(thin) () -> ()
   // CHECK: ref_to_bridge_object undef : $C, undef : $Builtin.Word
   ref_to_bridge_object undef : $C, undef : $Builtin.Word
   // CHECK: bridge_object_to_ref undef : $Builtin.BridgeObject to $C

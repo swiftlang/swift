@@ -1086,6 +1086,8 @@ ERROR(conditional_var_initializer_required,none,
 ERROR(wrong_condition_case_location,none,
       "pattern matching binding is spelled with 'case %0', not '%0 case'",
       (StringRef))
+ERROR(conditional_var_valid_identifiers_only,none,
+      "unwrap condition requires a valid identifier", ())
 
 // If Statement
 ERROR(expected_condition_if,PointsToFirstBadToken,
@@ -1497,9 +1499,8 @@ ERROR(attr_unsupported_on_target, none,
 // availability
 ERROR(attr_availability_platform,none,
       "expected platform name or '*' for '%0' attribute", (StringRef))
-ERROR(attr_availability_unavailable_deprecated,none,
-      "'%0' attribute cannot be both unconditionally 'unavailable' and "
-      "'deprecated'", (StringRef))
+ERROR(attr_availability_multiple_kinds ,none,
+      "'%0' attribute cannot be both '%1' and '%2'", (StringRef, StringRef, StringRef))
 
 WARNING(attr_availability_invalid_duplicate,none,
         "'%0' argument has already been specified", (StringRef))
@@ -1572,6 +1573,10 @@ ERROR(originally_defined_in_need_nonempty_module_name,none,
       "original module name cannot be empty in @_originallyDefinedIn", ())
 
 // backDeploy
+ERROR(attr_back_deploy_expected_before_label,none,
+      "expected 'before:' in '@_backDeploy' attribute", ())
+ERROR(attr_back_deploy_expected_colon_after_before,none,
+      "expected ':' after 'before' in '@_backDeploy' attribute", ())
 ERROR(attr_back_deploy_missing_rparen,none,
       "expected ')' in '@_backDeploy' argument list", ())
 
@@ -1885,11 +1890,6 @@ ERROR(availability_query_repeated_platform, none,
 ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
       "concurrency is enabled",
-      (StringRef, bool))
-
-ERROR(attr_requires_distributed, none,
-      "'%0' %select{attribute|modifier}1 is only valid when experimental "
-      "distributed support is enabled",
       (StringRef, bool))
 
 //------------------------------------------------------------------------------

@@ -433,7 +433,8 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
         if (isa<AssociatedTypeDecl>(typeDecl) ||
             (isa<TypeAliasDecl>(typeDecl) &&
-             !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
+             !cast<TypeAliasDecl>(typeDecl)->isGeneric() &&
+             !isSpecialized)) {
           if (getStage() == TypeResolutionStage::Structural) {
             return DependentMemberType::get(selfType, typeDecl->getName());
           } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
@@ -517,28 +518,32 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   const auto subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
   const auto genericSig = decl->getGenericSignature();
 
-  const auto result =
-    TypeChecker::checkGenericArguments(
-        module, loc, noteLoc,
-        decl->getDeclaredInterfaceType(),
-        genericSig.getGenericParams(),
-        genericSig.getRequirements(),
-        [&](SubstitutableType *type) -> Type {
-          auto result = QueryTypeSubstitutionMap{subMap}(type);
-          if (result->hasTypeParameter()) {
-            if (contextSig) {
-              auto *genericEnv = contextSig.getGenericEnvironment();
-              return genericEnv->mapTypeIntoContext(result);
-            }
-          }
-          return result;
-        });
+  const auto substitutions = [&](SubstitutableType *type) -> Type {
+    auto result = QueryTypeSubstitutionMap{subMap}(type);
+    if (result->hasTypeParameter()) {
+      if (contextSig) {
+        auto *genericEnv = contextSig.getGenericEnvironment();
+        return genericEnv->mapTypeIntoContext(result);
+      }
+    }
+    return result;
+  };
 
+  const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
+      module, genericSig.getRequirements(), substitutions);
   switch (result) {
-  case RequirementCheckResult::Failure:
-  case RequirementCheckResult::SubstitutionFailure:
+  case CheckGenericArgumentsResult::RequirementFailure:
+    if (loc.isValid()) {
+      TypeChecker::diagnoseRequirementFailure(
+          result.getRequirementFailureInfo(), loc, noteLoc,
+          decl->getDeclaredInterfaceType(), genericSig.getGenericParams(),
+          substitutions, module);
+    }
+
     return false;
-  case RequirementCheckResult::Success:
+  case CheckGenericArgumentsResult::SubstitutionFailure:
+    return false;
+  case CheckGenericArgumentsResult::Success:
     return true;
   }
   llvm_unreachable("invalid requirement check type");
@@ -644,9 +649,11 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 
       auto genericArgs = generic->getGenericArgs();
 
-      if (genericArgs.size() > assocTypes.size()) {
-        diags.diagnose(loc, diag::parameterized_protocol_too_many_type_arguments,
-                       protoType, genericArgs.size(), assocTypes.size());
+      if (genericArgs.size() != assocTypes.size()) {
+        diags.diagnose(loc,
+                       diag::parameterized_protocol_type_argument_count_mismatch,
+                       protoType, genericArgs.size(), assocTypes.size(),
+                       (genericArgs.size() < assocTypes.size()) ? 1 : 0);
 
         return ErrorType::get(ctx);
       }
@@ -948,26 +955,32 @@ Type TypeResolution::applyUnboundGenericArguments(
       noteLoc = loc;
 
     auto genericSig = decl->getGenericSignature();
-    auto result = TypeChecker::checkGenericArguments(
-        module, loc, noteLoc,
-        UnboundGenericType::get(decl, parentTy, getASTContext()),
-        genericSig.getGenericParams(), genericSig.getRequirements(),
-        [&](SubstitutableType *type) -> Type {
-          auto result = QueryTypeSubstitutionMap{subs}(type);
-          if (result->hasTypeParameter()) {
-            if (const auto contextSig = getGenericSignature()) {
-              auto *genericEnv = contextSig.getGenericEnvironment();
-              return genericEnv->mapTypeIntoContext(result);
-            }
-          }
-          return result;
-        });
+    const auto substitutions = [&](SubstitutableType *type) -> Type {
+      auto result = QueryTypeSubstitutionMap{subs}(type);
+      if (result->hasTypeParameter()) {
+        if (const auto contextSig = getGenericSignature()) {
+          auto *genericEnv = contextSig.getGenericEnvironment();
+          return genericEnv->mapTypeIntoContext(result);
+        }
+      }
+      return result;
+    };
 
+    const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
+        module, genericSig.getRequirements(), substitutions);
     switch (result) {
-    case RequirementCheckResult::Failure:
-    case RequirementCheckResult::SubstitutionFailure:
+    case CheckGenericArgumentsResult::RequirementFailure:
+      if (loc.isValid()) {
+        TypeChecker::diagnoseRequirementFailure(
+            result.getRequirementFailureInfo(), loc, noteLoc,
+            UnboundGenericType::get(decl, parentTy, getASTContext()),
+            genericSig.getGenericParams(), substitutions, module);
+      }
+
+      LLVM_FALLTHROUGH;
+    case CheckGenericArgumentsResult::SubstitutionFailure:
       return ErrorType::get(getASTContext());
-    case RequirementCheckResult::Success:
+    case CheckGenericArgumentsResult::Success:
       break;
     }
   }
@@ -3772,7 +3785,8 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool complained = false;
   if (repr->hasEllipsis()) {
-    if (repr->getNumElements() == 1 && !repr->hasElementNames()) {
+    if (getASTContext().LangOpts.EnableExperimentalVariadicGenerics &&
+        repr->getNumElements() == 1 && !repr->hasElementNames()) {
       // This is probably a pack expansion. Try to resolve the pattern type.
       auto patternTy = resolveType(repr->getElementType(0), elementOptions);
       if (patternTy->hasError())
@@ -4253,6 +4267,7 @@ public:
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
+                           proto->getExistentialType(),
                            /*isAlias=*/false)
             .limitBehavior(DiagnosticBehavior::Warning)
             .fixItReplace(replaceRepr->getSourceRange(), fix);
@@ -4272,6 +4287,7 @@ public:
           Ctx.Diags.diagnose(comp->getNameLoc(),
                              diag::existential_requires_any,
                              alias->getDeclaredInterfaceType(),
+                             ExistentialType::get(alias->getDeclaredInterfaceType()),
                              /*isAlias=*/true)
               .limitBehavior(DiagnosticBehavior::Warning)
               .fixItReplace(replaceRepr->getSourceRange(), fix);

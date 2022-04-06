@@ -435,9 +435,14 @@ func testInForEach9(arg: Int) {
 }
 func testInForEach10(arg: Int) {
   let local = 2
-  for index in [1:2, #^IN_FOR_EACH_10?check=IN_FOR_EACH_1^#] {}
+  for index in [1:2, #^IN_FOR_EACH_10^#] {}
   let after = 4
 }
+// IN_FOR_EACH_10-NOT: Decl[LocalVar]
+// IN_FOR_EACH_10: Decl[LocalVar]/Local/TypeRelation[Identical]:               local[#Int#];
+// IN_FOR_EACH_10-NOT: after
+// IN_FOR_EACH_10: Decl[LocalVar]/Local/TypeRelation[Identical]:               arg[#Int#];
+// IN_FOR_EACH_10-NOT: Decl[LocalVar]
 func testInForEach11(arg: Int) {
   let local = 2
   for index in [1:2, #^IN_FOR_EACH_11?check=IN_FOR_EACH_2^#:] {}

@@ -16,8 +16,6 @@ from build_swift import argparse
 from build_swift import migration
 from build_swift.constants import BUILD_SCRIPT_IMPL_PATH
 
-import six
-
 from swift_build_support.swift_build_support.targets import StdlibDeploymentTarget
 
 
@@ -66,8 +64,7 @@ class TestMigrateSwiftSDKsMeta(type):
         return test
 
 
-@six.add_metaclass(TestMigrateSwiftSDKsMeta)
-class TestMigrateSwiftSDKs(unittest.TestCase):
+class TestMigrateSwiftSDKs(unittest.TestCase, metaclass=TestMigrateSwiftSDKsMeta):
 
     def test_empty_swift_sdks(self):
         args = migration.migrate_swift_sdks(['--swift-sdks='])

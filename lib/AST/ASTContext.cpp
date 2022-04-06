@@ -1906,11 +1906,24 @@ void ASTContext::loadExtensions(NominalTypeDecl *nominal,
 }
 
 void ASTContext::loadObjCMethods(
-    ClassDecl *classDecl, ObjCSelector selector, bool isInstanceMethod,
+    NominalTypeDecl *tyDecl, ObjCSelector selector, bool isInstanceMethod,
     unsigned previousGeneration,
     llvm::TinyPtrVector<AbstractFunctionDecl *> &methods, bool swiftOnly) {
   PrettyStackTraceSelector stackTraceSelector("looking for", selector);
-  PrettyStackTraceDecl stackTraceDecl("...in", classDecl);
+  PrettyStackTraceDecl stackTraceDecl("...in", tyDecl);
+
+  // @objc protocols cannot have @objc extension members, so if we've recorded
+  // everything in the protocol definition, we've recorded everything. And we
+  // only ever use the ObjCSelector version of `NominalTypeDecl::lookupDirect()`
+  // on protocols in primary file typechecking, so we don't care about protocols
+  // that need to be loaded from files.
+  // TODO: Rework `ModuleLoader::loadObjCMethods()` to support protocols too if
+  //       selector-based `NominalTypeDecl::lookupDirect()` ever needs to work
+  //       in more situations.
+  ClassDecl *classDecl = dyn_cast<ClassDecl>(tyDecl);
+  if (!classDecl)
+    return;
+
   for (auto &loader : getImpl().ModuleLoaders) {
     // Ignore the Clang importer if we've been asked for Swift-only results.
     if (swiftOnly && loader.get() == getClangModuleLoader())
@@ -3028,23 +3041,21 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
       // FIXME(distributed): pending swift-evolution, allow `self =` in class
       //  inits in general.
       //  See also: https://github.com/apple/swift/pull/19151 general impl
-      if (Ctx.LangOpts.EnableExperimentalDistributed) {
-        auto ext = dyn_cast<ExtensionDecl>(AFD->getDeclContext());
-        auto distProto =
-            Ctx.getProtocol(KnownProtocolKind::DistributedActor);
-        if (distProto && ext && ext->getExtendedNominal() &&
-            ext->getExtendedNominal()->getInterfaceType()
-                ->isEqual(distProto->getInterfaceType())) {
-          auto name = CD->getName();
-          auto params = name.getArgumentNames();
-          if (params.size() == 1 && params[0] == Ctx.Id_from) {
-            // FIXME(distributed): this is a workaround to allow init(from:) to
-            //  be implemented in AST by allowing the self to be mutable in the
-            //  decoding initializer. This should become a general Swift
-            //  feature, allowing this in all classes:
-            //  https://forums.swift.org/t/allow-self-x-in-class-convenience-initializers/15924
-            selfAccess = SelfAccessKind::Mutating;
-          }
+      auto ext = dyn_cast<ExtensionDecl>(AFD->getDeclContext());
+      auto distProto =
+          Ctx.getProtocol(KnownProtocolKind::DistributedActor);
+      if (distProto && ext && ext->getExtendedNominal() &&
+          ext->getExtendedNominal()->getInterfaceType()
+              ->isEqual(distProto->getInterfaceType())) {
+        auto name = CD->getName();
+        auto params = name.getArgumentNames();
+        if (params.size() == 1 && params[0] == Ctx.Id_from) {
+          // FIXME(distributed): this is a workaround to allow init(from:) to
+          //  be implemented in AST by allowing the self to be mutable in the
+          //  decoding initializer. This should become a general Swift
+          //  feature, allowing this in all classes:
+          //  https://forums.swift.org/t/allow-self-x-in-class-convenience-initializers/15924
+          selfAccess = SelfAccessKind::Mutating;
         }
       }
     } else {

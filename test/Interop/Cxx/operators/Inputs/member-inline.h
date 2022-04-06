@@ -21,6 +21,13 @@ struct LoadableIntWrapper {
   }
 };
 
+struct LoadableBoolWrapper {
+  bool value;
+  LoadableBoolWrapper operator!() {
+    return LoadableBoolWrapper{.value = !value};
+  }
+};
+
 struct AddressOnlyIntWrapper {
   int value;
 

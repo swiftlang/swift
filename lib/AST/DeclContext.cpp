@@ -85,10 +85,11 @@ ProtocolDecl *DeclContext::getExtendedProtocolDecl() const {
 
 VarDecl *DeclContext::getNonLocalVarDecl() const {
   if (auto *init = dyn_cast<PatternBindingInitializer>(this)) {
-   if (auto *var =
-         init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
-      return var;
-     }
+    if (auto binding = init->getBinding()) {
+      if (auto *var = binding->getAnchoringVarDecl(init->getBindingIndex())) {
+        return var;
+      }
+    }
   }
   return nullptr;
 }
@@ -1239,12 +1240,10 @@ bool DeclContext::isAsyncContext() const {
     return false;
   case DeclContextKind::FileUnit:
     if (const SourceFile *sf = dyn_cast<SourceFile>(this))
-      return getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
-             sf->isAsyncTopLevelSourceFile();
+      return sf->isAsyncTopLevelSourceFile();
     return false;
   case DeclContextKind::TopLevelCodeDecl:
-    return getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
-           getParent()->isAsyncContext();
+    return getParent()->isAsyncContext();
   case DeclContextKind::AbstractClosureExpr:
     return cast<AbstractClosureExpr>(this)->isBodyAsync();
   case DeclContextKind::AbstractFunctionDecl: {

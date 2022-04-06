@@ -439,7 +439,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func copyMemory(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
       "${Self}.copyMemory source has too many elements")
-    baseAddress?.copyMemory(from: source.baseAddress!, byteCount: source.count)
+    if let baseAddress = baseAddress, let sourceAddress = source.baseAddress {
+      baseAddress.copyMemory(from: sourceAddress, byteCount: source.count)
+    }
   }
 
   /// Copies from a collection of `UInt8` into this buffer's memory.

@@ -259,6 +259,10 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
   if ((!WT || WT->isDeclaration()) &&
       (mustDeserialize || Mode == SILModule::LinkingMode::LinkAll)) {
     if (!WT) {
+      // Marker protocols should never have witness tables.
+      if (C->getProtocol()->isMarkerProtocol())
+        return;
+
       RootProtocolConformance *rootC = C->getRootConformance();
       SILLinkage linkage = getLinkageForProtocolConformance(rootC, NotForDefinition);
       WT = SILWitnessTable::create(Mod, linkage,

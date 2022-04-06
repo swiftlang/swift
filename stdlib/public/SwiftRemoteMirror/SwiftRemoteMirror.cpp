@@ -875,9 +875,26 @@ swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
     Result.Error = returnableCString(ContextRef, Error);
     return Result;
   }
-  Result.JobFlags = TaskInfo.JobFlags;
-  Result.TaskStatusFlags = TaskInfo.TaskStatusFlags;
+
+  Result.Kind = TaskInfo.Kind;
+  Result.EnqueuePriority = TaskInfo.EnqueuePriority;
+  Result.IsChildTask = TaskInfo.IsChildTask;
+  Result.IsFuture = TaskInfo.IsFuture;
+  Result.IsGroupChildTask = TaskInfo.IsGroupChildTask;
+  Result.IsAsyncLetTask = TaskInfo.IsAsyncLetTask;
+
+  Result.MaxPriority = TaskInfo.MaxPriority;
+  Result.IsCancelled = TaskInfo.IsCancelled;
+  Result.IsStatusRecordLocked = TaskInfo.IsStatusRecordLocked;
+  Result.IsEscalated = TaskInfo.IsEscalated;
+  Result.HasIsRunning = TaskInfo.HasIsRunning;
+  Result.IsRunning = TaskInfo.IsRunning;
+  Result.IsEnqueued = TaskInfo.IsEnqueued;
   Result.Id = TaskInfo.Id;
+
+  Result.HasThreadPort = TaskInfo.HasThreadPort;
+  Result.ThreadPort = TaskInfo.ThreadPort;
+
   Result.RunJob = TaskInfo.RunJob;
   Result.AllocatorSlabPtr = TaskInfo.AllocatorSlabPtr;
 
@@ -905,13 +922,19 @@ swift_reflection_actorInfo(SwiftReflectionContextRef ContextRef,
                            swift_reflection_ptr_t ActorPtr) {
   auto Context = ContextRef->nativeContext;
   llvm::Optional<std::string> Error;
-  NativeReflectionContext::ActorInfo TaskInfo;
-  std::tie(Error, TaskInfo) = Context->actorInfo(ActorPtr);
+  NativeReflectionContext::ActorInfo ActorInfo;
+  std::tie(Error, ActorInfo) = Context->actorInfo(ActorPtr);
 
   swift_actor_info_t Result = {};
   Result.Error = returnableCString(ContextRef, Error);
-  Result.Flags = TaskInfo.Flags;
-  Result.FirstJob = TaskInfo.FirstJob;
+  Result.State = ActorInfo.State;
+  Result.IsDistributedRemote = ActorInfo.IsDistributedRemote;
+  Result.IsPriorityEscalated = ActorInfo.IsPriorityEscalated;
+  Result.MaxPriority = ActorInfo.MaxPriority;
+  Result.FirstJob = ActorInfo.FirstJob;
+
+  Result.HasThreadPort = ActorInfo.HasThreadPort;
+  Result.ThreadPort = ActorInfo.ThreadPort;
 
   return Result;
 }

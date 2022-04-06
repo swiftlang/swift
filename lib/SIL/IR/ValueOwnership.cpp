@@ -121,7 +121,6 @@ CONSTANT_OWNERSHIP_INST(None, OpenExistentialAddr)
 CONSTANT_OWNERSHIP_INST(None, OpenExistentialBox)
 CONSTANT_OWNERSHIP_INST(None, OpenExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(None, PointerToAddress)
-CONSTANT_OWNERSHIP_INST(None, PointerToThinFunction)
 CONSTANT_OWNERSHIP_INST(None, ProjectBlockStorage)
 CONSTANT_OWNERSHIP_INST(None, ProjectBox)
 CONSTANT_OWNERSHIP_INST(None, ProjectExistentialBox)
@@ -135,7 +134,6 @@ CONSTANT_OWNERSHIP_INST(None, SuperMethod)
 CONSTANT_OWNERSHIP_INST(None, ObjCSuperMethod)
 CONSTANT_OWNERSHIP_INST(None, TailAddr)
 CONSTANT_OWNERSHIP_INST(None, ThickToObjCMetatype)
-CONSTANT_OWNERSHIP_INST(None, ThinFunctionToPointer)
 CONSTANT_OWNERSHIP_INST(None, TupleElementAddr)
 CONSTANT_OWNERSHIP_INST(None, UncheckedAddrCast)
 CONSTANT_OWNERSHIP_INST(None, UncheckedTakeEnumDataAddr)
@@ -179,7 +177,6 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)
 // be borrowed sub-objects of the parent CoW box.
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, OpenExistentialValue)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, OpenExistentialBoxValue)
-CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
 
 // Given an owned value, mark_uninitialized always forwards an owned value since
 // we want to make sure that all destroys of that value must come through the

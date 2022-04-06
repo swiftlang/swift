@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-parameterized-protocol-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-parameterized-protocol-types -disable-availability-checking -requirement-machine-inferred-signatures=on
 
 protocol P { }
 
@@ -18,7 +18,7 @@ extension Array: Q where Element: P, Element: Equatable {
   }
 }
 
-extension Set: Q where Element: P, Element: Equatable {
+extension Set: Q where Element: P, Element: Equatable { // expected-warning {{redundant conformance constraint 'Element' : 'Equatable'}}
   func f() -> Element {
     return first!
   }

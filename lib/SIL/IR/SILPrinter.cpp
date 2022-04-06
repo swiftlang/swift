@@ -1747,23 +1747,10 @@ public:
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
 
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {
-    *this << CI->getSourceFormalType() << " in "
-          << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType()
-          << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
-          << Ctx.getID(CI->getFailureBB());
-  }
-
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
-  }
-
-  void visitUnconditionalCheckedCastValueInst(
-      UnconditionalCheckedCastValueInst *CI) {
-    *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getOperand())
-          << " to " << CI->getTargetFormalType();
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
@@ -1803,12 +1790,6 @@ public:
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
           << getIDAndType(CI->getOperand()) << " to " << CI->getType();
-  }
-  void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
-  }
-  void visitPointerToThinFunctionInst(PointerToThinFunctionInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUpcastInst(UpcastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());

@@ -338,6 +338,20 @@ IRGenFunction::emitLoadOfRelativePointer(Address addr, bool isFar,
 }
 
 llvm::Value *
+IRGenFunction::emitLoadOfCompactFunctionPointer(Address addr, bool isFar,
+                                                 llvm::PointerType *expectedType,
+                                                 const llvm::Twine &name) {
+  if (IGM.getOptions().CompactAbsoluteFunctionPointer) {
+    llvm::Value *value = Builder.CreateLoad(addr);
+    auto *uncastPointer = Builder.CreateIntToPtr(value, IGM.Int8PtrTy);
+    auto pointer = Builder.CreateBitCast(Address(uncastPointer, IGM.getPointerAlignment()), expectedType);
+    return pointer.getAddress();
+  } else {
+    return emitLoadOfRelativePointer(addr, isFar, expectedType, name);
+  }
+}
+
+llvm::Value *
 IRGenFunction::emitLoadOfRelativeIndirectablePointer(Address addr,
                                                 bool isFar,
                                                 llvm::PointerType *expectedType,

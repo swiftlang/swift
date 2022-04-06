@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
@@ -45,9 +46,16 @@ static bool canDeriveConformance(DeclContext *DC,
   if (auto structDecl = dyn_cast<StructDecl>(target)) {
     // All stored properties of the struct must conform to the protocol. If
     // there are no stored properties, we will vaccously return true.
-    return DerivedConformance::storedPropertiesNotConformingToProtocol(
-               DC, structDecl, protocol)
-        .empty();
+    if (!DerivedConformance::storedPropertiesNotConformingToProtocol(
+               DC, structDecl, protocol).empty())
+      return false;
+
+    // If the struct is actor-isolated, we cannot derive Equatable/Hashable
+    // conformance if any of the stored properties are mutable.
+    if (memberwiseAccessorsRequireActorIsolation(structDecl))
+      return false;
+
+    return true;
   }
 
   return false;
@@ -426,6 +434,8 @@ deriveEquatable_eq(
     return nullptr;
   }
 
+  addNonIsolatedToSynthesized(derived.Nominal, eqDecl);
+
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
@@ -544,7 +554,7 @@ deriveHashable_hashInto(
       /*Throws=*/false,
       /*GenericParams=*/nullptr, params, returnType, parentDC);
   hashDecl->setBodySynthesizer(bodySynthesizer);
-
+  addNonIsolatedToSynthesized(derived.Nominal, hashDecl);
   hashDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
 
@@ -881,6 +891,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                     SourceLoc(), C.Id_hashValue, parentDC);
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->setSynthesized();
+  addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl);
 
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -896,7 +907,6 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setSynthesized();
   getterDecl->setIsTransparent(false);
-
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 

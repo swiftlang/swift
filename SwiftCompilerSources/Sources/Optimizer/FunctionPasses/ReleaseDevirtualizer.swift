@@ -49,10 +49,15 @@ let releaseDevirtualizerPass = FunctionPass(
           }
         }
 
-        if instruction is ReleaseValueInst || instruction is StrongReleaseInst {
-          lastRelease = instruction as? RefCountingInst
-        } else if instruction.mayRelease {
-          lastRelease = nil
+        switch instruction {
+          case is ReleaseValueInst, is StrongReleaseInst:
+            lastRelease = instruction as? RefCountingInst
+          case is DeallocRefInst, is SetDeallocatingInst:
+            lastRelease = nil
+          default:
+            if instruction.mayRelease {
+              lastRelease = nil
+            }
         }
       }
     }

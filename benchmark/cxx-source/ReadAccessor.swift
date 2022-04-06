@@ -34,17 +34,9 @@ public let benchmarks = [
 public func run_ReadAccessor(_ N: Int) {
   for i in 0...N {
     for j in 0..<100 {
-#if os(Linux)
-      let row = vec![UInt(j)];
-#else
       let row = vec![j];
-#endif
       for k in 0..<1_000 {
-#if os(Linux)
-        let element = row[UInt(k)];
-#else
         let element = row[k];
-#endif
         blackHole(element)
       }
     }

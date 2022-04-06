@@ -47,7 +47,7 @@ DistributedModuleIsAvailableRequest::evaluate(Evaluator &evaluator,
   if (C.getLoadedModule(C.Id_Distributed))
     return true;
 
-  // seems we're missing the _Distributed module, ask to import it explicitly
+  // seems we're missing the Distributed module, ask to import it explicitly
   decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
   return false;
 }
@@ -305,25 +305,10 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getDescriptiveKind(), decl->getName(), identifier);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
                      decl->getName(), identifier,
-                     "mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws\n");
+                     "mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws\n");
       anyMissingAdHocRequirements = true;
     }
     if (checkAdHocRequirementAccessControl(decl, Proto, recordArgumentDecl))
-      anyMissingAdHocRequirements = true;
-
-    // - recordErrorType
-    auto recordErrorTypeDecl = C.getRecordErrorTypeOnDistributedInvocationEncoder(decl);
-    if (!recordErrorTypeDecl) {
-      auto identifier = C.Id_recordErrorType;
-      decl->diagnose(
-          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl->getDescriptiveKind(), decl->getName(), identifier);
-      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     decl->getName(), identifier,
-                     "mutating func recordErrorType<Err: Error>(_ errorType: Err.Type) throws\n");
-      anyMissingAdHocRequirements = true;
-    }
-    if (checkAdHocRequirementAccessControl(decl, Proto, recordErrorTypeDecl))
       anyMissingAdHocRequirements = true;
 
     // - recordReturnType
@@ -375,9 +360,12 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
       decl->diagnose(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), identifier);
-      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     decl->getName(), identifier,
-                     "mutating func onReturn<Res: SerializationRequirement>(_ result: Res) async throws\n");
+      decl->diagnose(
+          diag::
+              note_distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getName(), identifier,
+          "mutating func onReturn<Success: SerializationRequirement>(value: "
+          "Success) async throws\n");
       anyMissingAdHocRequirements = true;
     }
     if (checkAdHocRequirementAccessControl(decl, Proto, onReturnDecl))
@@ -607,54 +595,13 @@ void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
   }
 }
 
-void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ctor) {
-  // bail out unless distributed actor, only those have special rules to check here
-  if (!decl->isDistributedActor())
-    return;
-
-  // Only designated initializers need extra checks
-  if (!ctor->isDesignatedInit())
-    return;
-
-  // === Designated initializers must accept exactly one actor transport that
-  // matches the actor transport type of the actor.
-  SmallVector<ParamDecl*, 2> transportParams;
-  int transportParamsCount = 0;
-  Type actorSystemTy = ctor->mapTypeIntoContext(
-      getDistributedActorSystemType(const_cast<ClassDecl *>(decl)));
-  for (auto param : *ctor->getParameters()) {
-    auto paramTy = ctor->mapTypeIntoContext(param->getInterfaceType());
-    if (paramTy->isEqual(actorSystemTy)) {
-      transportParamsCount += 1;
-      transportParams.push_back(param);
-    }
-  }
-
-  // missing transport parameter
-  if (transportParamsCount == 0) {
-    ctor->diagnose(diag::distributed_actor_designated_ctor_missing_transport_param,
-                   ctor->getName());
-    // TODO(distributed): offer fixit to insert 'system: DistributedActorSystem'
-    return;
-  }
-
-  // ok! We found exactly one transport parameter
-  if (transportParamsCount == 1)
-    return;
-
-  // TODO(distributed): rdar://81824959 report the error on the offending (2nd) matching parameter
-  //                    Or maybe we can issue a note about the other offending params?
-  ctor->diagnose(diag::distributed_actor_designated_ctor_must_have_one_distributedactorsystem_param,
-                 ctor->getName(), transportParamsCount);
-}
-
 // ==== ------------------------------------------------------------------------
 
 void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal) {
   if (!nominal)
     return;
 
-  // ==== Ensure the _Distributed module is available,
+  // ==== Ensure the Distributed module is available,
   // without it there's no reason to check the decl in more detail anyway.
   if (!swift::ensureDistributedModuleLoaded(nominal))
     return;
@@ -665,14 +612,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   (void)nominal->getDefaultInitializer();
 
   for (auto member : nominal->getMembers()) {
-    // --- Check all constructors
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-        checkDistributedActorConstructor(classDecl, ctor);
-        continue;
-      }
-    }
-
     // --- Ensure all thunks
     if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
       if (!func->isDistributed())
@@ -690,6 +629,8 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   //     because the 'DerivedConformanceDistributedActor' won't trigger for 'id'
   //     because it has a default impl via 'Identifiable' (ObjectIdentifier)
   //     which we do not want.
+  // Also, the 'id' var must be added before the 'actorSystem'.
+  // See NOTE (id-before-actorSystem) for more details.
   (void)nominal->getDistributedActorIDProperty();
 }
 
@@ -736,13 +677,55 @@ GetDistributedRemoteCallTargetInitFunctionRequest::evaluate(
     if (params->size() != 1)
       return nullptr;
 
-    if (params->get(0)->getArgumentName() == C.getIdentifier("_mangledName"))
+    // _ identifier
+    if (params->get(0)->getArgumentName().empty())
       return ctor;
 
     return nullptr;
   }
 
-  // TODO(distributed): make a Request for it?
+  return nullptr;
+}
+
+ConstructorDecl*
+GetDistributedRemoteCallArgumentInitFunctionRequest::evaluate(
+    Evaluator &evaluator,
+    NominalTypeDecl *nominal) const {
+  auto &C = nominal->getASTContext();
+
+  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+  // we won't be emitting the offending decl after all.
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return nullptr;
+
+  if (!nominal->getDeclaredInterfaceType()->isEqual(
+          C.getRemoteCallArgumentType()))
+    return nullptr;
+
+  for (auto value : nominal->getMembers()) {
+    auto ctor = dyn_cast<ConstructorDecl>(value);
+    if (!ctor)
+      continue;
+
+    auto params = ctor->getParameters();
+    if (params->size() != 3)
+      return nullptr;
+
+    // --- param: label
+    if (!params->get(0)->getArgumentName().is("label"))
+      return nullptr;
+
+    // --- param: name
+    if (!params->get(1)->getArgumentName().is("name"))
+      return nullptr;
+
+    // --- param: value
+    if (params->get(2)->getArgumentName() != C.Id_value)
+      return nullptr;
+
+    return ctor;
+  }
+
   return nullptr;
 }
 
