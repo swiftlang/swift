@@ -14,9 +14,9 @@ enum FooEnum: CaseIterable {
 }
 
 // FOO_ENUM_TYPE_CONTEXT: Begin completions
-// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: .Foo1[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: .Foo2[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: .alias1[#FooEnum#]; name=alias1
+// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Foo1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: .alias1[#FooEnum#]; name=alias1
 // FOO_ENUM_TYPE_CONTEXT: End completions
 
 // FOO_ENUM_NO_DOT: Begin completions
@@ -202,8 +202,8 @@ enum QuxEnum : Int {
 }
 
 // QUX_ENUM_TYPE_CONTEXT: Begin completions
-// QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: .Qux1[#QuxEnum#]{{; name=.+$}}
-// QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: .Qux2[#QuxEnum#]{{; name=.+$}}
+// QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Qux1[#QuxEnum#]{{; name=.+$}}
+// QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_TYPE_CONTEXT: End completions
 
 // QUX_ENUM_NO_DOT: Begin completions, 7 items

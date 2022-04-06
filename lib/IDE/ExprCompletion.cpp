@@ -42,6 +42,8 @@ bool ExprTypeCheckCompletionCallback::Result::operator==(
   return IsImplicitSingleExpressionReturn ==
              Other.IsImplicitSingleExpressionReturn &&
          IsInAsyncContext == Other.IsInAsyncContext &&
+         nullableTypesEqual(UnresolvedMemberBaseType,
+                            Other.UnresolvedMemberBaseType) &&
          solutionSpecificVarTypesEqual(SolutionSpecificVarTypes,
                                        Other.SolutionSpecificVarTypes);
 }
@@ -58,9 +60,13 @@ void ExprTypeCheckCompletionCallback::addExpectedType(Type ExpectedType) {
 
 void ExprTypeCheckCompletionCallback::addResult(
     bool IsImplicitSingleExpressionReturn, bool IsInAsyncContext,
+    Type UnresolvedMemberBaseType,
     llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes) {
+  if (!AddUnresolvedMemberCompletions) {
+    UnresolvedMemberBaseType = Type();
+  }
   Result NewResult = {IsImplicitSingleExpressionReturn, IsInAsyncContext,
-                      SolutionSpecificVarTypes};
+                      UnresolvedMemberBaseType, SolutionSpecificVarTypes};
   if (llvm::is_contained(Results, NewResult)) {
     return;
   }
@@ -80,10 +86,12 @@ void ExprTypeCheckCompletionCallback::sawSolutionImpl(
   llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
   getSolutionSpecificVarTypes(S, SolutionSpecificVarTypes);
 
-  addResult(ImplicitReturn, IsAsync, SolutionSpecificVarTypes);
+  addResult(ImplicitReturn, IsAsync, ExpectedTy, SolutionSpecificVarTypes);
   addExpectedType(ExpectedTy);
 
   if (auto PatternMatchType = getPatternMatchType(S, CompletionExpr)) {
+    addResult(ImplicitReturn, IsAsync, PatternMatchType,
+              SolutionSpecificVarTypes);
     addExpectedType(PatternMatchType);
   }
 }
@@ -104,6 +112,9 @@ void ExprTypeCheckCompletionCallback::deliverResults(
 
     Lookup.getValueCompletionsInDeclContext(CCLoc);
     Lookup.getSelfTypeCompletionInDeclContext(CCLoc, /*isForDeclResult=*/false);
+    if (Result.UnresolvedMemberBaseType) {
+      Lookup.getUnresolvedMemberCompletions(Result.UnresolvedMemberBaseType);
+    }
   }
 
   deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);

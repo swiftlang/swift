@@ -2683,6 +2683,8 @@ void CompletionLookup::getUnresolvedMemberCompletions(Type T) {
   if (!T->mayHaveMembers())
     return;
 
+  NeedLeadingDot = !HaveDot;
+
   if (auto objT = T->getOptionalObjectType()) {
     // Add 'nil' keyword with erasing '.' instruction.
     unsigned bytesToErase = 0;
