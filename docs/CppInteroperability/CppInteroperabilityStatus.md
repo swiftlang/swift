@@ -108,7 +108,7 @@ Unless stated otherwise (i.e., imported reference types) all Swift features work
 
 ### C++ Standard Library Support
 
-Parts of libc++ can be imported and used from Swift.
+Parts of libc++ can be imported and used from Swift. C++ standard library types are bridged directly to Swift, and there is not automatic bridging to native Swift types. This means that if an imported C++ API returns `std::string`, you will get a `std::string` value in Swift as well, and not Swift's `String`.
 
 This status table describes which of the following C++ standard library features have some experimental support for using them in Swift. Please note that this is not a comprehensive list and other libc++ APIs that use the above supported C++ language features could be imported into Swift.
 

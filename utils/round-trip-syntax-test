@@ -72,8 +72,8 @@ class RoundTripTask(object):
                 logging.error('---===ERROR===--- Lex/parse had error'
                               ' diagnostics, so not diffing.')
                 logging.error(' '.join(command))
-                logging.error(self.stdout)
-                logging.error(self.stderr)
+                logging.error(self.stdout.decode('utf-8', errors='replace'))
+                logging.error(self.stderr.decode('utf-8', errors='replace'))
                 raise RuntimeError()
 
         contents = ''.join(map(lambda l: l.decode('utf-8', errors='replace'),

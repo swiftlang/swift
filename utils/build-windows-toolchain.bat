@@ -693,11 +693,14 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj
 
 :: Stage Artifacts
 md %BuildRoot%\artifacts
-:: FIXME(compnerd) should we provide SDKs as standalone artifact?
-move %PackageRoot%\sdk.msi %BuildRoot%\artifacts || (exit /b)
+:: ICU Dependency for runtime libraries
+move %PackageRoot%\icu.msi %BuildRoot%\artifacts || (exit /b)
 :: Redistributable libraries for developers
 move %PackageRoot%\runtime.msi %BuildRoot%\artifacts || (exit /b)
-move %PackageRoot%\icu.msi %BuildRoot%\artifacts || (exit /b)
+:: Toolchain
+move %PackageRoot%\toolchain.msi %BuildRoot%\artifacts || (exit /b)
+:: SDK
+move %PackageRoot%\sdk.msi %BuildRoot%\artifacts || (exit /b)
 :: Installer
 move %PackageRoot%\installer\installer.exe %BuildRoot%\artifacts || (exit /b)
 

@@ -380,7 +380,6 @@ bool MoveKillsCopyableValuesChecker::check() {
   //
   // TODO: We should add llvm.dbg.addr support for fastisel and also teach
   // CodeGen how to handle llvm.dbg.addr better.
-  bool emittedDiagnostic = false;
   while (!valuesToProcess.empty()) {
     auto lexicalValue = valuesToProcess.front();
     valuesToProcess = valuesToProcess.drop_front(1);
@@ -416,7 +415,6 @@ bool MoveKillsCopyableValuesChecker::check() {
         if (livenessInfo.liveness.isWithinBoundary(mvi)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
           emitDiagnosticForMove(lexicalValue, varName, mvi);
-          emittedDiagnostic = true;
         } else {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: No!\n");
           if (auto varInfo = dbgVarInst.getVarInfo()) {
