@@ -330,9 +330,9 @@ namespace swift {
     /// in calls to generic functions.
     bool EnableOpenedExistentialTypes = false;
 
-    /// Enable support for protocol types parameterized by primary
-    /// associated type.
-    bool EnableParameterizedProtocolTypes = false;
+    /// Enable support for parameterized protocol types in existential
+    /// position.
+    bool EnableParameterizedExistentialTypes = false;
 
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
