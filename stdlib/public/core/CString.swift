@@ -45,16 +45,17 @@ extension String {
   /// - Parameter nullTerminatedUTF8: A pointer to a null-terminated UTF-8 code sequence.
   public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
-    self = nullTerminatedUTF8.withMemoryRebound(to: UInt8.self, capacity: len) {
-      String._fromUTF8Repairing(UnsafeBufferPointer(start: $0, count: len)).0
+    let buffer = UnsafeBufferPointer(start: nullTerminatedUTF8, count: len)
+    self = buffer.withMemoryRebound(to: UInt8.self) {
+      String._fromUTF8Repairing($0).0
     }
   }
 
   @inlinable
   @_alwaysEmitIntoClient
   public init(cString nullTerminatedUTF8: [CChar]) {
-    self = nullTerminatedUTF8.withUnsafeBytes {
-      String(_checkingCString: $0.assumingMemoryBound(to: UInt8.self))
+    self = nullTerminatedUTF8.withUnsafeBufferPointer {
+      $0.withMemoryRebound(to: UInt8.self, String.init(_checkingCString:))
     }
   }
 
@@ -247,14 +248,18 @@ extension String {
     guard let cPtr = cString else { return nil }
 
     if _fastPath(encoding == Unicode.UTF8.self) {
-      let ptr = UnsafeRawPointer(cPtr).assumingMemoryBound(to: UInt8.self)
-      let len = UTF8._nullCodeUnitOffset(in: ptr)
-      let codeUnits = UnsafeBufferPointer(start: ptr, count: len)
-      if isRepairing {
-        return String._fromUTF8Repairing(codeUnits)
-      } else {
-        guard let str = String._tryFromUTF8(codeUnits) else { return nil }
-        return (str, false)
+      let len = UTF8._nullCodeUnitOffset(
+        in: UnsafeRawPointer(cPtr).assumingMemoryBound(to: UInt8.self)
+      )
+      let bytes = UnsafeBufferPointer(start: cPtr, count: len)
+      return bytes.withMemoryRebound(to: UInt8.self) { codeUnits in
+        if isRepairing {
+          return String._fromUTF8Repairing(codeUnits)
+        }
+        else if let str = String._tryFromUTF8(codeUnits) {
+          return (str, false)
+        }
+        return nil
       }
     }
 
@@ -282,16 +287,17 @@ extension String {
     }
 
     if _fastPath(encoding == Unicode.UTF8.self) {
-      return cString.prefix(length).withUnsafeBytes {
-        buf -> (result: String, repairsMade: Bool)? in
-        let codeUnits = buf.assumingMemoryBound(to: UInt8.self)
-        if isRepairing {
-          return String._fromUTF8Repairing(codeUnits)
+      return cString.prefix(length).withUnsafeBufferPointer {
+        buffer -> (result: String, repairsMade: Bool)? in
+        return buffer.withMemoryRebound(to: UInt8.self) { codeUnits in
+          if isRepairing {
+            return String._fromUTF8Repairing(codeUnits)
+          }
+          else if let str = String._tryFromUTF8(codeUnits) {
+            return (str, false)
+          }
+          return nil
         }
-        else if let str = String._tryFromUTF8(codeUnits) {
-          return (str, false)
-        }
-        return nil
       }
     }
 
