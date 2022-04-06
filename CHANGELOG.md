@@ -5,6 +5,20 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0347][]:
+
+  It's now possible to use a default value expression with a generic parameter type
+  to default the argument and its type:
+
+  ```
+  func compute<C: Collection>(_ values: C = [0, 1, 2]) {
+    ...
+  }
+  ```
+
+  `compute` is now accepted by compiler and `[Int]` is going to be inferred
+  for `C` at call sites that do not provide the argument explicitly.
+
 * [SE-0326][]:
 
   It's now possible to infer parameter and result types from the body of a multi-statement
@@ -9150,6 +9164,7 @@ Swift 1.0
 [SE-0340]: <https://github.com/apple/swift-evolution/blob/main/proposals/0340-swift-noasync.md>
 [SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
 [SE-0326]: <https://github.com/apple/swift-evolution/blob/main/proposals/0326-extending-multi-statement-closure-inference.md>
+[SE-0347]: <https://github.com/apple/swift-evolution/blob/main/proposals/0347-type-inference-from-default-exprs.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
