@@ -1891,7 +1891,7 @@ giveUpFastPath:
       XRefExtensionPathPieceLayout::readRecord(scratch, ownerID, rawGenericSig);
       M = getModule(ownerID);
       if (!M) {
-        return llvm::make_error<XRefError>("module is not loaded",
+        return llvm::make_error<XRefError>("module with extension is not loaded",
                                            pathTrace, getIdentifier(ownerID));
       }
       pathTrace.addExtension(M);
