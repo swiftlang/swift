@@ -22,7 +22,7 @@
       "name": "empty-abi-descriptor"
     },
     {
-      "name": "enable-regex-literals"
+      "name": "enable-bare-slash-regex"
     }    
   ]
 }
