@@ -649,6 +649,14 @@ void swift::rewriting::realizeInheritedRequirements(
                           Type());
     if (!inheritedType) continue;
 
+    // Ignore trivially circular protocol refinement (protocol P : P)
+    // since we diagnose that elsewhere. Adding a rule here would emit
+    // a useless redundancy warning.
+    if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+      if (inheritedType->isEqual(protoDecl->getDeclaredInterfaceType()))
+        continue;
+    }
+
     auto *typeRepr = inheritedTypes[index].getTypeRepr();
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
     if (shouldInferRequirements) {
