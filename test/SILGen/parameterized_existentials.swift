@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name parameterized -enable-parameterized-protocol-types %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name parameterized -enable-parameterized-existential-types %s | %FileCheck %s
 
 protocol P<T, U, V> {
   associatedtype T

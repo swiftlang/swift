@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -module-name ParameterizedProtocols -emit-module-interface-path %t/ParameterizedProtocols.swiftinterface -enable-parameterized-protocol-types %s
+// RUN: %target-swift-frontend -typecheck -module-name ParameterizedProtocols -emit-module-interface-path %t/ParameterizedProtocols.swiftinterface %s
 // RUN: %FileCheck %s < %t/ParameterizedProtocols.swiftinterface
 
 public protocol HasPrimaryAssociatedTypes<T, U> {
