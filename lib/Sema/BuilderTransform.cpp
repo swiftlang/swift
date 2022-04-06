@@ -1714,10 +1714,17 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   }
 
   // Solve the constraint system.
-  SmallVector<Solution, 4> solutions;
-  bool solvingFailed = cs.solve(solutions);
 
-  if (cs.getASTContext().CompletionCallback) {
+  // When solving for code completion, we don't actually apply the solution to
+  // the AST but report the solutions to the callback. We also want to record
+  // fixes in the solution for better code completionr results.
+  bool forCodeCompletion = cs.getASTContext().CompletionCallback;
+
+  SmallVector<Solution, 4> solutions;
+  bool solvingFailed = cs.solve(solutions, FreeTypeVariableBinding::Disallow,
+                                /*recordFixes=*/forCodeCompletion);
+
+  if (forCodeCompletion) {
     CompletionContextFinder analyzer(func, func->getDeclContext());
     filterSolutionsForCodeCompletion(solutions, analyzer);
     for (const auto &solution : solutions) {

@@ -1390,10 +1390,12 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
 }
 
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
-                             FreeTypeVariableBinding allowFreeTypeVariables) {
+                             FreeTypeVariableBinding allowFreeTypeVariables,
+                             bool recordFixes) {
   // Set up solver state.
   SolverState state(*this, allowFreeTypeVariables);
 
+  state.recordFixes = recordFixes;
   // Solve the system.
   solveImpl(solutions);
 

@@ -5276,12 +5276,17 @@ public:
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
+  /// \param recordFixes Whether to record fixes while solving the constraint
+  /// system. Used in code completion so that fixed solutions are produced
+  /// alongside valid ones.
+  ///
   /// \returns true if an error occurred, false otherwise.  Note that multiple
   /// ambiguous solutions for the same constraint system are considered to be
   /// success by this API.
   bool solve(SmallVectorImpl<Solution> &solutions,
              FreeTypeVariableBinding allowFreeTypeVariables =
-                 FreeTypeVariableBinding::Disallow);
+                 FreeTypeVariableBinding::Disallow,
+             bool recordFixes = false);
 
   /// Solve the system of constraints.
   ///
