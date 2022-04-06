@@ -1208,8 +1208,8 @@ void DefaultActorImpl::deallocateUnconditional() {
   if (JobStorageHeapObject.metadata != nullptr)
     JobStorage.~ProcessInlineJob();
   auto metadata = cast<ClassMetadata>(this->metadata);
-  swift_deallocObject(this, metadata->getInstanceSize(),
-                      metadata->getInstanceAlignMask());
+  swift_deallocClassInstance(this, metadata->getInstanceSize(),
+                             metadata->getInstanceAlignMask());
 }
 
 void DefaultActorImpl::scheduleActorProcessJob(JobPriority priority, bool useInlineJob) {
