@@ -39,6 +39,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArrayOfRef
     single-source/ArraySetElement
     single-source/ArraySubscript
+    single-source/BankAccount
     single-source/BinaryFloatingPointConversionFromBinaryInteger
     single-source/BinaryFloatingPointProperties
     single-source/BitCount
