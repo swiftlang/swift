@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -enable-experimental-type-inference-from-defaults
 
 func takeIntToInt(_ f: (Int) -> Int) { }
 func takeIntIntToInt(_ f: (Int, Int) -> Int) { }
