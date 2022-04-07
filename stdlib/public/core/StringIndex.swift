@@ -364,14 +364,14 @@ extension String.Index {
 // this way: position zero is the same no matter how what encoding is used for
 // the rest of string.)
 //
-// These two bits (along with the isKnownUTF16 flag in StringObject) allow newer
-// versions of the Standard Library to more reliably catch runtime errors where
-// client code is applying an index from a UTF-16 string to a UTF-8 one, or vice
-// versa. This typically happens when indices from a UTF-16 Cocoa string that
-// was verbatim bridged into Swift are accidentally applied to a mutated version
-// of the same string. (The mutation turns it into a UTF-8 native string, where
-// the same numerical offsets might correspond to wildly different logical
-// positions.)
+// These two bits (along with the isForeignUTF8 flag in StringObject) allow
+// newer versions of the Standard Library to more reliably catch runtime errors
+// where client code is applying an index from a UTF-16 string to a UTF-8 one,
+// or vice versa. This typically happens when indices from a UTF-16 Cocoa string
+// that was verbatim bridged into Swift are accidentally applied to a mutated
+// version of the same string. (The mutation turns it into a UTF-8 native
+// string, where the same numerical offsets might correspond to wildly different
+// logical positions.)
 //
 // Such code has always been broken, as the old indices are documented to be no
 // longer valid after the mutation; however, in previous releases such cases

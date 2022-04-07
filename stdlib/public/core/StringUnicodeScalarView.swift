@@ -504,7 +504,7 @@ extension String.UnicodeScalarView {
     let len = UTF16.isLeadSurrogate(cu) ? 2 : 1
 
     let r = i.encoded(offsetBy: len)._scalarAligned
-    return _guts.internalMarkEncoding(r)
+    return r._knownUTF16
   }
 
   @usableFromInline @inline(never)
@@ -516,6 +516,6 @@ extension String.UnicodeScalarView {
     let len = UTF16.isTrailSurrogate(cu) ? 2 : 1
 
     let r = i.encoded(offsetBy: -len)._scalarAligned
-    return _guts.internalMarkEncoding(r)
+    return r._knownUTF16
   }
 }

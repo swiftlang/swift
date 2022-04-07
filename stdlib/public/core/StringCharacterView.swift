@@ -55,8 +55,7 @@ extension String: BidirectionalCollection {
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
     let i = _guts.roundDownToNearestCharacter(_guts.validateScalarIndex(i))
-    let r = _uncheckedIndex(after: i)
-    return _guts.internalMarkEncoding(r)
+    return _uncheckedIndex(after: i)
   }
 
   /// A version of `index(after:)` that assumes that the given index:
@@ -64,8 +63,6 @@ extension String: BidirectionalCollection {
   /// - has the right encoding,
   /// - is within bounds, and
   /// - is scalar aligned.
-  ///
-  /// It does not mark the encoding of the returned index.
   internal func _uncheckedIndex(after i: Index) -> Index {
     _internalInvariant(_guts.hasMatchingEncoding(i))
     _internalInvariant(i < endIndex)
@@ -77,7 +74,7 @@ extension String: BidirectionalCollection {
     let nextIndex = Index(_encodedOffset: nextOffset)._characterAligned
     let nextStride = _characterStride(startingAt: nextIndex)
     let r = Index(encodedOffset: nextOffset, characterStride: nextStride)
-    return _guts.internalMarkEncoding(r._characterAligned)
+    return _guts.markEncoding(r._characterAligned)
   }
 
   /// Returns the position immediately before the given index.
@@ -92,8 +89,7 @@ extension String: BidirectionalCollection {
     // the `i > startIndex` check needs to come after rounding.
     _precondition(i > startIndex, "String index is out of bounds")
 
-    let r = _uncheckedIndex(before: i)
-    return _guts.internalMarkEncoding(r)
+    return _uncheckedIndex(before: i)
   }
 
   /// A version of `index(before:)` that assumes that the given index:
@@ -101,8 +97,6 @@ extension String: BidirectionalCollection {
   /// - has the right encoding,
   /// - is within bounds, and
   /// - is character aligned.
-  ///
-  /// It does not mark the encoding of the returned index.
   internal func _uncheckedIndex(before i: Index) -> Index {
     _internalInvariant(_guts.hasMatchingEncoding(i))
     _internalInvariant(i > startIndex && i <= endIndex)
@@ -113,7 +107,7 @@ extension String: BidirectionalCollection {
     let priorOffset = i._encodedOffset &- stride
 
     let r = Index(encodedOffset: priorOffset, characterStride: stride)
-    return r._characterAligned
+    return _guts.markEncoding(r._characterAligned)
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -158,7 +152,7 @@ extension String: BidirectionalCollection {
         i = _uncheckedIndex(before: i)
       }
     }
-    return _guts.internalMarkEncoding(i)
+    return i
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -238,7 +232,7 @@ extension String: BidirectionalCollection {
       }
       guard limit > start || i >= limit else { return nil }
     }
-    return _guts.internalMarkEncoding(i)
+    return i
   }
 
   /// Returns the distance between two indices.

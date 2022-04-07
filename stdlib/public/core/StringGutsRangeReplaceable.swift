@@ -466,7 +466,7 @@ extension _StringGuts {
     _internalInvariant(
       subrange.lowerBound >= startIndex && subrange.upperBound <= endIndex)
 
-    if _slowPath(isKnownUTF16) {
+    if _slowPath(isUTF16) {
       // UTF-16 (i.e., foreign) string. The mutation will convert this to the
       // native UTF-8 encoding, so we need to do some extra work to preserve our
       // bounds.
@@ -479,7 +479,7 @@ extension _StringGuts {
         from: subrange.lowerBound, to: subrange.upperBound)
 
       let newUTF8Subrange = body(&self)
-      _internalInvariant(!isKnownUTF16)
+      _internalInvariant(isUTF8)
 
       let newUTF8Count =
         oldUTF8Count + newUTF8Subrange.count - oldUTF8SubrangeCount

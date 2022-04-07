@@ -588,7 +588,7 @@ extension _StringObject {
 ┌──────┬──────┬──────┬──────┬──────┬──────────┬───────────────────────────────┐
 │ b63  │ b62  │ b61  │ b60  │ b59  │  b58:48  │             b47:0             │
 ├──────┼──────┼──────┼──────┼──────┼──────────┼───────────────────────────────┤
-│ ASCII│ NFC  │native│ tail │ UTF16│ reserved │             count             │
+│ ASCII│ NFC  │native│ tail │ UTF8 │ reserved │             count             │
 └──────┴──────┴──────┴──────┴──────┴──────────┴───────────────────────────────┘
 
  b63: isASCII. set when all code units are known to be ASCII, enabling:
@@ -613,26 +613,17 @@ extension _StringObject {
       (e.g. literals)
    - `isTailAllocated` always implies `isFastUTF8`
 
- b59: isKnownUTF16. This bit is set if index positions in the string are known
-     to be measured in UTF-16 code units, rather than the default UTF-8.
-   - This is only ever set on UTF-16 foreign strings created in noninlinable
-     code in stdlib versions >= 5.7. On stdlibs <= 5.6, this bit is always set
-     to zero.
-   - Note that while as of 5.7 all foreign strings are UTF-16, this isn't
-     guaranteed to remain this way -- future versions of the stdlib may
-     introduce new foreign forms that use a different encoding. (Likely UTF-8.)
-   - Foreign strings are only created in non-inlinable code, so on stdlib
-     versions >=5.7, this bit always correctly reflects the correct encoding
-     for the string's offset values.
-   - This bit along with the two related bits in String.Index allow us to
-     opportunistically catch cases where an UTF-16 index is used on an UTF-8
-     string (or vice versa), and to provide better error reporting & recovery.
-     As more code gets rebuilt with Swift 5.7+, the stdlib will gradually become
-     able to reliably catch all such issues.
-   - It is okay for isASCII strings to not set this flag, even if they are
-     UTF-16 encoded -- the offsets in that case can work in either encoding.
-     (This is not currently exercised, as foreign bridged strings never set
-     the isASCII flag.)
+ b59: isForeignUTF8. This bit is to be set on future UTF-8 encoded string
+      variants, i.e. on strings whose index positions are measured in UTF-8 code
+      units, even though their storage isn't continuous. As of Swift 5.7, we
+      don't have any such foreign forms, but inlinable index validation methods
+      need to prepare for the possibility of their introduction, so we need to
+      assign this bit in preparation.
+
+      If we decide to never introduce such forms, we can stop checking this bit
+      at any time, but we cannot reuse it for something else -- we need to
+      preserve its current meaning to keep inlined index validation code
+      working.
 
  b48-58: Reserved for future usage.
    - Because Swift is ABI stable (on some platforms at least), these bits can
@@ -649,7 +640,7 @@ extension _StringObject {
      performance shortcuts, e.g. to signal the availability of a potential fast
      path. (However, it is also possible to store information here that allows
      more reliable detection & handling of runtime errors, like the
-     `isKnownUTF16` bit above.)
+     `isForeignUTF8` bit above.)
 
  b0-47: count. Stores the number of code units. Corresponds to the position of
      the `endIndex`.
@@ -680,7 +671,7 @@ extension _StringObject.CountAndFlags {
 
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
-  internal static var isKnownUTF16Mask: UInt64 {
+  internal static var isForeignUTF8Mask: UInt64 {
     return 0x0800_0000_0000_0000
   }
 
@@ -722,49 +713,6 @@ extension _StringObject.CountAndFlags {
     _internalInvariant(isTailAllocated == self.isTailAllocated)
   }
 
-  @inline(__always)
-  internal init(
-    count: Int,
-    isASCII: Bool,
-    isNFC: Bool,
-    isNativelyStored: Bool,
-    isTailAllocated: Bool,
-    isKnownUTF16: Bool
-  ) {
-    var rawBits = UInt64(truncatingIfNeeded: count)
-    _internalInvariant(rawBits <= _StringObject.CountAndFlags.countMask)
-
-    if isASCII {
-      _internalInvariant(isNFC)
-      rawBits |= _StringObject.CountAndFlags.isASCIIMask
-    }
-
-    if isNFC {
-      rawBits |= _StringObject.CountAndFlags.isNFCMask
-    }
-
-    if isNativelyStored {
-      _internalInvariant(isTailAllocated)
-      rawBits |= _StringObject.CountAndFlags.isNativelyStoredMask
-    }
-
-    if isTailAllocated {
-      rawBits |= _StringObject.CountAndFlags.isTailAllocatedMask
-    }
-
-    if isKnownUTF16 {
-      rawBits |= _StringObject.CountAndFlags.isKnownUTF16Mask
-    }
-
-    self.init(raw: rawBits)
-    _internalInvariant(count == self.count)
-    _internalInvariant(isASCII == self.isASCII)
-    _internalInvariant(isNFC == self.isNFC)
-    _internalInvariant(isNativelyStored == self.isNativelyStored)
-    _internalInvariant(isTailAllocated == self.isTailAllocated)
-    _internalInvariant(isKnownUTF16 == self.isKnownUTF16)
-  }
-
   @inlinable @inline(__always)
   internal init(count: Int, flags: UInt16) {
     // Currently, we only use top 5 flags
@@ -798,14 +746,13 @@ extension _StringObject.CountAndFlags {
       isTailAllocated: true)
   }
   @inline(__always)
-  internal init(sharedCount: Int, isASCII: Bool, isUTF16: Bool) {
+  internal init(sharedCount: Int, isASCII: Bool) {
     self.init(
       count: sharedCount,
       isASCII: isASCII,
       isNFC: isASCII,
       isNativelyStored: false,
-      isTailAllocated: false,
-      isKnownUTF16: isUTF16)
+      isTailAllocated: false)
   }
 
   //
@@ -840,17 +787,15 @@ extension _StringObject.CountAndFlags {
     return 0 != _storage & _StringObject.CountAndFlags.isTailAllocatedMask
   }
 
-  /// Returns whether this string is known to use UTF-16 code units.
+  /// Returns whether this string is a foreign form with a UTF-8 storage
+  /// representation.
   ///
-  /// This always returns a value corresponding to the string's actual encoding
-  /// on stdlib versions >=5.7.
-  ///
-  /// Standard Library versions <=5.6 did not set the corresponding flag, so
-  /// this property always returns false.
+  /// As of Swift 5.7, this bit is never set; however, future releases may
+  /// introduce such forms.
   @_alwaysEmitIntoClient
   @inline(__always) // Swift 5.7
-  internal var isKnownUTF16: Bool {
-    return 0 != _storage & _StringObject.CountAndFlags.isKnownUTF16Mask
+  internal var isForeignUTF8: Bool {
+    (_storage & Self.isForeignUTF8Mask) != 0
   }
 
   #if !INTERNAL_CHECKS_ENABLED
@@ -864,7 +809,7 @@ extension _StringObject.CountAndFlags {
     if isNativelyStored {
       _internalInvariant(isTailAllocated)
     }
-    if isKnownUTF16 {
+    if isForeignUTF8 {
       _internalInvariant(!isNativelyStored)
       _internalInvariant(!isTailAllocated)
     }
@@ -1001,11 +946,35 @@ extension _StringObject {
     return _countAndFlags.isNFC
   }
 
-  @_alwaysEmitIntoClient // Swift 5.7
-  @inline(__always)
-  internal var isKnownUTF16: Bool {
-    if isSmall { return false }
-    return _countAndFlags.isKnownUTF16
+  /// Returns whether this string has a UTF-8 storage representation.
+  ///
+  /// This always returns a value corresponding to the string's actual encoding.
+  @_alwaysEmitIntoClient
+  @inline(__always) // Swift 5.7
+  internal var isUTF8: Bool {
+    // This is subtle. It is designed to return the right value in all past &
+    // future stdlibs.
+    //
+    // If `providesFastUTF8` is true, then we know we have an UTF-8 string.
+    //
+    // Otherwise we have a foreign string. On Swift <=5.7, foreign strings are
+    // always UTF-16 encoded, but a future Swift release may introduce UTF-8
+    // encoded foreign strings. To allow this, we have a dedicated
+    // `isForeignUTF8` bit that future UTF-8 encoded foreign forms will need to
+    // set to avoid breaking index validation.
+    //
+    // Note that `providesFastUTF8` returns true for small strings, so we don't
+    // need to check for smallness before accessing the `isForeignUTF8` bit.
+    providesFastUTF8 || _countAndFlags.isForeignUTF8
+  }
+
+  /// Returns whether this string has a UTF-16 storage representation.
+  ///
+  /// This always returns a value corresponding to the string's actual encoding.
+  @_alwaysEmitIntoClient
+  @inline(__always) // Swift 5.7
+  internal var isUTF16: Bool {
+    !isUTF8
   }
 
   // Get access to fast UTF-8 contents for large strings which provide it.
@@ -1107,8 +1076,7 @@ extension _StringObject {
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
   ) {
-    let countAndFlags = CountAndFlags(
-      sharedCount: length, isASCII: isASCII, isUTF16: !providesFastUTF8)
+    let countAndFlags = CountAndFlags(sharedCount: length, isASCII: isASCII)
     let discriminator = Nibbles.largeCocoa(providesFastUTF8: providesFastUTF8)
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     self.init(

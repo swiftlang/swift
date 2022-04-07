@@ -237,7 +237,7 @@ extension Substring: StringProtocol {
 
     let i = _roundDownToNearestCharacter(_validateScalarIndex(i))
     let r = _uncheckedIndex(after: i)
-    return _wholeGuts.internalMarkEncoding(r)
+    return _wholeGuts.markEncoding(r)
   }
 
   /// A version of `index(after:)` that assumes that the given index:
@@ -298,7 +298,7 @@ extension Substring: StringProtocol {
     _precondition(i > startIndex, "Substring index is out of bounds")
 
     let r = _uncheckedIndex(before: i)
-    return _wholeGuts.internalMarkEncoding(r)
+    return _wholeGuts.markEncoding(r)
   }
 
   /// A version of `index(before:)` that assumes that the given index:
@@ -361,7 +361,7 @@ extension Substring: StringProtocol {
         i = _uncheckedIndex(before: i)
       }
     }
-    return _wholeGuts.internalMarkEncoding(i)
+    return _wholeGuts.markEncoding(i)
   }
 
   public func index(
@@ -401,7 +401,7 @@ extension Substring: StringProtocol {
       }
       guard limit > start || i >= limit else { return nil }
     }
-    return _wholeGuts.internalMarkEncoding(i)
+    return _wholeGuts.markEncoding(i)
   }
 
   public func distance(from start: Index, to end: Index) -> Int {

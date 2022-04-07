@@ -311,55 +311,36 @@ func _isSwiftStdlib_5_7() -> Bool {
 
 // Encoding
 extension _StringGuts {
-  /// Returns whether this string is known to use UTF-16 code units.
+  /// Returns whether this string has a UTF-8 storage representation.
   ///
-  /// This always returns a value corresponding to the string's actual encoding
-  /// on stdlib versions >=5.7.
-  ///
-  /// Standard Library versions <=5.6 did not set the corresponding flag, so
-  /// this property always returns false.
+  /// This always returns a value corresponding to the string's actual encoding.
   @_alwaysEmitIntoClient
   @inline(__always)
-  internal var isKnownUTF16: Bool { _object.isKnownUTF16 }
+  internal var isUTF8: Bool { _object.isUTF8 }
+
+  /// Returns whether this string has a UTF-16 storage representation.
+  ///
+  /// This always returns a value corresponding to the string's actual encoding.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal var isUTF16: Bool { _object.isUTF16 }
 
   @_alwaysEmitIntoClient // Swift 5.7
   internal func markEncoding(_ i: String.Index) -> String.Index {
-    // In this inlinable function, we cannot assume that all foreign strings are
-    // UTF-16 encoded, as this code may run on a future stdlib that may have
-    // introduced other foreign forms.
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) { // SwiftStdlib 5.7
-      // With a >=5.7 stdlib, we can rely on `isKnownUTF16` to contain the truth.
-      return isKnownUTF16 ? i._knownUTF16 : i._knownUTF8
-    }
-    // We know that in stdlibs 5.0..<5.7, all foreign strings were UTF-16,
-    // so we can use `isForeign` to determine the encoding.
-    return isForeign ? i._knownUTF16 : i._knownUTF8
-  }
-
-  @inline(__always)
-  internal func internalMarkEncoding(_ i: String.Index) -> String.Index {
-    // This code is behind a resiliance boundary, so it always runs on a >=5.7
-    // stdlib. Note though that it doesn't match the 5.7+ case in the inlinable
-    // version above!
-    //
-    // We know that in this version of the stdlib, foreign strings happen to
-    // always be UTF-16 encoded (like they were between 5.0 and 5.6), and
-    // looking at `isForeign` instead of `isKnownUTF16` may allow the stdlib's
-    // internal code to be better optimized -- so let's do that.
-    isForeign ? i._knownUTF16 : i._knownUTF8
+    isUTF8 ? i._knownUTF8 : i._knownUTF16
   }
 
   /// Returns true if the encoding of the given index isn't known to be in
   /// conflict with this string's encoding.
   ///
-  /// If the index or the string was created by code that was built on stdlibs
-  /// below 5.7, then this check may incorrectly return true on a mismatching
-  /// index, but it is guaranteed to never incorrectly return false. If all
-  /// loaded binaries were built in 5.7+, then this method is guaranteed to
-  /// always return the correct value.
-  @_alwaysEmitIntoClient
+  /// If the index was created by code that was built on a stdlib below 5.7,
+  /// then this check may incorrectly return true on a mismatching index, but it
+  /// is guaranteed to never incorrectly return false. If all loaded binaries
+  /// were built in 5.7+, then this method is guaranteed to always return the
+  /// correct value.
+  @_alwaysEmitIntoClient @inline(__always)
   internal func hasMatchingEncoding(_ i: String.Index) -> Bool {
-    (isForeign && i._canBeUTF16) || (!isForeign && i._canBeUTF8)
+    isUTF8 ? i._canBeUTF8 : i._canBeUTF16
   }
 
   /// Return an index whose encoding can be assumed to match that of `self`.
@@ -371,22 +352,20 @@ extension _StringGuts {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal func ensureMatchingEncoding(_ i: String.Index) -> String.Index {
-    if _fastPath(!isForeign && i._canBeUTF8) { return i }
+    if _fastPath(hasMatchingEncoding(i)) { return i }
     return _slowEnsureMatchingEncoding(i)
   }
 
   @_alwaysEmitIntoClient
   @inline(never)
   internal func _slowEnsureMatchingEncoding(_ i: String.Index) -> String.Index {
-    _internalInvariant(isForeign || !i._canBeUTF8)
-    if isForeign {
-      // Opportunistically detect attempts to use an UTF-8 index on a UTF-16
-      // string. Strings don't usually get converted to UTF-16 storage, so it
-      // seems okay to trap in this case -- the index most likely comes from an
-      // unrelated string. (Trapping here may still turn out to affect binary
-      // compatibility with broken code in existing binaries running with new
-      // stdlibs. If so, we can replace this with the same transcoding hack as
-      // in the UTF-16->8 case below.)
+    guard isUTF8 else {
+      // Attempt to use an UTF-8 index on a UTF-16 string. Strings don't usually
+      // get converted to UTF-16 storage, so it seems okay to trap in this case
+      // -- the index most likely comes from an unrelated string. (Trapping here
+      // may still turn out to affect binary compatibility with broken code in
+      // existing binaries running with new stdlibs. If so, we can replace this
+      // with the same transcoding hack as in the UTF-16->8 case below.)
       //
       // Note that this trap is not guaranteed to trigger when the process
       // includes client binaries compiled with a previous Swift release.
@@ -397,13 +376,9 @@ extension _StringGuts {
       //
       // This trap can never trigger on OSes that have stdlibs <= 5.6, because
       // those versions never set the `isKnownUTF16` flag in `_StringObject`.
-      //
-      _precondition(!isKnownUTF16 || i._canBeUTF16,
-        "Invalid string index")
-      return i
+      _preconditionFailure("Invalid string index")
     }
-    // If we get here, then we know for sure that this is an attempt to use an
-    // UTF-16 index on a UTF-8 string.
+    // Attempt to use an UTF-16 index on a UTF-8 string.
     //
     // This can happen if `self` was originally verbatim-bridged, and someone
     // mistakenly attempts to keep using an old index after a mutation. This is

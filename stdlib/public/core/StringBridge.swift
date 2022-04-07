@@ -616,8 +616,7 @@ extension String {
       let gutsCountAndFlags = _guts._object._countAndFlags
       let countAndFlags = _StringObject.CountAndFlags(
         sharedCount: _guts.count,
-        isASCII: gutsCountAndFlags.isASCII,
-        isUTF16: false)
+        isASCII: gutsCountAndFlags.isASCII)
       return __SharedStringStorage(
         immortal: _guts._object.fastUTF8.baseAddress!,
         countAndFlags: countAndFlags)
