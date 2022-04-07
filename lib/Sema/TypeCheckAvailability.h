@@ -183,9 +183,10 @@ public:
   Optional<ExportabilityReason> getExportabilityReason() const;
 };
 
-/// Check if a public declaration is part of a module's API; that is, this
-/// will return false if the declaration is @_spi or @_implementationOnly.
+/// Check if a declaration is exported as part of a module's external interface.
+/// This includes public and @usableFromInline decls.
 bool isExported(const ValueDecl *VD);
+bool isExported(const ExtensionDecl *ED);
 bool isExported(const Decl *D);
 
 /// Diagnose uses of unavailable declarations in expressions.
