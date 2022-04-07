@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-stdlib-swift %S/Inputs/
 // REQUIRES: executable_test
 // UNSUPPORTED: freestanding
 
@@ -6,6 +6,7 @@ import StdlibUnittest
 #if _runtime(_ObjC)
 import Foundation
 #endif
+import StdlibUnicodeUnittest
 
 var suite = TestSuite("StringIndexTests")
 defer { runAllTests() }
@@ -16,40 +17,6 @@ enum SimpleString: String {
   case largeASCII = "012345678901234567890"
   case largeUnicode = "abéÏ012345678901234567890𓀀"
   case emoji = "😀😃🤢🤮👩🏿‍🎤🧛🏻‍♂️🧛🏻‍♂️👩‍👩‍👦‍👦"
-}
-
-/// Print out a full list of indices in every view of `string`.
-/// This is useful while debugging test failures in this test.
-func dumpIndices(_ string: String) {
-  print("-------------------------------------------------------------------")
-  print("String: \(String(reflecting: string))")
-  print("Characters:")
-  string.indices.forEach { i in
-    let char = string[i]
-    print("  \(i) -> \(String(reflecting: char))")
-  }
-  print("Scalars:")
-  string.unicodeScalars.indices.forEach { i in
-    let scalar = string.unicodeScalars[i]
-    let value = String(scalar.value, radix: 16, uppercase: true)
-    let padding = String(repeating: "0", count: max(0, 4 - value.count))
-    let name = scalar.properties.name ?? "\(scalar.debugDescription)"
-    print("  \(i) -> U+\(padding)\(value) \(name)")
-  }
-  print("UTF-8:")
-  string.utf8.indices.forEach { i in
-    let code = string.utf8[i]
-    let value = String(code, radix: 16, uppercase: true)
-    let padding = value.count < 2 ? "0" : ""
-    print("  \(i) -> \(padding)\(value)")
-  }
-  print("UTF-16:")
-  string.utf16.indices.forEach { i in
-    let code = string.utf16[i]
-    let value = String(code, radix: 16, uppercase: true)
-    let padding = String(repeating: "0", count: 4 - value.count)
-    print("  \(i) -> \(padding)\(value)")
-  }
 }
 
 let simpleStrings: [String] = [
@@ -352,7 +319,7 @@ suite.test("Exhaustive Index Interchange")
     return
   }
 
-  //dumpIndices(str)
+  //str.dumpIndices()
 
   var curCharIdx = str.startIndex
   var curScalarIdx = str.startIndex
@@ -482,111 +449,7 @@ suite.test("Exhaustive Index Interchange")
 }
 #endif
 
-extension Collection {
-  // Assuming both `self` and `other` use the same index space, call `body` for
-  // each index `i` in `other`, along with the slice in `self` that begins at
-  // `i` and ends at the index following it in `other`.
-  //
-  // `other` must start with an item that is less than or equal to the first
-  // item in `self`.
-  func forEachIndexGroup<G: Collection>(
-    by other: G,
-    body: (G.Index, Self.SubSequence, Int) throws -> Void
-  ) rethrows
-  where G.Index == Self.Index
-  {
-    if other.isEmpty {
-      assert(self.isEmpty)
-      return
-    }
-    var i = other.startIndex
-    var j = self.startIndex
-    var offset = 0
-    while i != other.endIndex {
-      let current = i
-      other.formIndex(after: &i)
-      let start = j
-      while j < i, j < self.endIndex {
-        self.formIndex(after: &j)
-      }
-      let end = j
-      try body(current, self[start ..< end], offset)
-      offset += 1
-    }
-  }
-}
-
-extension String {
-  // Returns a list of every valid index in every string view, optionally
-  // including end indices. We keep equal indices originating from different
-  // views because they may have different grapheme size caches or flags etc.
-  func allIndices(includingEnd: Bool = true) -> [String.Index] {
-    var r = Array(self.indices)
-    if includingEnd { r.append(self.endIndex) }
-    r += Array(self.unicodeScalars.indices)
-    if includingEnd { r.append(self.unicodeScalars.endIndex) }
-    r += Array(self.utf8.indices)
-    if includingEnd { r.append(self.utf8.endIndex) }
-    r += Array(self.utf16.indices)
-    if includingEnd { r.append(self.utf16.endIndex) }
-    return r
-  }
-
-  /// Returns a dictionary mapping each valid index to the index that lies on
-  /// the nearest scalar boundary, rounding down.
-  func scalarMap() -> [String.Index: (index: String.Index, offset: Int)] {
-    var map: [String.Index: (index: String.Index, offset: Int)] = [:]
-
-    self.utf8.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice, offset in
-      for i in slice.indices { map[i] = (scalar, offset) }
-    }
-    self.utf16.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice, offset in
-      for i in slice.indices { map[i] = (scalar, offset) }
-    }
-    self.forEachIndexGroup(by: self.unicodeScalars) { scalar, slice, offset in
-      for i in slice.indices { map[i] = (scalar, offset) }
-    }
-    map[endIndex] = (endIndex, self.unicodeScalars.count)
-    return map
-  }
-
-  /// Returns a dictionary mapping each valid index to the index that lies on
-  /// the nearest character boundary, rounding down.
-  func characterMap() -> [String.Index: (index: String.Index, offset: Int)] {
-    var map: [String.Index: (index: String.Index, offset: Int)] = [:]
-    self.utf8.forEachIndexGroup(by: self) { char, slice, offset in
-      for i in slice.indices { map[i] = (char, offset) }
-    }
-    self.utf16.forEachIndexGroup(by: self) { char, slice, offset in
-      for i in slice.indices { map[i] = (char, offset) }
-    }
-    self.unicodeScalars.forEachIndexGroup(by: self) { char, slice, offset in
-      for i in slice.indices { map[i] = (char, offset) }
-    }
-    map[endIndex] = (endIndex, count)
-    return map
-  }
-}
-
-extension Substring {
-  // Returns a list of every valid index in every string view, optionally
-  // including end indices. We keep equal indices originating from different
-  // views because they may have different grapheme size caches or flags etc.
-  func allIndices(includingEnd: Bool = true) -> [String.Index] {
-    var r = Array(self.indices)
-    if includingEnd { r.append(self.endIndex) }
-    r += Array(self.unicodeScalars.indices)
-    if includingEnd { r.append(self.unicodeScalars.endIndex) }
-    r += Array(self.utf8.indices)
-    if includingEnd { r.append(self.utf8.endIndex) }
-    r += Array(self.utf16.indices)
-    if includingEnd { r.append(self.utf16.endIndex) }
-    return r
-  }
-}
-
-suite.test("Fully exhaustive index interchange")
-.forEach(in: examples) { string in
+func fullyExhaustiveIndexInterchange(_ string: String) {
   guard #available(SwiftStdlib 5.7, *) else {
     // Index navigation in 5.7 always rounds input indices down to the nearest
     // Character, so that we always have a well-defined distance between
@@ -596,7 +459,7 @@ suite.test("Fully exhaustive index interchange")
     return
   }
 
-  //dumpIndices(string)
+  //string.dumpIndices()
 
   let scalarMap = string.scalarMap()
   let characterMap = string.characterMap()
@@ -736,6 +599,18 @@ suite.test("Fully exhaustive index interchange")
   }
 }
 
+suite.test("Fully exhaustive index interchange")
+.forEach(in: examples) { string in
+  fullyExhaustiveIndexInterchange(string)
+}
+
+suite.test("Fully exhaustive index interchange/GraphemeBreakTests") {
+  for string in graphemeBreakTests.map { $0.0 } {
+    fullyExhaustiveIndexInterchange(string)
+  }
+}
+
+
 suite.test("Global vs local grapheme cluster boundaries") {
   guard #available(SwiftStdlib 5.7, *) else {
     // Index navigation in 5.7 always rounds input indices down to the nearest
@@ -864,14 +739,14 @@ suite.test("Index encoding correction") {
   // If the mutation's effect included the data addressed by the original index,
   // then we may still get nonsensical results.
   var s = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
-  //dumpIndices(s)
+  //s.dumpIndices()
 
   let originals = s.allIndices(includingEnd: false).map {
     ($0, s[$0], s.unicodeScalars[$0], s.utf8[$0], s.utf16[$0])
   }
 
   s.append(".")
-  //dumpIndices(s)
+  //s.dumpIndices()
 
   for (i, char, scalar, u8, u16) in originals {
     expectEqual(s[i], char, "i: \(i)")
@@ -893,7 +768,7 @@ suite.test("String.replaceSubrange index validation")
     return
   }
 
-  //dumpIndices(string)
+  //string.dumpIndices()
 
   let scalarMap = string.scalarMap()
   let allIndices = string.allIndices()
@@ -958,12 +833,13 @@ suite.test("Substring.replaceSubrange index validation")
     return
   }
 
-  dumpIndices(string)
+  string.dumpIndices()
 
   let scalarMap = string.scalarMap()
   let allIndices = string.allIndices()
 
   for i in allIndices {
+    print(i)
     for j in allIndices {
       guard i <= j else { continue }
       let si = scalarMap[i]!.index
@@ -1021,3 +897,4 @@ suite.test("Substring.replaceSubrange index validation")
     }
   }
 }
+
