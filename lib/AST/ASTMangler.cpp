@@ -970,6 +970,7 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
   } else if (!name.empty()) {
     appendIdentifier(name.getIdentifier().str());
   } else {
+    decl->dump();
     assert(AllowNamelessEntities && "attempt to mangle unnamed decl");
     // Fall back to an unlikely name, so that we still generate a valid
     // mangled name.
@@ -3458,10 +3459,25 @@ ASTMangler::mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl) {
   return finalize();
 }
 
-std::string ASTMangler::mangleDistributedThunk(const FuncDecl *thunk) {
+std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk) {
   // Marker protocols cannot be checked at runtime, so there is no point
   // in recording them for distributed thunks.
   llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(AllowMarkerProtocols,
                                                        false);
+//  if (auto acc = dyn_cast<AccessorDecl>(thunk)) {
+//    auto kind = acc->getAccessorKind();
+//    auto var = acc->getStorage();
+//    assert(kind == AccessorKind::Get &&
+//           "Only get accessors can have distributed thunks");
+//    assert(!acc->isStatic() &&
+//           "distributed thunk must be for a member, not static, getter");
+//
+//    auto mangling = mangleAccessorEntity(kind, var, /*isStatic=*/false,
+//                                SymbolKind::DistributedThunk);
+//    fprintf(stderr, "[%s:%d] (%s) MANGLED AS: %s\n", __FILE__, __LINE__, __FUNCTION__,
+//            mangling.c_str());
+//    return mangling;
+//  }
+
   return mangleEntity(thunk, SymbolKind::DistributedThunk);
 }

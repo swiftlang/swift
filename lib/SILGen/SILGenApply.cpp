@@ -1085,14 +1085,9 @@ public:
   void visitDeclRefExpr(DeclRefExpr *e) {
     auto subs = e->getDeclRef().getSubstitutions();
 
-    fprintf(stderr, "[%s:%d] (%s) declref ========================================\n", __FILE__, __LINE__, __FUNCTION__);
-    e->dump();
-
     // If this is a direct reference to a vardecl, just emit its value directly.
     // Recursive references to callable declarations are allowed.
     if (auto var = dyn_cast<VarDecl>(e->getDecl())) {
-      fprintf(stderr, "[%s:%d] (%s) VAR:::::\n", __FILE__, __LINE__, __FUNCTION__);
-      var->dump();
       visitExpr(e);
       return;
     }
@@ -1129,8 +1124,18 @@ public:
     // TODO(distributed): need to do the same when it is a computed get-property
     /// Some special handling may be necessary for thunks:
     if (callSite && callSite->shouldApplyDistributedThunk()) {
-      if (auto distributedThunk = cast<AbstractFunctionDecl>(e->getDecl())->getDistributedThunk()) {
-        constant = SILDeclRef(distributedThunk).asDistributed();
+      if (auto getter = constant.getAbstractFunctionDecl()) {
+        auto distributedAttr = new (getter->getASTContext())
+            DistributedActorAttr(/*implicit=*/true);
+        getter->getAttrs().add(distributedAttr);
+        fprintf(stderr, "[%s:%d] (%s) Added distributed attr to getter...!\n", __FILE__, __LINE__, __FUNCTION__);
+        if (auto distributedThunk = getter->getDistributedThunk()) {
+          fprintf(stderr, "[%s:%d] (%s) getter thunk\n", __FILE__, __LINE__, __FUNCTION__);
+          distributedThunk->dump();
+          constant = SILDeclRef(distributedThunk).asDistributed();
+        } else {
+          assert(false && "no getter thunk!");
+        }
       }
     } else if (afd->isBackDeployed()) {
       // If we're calling a back deployed function then we need to call a
@@ -5406,6 +5411,11 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
         subs, loc, true);
   }
 
+//  (accessor_decl range=[/Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_func_calls_remoteCall_computedProperty.swift:23:50 - line:25:3] 'anonname=0x1360e1d30' interface type='(isolated Greeter) -> () -> String' access=internal get_for=theDistributedProperty
+//   (parameter "self" type='Greeter' interface type='Greeter')
+//       (parameter_list)
+//           (string_literal_expr type='String' location=/Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_func_calls_remoteCall_computedProperty.swift:24:5 range=[/Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_func_calls_remoteCall_computedProperty.swift:24:5 - line:24:5] encoding=utf8 value="Patrik the Seastar" builtin_initializer=Swift.(file).String extension.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:) initializer=**NULL**))
+
   // The accessor might be a local function that does not capture any
   // generic parameters, in which case we don't want to pass in any
   // substitutions.
@@ -5468,14 +5478,13 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &SGF,
                                    ArgumentSource &selfValue,
                                    bool isSuper,
                                    bool isDirectUse,
-                                   bool isOnSelfParameter)
-{
+                                   bool isOnSelfParameter) {
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(SGF, loc, constant, selfValue,
                                              isSuper, isDirectUse,
                                              substitutions, isOnSelfParameter);
-  
+
   // Collect captures if the accessor has them.
   if (SGF.SGM.M.Types.hasLoweredLocalCaptures(constant)) {
     assert(!selfValue && "local property has self param?!");
@@ -5777,6 +5786,10 @@ SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {
   auto declRef = SILDeclRef(accessor, SILDeclRef::Kind::Func);
   if (accessor->isBackDeployed())
     return declRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
+  if (accessor->isDistributed()) {
+    fprintf(stderr, "[%s:%d] (%s) getAccessorDeclRef DIST!\n", __FILE__, __LINE__, __FUNCTION__);
+    return declRef.asDistributed();
+  }
 
   return declRef.asForeign(requiresForeignEntryPoint(accessor));
 }
@@ -5786,13 +5799,35 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
                                        SubstitutionMap substitutions,
                                        ArgumentSource &&selfValue, bool isSuper,
                                        bool isDirectUse,
+                                       bool shouldUseDistributedThunk,
                                        PreparedArguments &&subscriptIndices,
                                        SGFContext c, bool isOnSelfParameter) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
+  auto constant = get;
+  if (shouldUseDistributedThunk) {
+    fprintf(stderr, "[%s:%d] (%s) need to make dist accessor for -----\n", __FILE__, __LINE__, __FUNCTION__);
+    get.dump();
+    fprintf(stderr, "[%s:%d] (%s) accessor ^^^^^^^^^^^^^^^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
+
+    if (auto accessorAFD = get.getAbstractFunctionDecl()) {
+      if (!accessorAFD->getAttrs().hasAttribute<DistributedActorAttr>()) {
+        accessorAFD->getAttrs().add(new (
+            get.getASTContext()) DistributedActorAttr(/*isImplicit=*/true));
+      }
+
+      fprintf(stderr, "[%s:%d] (%s) accessor AFD\n", __FILE__, __LINE__, __FUNCTION__);
+      accessorAFD->dump();
+
+      if (auto distributedThunk = accessorAFD->getDistributedThunk()) {
+        constant = SILDeclRef(distributedThunk).asDistributed();
+      }
+    }
+  }
+
   Callee getter = emitSpecializedAccessorFunctionRef(
-      *this, loc, get, substitutions, selfValue, isSuper, isDirectUse,
+      *this, loc, constant, substitutions, selfValue, isSuper, isDirectUse,
       isOnSelfParameter);
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = getter.getSubstFormalType();

@@ -1443,6 +1443,7 @@ public:
                          SubstitutionMap substitutions,
                          ArgumentSource &&optionalSelfValue, bool isSuper,
                          bool isDirectAccessorUse,
+                         bool shouldUseDistributedThunk,
                          PreparedArguments &&optionalSubscripts, SGFContext C,
                          bool isOnSelfParameter);
 

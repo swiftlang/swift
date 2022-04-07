@@ -551,10 +551,22 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
 
   // distributed properties cannot have setters
   if (var->getWriteImpl() != swift::WriteImplKind::Immutable) {
-    var->diagnose(diag::distributed_property_can_only_be_computed_get_only,
-                  var->getName());
+    var->diagnose(diag::distributed_property_accessor_only_get_can_be_distributed);
     return true;
   }
+
+  for (auto acc : var->getAllAccessors()) {
+    switch (acc->getAccessorKind()) {
+    case AccessorKind::Get:
+      // get accessors are allowed to be distributed
+      continue;
+    default:
+      // no other kind of accessor is allowed to be distributed
+      var->diagnose(diag::distributed_property_accessor_only_get_can_be_distributed);
+      return true;
+    }
+  }
+
 
   auto systemVar =
       DC->getSelfNominalTypeDecl()->getDistributedActorSystemProperty();
@@ -611,20 +623,42 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   // If applicable, this will create the default 'init(transport:)' initializer
   (void)nominal->getDefaultInitializer();
 
+  // --- Ensure all thunks
   for (auto member : nominal->getMembers()) {
-    // --- Ensure all thunks
     if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
       if (!func->isDistributed())
         continue;
 
-      if (auto thunk = func->getDistributedThunk()) {
+      auto thunk = func->getDistributedThunk();
+      assert(thunk && "expected to emit a thunk for distributed func");
+      SF->DelayedFunctions.push_back(thunk);
+    }
+    if (auto var = dyn_cast<VarDecl>(member)) {
+      if (!var->isDistributed())
+        continue;
+
+      if (auto get = var->getAccessor(AccessorKind::Get)) {
+        // ensure the getter has `distributed`
+        if (!get->getAttrs().hasAttribute<DistributedActorAttr>()) {
+          get->getAttrs().add(new (get->getASTContext())
+                                  DistributedActorAttr(/*implicit=*/true));
+        }
+
+        auto thunk = get->getDistributedThunk();
+        assert(thunk && "expected to emit a thunk for distributed var");
         SF->DelayedFunctions.push_back(thunk);
+        fprintf(stderr, "[%s:%d] (%s) added distributed thunk for: %s\n", __FILE__, __LINE__, __FUNCTION__, get->getNameStr().str().c_str());
+        get->dump();
+
+        fprintf(stderr, "[%s:%d] (%s) added distributed thunk, THE THUNK: %s\n", __FILE__, __LINE__, __FUNCTION__, thunk->getNameStr().str().c_str());
+        thunk->dump();
       }
     }
   }
 
   // ==== Properties
   checkDistributedActorProperties(nominal);
+
   // --- Synthesize the 'id' property here rather than via derived conformance
   //     because the 'DerivedConformanceDistributedActor' won't trigger for 'id'
   //     because it has a default impl via 'Identifiable' (ObjectIdentifier)

@@ -816,6 +816,7 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
   if (isa<StructDecl>(decoderDecl) || isa<EnumDecl>(decoderDecl) ||
       decoderDecl->isFinal()) {
     auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+    assert("missing decodeNextArgument SIL function"); // This is usually because
     auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
                                            /*isDynamicallyReplacible=*/false);
 

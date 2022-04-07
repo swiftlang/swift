@@ -1761,8 +1761,11 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
+  if (vd->isDistributed())
 
   vd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    if (accessor->hasName() && !accessor->getName().isSpecial())
+      fprintf(stderr, "[%s:%d] (%s) emit accessor %s\n", __FILE__, __LINE__, __FUNCTION__, accessor->getNameStr().str().c_str());
     emitFunction(accessor);
   });
 
@@ -1828,6 +1831,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:
   case AccessStrategy::MaterializeToTemporary:
+  case AccessStrategy::DirectToDistributedThunkAccessor:
     return false;
   }
   llvm_unreachable("unhandled strategy");

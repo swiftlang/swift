@@ -2246,11 +2246,8 @@ namespace {
               // a distributed computed property access is implicitly throwing
               // and async
               if (distributedAccess && distributedAccess->second) {
-                auto usesDistributedThunk =
-                    distributedAccess && distributedAccess->second;
-                memberRef->setImplicitlyThrows(usesDistributedThunk);
-                memberRef->setShouldApplyDistributedThunk(
-                    usesDistributedThunk);
+                memberRef->setImplicitlyThrows(true);
+                memberRef->setShouldApplyDistributedThunk(true);
                 fprintf(stderr, "[%s:%d] (%s) SET SHOULD USE THUNK\n", __FILE__, __LINE__, __FUNCTION__);
                 memberRef->dump();
               }

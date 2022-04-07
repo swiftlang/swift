@@ -120,7 +120,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   auto selfDecl = thunk->getImplicitSelfDecl();
   selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(implicit));
-  auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
 
   // === return type
   Type returnTy = func->getResultInterfaceType();
@@ -146,8 +145,9 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   Type remoteCallTargetTy = RCT->getDeclaredInterfaceType();
 
   // === __isRemoteActor(self)
-  ArgumentList *isRemoteArgs =
-      ArgumentList::forImplicitSingle(C, /*label=*/Identifier(), selfRefExpr);
+  ArgumentList *isRemoteArgs = ArgumentList::forImplicitSingle(
+      C, /*label=*/Identifier(),
+      new (C) DeclRefExpr(selfDecl, dloc, implicit));
 
   FuncDecl *isRemoteFn = C.getIsRemoteDistributedActor();
   assert(isRemoteFn && "Could not find 'is remote' function, is the "
@@ -158,22 +158,53 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       CallExpr::createImplicit(C, isRemoteDeclRef, isRemoteArgs);
 
   // === local branch ----------------------------------------------------------
-  // -- forward arguments
-  SmallVector<Expr*, 4> forwardingParams;
-  forwardParameters(thunk, forwardingParams);
-  auto funcRef = UnresolvedDeclRefExpr::createImplicit(C, func->getName());
-  auto forwardingArgList = ArgumentList::forImplicitCallTo(funcRef->getName(), forwardingParams, C);
+  BraceStmt *localBranchStmt;
+  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+    auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
 
-  auto funcDeclRef =
-      UnresolvedDotExpr::createImplicit(C, selfRefExpr, func->getBaseName());
-  Expr *localFuncCall = CallExpr::createImplicit(C, funcDeclRef, forwardingArgList);
-  localFuncCall = AwaitExpr::createImplicit(C, sloc, localFuncCall);
-  if (func->hasThrows()) {
-    localFuncCall = TryExpr::createImplicit(C, sloc, localFuncCall);
+    auto var = accessor->getStorage();
+
+    auto varRef = UnresolvedDeclRefExpr::createImplicit(C, var->getName());
+    auto funcDeclRef =
+        UnresolvedDotExpr::createImplicit(C, selfRefExpr, var->getBaseName());
+
+    Expr *localPropertyAccess = new (C) MemberRefExpr(
+        selfRefExpr, sloc, ConcreteDeclRef(var), dloc, implicit);
+    localPropertyAccess =
+        AwaitExpr::createImplicit(C, sloc, localPropertyAccess);
+    if (accessor->hasThrows()) {
+      localPropertyAccess =
+          TryExpr::createImplicit(C, sloc, localPropertyAccess);
+    }
+
+    auto returnLocalPropertyAccess = new (C) ReturnStmt(sloc, localPropertyAccess, implicit);
+
+    fprintf(stderr, "[%s:%d] (%s) LOCAL BRANCH\n", __FILE__, __LINE__, __FUNCTION__);
+    returnLocalPropertyAccess->dump();
+    localBranchStmt =
+        BraceStmt::create(C, sloc, {returnLocalPropertyAccess}, sloc, implicit);
+  } else {
+    // normal function
+    auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
+
+    // -- forward arguments
+    SmallVector<Expr*, 4> forwardingParams;
+    forwardParameters(thunk, forwardingParams);
+    auto funcRef = UnresolvedDeclRefExpr::createImplicit(C, func->getName());
+    auto forwardingArgList = ArgumentList::forImplicitCallTo(funcRef->getName(), forwardingParams, C);
+    auto funcDeclRef =
+        UnresolvedDotExpr::createImplicit(C, selfRefExpr, func->getBaseName());
+
+    Expr *localFuncCall = CallExpr::createImplicit(C, funcDeclRef, forwardingArgList);
+    localFuncCall = AwaitExpr::createImplicit(C, sloc, localFuncCall);
+    if (func->hasThrows()) {
+      localFuncCall = TryExpr::createImplicit(C, sloc, localFuncCall);
+    }
+    auto returnLocalFuncCall = new (C) ReturnStmt(sloc, localFuncCall, implicit);
+
+    localBranchStmt =
+        BraceStmt::create(C, sloc, {returnLocalFuncCall}, sloc, implicit);
   }
-  auto returnLocalFuncCall = new (C) ReturnStmt(sloc, localFuncCall, implicit);
-  auto localBranchStmt = 
-      BraceStmt::create(C, sloc, {returnLocalFuncCall}, sloc, implicit);
 
   // === remote branch  --------------------------------------------------------
   SmallVector<ASTNode, 8> remoteBranchStmts;
@@ -435,7 +466,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     // --- Mangle the thunk name
     Mangle::ASTMangler mangler;
     auto mangled =
-        C.AllocateCopy(mangler.mangleDistributedThunk(cast<FuncDecl>(thunk)));
+        C.AllocateCopy(mangler.mangleDistributedThunk(thunk));
     auto mangledTargetStringLiteral =
         new (C) StringLiteralExpr(mangled, SourceRange(), implicit);
 
@@ -555,7 +586,23 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   assert(systemTy &&
          "Thunk synthesis must have concrete actor system type available");
 
-  DeclName thunkName = func->getName();
+  // Compute the name to use for the distributed thunk
+  DeclName thunkName;
+  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+    // for a `get` accessor of a distributed computed property
+    // we cannot use the name of the accessor because it is anonymous,
+    // rather we'll use the name of the computed property.
+    assert(accessor->getAccessorKind() == swift::AccessorKind::Get);
+
+    auto varDecl = accessor->getStorage(); // the computed property var decl
+    // we must create a compound name, rather than just use the simple name
+    // of the property. Since a function (thunk) must have a compound name.
+    auto noParams = ParameterList::createEmpty(C, SourceLoc(), SourceLoc());
+    thunkName = DeclName(C, varDecl->getName().getBaseName(), noParams);
+  } else {
+    // it is just a normal `distributed func` so we can reuse its name
+    thunkName = func->getName();
+  }
 
   // --- Prepare generic parameters
   GenericParamList *genericParamList = nullptr;
@@ -683,8 +730,10 @@ addDistributedActorCodableConformance(
 
 FuncDecl *GetDistributedThunkRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *distributedTarget) const {
-  if (!distributedTarget->isDistributed())
+  if (!distributedTarget->isDistributed()) {
+    fprintf(stderr, "[%s:%d] (%s) NOT DIST\n", __FILE__, __LINE__, __FUNCTION__);
     return nullptr;
+  }
 
   auto &C = distributedTarget->getASTContext();
   auto DC = distributedTarget->getDeclContext();

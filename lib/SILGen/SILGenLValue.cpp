@@ -1291,6 +1291,8 @@ namespace {
     SILDeclRef Accessor;
     bool IsSuper;
     bool IsDirectAccessorUse;
+    /// True only if the access is to a `distributed var computed: T { ... }`.
+    bool IsDistributedAccessor;
     bool IsOnSelfParameter;
     SubstitutionMap Substitutions;
     Optional<ActorIsolation> ActorIso;
@@ -1298,7 +1300,9 @@ namespace {
   public:
     AccessorBasedComponent(PathComponent::KindTy kind,
                            AbstractStorageDecl *decl, SILDeclRef accessor,
-                           bool isSuper, bool isDirectAccessorUse,
+                           bool isSuper,
+                           bool isDirectAccessorUse,
+                           bool isDistributedAccessor,
                            SubstitutionMap substitutions,
                            CanType baseFormalType, LValueTypeData typeData,
                            ArgumentList *argListForDiagnostics,
@@ -1309,7 +1313,9 @@ namespace {
                 std::move(indices)),
           Accessor(accessor), IsSuper(isSuper),
           IsDirectAccessorUse(isDirectAccessorUse),
-          IsOnSelfParameter(isOnSelfParameter), Substitutions(substitutions),
+          IsDistributedAccessor(isDistributedAccessor),
+          IsOnSelfParameter(isOnSelfParameter),
+          Substitutions(substitutions),
           ActorIso(actorIso) {}
 
     AccessorBasedComponent(const AccessorBasedComponent &copied,
@@ -1319,6 +1325,7 @@ namespace {
         Accessor(copied.Accessor),
         IsSuper(copied.IsSuper),
         IsDirectAccessorUse(copied.IsDirectAccessorUse),
+        IsDistributedAccessor(copied.IsDistributedAccessor),
         IsOnSelfParameter(copied.IsOnSelfParameter),
         Substitutions(copied.Substitutions),
         ActorIso(copied.ActorIso) {}
@@ -1334,7 +1341,9 @@ namespace {
 
      GetterSetterComponent(AbstractStorageDecl *decl,
                            SILDeclRef accessor,
-                           bool isSuper, bool isDirectAccessorUse,
+                           bool isSuper,
+                           bool isDirectAccessorUse,
+                           bool isDistributedAccessor,
                            SubstitutionMap substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
@@ -1343,7 +1352,9 @@ namespace {
                            bool isOnSelfParameter,
                            Optional<ActorIsolation> actorIso)
       : AccessorBasedComponent(GetterSetterKind, decl, accessor, isSuper,
-                               isDirectAccessorUse, substitutions,
+                               isDirectAccessorUse,
+                               isDistributedAccessor,
+                               substitutions,
                                baseFormalType, typeData, subscriptArgList,
                                std::move(indices), isOnSelfParameter, actorIso)
     {
@@ -1642,6 +1653,8 @@ namespace {
       {
         FormalEvaluationScope scope(SGF);
 
+        // FIXME: avoid the hop when emitting distributed func thunk
+
         // If the 'get' is in the context of the target's actor, do a hop first.
         prevExecutor = SGF.emitHopToTargetActor(loc, ActorIso, base);
 
@@ -1650,7 +1663,14 @@ namespace {
 
         rvalue = SGF.emitGetAccessor(
             loc, getter, Substitutions, std::move(args.base), IsSuper,
-            IsDirectAccessorUse, std::move(args.Indices), c, IsOnSelfParameter);
+            IsDirectAccessorUse, IsDistributedAccessor,
+            std::move(args.Indices), c, IsOnSelfParameter);
+
+        if (IsDistributedAccessor) {
+          fprintf(stderr, "[%s:%d] (%s) EMITTED:\n", __FILE__, __LINE__, __FUNCTION__);
+          SGF.F.dump();
+          fprintf(stderr, "[%s:%d] (%s) EMITTED =======\n", __FILE__, __LINE__, __FUNCTION__);
+        }
 
       } // End the evaluation scope before any hop back to the current executor.
 
@@ -1799,7 +1819,8 @@ namespace {
                         ArgumentList *argListForDiagnostics,
                         PreparedArguments &&indices, bool isOnSelfParameter)
       : AccessorBasedComponent(AddressorKind, decl, accessor, isSuper,
-                               isDirectAccessorUse, substitutions,
+                               isDirectAccessorUse, /*isDistributed=*/false,
+                               substitutions,
                                baseFormalType, typeData,
                                argListForDiagnostics, std::move(indices),
                                isOnSelfParameter),
@@ -1914,8 +1935,9 @@ namespace {
                                bool isOnSelfParameter)
         : AccessorBasedComponent(
               CoroutineAccessorKind, decl, accessor, isSuper,
-              isDirectAccessorUse, substitutions, baseFormalType, typeData,
-              argListForDiagnostics, std::move(indices), isOnSelfParameter) {}
+              isDirectAccessorUse, /*isDistributed=*/false, substitutions,
+              baseFormalType, typeData, argListForDiagnostics,
+              std::move(indices), isOnSelfParameter) {}
 
     using AccessorBasedComponent::AccessorBasedComponent;
 
@@ -2639,6 +2661,7 @@ namespace {
         AccessKind(accessKind) {}
 
     void emitUsingStrategy(AccessStrategy strategy) {
+      auto isDist = false;
       switch (strategy.getKind()) {
       case AccessStrategy::Storage: {
         auto typeData =
@@ -2648,10 +2671,29 @@ namespace {
       }
 
       case AccessStrategy::DirectToAccessor:
-        return asImpl().emitUsingAccessor(strategy.getAccessor(), true);
+        if (auto var = dyn_cast<VarDecl>(Storage))
+          isDist = var->isDistributed();
+
+        return asImpl()
+            .emitUsingAccessor(strategy.getAccessor(),
+                               /*isDirect=*/true,
+                               /*isDistributed=*/false);
 
       case AccessStrategy::DispatchToAccessor:
-        return asImpl().emitUsingAccessor(strategy.getAccessor(), false);
+        if (auto var = dyn_cast<VarDecl>(Storage))
+          isDist = var->isDistributed();
+
+        return asImpl().emitUsingAccessor(strategy.getAccessor(),
+                                          /*isDirect=*/false,
+                                          /*isDistributed=*/isDist);
+
+      case AccessStrategy::DirectToDistributedThunkAccessor:
+        assert(false && "GOOD! DirectToDistributedThunkAccessor"); // FIXME: not used
+
+        fprintf(stderr, "[%s:%d] (%s) DirectToDistributedThunkAccessor = dist \n", __FILE__, __LINE__, __FUNCTION__);
+        return asImpl().emitUsingAccessor(strategy.getAccessor(),
+                                          /*isDirect=*/false,
+                                          /*isDistributed=*/true);
 
       case AccessStrategy::MaterializeToTemporary: {
         auto typeData = getLogicalStorageTypeData(
@@ -2664,7 +2706,9 @@ namespace {
       llvm_unreachable("unknown kind");
     }
 
-    void emitUsingAccessor(AccessorKind accessorKind, bool isDirect) {
+    void emitUsingAccessor(AccessorKind accessorKind,
+                           bool isDirect,
+                           bool isDistributed) {
       auto accessor =
         SGF.SGM.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
 
@@ -2673,11 +2717,12 @@ namespace {
       case AccessorKind::Set: {
         auto typeData = getLogicalStorageTypeData(
             SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);
-        return asImpl().emitUsingGetterSetter(accessor, isDirect, typeData);
+        return asImpl().emitUsingGetterSetter(accessor, isDirect, isDistributed, typeData);
       }
 
       case AccessorKind::Address:
       case AccessorKind::MutableAddress: {
+        assert(!isDistributed);
         auto typeData =
             getPhysicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
                                        AccessKind, Storage, FormalRValueType);
@@ -2686,6 +2731,7 @@ namespace {
 
       case AccessorKind::Read:
       case AccessorKind::Modify: {
+        assert(!isDistributed);
         auto typeData =
             getPhysicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
                                        AccessKind, Storage, FormalRValueType);
@@ -2795,12 +2841,14 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
           PreparedArguments(), /*isOnSelfParameter*/ false);
     }
 
-    void emitUsingGetterSetter(SILDeclRef accessor, bool isDirect,
+    void emitUsingGetterSetter(SILDeclRef accessor,
+                               bool isDirect,
+                               bool isDistributed,
                                LValueTypeData typeData) {
       LV.add<GetterSetterComponent>(
           Storage, accessor,
-          /*isSuper=*/false, isDirect, Subs, CanType(), typeData, nullptr,
-          PreparedArguments(), /* isOnSelfParameter */ false,
+          /*isSuper=*/false, isDirect, isDistributed, Subs, CanType(), typeData,
+          nullptr, PreparedArguments(), /* isOnSelfParameter */ false,
           ActorIso);
     }
 
@@ -3149,7 +3197,8 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
   }
 
   case AccessStrategy::DirectToAccessor:
-  case AccessStrategy::DispatchToAccessor: {
+  case AccessStrategy::DispatchToAccessor:
+  case AccessStrategy::DirectToDistributedThunkAccessor: {
     auto accessor = member->getOpaqueAccessor(strategy.getAccessor());
     return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType);
   }
@@ -3288,11 +3337,13 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
         ArgListForDiagnostics, std::move(Indices), IsOnSelfParameter);
   }
 
-  void emitUsingGetterSetter(SILDeclRef accessor, bool isDirect,
+  void emitUsingGetterSetter(SILDeclRef accessor,
+                             bool isDirect,
+                             bool isDistributed,
                              LValueTypeData typeData) {
     LV.add<GetterSetterComponent>(
-        Storage, accessor, IsSuper, isDirect, Subs, BaseFormalType, typeData,
-        ArgListForDiagnostics, std::move(Indices), IsOnSelfParameter,
+        Storage, accessor, IsSuper, isDirect, isDistributed, Subs,
+        BaseFormalType, typeData, ArgListForDiagnostics, std::move(Indices), IsOnSelfParameter,
         ActorIso);
   }
 
@@ -3363,6 +3414,10 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
             /*indices for diags*/ nullptr, /*indices*/ PreparedArguments(),
             isOnSelfParameter, actorIso);
 
+  if (var->isDistributed()) {
+    fprintf(stderr, "[%s:%d] (%s) EMIT FOR DIST VAR\n", __FILE__, __LINE__, __FUNCTION__);
+    var->dump();
+  }
   emitter.emitUsingStrategy(strategy);
 }
 

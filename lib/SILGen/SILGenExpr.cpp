@@ -3437,12 +3437,30 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
     // If the property came from an import-as-member function defined in C,
     // use the original C function as the key.
     bool isForeign = representativeDecl->isImportAsMember();
+
     auto getterRef = SILDeclRef(representativeDecl,
                                 SILDeclRef::Kind::Func, isForeign);
     // TODO: If the getter has shared linkage (say it's synthesized for a
     // Clang-imported thing), we'll need some other sort of
     // stable identifier.
     return SGM.getFunction(getterRef, NotForDefinition);
+  }
+  case AccessStrategy::DirectToDistributedThunkAccessor: {
+    assert(false && "dont need this");
+    // Locate the distributed thunk for the getter of this property
+    fprintf(stderr, "[%s:%d] (%s) CHECKING.... DirectToDistributedThunkAccessor\n", __FILE__, __LINE__, __FUNCTION__);
+    auto representativeDecl = getRepresentativeAccessorForKeyPath(storage);
+    assert(representativeDecl->isDistributed());
+    fprintf(stderr, "[%s:%d] (%s) OK, representative is DIST\n", __FILE__, __LINE__, __FUNCTION__);
+
+    auto getterThunkRef = SILDeclRef(representativeDecl->getDistributedThunk(),
+                                SILDeclRef::Kind::Func,
+                                /*isForeign=*/false,
+                                /*isDistributed=*/true);
+    fprintf(stderr, "[%s:%d] (%s) THUNK\n", __FILE__, __LINE__, __FUNCTION__);
+    getterThunkRef.dump();
+
+    return SGM.getFunction(getterThunkRef, NotForDefinition);
   }
   case AccessStrategy::DispatchToAccessor: {
     // Identify the property by its vtable or wtable slot.
