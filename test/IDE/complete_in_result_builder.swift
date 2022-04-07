@@ -172,3 +172,49 @@ func testCompleteErrorTypeInCatch() {
 // CATHC2-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: E2({#Int32#})[#Error4#]; name=E2(Int32)
 // CATCH2: End completions
 }
+
+func testCompleteInStringLiteral() {
+  struct Island {
+    var turnipPrice: String
+  }
+
+  func takeTrailingClosure(_ x: () -> Void) -> Text { fatalError() }
+
+  struct BStack<Content> {
+    init(@ViewBuilder content: () -> Content) {}
+  }
+
+  protocol View {}
+
+  struct Text: View {
+    init(_ x: String) {}
+
+    var body: Never { fatalError() }
+  }
+
+  @resultBuilder struct ViewBuilder {
+    static func buildBlock() -> Text { fatalError() }
+    static func buildBlock<C: View>(_ c: C) -> C { return c }
+    static func buildBlock<C1: View, C2: View>(_ c: C1, _ d: C2) -> C1 { return c }
+  }
+
+
+  func foo(island: Island) {
+    BStack {
+      let b = "\(island.#^STRING_LITERAL_VAR^#turnipPrice)"
+      takeTrailingClosure {}
+    }
+// STRING_LITERAL_VAR: Begin completions, 2 items
+// STRING_LITERAL_VAR-DAG: Keyword[self]/CurrNominal:          self[#Island#]; name=self
+// STRING_LITERAL_VAR-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: turnipPrice[#String#]; name=turnipPrice
+// STRING_LITERAL_VAR: End completions
+
+
+    func bar(island: Island) {
+    BStack {
+      Text("\(island.#^STRING_LITERAL_AS_ARGUMENT?check=STRING_LITERAL_VAR^#turnipPrice)")
+      takeTrailingClosure {}
+    }
+  }
+
+}

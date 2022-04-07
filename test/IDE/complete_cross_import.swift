@@ -34,6 +34,8 @@ func foo() {
 
 import #^IMPORT^#
 
+func sync() {}
+
 // IMPORT-DAG: Decl[Module]/None/NotRecommended:   A[#Module#]; name=A
 // IMPORT-DAG: Decl[Module]/None/NotRecommended:   B[#Module#]; name=B
 // IMPORT-DAG: Decl[Module]/None:                  C[#Module#]; name=C

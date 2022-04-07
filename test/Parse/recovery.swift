@@ -660,9 +660,6 @@ func foo2(bar! = baz) {}// expected-note {{did you mean 'foo2'?}}
 // expected-error@+1{{cannot find 'esp' in scope; did you mean 'test'?}}
 switch esp {
 case let (jeb):
-  // expected-error@+5{{top-level statement cannot begin with a closure expression}}
-  // expected-error@+4{{closure expression is unused}}
-  // expected-note@+3{{did you mean to use a 'do' statement?}}
   // expected-error@+2{{expected an identifier to name generic parameter}}
   // expected-error@+1{{expected '{' in class}}
   class Ceac<}> {}
