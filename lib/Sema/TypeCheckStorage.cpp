@@ -2955,7 +2955,6 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   Type storageType = dc->mapTypeIntoContext(wrapperType);
   Expr *initializer = nullptr;
   PropertyWrapperValuePlaceholderExpr *wrappedValue = nullptr;
-//creates pattern bingind decl for property wrapper
   auto createPBD = [&](VarDecl *singleVar) -> PatternBindingDecl * {
     Pattern *pattern = NamedPattern::createImplicit(ctx, singleVar);
     pattern->setType(singleVar->getType());

@@ -581,8 +581,6 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (var->hasImplicitPropertyWrapper())
     return var->getInterfaceType();
 
-  if(var->isTopLevelGlobal())
-      bool toplevel = true;
   // The constraint system will infer closure parameter types
   if (isa<ParamDecl>(var) && isa<ClosureExpr>(var->getDeclContext()))
     return var->getPropertyWrapperBackingProperty()->getInterfaceType();
