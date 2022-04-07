@@ -1772,24 +1772,20 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 void SILGenModule::visitVarDecl(VarDecl *vd) {
     // We handle emitting the variable storage when we see the pattern binding.
 
-    // Avoid request evaluator overhead in the common case where there's
-    // no wrapper.
-    /*if (vd->getAttrs().hasAttribute<CustomAttr>()) {
-      // Emit the property wrapper backing initializer if necessary.
-      auto initInfo = vd->getPropertyWrapperInitializerInfo();
-      if (initInfo.hasInitFromWrappedValue())
-        emitPropertyWrapperBackingInitializer(vd);
-    }*/
-
     // Emit lazy and property wrapper backing storage.
     vd->visitAuxiliaryDecls([&](VarDecl *var) {
-        if (auto *patternBinding = var->getParentPatternBinding())
-          TopLevelSGF->visitPatternBindingDecl(patternBinding);
+        if (auto *patternBinding = var->getParentPatternBinding()){
+            if (TopLevelSGF){
+            TopLevelSGF->visitPatternBindingDecl(patternBinding);
+            } else {
+                //Call SGM::visitPatternBindingDecl if not in script mode
+                visitPatternBindingDecl(patternBinding);
+            }
+        }
         TopLevelSGF->visit(var);
 
         if (var->hasStorage())
           addGlobalVariable(var);
-
     });
 
   if (vd->hasStorage())
