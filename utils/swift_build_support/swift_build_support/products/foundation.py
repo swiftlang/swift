@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 from . import cmark
+from . import curl
 from . import libcxx
 from . import libdispatch
 from . import libicu
@@ -55,7 +56,8 @@ class Foundation(product.Product):
                 swift.Swift,
                 libdispatch.LibDispatch,
                 libxml2.LibXML2,
-                zlib.Zlib]
+                zlib.Zlib,
+                curl.LibCurl]
 
     @classmethod
     def is_nondarwin_only_build_product(cls):

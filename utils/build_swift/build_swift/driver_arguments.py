@@ -96,6 +96,9 @@ def _apply_default_arguments(args):
     if args.zlib_build_variant is None:
         args.zlib_build_variant = args.build_variant
 
+    if args.curl_build_variant is None:
+        args.curl_build_variant = args.build_variant
+
     # Assertions are enabled by default.
     if args.assertions is None:
         args.assertions = True
@@ -721,6 +724,9 @@ def create_argument_parser():
     option('--static-zlib', toggle_true('build_zlib'), default=False,
            help='build static zlib')
 
+    option('--static-curl', toggle_true('build_curl'), default=False,
+           help='build static curl libraries')
+
     option('--playgroundsupport', toggle_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
     option('--install-playgroundsupport',
@@ -839,6 +845,10 @@ def create_argument_parser():
     option('--debug-zlib', store('zlib_build_variant'),
            const='Debug',
            help='build the Debug variant of zlib')
+
+    option('--debug-curl', store('curl_build_variant'),
+           const='Debug',
+           help='build the Debug variant of libcurl')
 
     # -------------------------------------------------------------------------
     # Assertions group
@@ -1276,6 +1286,8 @@ def create_argument_parser():
            help='skip building libxml2')
     option('--skip-build-zlib', toggle_false('build_zlib'),
            help='skip building zlib')
+    option('--skip-build-curl', toggle_false('build_curl'),
+           help='skip building curl')
 
     # We need to list --skip-test-swift explicitly because otherwise argparse
     # will auto-expand arguments like --skip-test-swift to the only known
@@ -1356,6 +1368,7 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /icu                        (optional)
                      /libxml2                    (optional)
                      /zlib                       (optional)
+                     /curl                       (optional)
 
 SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
                   Defaults to "$SWIFT_SOURCE_ROOT/build/".

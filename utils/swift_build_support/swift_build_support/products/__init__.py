@@ -13,6 +13,7 @@
 from .backdeployconcurrency import BackDeployConcurrency
 from .benchmarks import Benchmarks
 from .cmark import CMark
+from .curl import LibCurl
 from .earlyswiftdriver import EarlySwiftDriver
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
@@ -50,6 +51,7 @@ __all__ = [
     'LibICU',
     'LibXML2',
     'Zlib',
+    'LibCurl',
     'LLBuild',
     'LLDB',
     'LLVM',

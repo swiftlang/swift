@@ -267,6 +267,7 @@ components=(
   libicu
   libxml2
   zlib
+  curl
   llbuild
   lldb
   llvm
@@ -2567,6 +2568,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [[ ! "${SKIP_BUILD_CURL}" ]]; then
+                    BASE_INSTALL_DIR="$(get_host_install_destdir ${host})"
+                    CURL_BUILD_ARGS=(
+                        -DCURL_DIR="${BASE_INSTALL_DIR}/usr/lib/cmake/CURL"
+                    )
+                fi
+
                 if [[ "${SKIP_CLEAN_FOUNDATION}" == "0" ]]
                 then
                   # The Swift project might have been changed, but CMake might
@@ -2596,6 +2604,8 @@ for host in "${ALL_HOSTS[@]}"; do
                   ${LIBXML2_BUILD_ARGS[@]}
 
                   ${ZLIB_BUILD_ARGS[@]}
+
+                  ${CURL_BUILD_ARGS[@]}
 
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=$(build_directory ${host} libdispatch)
