@@ -1989,14 +1989,11 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
       return;
     }
 
-    auto *decl = td->getDeclContext();
-    auto *vard = dyn_cast<VarDecl>(td);
-
     if (auto *S = ESD.dyn_cast<Stmt*>()) {
       TopLevelSGF->emitStmt(S);
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       TopLevelSGF->emitIgnoredExpr(E);
-    }else {
+    } else {
         TopLevelSGF->visit(ESD.get<Decl*>());
     }
   }
@@ -2192,8 +2189,6 @@ public:
     for (auto *D : sf->getTopLevelDecls()) {
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                       "SILgen-decl", D);
-      if(isa<TopLevelCodeDecl>(D))
-          bool top = true;
       SGM.visit(D);
     }
 
