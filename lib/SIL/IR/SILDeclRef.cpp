@@ -376,11 +376,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     if (isSerialized())
       return maybeAddExternal(SILLinkage::PublicNonABI);
 
-    d = cast<NominalTypeDecl>(d->getDeclContext());
+    limit = Limit::NeverPublic;
 
-    // FIXME: This should always be true.
-    if (d->getModuleContext()->isResilient())
-      limit = Limit::NeverPublic;
   }
 
   // The global addressor is never public for resilient globals.
