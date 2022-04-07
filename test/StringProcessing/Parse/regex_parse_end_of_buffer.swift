@@ -2,5 +2,6 @@
 // REQUIRES: swift_in_compiler
 
 // Note there is purposefully no trailing newline here.
-// expected-error@+1 {{unterminated regex literal}}
-var unterminated = #/xy
+// expected-error@+2:20 {{unterminated regex literal}}
+// expected-error@+1:25 {{cannot parse regular expression: expected ')'}}
+var unterminated = #/(xy

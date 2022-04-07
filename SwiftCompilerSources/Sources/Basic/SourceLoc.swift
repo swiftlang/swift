@@ -33,6 +33,12 @@ public struct SourceLoc {
   }
 }
 
+extension SourceLoc {
+  public func advanced(by n: Int) -> SourceLoc {
+    SourceLoc(locationInFile: locationInFile.advanced(by: n))!
+  }
+}
+
 extension Optional where Wrapped == SourceLoc {
   public var bridged: BridgedSourceLoc {
     self?.bridged ?? .init(pointer: nil)

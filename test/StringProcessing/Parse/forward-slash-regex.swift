@@ -293,7 +293,7 @@ _ = qux(/, 1) / 2
 do {
   _ = qux(/, "(") / 2
   // expected-error@-1 {{cannot convert value of type 'Regex<(Substring, Substring)>' to expected argument type '(Int, Int) -> Int'}}
-  // expected-error@-2 {{expected ',' separator}}
+  // expected-error@-2:21 {{expected ',' separator}}
 }
 _ = qux((/), "(") / 2
 _ = qux(/, 1) // this comment tests to make sure we don't try and end the regex on the starting '/' of '//'.
