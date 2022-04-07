@@ -1411,14 +1411,15 @@ class MA {
 @SomeGlobalActor class SGA: MA {} // expected-error {{global actor 'SomeGlobalActor'-isolated class 'SGA' has different actor isolation from main actor-isolated superclass 'MA'}}
 
 protocol SGA_Proto {
-  @SomeGlobalActor func method() // expected-note {{'method()' declared here}}
+  @SomeGlobalActor func method() // expected-note {{mark the protocol requirement 'method()' 'async' to allow actor-isolated conformances}}
 }
 
 // try to override a MA method with inferred isolation from a protocol requirement
 class SGA_MA: MA, SGA_Proto {
   // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
-  // expected-warning@+1 {{instance method 'method()' isolated to global actor 'MainActor' can not satisfy corresponding requirement from protocol 'SGA_Proto' isolated to global actor 'SomeGlobalActor'}}
+  // expected-warning@+1 {{main actor-isolated instance method 'method()' cannot be used to satisfy global actor 'SomeGlobalActor'-isolated protocol requirement}}
   override func method() { onions_sga() }
+  // expected-note@-1{{add 'nonisolated' to 'method()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 }
 
 class None_MA: MA {

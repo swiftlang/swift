@@ -87,130 +87,6 @@ enum class SendableCheckReason {
   ObjC,
 };
 
-/// The isolation restriction in effect for a given declaration that is
-/// referenced from source.
-class ActorIsolationRestriction {
-public:
-  enum Kind {
-    /// There is no restriction on references to the given declaration.
-    Unrestricted,
-
-    /// Access to the declaration is unsafe in any concurrent context.
-    Unsafe,
-
-    /// References to this entity are allowed from anywhere, but doing so
-    /// may cross an actor boundary if it is not from within the same actor's
-    /// isolation domain.
-    CrossActorSelf,
-
-    /// References to this member of an actor are only permitted from within
-    /// the actor's isolation domain.
-    ActorSelf,
-
-    /// References to a declaration that is part of a global actor are
-    /// permitted from other declarations with that same global actor or
-    /// are permitted from elsewhere as a cross-actor reference.
-    GlobalActor,
-
-    /// References to a declaration that is part of a global actor are
-    /// permitted from other declarations with that same global actor or
-    /// are permitted from elsewhere as a cross-actor reference, but
-    /// contexts with unspecified isolation won't diagnose anything.
-    GlobalActorUnsafe,
-  };
-
-private:
-  union {
-    /// The local context that an entity is tied to.
-    DeclContext *localContext;
-
-    /// The actor that the entity is declared in.
-    NominalTypeDecl *actorType;
-
-    /// The global actor type.
-    TypeBase *globalActor;
-  } data;
-
-  explicit ActorIsolationRestriction(Kind kind, bool isCrossActor)
-      : kind(kind), isCrossActor(isCrossActor) { }
-
-public:
-  /// The kind of restriction.
-  const Kind kind;
-
-  /// Whether referencing this from another actor constitutes a cross-acter
-  /// reference.
-  const bool isCrossActor;
-
-  Kind getKind() const { return kind; }
-
-  /// Retrieve the actor type that the declaration is within.
-  NominalTypeDecl *getActorType() const {
-    assert(kind == ActorSelf || 
-           kind == CrossActorSelf);
-    return data.actorType;
-  }
-
-  /// Retrieve the actor that the declaration is within.
-  Type getGlobalActor() const {
-    assert(kind == GlobalActor || kind == GlobalActorUnsafe);
-    return Type(data.globalActor);
-  }
-
-  /// There are no restrictions on the use of the entity.
-  static ActorIsolationRestriction forUnrestricted() {
-    return ActorIsolationRestriction(Unrestricted, /*isCrossActor=*/false);
-  }
-
-  /// Accesses to the given declaration are unsafe.
-  static ActorIsolationRestriction forUnsafe() {
-    return ActorIsolationRestriction(Unsafe, /*isCrossActor=*/false);
-  }
-
-  /// Accesses to the given declaration can only be made via the 'self' of
-  /// the current actor or is a cross-actor access.
-  static ActorIsolationRestriction forActorSelf(
-      NominalTypeDecl *actor, bool isCrossActor) {
-
-    ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf,
-                                     isCrossActor);
-    result.data.actorType = actor;
-    return result;
-  }
-
-  /// Accesses to the given declaration can only be made via the 'self' of
-  /// the current actor.
-  static ActorIsolationRestriction forDistributedActorSelf(
-      NominalTypeDecl *actor, bool isCrossActor) {
-    ActorIsolationRestriction result(isCrossActor ? CrossActorSelf : ActorSelf,
-                                     isCrossActor);
-    result.data.actorType = actor;
-    return result;
-  }
-
-  /// Accesses to the given declaration can only be made via this particular
-  /// global actor or is a cross-actor access.
-  static ActorIsolationRestriction forGlobalActor(
-      Type globalActor, bool isCrossActor, bool isUnsafe) {
-    ActorIsolationRestriction result(
-        isUnsafe ? GlobalActorUnsafe : GlobalActor, isCrossActor);
-    result.data.globalActor = globalActor.getPointer();
-    return result;
-  }
-
-  /// Determine the isolation rules for a given declaration.
-  /// The isolation restriction represents the isolation requirement of the
-  /// using context.
-  ///
-  /// \param fromExpression Indicates that the reference is coming from an
-  /// expression.
-  static ActorIsolationRestriction forDeclaration(
-      ConcreteDeclRef declRef, const DeclContext *fromDC,
-      bool fromExpression = true);
-
-  operator Kind() const { return kind; };
-};
-
 /// Check that the actor isolation of an override matches that of its
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
@@ -361,8 +237,27 @@ public:
       ConcreteDeclRef declRef,
       SourceLoc declRefLoc,
       const DeclContext *fromDC,
-      Optional<VarRefUseEnv> useKind,
+      Optional<VarRefUseEnv> useKind = None,
       Optional<ReferencedActor> actorInstance = None);
+
+  /// Determine what happens when referencing the given declaration from the
+  /// given declaration context.
+  ///
+  ///
+  /// \param declRef The declaration that is being referenced.
+  ///
+  /// \param fromDC The declaration context from which the reference occurs.
+  ///
+  /// \param actorInstance When not \c None, the actor instance value that is
+  /// provided when referencing the declaration. This can be either the base
+  /// of a member access or a parameter passed to a function.
+  static ActorReferenceResult forReference(
+      ConcreteDeclRef declRef,
+      SourceLoc declRefLoc,
+      const DeclContext *fromDC,
+      Optional<VarRefUseEnv> useKind,
+      Optional<ReferencedActor> actorInstance,
+      ActorIsolation contextIsolation);
 
   operator Kind() const { return kind; }
 };
@@ -560,6 +455,12 @@ bool checkSendableConformance(
 AbstractFunctionDecl const *isActorInitOrDeInitContext(
     const DeclContext *dc,
     llvm::function_ref<bool(const AbstractClosureExpr *)> isSendable);
+
+/// Determine whether this declaration is always accessed asynchronously.
+bool isAsyncDecl(ConcreteDeclRef declRef);
+
+/// Determine whether this declaration can throw errors.
+bool isThrowsDecl(ConcreteDeclRef declRef);
 
 /// Find the directly-referenced parameter or capture of a parameter for
 /// for the given expression.

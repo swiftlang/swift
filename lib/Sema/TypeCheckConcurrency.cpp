@@ -447,138 +447,6 @@ bool swift::isLetAccessibleAnywhere(const ModuleDecl *fromModule,
   return varIsSafeAcrossActors(fromModule, let, isolation);
 }
 
-/// Determine the isolation rules for a given declaration.
-ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
-    ConcreteDeclRef declRef, const DeclContext *fromDC, bool fromExpression) {
-  auto decl = declRef.getDecl();
-
-  switch (decl->getKind()) {
-  case DeclKind::AssociatedType:
-  case DeclKind::Class:
-  case DeclKind::Enum:
-  case DeclKind::Extension:
-  case DeclKind::GenericTypeParam:
-  case DeclKind::OpaqueType:
-  case DeclKind::Protocol:
-  case DeclKind::Struct:
-  case DeclKind::TypeAlias:
-    // Types are always available.
-    return forUnrestricted();
-
-  case DeclKind::EnumCase:
-  case DeclKind::EnumElement:
-    // Type-level entities don't require isolation.
-    return forUnrestricted();
-
-  case DeclKind::IfConfig:
-  case DeclKind::Import:
-  case DeclKind::InfixOperator:
-  case DeclKind::MissingMember:
-  case DeclKind::Module:
-  case DeclKind::PatternBinding:
-  case DeclKind::PostfixOperator:
-  case DeclKind::PoundDiagnostic:
-  case DeclKind::PrecedenceGroup:
-  case DeclKind::PrefixOperator:
-  case DeclKind::TopLevelCode:
-    // Non-value entities don't require isolation.
-    return forUnrestricted();
-
-  case DeclKind::Destructor:
-    // Destructors don't require isolation.
-    return forUnrestricted();
-
-  case DeclKind::Param:
-  case DeclKind::Var:
-  case DeclKind::Accessor:
-  case DeclKind::Constructor:
-  case DeclKind::Func:
-  case DeclKind::Subscript: {
-    // Local captures are checked separately.
-    if (cast<ValueDecl>(decl)->isLocalCapture())
-      return forUnrestricted();
-
-    auto isolation = getActorIsolation(cast<ValueDecl>(decl));
-
-    // 'let' declarations are immutable, so some of them can be accessed across
-    // actors.
-    bool isAccessibleAcrossActors = false;
-    if (auto var = dyn_cast<VarDecl>(decl)) {
-      if (varIsSafeAcrossActors(fromDC->getParentModule(), var, isolation))
-        isAccessibleAcrossActors = true;
-    }
-
-    // A function that provides an asynchronous context has no restrictions
-    // on its access.
-    //
-    // FIXME: technically, synchronous functions are allowed to be cross-actor.
-    // The call-sites are just conditionally async based on where they appear
-    // (outside or inside the actor). This suggests that the implicitly-async
-    // concept could be merged into the CrossActorSelf concept.
-    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->isAsyncContext())
-        isAccessibleAcrossActors = true;
-    }
-
-    // Similarly, a computed property or subscript that has an 'async' getter
-    // provides an asynchronous context, and has no restrictions.
-    if (auto storageDecl = dyn_cast<AbstractStorageDecl>(decl)) {
-      if (auto effectfulGetter = storageDecl->getEffectfulGetAccessor())
-        if (effectfulGetter->hasAsync())
-          isAccessibleAcrossActors = true;
-    }
-
-    // Determine the actor isolation of the given declaration.
-    switch (isolation) {
-    case ActorIsolation::ActorInstance:
-      // Protected actor instance members can only be accessed on 'self'.
-      return forActorSelf(isolation.getActor(),
-          isAccessibleAcrossActors || isa<ConstructorDecl>(decl));
-
-    case ActorIsolation::GlobalActorUnsafe:
-    case ActorIsolation::GlobalActor: {
-      // A global-actor-isolated function referenced within an expression
-      // carries the global actor into its function type. The actual
-      // reference to the function is therefore not restricted, because the
-      // call to the function is.
-      if (fromExpression && isa<AbstractFunctionDecl>(decl))
-        return forUnrestricted();
-
-      Type actorType = isolation.getGlobalActor();
-      if (auto subs = declRef.getSubstitutions())
-        actorType = actorType.subst(subs);
-
-      return forGlobalActor(actorType, isAccessibleAcrossActors,
-                            isolation == ActorIsolation::GlobalActorUnsafe);
-    }
-
-    case ActorIsolation::Independent:
-      // While some synchronous actor inits are not isolated they still need
-      // cross-actor restrictions (e.g., for Sendable) for safety.
-      if (auto *ctor = dyn_cast<ConstructorDecl>(decl))
-        if (auto *parent = ctor->getParent()->getSelfClassDecl())
-          if (parent->isAnyActor())
-            return forActorSelf(parent, /*isCrossActor=*/true);
-
-      // `nonisolated let` members are cross-actor as well.
-      if (auto var = dyn_cast<VarDecl>(decl)) {
-        if (var->isInstanceMember() && var->isLet()) {
-          if (auto parent = var->getDeclContext()->getSelfClassDecl()) {
-            if (parent->isActor() && !parent->isDistributedActor())
-              return forActorSelf(parent, /*isCrossActor=*/true);
-          }
-        }
-      }
-
-      return forUnrestricted();
-
-    case ActorIsolation::Unspecified:
-      return isAccessibleAcrossActors ? forUnrestricted() : forUnsafe();
-    }
-  }
-  }
-}
-
 namespace {
   /// Describes the important parts of a partial apply thunk.
   struct PartialApplyThunkInfo {
@@ -1593,7 +1461,7 @@ static ActorIsolation getInnermostIsolatedContext(const DeclContext *dc) {
 }
 
 /// Determine whether this declaration is always accessed asynchronously.
-static bool isAsyncDecl(ConcreteDeclRef declRef) {
+bool swift::isAsyncDecl(ConcreteDeclRef declRef) {
   auto decl = declRef.getDecl();
 
   // An async function is asynchronously accessed.
@@ -4862,6 +4730,10 @@ static ActorIsolation getActorIsolationForReference(
 
   // A constructor that is not explicitly 'nonisolated' is treated as
   // isolated from the perspective of the referencer.
+  //
+  // FIXME: The current state is that even `nonisolated` initializers are
+  // externally treated as being on the actor, even though this model isn't
+  // consistent. We'll fix it later.
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     // If the constructor is part of an actor, references to it are treated
     // as needing to enter the actor.
@@ -4896,7 +4768,7 @@ static ActorIsolation getActorIsolationForReference(
 }
 
 /// Determine whether this declaration always throws.
-static bool isThrowsDecl(ConcreteDeclRef declRef) {
+bool swift::isThrowsDecl(ConcreteDeclRef declRef) {
   auto decl = declRef.getDecl();
 
   // An async function is asynchronously accessed.
@@ -4998,13 +4870,33 @@ ActorReferenceResult ActorReferenceResult::forReference(
     ConcreteDeclRef declRef, SourceLoc declRefLoc, const DeclContext *fromDC,
     Optional<VarRefUseEnv> useKind,
     Optional<ReferencedActor> actorInstance) {
+  return forReference(declRef, declRefLoc, fromDC, useKind, actorInstance,
+                      getInnermostIsolatedContext(fromDC));
+}
+
+// Determine if two actor isolation contexts are considered to be equivalent.
+static bool equivalentIsolationContexts(
+    const ActorIsolation &lhs, const ActorIsolation &rhs) {
+  if (lhs == rhs)
+    return true;
+
+  if (lhs == ActorIsolation::ActorInstance &&
+      rhs == ActorIsolation::ActorInstance &&
+      lhs.isDistributedActor() == rhs.isDistributedActor())
+    return true;
+
+  return false;
+}
+
+ActorReferenceResult ActorReferenceResult::forReference(
+    ConcreteDeclRef declRef, SourceLoc declRefLoc, const DeclContext *fromDC,
+    Optional<VarRefUseEnv> useKind,
+    Optional<ReferencedActor> actorInstance,
+    ActorIsolation contextIsolation) {
   // Compute the isolation of the declaration, adjusted for references.
   auto declIsolation = getActorIsolationForReference(declRef.getDecl(), fromDC);
   if (auto subs = declRef.getSubstitutions())
     declIsolation = declIsolation.subst(subs);
-
-  // Compute the isolation of the context.
-  auto contextIsolation = getInnermostIsolatedContext(fromDC);
 
   // When the declaration is not actor-isolated, it can always be accessed
   // directly.
@@ -5025,7 +4917,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
     // If this instance is isolated, we're in the same concurrency domain.
     if (actorInstance->isIsolated())
       return forSameConcurrencyDomain(declIsolation);
-  } else if (contextIsolation == declIsolation) {
+  } else if (equivalentIsolationContexts(declIsolation, contextIsolation)) {
     // The context isolation matches, so we are in the same concurrency
     // domain.
     return forSameConcurrencyDomain(declIsolation);
@@ -5078,13 +4970,21 @@ ActorReferenceResult ActorReferenceResult::forReference(
     options |= Flags::AsyncPromotion;
 
   // If the declaration is isolated to a distributed actor and we are not
-  // guaranteed to be on the same node, adjustments for a distributed call.
-  if (declIsolation.isDistributedActor() &&
-      !(actorInstance && actorInstance->isKnownToBeLocal())) {
-    options |= Flags::Distributed;
+  // guaranteed to be on the same node, make adjustments distributed
+  // access.
+  if (declIsolation.isDistributedActor()) {
+    bool needsDistributed;
+    if (actorInstance)
+      needsDistributed = !actorInstance->isKnownToBeLocal();
+    else
+      needsDistributed = !contextIsolation.isDistributedActor();
 
-    if (!isThrowsDecl(declRef))
-      options |= Flags::ThrowsPromotion;
+    if (needsDistributed) {
+      options |= Flags::Distributed;
+
+      if (!isThrowsDecl(declRef))
+        options |= Flags::ThrowsPromotion;
+    }
   }
 
   return forEntersActor(declIsolation, options);
