@@ -814,3 +814,50 @@ extension Substring {
     return Substring(_slice[r])
   }
 }
+
+// Adds Equatable and Hashable conformances to Substring views
+
+extension Substring.UnicodeScalarView: Equatable {
+    public static func ==(lhs: Self, rhs: Self) -> Bool {
+        lhs.elementsEqual(rhs)
+    }
+}
+
+extension Substring.UnicodeScalarView: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(count)
+        for element in self {
+            hasher.combine(element)
+        }
+    }
+}
+
+extension Substring.UTF8View: Equatable {
+    public static func ==(lhs: Self, rhs: Self) -> Bool {
+        lhs.elementsEqual(rhs)
+    }
+}
+
+extension Substring.UTF8View: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(count)
+        for element in self {
+            hasher.combine(element)
+        }
+    }
+}
+
+extension Substring.UTF16View: Equatable {
+    public static func ==(lhs: Self, rhs: Self) -> Bool {
+        lhs.elementsEqual(rhs)
+    }
+}
+
+extension Substring.UTF16View: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(count)
+        for element in self {
+            hasher.combine(element)
+        }
+    }
+}

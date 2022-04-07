@@ -441,3 +441,20 @@ extension String.UnicodeScalarView {
     return i.encoded(offsetBy: -len)._scalarAligned
   }
 }
+
+//Equatable conformance
+extension String.UnicodeScalarView: Equatable {
+    public static func ==(lhs: Self, rhs: Self) -> Bool {
+        lhs.elementsEqual(rhs)
+    }
+}
+
+// Hashable conformance
+extension String.UnicodeScalarView: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(count)
+        for element in self {
+            hasher.combine(element)
+        }
+    }
+}

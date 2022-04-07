@@ -546,3 +546,20 @@ extension String.UTF8View {
     return try _guts.withFastUTF8(body)
   }
 }
+
+//Equatable conformance
+extension String.UTF8View: Equatable {
+    public static func ==(lhs: Self, rhs: Self) -> Bool {
+        lhs.elementsEqual(rhs)
+    }
+}
+
+// Hashable conformance
+extension String.UTF8View: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(count)
+        for element in self {
+            hasher.combine(element)
+        }
+    }
+}

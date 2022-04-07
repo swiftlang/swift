@@ -779,3 +779,20 @@ extension String.UTF16View {
     }
   }
 }
+
+//Equatable conformance
+extension String.UTF16View: Equatable {
+    public static func ==(lhs: Self, rhs: Self) -> Bool {
+        lhs.elementsEqual(rhs)
+    }
+}
+
+// Hashable conformance
+extension String.UTF16View: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(count)
+        for element in self {
+            hasher.combine(element)
+        }
+    }
+}
