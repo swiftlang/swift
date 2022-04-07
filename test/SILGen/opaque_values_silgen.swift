@@ -375,3 +375,12 @@ func anon_read_only_capture(_ x: Int) -> Int {
   return ({ x })()
 }
 
+
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_ : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <()> {
+// CHECK-NOT: bb1 
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_'
+func testEmptyReturnClosure() {
+  func bar() {}
+  let b = nil ?? { bar() }
+}
+
