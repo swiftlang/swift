@@ -795,10 +795,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // First, set up default minimum inlining target versions.
   auto getDefaultMinimumInliningTargetVersion =
       [&](const llvm::Triple &triple) -> llvm::VersionTuple {
+    // FIXME: Re-enable with rdar://91387029
+#if SWIFT_DEFAULT_API_TARGET_MIN_INLINING_VERSION_TO_MIN
     // In API modules, default to the version when Swift first became available.
     if (Opts.LibraryLevel == LibraryLevel::API)
       if (auto minTriple = minimumAvailableOSVersionForTriple(triple))
         return *minTriple;
+#endif
 
     // In other modules, assume that availability is used less consistently
     // and that library clients will generally raise deployment targets as the
