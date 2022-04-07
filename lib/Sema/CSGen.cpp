@@ -1346,7 +1346,11 @@ namespace {
 
       // If declaration is invalid, let's turn it into a potential hole
       // and keep generating constraints.
-      if (!knownType && E->getDecl()->isInvalid()) {
+      // For code completion, we still resolve the overload and replace error
+      // types inside the function decl with placeholders
+      // (in getTypeOfReference) so we can match non-error param types.
+      if (!knownType && E->getDecl()->isInvalid() &&
+          !CS.isForCodeCompletion()) {
         auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
         (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
         CS.setType(E, hole);
