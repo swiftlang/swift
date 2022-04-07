@@ -284,6 +284,7 @@ namespace sil_block {
                      BCFixed<1>,  // is distributed
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
+                     DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
                      GenericSignatureIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
