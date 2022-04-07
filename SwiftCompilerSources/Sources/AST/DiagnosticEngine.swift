@@ -67,6 +67,12 @@ public struct DiagnosticEngine {
   public init(bridged: BridgedDiagnosticEngine) {
     self.bridged = bridged
   }
+  public init?(bridged: BridgedOptionalDiagnosticEngine) {
+    guard let object = bridged.object else {
+      return nil
+    }
+    self.bridged = BridgedDiagnosticEngine(object: object)
+  }
 
   public func diagnose(_ position: SourceLoc?,
                        _ id: DiagID,

@@ -14,6 +14,7 @@
 #ifndef REGEX_PARSER_BRIDGING
 #define REGEX_PARSER_BRIDGING
 
+#include "swift/AST/ASTBridging.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -28,32 +29,40 @@ extern "C" {
 ///              is not a regex literal.
 /// - BufferEnd: A pointer to the end of the buffer, which should not be lexed
 ///              past.
-/// - ErrorOut: If an error is encountered, this will be set to the error
-///             string.
+/// - MustBeRegex: whether an error during lexing should be considered a regex
+///                literal, or some thing else.
+/// - BridgedOptionalDiagnosticEngine: RegexLiteralLexingFn should diagnose the
+///                                    token using this engine.
 ///
 /// Returns: A bool indicating whether lexing was completely erroneous, and
 ///          cannot be recovered from, or false if there either was no error,
 ///          or there was a recoverable error.
-typedef bool (* RegexLiteralLexingFn)(/*CurPtrPtr*/ const char **,
-                                      /*BufferEnd*/ const char *,
-                                      /*ErrorOut*/ const char **);
-void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn);
+typedef bool (*RegexLiteralLexingFn)(
+    /*CurPtrPtr*/ const char *_Nonnull *_Nonnull,
+    /*BufferEnd*/ const char *_Nonnull,
+    /*MustBeRegex*/ bool, BridgedOptionalDiagnosticEngine);
+void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn _Nullable fn);
 
 /// Parse a regex literal string. Takes the following arguments:
 ///
 /// - InputPtr: A null-terminated C string of the regex literal.
-/// - ErrorOut: A buffer accepting an error string upon error.
 /// - VersionOut: A buffer accepting a regex literal format version.
 /// - CaptureStructureOut: A buffer accepting a byte sequence representing the
 ///                        capture structure of the literal.
 /// - CaptureStructureSize: The size of the capture structure buffer. Must be
 ///                         greater than or equal to `strlen(InputPtr) + 3`.
-typedef void(* RegexLiteralParsingFn)(/*InputPtr*/ const char *,
-                                      /*ErrorOut*/ const char **,
-                                      /*VersionOut*/ unsigned *,
-                                      /*CaptureStructureOut*/ void *,
-                                      /*CaptureStructureSize*/ unsigned);
-void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn);
+/// - DiagnosticBaseLoc: Start location of the regex literal.
+/// - BridgedDiagnosticEngine: RegexLiteralParsingFn should diagnose the
+///                            parsing errors using this engine.
+///
+/// Returns: A bool value indicating if there was an error while parsing.
+typedef bool (*RegexLiteralParsingFn)(/*InputPtr*/ const char *_Nonnull,
+                                      /*VersionOut*/ unsigned *_Nonnull,
+                                      /*CaptureStructureOut*/ void *_Nonnull,
+                                      /*CaptureStructureSize*/ unsigned,
+                                      /*DiagnosticBaseLoc*/ BridgedSourceLoc,
+                                      BridgedDiagnosticEngine);
+void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn _Nullable fn);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -1,18 +1,18 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+# Copyright (c) 2022 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-# NOTE: Subdirectories must be added in dependency order.
-
+set(dependencies Basic AST)
 if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
-  add_subdirectory(_RegexParser)
+  list(APPEND dependencies _CompilerRegexParser)
 endif()
-add_subdirectory(Basic)
-add_subdirectory(AST)
-add_subdirectory(Parse)
-add_subdirectory(SIL)
-add_subdirectory(Optimizer)
+
+add_swift_compiler_module(Parse
+  DEPENDS
+    ${dependencies}
+  SOURCES
+    Regex.swift)
