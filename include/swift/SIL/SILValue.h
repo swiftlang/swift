@@ -377,6 +377,8 @@ public:
   /// same type as the result of this instruction.
   void replaceAllUsesWithUndef();
 
+  void replaceAllTypeDependentUsesWith(ValueBase *RHS);
+
   /// Is this value a direct result of the given instruction?
   bool isResultOf(SILInstruction *I) const;
 

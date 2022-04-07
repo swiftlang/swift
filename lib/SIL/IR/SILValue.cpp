@@ -65,6 +65,13 @@ void ValueBase::replaceAllUsesWithUndef() {
   }
 }
 
+void ValueBase::replaceAllTypeDependentUsesWith(ValueBase *RHS) {
+  SmallVector<Operand *, 4> typeUses(getTypeDependentUses());
+  for (Operand *use : typeUses) {
+    use->set(RHS);
+  }
+}
+
 SILInstruction *ValueBase::getDefiningInstruction() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
     return inst;

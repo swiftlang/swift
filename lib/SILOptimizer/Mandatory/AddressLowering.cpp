@@ -2625,15 +2625,7 @@ void UseRewriter::visitOpenExistentialValueInst(
       openExistential->getType().getAddressType(),
       OpenedExistentialAccess::Immutable);
 
-  SmallVector<Operand *, 4> typeUses;
-  for (Operand *use : openExistential->getUses()) {
-    if (use->isTypeDependent()) {
-      typeUses.push_back(use);
-    }
-  }
-  for (Operand *use : typeUses) {
-    use->set(openAddr);
-  }
+  openExistential->replaceAllTypeDependentUsesWith(openAddr);
   markRewritten(openExistential, openAddr);
 }
 
