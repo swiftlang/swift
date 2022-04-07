@@ -67,7 +67,7 @@ func d(_ b: String -> <T>() -> T) {} // expected-error {{expected type for funct
 
 
 // <rdar://problem/22143680> QoI: terrible diagnostic when trying to form a generic protocol
-protocol Animal<Food> {  // expected-error {{protocols do not allow generic parameters; use associated types instead}}
+protocol Animal<Food> {  // expected-error {{an associated type named 'Food' must be declared in the protocol 'Animal' or a protocol it inherits}}
   func feed(_ food: Food) // expected-error {{cannot find type 'Food' in scope}}
 }
 
