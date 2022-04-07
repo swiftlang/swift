@@ -22,7 +22,7 @@ func isolatedSync() {
 func nonIsolatedAsync() async {
     await print(a)
     a = a + 10
-    // expected-error@-1:5 {{var 'a' isolated to global actor 'MainActor' can not be mutated from this context}}
+    // expected-error@-1:5 {{main actor-isolated var 'a' can not be mutated from a non-isolated context}}
     // expected-error@-2:9 {{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
     // expected-note@-3:9 {{property access is 'async'}}
 }

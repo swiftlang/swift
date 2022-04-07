@@ -133,7 +133,7 @@ func fromAsync() async {
 @SomeGlobalActor var value: Int = 42
 
 func topLevelSyncFunction(_ number: inout Int) { }
-// expected-error@+1{{var 'value' isolated to global actor 'SomeGlobalActor' can not be used 'inout' from this context}}
+// expected-error@+1{{global actor 'SomeGlobalActor'-isolated var 'value' can not be used 'inout' from a non-isolated context}}
 topLevelSyncFunction(&value)
 
 // Strict checking based on inferred Sendable/async/etc.

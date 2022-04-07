@@ -11,10 +11,10 @@ var b = 14
 
 func nonIsolatedSynchronous() {
     print(a)
-// Swift6-CHECK: var 'a' isolated to global actor 'MainActor'
+// Swift6-CHECK: main actor-isolated var 'a' can not be referenced from a non-isolated context
 // Swift6-CHECK: add '@MainActor' to make global function 'nonIsolatedSynchronous()' part of global actor 'MainActor'
 
-// Swift5-CHECK-NOT: var 'a' isolated to global actor 'MainActor'
+// Swift5-CHECK-NOT: main actor-isolated var 'a' can not be referenced from a non-isolated context
 // Swift5-CHECK-NOT: add '@MainActor' to make global function 'nonIsolatedSynchronous()' part of global actor 'MainActor'
 }
 
@@ -26,13 +26,13 @@ func nonIsolatedAsync() async {
 
 await nonIsolatedAsync()
 
-// Swift6-CHECK: foo.swift{{.*}}var 'a' isolated to global actor 'MainActor' can not be referenced from this synchronous context
-// Swift6-CHECK: foo.swift{{.*}}add '@MainActor' to make global function 'foo()' part of global actor 'MainActor'
+// Swift6-CHECK: foo.swift{{.*}}main actor-isolated var 'a' can not be referenced from a non-isolated context
 // Swift6-CHECK: var declared here
+// Swift6-CHECK: foo.swift{{.*}}add '@MainActor' to make global function 'foo()' part of global actor 'MainActor'
 
-// Swift5-CHECK-NOT: foo.swift{{.*}}var 'a' isolated to global actor 'MainActor' can not be referenced from this synchronous context
-// Swift5-CHECK-NOT: foo.swift{{.*}}add '@MainActor' to make global function 'foo()' part of global actor 'MainActor'
+// Swift5-CHECK-NOT: foo.swift{{.*}}main actor-isolated var 'a' can not be referenced from a non-isolated context
 // Swift5-CHECK-NOT: var declared here
+// Swift5-CHECK-NOT: foo.swift{{.*}}add '@MainActor' to make global function 'foo()' part of global actor 'MainActor'
 
 @MainActor
 func isolated() {
