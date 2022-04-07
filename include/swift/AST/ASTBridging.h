@@ -65,6 +65,10 @@ typedef struct {
   void * _Nonnull object;
 } BridgedDiagnosticEngine;
 
+typedef struct {
+  void *_Nullable object;
+} BridgedOptionalDiagnosticEngine;
+
 // FIXME: Can we bridge InFlightDiagnostic?
 void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, BridgedSourceLoc loc,
                                BridgedDiagID diagID, BridgedArrayRef arguments,
