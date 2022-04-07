@@ -1651,6 +1651,10 @@ static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
   }
 }
 
+static bool isAccessibleAcrossActors(
+    ValueDecl *value, const ActorIsolation &isolation,
+    const DeclContext *fromDC, Optional<ReferencedActor> actorInstance);
+
 namespace {
   /// Check for adherence to the actor isolation rules, emitting errors
   /// when actor-isolated declarations are used in an unsafe manner.
@@ -2758,72 +2762,49 @@ namespace {
     bool checkKeyPathExpr(KeyPathExpr *keyPath) {
       bool diagnosed = false;
 
-      // returns None if it is not a 'let'-bound var decl. Otherwise,
-      // the bool indicates whether a diagnostic was emitted.
-      auto checkLetBoundVarDecl = [&](KeyPathExpr::Component const& component)
-                                                            -> Optional<bool> {
-        auto decl = component.getDeclRef().getDecl();
-        if (auto varDecl = dyn_cast<VarDecl>(decl)) {
-          if (varDecl->isLet()) {
-            auto type = component.getComponentType();
-            if (shouldDiagnoseExistingDataRaces(getDeclContext()) &&
-                diagnoseNonSendableTypes(
-                    type, getDeclContext(), component.getLoc(),
-                    diag::non_sendable_keypath_access))
-              return true;
-
-            return false;
-          }
-        }
-        return None;
-      };
-
       // check the components of the keypath.
       for (const auto &component : keyPath->getComponents()) {
         // The decl referred to by the path component cannot be within an actor.
         if (component.hasDeclRef()) {
           auto concDecl = component.getDeclRef();
-          auto isolation = ActorIsolationRestriction::forDeclaration(
-              concDecl, getDeclContext());
+          auto decl = concDecl.getDecl();
+          auto isolation = getActorIsolationForReference(
+              decl, getDeclContext());
+          switch (isolation) {
+          case ActorIsolation::Independent:
+          case ActorIsolation::Unspecified:
+            break;
 
-          switch (isolation.getKind()) {
-          case ActorIsolationRestriction::Unsafe:
-          case ActorIsolationRestriction::Unrestricted:
-            break; // OK. Does not refer to an actor-isolated member.
-
-          case ActorIsolationRestriction::GlobalActorUnsafe:
-            // Only check if we're in code that's adopted concurrency features.
-            if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
-              break; // do not check
-
-            LLVM_FALLTHROUGH; // otherwise, perform checking
-
-          case ActorIsolationRestriction::GlobalActor:
+          case ActorIsolation::GlobalActor:
+          case ActorIsolation::GlobalActorUnsafe:
             // Disable global actor checking for now.
-            if (!ctx.LangOpts.isSwiftVersionAtLeast(6))
+            if (isolation.isGlobalActor() &&
+                !ctx.LangOpts.isSwiftVersionAtLeast(6))
               break;
 
-            LLVM_FALLTHROUGH; // otherwise, it's invalid so diagnose it.
+            LLVM_FALLTHROUGH;
 
-          case ActorIsolationRestriction::CrossActorSelf:
-            // 'let'-bound decls with this isolation are OK, just check them.
-            if (auto wasLetBound = checkLetBoundVarDecl(component)) {
-              diagnosed = wasLetBound.getValue();
+          case ActorIsolation::ActorInstance:
+            // If this entity is always accessible across actors, just check
+            // Sendable.
+            if (isAccessibleAcrossActors(
+                    decl, isolation, getDeclContext(), None)) {
+              if (diagnoseNonSendableTypes(
+                             component.getComponentType(), getDeclContext(),
+                             component.getLoc(),
+                             diag::non_sendable_keypath_access)) {
+                diagnosed = true;
+              }
               break;
             }
-            LLVM_FALLTHROUGH; // otherwise, it's invalid so diagnose it.
 
-          case ActorIsolationRestriction::ActorSelf: {
-            auto decl = concDecl.getDecl();
             ctx.Diags.diagnose(component.getLoc(),
                                diag::actor_isolated_keypath_component,
-                               isolation.getKind() ==
-                                  ActorIsolationRestriction::CrossActorSelf,
+                               isolation.isDistributedActor(),
                                decl->getDescriptiveKind(), decl->getName());
             diagnosed = true;
             break;
           }
-          }; // end switch
         }
 
         // Captured values in a path component must conform to Sendable.
@@ -4937,12 +4918,12 @@ static bool isThrowsDecl(ConcreteDeclRef declRef) {
 }
 
 /// Determine whether the given value can be accessed across actors
-/// without requiring async promotion.
+/// without from normal synchronous code.
 ///
 /// \param value The value we are checking.
 /// \param isolation The actor isolation of the value.
 /// \param fromDC The context where we are performing the access.
-static bool isAccessibleAcrossActorsWithoutAsyncPromotion(
+static bool isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
     const DeclContext *fromDC, Optional<ReferencedActor> actorInstance) {
   switch (value->getKind()) {
@@ -5094,7 +5075,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // At this point, we are accessing the target from outside the actor.
   // First, check whether it is something that can be accessed directly,
   // without any kind of promotion.
-  if (isAccessibleAcrossActorsWithoutAsyncPromotion(
+  if (isAccessibleAcrossActors(
           declRef.getDecl(), declIsolation, fromDC, actorInstance))
     return forEntersActor(declIsolation, None);
 
