@@ -428,35 +428,52 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   return true;
 }
 
+/// Whether the given declaration can be exposed as Objective-C.
+static bool canExposeActorIsolatedAsObjC(
+    const ValueDecl *value, const ActorIsolation &isolation) {
+  if (isAccessibleAcrossActors(
+          const_cast<ValueDecl *>(value), isolation, value->getDeclContext()))
+    return true;
+
+  // An async function can be exposed as Objective-C.
+  if (auto func = dyn_cast<AbstractFunctionDecl>( value))
+    return func->hasAsync();
+
+  return false;
+}
+
 /// Actor-isolated declarations cannot be @objc.
-static bool checkObjCActorIsolation(const ValueDecl *VD,
-                                    ObjCReason Reason) {
+static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
   // Check actor isolation.
-  switch (auto restriction = ActorIsolationRestriction::forDeclaration(
-              const_cast<ValueDecl *>(VD), VD->getDeclContext(),
-              /*fromExpression=*/false)) {
-  case ActorIsolationRestriction::CrossActorSelf:
+  switch (auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD))) {
+  case ActorIsolation::ActorInstance:
+    if (!canExposeActorIsolatedAsObjC(VD, isolation)) {
+      // Actor-isolated functions cannot be @objc.
+      VD->diagnose(diag::actor_isolated_objc, VD->getDescriptiveKind(),
+                   VD->getName());
+      Reason.describe(VD);
+      if (auto FD = dyn_cast<FuncDecl>(VD)) {
+        addAsyncNotes(const_cast<FuncDecl *>(FD));
+      }
+
+      return true;
+    }
+
     // FIXME: Substitution map?
     diagnoseNonSendableTypesInReference(
         const_cast<ValueDecl *>(VD), VD->getDeclContext(),
         VD->getLoc(), SendableCheckReason::ObjC);
     return false;
-  case ActorIsolationRestriction::ActorSelf:
-    // Actor-isolated functions cannot be @objc.
-    VD->diagnose(diag::actor_isolated_objc, VD->getDescriptiveKind(),
-                 VD->getName());
-    Reason.describe(VD);
-    if (auto FD = dyn_cast<FuncDecl>(VD)) {
-      addAsyncNotes(const_cast<FuncDecl *>(FD));
-    }
-    return true;
 
-  case ActorIsolationRestriction::GlobalActorUnsafe:
-  case ActorIsolationRestriction::GlobalActor:
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe:
     // FIXME: Consider whether to limit @objc on global-actor-qualified
-    // declarations.
-  case ActorIsolationRestriction::Unrestricted:
-  case ActorIsolationRestriction::Unsafe:
+    // declarations. Perhaps only allow main actor, which we can reflect
+    // in the generated header.
+    return false;
+
+  case ActorIsolation::Independent:
+  case ActorIsolation::Unspecified:
     return false;
   }
 }

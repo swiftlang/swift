@@ -1597,10 +1597,6 @@ static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
   }
 }
 
-static bool isAccessibleAcrossActors(
-    ValueDecl *value, const ActorIsolation &isolation,
-    const DeclContext *fromDC, Optional<ReferencedActor> actorInstance);
-
 namespace {
   /// Check for adherence to the actor isolation rules, emitting errors
   /// when actor-isolated declarations are used in an unsafe manner.
@@ -4847,13 +4843,7 @@ static bool isThrowsDecl(ConcreteDeclRef declRef) {
   return false;
 }
 
-/// Determine whether the given value can be accessed across actors
-/// without from normal synchronous code.
-///
-/// \param value The value we are checking.
-/// \param isolation The actor isolation of the value.
-/// \param fromDC The context where we are performing the access.
-static bool isAccessibleAcrossActors(
+bool swift::isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
     const DeclContext *fromDC, Optional<ReferencedActor> actorInstance) {
   switch (value->getKind()) {

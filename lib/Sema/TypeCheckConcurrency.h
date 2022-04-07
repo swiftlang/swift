@@ -542,6 +542,16 @@ VarDecl *getReferencedParamOrCapture(
     Expr *expr,
     llvm::function_ref<Expr *(OpaqueValueExpr *)> getExistentialValue);
 
+/// Determine whether the given value can be accessed across actors
+/// without from normal synchronous code.
+///
+/// \param value The value we are checking.
+/// \param isolation The actor isolation of the value.
+/// \param fromDC The context where we are performing the access.
+bool isAccessibleAcrossActors(
+    ValueDecl *value, const ActorIsolation &isolation,
+    const DeclContext *fromDC, Optional<ReferencedActor> actorInstance = None);
+
 /// Check whether given variable references to a potentially
 /// isolated actor.
 bool isPotentiallyIsolatedActor(
