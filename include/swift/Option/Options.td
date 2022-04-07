@@ -270,10 +270,6 @@ def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to persist automatically created precompiled bridging headers">;
 
-def async_main: Flag<["-"], "async-main">,
-    Flags<[FrontendOption]>,
-    HelpText<"Resolve main function as if it were called from an asynchronous context">;
-
 // FIXME: Unhide this once it doesn't depend on an output file map.
 def incremental : Flag<["-"], "incremental">,
   Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
