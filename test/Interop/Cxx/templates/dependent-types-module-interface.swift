@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=DependentTypes -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=DependentTypes -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: func differentDependentArgAndRet<T, U>(_ a: Any, T: T.Type, U: U.Type) -> Any
 // CHECK: func dependantReturnTypeInffered<T>(_ a: T) -> Any
