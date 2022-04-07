@@ -1516,26 +1516,8 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   }
 }
 
-bool ConstraintSystem::solveForCodeCompletion(
-    SolutionApplicationTarget &target, SmallVectorImpl<Solution> &solutions) {
-  auto *expr = target.getAsExpr();
-  // Tell the constraint system what the contextual type is.
-  setContextualType(expr, target.getExprContextualTypeLoc(),
-                    target.getExprContextualTypePurpose());
-
-  // Set up the expression type checker timer.
-  Timer.emplace(expr, *this);
-
-  shrink(expr);
-
-  if (isDebugMode()) {
-    auto &log = llvm::errs();
-    log << "--- Code Completion ---\n";
-  }
-
-  if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
-    return false;
-
+void ConstraintSystem::solveForCodeCompletion(
+    SmallVectorImpl<Solution> &solutions) {
   {
     SolverState state(*this, FreeTypeVariableBinding::Disallow);
 
@@ -1556,6 +1538,30 @@ bool ConstraintSystem::solveForCodeCompletion(
     }
   }
 
+  return;
+}
+
+bool ConstraintSystem::solveForCodeCompletion(
+    SolutionApplicationTarget &target, SmallVectorImpl<Solution> &solutions) {
+  auto *expr = target.getAsExpr();
+  // Tell the constraint system what the contextual type is.
+  setContextualType(expr, target.getExprContextualTypeLoc(),
+                    target.getExprContextualTypePurpose());
+
+  // Set up the expression type checker timer.
+  Timer.emplace(expr, *this);
+
+  shrink(expr);
+
+  if (isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Code Completion ---\n";
+  }
+
+  if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+    return false;
+
+  solveForCodeCompletion(solutions);
   return true;
 }
 
