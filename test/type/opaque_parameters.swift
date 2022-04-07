@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-parameterized-protocol-types -disable-availability-checking -requirement-machine-inferred-signatures=on
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -requirement-machine-inferred-signatures=on
 
 protocol P { }
 

@@ -378,9 +378,6 @@ ERROR(expected_rbrace_actor,none,
       "expected '}' in actor", ())
 
 // Protocol
-ERROR(generic_arguments_protocol,PointsToFirstBadToken,
-      "protocols do not allow generic parameters; use associated types instead",
-      ())
 ERROR(expected_lbrace_protocol,PointsToFirstBadToken,
       "expected '{' in protocol type", ())
 ERROR(expected_rbrace_protocol,none,
