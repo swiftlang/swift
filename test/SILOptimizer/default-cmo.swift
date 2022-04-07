@@ -7,6 +7,7 @@
 
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -emit-sil | %FileCheck %s
 
+// REQUIRES: cmo_enabled
 
 import Module
 import ModuleTBD
