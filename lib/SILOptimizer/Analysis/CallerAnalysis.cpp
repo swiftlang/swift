@@ -33,8 +33,10 @@ CallerAnalysis::FunctionInfo::FunctionInfo(SILFunction *f)
     : callerStates(),
       // TODO: Make this more aggressive by considering
       // final/visibility/etc.
-      mayHaveIndirectCallers(f->getDynamicallyReplacedFunction() ||
-                             canBeCalledIndirectly(f->getRepresentation())),
+      mayHaveIndirectCallers(
+          f->getDynamicallyReplacedFunction() ||
+          f->getReferencedAdHocRequirementWitnessFunction() ||
+          canBeCalledIndirectly(f->getRepresentation())),
       mayHaveExternalCallers(f->isPossiblyUsedExternally() ||
                              f->isAvailableExternally()) {}
 
