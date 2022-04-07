@@ -284,7 +284,8 @@ def obtain_additional_swift_sources(pool_args):
     (args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name,
      skip_history, skip_tags, skip_repository_list) = pool_args
 
-    env = {'GIT_TERMINAL_PROMPT': '0'}
+    env = dict(os.environ)
+    env.update({'GIT_TERMINAL_PROMPT': '0'})
 
     with shell.pushd(args.source_root, dry_run=False, echo=False):
 
