@@ -228,7 +228,7 @@ extension LazyPrefixWhileCollection: Collection {
       _preconditionFailure("Invalid index passed to index(after:)")
     }
     let nextIndex = _base.index(after: i)
-    guard nextIndex != _base.endIndex && _predicate(_base[nextIndex]) else {
+    guard nextIndex < _base.endIndex && _predicate(_base[nextIndex]) else {
       return Index(endOf: _base)
     }
     return Index(nextIndex)

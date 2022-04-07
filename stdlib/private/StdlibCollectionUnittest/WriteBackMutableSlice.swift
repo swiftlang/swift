@@ -30,8 +30,8 @@ internal func _writeBackMutableSlice<C, Slice_>(
   var newElementIndex = slice.startIndex
   let newElementsEndIndex = slice.endIndex
 
-  while selfElementIndex != selfElementsEndIndex &&
-    newElementIndex != newElementsEndIndex {
+  while selfElementIndex < selfElementsEndIndex &&
+    newElementIndex < newElementsEndIndex {
 
     self_[selfElementIndex] = slice[newElementIndex]
     self_.formIndex(after: &selfElementIndex)

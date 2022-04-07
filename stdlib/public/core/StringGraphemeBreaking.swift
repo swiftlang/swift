@@ -245,7 +245,7 @@ extension _StringGuts {
     startingAt index: Int,
     nextScalar: (Int) -> (Unicode.Scalar, end: Int)
   ) -> Int {
-    _internalInvariant(index != endIndex._encodedOffset)
+    _internalInvariant(index < endIndex._encodedOffset)
     var state = _GraphemeBreakingState()
     var index = index
 
@@ -253,7 +253,7 @@ extension _StringGuts {
       let (scalar1, nextIdx) = nextScalar(index)
       index = nextIdx
 
-      guard index != endIndex._encodedOffset else {
+      guard index < endIndex._encodedOffset else {
         break
       }
 
@@ -273,7 +273,7 @@ extension _StringGuts {
     endingAt index: Int,
     previousScalar: (Int) -> (Unicode.Scalar, start: Int)
   ) -> Int {
-    _internalInvariant(index != startIndex._encodedOffset)
+    _internalInvariant(index > startIndex._encodedOffset)
     var state = _GraphemeBreakingState()
     var index = index
 
@@ -281,7 +281,7 @@ extension _StringGuts {
       let (scalar2, previousIdx) = previousScalar(index)
       index = previousIdx
 
-      guard index != startIndex._encodedOffset else {
+      guard index > startIndex._encodedOffset else {
         break
       }
 
@@ -517,14 +517,14 @@ extension _StringGuts {
   internal func checkIfInEmojiSequence(_ index: Int) -> Bool {
     var emojiIdx = String.Index(_encodedOffset: index)
 
-    guard emojiIdx != startIndex else {
+    guard emojiIdx > startIndex else {
       return false
     }
 
     let scalars = String.UnicodeScalarView(self)
     scalars.formIndex(before: &emojiIdx)
 
-    while emojiIdx != startIndex {
+    while emojiIdx > startIndex {
       scalars.formIndex(before: &emojiIdx)
       let scalar = scalars[emojiIdx]
 
@@ -662,7 +662,7 @@ extension _StringGuts {
   ) -> Bool {
     var riIdx = String.Index(_encodedOffset: index)
 
-    guard riIdx != startIndex else {
+    guard riIdx > startIndex else {
       return false
     }
 
@@ -671,7 +671,7 @@ extension _StringGuts {
     let scalars = String.UnicodeScalarView(self)
     scalars.formIndex(before: &riIdx)
 
-    while riIdx != startIndex {
+    while riIdx > startIndex {
       scalars.formIndex(before: &riIdx)
       let scalar = scalars[riIdx]
 

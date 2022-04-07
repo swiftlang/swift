@@ -139,7 +139,7 @@ extension LazyFilterCollection: Collection {
   @inlinable // lazy-performance
   public var startIndex: Index {
     var index = _base.startIndex
-    while index != _base.endIndex && !_predicate(_base[index]) {
+    while index < _base.endIndex && !_predicate(_base[index]) {
       _base.formIndex(after: &index)
     }
     return index
@@ -170,7 +170,7 @@ extension LazyFilterCollection: Collection {
     _precondition(index != _base.endIndex, "Can't advance past endIndex")
     repeat {
       _base.formIndex(after: &index)
-    } while index != _base.endIndex && !_predicate(_base[index])
+    } while index < _base.endIndex && !_predicate(_base[index])
     i = index
   }
 
