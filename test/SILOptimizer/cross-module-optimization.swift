@@ -25,6 +25,8 @@
 // RUN: %FileCheck %s -check-prefix=CHECK-SIL < %t/out.sil
 // RUN: %FileCheck %s -check-prefix=CHECK-SIL2 < %t/out.sil
 
+// REQUIRES: cmo_enabled
+
 import Test
 
 // CHECK-SIL: sil_global public_external [serialized] @_swiftEmptySetSingleton : $_SwiftEmptySetSingleton

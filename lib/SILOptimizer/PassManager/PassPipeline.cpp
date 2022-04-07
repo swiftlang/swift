@@ -862,7 +862,8 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
     P.addSemanticARCOpts();
   }
 
-  P.addCrossModuleOptimization();
+  // disabled in Swift 5.7
+  // P.addCrossModuleOptimization();
 
   // It is important to serialize before any of the @_semantics
   // functions are inlined, because otherwise the information about
