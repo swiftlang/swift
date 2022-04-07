@@ -110,7 +110,7 @@ protocol Interface {
 
 @MainActor
 class Object: Interface {
-  var baz: Int = 42 // expected-warning{{property 'baz' isolated to global actor 'MainActor' can not satisfy corresponding requirement from protocol 'Interface'}}
+  var baz: Int = 42 // expected-warning{{main actor-isolated property 'baz' cannot be used to satisfy nonisolated protocol requirement}}
 }
 
 
