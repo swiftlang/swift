@@ -1322,6 +1322,8 @@ public:
   using BuiltType = const Metadata *;
   using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
+  using BuiltProtocolConformance = const WitnessTable *;
+  using BuiltProtocolConformanceDecl = const ProtocolConformanceDescriptor *;
 
   BuiltType decodeMangledType(NodePointer node,
                               bool forRequirement = true) {
@@ -1729,6 +1731,52 @@ public:
     // Mangled types for building metadata don't contain sugared types
     return BuiltType();
   }
+  
+  const WitnessTable *
+  createConcreteProtocolConformance(const Metadata *conformingType,
+                                    const ProtocolConformanceDescriptor *conformanceDecl,
+                                    llvm::ArrayRef<const WitnessTable *> args) {
+    if (args.size() != conformanceDecl->getConditionalRequirements().size())
+      return nullptr;
+    
+    auto argsPtr = (const void * const *)args.data();
+    return swift_getWitnessTable(conformanceDecl, conformingType, argsPtr);
+  }
+  
+  const WitnessTable *
+  createDependentProtocolConformanceRoot(const Metadata *conformingType,
+                                         ProtocolDescriptorRef requirement,
+                                         unsigned index) {
+    return substWitnessTable(conformingType, index);
+  }
+  
+  const WitnessTable *
+  createDependentProtocolConformanceAssociated(const WitnessTable *base,
+                                               const Metadata *conformingType,
+                                               ProtocolDescriptorRef requirement,
+                                               unsigned index) {
+    
+  }
+  
+  const WitnessTable *
+  createDependentProtocolConformanceInherited(const WitnessTable *base,
+                                              ProtocolDescriptorRef requirement,
+                                              unsigned index);
+  
+  const ProtocolConformanceDescriptor *
+  createProtocolConformanceDeclInTypeModule(const Metadata *conformingType,
+                                            ProtocolDescriptorRef protocol) {
+    
+  }
+  
+  const ProtocolConformanceDescriptor *
+  createProtocolConformanceDeclInProtocolModule(const Metadata *conformingType,
+                                                ProtocolDescriptorRef protocol);
+
+  const ProtocolConformanceDescriptor *
+  createProtocolConformanceDeclRetroactive(const Metadata *conformingType,
+                                           ProtocolDescriptorRef protocol,
+                                           StringRef moduleName);
 };
 
 }

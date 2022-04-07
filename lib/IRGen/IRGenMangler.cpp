@@ -93,6 +93,9 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
     CanSymbolicReferenceLocally(CanSymbolicReference);
 
   AllowSymbolicReferences = true;
+  bool SupportsProtocolConformanceSymbolicReferences
+    = IGM.getAvailabilityContext()
+        .isContainedIn(IGM.Context.getSwiftFutureAvailability());
   CanSymbolicReference = [&](SymbolicReferent s) -> bool {
     if (auto type = s.dyn_cast<const NominalTypeDecl *>()) {
       // The short-substitution types in the standard library have compact
@@ -134,6 +137,10 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
     } else if (s.is<const OpaqueTypeDecl *>()) {
       // Always symbolically reference opaque types.
       return true;
+    } else if (s.is<const ProtocolConformance *>()) {
+      // Always symbolically reference protocol conformances, if we
+      // have a runtime that supports it.
+      return SupportsProtocolConformanceSymbolicReferences;
     } else {
       llvm_unreachable("symbolic referent not handled");
     }
@@ -300,6 +307,8 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
       appendContext(ty, ty->getAlternateModuleName());
     else if (auto opaque = referent.dyn_cast<const OpaqueTypeDecl*>())
       appendOpaqueDeclName(opaque);
+    else if (auto conformance = referent.dyn_cast<const ProtocolConformance *>())
+      appendProtocolConformance(conformance);
     else
       llvm_unreachable("unhandled referent");
   }
