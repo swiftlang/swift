@@ -417,7 +417,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
   EXPECT_EQ(strlen("fog"), Info.Length);
 }
 
-TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
+// Disabled until we re-enable cancellation (rdar://91251055)
+TEST_F(CursorInfoTest, DISABLED_CursorInfoCancelsPreviousRequest) {
   // TODO: This test case relies on the following snippet being slow to type 
   // check so that the first cursor info request takes longer to execute than it 
   // takes time to schedule the second request. If that is fixed, we need to 
@@ -467,7 +468,8 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
     llvm::report_fatal_error("Did not receive a resonse for the first request");
 }
 
-TEST_F(CursorInfoTest, CursorInfoCancellation) {
+// Disabled until we re-enable cancellation (rdar://91251055)
+TEST_F(CursorInfoTest, DISABLED_CursorInfoCancellation) {
   // TODO: This test case relies on the following snippet being slow to type
   // check so that the first cursor info request takes longer to execute than it
   // takes time to schedule the second request. If that is fixed, we need to
