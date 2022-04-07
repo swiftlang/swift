@@ -4560,7 +4560,7 @@ ERROR(override_implicit_unowned_executor,none,
 ERROR(actor_isolated_non_self_reference,none,
         "%5 %0 %1 can not be "
         "%select{referenced|mutated|used 'inout'}2 "
-        "%select{on a different actor instance|"
+        "%select{from outside the actor|on a different actor instance|"
         "on a non-isolated actor instance|"
         "from a Sendable function|from a Sendable closure|"
         "from an 'async let' initializer|from global actor %4|"
@@ -4582,18 +4582,6 @@ ERROR(actor_isolated_inout_state,none,
 ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
-ERROR(global_actor_from_instance_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from actor %3 %select{|in a synchronous context}5",
-      (DescriptiveDeclKind, DeclName, Type, DeclName, unsigned, bool))
-ERROR(global_actor_from_other_global_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from different global actor %3 %select{|in a synchronous context}5",
-      (DescriptiveDeclKind, DeclName, Type, Type, unsigned, bool))
-ERROR(global_actor_from_nonactor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from %select{this|a non-isolated}3%select{| synchronous}5 context",
-      (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
 ERROR(actor_isolated_call,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))

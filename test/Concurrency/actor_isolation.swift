@@ -566,7 +566,7 @@ var number: Int = 42 // expected-note {{var declared here}}
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'badNumberUser()' part of global actor 'SomeGlobalActor'}}
 func badNumberUser() {
-  //expected-error@+1{{var 'number' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  //expected-error@+1{{global actor 'SomeGlobalActor'-isolated var 'number' can not be referenced from a non-isolated context}}
   print("The protected number is: \(number)")
 }
 

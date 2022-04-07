@@ -634,7 +634,7 @@ class Cutter {
 class Butter {
   var a = useFooInADefer() // expected-error {{call to main actor-isolated global function 'useFooInADefer()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
 
-  nonisolated let b = statefulThingy // expected-error {{var 'statefulThingy' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
+  nonisolated let b = statefulThingy // expected-error {{main actor-isolated var 'statefulThingy' can not be referenced from a non-isolated context}}
 
   var c: Int = {
     return getGlobal7()

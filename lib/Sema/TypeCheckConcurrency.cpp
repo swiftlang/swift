@@ -1501,7 +1501,7 @@ static bool memberAccessHasSpecialPermissionInSwift5(DeclContext const *refCxt,
         member->getDescriptiveKind(),
         member->getName(),
         useKindInt,
-        baseActor.kind,
+        baseActor.kind + 1,
         baseActor.globalActor,
         getActorIsolation(const_cast<ValueDecl *>(member)))
     .warnUntilSwiftVersion(6);
@@ -1935,7 +1935,7 @@ namespace {
         recordMutableVarParent(load, load->getSubExpr());
 
       if (auto lookup = dyn_cast<LookupExpr>(expr)) {
-        checkMemberReference(lookup->getBase(), lookup->getMember(),
+        checkReference(lookup->getBase(), lookup->getMember(),
                              lookup->getLoc(),
                              /*partialApply*/None,
                              lookup);
@@ -1943,8 +1943,15 @@ namespace {
       }
 
       if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
-        checkNonMemberReference(
-            declRef->getDeclRef(), declRef->getLoc(), declRef);
+        auto valueRef = declRef->getDeclRef();
+        auto value = valueRef.getDecl();
+        auto loc = declRef->getLoc();
+
+        //FIXME: Should this be subsumed in reference checking?
+        if (value->isLocalCapture())
+          checkLocalCapture(valueRef, loc, declRef);
+        else
+          checkReference(nullptr, valueRef, loc, None, declRef);
         return { true, expr };
       }
 
@@ -1961,7 +1968,7 @@ namespace {
           if (auto memberRef = findMemberReference(partialApply->fn)) {
             // NOTE: partially-applied thunks are never annotated as
             // implicitly async, regardless of whether they are escaping.
-            checkMemberReference(
+            checkReference(
                 partialApply->base, memberRef->first, memberRef->second,
                 partialApply);
 
@@ -1980,7 +1987,7 @@ namespace {
       if (auto call = dyn_cast<SelfApplyExpr>(expr)) {
         Expr *fn = call->getFn()->getValueProvidingExpr();
         if (auto memberRef = findMemberReference(fn)) {
-          checkMemberReference(
+          checkReference(
               call->getBase(), memberRef->first, memberRef->second,
               /*partialApply=*/None, call);
 
@@ -2276,7 +2283,15 @@ namespace {
       if (!var || var->isLet())
         return false;
 
-      if (!var->getDeclContext()->isModuleScopeContext() && !var->isStatic())
+      if (!var->getDeclContext()->isModuleScopeContext() &&
+          !(var->getDeclContext()->isTypeContext() && !var->isInstanceMember()))
+        return false;
+
+      if (!var->hasStorage())
+        return false;
+
+      // If it's actor-isolated, it's already been dealt with.
+      if (getActorIsolation(value).isActorIsolated())
         return false;
 
       ctx.Diags.diagnose(
@@ -2665,97 +2680,6 @@ namespace {
       return false;
     }
 
-    /// Check a reference to an entity within a global actor.
-    bool checkGlobalActorReference(
-        ConcreteDeclRef valueRef, SourceLoc loc, Type globalActor,
-        bool isCrossActor,
-        Expr *context) {
-      ValueDecl *value = valueRef.getDecl();
-      auto declContext = const_cast<DeclContext *>(getDeclContext());
-
-      // Check whether we are within the same isolation context, in which
-      // case there is nothing further to check,
-      auto contextIsolation = getInnermostIsolatedContext(declContext);
-      if (contextIsolation.isGlobalActor() &&
-          contextIsolation.getGlobalActor()->isEqual(globalActor)) {
-        return false;
-      }
-
-      // A cross-actor access requires types to be concurrent-safe.
-      if (isCrossActor) {
-        return diagnoseNonSendableTypesInReference(
-            valueRef, getDeclContext(), loc,
-            SendableCheckReason::CrossActor);
-      }
-
-      // Call is implicitly asynchronous.
-      auto result = tryMarkImplicitlyAsync(
-        loc, valueRef, context,
-        ImplicitActorHopTarget::forGlobalActor(globalActor),
-        /*FIXME if we get global distributed actors*/false);
-      if (result == AsyncMarkingResult::FoundAsync)
-        return false;
-
-      // Diagnose failures.
-      switch (contextIsolation) {
-      case ActorIsolation::ActorInstance: {
-        auto useKind = static_cast<unsigned>(
-            kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
-
-        ctx.Diags.diagnose(loc, diag::global_actor_from_instance_actor_context,
-                           value->getDescriptiveKind(), value->getName(),
-                           globalActor, contextIsolation.getActor()->getName(),
-                           useKind, result == AsyncMarkingResult::SyncContext);
-        noteIsolatedActorMember(value, context);
-        return true;
-      }
-
-      case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe: {
-        auto useKind = static_cast<unsigned>(
-            kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
-
-        // Otherwise, this is a problematic global actor decl reference.
-        ctx.Diags.diagnose(
-            loc, diag::global_actor_from_other_global_actor_context,
-            value->getDescriptiveKind(), value->getName(), globalActor,
-            contextIsolation.getGlobalActor(), useKind,
-            result == AsyncMarkingResult::SyncContext);
-        noteIsolatedActorMember(value, context);
-        return true;
-      }
-
-      case ActorIsolation::Independent: {
-        auto useKind = static_cast<unsigned>(
-            kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
-
-        ctx.Diags.diagnose(loc, diag::global_actor_from_nonactor_context,
-                           value->getDescriptiveKind(), value->getName(),
-                           globalActor,
-                           /*actorIndependent=*/true, useKind,
-                           result == AsyncMarkingResult::SyncContext);
-        noteIsolatedActorMember(value, context);
-        return true;
-      }
-
-      case ActorIsolation::Unspecified: {
-        // Diagnose the reference.
-        auto useKind = static_cast<unsigned>(
-            kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
-        ctx.Diags.diagnose(
-          loc, diag::global_actor_from_nonactor_context,
-          value->getDescriptiveKind(), value->getName(), globalActor,
-          /*actorIndependent=*/false, useKind,
-          result == AsyncMarkingResult::SyncContext);
-        noteGlobalActorOnContext(declContext, globalActor);
-        noteIsolatedActorMember(value, context);
-
-        return true;
-      } // end Unspecified case
-      } // end switch
-      llvm_unreachable("unhandled actor isolation kind!");
-    }
-
     /// Find the innermost context in which this declaration was explicitly
     /// captured.
     const DeclContext *findCapturedDeclContext(ValueDecl *value) {
@@ -2936,65 +2860,38 @@ namespace {
       return diagnosed;
     }
 
-    /// Check a reference to a local or global.
-    bool checkNonMemberReference(
-        ConcreteDeclRef valueRef, SourceLoc loc, DeclRefExpr *declRefExpr) {
-      if (!valueRef)
-        return false;
-
-      auto value = valueRef.getDecl();
-
-      if (value->isLocalCapture())
-        return checkLocalCapture(valueRef, loc, declRefExpr);
-
-      switch (auto isolation =
-                  ActorIsolationRestriction::forDeclaration(
-                    valueRef, getDeclContext())) {
-      case ActorIsolationRestriction::Unrestricted:
-        return false;
-
-      case ActorIsolationRestriction::CrossActorSelf:
-      case ActorIsolationRestriction::ActorSelf:
-        llvm_unreachable("non-member reference into an actor");
-
-      case ActorIsolationRestriction::GlobalActorUnsafe:
-        // Only complain if we're in code that's adopted concurrency features.
-        if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
-          return false;
-
-        LLVM_FALLTHROUGH;
-
-      case ActorIsolationRestriction::GlobalActor:
-        return checkGlobalActorReference(
-            valueRef, loc, isolation.getGlobalActor(), isolation.isCrossActor,
-            declRefExpr);
-
-      case ActorIsolationRestriction::Unsafe:
-        return diagnoseReferenceToUnsafeGlobal(value, loc);
-      }
-      llvm_unreachable("unhandled actor isolation kind!");
-    }
-
-    /// Check a reference with the given base expression to the given member.
-    /// Returns true iff the member reference refers to actor-isolated state
-    /// in an invalid or unsafe way such that a diagnostic was emitted.
-    bool checkMemberReference(
-        Expr *base, ConcreteDeclRef memberRef, SourceLoc memberLoc,
+    /// Check a reference to the given declaration.
+    ///
+    /// \param base For a reference to a member, the base expression. May be
+    /// nullptr for non-member referenced.
+    ///
+    /// \returns true if the reference is invalid, in which case a diagnostic
+    /// has already been emitted.
+    bool checkReference(
+        Expr *base, ConcreteDeclRef declRef, SourceLoc loc,
         Optional<PartialApplyThunkInfo> partialApply = None,
         Expr *context = nullptr) {
-      if (!base || !memberRef)
+      if (!declRef)
         return false;
 
-      auto member = memberRef.getDecl();
-      auto isolatedActor = getIsolatedActor(base);
+      auto decl = declRef.getDecl();
+      Optional<ReferencedActor> isolatedActor;
+      if (base)
+        isolatedActor.emplace(getIsolatedActor(base));
       auto result = ActorReferenceResult::forReference(
-          memberRef, memberLoc, getDeclContext(),
-          kindOfUsage(member, context), isolatedActor);
+          declRef, loc, getDeclContext(),
+          kindOfUsage(decl, context), isolatedActor);
       switch (result) {
       case ActorReferenceResult::SameConcurrencyDomain:
+        if (diagnoseReferenceToUnsafeGlobal(decl, loc))
+          return true;
+
         return false;
 
       case ActorReferenceResult::ExitsActorToNonisolated:
+        if (diagnoseReferenceToUnsafeGlobal(decl, loc))
+          return true;
+
         // FIXME: SE-0338 would trigger Sendable checks here.
         return false;
 
@@ -3011,16 +2908,16 @@ namespace {
 
       // A call to a global-actor-isolated function is diagnosed elsewhere.
       if (!partialApply && result.isolation.isGlobalActor() &&
-          isa<AbstractFunctionDecl>(member))
+          isa<AbstractFunctionDecl>(decl))
         return false;
 
       // An escaping partial application of something that is part of
       // the actor's isolated state is never permitted.
-      if (partialApply && partialApply->isEscaping && !isAsyncDecl(memberRef)) {
+      if (partialApply && partialApply->isEscaping && !isAsyncDecl(declRef)) {
         ctx.Diags.diagnose(
-            memberLoc, diag::actor_isolated_partial_apply,
-            member->getDescriptiveKind(),
-            member->getName());
+            loc, diag::actor_isolated_partial_apply,
+            decl->getDescriptiveKind(),
+            decl->getName());
         return true;
       }
 
@@ -3028,7 +2925,7 @@ namespace {
       // Sendable checking and we're done.
       if (!result.options) {
         return diagnoseNonSendableTypesInReference(
-                   memberRef, getDeclContext(), memberLoc,
+                   declRef, getDeclContext(), loc,
                    SendableCheckReason::CrossActor);
       }
 
@@ -3042,7 +2939,7 @@ namespace {
               result.isolation.getGlobalActor())
           : ImplicitActorHopTarget::forInstanceSelf();
       auto implicitAsyncResult = tryMarkImplicitlyAsync(
-          memberLoc, memberRef, context, target, isDistributed);
+          loc, declRef, context, target, isDistributed);
       switch (implicitAsyncResult) {
       case AsyncMarkingResult::FoundAsync:
         // Success! We're done.
@@ -3057,18 +2954,44 @@ namespace {
       case AsyncMarkingResult::NotFound:
         // Complain about access outside of the isolation domain.
         auto useKind = static_cast<unsigned>(
-            kindOfUsage(member, context).getValueOr(VarRefUseEnv::Read));
+            kindOfUsage(decl, context).getValueOr(VarRefUseEnv::Read));
+
+        ReferencedActor::Kind refKind;
+        Type refGlobalActor;
+        if (isolatedActor) {
+          refKind = isolatedActor->kind;
+          refGlobalActor = isolatedActor->globalActor;
+        } else {
+          auto contextIsolation = getInnermostIsolatedContext(getDeclContext());
+          switch (contextIsolation) {
+          case ActorIsolation::ActorInstance:
+            refKind = ReferencedActor::Isolated;
+            break;
+
+          case ActorIsolation::GlobalActor:
+          case ActorIsolation::GlobalActorUnsafe:
+            refGlobalActor = contextIsolation.getGlobalActor();
+            refKind = isMainActor(refGlobalActor)
+                ? ReferencedActor::MainActor
+                : ReferencedActor::GlobalActor;
+            break;
+
+          case ActorIsolation::Unspecified:
+          case ActorIsolation::Independent:
+            refKind = ReferencedActor::NonIsolatedContext;
+            break;
+          }
+        }
 
         ctx.Diags.diagnose(
-            memberLoc, diag::actor_isolated_non_self_reference,
-            member->getDescriptiveKind(),
-            member->getName(),
+            loc, diag::actor_isolated_non_self_reference,
+            decl->getDescriptiveKind(),
+            decl->getName(),
             useKind,
-            isolatedActor.kind,
-            isolatedActor.globalActor,
+            refKind + 1, refGlobalActor,
             result.isolation);
 
-        noteIsolatedActorMember(member, context);
+        noteIsolatedActorMember(decl, context);
 
         if (result.isolation.isGlobalActor()) {
           noteGlobalActorOnContext(
