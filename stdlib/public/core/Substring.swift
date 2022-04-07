@@ -149,10 +149,6 @@ extension Substring {
   internal var _startIsCharacterAligned: Bool {
     startIndex._isCharacterAligned
   }
-
-  internal var _endIsCharacterAligned: Bool {
-    endIndex._isCharacterAligned
-  }
 }
 
 extension Substring {
@@ -322,20 +318,16 @@ extension Substring: StringProtocol {
     _internalInvariant(priorOffset >= startIndex._encodedOffset)
 
     var r = Index(
-      encodedOffset: priorOffset, characterStride: priorStride)._scalarAligned
+      encodedOffset: priorOffset, characterStride: priorStride)
 
-    if
-      // Don't set the `_isCharacterAligned` bit in indices of exotic substrings
-      // whose startIndex isn't aligned on a grapheme cluster boundary. (Their
-      // grapheme breaks may not match with those in `base`.)
-      _startIsCharacterAligned,
-      // Likewise if this is the last character in a substring ending on a
-      // partial grapheme cluster.
-      _endIsCharacterAligned || i < endIndex
-    {
+    // Don't set the `_isCharacterAligned` bit in indices of exotic substrings
+    // whose startIndex isn't aligned on a grapheme cluster boundary. (Their
+    // grapheme breaks may not match with those in `base`.)
+    if _startIsCharacterAligned {
       r = r._characterAligned
+    } else {
+      r = r._scalarAligned
     }
-
     return r
   }
 
