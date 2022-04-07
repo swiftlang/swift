@@ -109,15 +109,15 @@
 // run a test where C++ interop is turned off to make sure we don't link
 // against libc++ in this case.
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 %s 2>&1 | %FileCheck -check-prefix IOS-no-cxx-interop %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 -enable-experimental-cxx-interop %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop-libcxx %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 -enable-experimental-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop-libcxx %s
-// RUN: not %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 -enable-experimental-cxx-interop -experimental-cxx-stdlib libstdc++ %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop-libstdcxx %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 -enable-cxx-interop %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop-libcxx %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 -enable-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop-libcxx %s
+// RUN: not %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 -enable-cxx-interop -experimental-cxx-stdlib libstdc++ %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop-libstdcxx %s
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-linux-gnu -enable-experimental-cxx-interop %s 2>&1 | %FileCheck -check-prefix LINUX-cxx-interop %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-linux-gnu -enable-experimental-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix LINUX-cxx-interop-libcxx %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-linux-gnu -enable-cxx-interop %s 2>&1 | %FileCheck -check-prefix LINUX-cxx-interop %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-linux-gnu -enable-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix LINUX-cxx-interop-libcxx %s
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-msvc -enable-experimental-cxx-interop %s 2>&1 | %FileCheck -check-prefix WINDOWS-cxx-interop %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-msvc -enable-experimental-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix WINDOWS-cxx-interop-libcxx %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-msvc -enable-cxx-interop %s 2>&1 | %FileCheck -check-prefix WINDOWS-cxx-interop %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-msvc -enable-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix WINDOWS-cxx-interop-libcxx %s
 
 // Check reading the SDKSettings.json from an SDK
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15 %s
