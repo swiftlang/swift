@@ -1315,6 +1315,9 @@ ReferencedActor ReferencedActor::forGlobalActor(VarDecl *actor,
   return ReferencedActor(actor, isPotentiallyIsolated, kind, globalActor);
 }
 
+static ActorIsolation getActorIsolationForReference(
+    ValueDecl *decl, const DeclContext *fromDC);
+
 bool ReferencedActor::isKnownToBeLocal() const {
   switch (kind) {
   case GlobalActor:
@@ -2311,54 +2314,36 @@ namespace {
         return false;
 
       bool result = false;
-      auto checkDiagnostic = [this, call, isPartialApply,
-                              &result](ValueDecl *decl, SourceLoc argLoc) {
-        auto isolation = ActorIsolationRestriction::forDeclaration(
-            decl, getDeclContext());
-        switch (isolation) {
-        case ActorIsolationRestriction::Unrestricted:
-        case ActorIsolationRestriction::Unsafe:
-          break;
-        case ActorIsolationRestriction::GlobalActorUnsafe:
-          // If we're not supposed to diagnose existing data races here,
-          // we're done.
-          if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
-            break;
+      auto checkDiagnostic = [this, call, isPartialApply, &result](
+          ConcreteDeclRef declRef, SourceLoc argLoc) {
+        auto decl = declRef.getDecl();
+        auto isolation = getActorIsolationForReference(decl, getDeclContext());
+        if (!isolation.isActorIsolated())
+          return;
 
-          LLVM_FALLTHROUGH;
-
-        case ActorIsolationRestriction::GlobalActor: {
-          ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
-                             decl->getDescriptiveKind(), decl->getName(),
-                             call->isImplicitlyAsync().hasValue());
-          decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
-          result = true;
-          break;
-        }
-        case ActorIsolationRestriction::CrossActorSelf:
-        case ActorIsolationRestriction::ActorSelf: {
-          if (isPartialApply) {
-            // The partially applied InoutArg is a property of actor. This
-            // can really only happen when the property is a struct with a
-            // mutating async method.
-            if (auto partialApply = dyn_cast<ApplyExpr>(call->getFn())) {
-              ValueDecl *fnDecl =
-                  cast<DeclRefExpr>(partialApply->getFn())->getDecl();
+        if (isPartialApply) {
+          // The partially applied InoutArg is a property of actor. This
+          // can really only happen when the property is a struct with a
+          // mutating async method.
+          if (auto partialApply = dyn_cast<ApplyExpr>(call->getFn())) {
+            if (auto declRef = dyn_cast<DeclRefExpr>(partialApply->getFn())) {
+              ValueDecl *fnDecl = declRef->getDecl();
               ctx.Diags.diagnose(call->getLoc(),
                                  diag::actor_isolated_mutating_func,
                                  fnDecl->getName(), decl->getDescriptiveKind(),
                                  decl->getName());
               result = true;
+              return;
             }
-          } else {
-            ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
-                               decl->getDescriptiveKind(), decl->getName(),
-                               call->isImplicitlyAsync().hasValue());
-            result = true;
           }
-          break;
         }
-        }
+
+        ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
+                           decl->getDescriptiveKind(), decl->getName(),
+                           call->isImplicitlyAsync().hasValue());
+        decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
+        result = true;
+        return;
       };
       auto expressionWalker = [baseArg = arg->getSubExpr(),
                                checkDiagnostic](Expr *expr) -> Expr * {
