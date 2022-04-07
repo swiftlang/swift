@@ -254,9 +254,10 @@ CStringTests.test("String.cString.with.Array.CChar.input") {
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
-    let cstr = UnsafeRawPointer(u8p).assumingMemoryBound(to: CChar.self)
-    let buffer = UnsafeBufferPointer(start: cstr, count: getUTF8Length(u8p)+1)
-    let str = String(cString: Array(buffer))
+    let buffer = UnsafeBufferPointer(start: u8p, count: getUTF8Length(u8p)+1)
+    let str = buffer.withMemoryRebound(to: CChar.self) {
+      String(cString: Array($0))
+    }
     str.withCString {
       $0.withMemoryRebound(to: UInt8.self, capacity: buffer.count) {
         expectEqualCString(u8p, $0)
@@ -324,9 +325,10 @@ CStringTests.test("String.validatingUTF8.with.Array.input") {
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
-    let cstr = UnsafeRawPointer(u8p).assumingMemoryBound(to: CChar.self)
-    let buffer = UnsafeBufferPointer(start: cstr, count: getUTF8Length(u8p)+1)
-    let str = String(validatingUTF8: Array(buffer))
+    let buffer = UnsafeBufferPointer(start: u8p, count: getUTF8Length(u8p)+1)
+    let str = buffer.withMemoryRebound(to: CChar.self) {
+      String(validatingUTF8: Array($0))
+    }
     expectNotNil(str)
     str?.withCString {
       $0.withMemoryRebound(to: UInt8.self, capacity: buffer.count) {
@@ -382,9 +384,10 @@ CStringTests.test("String.decodeCString.with.Array.input") {
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
-    let cstr = UnsafeRawPointer(u8p).assumingMemoryBound(to: Unicode.UTF8.CodeUnit.self)
-    let buffer = UnsafeBufferPointer(start: cstr, count: getUTF8Length(u8p)+1)
-    let result = String.decodeCString(Array(buffer), as: Unicode.UTF8.self)
+    let buffer = UnsafeBufferPointer(start: u8p, count: getUTF8Length(u8p)+1)
+    let result = buffer.withMemoryRebound(to: Unicode.UTF8.CodeUnit.self) {
+      String.decodeCString(Array($0), as: Unicode.UTF8.self)
+    }
     expectNotNil(result)
     expectEqual(result?.repairsMade, false)
     result?.result.withCString {
@@ -448,9 +451,10 @@ CStringTests.test("String.init.decodingCString.with.Array.input") {
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
-    let cstr = UnsafeRawPointer(u8p).assumingMemoryBound(to: Unicode.UTF8.CodeUnit.self)
-    let buffer = UnsafeBufferPointer(start: cstr, count: getUTF8Length(u8p)+1)
-    let str = String(decodingCString: Array(buffer), as: Unicode.UTF8.self)
+    let buffer = UnsafeBufferPointer(start: u8p, count: getUTF8Length(u8p)+1)
+    let str = buffer.withMemoryRebound(to: Unicode.UTF8.CodeUnit.self) {
+      String(decodingCString: Array($0), as: Unicode.UTF8.self)
+    }
     str.withCString {
       $0.withMemoryRebound(to: UInt8.self, capacity: buffer.count) {
         expectEqualCString(u8p, $0)
