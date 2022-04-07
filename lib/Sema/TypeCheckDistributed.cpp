@@ -72,8 +72,15 @@ static AbstractFunctionDecl *findDistributedAdHocRequirement(
 
   for (auto value : decl->lookupDirect(identifier)) {
     auto func = dyn_cast<AbstractFunctionDecl>(value);
-    if (func && matchFn(func))
+    if (func && matchFn(func)) {
+      // In order to prevent an "unused" (from SIL's perspective) function
+      // from being optimized away, we mark it as an ad-hoc requirement witness
+      // which is then picked up in SIL and causes the function to be retained.
+//      fprintf(stderr, "[%s:%d] (%s) FOUND ADHOC WITNESS: %s\n", __FILE__, __LINE__, __FUNCTION__, func->getNameStr().str().c_str());
+//
+//      func->setIsAdHocRequirementWitness(true);
       return func;
+    }
   }
 
   return nullptr;

@@ -14,6 +14,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
@@ -200,29 +201,52 @@ void SILFunctionBuilder::addFunctionAttributes(
   // Only assign replacements when the thing being replaced is function-like and
   // explicitly declared.  
   auto *origDecl = decl->getDynamicallyReplacedDecl();
-  auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl);
-  if (!replacedDecl)
-    return;
+  if (auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl)) {
+    // For @objc method replacement we normally use categories to perform the
+    // replacement. Except for methods in generic class where we can't. Instead,
+    // we special case this and use the native swift replacement mechanism.
+    if (decl->isObjC() && !decl->isNativeMethodReplacement()) {
+      F->setObjCReplacement(replacedDecl);
+      return;
+    }
 
-  // For @objc method replacement we normally use categories to perform the
-  // replacement. Except for methods in generic class where we can't. Instead,
-  // we special case this and use the native swift replacement mechanism.
-  if (decl->isObjC() && !decl->isNativeMethodReplacement()) {
-    F->setObjCReplacement(replacedDecl);
-    return;
+    if (constant.canBeDynamicReplacement()) {
+      SILDeclRef declRef(replacedDecl, constant.kind, false);
+      auto *replacedFunc = getOrCreateDeclaration(replacedDecl, declRef);
+
+      assert(replacedFunc->getLoweredFunctionType() ==
+                 F->getLoweredFunctionType() ||
+             replacedFunc->getLoweredFunctionType()->hasOpaqueArchetype());
+
+      F->setDynamicallyReplacedFunction(replacedFunc);
+    }
   }
 
-  if (!constant.canBeDynamicReplacement())
-    return;
+  if (constant.isDistributedThunk()) {
+    fprintf(stderr, "[%s:%d] (%s) IS DIST THUNK!\n", __FILE__, __LINE__, __FUNCTION__);
+    constant.dump();
 
-  SILDeclRef declRef(replacedDecl, constant.kind, false);
-  auto *replacedFunc = getOrCreateDeclaration(replacedDecl, declRef);
+    // TODO: also handle protocol / extension
+    auto actor = dyn_cast<ClassDecl>(decl->getDeclContext());
+    if (actor && actor->isDistributedActor()) {
+      auto &C = decl->getASTContext();
+      auto systemTy = getDistributedActorSystemType(actor);
+      assert(systemTy);
 
-  assert(replacedFunc->getLoweredFunctionType() ==
-             F->getLoweredFunctionType() ||
-         replacedFunc->getLoweredFunctionType()->hasOpaqueArchetype());
+      auto decoderTy =
+          getDistributedActorSystemInvocationDecoderType(
+              systemTy->getAnyNominal());
+      assert(decoderTy);
 
-  F->setDynamicallyReplacedFunction(replacedFunc);
+      auto decodeFunc = C.getDecodeNextArgumentOnDistributedInvocationDecoder(
+          decoderTy->getAnyNominal());
+      auto decodeRef = SILDeclRef(decodeFunc);
+      auto *adHocWitness = getOrCreateDeclaration(decodeFunc, decodeRef);
+      F->setUsedAdHocRequirementWitnessFunction(adHocWitness);
+
+      F->dump();
+    }
+  }
 }
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(

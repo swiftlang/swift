@@ -1382,6 +1382,14 @@ bool SILDeclRef::canBeDynamicReplacement() const {
   return true;
 }
 
+//bool SILDeclRef::isAdHocRequirementWitness() const {
+//  auto decl = getDecl();
+//  if (!decl)
+//    return false;
+//
+//  return decl->isAdHocRequirementWitness();
+//}
+
 bool SILDeclRef::isDynamicallyReplaceable() const {
   // The non-foreign entry of a @dynamicReplacement(for:) of @objc method in a
   // generic class can't be a dynamically replaced.

@@ -168,6 +168,21 @@ Type swift::getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *syst
   return conformance.getTypeWitnessByName(selfType, ctx.Id_InvocationEncoder);
 }
 
+Type swift::getDistributedActorSystemInvocationDecoderType(NominalTypeDecl *system) {
+  assert(!system->isDistributedActor());
+  auto &ctx = system->getASTContext();
+
+  auto DAS = ctx.getDistributedActorSystemDecl();
+  if (!DAS)
+    return Type();
+
+  // Dig out the serialization requirement type.
+  auto module = system->getParentModule();
+  Type selfType = system->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, DAS);
+  return conformance.getTypeWitnessByName(selfType, ctx.Id_InvocationDecoder);
+}
+
 Type swift::getDistributedSerializationRequirementType(
     NominalTypeDecl *nominal, ProtocolDecl *protocol) {
   assert(nominal);
