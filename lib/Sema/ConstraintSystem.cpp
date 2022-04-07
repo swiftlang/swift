@@ -2900,11 +2900,6 @@ bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
         FunctionType::ExtInfo()).isAsync();
   }
 
-  if (Options.contains(
-          ConstraintSystemFlags::ConsiderNominalTypeContextsAsync) &&
-      isa<NominalTypeDecl>(dc))
-    return true;
-
   return false;
 }
 
