@@ -358,6 +358,7 @@ extension _StringGuts {
 
   @_alwaysEmitIntoClient
   @inline(never)
+  @_effects(releasenone)
   internal func _slowEnsureMatchingEncoding(_ i: String.Index) -> String.Index {
     guard isUTF8 else {
       // Attempt to use an UTF-8 index on a UTF-16 string. Strings don't usually
