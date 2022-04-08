@@ -2,12 +2,12 @@
 // opaque result types, even in the presence of errors or unusual generic
 // signatures.
 
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 // RUN: %target-swift-ide-test -print-usrs -source-filename %s | %FileCheck -strict-whitespace %s
 
 // CHECK: [[@LINE+1]]:{{[0-9]+}} s:14swift_ide_test0C21UnifyingGenericParams1xQrx_tq_Rszr0_lF
 func testUnifyingGenericParams<T, U>(x: T) -> some Collection where T == U {
-  // expected-error@-1 {{same-type requirement makes generic parameters 'T' and 'U' equivalent}}
+  // expected-error@-1 {{same-type requirement makes generic parameters 'U' and 'T' equivalent}}
   return []
 }
 

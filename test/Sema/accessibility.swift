@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5 -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5
 
 public protocol PublicProto {
   func publicReq()
