@@ -66,7 +66,7 @@ import Foundation
   }
 
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s20objc_blocks_bridging3FooC16cFunctionPointer{{[_0-9a-zA-Z]*}}FTo
-  // CHECK:       bb0([[F:%.*]] : $@convention(c) @noescape (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : @unowned $Foo):
+  // CHECK:       bb0([[F:%.*]] : $@convention(c) (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @$s20objc_blocks_bridging3FooC16cFunctionPointer{{[_0-9a-zA-Z]*}}F
