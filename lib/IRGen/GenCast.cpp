@@ -1061,6 +1061,11 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
                                                 llvm::Value *instance,
                                                 CanType sourceFormalType,
                                                 CanType targetFormalType) {
+  // Currently fast casting causes a miscompile on Windows.
+  // TODO: fix https://bugs.swift.org/browse/SR-16112 and enable fast casting on Windows.
+  if (IGF.IGM.Triple.isOSWindows())
+    return nullptr;
+
   if (!doesCastPreserveOwnershipForTypes(IGF.IGM.getSILModule(), sourceFormalType,
                                          targetFormalType)) {
     return nullptr;

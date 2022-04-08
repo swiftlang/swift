@@ -15,6 +15,8 @@
 
 // REQUIRES: executable_test
 
+// Currently fast casting causes a miscompile on Windows.
+// UNSUPPORTED: windows
 
 import Classes
 import ResilientClasses
