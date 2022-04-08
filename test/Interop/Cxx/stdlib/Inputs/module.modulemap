@@ -7,3 +7,8 @@ module StdString {
   header "std-string.h"
   requires cplusplus
 }
+
+module StdIterator {
+  header "std-iterator.h"
+  requires cplusplus
+}
