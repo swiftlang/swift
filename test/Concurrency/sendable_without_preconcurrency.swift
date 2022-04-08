@@ -33,3 +33,23 @@ func testA(ns: NS, mt: MyType, mt2: MyType2, sc: StrictClass, nsc: NonStrictClas
 }
 
 extension NonStrictStruct: @unchecked Sendable { }
+
+class StrictSubclass: StrictClass {
+  override func send(_ body: () -> ()) {}
+  override func dontSend(_ body: () -> ()) {}
+}
+
+struct StrictConformer: StrictProtocol {
+  func send(_ body: () -> Void) {}
+  func dontSend(_ body: () -> Void) {}
+}
+
+class NonStrictSubclass: NonStrictClass {
+  override func send(_ body: () -> ()) {}
+  override func dontSend(_ body: () -> ()) {}
+}
+
+struct NonStrictConformer: NonStrictProtocol {
+  func send(_ body: () -> Void) {}
+  func dontSend(_ body: () -> Void) {}
+}
