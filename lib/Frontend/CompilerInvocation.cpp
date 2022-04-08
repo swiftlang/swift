@@ -1107,9 +1107,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.EnableMultiStatementClosureInference |=
       Args.hasArg(OPT_experimental_multi_statement_closures);
 
-  Opts.EnableTypeInferenceFromDefaultArguments |=
-      Args.hasArg(OPT_experimental_type_inference_from_defaults);
-
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);
 
