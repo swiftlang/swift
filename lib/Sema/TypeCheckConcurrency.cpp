@@ -877,80 +877,105 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
   return defaultBehavior;
 }
 
-/// Produce a diagnostic for a single instance of a non-Sendable type where
-/// a Sendable type is required.
-static bool diagnoseSingleNonSendableType(
-    Type type, SendableCheckContext fromContext, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
-
+bool swift::diagnoseSendabilityErrorBasedOn(
+    NominalTypeDecl *nominal, SendableCheckContext fromContext,
+    llvm::function_ref<bool(DiagnosticBehavior)> diagnose) {
   auto behavior = DiagnosticBehavior::Unspecified;
 
-  auto module = fromContext.fromDC->getParentModule();
-  ASTContext &ctx = module->getASTContext();
-  auto nominal = type->getAnyNominal();
   if (nominal) {
     behavior = fromContext.diagnosticBehavior(nominal);
   } else {
     behavior = fromContext.defaultDiagnosticBehavior();
   }
 
-  bool wasSuppressed = diagnose(type, behavior);
+  bool wasSuppressed = diagnose(behavior);
 
-  if (behavior == DiagnosticBehavior::Ignore || wasSuppressed) {
-    // Don't emit any other diagnostics.
-  } else if (type->is<FunctionType>()) {
-    ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
-  } else if (nominal && nominal->getParentModule() == module) {
-    // If the nominal type is in the current module, suggest adding
-    // `Sendable` if it might make sense. Otherwise, just complain.
-    if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
-      auto note = nominal->diagnose(
-          diag::add_nominal_sendable_conformance,
-          nominal->getDescriptiveKind(), nominal->getName());
-      addSendableFixIt(nominal, note, /*unchecked=*/false);
-    } else {
-      nominal->diagnose(
-          diag::non_sendable_nominal, nominal->getDescriptiveKind(),
-          nominal->getName());
+  bool emittedDiagnostics =
+      behavior != DiagnosticBehavior::Ignore && !wasSuppressed;
+
+  // When the type is explicitly Sendable *or* explicitly non-Sendable, we
+  // assume it has been audited and `@preconcurrency` is not recommended even
+  // though it would actually affect the diagnostic.
+  bool nominalIsImportedAndHasImplicitSendability =
+      nominal &&
+      nominal->getParentModule() != fromContext.fromDC->getParentModule() &&
+      !hasExplicitSendableConformance(nominal);
+
+  if (emittedDiagnostics && nominalIsImportedAndHasImplicitSendability) {
+    // This type was imported from another module; try to find the
+    // corresponding import.
+    Optional<AttributedImport<swift::ImportedModule>> import;
+    SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
+    if (sourceFile) {
+      import = findImportFor(nominal, fromContext.fromDC);
     }
-  } else if (nominal) {
-    // Note which nominal type does not conform to `Sendable`.
-    nominal->diagnose(
-        diag::non_sendable_nominal, nominal->getDescriptiveKind(),
-        nominal->getName());
 
-    // When the type is explicitly Sendable *or* explicitly non-Sendable, we
-    // assume it has been audited and `@preconcurrency` is not recommended even
-    // though it would actually affect the diagnostic.
-    if (!hasExplicitSendableConformance(nominal)) {
-      // This type was imported from another module; try to find the
-      // corresponding import.
-      Optional<AttributedImport<swift::ImportedModule>> import;
-      SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
-      if (sourceFile) {
-        import = findImportFor(nominal, fromContext.fromDC);
-      }
+    // If we found the import that makes this nominal type visible, remark
+    // that it can be @preconcurrency import.
+    // Only emit this remark once per source file, because it can happen a
+    // lot.
+    if (import && !import->options.contains(ImportFlags::Preconcurrency) &&
+        import->importLoc.isValid() && sourceFile &&
+        !sourceFile->hasImportUsedPreconcurrency(*import)) {
+      SourceLoc importLoc = import->importLoc;
+      ASTContext &ctx = nominal->getASTContext();
 
-      // If we found the import that makes this nominal type visible, remark
-      // that it can be @preconcurrency import.
-      // Only emit this remark once per source file, because it can happen a
-      // lot.
-      if (import && !import->options.contains(ImportFlags::Preconcurrency) &&
-          import->importLoc.isValid() && sourceFile &&
-          !sourceFile->hasImportUsedPreconcurrency(*import)) {
-        SourceLoc importLoc = import->importLoc;
-        ctx.Diags.diagnose(
-            importLoc, diag::add_predates_concurrency_import,
-            ctx.LangOpts.isSwiftVersionAtLeast(6),
-            nominal->getParentModule()->getName())
-          .fixItInsert(importLoc, "@preconcurrency ");
+      ctx.Diags.diagnose(
+          importLoc, diag::add_predates_concurrency_import,
+          ctx.LangOpts.isSwiftVersionAtLeast(6),
+          nominal->getParentModule()->getName())
+        .fixItInsert(importLoc, "@preconcurrency ");
 
-        sourceFile->setImportUsedPreconcurrency(*import);
-      }
+      sourceFile->setImportUsedPreconcurrency(*import);
     }
   }
 
   return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
+}
+
+/// Produce a diagnostic for a single instance of a non-Sendable type where
+/// a Sendable type is required.
+static bool diagnoseSingleNonSendableType(
+    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+
+  auto module = fromContext.fromDC->getParentModule();
+  auto nominal = type->getAnyNominal();
+
+  return diagnoseSendabilityErrorBasedOn(nominal, fromContext,
+                                         [&](DiagnosticBehavior behavior) {
+    bool wasSuppressed = diagnose(type, behavior);
+
+    // Don't emit the following notes if we didn't have any diagnostics to
+    // attach them to.
+    if (wasSuppressed || behavior == DiagnosticBehavior::Ignore)
+      return true;
+
+    if (type->is<FunctionType>()) {
+      module->getASTContext().Diags
+          .diagnose(loc, diag::nonsendable_function_type);
+    } else if (nominal && nominal->getParentModule() == module) {
+      // If the nominal type is in the current module, suggest adding
+      // `Sendable` if it might make sense. Otherwise, just complain.
+      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+        auto note = nominal->diagnose(
+            diag::add_nominal_sendable_conformance,
+            nominal->getDescriptiveKind(), nominal->getName());
+        addSendableFixIt(nominal, note, /*unchecked=*/false);
+      } else {
+        nominal->diagnose(
+            diag::non_sendable_nominal, nominal->getDescriptiveKind(),
+            nominal->getName());
+      }
+    } else if (nominal) {
+      // Note which nominal type does not conform to `Sendable`.
+      nominal->diagnose(
+          diag::non_sendable_nominal, nominal->getDescriptiveKind(),
+          nominal->getName());
+    }
+
+    return false;
+  });
 }
 
 bool swift::diagnoseNonSendableTypes(
