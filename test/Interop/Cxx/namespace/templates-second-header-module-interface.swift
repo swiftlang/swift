@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=TemplatesSecondHeader -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=TemplatesSecondHeader -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: enum TemplatesNS1 {
 // CHECK:   static func basicFunctionTemplateDefinedInDefs<T>(_: T) -> UnsafePointer<CChar>!

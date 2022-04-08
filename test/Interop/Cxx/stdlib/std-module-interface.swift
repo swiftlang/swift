@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=std -source-filename=x -enable-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STD
-// RUN: %target-swift-ide-test -print-module -module-to-print=std.iosfwd -source-filename=x -enable-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-IOSFWD
-// RUN: %target-swift-ide-test -print-module -module-to-print=std.string -source-filename=x -enable-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STRING
+// RUN: %target-swift-ide-test -print-module -module-to-print=std -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STD
+// RUN: %target-swift-ide-test -print-module -module-to-print=std.iosfwd -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-IOSFWD
+// RUN: %target-swift-ide-test -print-module -module-to-print=std.string -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STRING
 
 // Clang driver on Windows doesn't support -stdlib=libc++
 // UNSUPPORTED: OS=windows-msvc
