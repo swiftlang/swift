@@ -125,3 +125,31 @@ func testExplicitConcurrentClosure() {
   }
   let _: String = fn // expected-error{{cannot convert value of type '@Sendable () -> Int' to specified type 'String'}}
 }
+
+class SuperSendable {
+  func runsInBackground(_: @Sendable () -> Void) {}
+  func runsInForeground(_: () -> Void) {} // expected-note {{overridden declaration is here}}
+  func runnableInBackground() -> @Sendable () -> Void { fatalError() } // expected-note {{overridden declaration is here}}
+  func runnableInForeground() -> () -> Void { fatalError() }
+}
+
+class SubSendable: SuperSendable {
+  override func runsInBackground(_: () -> Void) {}
+  override func runsInForeground(_: @Sendable () -> Void) {} // expected-warning {{declaration 'runsInForeground' has a type with different sendability from any potential overrides; this is an error in Swift 6}}
+  override func runnableInBackground() -> () -> Void { fatalError() }  // expected-warning {{declaration 'runnableInBackground()' has a type with different sendability from any potential overrides; this is an error in Swift 6}}
+  override func runnableInForeground() -> @Sendable () -> Void { fatalError() }
+}
+
+protocol AbstractSendable {
+  func runsInBackground(_: @Sendable () -> Void)
+  func runsInForeground(_: () -> Void) // expected-note {{expected sendability to match requirement here}}
+  func runnableInBackground() -> @Sendable () -> Void // expected-note {{expected sendability to match requirement here}}
+  func runnableInForeground() -> () -> Void
+}
+
+struct ConcreteSendable: AbstractSendable {
+  func runsInBackground(_: () -> Void) {}
+  func runsInForeground(_: @Sendable () -> Void) {} // expected-warning {{sendability of function types in instance method 'runsInForeground' does not match requirement in protocol 'AbstractSendable'; this is an error in Swift 6}}
+  func runnableInBackground() -> () -> Void { fatalError() } // expected-warning {{sendability of function types in instance method 'runnableInBackground()' does not match requirement in protocol 'AbstractSendable'; this is an error in Swift 6}}
+  func runnableInForeground() -> @Sendable () -> Void { fatalError() }
+}

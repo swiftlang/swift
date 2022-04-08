@@ -155,13 +155,25 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     // function types that aren't in a parameter can be Sendable or not.
     // FIXME: Should we check for a Sendable bound on the requirement type?
     bool inRequirement = (adjustment != TypeAdjustment::NoescapeToEscaping);
-    (void)adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
+    Type adjustedReqtType =
+      adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
 
     bool inWitness = false;
     Type adjustedWitnessType =
       adjustInferredAssociatedType(adjustment, witnessType, inWitness);
-    if (inWitness && !inRequirement)
-      witnessType = adjustedWitnessType;
+
+    switch (variance) {
+    case VarianceKind::None:
+      break;
+    case VarianceKind::Covariant:
+      if (inRequirement && !inWitness)
+        reqtType = adjustedReqtType;
+      break;
+    case VarianceKind::Contravariant:
+      if (inWitness && !inRequirement)
+        witnessType = adjustedWitnessType;
+      break;
+    }
   };
 
   applyAdjustment(TypeAdjustment::NoescapeToEscaping);
@@ -1150,15 +1162,26 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
           return *result;
       }
     }
-    if (!solution || solution->Fixes.size())
-      return RequirementMatch(witness, MatchKind::TypeConflict,
-                              witnessType);
+    bool requiresNonSendable = false;
+    if (!solution || solution->Fixes.size()) {
+      /// If the *only* problems are that `@Sendable` attributes are missing,
+      /// allow the match in some circumstances.
+      requiresNonSendable = solution
+          && llvm::all_of(solution->Fixes, [](constraints::ConstraintFix *fix) {
+            return fix->getKind() == constraints::FixKind::AddSendableAttribute;
+          });
+      if (!requiresNonSendable)
+        return RequirementMatch(witness, MatchKind::TypeConflict,
+                                witnessType);
+    }
 
     MatchKind matchKind = MatchKind::ExactMatch;
     if (hasAnyError(optionalAdjustments))
       matchKind = MatchKind::OptionalityConflict;
     else if (anyRenaming)
       matchKind = MatchKind::RenamedMatch;
+    else if (requiresNonSendable)
+      matchKind = MatchKind::RequiresNonSendable;
     else if (getEffects(witness).containsOnly(getEffects(req)))
       matchKind = MatchKind::FewerEffects;
 
@@ -2516,6 +2539,12 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   case MatchKind::FewerEffects:
     diags.diagnose(match.Witness, diag::protocol_witness_exact_match,
                    withAssocTypes);
+    break;
+
+  case MatchKind::RequiresNonSendable:
+    diags.diagnose(match.Witness, diag::protocol_witness_non_sendable,
+                   withAssocTypes,
+                   module->getASTContext().isSwiftVersionAtLeast(6));
     break;
 
   case MatchKind::RenamedMatch: {
@@ -4125,6 +4154,19 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                          requirement->getName());
         });
     }
+    if (best.Kind == MatchKind::RequiresNonSendable)
+      diagnoseOrDefer(requirement, getASTContext().isSwiftVersionAtLeast(6),
+                      [this, requirement, witness]
+                          (NormalProtocolConformance *conformance) {
+        auto &diags = DC->getASTContext().Diags;
+
+        diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
+                       diag::witness_not_as_sendable,
+                       witness->getDescriptiveKind(), witness->getName(),
+                       conformance->getProtocol()->getName())
+            .warnUntilSwiftVersion(6);
+        diags.diagnose(requirement, diag::less_sendable_reqt_here);
+      });
 
     auto check = checkWitness(requirement, best);
 

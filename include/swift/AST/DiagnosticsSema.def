@@ -2155,6 +2155,13 @@ ERROR(witness_not_accessible_proto,none,
       "requirement in %select{private|fileprivate|internal|public|%error}4 protocol "
       "%5",
       (RequirementKind, DeclName, bool, AccessLevel, AccessLevel, Identifier))
+ERROR(witness_not_as_sendable,none,
+      "sendability of function types in %0 %1 does not match requirement in "
+      "protocol %2",
+      (DescriptiveDeclKind, DeclName, Identifier))
+NOTE(less_sendable_reqt_here,none,
+     "expected sendability to match requirement here",
+     ())
 ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
@@ -2303,6 +2310,9 @@ NOTE(ambiguous_witnesses_type,none,
      "multiple matching types named %0", (Identifier))
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
+NOTE(protocol_witness_non_sendable,none,
+     "candidate matches except for closure sendability%0%select{; this will be "
+     "an error in Swift 6|}1", (StringRef, bool))
 NOTE(protocol_witness_renamed,none,
      "rename to %0 to satisfy this requirement%1", (DeclName, StringRef))
 NOTE(protocol_witness_kind_conflict,none,
@@ -2602,6 +2612,9 @@ WARNING(generic_param_usable_from_inline_warn,none,
 ERROR(override_multiple_decls_base,none,
       "declaration %0 cannot override more than one superclass declaration",
       (DeclName))
+ERROR(override_sendability_mismatch,none,
+      "declaration %0 has a type with different sendability from any potential "
+      "overrides", (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument labels from any potential "
       "overrides", (DeclName))
