@@ -7,7 +7,9 @@
 // on the call to takesError.
 
 @_optimize(none)
-func takesError<T : Error>(_: T) {}
+func takesError<T : Error>(_ t: T) {
+  print(t)
+}
 
 @inline(__always)
 func callsTakesError<U : Error>(_ error: U) {
@@ -56,7 +58,9 @@ func test2(_ error: Error) {
 // on the call to takesErrorAndValue.
 
 @_optimize(none)
-func takesErrorAndValue<T : Error, U>(_: T, _: U) {}
+func takesErrorAndValue<T : Error, U>(_ t: T, _ u: U) {
+  print(t, u)
+}
 
 @inline(__always)
 func callsTakesErrorAndValueWithError<U>(_ error: Error, _ value : U) {

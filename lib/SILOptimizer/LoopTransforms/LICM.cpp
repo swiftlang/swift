@@ -168,29 +168,58 @@ static bool isOnlyLoadedAndStored(AliasAnalysis *AA, InstSet &SideEffectInsts,
 /// Note: This function should only be called on a read-only apply!
 static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
                        InstSet &SideEffectInsts, ApplyInst *AI) {
-  FunctionSideEffects E;
-  SEA->getCalleeEffects(E, AI);
-  assert(E.getMemBehavior(RetainObserveKind::IgnoreRetains) <=
-         SILInstruction::MemoryBehavior::MayRead &&
-         "apply should only read from memory");
-  assert(!E.getGlobalEffects().mayRead() &&
-         "apply should not have global effects");
 
-  for (unsigned Idx = 0, End = AI->getNumArguments(); Idx < End; ++Idx) {
-    auto &ArgEffect = E.getParameterEffects()[Idx];
-    assert(!ArgEffect.mayRelease() && "apply should only read from memory");
-    if (!ArgEffect.mayRead())
-      continue;
+  FunctionSideEffects aiEffects;
+  SEA->getCalleeEffects(aiEffects, FullApplySite::isa(AI));
+  if (aiEffects.getMemBehavior(RetainObserveKind::IgnoreRetains) ==
+        SILInstruction::MemoryBehavior::None) {
+    return false;
+  }
 
-    SILValue Arg = AI->getArgument(Idx);
-
-    // Check if the memory addressed by the argument may alias any writes.
-    for (auto *I : SideEffectInsts) {
-      if (AA->mayWriteToMemory(I, Arg)) {
-        LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *I << " to "
-                                << *AI << "\n");
-        return true;
+  // Check if the memory addressed by the argument may alias any writes.
+  for (auto *inst : SideEffectInsts) {
+    switch (inst->getKind()) {
+      case SILInstructionKind::StoreInst: {
+        auto *si = cast<StoreInst>(inst);
+        if (si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign)
+          return true;
+        if (AA->mayReadFromMemory(AI, si->getDest()))
+          return true;
+        break;
       }
+      case SILInstructionKind::CopyAddrInst: {
+        auto *ca = cast<CopyAddrInst>(inst);
+        if (!ca->isInitializationOfDest())
+          return true;
+        if (AA->mayReadFromMemory(AI, ca->getDest()))
+          return true;
+        break;
+      }
+      case SILInstructionKind::ApplyInst:
+      case SILInstructionKind::BeginApplyInst:
+      case SILInstructionKind::TryApplyInst: {
+        FunctionSideEffects applyEffects;
+        SEA->getCalleeEffects(applyEffects, FullApplySite::isa(inst));
+        if (applyEffects.getMemBehavior(RetainObserveKind::IgnoreRetains) >
+              SILInstruction::MemoryBehavior::MayRead)
+          return true;
+        break;
+      }
+      case SILInstructionKind::CondFailInst:
+      case SILInstructionKind::StrongRetainInst:
+      case SILInstructionKind::UnmanagedRetainValueInst:
+      case SILInstructionKind::RetainValueInst:
+      case SILInstructionKind::StrongRetainUnownedInst:
+      case SILInstructionKind::FixLifetimeInst:
+      case SILInstructionKind::KeyPathInst:
+      case SILInstructionKind::DeallocStackInst:
+      case SILInstructionKind::DeallocStackRefInst:
+      case SILInstructionKind::DeallocRefInst:
+        break;
+      default:
+        if (inst->mayWriteToMemory())
+          return true;
+        break;
     }
   }
   return false;

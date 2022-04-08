@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt %s -dead-store-elim -max-partial-store-count=2 -enable-sil-verify-all | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 sil_stage canonical
 
 import Swift

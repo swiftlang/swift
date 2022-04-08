@@ -17,6 +17,7 @@ import Parse
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
   registerSILClasses()
+  registerAnalysis()
   registerSwiftPasses()
   registerRegexParser()
 }
@@ -35,6 +36,10 @@ private func registerPass<InstType: Instruction>(
   pass.name.withBridgedStringRef { nameStr in
     SILCombine_registerInstructionPass(nameStr, runFn)
   }
+}
+
+private func registerAnalysis() {
+  AliasAnalysis.register()
 }
 
 private func registerSwiftPasses() {

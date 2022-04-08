@@ -1,6 +1,8 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim | %FileCheck %s
 // TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
 
+// REQUIRES: swift_in_compiler
+
 sil_stage canonical
 
 import Builtin

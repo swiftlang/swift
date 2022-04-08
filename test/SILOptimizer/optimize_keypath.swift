@@ -8,6 +8,8 @@
 // REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
+// REQUIRES: swift_in_compiler
+
 protocol P {
   mutating func modifyIt()
   var computed: Int { get set }
