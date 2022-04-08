@@ -64,7 +64,7 @@ struct X1b : P1 {
 struct SendableX1b : P1 {
   typealias A = @Sendable (Int) -> Int
 
-  func f(_: (Int) -> Int) { } // expected-warning {{sendability of function types in instance method 'f' does not match requirement in protocol 'P1'; this is an error in Swift 6}}
+  func f(_: (Int) -> Int) { } // expected-warning {{sendability of function types in instance method 'f' does not match requirement in protocol 'P1'}}
 }
 
 struct X1c : P1 {
@@ -99,15 +99,15 @@ struct X2b : P2 { // expected-error{{type 'X2b' does not conform to protocol 'P2
 }
 
 struct X2c : P2 {
-  func f(_: @Sendable (Int) -> Int) { } // expected-warning{{sendability of function types in instance method 'f' does not match requirement in protocol 'P2'; this is an error in Swift 6}}
-  func g(_: @Sendable (Int) -> Int) { } // expected-warning{{sendability of function types in instance method 'g' does not match requirement in protocol 'P2'; this is an error in Swift 6}}
+  func f(_: @Sendable (Int) -> Int) { } // expected-warning{{sendability of function types in instance method 'f' does not match requirement in protocol 'P2'}}
+  func g(_: @Sendable (Int) -> Int) { } // expected-warning{{sendability of function types in instance method 'g' does not match requirement in protocol 'P2'}}
   func h(_: @Sendable (Int) -> Int) { }
   func i(_: @Sendable (Int) -> Int) { }
 }
 
 struct X2d : P2 { // expected-error{{type 'X2d' does not conform to protocol 'P2'}}
   func f(_: @escaping @Sendable (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@escaping @Sendable (Int) -> Int) -> ()'}}
-  func g(_: @escaping @Sendable (Int) -> Int) { } // expected-warning{{sendability of function types in instance method 'g' does not match requirement in protocol 'P2'; this is an error in Swift 6}}
+  func g(_: @escaping @Sendable (Int) -> Int) { } // expected-warning{{sendability of function types in instance method 'g' does not match requirement in protocol 'P2'}}
   func h(_: @escaping @Sendable (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@escaping @Sendable (Int) -> Int) -> ()'}}
   func i(_: @escaping @Sendable (Int) -> Int) { }
 }

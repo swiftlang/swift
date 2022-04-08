@@ -135,8 +135,8 @@ class SuperSendable {
 
 class SubSendable: SuperSendable {
   override func runsInBackground(_: () -> Void) {}
-  override func runsInForeground(_: @Sendable () -> Void) {} // expected-warning {{declaration 'runsInForeground' has a type with different sendability from any potential overrides; this is an error in Swift 6}}
-  override func runnableInBackground() -> () -> Void { fatalError() }  // expected-warning {{declaration 'runnableInBackground()' has a type with different sendability from any potential overrides; this is an error in Swift 6}}
+  override func runsInForeground(_: @Sendable () -> Void) {} // expected-warning {{declaration 'runsInForeground' has a type with different sendability from any potential overrides}}
+  override func runnableInBackground() -> () -> Void { fatalError() }  // expected-warning {{declaration 'runnableInBackground()' has a type with different sendability from any potential overrides}}
   override func runnableInForeground() -> @Sendable () -> Void { fatalError() }
 }
 
@@ -149,7 +149,7 @@ protocol AbstractSendable {
 
 struct ConcreteSendable: AbstractSendable {
   func runsInBackground(_: () -> Void) {}
-  func runsInForeground(_: @Sendable () -> Void) {} // expected-warning {{sendability of function types in instance method 'runsInForeground' does not match requirement in protocol 'AbstractSendable'; this is an error in Swift 6}}
-  func runnableInBackground() -> () -> Void { fatalError() } // expected-warning {{sendability of function types in instance method 'runnableInBackground()' does not match requirement in protocol 'AbstractSendable'; this is an error in Swift 6}}
+  func runsInForeground(_: @Sendable () -> Void) {} // expected-warning {{sendability of function types in instance method 'runsInForeground' does not match requirement in protocol 'AbstractSendable'}}
+  func runnableInBackground() -> () -> Void { fatalError() } // expected-warning {{sendability of function types in instance method 'runnableInBackground()' does not match requirement in protocol 'AbstractSendable'}}
   func runnableInForeground() -> @Sendable () -> Void { fatalError() }
 }

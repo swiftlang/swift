@@ -34,3 +34,23 @@ func testA(ns: NS, mt: MyType, mt2: MyType2, sc: StrictClass, nsc: NonStrictClas
 }
 
 extension NonStrictStruct: @unchecked Sendable { }
+
+class StrictSubclass: StrictClass {
+  override func send(_ body: () -> ()) {}
+  override func dontSend(_ body: @Sendable () -> ()) {} // expected-warning {{declaration 'dontSend' has a type with different sendability from any potential overrides}}
+}
+
+struct StrictConformer: StrictProtocol {
+  func send(_ body: () -> Void) {}
+  func dontSend(_ body: @Sendable () -> Void) {} // expected-warning {{sendability of function types in instance method 'dontSend' does not match requirement in protocol 'StrictProtocol'}}
+}
+
+class NonStrictSubclass: NonStrictClass {
+  override func send(_ body: () -> ()) {}
+  override func dontSend(_ body: @Sendable () -> ()) {} // expected-warning {{declaration 'dontSend' has a type with different sendability from any potential overrides}}
+}
+
+struct NonStrictConformer: NonStrictProtocol {
+  func send(_ body: () -> Void) {}
+  func dontSend(_ body: @Sendable () -> Void) {} // expected-warning {{sendability of function types in instance method 'dontSend' does not match requirement in protocol 'NonStrictProtocol'}}
+}
