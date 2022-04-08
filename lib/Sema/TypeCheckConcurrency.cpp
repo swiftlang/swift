@@ -770,10 +770,17 @@ DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
   return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
 }
 
-/// Determine whether the given nominal type that is within the current module
-/// has an explicit Sendable.
-static bool hasExplicitSendableConformance(NominalTypeDecl *nominal) {
+/// Determine whether the given nominal type has an explicit Sendable
+/// conformance (regardless of its availability).
+static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
+                                           bool applyModuleDefault = true) {
   ASTContext &ctx = nominal->getASTContext();
+  auto nominalModule = nominal->getParentModule();
+
+  // In a concurrency-checked module, a missing conformance is equivalent to
+  // an explicitly unavailable one. If we want to apply this rule, do so now.
+  if (applyModuleDefault && nominalModule->isConcurrencyChecked())
+    return true;
 
   // Look for any conformance to `Sendable`.
   auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
@@ -782,7 +789,7 @@ static bool hasExplicitSendableConformance(NominalTypeDecl *nominal) {
 
   // Look for a conformance. If it's present and not (directly) missing,
   // we're done.
-  auto conformance = nominal->getParentModule()->lookupConformance(
+  auto conformance = nominalModule->lookupConformance(
       nominal->getDeclaredInterfaceType(), proto, /*allowMissing=*/true);
   return conformance &&
       !(isa<BuiltinProtocolConformance>(conformance.getConcrete()) &&
@@ -826,18 +833,13 @@ static Optional<AttributedImport<ImportedModule>> findImportFor(
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     NominalTypeDecl *nominal) const {
-  // Determine whether the type was explicitly non-Sendable.
-  auto nominalModule = nominal->getParentModule();
-  bool isExplicitlyNonSendable = nominalModule->isConcurrencyChecked() ||
-      hasExplicitSendableConformance(nominal);
-
   // Determine whether this nominal type is visible via a @preconcurrency
   // import.
   auto import = findImportFor(nominal, fromDC);
+  auto sourceFile = fromDC->getParentSourceFile();
 
   // When the type is explicitly non-Sendable...
-  auto sourceFile = fromDC->getParentSourceFile();
-  if (isExplicitlyNonSendable) {
+  if (hasExplicitSendableConformance(nominal)) {
     // @preconcurrency imports downgrade the diagnostic to a warning in Swift 6,
     if (import && import->options.contains(ImportFlags::Preconcurrency)) {
       if (sourceFile)
@@ -857,7 +859,7 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     if (sourceFile)
       sourceFile->setImportUsedPreconcurrency(*import);
 
-    return nominalModule->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
+    return nominal->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
         ? DiagnosticBehavior::Warning
         : DiagnosticBehavior::Ignore;
   }
@@ -917,29 +919,34 @@ static bool diagnoseSingleNonSendableType(
         diag::non_sendable_nominal, nominal->getDescriptiveKind(),
         nominal->getName());
 
-    // This type was imported from another module; try to find the
-    // corresponding import.
-    Optional<AttributedImport<swift::ImportedModule>> import;
-    SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
-    if (sourceFile) {
-      import = findImportFor(nominal, fromContext.fromDC);
-    }
+    // When the type is explicitly Sendable *or* explicitly non-Sendable, we
+    // assume it has been audited and `@preconcurrency` is not recommended even
+    // though it would actually affect the diagnostic.
+    if (!hasExplicitSendableConformance(nominal)) {
+      // This type was imported from another module; try to find the
+      // corresponding import.
+      Optional<AttributedImport<swift::ImportedModule>> import;
+      SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
+      if (sourceFile) {
+        import = findImportFor(nominal, fromContext.fromDC);
+      }
 
-    // If we found the import that makes this nominal type visible, remark
-    // that it can be @preconcurrency import.
-    // Only emit this remark once per source file, because it can happen a
-    // lot.
-    if (import && !import->options.contains(ImportFlags::Preconcurrency) &&
-        import->importLoc.isValid() && sourceFile &&
-        !sourceFile->hasImportUsedPreconcurrency(*import)) {
-      SourceLoc importLoc = import->importLoc;
-      ctx.Diags.diagnose(
-          importLoc, diag::add_predates_concurrency_import,
-          ctx.LangOpts.isSwiftVersionAtLeast(6),
-          nominal->getParentModule()->getName())
-        .fixItInsert(importLoc, "@preconcurrency ");
+      // If we found the import that makes this nominal type visible, remark
+      // that it can be @preconcurrency import.
+      // Only emit this remark once per source file, because it can happen a
+      // lot.
+      if (import && !import->options.contains(ImportFlags::Preconcurrency) &&
+          import->importLoc.isValid() && sourceFile &&
+          !sourceFile->hasImportUsedPreconcurrency(*import)) {
+        SourceLoc importLoc = import->importLoc;
+        ctx.Diags.diagnose(
+            importLoc, diag::add_predates_concurrency_import,
+            ctx.LangOpts.isSwiftVersionAtLeast(6),
+            nominal->getParentModule()->getName())
+          .fixItInsert(importLoc, "@preconcurrency ");
 
-      sourceFile->setImportUsedPreconcurrency(*import);
+        sourceFile->setImportUsedPreconcurrency(*import);
+      }
     }
   }
 
@@ -1156,7 +1163,7 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
     return;
 
   // If the conformance is explicitly stated, do nothing.
-  if (hasExplicitSendableConformance(nominal))
+  if (hasExplicitSendableConformance(nominal, /*applyModuleDefault=*/false))
     return;
 
   // Diagnose it.
