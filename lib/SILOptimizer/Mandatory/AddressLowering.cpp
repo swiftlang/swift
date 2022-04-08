@@ -2900,6 +2900,14 @@ protected:
     storage.storageAddress = addrMat.materializeAddress(arg);
   }
 
+  void setStorageAddress(SILValue oldValue, SILValue addr) {
+    auto &storage = pass.valueStorageMap.getStorage(oldValue);
+    // getReusedStorageOperand() ensures that oldValue does not already have
+    // separate storage. So there's no need to delete its alloc_stack.
+    assert(!storage.storageAddress || storage.storageAddress == addr);
+    storage.storageAddress = addr;
+  }
+
   void beforeVisit(SILInstruction *inst) {
     LLVM_DEBUG(llvm::dbgs() << "REWRITE DEF "; inst->dump());
     if (storage.storageAddress)
@@ -3001,14 +3009,6 @@ protected:
     // may be loadable types.
     for (Operand &operand : tupleInst->getAllOperands())
       addrMat.initializeComposingUse(&operand);
-  }
-
-  void setStorageAddress(SILValue oldValue, SILValue addr) {
-    auto &storage = pass.valueStorageMap.getStorage(oldValue);
-    // getReusedStorageOperand() ensures that oldValue does not already have
-    // separate storage. So there's no need to delete its alloc_stack.
-    assert(!storage.storageAddress || storage.storageAddress == addr);
-    storage.storageAddress = addr;
   }
 
   void visitUnconditionalCheckedCastInst(
