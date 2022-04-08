@@ -45,6 +45,9 @@ struct SymbolGraphOptions {
 
   /// Whether to emit symbols with SPI information.
   bool IncludeSPISymbols;
+
+  /// Whether to include documentation for clang nodes or not.
+  bool IncludeClangDocs;
 };
 
 } // end namespace symbolgraphgen
