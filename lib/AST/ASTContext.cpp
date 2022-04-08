@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -3960,6 +3961,13 @@ SILFunctionType::SILFunctionType(
   }
   if (!ext.getClangTypeInfo().empty())
     *getTrailingObjects<ClangTypeInfo>() = ext.getClangTypeInfo();
+
+  // Canonicalize all thin functions to be escaping (to keep compatibility
+  // with generic parameters)
+  if (ext.getRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer) {
+    auto extInfoBuilder = ext.intoBuilder().withNoEscape(false);
+    Bits.SILFunctionType.ExtInfoBits = extInfoBuilder.bits;
+  }
 
 #ifndef NDEBUG
   if (ext.getRepresentation() == Representation::WitnessMethod)
