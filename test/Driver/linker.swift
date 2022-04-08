@@ -452,7 +452,7 @@
 // IOS-no-cxx-interop-NOT: -lc++
 
 // IOS-cxx-interop-libcxx: swift
-// IOS-cxx-interop-libcxx-DAG: -enable-cxx-interop
+// IOS-cxx-interop-libcxx-DAG: -enable-experimental-cxx-interop
 // IOS-cxx-interop-libcxx-DAG: -o [[OBJECTFILE:.*]]
 
 // IOS-cxx-interop-libcxx: {{(bin/)?}}ld{{"? }}
@@ -465,7 +465,7 @@
 // LINUX-cxx-interop-NOT: -stdlib
 
 // LINUX-cxx-interop-libcxx: swift
-// LINUX-cxx-interop-libcxx-DAG: -enable-cxx-interop
+// LINUX-cxx-interop-libcxx-DAG: -enable-experimental-cxx-interop
 // LINUX-cxx-interop-libcxx-DAG: -o [[OBJECTFILE:.*]]
 
 // LINUX-cxx-interop-libcxx: clang++{{(\.exe)?"? }}
@@ -476,7 +476,7 @@
 // WINDOWS-cxx-interop-NOT: -stdlib
 
 // WINDOWS-cxx-interop-libcxx: swift
-// WINDOWS-cxx-interop-libcxx-DAG: -enable-cxx-interop
+// WINDOWS-cxx-interop-libcxx-DAG: -enable-experimental-cxx-interop
 // WINDOWS-cxx-interop-libcxx-DAG: -o [[OBJECTFILE:.*]]
 
 // WINDOWS-cxx-interop-libcxx: clang++{{(\.exe)?"? }}

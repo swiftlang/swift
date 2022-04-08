@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
 
 // This test checks that the compiler uses well-known witness tables for types
 // that have the appropriate size/shape (for example, { i8 x 4 } -> i32).

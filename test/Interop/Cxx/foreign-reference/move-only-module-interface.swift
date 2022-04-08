@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=MoveOnly -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MoveOnly -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: class MoveOnly {
 // CHECK-NOT: init
