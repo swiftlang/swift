@@ -18,6 +18,8 @@
 #include "Common/ScalarPropsData.h"
 #endif
 
+#include "Common/ScriptData.h"
+
 #else
 #include "swift/Runtime/Debug.h"
 #endif
@@ -425,5 +427,86 @@ __swift_uint8_t _swift_stdlib_getGeneralCategory(__swift_uint32_t scalar) {
   // array.
   // Return the max here to indicate that we couldn't find one.
   return std::numeric_limits<__swift_uint8_t>::max();
+#endif
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint8_t _swift_stdlib_getScript(__swift_uint32_t scalar) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
+  auto lowerBoundIndex = 0;
+  auto endIndex = SCRIPTS_COUNT;
+  auto upperBoundIndex = endIndex - 1;
+  
+  while (upperBoundIndex >= lowerBoundIndex) {
+    auto index = lowerBoundIndex + (upperBoundIndex - lowerBoundIndex) / 2;
+    
+    auto entry = _swift_stdlib_scripts[index];
+    
+    // Shift the enum value out of the scalar.
+    auto lowerBoundScalar = (entry << 11) >> 11;
+    
+    __swift_uint32_t upperBoundScalar = 0;
+    
+    // If we're not at the end of the array, the range count is simply the
+    // distance to the next element.
+    if (index != endIndex - 1) {
+      auto nextEntry = _swift_stdlib_scripts[index + 1];
+      
+      auto nextLower = (nextEntry << 11) >> 11;
+      
+      upperBoundScalar = nextLower - 1;
+    } else {
+      // Otherwise, the range count is the distance to 0x10FFFF
+      upperBoundScalar = 0x10FFFF;
+    }
+    
+    // Shift the scalar out and get the enum value.
+    auto script = entry >> 21;
+    
+    if (scalar >= lowerBoundScalar && scalar <= upperBoundScalar) {
+      return script;
+    }
+    
+    if (scalar > upperBoundScalar) {
+      lowerBoundIndex = index + 1;
+      continue;
+    }
+    
+    if (scalar < lowerBoundScalar) {
+      upperBoundIndex = index - 1;
+      continue;
+    }
+  }
+  
+  // If we make it out of this loop, then it means the scalar was not found at
+  // all in the array. This should never happen because the array represents all
+  // scalars from 0x0 to 0x10FFFF, but if somehow this branch gets reached,
+  // return 255 to indicate a failure.
+  return std::numeric_limits<__swift_uint8_t>::max();
+#endif
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const __swift_uint8_t *_swift_stdlib_getScriptExtensions(__swift_uint32_t scalar,
+                                                       __swift_uint8_t *count) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
+  auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
+                                                _swift_stdlib_script_extensions,
+                                         _swift_stdlib_script_extensions_ranks);
+  
+  // If we don't have an index into the data indices, then this scalar has no
+  // script extensions
+  if (dataIdx == std::numeric_limits<__swift_intptr_t>::max()) {
+    return 0;
+  }
+  
+  auto scalarDataIdx = _swift_stdlib_script_extensions_data_indices[dataIdx];
+  *count = scalarDataIdx >> 11;
+  
+  return _swift_stdlib_script_extensions_data + (scalarDataIdx & 0x7FF);
 #endif
 }
