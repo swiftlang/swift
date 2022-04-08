@@ -1065,8 +1065,10 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
 
 Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
                                           ParamDecl *param) const {
-  if (auto expr = param->getTypeCheckedDefaultExpr())
-    return expr->getType();
+  if (auto *expr = param->getTypeCheckedDefaultExpr()) {
+    // If the request failed, let's not propagate ErrorType up.
+    return isa<ErrorExpr>(expr) ? Type() : expr->getType();
+  }
   return Type();
 }
 
