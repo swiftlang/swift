@@ -1371,3 +1371,14 @@ func testDynamicMemberSubscriptLookup() {
 // DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: index[#Int#]; name=index
 // DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<Binding<MyStruct>, Value>#}[']'][#Value#]; name=keyPath:
 // DYNAMIC_MEMBER_SUBSCRIPT_LOOKUP: End completions
+
+func testTopLevelFuncWithErrorParam() {
+  enum A { case a }
+  func foo(x: A, b: Undefined) {}
+
+  foo(x: .#^TOP_LEVEL_FUNC_WITH_ERROR_PARAM^#)
+// TOP_LEVEL_FUNC_WITH_ERROR_PARAM: Begin completions, 2 items
+// TOP_LEVEL_FUNC_WITH_ERROR_PARAM-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: a[#A#]; name=a
+// TOP_LEVEL_FUNC_WITH_ERROR_PARAM-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): A#})[#(into: inout Hasher) -> Void#]; name=hash(:)
+// TOP_LEVEL_FUNC_WITH_ERROR_PARAM: End completions
+}
