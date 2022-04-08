@@ -37,7 +37,7 @@ func referenceGlobalActor() async {
 
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = a[1]  // expected-note{{subscript access is 'async'}}
-  a[0] = 1  // expected-error{{subscript 'subscript(_:)' isolated to global actor 'SomeGlobalActor' can not be mutated from this context}}
+  a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a non-isolated context}}
 
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = 32 + a[1] // expected-note@:12{{subscript access is 'async'}}
@@ -126,14 +126,14 @@ func fromAsync() async {
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = a[1]  // expected-note{{subscript access is 'async'}}
   _ = await a[1]
-  a[0] = 1  // expected-error{{subscript 'subscript(_:)' isolated to global actor 'SomeGlobalActor' can not be mutated from this context}}
+  a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a non-isolated context}}
 }
 
 // expected-note@+1{{mutation of this var is only permitted within the actor}}
 @SomeGlobalActor var value: Int = 42
 
 func topLevelSyncFunction(_ number: inout Int) { }
-// expected-error@+1{{var 'value' isolated to global actor 'SomeGlobalActor' can not be used 'inout' from this context}}
+// expected-error@+1{{global actor 'SomeGlobalActor'-isolated var 'value' can not be used 'inout' from a non-isolated context}}
 topLevelSyncFunction(&value)
 
 // Strict checking based on inferred Sendable/async/etc.

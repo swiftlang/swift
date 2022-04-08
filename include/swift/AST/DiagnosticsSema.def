@@ -4457,14 +4457,11 @@ NOTE(note_add_nonisolated_to_decl,none,
      (DeclName, DescriptiveDeclKind))
 NOTE(note_add_async_and_throws_to_decl,none,
      "mark the protocol requirement %0 '%select{|async|throws|async throws}1' "
-     "in order witness it with 'distributed' function declared in distributed actor %2",
-     (DeclName, unsigned, DeclName))
+     "to allow actor-isolated conformances",
+     (DeclName, unsigned))
 NOTE(note_add_distributed_to_decl,none,
-     "add 'distributed' to %0 to make this %1 witness the protocol requirement",
+     "add 'distributed' to %0 to make this %1 satisfy the protocol requirement",
      (DeclName, DescriptiveDeclKind))
-NOTE(note_distributed_requirement_defined_here,none,
-     "distributed instance method requirement %0 declared here",
-     (DeclName))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
      (StringRef, DescriptiveDeclKind, DeclName, Type))
@@ -4541,13 +4538,16 @@ ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
       "explicitly defined", ())
 ERROR(actor_isolated_non_self_reference,none,
-        "actor-isolated %0 %1 can not be "
+        "%5 %0 %1 can not be "
         "%select{referenced|mutated|used 'inout'}2 "
-        "%select{on a non-isolated actor instance|"
+        "%select{from outside the actor|on a different actor instance|"
+        "on a non-isolated actor instance|"
         "from a Sendable function|from a Sendable closure|"
         "from an 'async let' initializer|from global actor %4|"
-        "from the main actor|from a non-isolated context|from a non-isolated autoclosure}3",
-        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
+        "from the main actor|from a non-isolated context|"
+        "from a non-isolated autoclosure}3",
+        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type,
+         ActorIsolation))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %0 %1 can not be accessed from a "
       "non-isolated context",
@@ -4562,18 +4562,6 @@ ERROR(actor_isolated_inout_state,none,
 ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
-ERROR(global_actor_from_instance_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from actor %3 %select{|in a synchronous context}5",
-      (DescriptiveDeclKind, DeclName, Type, DeclName, unsigned, bool))
-ERROR(global_actor_from_other_global_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from different global actor %3 %select{|in a synchronous context}5",
-      (DescriptiveDeclKind, DeclName, Type, Type, unsigned, bool))
-ERROR(global_actor_from_nonactor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from %select{this|a non-isolated}3%select{| synchronous}5 context",
-      (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
 ERROR(actor_isolated_call,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))
@@ -4667,19 +4655,9 @@ WARNING(shared_mutable_state_access,none,
         "reference to %0 %1 is not concurrency-safe because it involves "
         "shared mutable state", (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_witness,none,
-     "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
-     (DescriptiveDeclKind, DeclName))
-ERROR(distributed_actor_isolated_witness,none,
-     "distributed actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
-     (DescriptiveDeclKind, DeclName))
-ERROR(global_actor_isolated_witness,none,
-      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
-      "requirement from protocol %3",
-      (DescriptiveDeclKind, DeclName, Type, Identifier))
-ERROR(global_actor_isolated_requirement_witness_conflict,none,
-      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
-      "requirement from protocol %3 isolated to global actor %4",
-      (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
+     "%select{|distributed }0%1 %2 %3 cannot be used to satisfy %4 protocol "
+     "requirement",
+     (bool, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       "actor %0 cannot conform to global actor isolated protocol %1",
       (Type, Type))
