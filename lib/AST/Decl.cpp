@@ -9380,3 +9380,7 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
   else
     out << "closure";
 }
+
+bool ActorIsolation::isDistributedActor() const {
+  return getKind() == ActorInstance && getActor()->isDistributedActor();
+}

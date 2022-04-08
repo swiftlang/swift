@@ -110,7 +110,7 @@ protocol Interface {
 
 @MainActor
 class Object: Interface {
-  var baz: Int = 42 // expected-warning{{property 'baz' isolated to global actor 'MainActor' can not satisfy corresponding requirement from protocol 'Interface'}}
+  var baz: Int = 42 // expected-warning{{main actor-isolated property 'baz' cannot be used to satisfy nonisolated protocol requirement}}
 }
 
 
@@ -283,7 +283,7 @@ struct Observed {
 }
 
 func checkObserved(_ o: Observed) { // expected-note {{add '@OtherGlobalActor' to make global function 'checkObserved' part of global actor 'OtherGlobalActor'}}
-  _ = o.thing // expected-error {{property 'thing' isolated to global actor 'OtherGlobalActor' can not be referenced from this synchronous context}}
+  _ = o.thing // expected-error {{global actor 'OtherGlobalActor'-isolated property 'thing' can not be referenced from a non-isolated context}}
 }
 
 // ----------------------------------------------------------------------
@@ -358,9 +358,9 @@ struct HasWrapperOnActor {
 
   // expected-note@+1 3{{to make instance method 'testErrors()'}}
   func testErrors() {
-    _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
-    _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
-    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from this synchronous context}}
+    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
+    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = _synced // expected-error{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
   }
 
   @MainActor mutating func testOnMain() {
@@ -422,9 +422,9 @@ actor ActorWithWrapper {
   @WrapperOnActor var synced: Int = 0
   // expected-note@-1 3{{property declared here}}
   func f() {
-    _ = synced // expected-error{{'synced' isolated to global actor}}
-    _ = $synced // expected-error{{'$synced' isolated to global actor}}
-    _ = _synced // expected-error{{'_synced' isolated to global actor}}
+    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced on a different actor instance}}
+    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced on a different actor instance}}
+    _ = _synced // expected-error{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced on a different actor instance}}
 
     @WrapperWithMainActorDefaultInit var value: Int // expected-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
   }
@@ -528,9 +528,9 @@ struct HasWrapperOnUnsafeActor {
   }
 
   nonisolated func testErrors() {
-    _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from}}
-    _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from}}
-    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from a non-isolated synchronous context}}
+    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
+    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = _synced // expected-error{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
   }
 
   @MainActor mutating func testOnMain() {
@@ -634,7 +634,7 @@ class Cutter {
 class Butter {
   var a = useFooInADefer() // expected-error {{call to main actor-isolated global function 'useFooInADefer()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
 
-  nonisolated let b = statefulThingy // expected-error {{var 'statefulThingy' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
+  nonisolated let b = statefulThingy // expected-error {{main actor-isolated var 'statefulThingy' can not be referenced from a non-isolated context}}
 
   var c: Int = {
     return getGlobal7()

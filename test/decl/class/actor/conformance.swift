@@ -15,14 +15,14 @@ extension MyActor: AsyncProtocol {
 }
 
 protocol SyncProtocol {
-  var propertyA: Int { get }
-  var propertyB: Int { get set }
+  var propertyA: Int { get } // expected-note{{'propertyA' declared here}}
+  var propertyB: Int { get set } // expected-note{{'propertyB' declared here}}
 
-  func syncMethodA()
+  func syncMethodA() // expected-note{{mark the protocol requirement 'syncMethodA()' 'async' to allow actor-isolated conformances}}{{21-21= async}}
 
   func syncMethodC() -> Int
 
-  subscript (index: Int) -> String { get }
+  subscript (index: Int) -> String { get } // expected-note{{'subscript(_:)' declared here}}
 
   static func staticMethod()
   static var staticProperty: Int { get }
@@ -31,14 +31,13 @@ protocol SyncProtocol {
 
 actor OtherActor: SyncProtocol {
   var propertyB: Int = 17
-  // expected-error@-1{{actor-isolated property 'propertyB' cannot be used to satisfy a protocol requirement}}
+  // expected-error@-1{{actor-isolated property 'propertyB' cannot be used to satisfy nonisolated protocol requirement}}
 
   var propertyA: Int { 17 }
-  // expected-error@-1{{actor-isolated property 'propertyA' cannot be used to satisfy a protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'propertyA' to make this property not isolated to the actor}}{{3-3=nonisolated }}
+  // expected-error@-1{{actor-isolated property 'propertyA' cannot be used to satisfy nonisolated protocol requirement}}
 
   func syncMethodA() { }
-  // expected-error@-1{{actor-isolated instance method 'syncMethodA()' cannot be used to satisfy a protocol requirement}}
+  // expected-error@-1{{actor-isolated instance method 'syncMethodA()' cannot be used to satisfy nonisolated protocol requirement}}
   // expected-note@-2{{add 'nonisolated' to 'syncMethodA()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 
   // nonisolated methods are okay.
@@ -46,7 +45,7 @@ actor OtherActor: SyncProtocol {
   nonisolated func syncMethodC() -> Int { 5 }
 
   subscript (index: Int) -> String { "\(index)" }
-  // expected-error@-1{{actor-isolated subscript 'subscript(_:)' cannot be used to satisfy a protocol requirement}}
+  // expected-error@-1{{actor-isolated subscript 'subscript(_:)' cannot be used to satisfy nonisolated protocol requirement}}
   // expected-note@-2{{add 'nonisolated' to 'subscript(_:)' to make this subscript not isolated to the actor}}{{3-3=nonisolated }}
 
   // Static methods and properties are okay.
