@@ -37,7 +37,7 @@ class Foo: FooType {
 protocol P1 {
   associatedtype A
 
-  func f(_: A) // expected-note {{protocol requires function 'f' with type '(@escaping SendableX1b.A) -> ()' (aka '(@escaping @Sendable (Int) -> Int) -> ()'); do you want to add a stub?}}
+  func f(_: A) // expected-note {{expected sendability to match requirement here}}
 }
 
 struct X1a : P1 {
@@ -61,10 +61,10 @@ struct X1b : P1 {
 //        instead of adjusting types before adding them to the constraint
 //        graph, we should introduce a new constraint kind that allows only a
 //        witness's adjustments.
-struct SendableX1b : P1 { // expected-error {{type 'SendableX1b' does not conform to protocol 'P1'}}
+struct SendableX1b : P1 {
   typealias A = @Sendable (Int) -> Int
 
-  func f(_: (Int) -> Int) { } // expected-note {{candidate has non-matching type '((Int) -> Int) -> ()'}}
+  func f(_: (Int) -> Int) { } // expected-warning {{sendability of function types in instance method 'f' does not match requirement in protocol 'P1'; this is an error in Swift 6}}
 }
 
 struct X1c : P1 {
@@ -78,8 +78,8 @@ struct X1d : P1 {
 }
 
 protocol P2 {
-  func f(_: (Int) -> Int) // expected-note 3 {{protocol requires function 'f' with type '((Int) -> Int) -> ()'; do you want to add a stub?}}
-  func g(_: @escaping (Int) -> Int) // expected-note 2 {{protocol requires function 'g' with type '(@escaping (Int) -> Int) -> ()'; do you want to add a stub?}}
+  func f(_: (Int) -> Int) // expected-note{{expected sendability to match requirement here}} expected-note 2{{protocol requires function 'f' with type '((Int) -> Int) -> ()'; do you want to add a stub?}}
+  func g(_: @escaping (Int) -> Int) // expected-note 2 {{expected sendability to match requirement here}}
   func h(_: @Sendable (Int) -> Int) // expected-note 2 {{protocol requires function 'h' with type '(@Sendable (Int) -> Int) -> ()'; do you want to add a stub?}}
   func i(_: @escaping @Sendable (Int) -> Int)
 }
@@ -98,16 +98,16 @@ struct X2b : P2 { // expected-error{{type 'X2b' does not conform to protocol 'P2
   func i(_: @escaping (Int) -> Int) { }
 }
 
-struct X2c : P2 { // expected-error{{type 'X2c' does not conform to protocol 'P2'}}
-  func f(_: @Sendable (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@Sendable (Int) -> Int) -> ()'}}
-  func g(_: @Sendable (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@Sendable (Int) -> Int) -> ()'}}
+struct X2c : P2 {
+  func f(_: @Sendable (Int) -> Int) { } // expected-warning{{sendability of function types in instance method 'f' does not match requirement in protocol 'P2'; this is an error in Swift 6}}
+  func g(_: @Sendable (Int) -> Int) { } // expected-warning{{sendability of function types in instance method 'g' does not match requirement in protocol 'P2'; this is an error in Swift 6}}
   func h(_: @Sendable (Int) -> Int) { }
   func i(_: @Sendable (Int) -> Int) { }
 }
 
 struct X2d : P2 { // expected-error{{type 'X2d' does not conform to protocol 'P2'}}
   func f(_: @escaping @Sendable (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@escaping @Sendable (Int) -> Int) -> ()'}}
-  func g(_: @escaping @Sendable (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@escaping @Sendable (Int) -> Int) -> ()'}}
+  func g(_: @escaping @Sendable (Int) -> Int) { } // expected-warning{{sendability of function types in instance method 'g' does not match requirement in protocol 'P2'; this is an error in Swift 6}}
   func h(_: @escaping @Sendable (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@escaping @Sendable (Int) -> Int) -> ()'}}
   func i(_: @escaping @Sendable (Int) -> Int) { }
 }
