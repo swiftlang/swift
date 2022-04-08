@@ -110,7 +110,7 @@ swiftc -g -emit-sil -O file.swift
 * **IRGen** To print the LLVM IR after IR generation:
 
 ```sh
-swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
+swiftc -emit-ir -Xfrontend -disable-llvm-optzns -Xfrontend -disable-swift-specific-llvm-optzns -O file.swift
 ```
 
 * **LLVM passes** To print the LLVM IR after LLVM passes:
