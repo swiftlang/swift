@@ -239,13 +239,10 @@ CStringTests.test("String.cString.with.Array.UInt8.input") {
     }
   }
   // no need to test every case; that is covered in other tests
-  #if os(Linux)
-  expectCrashLater()
-  #else
   expectCrashLater(
-    withMessage: "input of String.init(cString:) must be null-terminated"
+    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // withMessage: "input of String.init(cString:) must be null-terminated"
   )
-  #endif
   _ = String(cString: [] as [UInt8])
   expectUnreachable()
 }
@@ -265,13 +262,10 @@ CStringTests.test("String.cString.with.Array.CChar.input") {
     }
   }
   // no need to test every case; that is covered in other tests
-  #if os(Linux)
-  expectCrashLater()
-  #else
   expectCrashLater(
-    withMessage: "input of String.init(cString:) must be null-terminated"
+    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // withMessage: "input of String.init(cString:) must be null-terminated"
   )
-  #endif
   _ = String(cString: [] as [CChar])
   expectUnreachable()
 }
@@ -294,13 +288,10 @@ CStringTests.test("String.cString.with.inout.UInt8.conversion") {
   var str = String(cString: &c)
   expectTrue(str.isEmpty)
   c = 100
-  #if os(Linux)
-  expectCrashLater()
-  #else
   expectCrashLater(
-    withMessage: "input of String.init(cString:) must be null-terminated"
+    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // withMessage: "input of String.init(cString:) must be null-terminated"
   )
-  #endif
   str = String(cString: &c)
   expectUnreachable()
 }
@@ -310,13 +301,10 @@ CStringTests.test("String.cString.with.inout.CChar.conversion") {
   var str = String(cString: &c)
   expectTrue(str.isEmpty)
   c = 100
-  #if os(Linux)
-  expectCrashLater()
-  #else
   expectCrashLater(
-    withMessage: "input of String.init(cString:) must be null-terminated"
+    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // withMessage: "input of String.init(cString:) must be null-terminated"
   )
-  #endif
   str = String(cString: &c)
   expectUnreachable()
 }
@@ -337,13 +325,10 @@ CStringTests.test("String.validatingUTF8.with.Array.input") {
     }
   }
   // no need to test every case; that is covered in other tests
-  #if os(Linux)
-  expectCrashLater()
-  #else
   expectCrashLater(
-    withMessage: "input of String.init(validatingUTF8:) must be null-terminated"
+    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // withMessage: "input of String.init(validatingUTF8:) must be null-terminated"
   )
-  #endif
   _ = String(validatingUTF8: [])
   expectUnreachable()
 }
@@ -369,13 +354,10 @@ CStringTests.test("String.validatingUTF8.with.inout.conversion") {
   expectNotNil(str)
   expectEqual(str?.isEmpty, true)
   c = 100
-  #if os(Linux)
-  expectCrashLater()
-  #else
   expectCrashLater(
-    withMessage: "input of String.init(validatingUTF8:) must be null-terminated"
+    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // withMessage: "input of String.init(validatingUTF8:) must be null-terminated"
   )
-  #endif
   str = String(validatingUTF8: &c)
   expectUnreachable()
 }
@@ -397,13 +379,10 @@ CStringTests.test("String.decodeCString.with.Array.input") {
     }
   }
   // no need to test every case; that is covered in other tests
-  #if os(Linux)
-  expectCrashLater()
-  #else
   expectCrashLater(
-    withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
+    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
   )
-  #endif
   _ = String.decodeCString([], as: Unicode.UTF8.self)
   expectUnreachable()
 }
@@ -436,13 +415,10 @@ CStringTests.test("String.decodeCString.with.inout.conversion") {
   expectEqual(result?.result.isEmpty, true)
   expectEqual(result?.repairsMade, false)
   c = 100
-  #if os(Linux)
-  expectCrashLater()
-  #else
   expectCrashLater(
-    withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
+    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
   )
-  #endif
   result = String.decodeCString(&c, as: Unicode.UTF8.self)
   expectUnreachable()
 }
@@ -462,13 +438,10 @@ CStringTests.test("String.init.decodingCString.with.Array.input") {
     }
   }
   // no need to test every case; that is covered in other tests
-  #if os(Linux)
-  expectCrashLater()
-  #else
   expectCrashLater(
-    withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
+    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
   )
-  #endif
   _ = String(decodingCString: [], as: Unicode.UTF8.self)
   expectUnreachable()
 }
@@ -491,13 +464,10 @@ CStringTests.test("String.init.decodingCString.with.inout.conversion") {
   var str = String(decodingCString: &c, as: Unicode.UTF8.self)
   expectEqual(str.isEmpty, true)
   c = 100
-  #if os(Linux)
-  expectCrashLater()
-  #else
   expectCrashLater(
-    withMessage: "input of String.init(decodingCString:as:) must be null-terminated"
+    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // withMessage: "input of String.init(decodingCString:as:) must be null-terminated"
   )
-  #endif
   str = String(decodingCString: &c, as: Unicode.UTF8.self)
   expectUnreachable()
 }
