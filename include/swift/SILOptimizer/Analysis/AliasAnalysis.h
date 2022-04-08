@@ -21,7 +21,6 @@
 namespace swift {
 
 class SideEffectAnalysis;
-class EscapeAnalysis;
 
 /// This class is a simple wrapper around an alias analysis cache. This is
 /// needed since we do not have an "analysis" infrastructure.
@@ -75,7 +74,8 @@ private:
   using TBAACacheKey = std::pair<SILType, SILType>;
 
   SideEffectAnalysis *SEA;
-  EscapeAnalysis *EA;
+
+  void *escapeInfoBuffer[6];
 
   /// A cache for the computation of TBAA. True means that the types may
   /// alias. False means that the types must not alias.
@@ -125,8 +125,9 @@ private:
   bool isInImmutableScope(SILInstruction *inst, SILValue V);
 
 public:
-  AliasAnalysis(SideEffectAnalysis *SEA, EscapeAnalysis *EA)
-    : SEA(SEA), EA(EA) {}
+  AliasAnalysis(SideEffectAnalysis *SEA);
+
+  ~AliasAnalysis();
 
   static SILAnalysisKind getAnalysisKind() { return SILAnalysisKind::Alias; }
 
@@ -157,11 +158,6 @@ public:
                   SILType TBAAType2 = SILType()) {
     return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MayAlias;
   }
-
-  /// \returns True if the release of the \p releasedReference can access or
-  /// free memory accessed by \p User.
-  bool mayValueReleaseInterfereWithInstruction(SILInstruction *User,
-                                               SILValue releasedReference);
 
   /// Use the alias analysis to determine the memory behavior of Inst with
   /// respect to V.
@@ -206,6 +202,22 @@ public:
 
   /// Returns true if \p Ptr may be released by the builtin \p BI.
   bool canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr);
+
+  /// Returns true if the address(es of) `addr` can escape to `toInst`.
+  MemoryBehavior getAddressEscapingBehavior(SILValue addr, SILInstruction *toInst,
+                         uint64_t readingOpsMask = ~uint64_t(0),
+                         uint64_t writingOpsMask = ~uint64_t(0));
+
+  /// Returns true if the object(s of) `obj` can escape to `toInst`.
+  bool isObjectEscaping(SILValue obj, SILInstruction *toInst,
+                        uint64_t operandMask = ~uint64_t(0));
+
+  /// Is the `addr` within all reachable objects/addresses, when start walking
+  /// from `obj`?
+  bool isAddrVisibleFromObject(SILValue addr, SILValue obj);
+
+  /// Returns true if `lhs` can reference the same field as `rhs`.
+  bool canReferenceSameField(SILValue lhs, SILValue rhs);
 };
 
 

@@ -113,6 +113,8 @@ public:
     getCalleeEffects(calleeEffects, fullApply);
     callEffects.mergeFromApply(calleeEffects, fullApply);
   }
+  
+  BasicCalleeAnalysis *getBasicCalleeAnalysis() { return BCA; }
 
   virtual void initialize(SILPassManager *PM) override;
 

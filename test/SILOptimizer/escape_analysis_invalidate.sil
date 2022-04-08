@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -temp-rvalue-opt -enable-sil-verify-all -escapes-internal-verify -wmo | %FileCheck %s
+// RUN: %target-sil-opt %s -temp-rvalue-opt -enable-sil-verify-all -wmo | %FileCheck %s
 //
 // TempRValue iteratively uses EscapeAnalysis and deletes
 // instructions. Make sure that the connection graph remains valid

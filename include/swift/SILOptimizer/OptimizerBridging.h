@@ -15,6 +15,8 @@
 
 #include "swift/SIL/SILBridging.h"
 
+#include <stdint.h>
+
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 #ifdef __cplusplus
@@ -120,6 +122,23 @@ BridgedPostDomTree PassContext_getPostDomTree(BridgedPassContext context);
 SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
                                          BridgedBasicBlock dominating,
                                          BridgedBasicBlock dominated);
+
+typedef void (* _Nonnull AliasAnalysisInitFn)(void * _Nonnull, SwiftInt,
+                                              BridgedCalleeAnalysis);
+typedef void (* _Nonnull AliasAnalysisDestroyFn)(void * _Nonnull, SwiftInt);
+typedef BridgedMemoryBehavior (* _Nonnull AliasAnalysisAddr2InstFn)(
+      void * _Nonnull, BridgedValue, BridgedInstruction, uint64_t, uint64_t);
+typedef SwiftInt (* _Nonnull AliasAnalysisEscaping2InstFn)(
+      void * _Nonnull, BridgedValue, BridgedInstruction, uint64_t);
+typedef SwiftInt (* _Nonnull AliasAnalysisEscaping2ValFn)(
+      void * _Nonnull, BridgedValue, BridgedValue);
+
+void AliasAnalysis_register(AliasAnalysisInitFn initFn,
+                            AliasAnalysisDestroyFn destroyFn,
+                            AliasAnalysisAddr2InstFn isAddrEscaping2InstFn,
+                            AliasAnalysisEscaping2InstFn isObjEscaping2InstFn,
+                            AliasAnalysisEscaping2ValFn isAddrVisibleFromObjFn,
+                            AliasAnalysisEscaping2ValFn mayPointToSameAddrFn);
 
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
 BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab);
