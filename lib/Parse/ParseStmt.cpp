@@ -494,13 +494,12 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     if (NeedParseErrorRecovery) {
       SyntaxParsingContext TokenListCtxt(SyntaxContext,
                                          SyntaxKind::NonEmptyTokenList);
-      // If we had a parse error, skip to the start of the next stmt, decl or
-      // '{'.
+      // If we had a parse error, skip to the start of the next stmt or decl.
       //
       // It would be ideal to stop at the start of the next expression (e.g.
       // "X = 4"), but distinguishing the start of an expression from the middle
       // of one is "hard".
-      skipUntilDeclStmtRBrace(tok::l_brace);
+      skipUntilDeclStmtRBrace();
 
       // If we have to recover, pretend that we had a semicolon; it's less
       // noisy that way.
@@ -1875,7 +1874,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
             BraceStmt::create(Context, EndLoc, {}, EndLoc, /*implicit=*/true)));
   };
 
-  if (Tok.is(tok::l_brace)) {
+  if (Tok.isAny(tok::l_brace, tok::kw_else)) {
     SourceLoc LBraceLoc = Tok.getLoc();
     diagnose(GuardLoc, diag::missing_condition_after_guard)
       .highlight(SourceRange(GuardLoc, LBraceLoc));
