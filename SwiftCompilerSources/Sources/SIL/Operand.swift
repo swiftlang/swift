@@ -16,7 +16,7 @@ import SILBridging
 public struct Operand : CustomStringConvertible, CustomReflectable {
   fileprivate let bridged: BridgedOperand
 
-  init(_ bridged: BridgedOperand) {
+  public init(_ bridged: BridgedOperand) {
     self.bridged = bridged
   }
 

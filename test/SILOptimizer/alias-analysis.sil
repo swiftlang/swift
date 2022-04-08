@@ -74,6 +74,8 @@ bb0(%0 : $*MyStruct):
   %2 = integer_literal $Builtin.Word, 0
   %3 = index_addr %0 : $*MyStruct, %2 : $Builtin.Word
   %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+  fix_lifetime %1 : $*Int64
+  fix_lifetime %4 : $*Int64
   %99 = tuple ()
   return %99 : $()
 }
@@ -92,6 +94,8 @@ bb0(%0 : $*MyStruct, %1 : $Builtin.Word):
   %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
   %3 = index_addr %0 : $*MyStruct, %1 : $Builtin.Word
   %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+  fix_lifetime %2 : $*Int64
+  fix_lifetime %4 : $*Int64
   %99 = tuple ()
   return %99 : $()
 }

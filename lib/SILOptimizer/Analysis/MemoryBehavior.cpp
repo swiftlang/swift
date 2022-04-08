@@ -18,7 +18,6 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "llvm/Support/Debug.h"
@@ -48,8 +47,6 @@ class MemoryBehaviorVisitor
 
   SideEffectAnalysis *SEA;
 
-  EscapeAnalysis *EA;
-
   /// The value we are attempting to discover memory behavior relative to.
   SILValue V;
 
@@ -64,9 +61,8 @@ class MemoryBehaviorVisitor
   Optional<SILType> TypedAccessTy;
 
 public:
-  MemoryBehaviorVisitor(AliasAnalysis *AA, SideEffectAnalysis *SEA,
-                        EscapeAnalysis *EA, SILValue V)
-      : AA(AA), SEA(SEA), EA(EA), V(V) {}
+  MemoryBehaviorVisitor(AliasAnalysis *AA, SideEffectAnalysis *SEA, SILValue V)
+      : AA(AA), SEA(SEA), V(V) {}
 
   SILType getValueTBAAType() {
     if (!TypedAccessTy)
@@ -372,153 +368,99 @@ MemBehavior MemoryBehaviorVisitor::visitAbortApplyInst(AbortApplyInst *AAI) {
   return getApplyBehavior(AAI->getBeginApply());
 }
 
-/// Returns true if the \p address may have any users which let the address
-/// escape in an unusual way, e.g. with an address_to_pointer instruction.
-static bool hasEscapingUses(SILValue address, int &numChecks) {
-  for (Operand *use : address->getUses()) {
-    SILInstruction *user = use->getUser();
-    
-    // Avoid quadratic complexity in corner cases. A limit of 24 is more than
-    // enough in most cases.
-    if (++numChecks > 24)
-      return true;
-
-    switch (user->getKind()) {
-      case SILInstructionKind::FixLifetimeInst:
-      case SILInstructionKind::LoadInst:
-      case SILInstructionKind::StoreInst:
-      case SILInstructionKind::CopyAddrInst:
-      case SILInstructionKind::MarkUnresolvedMoveAddrInst:
-      case SILInstructionKind::DestroyAddrInst:
-      case SILInstructionKind::DeallocStackInst:
-      case SILInstructionKind::EndAccessInst:
-        // Those instructions have no result and cannot escape the address.
-        break;
-      case SILInstructionKind::DebugValueInst:
-        if (DebugValueInst::hasAddrVal(user))
-          break;
-        return true;
-      case SILInstructionKind::ApplyInst:
-      case SILInstructionKind::TryApplyInst:
-      case SILInstructionKind::BeginApplyInst:
-        // Apply instructions can not let an address escape either. It's not
-        // possible that an address, passed as an indirect parameter, escapes
-        // the function in any way (which is not unsafe and undefined behavior).
-        break;
-      case SILInstructionKind::BeginAccessInst:
-      case SILInstructionKind::OpenExistentialAddrInst:
-      case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-      case SILInstructionKind::StructElementAddrInst:
-      case SILInstructionKind::TupleElementAddrInst:
-      case SILInstructionKind::UncheckedAddrCastInst:
-        // Check the uses of address projections.
-        if (hasEscapingUses(cast<SingleValueInstruction>(user), numChecks))
-          return true;
-        break;
-      case SILInstructionKind::AddressToPointerInst:
-        // This is _the_ instruction which can let an address escape.
-        return true;
-      default:
-        // To be conservative, also bail for anything we don't handle here.
-        return true;
-    }
-  }
-  return false;
-}
-
 MemBehavior MemoryBehaviorVisitor::getApplyBehavior(FullApplySite AS) {
-
-  // Do a quick check first: if V is directly passed to an in_guaranteed
-  // argument, we know that the function cannot write to it.
-  for (Operand &argOp : AS.getArgumentOperands()) {
-    if (argOp.get() == V &&
-        AS.getArgumentConvention(argOp) ==
-          swift::SILArgumentConvention::Indirect_In_Guaranteed) {
-      return MemBehavior::MayRead;
-    }
-  }
-
-  SILValue object = getUnderlyingObject(V);
-  int numUsesChecked = 0;
-  
-  // For exclusive/local addresses we can do a quick and good check with alias
-  // analysis. For everything else we use escape analysis (see below).
-  // TODO: The check for not-escaping can probably done easier with the upcoming
-  // API of AccessStorage.
-  bool nonEscapingAddress =
-    (isa<AllocStackInst>(object) || isExclusiveArgument(object)) &&
-    !hasEscapingUses(object, numUsesChecked);
 
   FunctionSideEffects applyEffects;
   SEA->getCalleeEffects(applyEffects, AS);
 
-  MemBehavior behavior = MemBehavior::None;
   MemBehavior globalBehavior = applyEffects.getGlobalEffects().getMemBehavior(
                            RetainObserveKind::IgnoreRetains);
+  MemBehavior behavior = globalBehavior;
 
-  // If it's a non-escaping address, we don't care about the "global" effects
-  // of the called function.
-  if (!nonEscapingAddress)
-    behavior = globalBehavior;
-  
-  // Check all parameter effects.
-  for (unsigned argIdx = 0, end = AS.getNumArguments();
-       argIdx < end && behavior < MemBehavior::MayHaveSideEffects;
-       ++argIdx) {
-    SILValue arg = AS.getArgument(argIdx);
-    
-    // In case the argument is not an address, alias analysis will always report
-    // a no-alias. Therefore we have to treat non-address arguments
-    // conservatively here. For example V could be a ref_element_addr of a
-    // reference argument. In this case V clearly "aliases" the argument, but
-    // this is not reported by alias analysis.
-    if ((!nonEscapingAddress && !arg->getType().isAddress()) ||
-         mayAlias(arg)) {
-      MemBehavior argBehavior = applyEffects.getArgumentBehavior(AS, argIdx);
-      behavior = combineMemoryBehavior(behavior, argBehavior);
+  uint64_t readingOps = 0;
+  uint64_t writingOps = 0;
+
+  for (unsigned argIdx = 0, end = AS.getNumArguments(); argIdx < end; ++argIdx) {
+    unsigned opIdx = argIdx + AS.getOperandIndexOfFirstArgument();
+    if (opIdx >= 64)
+      break;
+
+    MemBehavior argBehavior = applyEffects.getArgumentBehavior(AS, argIdx);
+
+    bool isArgReading = true;
+    bool isArgWriting = true;
+    Operand &argOp = AS.getArgumentRef(argIdx);
+
+    if (AS.getArgumentConvention(argOp) ==
+          swift::SILArgumentConvention::Indirect_In_Guaranteed) {
+      isArgWriting = false;
     }
+    if (globalBehavior == MemBehavior::None) {
+      switch (argBehavior) {
+        case MemBehavior::None:
+          isArgReading = false;
+          isArgWriting = false;
+          break;
+        case MemBehavior::MayRead:
+          isArgWriting = false;
+          break;
+        case MemBehavior::MayWrite:
+          isArgReading = false;
+          break;
+        case MemBehavior::MayReadWrite:
+        case MemBehavior::MayHaveSideEffects:
+          break;
+      }
+    }
+    if (isArgReading)
+      readingOps |= uint64_t(1) << opIdx;
+    if (isArgWriting)
+      writingOps |= uint64_t(1) << opIdx;
+
+    behavior = combineMemoryBehavior(behavior, argBehavior);
   }
+  
+  if (behavior == MemBehavior::None)
+    return MemBehavior::None;
+  if (behavior > MemBehavior::MayRead && isLetValue())
+    return MemBehavior::MayRead;
 
-  if (behavior > MemBehavior::None) {
-    if (behavior > MemBehavior::MayRead && isLetValue())
-      behavior = MemBehavior::MayRead;
-
-    // Ask escape analysis.
-    if (!EA->canEscapeTo(V, AS))
-      behavior = MemBehavior::None;
+  switch (AA->getAddressEscapingBehavior(V, AS.getInstruction(), readingOps, writingOps)) {
+    case MemBehavior::None:
+      return MemBehavior::None;
+    case MemBehavior::MayRead:
+      if (behavior == MemBehavior::MayWrite)
+        return MemBehavior::None;
+      return MemBehavior::MayRead;
+    case MemBehavior::MayWrite:
+      if (behavior == MemBehavior::MayRead)
+        return MemBehavior::None;
+      return MemBehavior::MayWrite;
+    case MemBehavior::MayReadWrite:
+    case MemBehavior::MayHaveSideEffects:
+      return behavior;
   }
-  LLVM_DEBUG(llvm::dbgs() << "  Found apply, returning " << behavior << '\n');
-
-  return behavior;
 }
 
 MemBehavior
 MemoryBehaviorVisitor::visitStrongReleaseInst(StrongReleaseInst *SI) {
-  if (!EA->canEscapeTo(V, SI))
-    return MemBehavior::None;
-  return MemBehavior::MayHaveSideEffects;
+  return AA->getAddressEscapingBehavior(V, SI);
 }
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
 MemBehavior \
 MemoryBehaviorVisitor::visit##Name##ReleaseInst(Name##ReleaseInst *SI) { \
-  if (!EA->canEscapeTo(V, SI)) \
-    return MemBehavior::None; \
-  return MemBehavior::MayHaveSideEffects; \
+  return AA->getAddressEscapingBehavior(V, SI); \
 }
 #include "swift/AST/ReferenceStorage.def"
 
 MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
-  if (!EA->canEscapeTo(V, SI))
-    return MemBehavior::None;
-  return MemBehavior::MayHaveSideEffects;
+  return AA->getAddressEscapingBehavior(V, SI);
 }
 
 MemBehavior
 MemoryBehaviorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
-  if (!EA->canEscapeTo(V, DVI))
-    return MemBehavior::None;
-  return MemBehavior::MayHaveSideEffects;
+  return AA->getAddressEscapingBehavior(V, DVI);
 }
 
 MemBehavior MemoryBehaviorVisitor::visitSetDeallocatingInst(SetDeallocatingInst *SDI) {
@@ -699,7 +641,7 @@ AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V) {
                           << *V);
   assert(SEA && "SideEffectsAnalysis must be initialized!");
   
-  MemBehavior result = MemoryBehaviorVisitor(this, SEA, EA, V).visit(Inst);
+  MemBehavior result = MemoryBehaviorVisitor(this, SEA, V).visit(Inst);
   
   // If the "regular" alias analysis thinks that Inst may modify V, check if
   // Inst is in an immutable scope of V.

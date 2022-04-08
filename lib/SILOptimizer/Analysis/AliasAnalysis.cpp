@@ -20,7 +20,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -95,21 +94,6 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, AliasResult R) {
   }
 
   llvm_unreachable("Unhandled AliasResult in switch.");
-}
-
-// Return the address of the directly accessed memory. If either the address is
-// unknown, or any other memory is accessed via indirection, return an invalid
-// SILValue.
-SILValue getDirectlyAccessedMemory(SILInstruction *User) {
-  if (auto *LI = dyn_cast<LoadInst>(User)) {
-    return LI->getOperand();
-  }
-
-  if (auto *SI = dyn_cast<StoreInst>(User)) {
-    return SI->getDest();
-  }
-
-  return SILValue();
 }
 
 //===----------------------------------------------------------------------===//
@@ -538,6 +522,27 @@ bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2,
 //                                Entry Points
 //===----------------------------------------------------------------------===//
 
+// Bridging functions.
+static AliasAnalysisInitFn initFunction = nullptr;
+static AliasAnalysisDestroyFn destroyFunction = nullptr;
+static AliasAnalysisAddr2InstFn isAddrEscaping2InstFunction = nullptr;
+static AliasAnalysisEscaping2InstFn isObjEscaping2InstFunction = nullptr;
+static AliasAnalysisEscaping2ValFn isAddrVisibleFromObjFunction = nullptr;
+static AliasAnalysisEscaping2ValFn canReferenceSameFieldFunction = nullptr;
+
+AliasAnalysis::AliasAnalysis(SideEffectAnalysis *SEA) : SEA(SEA) {
+  if (initFunction) {
+    initFunction(&escapeInfoBuffer, sizeof(escapeInfoBuffer),
+                 {SEA->getBasicCalleeAnalysis()});
+  }
+}
+
+AliasAnalysis::~AliasAnalysis() {
+  if (destroyFunction) {
+    destroyFunction(&escapeInfoBuffer, sizeof(escapeInfoBuffer));
+  }
+}
+
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
 /// to disambiguate the two values.
 AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
@@ -631,7 +636,7 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // modeled by escape analysis as different content, and canPointToSameMemory
   // assumes that only the pointer itself may be accessed here, not any other
   // address that can be derived from this pointer.
-  if (!EA->canPointToSameMemory(V1, V2)) {
+  if (!canReferenceSameField(V1, V2)) {
     LLVM_DEBUG(llvm::dbgs() << "            Found not-aliased objects based on "
                                "escape analysis\n");
     return AliasResult::NoAlias;
@@ -661,128 +666,46 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 }
 
 bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
-  // If the connection graph is invalid due to a very large function, we also
-  // skip all other tests, which might take significant time for a very large
-  // function.
-  // This is a workaround for some quadratic complexity in ARCSequenceOpt.
-  // TODO: remove this check once ARCSequenceOpt is retired or the quadratic
-  // behavior is fixed.
-  auto *conGraph = EA->getConnectionGraph(FAS.getFunction());
-  if (!conGraph->isValid())
-    return true;
-
   // Treat applications of no-return functions as decrementing ref counts. This
   // causes the apply to become a sink barrier for ref count increments.
   if (FAS.isCalleeNoReturn())
     return true;
 
-  /// If the pointer cannot escape to the function we are done.
-  if (!EA->canEscapeTo(Ptr, FAS))
-    return false;
-
   FunctionSideEffects ApplyEffects;
   SEA->getCalleeEffects(ApplyEffects, FAS);
 
   auto &GlobalEffects = ApplyEffects.getGlobalEffects();
-  if (ApplyEffects.mayReadRC() || GlobalEffects.mayRelease())
-    return true;
-
-  /// The function has no unidentified releases, so let's look at the arguments
-  // in detail.
-  for (unsigned Idx = 0, End = FAS.getNumArguments(); Idx < End; ++Idx) {
-    auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
-    if (ArgEffect.mayRelease()) {
-      // The function may release this argument, so check if the pointer can
-      // escape to it.
-      auto arg = FAS.getArgument(Idx);
-      if (arg->getType().isAddress()) {
-        // Handle indirect argument as if they are a release to any references
-        // pointed to by the argument's address.
-        if (EA->mayReleaseAddressContent(arg, Ptr))
-          return true;
-      } else {
-        // Handle direct arguments as if they are a direct release of the
-        // reference (just like a destroy_value).
-        if (EA->mayReleaseReferenceContent(arg, Ptr))
-          return true;
+  uint64_t releasingOps = ~uint64_t(0);
+  if (!ApplyEffects.mayReadRC() && !GlobalEffects.mayRelease()) {
+    /// The function has no unidentified releases, so let's look at the arguments
+    // in detail.
+    bool anyArgReleases = false;
+    for (unsigned argIdx = 0, end = FAS.getNumArguments(); argIdx < end; ++argIdx) {
+      auto &argEffect = ApplyEffects.getParameterEffects()[argIdx];
+      unsigned opIdx = argIdx + FAS.getOperandIndexOfFirstArgument();
+      if (argEffect.mayRelease()) {
+        anyArgReleases = true;
+      } else if (opIdx < 64) {
+        releasingOps &= ~(uint64_t(1) << opIdx);
       }
     }
+    if (!anyArgReleases)
+      return false;
   }
-  return false;
+
+  /// If the pointer cannot escape to the function we are done.
+  bool result = isObjectEscaping(Ptr, FAS.getInstruction(), releasingOps);
+  return result;
 }
 
 bool AliasAnalysis::canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr) {
-  for (SILValue Arg : BI->getArguments()) {
-
-    // Exclude some types of arguments where Ptr can never escape to.
-    if (isa<MetatypeInst>(Arg))
-      continue;
-    if (Arg->getType().is<BuiltinIntegerType>())
-      continue;
-
-    // A builtin can only release an object if it can escape to one of the
-    // builtin's arguments.
-    if (Arg->getType().isAddress()) {
-      // Handle indirect argument as if they are a release to any references
-      // pointed to by the argument's address.
-      if (EA->mayReleaseAddressContent(Arg, Ptr))
-        return true;
-    } else {
-      // Handle direct arguments as if they are a direct release of the
-      // reference (just like a destroy_value).
-      if (EA->mayReleaseReferenceContent(Arg, Ptr))
-        return true;
-    }
-  }
-  return false;
-}
-
-// If the deinit for releasedReference can release any values used by User, then
-// this is an interference. (The retains that originally forced liveness of
-// those values may have already been eliminated). Note that we only care about
-// avoiding a dangling pointer. The memory side affects of Release are
-// unordered.
-//
-// \p releasedReference must be a value that directly contains the references
-// being released. It cannot be an address or other kind of pointer that
-// indirectly releases a reference. Otherwise, the escape analysis query is
-// invalid.
-bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(
-    SILInstruction *User, SILValue releasedReference) {
-  assert(!releasedReference->getType().isAddress()
-         && "an address is never a reference");
-
-  // If this instruction can not read or write any memory. Its OK.
-  if (!User->mayReadOrWriteMemory())
-    return false;
-
-  // Get a pointer to the memory directly accessed by 'Users' (either via an
-  // address or heap reference operand). If additional memory may be indirectly
-  // accessed by 'User', such as via an inout argument, then stop here because
-  // mayReleaseContent can only reason about one level of memory access.
-  //
-  // TODO: Handle @inout arguments by iterating over the apply arguments. For
-  // each argument find out if any reachable content can be released. This is
-  // slightly more involved than mayReleaseContent because it needs to check all
-  // connection graph nodes reachable from accessedPointer that don't pass
-  // through another stored reference.
-  SILValue accessedPointer = getDirectlyAccessedMemory(User);
-  if (!accessedPointer)
-    return true;
-
-  // If releasedReference can reach the first refcounted object reachable from
-  // accessedPointer, then releasing it early may destroy the object accessed by
-  // accessedPointer. Access to any objects beyond the first released refcounted
-  // object are irrelevant--they must already have sufficient refcount that they
-  // won't be released when releasing Ptr.
-  return EA->mayReleaseReferenceContent(releasedReference, accessedPointer);
+  return isObjectEscaping(Ptr, BI);
 }
 
 namespace {
 
 class AliasAnalysisContainer : public FunctionAnalysisBase<AliasAnalysis> {
   SideEffectAnalysis *SEA = nullptr;
-  EscapeAnalysis *EA = nullptr;
 
 public:
   AliasAnalysisContainer() : FunctionAnalysisBase(SILAnalysisKind::Alias) {}
@@ -795,13 +718,12 @@ public:
   // information.
   virtual std::unique_ptr<AliasAnalysis>
   newFunctionAnalysis(SILFunction *F) override {
-    assert(EA && SEA && "dependent analysis not initialized");
-    return std::make_unique<AliasAnalysis>(SEA, EA);
+    assert(SEA && "dependent analysis not initialized");
+    return std::make_unique<AliasAnalysis>(SEA);
   }
 
   virtual void initialize(SILPassManager *PM) override {
     SEA = PM->getAnalysis<SideEffectAnalysis>();
-    EA = PM->getAnalysis<EscapeAnalysis>();
   }
 };
 
@@ -825,4 +747,51 @@ BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
                                                    BridgedValue addr) {
   return (BridgedMemoryBehavior)castToAliasAnalysis(aa)->
     computeMemoryBehavior(castToInst(inst), castToSILValue(addr));
+}
+
+void AliasAnalysis_register(AliasAnalysisInitFn initFn,
+                            AliasAnalysisDestroyFn destroyFn,
+                            AliasAnalysisAddr2InstFn isAddrEscaping2InstFn,
+                            AliasAnalysisEscaping2InstFn isObjEscaping2InstFn,
+                            AliasAnalysisEscaping2ValFn isAddrVisibleFromObjFn,
+                            AliasAnalysisEscaping2ValFn canReferenceSameFieldFn) {
+  initFunction = initFn;
+  destroyFunction = destroyFn;
+  isAddrEscaping2InstFunction = isAddrEscaping2InstFn;
+  isObjEscaping2InstFunction = isObjEscaping2InstFn;
+  isAddrVisibleFromObjFunction = isAddrVisibleFromObjFn;
+  canReferenceSameFieldFunction = canReferenceSameFieldFn;
+}
+
+SILInstruction::MemoryBehavior AliasAnalysis::getAddressEscapingBehavior(
+            SILValue addr, SILInstruction *toInst,
+            uint64_t readingOpsMask, uint64_t writingOpsMask) {
+  if (isAddrEscaping2InstFunction) {
+    return (MemoryBehavior)isAddrEscaping2InstFunction(&escapeInfoBuffer, {addr},
+                {toInst->asSILNode()}, readingOpsMask, writingOpsMask);
+  }
+  return MemoryBehavior::MayHaveSideEffects;
+}
+
+bool AliasAnalysis::isObjectEscaping(SILValue obj, SILInstruction *toInst,
+                                     uint64_t operandMask) {
+  if (isObjEscaping2InstFunction) {
+    return isObjEscaping2InstFunction(&escapeInfoBuffer, {obj},
+                                      {toInst->asSILNode()}, operandMask) != 0;
+  }
+  return true;
+}
+
+bool AliasAnalysis::isAddrVisibleFromObject(SILValue addr, SILValue obj) {
+  if (isAddrVisibleFromObjFunction) {
+    return isAddrVisibleFromObjFunction(&escapeInfoBuffer, {addr}, {obj}) != 0;
+  }
+  return true;
+}
+
+bool AliasAnalysis::canReferenceSameField(SILValue lhs, SILValue rhs) {
+  if (canReferenceSameFieldFunction) {
+    return canReferenceSameFieldFunction(&escapeInfoBuffer, {lhs}, {rhs}) != 0;
+  }
+  return true;
 }
