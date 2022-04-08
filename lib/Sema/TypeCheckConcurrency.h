@@ -353,9 +353,10 @@ struct SendableCheckContext {
 ///
 /// \param diagnose Emit a diagnostic indicating that the current type
 /// is non-Sendable, with the suggested behavior limitation. Returns \c true
-/// if an error was produced.
+/// if it did not emit any diagnostics.
 ///
-/// \returns \c true if any diagnostics were produced, \c false otherwise.
+/// \returns \c true if any errors were produced, \c false if no diagnostics or
+/// only warnings and notes were produced.
 bool diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose);
@@ -370,7 +371,8 @@ namespace detail {
 /// Diagnose any non-Sendable types that occur within the given type, using
 /// the given diagnostic.
 ///
-/// \returns \c true if any errors were produced, \c false otherwise.
+/// \returns \c true if any errors were produced, \c false if no diagnostics or
+/// only warnings and notes were produced.
 template<typename ...DiagArgs>
 bool diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
@@ -388,6 +390,26 @@ bool diagnoseNonSendableTypes(
     return false;
   });
 }
+
+/// Diagnose this sendability error with behavior based on the import of
+/// \p nominal . For instance, depending on how \p nominal is imported into
+/// \p fromContext , the diagnostic behavior limitation may be lower or the
+/// compiler might emit a fix-it adding \c \@preconcurrency to the \c import .
+///
+/// \param nominal The declaration whose import we should check, or \c nullptr
+/// to get behavior for a non-nominal type.
+///
+/// \param fromContext The context where the error will be emitted.
+///
+/// \param diagnose Emit a diagnostic indicating a sendability problem,
+/// with the suggested behavior limitation. Returns \c true
+/// if it did \em not emit any diagnostics.
+///
+/// \returns \c true if any errors were produced, \c false if no diagnostics or
+/// only warnings and notes were produced.
+bool diagnoseSendabilityErrorBasedOn(
+    NominalTypeDecl *nominal, SendableCheckContext fromContext,
+    llvm::function_ref<bool(DiagnosticBehavior)> diagnose);
 
 /// Given a set of custom attributes, pick out the global actor attributes
 /// and perform any necessary resolution and diagnostics, returning the
