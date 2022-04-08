@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/InferViaDefaults.swiftmodule -enable-experimental-type-inference-from-defaults -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift
-// RUN: %target-swift-frontend -enable-experimental-type-inference-from-defaults -module-name main -typecheck -verify -I %t %s %S/Inputs/type_inference_via_defaults_other_module.swift
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/InferViaDefaults.swiftmodule -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift
+// RUN: %target-swift-frontend -module-name main -typecheck -verify -I %t %s %S/Inputs/type_inference_via_defaults_other_module.swift
 
 func testInferFromResult<T>(_: T = 42) -> T { fatalError() } // Ok
 
