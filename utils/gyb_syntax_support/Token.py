@@ -166,6 +166,7 @@ SYNTAX_TOKENS = [
     DeclKeyword('Private', 'private', serialization_code=20),
     DeclKeyword('Public', 'public', serialization_code=21),
     DeclKeyword('Static', 'static', serialization_code=22),
+    DeclKeyword('Open', 'open', serialization_code=125),
 
     # Statement keywords
     StmtKeyword('Defer', 'defer', serialization_code=23),
