@@ -458,7 +458,11 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // Non-escaping stored decls are captured as the address of the value.
     auto type = getVarTypeInCaptureContext();
     SILType ty = SGF.getLoweredType(type);
-    if (SGF.SGM.M.useLoweredAddresses()) {
+    auto argConv = SGF.F.getConventions().getSILArgumentConvention(
+        SGF.F.begin()->getNumArguments());
+    bool isInOut = (argConv == SILArgumentConvention::Indirect_Inout ||
+                    argConv == SILArgumentConvention::Indirect_InoutAliasable);
+    if (isInOut || SGF.SGM.M.useLoweredAddresses()) {
       ty = ty.getAddressType();
     }
     SILValue arg = SGF.F.begin()->createFunctionArgument(ty, VD);
