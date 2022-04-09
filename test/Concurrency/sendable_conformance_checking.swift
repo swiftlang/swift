@@ -165,3 +165,29 @@ extension SendableExtSub: @unchecked Sendable {}
 // Still want to know about same-class redundancy
 class MultiConformance: @unchecked Sendable {} // expected-note {{'MultiConformance' declares conformance to protocol 'Sendable' here}}
 extension MultiConformance: @unchecked Sendable {} // expected-error {{redundant conformance of 'MultiConformance' to protocol 'Sendable'}}
+
+// rdar://91174106 - allow missing Sendable conformances when extending a
+// type generically.
+// FIXME: Should warn because of missing Sendable, but currently is silent
+// because we aren't checking conformance availability here yet.
+struct X<T: Sendable> { }
+enum Y {}
+extension X where T == Y {}
+
+protocol P2 {
+  associatedtype A: Sendable
+}
+
+enum Y2: P2, P3 {
+  typealias A = Y
+}
+
+struct X2<T: P2> { }
+extension X2 where T == Y2 { }
+
+protocol P3 {
+  associatedtype A
+}
+
+struct X3<T: P3> where T.A: Sendable { }
+extension X3 where T == Y2 { }
