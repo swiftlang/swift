@@ -139,6 +139,7 @@ class PartialApplySimplificationPass : public SILModuleTransform {
 static bool isSimplePartialApply(SILModule &M,
                                  CanSILFunctionType calleeTy,
                                  TypeExpansionContext context,
+                                 ParameterConvention calleeConvention,
                                  unsigned numPartiallyAppliedArgs,
                                  bool isOnStack) {
   if (calleeTy->isPolymorphic()) {
@@ -157,6 +158,7 @@ static bool isSimplePartialApply(SILModule &M,
 
   auto contextParam = calleeTy->getSelfParameter();
 
+  auto argTy = contextParam.getArgumentType(M, calleeTy, context);
   if (isOnStack) {
     switch (contextParam.getConvention()) {
     case ParameterConvention::Indirect_Inout:
@@ -167,13 +169,11 @@ static bool isSimplePartialApply(SILModule &M,
       return true;
         
     case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Unowned: {
-      auto argTy = contextParam.getArgumentType(M, calleeTy, context);
+    case ParameterConvention::Direct_Unowned:
       return SILType::getPrimitiveObjectType(argTy)
         .isPointerSizeAndAligned(M, context.getResilienceExpansion());
       // TODO: If we're running as an IRGen pass, use IRGen's version of
       // `isPointerSizeAndAligned` as a more accurate check.
-    }
     
     // +1 arguments need a thunk to stage a copy for the callee to consume.
     case ParameterConvention::Direct_Owned:
@@ -185,12 +185,16 @@ static bool isSimplePartialApply(SILModule &M,
       return false;
     }
     
-    // TODO: Handle native-refcounted classes, single-refcounted aggregates,
-    // and bit-packable trivial types using knowledge from IRGen if this becomes
-    // an IRGenPrepare pass
-    if (!isa<SILBoxType>(contextParam.getInterfaceType())) {
+    // The context parameter's convention must match the callee convention of
+    // the resulting closure.
+    if (contextParam.getConvention() != calleeConvention) {
       return false;
     }
+    
+    // The context type must consist of only a swift-refcounted object
+    // reference.
+    return SILType::getPrimitiveObjectType(argTy)
+      .isSingleSwiftRefcounted(M, context.getResilienceExpansion());
   }
   
   return true;
@@ -200,6 +204,7 @@ static bool isSimplePartialApply(PartialApplyInst *i) {
   return isSimplePartialApply(i->getModule(),
                               i->getCallee()->getType().castTo<SILFunctionType>(),
                               i->getFunction()->getTypeExpansionContext(),
+                              i->getFunctionType()->getCalleeConvention(),
                               i->getNumArguments(),
                               i->isOnStack());
 }
@@ -323,6 +328,7 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
   if (isSimplePartialApply(callee->getModule(),
                            calleeTyAsMethod,
                            examplePA->getFunction()->getTypeExpansionContext(),
+                           examplePA->getFunctionType()->getCalleeConvention(),
                            examplePA->getNumArguments(),
                            examplePA->isOnStack())) {
     return rewriteKnownCalleeConventionOnly(callee, pa, examplePA,

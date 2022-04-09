@@ -191,6 +191,79 @@ bool SILType::isPointerSizeAndAligned(SILModule &M,
   return false;
 }
 
+static bool isSingleSwiftRefcounted(SILModule &M,
+                                    SILType SILTy,
+                                    ResilienceExpansion expansion,
+                                    bool didUnwrapOptional) {
+  auto &C = M.getASTContext();
+  
+  // Unwrap one layer of optionality.
+  // TODO: Or more generally, any fragile enum with a single payload and single
+  // no-payload case.
+  if (!didUnwrapOptional) {
+    if (auto objectTy = SILTy.getOptionalObjectType()) {
+      return ::isSingleSwiftRefcounted(M, objectTy, expansion, true);
+    }
+  }
+
+  // Unwrap singleton aggregates.
+  if (auto underlyingField = SILTy.getSingletonAggregateFieldType(M, expansion)) {
+    return ::isSingleSwiftRefcounted(M, underlyingField, expansion,
+                                     didUnwrapOptional);
+  }
+  
+  auto Ty = SILTy.getASTType();
+  
+  // Easy cases: Builtin.NativeObject and boxes are always Swift-refcounted.
+  if (Ty == C.TheNativeObjectType)
+    return true;
+  if (isa<SILBoxType>(Ty))
+    return true;
+  
+  // Is the type a Swift-refcounted class?
+  // For a generic type, consider its superclass constraint, if any.
+  auto ClassTy = Ty;
+  if (auto archety = dyn_cast<ArchetypeType>(Ty)) {
+    if (auto superclass = Ty->getSuperclass()) {
+      ClassTy = superclass->getCanonicalType();
+    }
+  }
+  // For an existential type, consider its superclass constraint, if it carries
+  // no witness tables.
+  if (Ty->isAnyExistentialType()) {
+    auto layout = Ty->getExistentialLayout();
+    // Must be no protocol constraints that aren't @objc or @_marker.
+    if (layout.containsNonObjCProtocol) {
+      for (auto proto : layout.getProtocols()) {
+        if (!proto->isObjC() && !proto->isMarkerProtocol()) {
+          return false;
+        }
+      }
+    }
+    
+    // The Error existential has its own special layout.
+    if (layout.isErrorExistential()) {
+      return false;
+    }
+    
+    // We can look at the superclass constraint, if any, to see if it's
+    // Swift-refcounted.
+    if (!layout.getSuperclass()) {
+      return false;
+    }
+    ClassTy = layout.getSuperclass()->getCanonicalType();
+  }
+  
+  // TODO: Does the base class we found have fully native Swift ancestry,
+  // so we can use Swift native refcounting on it?
+  return false;
+}
+
+bool SILType::isSingleSwiftRefcounted(SILModule &M,
+                                      ResilienceExpansion expansion) const {
+  return ::isSingleSwiftRefcounted(M, *this, expansion, false);
+}
+
 // Reference cast from representations with single pointer low bits.
 // Only reference cast to simple single pointer representations.
 //
