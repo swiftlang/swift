@@ -248,6 +248,26 @@ extension String.Index {
   }
 }
 
+extension String.Index {
+  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  internal static var __scalarAlignmentBit: UInt64 { 0x1 }
+
+  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  internal static var __characterAlignmentBit: UInt64 { 0x2 }
+
+  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  internal static var __utf8Bit: UInt64 { 0x4 }
+
+  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  internal static var __utf16Bit: UInt64 { 0x8 }
+
+  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  internal static func __encodingBit(utf16: Bool) -> UInt64 {
+    let utf16 = Int8(Builtin.zext_Int1_Int8(utf16._value))
+    return __utf8Bit &<< utf16
+  }
+}
+
 /*
   Index Scalar Alignment
 
@@ -289,13 +309,15 @@ extension String.Index {
 extension String.Index {
   @_alwaysEmitIntoClient // Swift 5.1
   @inline(__always)
-  internal var _isScalarAligned: Bool { return 0 != _rawBits & 0x1 }
+  internal var _isScalarAligned: Bool {
+    0 != _rawBits & Self.__scalarAlignmentBit
+  }
 
   @_alwaysEmitIntoClient // Swift 5.1
   @inline(__always)
   internal var _scalarAligned: String.Index {
     var idx = self
-    idx._rawBits |= 0x1
+    idx._rawBits |= Self.__scalarAlignmentBit
     idx._invariantCheck()
     return idx
   }
@@ -325,7 +347,9 @@ extension String.Index {
 extension String.Index {
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
-  internal var _isCharacterAligned: Bool { return 0 != _rawBits & 0x2 }
+  internal var _isCharacterAligned: Bool {
+    0 != _rawBits & Self.__characterAlignmentBit
+  }
 
   /// Return the same index with both the scalar- and `Character`-aligned bits
   /// set.
@@ -334,7 +358,8 @@ extension String.Index {
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
   internal var _characterAligned: String.Index {
-    let idx = Self(_rawBits | 0x3)
+    let r = _rawBits | Self.__characterAlignmentBit | Self.__scalarAlignmentBit
+    let idx = Self(r)
     idx._invariantCheck()
     return idx
   }
@@ -385,6 +410,12 @@ extension String.Index {
 // handled in `_StringGuts.ensureMatchingEncoding(_:)`; see there for the sordid
 // details.
 extension String.Index {
+  @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
+  internal var _encodingBits: UInt64 {
+    _rawBits & (Self.__utf8Bit | Self.__utf16Bit)
+  }
+
   /// Returns true if the position in this index can be interpreted as an offset
   /// into UTF-8-encoded string storage.
   ///
@@ -394,7 +425,7 @@ extension String.Index {
   @inline(__always)
   internal var _canBeUTF8: Bool {
     // The only way an index cannot be UTF-8 is it has only the UTF-16 flag set.
-    _rawBits & 0xC != 0x08
+    _encodingBits != Self.__utf16Bit
   }
 
   /// Returns true if the position in this index can be interpreted as offset
@@ -407,45 +438,30 @@ extension String.Index {
   @inline(__always)
   internal var _canBeUTF16: Bool {
     // The only way an index cannot be UTF-16 is it has only the UTF-8 flag set.
-    _rawBits & 0xC != 0x04
+    _encodingBits != Self.__utf8Bit
   }
 
   /// Returns the same index with the UTF-8 bit set.
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
-  internal var _knownUTF8: Self { Self(_rawBits | 0x4) }
+  internal var _knownUTF8: Self { Self(_rawBits | Self.__utf8Bit) }
 
   /// Returns the same index with the UTF-16 bit set.
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
-  internal var _knownUTF16: Self { Self(_rawBits | 0x8) }
+  internal var _knownUTF16: Self { Self(_rawBits | Self.__utf16Bit) }
 
   /// Returns the same index with both UTF-8 & UTF-16 bits set.
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
-  internal var _encodingIndependent: Self { Self(_rawBits | 0xC) }
-
-  /// Returns true if the UTF-8 flag is set.
-  ///
-  /// This is for debugging purposes only. Do not use this property to determine
-  /// whether an index is compatible with UTF-8 storage; instead, use
-  /// `_canBeUTF8`.
-  @_alwaysEmitIntoClient // Swift 5.7
-  @inline(__always)
-  internal var __isUTF8: Bool { _rawBits & 0x4 != 0 }
-
-  /// Returns true if the UTF-16 flag is set.
-  ///
-  /// This is for debugging purposes only. Do not use this property to determine
-  /// whether an index is compatible with UTF-16 storage; instead, use
-  /// `_canBeUTF16`.
-  @_alwaysEmitIntoClient // Swift 5.7
-  @inline(__always)
-  internal var __isUTF16: Bool { _rawBits & 0x8 != 0 }
+  internal var _encodingIndependent: Self {
+    Self(_rawBits | Self.__utf8Bit | Self.__utf16Bit)
+  }
 
   @_alwaysEmitIntoClient // Swift 5.7
   internal func _copyEncoding(from index: Self) -> Self {
-    Self((_rawBits & ~0xC) | (index._rawBits & 0xC))
+    let mask = Self.__utf8Bit | Self.__utf16Bit
+    return Self((_rawBits & ~mask) | (index._rawBits & mask))
   }
 }
 
@@ -487,7 +503,7 @@ extension String.Index {
     }
 
     d += ", encoding: "
-    switch (__isUTF8, __isUTF16) {
+    switch (_rawBits & Self.__utf8Bit != 0, _rawBits & Self.__utf16Bit != 0) {
     case (false, false): d += "unknown"
     case (true, false): d += "utf8"
     case (false, true): d += "utf16"
