@@ -78,6 +78,12 @@ namespace swift {
 
     /// Whether the AST node is implicit.
     bool isImplicit() const;
+
+    static inline ASTNode getFromOpaqueValue(void *VP) {
+      ASTNode V;
+      V.Val = decltype(V.Val)::getFromOpaqueValue(VP);
+      return V;
+    }
   };
 } // namespace swift
 
@@ -96,6 +102,19 @@ namespace llvm {
     static bool isEqual(const ASTNode LHS, const ASTNode RHS) {
       return LHS.getOpaqueValue() == RHS.getOpaqueValue();
     }
+  };
+
+  // A ASTNode is "pointer like".
+  template <>
+  struct PointerLikeTypeTraits<ASTNode> {
+  public:
+    static inline void *getAsVoidPointer(ASTNode N) {
+      return (void *)N.getOpaqueValue();
+    }
+    static inline ASTNode getFromVoidPointer(void *P) {
+      return ASTNode::getFromOpaqueValue(P);
+    }
+    enum { NumLowBitsAvailable = swift::TypeAlignInBits };
   };
 }
 
