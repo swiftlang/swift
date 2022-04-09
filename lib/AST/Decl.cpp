@@ -7125,12 +7125,19 @@ void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {
            "Can't overwrite type-checked default with un-type-checked default");
   }
   defaultInfo->DefaultArg = E;
-  defaultInfo->ExprType = E->getType();
+  // `Inherited` default arguments do not have an expression,
+  // so if the storage has been pre-allocated already we need
+  // to be careful requesting type here.
+  defaultInfo->ExprType = E ? E->getType() : Type();
   defaultInfo->InitContextAndIsTypeChecked.setInt(isTypeChecked);
 }
 
 void ParamDecl::setDefaultExprType(Type type) {
   if (!DefaultValueAndFlags.getPointer()) {
+    // If there is no type, let's not allocate storage.
+    if (!type)
+      return;
+
     DefaultValueAndFlags.setPointer(
         getASTContext().Allocate<StoredDefaultArgument>());
   }

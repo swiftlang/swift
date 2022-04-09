@@ -199,3 +199,35 @@ func test_allow_same_type_between_dependent_types() {
     s.test() // expected-error {{instance method 'test' requires the types 'String' and 'Default.X' (aka 'Int') be equivalent}}
   }
 }
+
+// Crash when default type is requested before inherited constructor is type-checked
+
+protocol StorageType {
+  var identifier: String { get }
+}
+
+class Storage {
+}
+
+extension Storage {
+  struct Test {
+    static let test = CustomStorage<String>("") // triggers default type request
+  }
+}
+
+class BaseStorage<T> : Storage, StorageType {
+  enum StorageType {
+  case standard
+  }
+
+  let identifier: String
+  let type: StorageType
+
+  init(_ id: String, type: StorageType = .standard) {
+    self.identifier = id
+    self.type = type
+  }
+}
+
+final class CustomStorage<T>: BaseStorage<T> { // Ok - no crash typechecking inherited init
+}
