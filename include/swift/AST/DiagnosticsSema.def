@@ -4746,6 +4746,9 @@ ERROR(unchecked_not_existential,none,
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))
+ERROR(incorrect_optional_any,none,
+      "optional 'any' type must be written %0",
+      (Type))
 ERROR(existential_requires_any,none,
       "use of %select{protocol |}2%0 as a type must be written %1",
       (Type, Type, bool))
