@@ -373,25 +373,25 @@ internal func reflect(instanceAddress: UInt,
                       shouldUnwrapClassExistential: Bool = false) {
   while let command = readLine(strippingNewline: true) {
     switch command {
-    case RequestInstanceKind:
+    case String(validatingUTF8: RequestInstanceKind)!:
       sendValue(kind.rawValue)
-    case RequestShouldUnwrapClassExistential:
+    case String(validatingUTF8: RequestShouldUnwrapClassExistential)!:
       sendValue(shouldUnwrapClassExistential)
-    case RequestInstanceAddress:
+    case String(validatingUTF8: RequestInstanceAddress)!:
       sendValue(instanceAddress)
-    case RequestReflectionInfos:
+    case String(validatingUTF8: RequestReflectionInfos)!:
       sendReflectionInfos()
-    case RequestImages:
+    case String(validatingUTF8: RequestImages)!:
       sendImages()
-    case RequestReadBytes:
+    case String(validatingUTF8: RequestReadBytes)!:
       sendBytes()
-    case RequestSymbolAddress:
+    case String(validatingUTF8: RequestSymbolAddress)!:
       sendSymbolAddress()
-    case RequestStringLength:
+    case String(validatingUTF8: RequestStringLength)!:
       sendStringLength()
-    case RequestPointerSize:
+    case String(validatingUTF8: RequestPointerSize)!:
       sendPointerSize()
-    case RequestDone:
+    case String(validatingUTF8: RequestDone)!:
       return
     default:
       fatalError("Unknown request received: '\(Array(command.utf8))'!")
