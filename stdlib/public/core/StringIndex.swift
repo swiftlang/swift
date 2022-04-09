@@ -441,6 +441,20 @@ extension String.Index {
     _encodingBits != Self.__utf8Bit
   }
 
+  /// Returns true if the encoding of this index isn't known to be in conflict
+  /// with the specified encoding.
+  ///
+  /// If the index was created by code that was built on a stdlib below 5.7,
+  /// then this check may incorrectly return true on a mismatching index, but it
+  /// is guaranteed to never incorrectly return false. If all loaded binaries
+  /// were built in 5.7+, then this method is guaranteed to always return the
+  /// correct value.
+  @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
+  internal func _hasMatchingEncoding(isUTF8 utf8: Bool) -> Bool {
+    _encodingBits != Self.__encodingBit(utf16: utf8)
+  }
+
   /// Returns the same index with the UTF-8 bit set.
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)

@@ -340,7 +340,7 @@ extension _StringGuts {
   /// correct value.
   @_alwaysEmitIntoClient @inline(__always)
   internal func hasMatchingEncoding(_ i: String.Index) -> Bool {
-    isUTF8 ? i._canBeUTF8 : i._canBeUTF16
+    i._hasMatchingEncoding(isUTF8: isUTF8)
   }
 
   /// Return an index whose encoding can be assumed to match that of `self`.
