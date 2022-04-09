@@ -445,7 +445,7 @@ public:
         ValueNames(false), ReflectionMetadata(ReflectionMetadataMode::Runtime),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(true),
-        LazyInitializeProtocolConformances(false),
+        LazyInitializeProtocolConformances(true),
         IndirectAsyncFunctionPointer(false),
         CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
