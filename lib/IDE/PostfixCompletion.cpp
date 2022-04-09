@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/DotExprCompletion.h"
+#include "swift/IDE/PostfixCompletion.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/Sema/CompletionContextFinder.h"
@@ -21,12 +21,12 @@ using namespace swift;
 using namespace swift::constraints;
 using namespace swift::ide;
 
-bool DotExprTypeCheckCompletionCallback::Result::canBeMergedWith(
+bool PostfixCompletionCallback::Result::canBeMergedWith(
     const Result &Other) const {
   return BaseTy->isEqual(Other.BaseTy) && BaseDecl == Other.BaseDecl;
 }
 
-void DotExprTypeCheckCompletionCallback::Result::merge(const Result &Other) {
+void PostfixCompletionCallback::Result::merge(const Result &Other) {
   assert(canBeMergedWith(Other));
   // These properties should match if we are talking about the same BaseDecl.
   assert(IsBaseDeclUnapplied == Other.IsBaseDeclUnapplied);
@@ -45,7 +45,7 @@ void DotExprTypeCheckCompletionCallback::Result::merge(const Result &Other) {
   IsInAsyncContext |= Other.IsInAsyncContext;
 }
 
-void DotExprTypeCheckCompletionCallback::addResult(const Result &Res) {
+void PostfixCompletionCallback::addResult(const Result &Res) {
   auto ExistingRes =
       llvm::find_if(Results, [&Res](const Result &ExistingResult) {
         return ExistingResult.canBeMergedWith(Res);
@@ -57,7 +57,7 @@ void DotExprTypeCheckCompletionCallback::addResult(const Result &Res) {
   }
 }
 
-void DotExprTypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
+void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   assert(!gotCallback());
 
   // Default to checking the completion expression in isolation.
@@ -103,7 +103,7 @@ static bool isUnappliedFunctionRef(const OverloadChoice &Choice) {
   }
 }
 
-void DotExprTypeCheckCompletionCallback::sawSolutionImpl(
+void PostfixCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
   auto &CS = S.getConstraintSystem();
   auto *ParsedExpr = CompletionExpr->getBase();
@@ -315,7 +315,7 @@ static void addOperatorResults(Type LHSType, ArrayRef<OperatorDecl *> Operators,
   }
 }
 
-void DotExprTypeCheckCompletionCallback::deliverResults(
+void PostfixCompletionCallback::deliverResults(
     SourceLoc DotLoc, bool IsInSelector, bool IncludeOperators,
     bool HasLeadingSpace, CodeCompletionContext &CompletionCtx,
     CodeCompletionConsumer &Consumer) {

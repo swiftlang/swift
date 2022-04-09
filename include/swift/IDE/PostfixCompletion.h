@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IDE_DOTEXPRCODECOMPLETION_H
-#define SWIFT_IDE_DOTEXPRCODECOMPLETION_H
+#ifndef SWIFT_IDE_POSTFIXCOMPLETION_H
+#define SWIFT_IDE_POSTFIXCOMPLETION_H
 
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
@@ -20,10 +20,9 @@
 namespace swift {
 namespace ide {
 
-/// Used to collect and store information needed to perform member completion
-/// (\c CompletionKind::DotExpr ) from the solutions formed during expression
-/// type-checking.
-class DotExprTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
+/// Used to collect and store information needed to perform postfix completion
+/// (either <base>.#^COMPLETE^# or <base>#^COMPLETE^#).
+class PostfixCompletionCallback : public TypeCheckCompletionCallback {
   struct Result {
     /// The type that we are completing on. Will never be null.
     Type BaseTy;
@@ -83,8 +82,7 @@ class DotExprTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
   void sawSolutionImpl(const constraints::Solution &solution) override;
 
 public:
-  DotExprTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
-                                     DeclContext *DC)
+  PostfixCompletionCallback(CodeCompletionExpr *CompletionExpr, DeclContext *DC)
       : CompletionExpr(CompletionExpr), DC(DC) {}
 
   /// Typecheck the code completion expression in isolation, calling
@@ -109,4 +107,4 @@ public:
 } // end namespace ide
 } // end namespace swift
 
-#endif // SWIFT_IDE_DOTEXPRCODECOMPLETION_H
+#endif // SWIFT_IDE_POSTFIXCOMPLETION_H

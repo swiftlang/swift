@@ -40,9 +40,9 @@
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/CompletionOverrideLookup.h"
-#include "swift/IDE/DotExprCompletion.h"
 #include "swift/IDE/ExprCompletion.h"
 #include "swift/IDE/KeyPathCompletion.h"
+#include "swift/IDE/PostfixCompletion.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/IDE/UnresolvedMemberCompletion.h"
 #include "swift/IDE/Utils.h"
@@ -1405,8 +1405,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
-    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
-                                              CurDeclContext);
+    PostfixCompletionCallback Lookup(CodeCompleteTokenExpr, CurDeclContext);
     typeCheckWithLookup(Lookup);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
