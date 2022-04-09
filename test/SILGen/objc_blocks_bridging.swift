@@ -175,8 +175,7 @@ func bridgeNonnullBlockResult() {
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtF
 func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$s20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtFyyXEfU_
-  // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
-  // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
+  // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CLOSURE_FN]]
 // without actually escaping sentinel
   // CHECK: [[WAE_THUNK:%.*]] = function_ref @$sIg_Ieg_TR
   // CHECK: [[WAE_PA:%.*]] = partial_apply [callee_guaranteed] [[WAE_THUNK]]([[THICK_FN]])
@@ -224,8 +223,7 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   noescapeBlock(nil)
 
   // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$s20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtF
-  // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
-  // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
+  // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CLOSURE_FN]]
   // CHECK: [[WAE_THUNK:%.*]] = function_ref @$sIg_Ieg_TR
   // CHECK: [[WAE_PA:%.*]] = partial_apply [callee_guaranteed] [[WAE_THUNK]]([[THICK_FN]])
   // CHECK: [[WAE_MD:%.*]] = mark_dependence [[WAE_PA]] : $@callee_guaranteed () -> () on [[THICK_FN]]
