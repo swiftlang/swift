@@ -2817,9 +2817,10 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
       // Not using `getImportTypeAttrs()` is unprincipled but OK for this hack.
-      swiftParamTy = ExistentialType::get(SwiftContext.getNSCopyingType());
-      if (!swiftParamTy)
+      auto nsCopying = SwiftContext.getNSCopyingType();
+      if (!nsCopying)
         return {Type(), false};
+      swiftParamTy = ExistentialType::get(nsCopying);
       if (optionalityOfParam != OTK_None)
         swiftParamTy = OptionalType::get(swiftParamTy);
 
