@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
@@ -548,12 +549,20 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
     diags.diagnose(decl, diag::override_multiple_decls_base,
                    decl->getName());
     break;
-  case OverrideCheckingAttempt::MismatchedSendability:
-    // FIXME: suppress if any matches brought in via @preconcurrency import?
-    diags.diagnose(decl, diag::override_sendability_mismatch,
-                   decl->getName())
-      .warnUntilSwiftVersion(6);
+  case OverrideCheckingAttempt::MismatchedSendability: {
+    SendableCheckContext fromContext(decl->getDeclContext(),
+                                     SendableCheck::Explicit);
+    auto baseDeclClass =
+        decl->getOverriddenDecl()->getDeclContext()->getSelfClassDecl();
+
+    diagnoseSendabilityErrorBasedOn(baseDeclClass, fromContext,
+                                    [&](DiagnosticBehavior limit) {
+      diags.diagnose(decl, diag::override_sendability_mismatch, decl->getName())
+          .limitBehavior(limit);
+      return false;
+    });
     break;
+  }
   case OverrideCheckingAttempt::BaseName:
     diags.diagnose(decl, diag::override_multiple_decls_arg_mismatch,
                    decl->getName());
@@ -1288,11 +1297,19 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     return true;
 
   if (attempt == OverrideCheckingAttempt::MismatchedSendability) {
-    // FIXME: suppress if any matches brought in via @preconcurrency import?
-    diags.diagnose(decl, diag::override_sendability_mismatch,
-                   decl->getName())
-      .warnUntilSwiftVersion(6);
-    diags.diagnose(baseDecl, diag::overridden_here);
+    SendableCheckContext fromContext(decl->getDeclContext(),
+                                     SendableCheck::Explicit);
+    auto baseDeclClass = baseDecl->getDeclContext()->getSelfClassDecl();
+
+    diagnoseSendabilityErrorBasedOn(baseDeclClass, fromContext,
+                                    [&](DiagnosticBehavior limit) {
+      diags.diagnose(decl, diag::override_sendability_mismatch,
+                     decl->getName())
+        .limitBehavior(limit);
+      diags.diagnose(baseDecl, diag::overridden_here)
+        .limitBehavior(limit);
+      return false;
+    });
   }
   // Catch-all to make sure we don't silently accept something we shouldn't.
   else if (attempt != OverrideCheckingAttempt::PerfectMatch) {

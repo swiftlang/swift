@@ -4154,19 +4154,32 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                          requirement->getName());
         });
     }
-    if (best.Kind == MatchKind::RequiresNonSendable)
-      diagnoseOrDefer(requirement, getASTContext().isSwiftVersionAtLeast(6),
-                      [this, requirement, witness]
-                          (NormalProtocolConformance *conformance) {
-        auto &diags = DC->getASTContext().Diags;
+    if (best.Kind == MatchKind::RequiresNonSendable) {
+      SendableCheckContext sendFrom(witness->getDeclContext(),
+                                    SendableCheck::Explicit);
 
-        diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
-                       diag::witness_not_as_sendable,
-                       witness->getDescriptiveKind(), witness->getName(),
-                       conformance->getProtocol()->getName())
-            .warnUntilSwiftVersion(6);
-        diags.diagnose(requirement, diag::less_sendable_reqt_here);
-      });
+      auto behavior = sendFrom.diagnosticBehavior(Conformance->getProtocol());
+      if (behavior != DiagnosticBehavior::Ignore) {
+        bool isError = behavior < DiagnosticBehavior::Warning;
+        
+        diagnoseOrDefer(requirement, isError,
+                        [this, requirement, witness, sendFrom](
+                          NormalProtocolConformance *conformance) {
+          diagnoseSendabilityErrorBasedOn(conformance->getProtocol(), sendFrom,
+                                          [&](DiagnosticBehavior limit) {
+            auto &diags = DC->getASTContext().Diags;
+            diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
+                           diag::witness_not_as_sendable,
+                           witness->getDescriptiveKind(), witness->getName(),
+                           conformance->getProtocol()->getName())
+                .limitBehavior(limit);
+            diags.diagnose(requirement, diag::less_sendable_reqt_here)
+                .limitBehavior(limit);
+            return false;
+          });
+        });
+      }
+    }
 
     auto check = checkWitness(requirement, best);
 

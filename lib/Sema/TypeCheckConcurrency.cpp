@@ -650,10 +650,17 @@ DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
   return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
 }
 
-/// Determine whether the given nominal type that is within the current module
-/// has an explicit Sendable.
-static bool hasExplicitSendableConformance(NominalTypeDecl *nominal) {
+/// Determine whether the given nominal type has an explicit Sendable
+/// conformance (regardless of its availability).
+static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
+                                           bool applyModuleDefault = true) {
   ASTContext &ctx = nominal->getASTContext();
+  auto nominalModule = nominal->getParentModule();
+
+  // In a concurrency-checked module, a missing conformance is equivalent to
+  // an explicitly unavailable one. If we want to apply this rule, do so now.
+  if (applyModuleDefault && nominalModule->isConcurrencyChecked())
+    return true;
 
   // Look for any conformance to `Sendable`.
   auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
@@ -662,7 +669,7 @@ static bool hasExplicitSendableConformance(NominalTypeDecl *nominal) {
 
   // Look for a conformance. If it's present and not (directly) missing,
   // we're done.
-  auto conformance = nominal->getParentModule()->lookupConformance(
+  auto conformance = nominalModule->lookupConformance(
       nominal->getDeclaredInterfaceType(), proto, /*allowMissing=*/true);
   return conformance &&
       !(isa<BuiltinProtocolConformance>(conformance.getConcrete()) &&
@@ -706,18 +713,13 @@ static Optional<AttributedImport<ImportedModule>> findImportFor(
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     NominalTypeDecl *nominal) const {
-  // Determine whether the type was explicitly non-Sendable.
-  auto nominalModule = nominal->getParentModule();
-  bool isExplicitlyNonSendable = nominalModule->isConcurrencyChecked() ||
-      hasExplicitSendableConformance(nominal);
-
   // Determine whether this nominal type is visible via a @preconcurrency
   // import.
   auto import = findImportFor(nominal, fromDC);
+  auto sourceFile = fromDC->getParentSourceFile();
 
   // When the type is explicitly non-Sendable...
-  auto sourceFile = fromDC->getParentSourceFile();
-  if (isExplicitlyNonSendable) {
+  if (hasExplicitSendableConformance(nominal)) {
     // @preconcurrency imports downgrade the diagnostic to a warning in Swift 6,
     if (import && import->options.contains(ImportFlags::Preconcurrency)) {
       if (sourceFile)
@@ -737,7 +739,7 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     if (sourceFile)
       sourceFile->setImportUsedPreconcurrency(*import);
 
-    return nominalModule->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
+    return nominal->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
         ? DiagnosticBehavior::Warning
         : DiagnosticBehavior::Ignore;
   }
@@ -755,48 +757,31 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
   return defaultBehavior;
 }
 
-/// Produce a diagnostic for a single instance of a non-Sendable type where
-/// a Sendable type is required.
-static bool diagnoseSingleNonSendableType(
-    Type type, SendableCheckContext fromContext, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
-
+bool swift::diagnoseSendabilityErrorBasedOn(
+    NominalTypeDecl *nominal, SendableCheckContext fromContext,
+    llvm::function_ref<bool(DiagnosticBehavior)> diagnose) {
   auto behavior = DiagnosticBehavior::Unspecified;
 
-  auto module = fromContext.fromDC->getParentModule();
-  ASTContext &ctx = module->getASTContext();
-  auto nominal = type->getAnyNominal();
   if (nominal) {
     behavior = fromContext.diagnosticBehavior(nominal);
   } else {
     behavior = fromContext.defaultDiagnosticBehavior();
   }
 
-  bool wasSuppressed = diagnose(type, behavior);
+  bool wasSuppressed = diagnose(behavior);
 
-  if (behavior == DiagnosticBehavior::Ignore || wasSuppressed) {
-    // Don't emit any other diagnostics.
-  } else if (type->is<FunctionType>()) {
-    ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
-  } else if (nominal && nominal->getParentModule() == module) {
-    // If the nominal type is in the current module, suggest adding
-    // `Sendable` if it might make sense. Otherwise, just complain.
-    if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
-      auto note = nominal->diagnose(
-          diag::add_nominal_sendable_conformance,
-          nominal->getDescriptiveKind(), nominal->getName());
-      addSendableFixIt(nominal, note, /*unchecked=*/false);
-    } else {
-      nominal->diagnose(
-          diag::non_sendable_nominal, nominal->getDescriptiveKind(),
-          nominal->getName());
-    }
-  } else if (nominal) {
-    // Note which nominal type does not conform to `Sendable`.
-    nominal->diagnose(
-        diag::non_sendable_nominal, nominal->getDescriptiveKind(),
-        nominal->getName());
+  bool emittedDiagnostics =
+      behavior != DiagnosticBehavior::Ignore && !wasSuppressed;
 
+  // When the type is explicitly Sendable *or* explicitly non-Sendable, we
+  // assume it has been audited and `@preconcurrency` is not recommended even
+  // though it would actually affect the diagnostic.
+  bool nominalIsImportedAndHasImplicitSendability =
+      nominal &&
+      nominal->getParentModule() != fromContext.fromDC->getParentModule() &&
+      !hasExplicitSendableConformance(nominal);
+
+  if (emittedDiagnostics && nominalIsImportedAndHasImplicitSendability) {
     // This type was imported from another module; try to find the
     // corresponding import.
     Optional<AttributedImport<swift::ImportedModule>> import;
@@ -813,6 +798,8 @@ static bool diagnoseSingleNonSendableType(
         import->importLoc.isValid() && sourceFile &&
         !sourceFile->hasImportUsedPreconcurrency(*import)) {
       SourceLoc importLoc = import->importLoc;
+      ASTContext &ctx = nominal->getASTContext();
+
       ctx.Diags.diagnose(
           importLoc, diag::add_predates_concurrency_import,
           ctx.LangOpts.isSwiftVersionAtLeast(6),
@@ -824,6 +811,51 @@ static bool diagnoseSingleNonSendableType(
   }
 
   return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
+}
+
+/// Produce a diagnostic for a single instance of a non-Sendable type where
+/// a Sendable type is required.
+static bool diagnoseSingleNonSendableType(
+    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+
+  auto module = fromContext.fromDC->getParentModule();
+  auto nominal = type->getAnyNominal();
+
+  return diagnoseSendabilityErrorBasedOn(nominal, fromContext,
+                                         [&](DiagnosticBehavior behavior) {
+    bool wasSuppressed = diagnose(type, behavior);
+
+    // Don't emit the following notes if we didn't have any diagnostics to
+    // attach them to.
+    if (wasSuppressed || behavior == DiagnosticBehavior::Ignore)
+      return true;
+
+    if (type->is<FunctionType>()) {
+      module->getASTContext().Diags
+          .diagnose(loc, diag::nonsendable_function_type);
+    } else if (nominal && nominal->getParentModule() == module) {
+      // If the nominal type is in the current module, suggest adding
+      // `Sendable` if it might make sense. Otherwise, just complain.
+      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+        auto note = nominal->diagnose(
+            diag::add_nominal_sendable_conformance,
+            nominal->getDescriptiveKind(), nominal->getName());
+        addSendableFixIt(nominal, note, /*unchecked=*/false);
+      } else {
+        nominal->diagnose(
+            diag::non_sendable_nominal, nominal->getDescriptiveKind(),
+            nominal->getName());
+      }
+    } else if (nominal) {
+      // Note which nominal type does not conform to `Sendable`.
+      nominal->diagnose(
+          diag::non_sendable_nominal, nominal->getDescriptiveKind(),
+          nominal->getName());
+    }
+
+    return false;
+  });
 }
 
 bool swift::diagnoseNonSendableTypes(
@@ -1036,7 +1068,7 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
     return;
 
   // If the conformance is explicitly stated, do nothing.
-  if (hasExplicitSendableConformance(nominal))
+  if (hasExplicitSendableConformance(nominal, /*applyModuleDefault=*/false))
     return;
 
   // Diagnose it.
