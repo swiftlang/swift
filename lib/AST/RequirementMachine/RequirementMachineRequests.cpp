@@ -890,15 +890,11 @@ InferredGenericSignatureRequestRQM::evaluate(
                                            std::move(machine));
     }
 
-    if (!allowConcreteGenericParams && attempt == 0 &&
+    if (!allowConcreteGenericParams &&
         ctx.LangOpts.RequirementMachineInferredSignatures ==
         RequirementMachineMode::Enabled) {
       for (auto genericParam : result.getInnermostGenericParams()) {
         auto canonical = result.getCanonicalTypeInContext(genericParam);
-
-        if (genericParam->is<DependentMemberType>() ||
-            canonical->is<DependentMemberType>())
-          continue;
 
         if (canonical->hasError() || canonical->isEqual(genericParam))
           continue;
