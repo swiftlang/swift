@@ -36,9 +36,9 @@ func testTupleNoDot1() {
 // TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: < {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: != {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: > {#(Int, Double)#}[#Bool#]{{; name=.+$}}
-// TUPLE_NO_DOT_1-DAG: BuiltinOperator/None:                                   = {#(Int, Double)#}[#Void#]{{; name=.+$}}
-// TUPLE_NO_DOT_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int, Double)#]; name=self
-// TUPLE_NO_DOT_1-NEXT: End completions
+// TUPLE_NO_DOT_1-DAG: BuiltinOperator/None:                                   = {#(Int, Double)#}{{; name=.+$}}
+// TUPLE_NO_DOT_1-DAG: Keyword[self]/CurrNominal: .self[#(Int, Double)#]; name=self
+// TUPLE_NO_DOT_1: End completions
 
 func testTupleNoDot2() {
   var t = (foo: 1, bar: 2.0)
@@ -53,7 +53,7 @@ func testTupleNoDot2() {
 // TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: < {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: != {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: > {#(Int, Double)#}[#Bool#]{{; name=.+$}}
-// TUPLE_NO_DOT_2-DAG: BuiltinOperator/None:                                   = {#(foo: Int, bar: Double)#}[#Void#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-DAG: BuiltinOperator/None:                                   = {#(foo: Int, bar: Double)#}{{; name=.+$}}
 // TUPLE_NO_DOT_2-DAG: Keyword[self]/CurrNominal: .self[#(foo: Int, bar: Double)#]; name=self
 // TUPLE_NO_DOT_2-NEXT: End completions
 
@@ -70,7 +70,7 @@ func testTupleNoDot3() {
 // TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: < {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: != {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: > {#(Int, Double)#}[#Bool#]{{; name=.+$}}
-// TUPLE_NO_DOT_3-DAG: BuiltinOperator/None:                                   = {#(foo: Int, Double)#}[#Void#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-DAG: BuiltinOperator/None:                                   = {#(foo: Int, Double)#}{{; name=.+$}}
 // TUPLE_NO_DOT_3-DAG: Keyword[self]/CurrNominal: .self[#(foo: Int, Double)#]; name=self
 // TUPLE_NO_DOT_3-NEXT: End completions
 

@@ -19,6 +19,7 @@
 #ifndef SWIFT_SEMA_IDETYPECHECKING_H
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
+#include "swift/AST/Expr.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -163,6 +164,11 @@ namespace swift {
   bool typeCheckForCodeCompletion(
       constraints::SolutionApplicationTarget &target, bool needsPrecheck,
       llvm::function_ref<void(const constraints::Solution &)> callback);
+
+  /// Thunk around \c TypeChecker::resolveDeclRefExpr to make it
+  /// available to \c swift::ide.
+  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
+                           bool replaceInvalidRefsWithErrors);
 
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);

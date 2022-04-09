@@ -1623,6 +1623,17 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
         for (auto arg : FileCheckArgs)
           llvm::errs() << " " << arg;
         llvm::errs() << "\n";
+
+        llvm::errs() << "Code completion results:\n";
+        SmallVector<StringRef, 20> ResultLines;
+        llvm::SplitString(ResultStr, ResultLines, "\n");
+        for (size_t LineNo = 0; LineNo < std::min(ResultLines.size(), 20ul);
+             LineNo++) {
+          llvm::errs() << ResultLines[LineNo] << '\n';
+        }
+        if (ResultLines.size() > 20) {
+          llvm::errs() << " + " << (ResultLines.size() - 20) << " more lines\n";
+        }
       }
     }
 

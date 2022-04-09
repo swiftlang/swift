@@ -88,7 +88,8 @@ func testArray(f1: Float) {
 func testDict(f1: Float) {
   _ = ["foo": f1, "bar": "baz"] #^LITERAL9^#
 }
-// LITERAL9-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .keys[#Dictionary<String, Any>.Keys#]; name=keys
+// LITERAL9-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .keys[#Dictionary<String, String>.Keys#]; name=keys
+// LITERAL9-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .keys[#Dictionary<String, Float>.Keys#]; name=keys
 // LITERAL9-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .isEmpty[#Bool#]; name=isEmpty
 
 func testEditorPlaceHolder() {

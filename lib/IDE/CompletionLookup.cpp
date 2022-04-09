@@ -2223,6 +2223,8 @@ void CompletionLookup::getPostfixKeywordCompletions(Type ExprType,
   if (IsSuperRefExpr)
     return;
 
+  NeedLeadingDot = !HaveDot;
+
   if (!ExprType->getAs<ModuleType>()) {
     addKeyword(getTokenText(tok::kw_self), ExprType->getRValueType(),
                SemanticContextKind::CurrentNominal,
@@ -2245,7 +2247,8 @@ void CompletionLookup::getPostfixKeywordCompletions(Type ExprType,
   }
 }
 
-void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD) {
+void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD,
+                                               bool IsDeclUnapplied) {
   Kind = LookupKind::ValueExpr;
   NeedLeadingDot = !HaveDot;
 
@@ -2278,7 +2281,7 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD) {
 
   // Handle special cases
   bool isIUO = VD && VD->isImplicitlyUnwrappedOptional();
-  if (tryFunctionCallCompletions(ExprType, VD))
+  if (tryFunctionCallCompletions(ExprType, IsDeclUnapplied ? VD : nullptr))
     return;
   if (tryModuleCompletions(ExprType))
     return;
@@ -2341,7 +2344,7 @@ void CompletionLookup::tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op) {
   addPostfixOperatorCompletion(op, funcTy->getResult());
 }
 
-void CompletionLookup::addAssignmentOperator(Type RHSType, Type resultType) {
+void CompletionLookup::addAssignmentOperator(Type RHSType) {
   CodeCompletionResultBuilder builder(Sink,
                                       CodeCompletionResultKind::BuiltinOperator,
                                       SemanticContextKind::None);
@@ -2352,12 +2355,11 @@ void CompletionLookup::addAssignmentOperator(Type RHSType, Type resultType) {
     builder.addWhitespace(" ");
   builder.addEqual();
   builder.addWhitespace(" ");
-  assert(RHSType && resultType);
+  assert(RHSType);
   Type contextTy;
   if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
     contextTy = typeContext->getDeclaredTypeInContext();
   builder.addCallArgument(Identifier(), RHSType, contextTy);
-  addTypeAnnotation(builder, resultType);
 }
 
 void CompletionLookup::addInfixOperatorCompletion(OperatorDecl *op,
@@ -2476,8 +2478,7 @@ void CompletionLookup::getOperatorCompletions(
 
   if (leadingSequence.empty() && LHS->getType() &&
       LHS->getType()->hasLValueType()) {
-    addAssignmentOperator(LHS->getType()->getRValueType(),
-                          CurrDeclContext->getASTContext().TheEmptyTupleType);
+    addAssignmentOperator(LHS->getType()->getRValueType());
   }
 
   // FIXME: unify this with the ?.member completions.

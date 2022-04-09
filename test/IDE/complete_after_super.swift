@@ -122,8 +122,17 @@ class SuperDerivedA : SuperBaseA {
 
   init() {
     super#^CONSTRUCTOR_SUPER_NO_DOT_1?check=COMMON_BASE_A_NO_DOT;check=CONSTRUCTOR_SUPER_NO_DOT_1^#
-// CONSTRUCTOR_SUPER_NO_DOT_1: Begin completions, 8 items
-// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[Constructor]/CurrNominal/Flair[SuperChain]: .init()[#SuperBaseA#]{{; name=.+$}}
+// CONSTRUCTOR_SUPER_NO_DOT_1: Begin completions, 10 items
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      .baseInstanceVar[#Int#];
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      .baseProp[#Int#];
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc0()[#Void#];
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc1({#(a): Int#})[#Void#];
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:        [{#(i): Int#}][#Double#];
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[Constructor]/CurrNominal/Flair[SuperChain]: .init()[#SuperBaseA#];
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      .baseExtProp[#Int#];
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   .baseExtFunc0()[#Void#];
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  !== {#AnyObject?#}[#Bool#];
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  === {#AnyObject?#}[#Bool#];
 // CONSTRUCTOR_SUPER_NO_DOT_1: End completions
   }
 
@@ -145,20 +154,30 @@ class SuperDerivedA : SuperBaseA {
   init (a: Float) {
     super.init#^CONSTRUCTOR_SUPER_INIT_1^#
 // CONSTRUCTOR_SUPER_INIT_1: Begin completions
-// CONSTRUCTOR_SUPER_INIT_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ()[#SuperBaseA#]; name=()
+// CONSTRUCTOR_SUPER_INIT_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ()[#SuperBaseA#];
 // CONSTRUCTOR_SUPER_INIT_1: End completions
   }
   init (b: Float) {
     super.init(#^CONSTRUCTOR_SUPER_INIT_PAREN_1^#
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: Begin completions, 1 items
-// CONSTRUCTOR_SUPER_INIT_PAREN_1: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['('][')'][#SuperBaseA#]; name=
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['('][')'][#SuperBaseA#];
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: End completions
   }
 
   deinit {
     super#^DESTRUCTOR_SUPER_NO_DOT_1?check=COMMON_BASE_A_NO_DOT;check=DESTRUCTOR_SUPER_NO_DOT_1;check=NO_CONSTRUCTORS^#
-// DESTRUCTOR_SUPER_NO_DOT_1: Begin completions, 7 items
+// DESTRUCTOR_SUPER_NO_DOT_1: Begin completions, 9 items
+// DESTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      .baseInstanceVar[#Int#];
+// DESTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      .baseProp[#Int#];
+// DESTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc0()[#Void#];
+// DESTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc1({#(a): Int#})[#Void#];
+// DESTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:        [{#(i): Int#}][#Double#];
+// DESTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      .baseExtProp[#Int#];
+// DESTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   .baseExtFunc0()[#Void#];
+// DESTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  !== {#AnyObject?#}[#Bool#];
+// DESTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  === {#AnyObject?#}[#Bool#];
 // DESTRUCTOR_SUPER_NO_DOT_1: End completions
+
 
     var resyncParser = 42
 
@@ -169,7 +188,16 @@ class SuperDerivedA : SuperBaseA {
 
   func test1() {
     super#^FUNC_SUPER_NO_DOT_1?check=COMMON_BASE_A_NO_DOT;check=FUNC_SUPER_NO_DOT_1;check=NO_CONSTRUCTORS^#
-// FUNC_SUPER_NO_DOT_1: Begin completions, 7 items
+// FUNC_SUPER_NO_DOT_1: Begin completions, 9 items
+// FUNC_SUPER_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      .baseInstanceVar[#Int#];
+// FUNC_SUPER_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      .baseProp[#Int#];
+// FUNC_SUPER_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc0()[#Void#];
+// FUNC_SUPER_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc1({#(a): Int#})[#Void#];
+// FUNC_SUPER_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:        [{#(i): Int#}][#Double#];
+// FUNC_SUPER_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      .baseExtProp[#Int#];
+// FUNC_SUPER_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   .baseExtFunc0()[#Void#];
+// FUNC_SUPER_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  !== {#AnyObject?#}[#Bool#];
+// FUNC_SUPER_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  === {#AnyObject?#}[#Bool#];
 // FUNC_SUPER_NO_DOT_1: End completions
   }
 
@@ -290,10 +318,19 @@ class SuperDerivedB : SuperBaseB {
 
   init() {
     super#^CONSTRUCTOR_SUPER_NO_DOT_2?check=COMMON_BASE_B_NO_DOT;check=CONSTRUCTOR_SUPER_NO_DOT_2^#
-// CONSTRUCTOR_SUPER_NO_DOT_2: Begin completions, 10 items
-// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal/Flair[SuperChain]: .init()[#SuperBaseB#]{{; name=.+$}}
-// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal: .init({#a: Double#})[#SuperBaseB#]{{; name=.+$}}
-// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal: .init({#int: Int#})[#SuperBaseB#]{{; name=.+$}}
+// CONSTRUCTOR_SUPER_NO_DOT_2: Begin completions, 12 items
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      .baseInstanceVar[#Int#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      .baseProp[#Int#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal/Flair[SuperChain]: .init()[#SuperBaseB#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal:      .init({#a: Double#})[#SuperBaseB#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal:      .init({#int: Int#})[#SuperBaseB#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc0()[#Void#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc1({#(a): Int#})[#Void#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Subscript]/CurrNominal:        [{#(i): Int#}][#Double#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      .baseExtProp[#Int#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   .baseExtFunc0()[#Void#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  !== {#AnyObject?#}[#Bool#];
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  === {#AnyObject?#}[#Bool#];
 // CONSTRUCTOR_SUPER_NO_DOT_2: End completions
   }
 
@@ -308,19 +345,43 @@ class SuperDerivedB : SuperBaseB {
 
   deinit {
     super#^DESTRUCTOR_SUPER_NO_DOT_2?check=COMMON_BASE_B_NO_DOT;check=DESTRUCTOR_SUPER_NO_DOT_2;check=NO_CONSTRUCTORS^#
-// DESTRUCTOR_SUPER_NO_DOT_2: Begin completions, 7 items
+// DESTRUCTOR_SUPER_NO_DOT_2: Begin completions, 9 items
+// DESTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      .baseInstanceVar[#Int#];
+// DESTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      .baseProp[#Int#];
+// DESTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc0()[#Void#];
+// DESTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc1({#(a): Int#})[#Void#];
+// DESTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Subscript]/CurrNominal:        [{#(i): Int#}][#Double#];
+// DESTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      .baseExtProp[#Int#];
+// DESTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   .baseExtFunc0()[#Void#];
+// DESTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  !== {#AnyObject?#}[#Bool#];
+// DESTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  === {#AnyObject?#}[#Bool#];
 // DESTRUCTOR_SUPER_NO_DOT_2: End completions
 
     var resyncParser = 42
 
     super.#^DESTRUCTOR_SUPER_DOT_2?check=COMMON_BASE_B_DOT;check=DESTRUCTOR_SUPER_DOT_2;check=NO_CONSTRUCTORS^#
 // DESTRUCTOR_SUPER_DOT_2: Begin completions, 6 items
+// DESTRUCTOR_SUPER_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      baseInstanceVar[#Int#];
+// DESTRUCTOR_SUPER_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      baseProp[#Int#];
+// DESTRUCTOR_SUPER_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   baseFunc0()[#Void#];
+// DESTRUCTOR_SUPER_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   baseFunc1({#(a): Int#})[#Void#];
+// DESTRUCTOR_SUPER_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      baseExtProp[#Int#];
+// DESTRUCTOR_SUPER_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   baseExtFunc0()[#Void#];
 // DESTRUCTOR_SUPER_DOT_2: End completions
   }
 
   func test1() {
     super#^FUNC_SUPER_NO_DOT_2?check=COMMON_BASE_B_NO_DOT;check=FUNC_SUPER_NO_DOT_2;check=NO_CONSTRUCTORS^#
-// FUNC_SUPER_NO_DOT_2: Begin completions, 7 items
+// FUNC_SUPER_NO_DOT_2: Begin completions, 9 items
+// FUNC_SUPER_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      .baseInstanceVar[#Int#];
+// FUNC_SUPER_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      .baseProp[#Int#];
+// FUNC_SUPER_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc0()[#Void#];
+// FUNC_SUPER_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   .baseFunc1({#(a): Int#})[#Void#];
+// FUNC_SUPER_NO_DOT_2-DAG: Decl[Subscript]/CurrNominal:        [{#(i): Int#}][#Double#];
+// FUNC_SUPER_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      .baseExtProp[#Int#];
+// FUNC_SUPER_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal:   .baseExtFunc0()[#Void#];
+// FUNC_SUPER_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  !== {#AnyObject?#}[#Bool#];
+// FUNC_SUPER_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  === {#AnyObject?#}[#Bool#];
 // FUNC_SUPER_NO_DOT_2: End completions
   }
 

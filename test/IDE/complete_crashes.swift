@@ -15,8 +15,8 @@ func badMembers1(_ a: BadMembers1) {
   a#^BAD_MEMBERS_1^#
 }
 // BAD_MEMBERS_1: Begin completions
-// BAD_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
-// BAD_MEMBERS_1-NEXT: Decl[Subscript]/CurrNominal:   [{#(i): Int#}][#Double#]{{; name=.+$}}
+// BAD_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
+// BAD_MEMBERS_1-DAG: Decl[Subscript]/CurrNominal:   [{#(i): Int#}][#Double#]{{; name=.+$}}
 // BAD_MEMBERS_1: End completions
 
 protocol BadMembers2 {
@@ -31,10 +31,10 @@ func badMembers2(_ a: BadMembers2) {
   a#^BAD_MEMBERS_2^#
 }
 // BAD_MEMBERS_2: Begin completions, 3 items
-// BAD_MEMBERS_2-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
-// BAD_MEMBERS_2-NEXT: Decl[Subscript]/CurrNominal:   [{#(i): Int#}][#Double#]{{; name=.+$}}
-// BAD_MEMBERS_2-NEXT: Keyword[self]/CurrNominal:     .self[#BadMembers2#]; name=self
-// BAD_MEMBERS_2-NEXT: End completions
+// BAD_MEMBERS_2-DAG: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
+// BAD_MEMBERS_2-DAG: Decl[Subscript]/CurrNominal:   [{#(i): Int#}][#Double#]{{; name=.+$}}
+// BAD_MEMBERS_2-DAG: Keyword[self]/CurrNominal:     .self[#BadMembers2#]; name=self
+// BAD_MEMBERS_2: End completions
 
 func globalFunc() {}
 
@@ -224,8 +224,6 @@ func foo_38149042(bar: Bar_38149042) {
 // RDAR_38149042: Begin completions
 // RDAR_38149042-DAG: Decl[InstanceVar]/CurrNominal:                  .x[#Int#]; name=x
 // RDAR_38149042-DAG: Keyword[self]/CurrNominal: .self[#Baz_38149042#]; name=self
-// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']=== {#AnyObject?#}[#Bool#]; name====
-// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']!== {#AnyObject?#}[#Bool#]; name=!==
 // RDAR_38149042: End completions
 
 // rdar://problem/38272904
@@ -251,7 +249,7 @@ func foo_38272904(a: A_38272904) {
 
 // rdar://problem/41159258
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41159258_1 | %FileCheck %s -check-prefix=RDAR_41159258
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41159258_2 | %FileCheck %s -check-prefix=RDAR_41159258
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41159258_2
 public func ==(lhs: RDAR41159258_MyResult1, rhs: RDAR41159258_MyResult1) -> Bool {
   fatalError()
 }
@@ -291,7 +289,7 @@ public final class IntStore {
   }
 }
 // RDAR_41232519: Begin completions
-// RDAR_41232519: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#Int#}[#Int#]; name=+
+// RDAR_41232519: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem/TypeRelation[Identical]: [' ']+ {#Int#}[#Int#]; name=+
 // RDAR_41232519: End completions
 
 // rdar://problem/28188259
@@ -300,8 +298,8 @@ func test_28188259(x: ((Int) -> Void) -> Void) {
   x({_ in }#^RDAR_28188259^#)
 }
 // RDAR_28188259: Begin completions
-// RDAR_28188259-DAG: Pattern/CurrModule/Flair[ArgLabels]: ({#Int#})[#Void#]; name=()
-// RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(Int) -> ()#]; name=self
+// RDAR_28188259-DAG: Pattern/CurrModule/Flair[ArgLabels]/TypeRelation[Invalid]: ({#_#})[#Void#]; name=()
+// RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(_) -> ()#]; name=self
 // RDAR_28188259: End completions
 
 // rdar://problem/40956846
@@ -360,14 +358,13 @@ extension Foo {
 // RDAR_41234606: End completions
 
 // rdar://problem/41071587
-// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_41071587 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_41071587
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_41071587 -source-filename=%s
 func test_41071587(x: Any) {
   switch x {
     case (let (_, _)) #^RDAR_41071587^#:
       ()
   }
 }
-// RDAR_41071587: Begin completions
 
 // rdar://problem/54215016
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_54215016 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_54215016

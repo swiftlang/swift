@@ -609,6 +609,9 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   if (isExpr<ObjectLiteralExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::ConstructorMember);
 
+  if (auto FVE = getAsExpr<ForceValueExpr>(anchor))
+    return getConstraintLocator(FVE->getSubExpr(), ConstraintLocator::Member);
+
   return getConstraintLocator(anchor);
 }
 

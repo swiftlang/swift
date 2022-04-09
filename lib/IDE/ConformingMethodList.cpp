@@ -46,7 +46,7 @@ public:
   // Only handle callbacks for suffix completions.
   // {
   void completeDotExpr(CodeCompletionExpr *E, SourceLoc DotLoc) override;
-  void completePostfixExpr(Expr *E, bool hasSpace) override;
+  void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace) override;
   // }
 
   void doneParsing() override;
@@ -58,10 +58,10 @@ void ConformingMethodListCallbacks::completeDotExpr(CodeCompletionExpr *E,
   ParsedExpr = E->getBase();
 }
 
-void ConformingMethodListCallbacks::completePostfixExpr(Expr *E,
+void ConformingMethodListCallbacks::completePostfixExpr(CodeCompletionExpr *E,
                                                         bool hasSpace) {
   CurDeclContext = P.CurDeclContext;
-  ParsedExpr = E;
+  ParsedExpr = E->getBase();
 }
 
 void ConformingMethodListCallbacks::doneParsing() {

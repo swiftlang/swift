@@ -83,7 +83,7 @@ func testDefaultArgs2() {
 // DEFAULT_ARGS_2: End completions
 
 // ONLY_DEFAULTS: Begin completions
-// ONLY_DEFAULTS-NEXT: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
+// ONLY_DEFAULTS-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
 // ONLY_DEFAULTS: End completions
 
 func testDefaultArgs3() {

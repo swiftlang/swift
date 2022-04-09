@@ -55,8 +55,9 @@ func testCallAsFunctionDeduplication() {
   overloaded()#^SKIP_CALLASFUNCTION_DUPLICATES^#
 }
 
-// FIXME: Update this to check the callAsFunction pattern only appears once when PostfixExpr completion is migrated to the solver-based implementation (which handles ambiguity).
-// SKIP_CALLASFUNCTION_DUPLICATES-NOT: Begin completions
+// SKIP_CALLASFUNCTION_DUPLICATES: Begin completions
+// SKIP_CALLASFUNCTION_DUPLICATES-DAG: Decl[InstanceMethod]/CurrNominal: .callAsFunction({#x: Int#})[#Void#];
+// SKIP_CALLASFUNCTION_DUPLICATES: End completions
 
 givenErrorExpr(undefined).#^ERROR_IN_BASE?check=SIMPLE^#
 

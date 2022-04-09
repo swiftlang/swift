@@ -137,8 +137,9 @@ public:
   /// -- no tokens provided by user.
   virtual void completeForEachSequenceBeginning(CodeCompletionExpr *E) {};
 
-  /// Complete a given expr-postfix.
-  virtual void completePostfixExpr(Expr *E, bool hasSpace) {};
+  /// Complete a expr-postfix. The \c CodeCompletionExpr has the expression it
+  /// is completing after set as its base.
+  virtual void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace){};
 
   /// Complete a given expr-postfix, given that there is a following
   /// left parenthesis.

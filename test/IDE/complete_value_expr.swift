@@ -5,9 +5,6 @@
 
 // NOCRASH: Token
 
-// NORESULT: Token
-// NORESULT-NOT: Begin completions
-
 struct FooStruct {
   lazy var lazyInstanceVar = 0
   var instanceVar = 0
@@ -139,181 +136,181 @@ extension FooStruct {
 var fooObject: FooStruct
 
 // FOO_OBJECT_DOT: Begin completions
-// FOO_OBJECT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    lazyInstanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc0()[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc5()[#Int?#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc6()[#Int!#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc7({#a: Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc8({#(a): (Int, Int)#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc9({#a: Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc10({#arg: Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc10({#arg: Int#}, {#optArg: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
+// FOO_OBJECT_DOT-DAG: Decl[InstanceVar]/CurrNominal:    lazyInstanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc5()[#Int?#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc6()[#Int!#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc7({#a: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc8({#(a): (Int, Int)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc9({#a: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc10({#arg: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc10({#arg: Int#}, {#optArg: Int#})[#Void#]{{; name=.+$}}
 //
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: varargInstanceFunc0({#(v): Int...#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: varargInstanceFunc1({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: varargInstanceFunc2({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: varargInstanceFunc0({#(v): Int...#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: varargInstanceFunc1({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: varargInstanceFunc2({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
 //
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc1()[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc1()[#Double#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc1({#(a): Int#})[#FooStruct#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: selectorVoidFunc1({#(a): Int#}, {#b: Float#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: selectorVoidFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: selectorVoidFunc3({#(a): Int#}, {#b: (Float, Double)#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorStringFunc1({#(a): Int#}, {#b: Float#})[#String#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorStringFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#String#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorStringFunc3({#(a): Int#}, {#b: (Float, Double)#})[#String#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    extProp[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: extFunc0()[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: End completions
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc1()[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc1()[#Double#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: builderFunc1({#(a): Int#})[#FooStruct#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: selectorVoidFunc1({#(a): Int#}, {#b: Float#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: selectorVoidFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: selectorVoidFunc3({#(a): Int#}, {#b: (Float, Double)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: selectorStringFunc1({#(a): Int#}, {#b: Float#})[#String#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: selectorStringFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#String#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: selectorStringFunc3({#(a): Int#}, {#b: (Float, Double)#})[#String#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceVar]/CurrNominal:    extProp[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: extFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT: End completions
 
 // FOO_OBJECT_NO_DOT: Begin completions
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .lazyInstanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc0()[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc5()[#Int?#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc6()[#Int!#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc7({#a: Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc8({#(a): (Int, Int)#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc9({#a: Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc10({#arg: Int#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc10({#arg: Int#}, {#optArg: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .lazyInstanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc5()[#Int?#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc6()[#Int!#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc7({#a: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc8({#(a): (Int, Int)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc9({#a: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc10({#arg: Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc10({#arg: Int#}, {#optArg: Int#})[#Void#]{{; name=.+$}}
 //
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc0({#(v): Int...#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc1({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc2({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc0({#(v): Int...#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc1({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc2({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
 //
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc1()[#Int#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc1()[#Double#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .builderFunc1({#(a): Int#})[#FooStruct#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#(i): Int#}, {#(j): Int#}][#Double#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc1({#(a): Int#}, {#b: Float#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc3({#(a): Int#}, {#b: (Float, Double)#})[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc1({#(a): Int#}, {#b: Float#})[#String#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#String#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc3({#(a): Int#}, {#b: (Float, Double)#})[#String#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .extProp[#Int#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .extFunc0()[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: BuiltinOperator/None:                     = {#Foo
-// FOO_OBJECT_NO_DOT-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct#]; name=self
-// FOO_OBJECT_NO_DOT-NEXT: End completions
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc1()[#Int#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc1()[#Double#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .builderFunc1({#(a): Int#})[#FooStruct#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#(i): Int#}, {#(j): Int#}][#Double#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc1({#(a): Int#}, {#b: Float#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc3({#(a): Int#}, {#b: (Float, Double)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc1({#(a): Int#}, {#b: Float#})[#String#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#String#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc3({#(a): Int#}, {#b: (Float, Double)#})[#String#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .extProp[#Int#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .extFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_NO_DOT-DAG: BuiltinOperator/None:                     = {#Foo
+// FOO_OBJECT_NO_DOT-DAG: Keyword[self]/CurrNominal: .self[#FooStruct#]; name=self
+// FOO_OBJECT_NO_DOT: End completions
 
 // FOO_STRUCT_DOT: Begin completions
-// FOO_STRUCT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct.Type#]; name=self
-// FOO_STRUCT_DOT-NEXT: Keyword/CurrNominal: Type[#FooStruct.Type#]; name=Type
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0({#(self): &FooStruct#})[#() -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(self): &FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc2({#(self): &FooStruct#})[#(Int, b: inout Double) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc3({#(self): &FooStruct#})[#(Int, (Float, Double)) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc4({#(self): &FooStruct#})[#(Int?, b: Int?, c: inout Int?, d: inout Int?) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc5({#(self): &FooStruct#})[#() -> Int?#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc6({#(self): &FooStruct#})[#() -> Int?#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc7({#(self): &FooStruct#})[#(a: Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc8({#(self): &FooStruct#})[#((Int, Int)) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc9({#(self): &FooStruct#})[#(a: @autoclosure () -> Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc10({#(self): &FooStruct#})[#(arg: Int, optArg: Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc0({#(self): &FooStruct#})[#(Int...) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc1({#(self): &FooStruct#})[#(Float, v: Int...) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc2({#(self): &FooStruct#})[#(Float, b: Double, v: Int...) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc1({#(self): &FooStruct#})[#() -> Int#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc1({#(self): &FooStruct#})[#() -> Double#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(self): &FooStruct#})[#(Int) -> Int#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(self): &FooStruct#})[#(Double) -> Int#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc1({#(self): &FooStruct#})[#(Int) -> FooStruct#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc1({#(self): &FooStruct#})[#(Int, b: Float) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc2({#(self): &FooStruct#})[#(Int, b: Float, c: Double) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc3({#(self): &FooStruct#})[#(Int, b: (Float, Double)) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorStringFunc1({#(self): &FooStruct#})[#(Int, b: Float) -> String#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorStringFunc2({#(self): &FooStruct#})[#(Int, b: Float, c: Double) -> String#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorStringFunc3({#(self): &FooStruct#})[#(Int, b: (Float, Double)) -> String#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[Struct]/CurrNominal:         NestedStruct[#FooStruct.NestedStruct#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[Class]/CurrNominal:          NestedClass[#FooStruct.NestedClass#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[Enum]/CurrNominal:           NestedEnum[#FooStruct.NestedEnum#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      NestedTypealias[#Int#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[StaticVar]/CurrNominal:      staticVar[#Int#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   staticFunc0()[#Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   staticFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc1()[#Int#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc1()[#Double#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[Constructor]/CurrNominal:    init()[#FooStruct#]; name=init(){{$}}
-// FOO_STRUCT_DOT-NEXT: Decl[Constructor]/CurrNominal:    init({#lazyInstanceVar: Int?#}, {#instanceVar: Int#})[#FooStruct#]; name=init(lazyInstanceVar:instanceVar:){{$}}
-// FOO_STRUCT_DOT-NEXT: Decl[Constructor]/CurrNominal:    init()[#FooStruct#]; name=init(){{$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: extFunc0({#(self): &FooStruct#})[#() -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[StaticVar]/CurrNominal:      extStaticProp[#Int#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   extStaticFunc0()[#Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[Struct]/CurrNominal:         ExtNestedStruct[#FooStruct.ExtNestedStruct#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[Class]/CurrNominal:          ExtNestedClass[#FooStruct.ExtNestedClass#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[Enum]/CurrNominal:           ExtNestedEnum[#FooStruct.ExtNestedEnum#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      ExtNestedTypealias[#Int#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: End completions
+// FOO_STRUCT_DOT-DAG: Keyword[self]/CurrNominal: self[#FooStruct.Type#]; name=self
+// FOO_STRUCT_DOT-DAG: Keyword/CurrNominal: Type[#FooStruct.Type#]; name=Type
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0({#(self): &FooStruct#})[#() -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(self): &FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc2({#(self): &FooStruct#})[#(Int, b: inout Double) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc3({#(self): &FooStruct#})[#(Int, (Float, Double)) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc4({#(self): &FooStruct#})[#(Int?, b: Int?, c: inout Int?, d: inout Int?) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc5({#(self): &FooStruct#})[#() -> Int?#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc6({#(self): &FooStruct#})[#() -> Int?#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc7({#(self): &FooStruct#})[#(a: Int) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc8({#(self): &FooStruct#})[#((Int, Int)) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc9({#(self): &FooStruct#})[#(a: @autoclosure () -> Int) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc10({#(self): &FooStruct#})[#(arg: Int, optArg: Int) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc0({#(self): &FooStruct#})[#(Int...) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc1({#(self): &FooStruct#})[#(Float, v: Int...) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc2({#(self): &FooStruct#})[#(Float, b: Double, v: Int...) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc1({#(self): &FooStruct#})[#() -> Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc1({#(self): &FooStruct#})[#() -> Double#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(self): &FooStruct#})[#(Int) -> Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(self): &FooStruct#})[#(Double) -> Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: builderFunc1({#(self): &FooStruct#})[#(Int) -> FooStruct#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc1({#(self): &FooStruct#})[#(Int, b: Float) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc2({#(self): &FooStruct#})[#(Int, b: Float, c: Double) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc3({#(self): &FooStruct#})[#(Int, b: (Float, Double)) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: selectorStringFunc1({#(self): &FooStruct#})[#(Int, b: Float) -> String#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: selectorStringFunc2({#(self): &FooStruct#})[#(Int, b: Float, c: Double) -> String#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: selectorStringFunc3({#(self): &FooStruct#})[#(Int, b: (Float, Double)) -> String#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[Struct]/CurrNominal:         NestedStruct[#FooStruct.NestedStruct#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[Class]/CurrNominal:          NestedClass[#FooStruct.NestedClass#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[Enum]/CurrNominal:           NestedEnum[#FooStruct.NestedEnum#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[TypeAlias]/CurrNominal:      NestedTypealias[#Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[StaticVar]/CurrNominal:      staticVar[#Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[StaticMethod]/CurrNominal:   staticFunc0()[#Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[StaticMethod]/CurrNominal:   staticFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc1()[#Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc1()[#Double#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[StaticMethod]/CurrNominal:   overloadedStaticFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[Constructor]/CurrNominal:    init()[#FooStruct#]; name=init(){{$}}
+// FOO_STRUCT_DOT-DAG: Decl[Constructor]/CurrNominal:    init({#lazyInstanceVar: Int?#}, {#instanceVar: Int#})[#FooStruct#]; name=init(lazyInstanceVar:instanceVar:){{$}}
+// FOO_STRUCT_DOT-DAG: Decl[Constructor]/CurrNominal:    init()[#FooStruct#]; name=init(){{$}}
+// FOO_STRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal: extFunc0({#(self): &FooStruct#})[#() -> Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[StaticVar]/CurrNominal:      extStaticProp[#Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[StaticMethod]/CurrNominal:   extStaticFunc0()[#Void#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[Struct]/CurrNominal:         ExtNestedStruct[#FooStruct.ExtNestedStruct#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[Class]/CurrNominal:          ExtNestedClass[#FooStruct.ExtNestedClass#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[Enum]/CurrNominal:           ExtNestedEnum[#FooStruct.ExtNestedEnum#]{{; name=.+$}}
+// FOO_STRUCT_DOT-DAG: Decl[TypeAlias]/CurrNominal:      ExtNestedTypealias[#Int#]{{; name=.+$}}
+// FOO_STRUCT_DOT: End completions
 
 // FOO_STRUCT_NO_DOT: Begin completions
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc0({#(self): &FooStruct#})[#() -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc1({#(self): &FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc2({#(self): &FooStruct#})[#(Int, b: inout Double) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc3({#(self): &FooStruct#})[#(Int, (Float, Double)) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc4({#(self): &FooStruct#})[#(Int?, b: Int?, c: inout Int?, d: inout Int?) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc5({#(self): &FooStruct#})[#() -> Int?#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc6({#(self): &FooStruct#})[#() -> Int?#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc7({#(self): &FooStruct#})[#(a: Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc8({#(self): &FooStruct#})[#((Int, Int)) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc9({#(self): &FooStruct#})[#(a: @autoclosure () -> Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc10({#(self): &FooStruct#})[#(arg: Int, optArg: Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc0({#(self): &FooStruct#})[#(Int...) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc1({#(self): &FooStruct#})[#(Float, v: Int...) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc2({#(self): &FooStruct#})[#(Float, b: Double, v: Int...) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc1({#(self): &FooStruct#})[#() -> Int#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc1({#(self): &FooStruct#})[#() -> Double#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#(self): &FooStruct#})[#(Int) -> Int#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#(self): &FooStruct#})[#(Double) -> Int#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .builderFunc1({#(self): &FooStruct#})[#(Int) -> FooStruct#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc1({#(self): &FooStruct#})[#(Int, b: Float) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc2({#(self): &FooStruct#})[#(Int, b: Float, c: Double) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc3({#(self): &FooStruct#})[#(Int, b: (Float, Double)) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc1({#(self): &FooStruct#})[#(Int, b: Float) -> String#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc2({#(self): &FooStruct#})[#(Int, b: Float, c: Double) -> String#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc3({#(self): &FooStruct#})[#(Int, b: (Float, Double)) -> String#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[Struct]/CurrNominal:         .NestedStruct[#FooStruct.NestedStruct#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[Class]/CurrNominal:          .NestedClass[#FooStruct.NestedClass#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[Enum]/CurrNominal:           .NestedEnum[#FooStruct.NestedEnum#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      .NestedTypealias[#Int#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal:      .staticVar[#Int#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .staticFunc0()[#Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .staticFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc1()[#Int#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc1()[#Double#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooStruct#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#lazyInstanceVar: Int?#}, {#instanceVar: Int#})[#FooStruct#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooStruct#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .extFunc0({#(self): &FooStruct#})[#() -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal:      .extStaticProp[#Int#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .extStaticFunc0()[#Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[Struct]/CurrNominal:         .ExtNestedStruct[#FooStruct.ExtNestedStruct#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[Class]/CurrNominal:          .ExtNestedClass[#FooStruct.ExtNestedClass#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[Enum]/CurrNominal:           .ExtNestedEnum[#FooStruct.ExtNestedEnum#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      .ExtNestedTypealias[#Int#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Keyword[self]/CurrNominal:        .self[#FooStruct.Type#]; name=self
-// FOO_STRUCT_NO_DOT-NEXT: Keyword/CurrNominal:              .Type[#FooStruct.Type#]; name=Type
-// FOO_STRUCT_NO_DOT-NEXT: End completions
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc0({#(self): &FooStruct#})[#() -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc1({#(self): &FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc2({#(self): &FooStruct#})[#(Int, b: inout Double) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc3({#(self): &FooStruct#})[#(Int, (Float, Double)) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc4({#(self): &FooStruct#})[#(Int?, b: Int?, c: inout Int?, d: inout Int?) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc5({#(self): &FooStruct#})[#() -> Int?#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc6({#(self): &FooStruct#})[#() -> Int?#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc7({#(self): &FooStruct#})[#(a: Int) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc8({#(self): &FooStruct#})[#((Int, Int)) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc9({#(self): &FooStruct#})[#(a: @autoclosure () -> Int) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc10({#(self): &FooStruct#})[#(arg: Int, optArg: Int) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc0({#(self): &FooStruct#})[#(Int...) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc1({#(self): &FooStruct#})[#(Float, v: Int...) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc2({#(self): &FooStruct#})[#(Float, b: Double, v: Int...) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc1({#(self): &FooStruct#})[#() -> Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc1({#(self): &FooStruct#})[#() -> Double#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#(self): &FooStruct#})[#(Int) -> Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#(self): &FooStruct#})[#(Double) -> Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .builderFunc1({#(self): &FooStruct#})[#(Int) -> FooStruct#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc1({#(self): &FooStruct#})[#(Int, b: Float) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc2({#(self): &FooStruct#})[#(Int, b: Float, c: Double) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc3({#(self): &FooStruct#})[#(Int, b: (Float, Double)) -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc1({#(self): &FooStruct#})[#(Int, b: Float) -> String#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc2({#(self): &FooStruct#})[#(Int, b: Float, c: Double) -> String#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc3({#(self): &FooStruct#})[#(Int, b: (Float, Double)) -> String#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[Struct]/CurrNominal:         .NestedStruct[#FooStruct.NestedStruct#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[Class]/CurrNominal:          .NestedClass[#FooStruct.NestedClass#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[Enum]/CurrNominal:           .NestedEnum[#FooStruct.NestedEnum#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[TypeAlias]/CurrNominal:      .NestedTypealias[#Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:      .staticVar[#Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal:   .staticFunc0()[#Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal:   .staticFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc1()[#Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc1()[#Double#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal:   .overloadedStaticFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooStruct#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#lazyInstanceVar: Int?#}, {#instanceVar: Int#})[#FooStruct#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooStruct#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .extFunc0({#(self): &FooStruct#})[#() -> Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:      .extStaticProp[#Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal:   .extStaticFunc0()[#Void#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[Struct]/CurrNominal:         .ExtNestedStruct[#FooStruct.ExtNestedStruct#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[Class]/CurrNominal:          .ExtNestedClass[#FooStruct.ExtNestedClass#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[Enum]/CurrNominal:           .ExtNestedEnum[#FooStruct.ExtNestedEnum#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Decl[TypeAlias]/CurrNominal:      .ExtNestedTypealias[#Int#]{{; name=.+$}}
+// FOO_STRUCT_NO_DOT-DAG: Keyword[self]/CurrNominal:        .self[#FooStruct.Type#]; name=self
+// FOO_STRUCT_NO_DOT-DAG: Keyword/CurrNominal:              .Type[#FooStruct.Type#]; name=Type
+// FOO_STRUCT_NO_DOT: End completions
 
 func testObjectExpr() {
   fooObject.#^FOO_OBJECT_DOT_1?check=FOO_OBJECT_DOT^#
@@ -361,8 +358,12 @@ struct NoMetaCompletions {
   typealias Foo = Int
 }
 func testMetatypeCompletions() {
-  NoMetaCompletions.Type.#^FOO_STRUCT_META_1?check=FOO_STRUCT_META^#
+  NoMetaCompletions.Type.#^FOO_STRUCT_META_1^#
 }
+// FOO_STRUCT_META_1: Begin completions, 2 items
+// FOO_STRUCT_META_1-DAG: Keyword[self]/CurrNominal:          self[#NoMetaCompletions.Type.Type#]; name=self
+// FOO_STRUCT_META_1-DAG: Keyword/CurrNominal:                Type[#NoMetaCompletions.Type.Type#]; name=Type
+// FOO_STRUCT_META_1: End completions
 func testMetatypeCompletionsWithoutDot() {
   NoMetaCompletions.Type#^FOO_STRUCT_META_2?check=FOO_STRUCT_META^#
 }
@@ -373,47 +374,59 @@ func testMetatypeCompletionsWithoutDot() {
 func testImplicitlyCurriedFunc(_ fs: inout FooStruct) {
   FooStruct.instanceFunc0(&fs)#^IMPLICITLY_CURRIED_FUNC_0^#
 // IMPLICITLY_CURRIED_FUNC_0: Begin completions
-// IMPLICITLY_CURRIED_FUNC_0-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ()[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_FUNC_0-NEXT: Keyword[self]/CurrNominal: .self[#() -> ()#]; name=self
-// IMPLICITLY_CURRIED_FUNC_0-NEXT: End completions
+// IMPLICITLY_CURRIED_FUNC_0-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ()[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_FUNC_0-DAG: Keyword[self]/CurrNominal: .self[#() -> ()#]; name=self
+// IMPLICITLY_CURRIED_FUNC_0: End completions
 
   FooStruct.instanceFunc1(&fs)#^IMPLICITLY_CURRIED_FUNC_1^#
 // IMPLICITLY_CURRIED_FUNC_1: Begin completions
-// IMPLICITLY_CURRIED_FUNC_1-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(a): Int#})[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_FUNC_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int) -> ()#]; name=self
-// IMPLICITLY_CURRIED_FUNC_1-NEXT: End completions
+// IMPLICITLY_CURRIED_FUNC_1-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(a): Int#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_FUNC_1-DAG: Keyword[self]/CurrNominal: .self[#(Int) -> ()#]; name=self
+// IMPLICITLY_CURRIED_FUNC_1: End completions
 
   FooStruct.instanceFunc2(&fs)#^IMPLICITLY_CURRIED_FUNC_2^#
 // IMPLICITLY_CURRIED_FUNC_2: Begin completions
-// IMPLICITLY_CURRIED_FUNC_2-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_FUNC_2-NEXT: Keyword[self]/CurrNominal: .self[#(Int, inout Double) -> ()#]; name=self
-// IMPLICITLY_CURRIED_FUNC_2-NEXT: End completions
+// IMPLICITLY_CURRIED_FUNC_2-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_FUNC_2-DAG: Keyword[self]/CurrNominal: .self[#(Int, inout Double) -> ()#]; name=self
+// IMPLICITLY_CURRIED_FUNC_2: End completions
 
   FooStruct.varargInstanceFunc0(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_0^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_0: Begin completions
-// IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(v): Int...#})[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: Keyword[self]/CurrNominal: .self[#(Int...) -> ()#]; name=self
-// IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: End completions
+// IMPLICITLY_CURRIED_VARARG_FUNC_0-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(v): Int...#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_VARARG_FUNC_0-DAG: Keyword[self]/CurrNominal: .self[#(Int...) -> ()#]; name=self
+// IMPLICITLY_CURRIED_VARARG_FUNC_0: End completions
 
   FooStruct.varargInstanceFunc1(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_1^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_1: Begin completions
-// IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: Keyword[self]/CurrNominal: .self[#(Float, Int...) -> ()#]; name=self
-// IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: End completions
+// IMPLICITLY_CURRIED_VARARG_FUNC_1-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_VARARG_FUNC_1-DAG: Keyword[self]/CurrNominal: .self[#(Float, Int...) -> ()#]; name=self
+// IMPLICITLY_CURRIED_VARARG_FUNC_1: End completions
 
   FooStruct.varargInstanceFunc2(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_2^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_2: Begin completions
-// IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: Keyword[self]/CurrNominal: .self[#(Float, Double, Int...) -> ()#]; name=self
-// IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: End completions
+// IMPLICITLY_CURRIED_VARARG_FUNC_2-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_VARARG_FUNC_2-DAG: Keyword[self]/CurrNominal: .self[#(Float, Double, Int...) -> ()#]; name=self
+// IMPLICITLY_CURRIED_VARARG_FUNC_2: End completions
 
   // This call is ambiguous, and the expression is invalid.
   // Ensure that we don't suggest to call the result.
-  FooStruct.overloadedInstanceFunc1(&fs)#^IMPLICITLY_CURRIED_OVERLOADED_FUNC_1?check=NORESULT^#
+  FooStruct.overloadedInstanceFunc1(&fs)#^IMPLICITLY_CURRIED_OVERLOADED_FUNC_1^#
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_1: Begin completions, 4 items
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_1-DAG: Keyword[self]/CurrNominal:          .self[#() -> Int#];
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_1-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ()[#Int#];
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_1-DAG: Keyword[self]/CurrNominal:          .self[#() -> Double#];
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_1-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ()[#Double#];
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_1: End completions
 
   // This call is ambiguous, and the expression is invalid.
   // Ensure that we don't suggest to call the result.
-  FooStruct.overloadedInstanceFunc2(&fs)#^IMPLICITLY_CURRIED_OVERLOADED_FUNC_2?check=NORESULT^#
+  FooStruct.overloadedInstanceFunc2(&fs)#^IMPLICITLY_CURRIED_OVERLOADED_FUNC_2^#
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_2: Begin completions, 4 items
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_2-DAG: Keyword[self]/CurrNominal:          .self[#(Int) -> Int#];
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_2-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(x): Int#})[#Int#];
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_2-DAG: Keyword[self]/CurrNominal:          .self[#(Double) -> Int#];
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_2-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(x): Double#})[#Int#];
+// IMPLICITLY_CURRIED_OVERLOADED_FUNC_2: End completions
 }
 
 //===---
@@ -577,8 +590,8 @@ func testInsideFunctionCall6() {
   var a = FooStruct()
   a.instanceFunc7(#^INSIDE_FUNCTION_CALL_6^#
 // INSIDE_FUNCTION_CALL_6: Begin completions
-// INSIDE_FUNCTION_CALL_6-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}[')'][#Void#]{{; name=.+$}}
-// INSIDE_FUNCTION_CALL_6-NEXT: End completions
+// INSIDE_FUNCTION_CALL_6-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_6: End completions
 }
 
 func testInsideFunctionCall7() {
@@ -671,18 +684,18 @@ class FuncTypeVars {
 var funcTypeVarsObject: FuncTypeVars
 func testFuncTypeVars() {
   funcTypeVarsObject.funcVar1#^VF1^#
-// VF1: Begin completions
-// VF1-NEXT: Pattern/CurrModule/Flair[ArgLabels]: ()[#Double#]{{; name=.+$}}
-// VF1-NEXT: BuiltinOperator/None:         = {#() -> Double##() -> Double#}[#Void#]
-// VF1-NEXT: Keyword[self]/CurrNominal:    .self[#() -> Double#]; name=self
-// VF1-NEXT: End completions
+// VF1: Begin completions, 3 items
+// VF1-DAG: Pattern/CurrModule/Flair[ArgLabels]: ()[#Double#]{{; name=.+$}}
+// VF1-DAG: BuiltinOperator/None:         = {#() -> Double##() -> Double#}
+// VF1-DAG: Keyword[self]/CurrNominal:    .self[#() -> Double#]; name=self
+// VF1: End completions
 
   funcTypeVarsObject.funcVar2#^VF2^#
-// VF2: Begin completions
-// VF2-NEXT: Pattern/CurrModule/Flair[ArgLabels]: ({#Int#})[#Double#]{{; name=.+$}}
-// VF2-NEXT: BuiltinOperator/None:         = {#(Int) -> Double##(_ a: Int) -> Double#}[#Void#]
-// VF2-NEXT: Keyword[self]/CurrNominal:    .self[#(Int) -> Double#]; name=self
-// VF2-NEXT: End completions
+// VF2: Begin completions, 3 items
+// VF2-DAG: Pattern/CurrModule/Flair[ArgLabels]: ({#Int#})[#Double#]{{; name=.+$}}
+// VF2-DAG: BuiltinOperator/None:         = {#(Int) -> Double##(_ a: Int) -> Double#}
+// VF2-DAG: Keyword[self]/CurrNominal:    .self[#(Int) -> Double#]; name=self
+// VF2: End completions
 }
 
 //===--- Check that we look into base classes.
@@ -704,24 +717,24 @@ func testLookInBase() {
   membersDerived.#^BASE_MEMBERS^#
 // BASE_MEMBERS: Begin completions
 // BASE_MEMBERS-DAG: Keyword[self]/CurrNominal: self[#MembersDerived#]; name=self
-// BASE_MEMBERS-NEXT: Decl[InstanceVar]/CurrNominal:    derivedVar[#Int#]{{; name=.+$}}
-// BASE_MEMBERS-NEXT: Decl[InstanceMethod]/CurrNominal: derivedInstanceFunc()[#Void#]{{; name=.+$}}
-// BASE_MEMBERS-NEXT: Decl[InstanceVar]/Super:          baseVar[#Int#]{{; name=.+$}}
-// BASE_MEMBERS-NEXT: Decl[InstanceMethod]/Super:       baseInstanceFunc()[#Void#]{{; name=.+$}}
-// BASE_MEMBERS-NEXT: End completions
+// BASE_MEMBERS-DAG: Decl[InstanceVar]/CurrNominal:    derivedVar[#Int#]{{; name=.+$}}
+// BASE_MEMBERS-DAG: Decl[InstanceMethod]/CurrNominal: derivedInstanceFunc()[#Void#]{{; name=.+$}}
+// BASE_MEMBERS-DAG: Decl[InstanceVar]/Super:          baseVar[#Int#]{{; name=.+$}}
+// BASE_MEMBERS-DAG: Decl[InstanceMethod]/Super:       baseInstanceFunc()[#Void#]{{; name=.+$}}
+// BASE_MEMBERS: End completions
 }
 
 func testLookInBaseStatic() {
   MembersDerived.#^BASE_MEMBERS_STATIC^#
 // BASE_MEMBERS_STATIC: Begin completions
-// BASE_MEMBERS_STATIC-NEXT: Keyword[self]/CurrNominal: self[#MembersDerived.Type#]; name=self
-// BASE_MEMBERS_STATIC-NEXT: Keyword/CurrNominal: Type[#MembersDerived.Type#]; name=Type
-// BASE_MEMBERS_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: derivedInstanceFunc({#(self): MembersDerived#})[#() -> Void#]{{; name=.+$}}
-// BASE_MEMBERS_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   derivedStaticFunc()[#Void#]{{; name=.+$}}
-// BASE_MEMBERS_STATIC-NEXT: Decl[Constructor]/CurrNominal:    init()[#MembersDerived#]; name=init(){{$}}
-// BASE_MEMBERS_STATIC-NEXT: Decl[InstanceMethod]/Super:       baseInstanceFunc({#(self): MembersBase#})[#() -> Void#]{{; name=.+$}}
-// BASE_MEMBERS_STATIC-NEXT: Decl[StaticMethod]/Super:         baseStaticFunc()[#Void#]{{; name=.+$}}
-// BASE_MEMBERS_STATIC-NEXT: End completions
+// BASE_MEMBERS_STATIC-DAG: Keyword[self]/CurrNominal: self[#MembersDerived.Type#]; name=self
+// BASE_MEMBERS_STATIC-DAG: Keyword/CurrNominal: Type[#MembersDerived.Type#]; name=Type
+// BASE_MEMBERS_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: derivedInstanceFunc({#(self): MembersDerived#})[#() -> Void#]{{; name=.+$}}
+// BASE_MEMBERS_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   derivedStaticFunc()[#Void#]{{; name=.+$}}
+// BASE_MEMBERS_STATIC-DAG: Decl[Constructor]/CurrNominal:    init()[#MembersDerived#]; name=init(){{$}}
+// BASE_MEMBERS_STATIC-DAG: Decl[InstanceMethod]/Super:       baseInstanceFunc({#(self): MembersBase#})[#() -> Void#]{{; name=.+$}}
+// BASE_MEMBERS_STATIC-DAG: Decl[StaticMethod]/Super:         baseStaticFunc()[#Void#]{{; name=.+$}}
+// BASE_MEMBERS_STATIC: End completions
 }
 
 //===--- Check that we can look into protocols.
@@ -729,86 +742,86 @@ func testLookInBaseStatic() {
 func testLookInProtoNoDot1() {
   fooProtocolInstance#^PROTO_MEMBERS_NO_DOT_1^#
 // PROTO_MEMBERS_NO_DOT_1: Begin completions
-// PROTO_MEMBERS_NO_DOT_1-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVar1[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_1-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVar2[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_1-NEXT: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_1-NEXT: Keyword[self]/CurrNominal:        .self[#FooProtocol#]; name=self
-// PROTO_MEMBERS_NO_DOT_1-NEXT: End completions
+// PROTO_MEMBERS_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVar1[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVar2[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_1-DAG: Keyword[self]/CurrNominal:        .self[#FooProtocol#]; name=self
+// PROTO_MEMBERS_NO_DOT_1: End completions
 }
 
 func testLookInProtoNoDot2() {
   fooBarProtocolInstance#^PROTO_MEMBERS_NO_DOT_2^#
 // PROTO_MEMBERS_NO_DOT_2: Begin completions
-// PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[InstanceVar]/CurrNominal:    .barInstanceVar[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .barInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVar1[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVar2[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_2-NEXT: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_2-NEXT: Keyword[self]/CurrNominal: .self[#BarProtocol & FooProtocol#]; name=self
-// PROTO_MEMBERS_NO_DOT_2-NEXT: End completions
+// PROTO_MEMBERS_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:    .barInstanceVar[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal: .barInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal: .barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVar1[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVar2[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_2-DAG: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_2-DAG: Keyword[self]/CurrNominal: .self[#BarProtocol & FooProtocol#]; name=self
+// PROTO_MEMBERS_NO_DOT_2: End completions
 }
 
 func testLookInProtoNoDot3() {
   fooExBarExProtocolInstance#^PROTO_MEMBERS_NO_DOT_3^#
 // PROTO_MEMBERS_NO_DOT_3: Begin completions
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceVar]/Super:          .barInstanceVar[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceMethod]/Super:       .barInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceMethod]/Super:       .barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceMethod]/CurrNominal: .barExInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceVar]/Super:          .fooInstanceVar1[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceVar]/Super:          .fooInstanceVar2[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceMethod]/Super:       .fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceMethod]/Super:       .fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[Subscript]/Super:            [{#(i): Int#}][#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Decl[InstanceMethod]/CurrNominal: .fooExInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_NO_DOT_3-NEXT: Keyword[self]/CurrNominal: .self[#BarExProtocol & FooExProtocol#]; name=self
-// PROTO_MEMBERS_NO_DOT_3-NEXT: End completions
+// PROTO_MEMBERS_NO_DOT_3-DAG: Decl[InstanceVar]/Super:          .barInstanceVar[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_3-DAG: Decl[InstanceMethod]/Super:       .barInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_3-DAG: Decl[InstanceMethod]/Super:       .barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_3-DAG: Decl[InstanceMethod]/CurrNominal: .barExInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_3-DAG: Decl[InstanceVar]/Super:          .fooInstanceVar1[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_3-DAG: Decl[InstanceVar]/Super:          .fooInstanceVar2[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_3-DAG: Decl[InstanceMethod]/Super:       .fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_3-DAG: Decl[InstanceMethod]/Super:       .fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_3-DAG: Decl[Subscript]/Super:            [{#(i): Int#}][#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_3-DAG: Decl[InstanceMethod]/CurrNominal: .fooExInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_NO_DOT_3-DAG: Keyword[self]/CurrNominal: .self[#BarExProtocol & FooExProtocol#]; name=self
+// PROTO_MEMBERS_NO_DOT_3: End completions
 }
 
 func testLookInProto1() {
   fooProtocolInstance.#^PROTO_MEMBERS_1^#
 // PROTO_MEMBERS_1: Begin completions
-// PROTO_MEMBERS_1-NEXT: Keyword[self]/CurrNominal: self[#FooProtocol#]; name=self
-// PROTO_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal:    fooInstanceVar1[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal:    fooInstanceVar2[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_1-NEXT: End completions
+// PROTO_MEMBERS_1-DAG: Keyword[self]/CurrNominal: self[#FooProtocol#]; name=self
+// PROTO_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal:    fooInstanceVar1[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal:    fooInstanceVar2[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_1-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_1-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_1: End completions
 }
 
 func testLookInProto2() {
   fooBarProtocolInstance.#^PROTO_MEMBERS_2^#
 // PROTO_MEMBERS_2: Begin completions
-// PROTO_MEMBERS_2-NEXT: Keyword[self]/CurrNominal: self[#BarProtocol & FooProtocol#]; name=self
-// PROTO_MEMBERS_2-NEXT: Decl[InstanceVar]/CurrNominal:    barInstanceVar[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal: barInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_2-NEXT: Decl[InstanceVar]/CurrNominal:    fooInstanceVar1[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_2-NEXT: Decl[InstanceVar]/CurrNominal:    fooInstanceVar2[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_2-NEXT: End completions
+// PROTO_MEMBERS_2-DAG: Keyword[self]/CurrNominal: self[#BarProtocol & FooProtocol#]; name=self
+// PROTO_MEMBERS_2-DAG: Decl[InstanceVar]/CurrNominal:    barInstanceVar[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_2-DAG: Decl[InstanceMethod]/CurrNominal: barInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_2-DAG: Decl[InstanceMethod]/CurrNominal: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_2-DAG: Decl[InstanceVar]/CurrNominal:    fooInstanceVar1[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_2-DAG: Decl[InstanceVar]/CurrNominal:    fooInstanceVar2[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_2-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_2-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_2: End completions
 }
 
 func testLookInProto3() {
   fooExBarExProtocolInstance.#^PROTO_MEMBERS_3^#
 // PROTO_MEMBERS_3: Begin completions
-// PROTO_MEMBERS_3-NEXT: Keyword[self]/CurrNominal: self[#BarExProtocol & FooExProtocol#]; name=self
-// PROTO_MEMBERS_3-NEXT: Decl[InstanceVar]/Super:          barInstanceVar[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_3-NEXT: Decl[InstanceMethod]/Super:       barInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_3-NEXT: Decl[InstanceMethod]/Super:       barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_3-NEXT: Decl[InstanceMethod]/CurrNominal: barExInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_3-NEXT: Decl[InstanceVar]/Super:          fooInstanceVar1[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_3-NEXT: Decl[InstanceVar]/Super:          fooInstanceVar2[#Int#]{{; name=.+$}}
-// PROTO_MEMBERS_3-NEXT: Decl[InstanceMethod]/Super:       fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_3-NEXT: Decl[InstanceMethod]/Super:       fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_3-NEXT: Decl[InstanceMethod]/CurrNominal: fooExInstanceFunc0()[#Double#]{{; name=.+$}}
-// PROTO_MEMBERS_3-NEXT: End completions
+// PROTO_MEMBERS_3-DAG: Keyword[self]/CurrNominal: self[#BarExProtocol & FooExProtocol#]; name=self
+// PROTO_MEMBERS_3-DAG: Decl[InstanceVar]/Super:          barInstanceVar[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_3-DAG: Decl[InstanceMethod]/Super:       barInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_3-DAG: Decl[InstanceMethod]/Super:       barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_3-DAG: Decl[InstanceMethod]/CurrNominal: barExInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_3-DAG: Decl[InstanceVar]/Super:          fooInstanceVar1[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_3-DAG: Decl[InstanceVar]/Super:          fooInstanceVar2[#Int#]{{; name=.+$}}
+// PROTO_MEMBERS_3-DAG: Decl[InstanceMethod]/Super:       fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_3-DAG: Decl[InstanceMethod]/Super:       fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_3-DAG: Decl[InstanceMethod]/CurrNominal: fooExInstanceFunc0()[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_3: End completions
 }
 
 func testLookInProto4(_ a: FooProtocol & BarBazProtocolComposition) {
@@ -835,56 +848,56 @@ class TestResolveFuncParam2 {
 func testResolveFuncParam3<Foo : FooProtocol>(_ foo: Foo) {
   foo.#^RESOLVE_FUNC_PARAM_3^#
 // RESOLVE_FUNC_PARAM_3: Begin completions
-// RESOLVE_FUNC_PARAM_3-NEXT: Keyword[self]/CurrNominal: self[#Foo#]; name=self
-// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_3-NEXT: End completions
+// RESOLVE_FUNC_PARAM_3-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_FUNC_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_3-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_3-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_3: End completions
 }
 
 func testResolveFuncParam4<FooBar : FooProtocol & BarProtocol>(_ fooBar: FooBar) {
   fooBar.#^RESOLVE_FUNC_PARAM_4^#
 // RESOLVE_FUNC_PARAM_4: Begin completions
-// RESOLVE_FUNC_PARAM_4-NEXT: Keyword[self]/CurrNominal: self[#FooBar#]; name=self
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/CurrNominal:    barInstanceVar[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/CurrNominal: barInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/CurrNominal: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_4-NEXT: End completions
+// RESOLVE_FUNC_PARAM_4-DAG: Keyword[self]/CurrNominal: self[#FooBar#]; name=self
+// RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceVar]/CurrNominal:    barInstanceVar[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceMethod]/CurrNominal: barInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceMethod]/CurrNominal: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4: End completions
 }
 
 func testResolveFuncParam5<FooExBarEx : FooExProtocol & BarExProtocol>(_ a: FooExBarEx) {
   a.#^RESOLVE_FUNC_PARAM_5^#
 // RESOLVE_FUNC_PARAM_5: Begin completions
-// RESOLVE_FUNC_PARAM_5-NEXT: Keyword[self]/CurrNominal: self[#FooExBarEx#]; name=self
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super: barInstanceVar[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: barInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/CurrNominal: barExInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super: fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super: fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/CurrNominal: fooExInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_5-NEXT: End completions
+// RESOLVE_FUNC_PARAM_5-DAG: Keyword[self]/CurrNominal: self[#FooExBarEx#]; name=self
+// RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceVar]/Super: barInstanceVar[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceMethod]/Super: barInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceMethod]/Super: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceMethod]/CurrNominal: barExInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceVar]/Super: fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceVar]/Super: fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceMethod]/CurrNominal: fooExInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5: End completions
 }
 
 func testResolveFuncParam6<Foo : FooProtocol where Foo : FooClass>(_ foo: Foo) {
   foo.#^RESOLVE_FUNC_PARAM_6^#
 // RESOLVE_FUNC_PARAM_6: Begin completions
-// RESOLVE_FUNC_PARAM_6-NEXT: Keyword[self]/CurrNominal: self[#Foo#]; name=self
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/CurrNominal: fooClassInstanceVar[#Int#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/CurrNominal: fooClassInstanceFunc0()[#Void#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/CurrNominal: fooClassInstanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// RESOLVE_FUNC_PARAM_6-NEXT: End completions
+// RESOLVE_FUNC_PARAM_6-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceVar]/CurrNominal: fooClassInstanceVar[#Int#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceMethod]/CurrNominal: fooClassInstanceFunc0()[#Void#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceMethod]/CurrNominal: fooClassInstanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6: End completions
 }
 
 class TestResolveConstructorParam1 {
@@ -897,12 +910,12 @@ class TestResolveConstructorParam2 {
   init<Foo : FooProtocol>(foo: Foo) {
     foo.#^RESOLVE_CONSTRUCTOR_PARAM_2^#
 // RESOLVE_CONSTRUCTOR_PARAM_2: Begin completions
-// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Keyword[self]/CurrNominal: self[#Foo#]; name=self
-// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceVar]/CurrNominal:  fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceVar]/CurrNominal:  fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: End completions
+// RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_2: End completions
   }
 }
 
@@ -910,12 +923,12 @@ class TestResolveConstructorParam3<Foo : FooProtocol> {
   init(foo: Foo) {
     foo.#^RESOLVE_CONSTRUCTOR_PARAM_3^#
 // RESOLVE_CONSTRUCTOR_PARAM_3: Begin completions
-// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Keyword[self]/CurrNominal: self[#Foo#]; name=self
-// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceVar]/CurrNominal:  fooInstanceVar1[#Int#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceVar]/CurrNominal:  fooInstanceVar2[#Int#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
-// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: End completions
+// RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar1[#Int#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar2[#Int#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_3: End completions
   }
 }
 
@@ -938,29 +951,29 @@ struct FuncParenPattern {
 func testFuncParenPattern1(_ fpp: FuncParenPattern) {
   fpp#^FUNC_PAREN_PATTERN_1^#
 // FUNC_PAREN_PATTERN_1: Begin completions
-// FUNC_PAREN_PATTERN_1-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#Int#})[#Void#]{{; name=.+$}}
-// FUNC_PAREN_PATTERN_1-NEXT: Decl[Subscript]/CurrNominal: [{#Int#}][#Int#]{{; name=.+$}}
-// FUNC_PAREN_PATTERN_1-NEXT: Keyword[self]/CurrNominal: .self[#FuncParenPattern#]; name=self
-// FUNC_PAREN_PATTERN_1-NEXT: End completions
+// FUNC_PAREN_PATTERN_1-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#Int#})[#Void#]{{; name=.+$}}
+// FUNC_PAREN_PATTERN_1-DAG: Decl[Subscript]/CurrNominal: [{#Int#}][#Int#]{{; name=.+$}}
+// FUNC_PAREN_PATTERN_1-DAG: Keyword[self]/CurrNominal: .self[#FuncParenPattern#]; name=self
+// FUNC_PAREN_PATTERN_1: End completions
 }
 
 func testFuncParenPattern2(_ fpp: FuncParenPattern) {
   FuncParenPattern#^FUNC_PAREN_PATTERN_2^#
 // FUNC_PAREN_PATTERN_2: Begin completions
-// FUNC_PAREN_PATTERN_2-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#Int#})[#FuncParenPattern#]{{; name=.+$}}
-// FUNC_PAREN_PATTERN_2-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#(Int, Int)#})[#FuncParenPattern#]{{; name=.+$}}
-// FUNC_PAREN_PATTERN_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(self): &FuncParenPattern#})[#(Int) -> Void#]{{; name=.+$}}
-// FUNC_PAREN_PATTERN_2-NEXT: Keyword[self]/CurrNominal: .self[#FuncParenPattern.Type#]; name=self
-// FUNC_PAREN_PATTERN_2-NEXT: Keyword/CurrNominal: .Type[#FuncParenPattern.Type#]; name=Type
-// FUNC_PAREN_PATTERN_2-NEXT: End completions
+// FUNC_PAREN_PATTERN_2-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#Int#})[#FuncParenPattern#]{{; name=.+$}}
+// FUNC_PAREN_PATTERN_2-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#(Int, Int)#})[#FuncParenPattern#]{{; name=.+$}}
+// FUNC_PAREN_PATTERN_2-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(self): &FuncParenPattern#})[#(Int) -> Void#]{{; name=.+$}}
+// FUNC_PAREN_PATTERN_2-DAG: Keyword[self]/CurrNominal: .self[#FuncParenPattern.Type#]; name=self
+// FUNC_PAREN_PATTERN_2-DAG: Keyword/CurrNominal: .Type[#FuncParenPattern.Type#]; name=Type
+// FUNC_PAREN_PATTERN_2: End completions
 }
 
 func testFuncParenPattern3(_ fpp: inout FuncParenPattern) {
   fpp.instanceFunc#^FUNC_PAREN_PATTERN_3^#
 // FUNC_PAREN_PATTERN_3: Begin completions
-// FUNC_PAREN_PATTERN_3-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#Int#})[#Void#]{{; name=.+$}}
-// FUNC_PAREN_PATTERN_3-NEXT: Keyword[self]/CurrNominal: .self[#(Int) -> ()#]; name=self
-// FUNC_PAREN_PATTERN_3-NEXT: End completions
+// FUNC_PAREN_PATTERN_3-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#Int#})[#Void#]{{; name=.+$}}
+// FUNC_PAREN_PATTERN_3-DAG: Keyword[self]/CurrNominal: .self[#(Int) -> ()#]; name=self
+// FUNC_PAREN_PATTERN_3: End completions
 }
 
 //===--- Check that we can code complete after function calls
@@ -1008,143 +1021,143 @@ func testChainedCalls3() {
 func testResolveGenericParams1() {
   FooGenericStruct<FooStruct>()#^RESOLVE_GENERIC_PARAMS_1^#
 // RESOLVE_GENERIC_PARAMS_1: Begin completions
-// RESOLVE_GENERIC_PARAMS_1-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarT[#FooStruct#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarTBrackets[#[FooStruct]#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): FooStruct#})[#Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1-NEXT: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1-NEXT: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>#]; name=self
-// RESOLVE_GENERIC_PARAMS_1-NEXT: End completions
+// RESOLVE_GENERIC_PARAMS_1-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarT[#FooStruct#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarTBrackets[#[FooStruct]#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): FooStruct#})[#Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>#]; name=self
+// RESOLVE_GENERIC_PARAMS_1: End completions
 
   FooGenericStruct<FooStruct>#^RESOLVE_GENERIC_PARAMS_1_STATIC^#
 // RESOLVE_GENERIC_PARAMS_1_STATIC: Begin completions
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<FooStruct>#]; name=()
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#t: FooStruct#})[#FooGenericStruct<FooStruct>#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(FooStruct) -> Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(FooStruct) -> FooStruct#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(U) -> U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[StaticVar]/CurrNominal:      .fooStaticVarT[#Int#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[StaticVar]/CurrNominal:      .fooStaticVarTBrackets[#[Int]#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): FooStruct#})[#Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>.Type#]; name=self
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<FooStruct>.Type#]; name=Type
-// RESOLVE_GENERIC_PARAMS_1_STATIC-NEXT: End completions
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<FooStruct>#]; name=()
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#t: FooStruct#})[#FooGenericStruct<FooStruct>#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(FooStruct) -> Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(FooStruct) -> FooStruct#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(U) -> U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Decl[StaticVar]/CurrNominal:      .fooStaticVarT[#Int#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Decl[StaticVar]/CurrNominal:      .fooStaticVarTBrackets[#[Int]#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): FooStruct#})[#Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_1_STATIC-DAG: Keyword/CurrNominal:              .Type[#FooGenericStruct<FooStruct>.Type#]; name=Type
+// RESOLVE_GENERIC_PARAMS_1_STATIC: End completions
 }
 
 func testResolveGenericParams2<Foo : FooProtocol>(_ foo: Foo) {
   FooGenericStruct<Foo>()#^RESOLVE_GENERIC_PARAMS_2^#
 // RESOLVE_GENERIC_PARAMS_2: Begin completions
-// RESOLVE_GENERIC_PARAMS_2-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarT[#FooProtocol#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarTBrackets[#[FooProtocol]#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): FooProtocol#})[#Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2-NEXT: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): FooProtocol#})[#FooProtocol#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2-NEXT: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<Foo>#]; name=self
-// RESOLVE_GENERIC_PARAMS_2-NEXT: End completions
+// RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarT[#FooProtocol#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarTBrackets[#[FooProtocol]#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): FooProtocol#})[#Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): FooProtocol#})[#FooProtocol#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<Foo>#]; name=self
+// RESOLVE_GENERIC_PARAMS_2: End completions
 
   FooGenericStruct<Foo>#^RESOLVE_GENERIC_PARAMS_2_STATIC^#
 // RESOLVE_GENERIC_PARAMS_2_STATIC: Begin completions
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<FooProtocol>#]; name=()
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#t: FooProtocol#})[#FooGenericStruct<FooProtocol>#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(self): &FooGenericStruct<FooProtocol>#})[#(FooProtocol) -> Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(self): &FooGenericStruct<FooProtocol>#})[#(FooProtocol) -> FooProtocol#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(self): &FooGenericStruct<FooProtocol>#})[#(U) -> U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[StaticVar]/CurrNominal:      .fooStaticVarT[#Int#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[StaticVar]/CurrNominal:      .fooStaticVarTBrackets[#[Int]#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): FooProtocol#})[#Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooProtocol#})[#FooProtocol#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<Foo>.Type#]; name=self
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<Foo>.Type#]; name=Type
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<FooProtocol>#]; name=()
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#t: FooProtocol#})[#FooGenericStruct<FooProtocol>#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(self): &FooGenericStruct<FooProtocol>#})[#(FooProtocol) -> Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(self): &FooGenericStruct<FooProtocol>#})[#(FooProtocol) -> FooProtocol#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(self): &FooGenericStruct<FooProtocol>#})[#(U) -> U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticVar]/CurrNominal:      .fooStaticVarT[#Int#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticVar]/CurrNominal:      .fooStaticVarTBrackets[#[Int]#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): FooProtocol#})[#Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooProtocol#})[#FooProtocol#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<Foo>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Keyword/CurrNominal:              .Type[#FooGenericStruct<Foo>.Type#]; name=Type
 
-// RESOLVE_GENERIC_PARAMS_2_STATIC-NEXT: End completions
+// RESOLVE_GENERIC_PARAMS_2_STATIC: End completions
 }
 
 struct TestResolveGenericParams3_4<T> {
   func testResolveGenericParams3() {
     FooGenericStruct<FooStruct>()#^RESOLVE_GENERIC_PARAMS_3^#
 // RESOLVE_GENERIC_PARAMS_3: Begin completions
-// RESOLVE_GENERIC_PARAMS_3-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarT[#FooStruct#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarTBrackets[#[FooStruct]#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): FooStruct#})[#Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3-NEXT: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3-NEXT: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>#]; name=self
-// RESOLVE_GENERIC_PARAMS_3-NEXT: End completions
+// RESOLVE_GENERIC_PARAMS_3-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarT[#FooStruct#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarTBrackets[#[FooStruct]#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): FooStruct#})[#Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>#]; name=self
+// RESOLVE_GENERIC_PARAMS_3: End completions
 
     FooGenericStruct<FooStruct>#^RESOLVE_GENERIC_PARAMS_3_STATIC^#
 // RESOLVE_GENERIC_PARAMS_3_STATIC: Begin completions, 12 items
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<FooStruct>#]; name=()
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#t: FooStruct#})[#FooGenericStruct<FooStruct>#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(FooStruct) -> Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(FooStruct) -> FooStruct#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(U) -> U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[StaticVar]/CurrNominal:      .fooStaticVarT[#Int#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[StaticVar]/CurrNominal:      .fooStaticVarTBrackets[#[Int]#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): FooStruct#})[#Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>.Type#]; name=self
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<FooStruct>.Type#]; name=Type
-// RESOLVE_GENERIC_PARAMS_3_STATIC-NEXT: End completions
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<FooStruct>#]; name=()
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#t: FooStruct#})[#FooGenericStruct<FooStruct>#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(FooStruct) -> Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(FooStruct) -> FooStruct#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(self): &FooGenericStruct<FooStruct>#})[#(U) -> U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Decl[StaticVar]/CurrNominal:      .fooStaticVarT[#Int#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Decl[StaticVar]/CurrNominal:      .fooStaticVarTBrackets[#[Int]#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): FooStruct#})[#Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooStruct#})[#FooStruct#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooStruct>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_3_STATIC-DAG: Keyword/CurrNominal:              .Type[#FooGenericStruct<FooStruct>.Type#]; name=Type
+// RESOLVE_GENERIC_PARAMS_3_STATIC: End completions
   }
 
   func testResolveGenericParams4(_ t: T) {
     FooGenericStruct<T>(t: t)#^RESOLVE_GENERIC_PARAMS_4^#
 // RESOLVE_GENERIC_PARAMS_4: Begin completions
-// RESOLVE_GENERIC_PARAMS_4-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarT[#T#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarTBrackets[#[T]#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): T#})[#Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4-NEXT: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): T#})[#T#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4-NEXT: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<T>#]; name=self
-// RESOLVE_GENERIC_PARAMS_4-NEXT: End completions
+// RESOLVE_GENERIC_PARAMS_4-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarT[#T#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarTBrackets[#[T]#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): T#})[#Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): T#})[#T#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<T>#]; name=self
+// RESOLVE_GENERIC_PARAMS_4: End completions
 
     FooGenericStruct<T>#^RESOLVE_GENERIC_PARAMS_4_STATIC^#
 // RESOLVE_GENERIC_PARAMS_4_STATIC: Begin completions
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<T>#]; name=()
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#t: T#})[#FooGenericStruct<T>#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(self): &FooGenericStruct<T>#})[#(T) -> Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(self): &FooGenericStruct<T>#})[#(T) -> T#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(self): &FooGenericStruct<T>#})[#(U) -> U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[StaticVar]/CurrNominal:      .fooStaticVarT[#Int#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[StaticVar]/CurrNominal:      .fooStaticVarTBrackets[#[Int]#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): T#})[#Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): T#})[#T#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<T>.Type#]; name=self
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<T>.Type#]; name=Type
-// RESOLVE_GENERIC_PARAMS_4_STATIC-NEXT: End completions
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<T>#]; name=()
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#t: T#})[#FooGenericStruct<T>#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(self): &FooGenericStruct<T>#})[#(T) -> Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(self): &FooGenericStruct<T>#})[#(T) -> T#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(self): &FooGenericStruct<T>#})[#(U) -> U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Decl[StaticVar]/CurrNominal:      .fooStaticVarT[#Int#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Decl[StaticVar]/CurrNominal:      .fooStaticVarTBrackets[#[Int]#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): T#})[#Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): T#})[#T#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<T>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_4_STATIC-DAG: Keyword/CurrNominal:              .Type[#FooGenericStruct<T>.Type#]; name=Type
+// RESOLVE_GENERIC_PARAMS_4_STATIC: End completions
   }
 
   func testResolveGenericParams5<U>(_ u: U) {
     FooGenericStruct<U>(t: u)#^RESOLVE_GENERIC_PARAMS_5^#
 // RESOLVE_GENERIC_PARAMS_5: Begin completions
-// RESOLVE_GENERIC_PARAMS_5-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarT[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5-NEXT: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarTBrackets[#[U]#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): U#})[#Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5-NEXT: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5-NEXT: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<U>#]; name=self
-// RESOLVE_GENERIC_PARAMS_5-NEXT: End completions
+// RESOLVE_GENERIC_PARAMS_5-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarT[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5-DAG: Decl[InstanceVar]/CurrNominal:    .fooInstanceVarTBrackets[#[U]#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): U#})[#Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<U>#]; name=self
+// RESOLVE_GENERIC_PARAMS_5: End completions
 
     FooGenericStruct<U>#^RESOLVE_GENERIC_PARAMS_5_STATIC^#
 // RESOLVE_GENERIC_PARAMS_5_STATIC: Begin completions
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<U>#]; name=()
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#t: U#})[#FooGenericStruct<U>#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(self): &FooGenericStruct<U>#})[#(U) -> Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(self): &FooGenericStruct<U>#})[#(U) -> U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(self): &FooGenericStruct<U>#})[#(U) -> U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[StaticVar]/CurrNominal:      .fooStaticVarT[#Int#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[StaticVar]/CurrNominal:      .fooStaticVarTBrackets[#[Int]#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): U#})[#Void#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<U>.Type#]; name=self
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: Keyword/CurrNominal:              .Type[#FooGenericStruct<U>.Type#]; name=Type
-// RESOLVE_GENERIC_PARAMS_5_STATIC-NEXT: End completions
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<U>#]; name=()
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#t: U#})[#FooGenericStruct<U>#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(self): &FooGenericStruct<U>#})[#(U) -> Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(self): &FooGenericStruct<U>#})[#(U) -> U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(self): &FooGenericStruct<U>#})[#(U) -> U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Decl[StaticVar]/CurrNominal:      .fooStaticVarT[#Int#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Decl[StaticVar]/CurrNominal:      .fooStaticVarTBrackets[#[Int]#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): U#})[#Void#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<U>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_5_STATIC-DAG: Keyword/CurrNominal:              .Type[#FooGenericStruct<U>.Type#]; name=Type
+// RESOLVE_GENERIC_PARAMS_5_STATIC: End completions
   }
 }
 
@@ -1177,37 +1190,37 @@ func testTypeCheckWithUnsolvedVariables1() {
   BuilderStyle().#^TC_UNSOLVED_VARIABLES_1^#
 }
 // TC_UNSOLVED_VARIABLES_1: Begin completions
-// TC_UNSOLVED_VARIABLES_1-NEXT: Keyword[self]/CurrNominal: self[#BuilderStyle<_>#]; name=self
-// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceVar]/CurrNominal: count[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<_>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): _#})[#BuilderStyle<_>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_1-NEXT: End completions
+// TC_UNSOLVED_VARIABLES_1-DAG: Keyword[self]/CurrNominal: self[#BuilderStyle<_>#]; name=self
+// TC_UNSOLVED_VARIABLES_1-DAG: Decl[InstanceVar]/CurrNominal: count[#Int#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_1-DAG: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<_>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_1-DAG: Decl[InstanceMethod]/CurrNominal: add({#(t): _#})[#BuilderStyle<_>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_1-DAG: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_1: End completions
 
 func testTypeCheckWithUnsolvedVariables2() {
   BuilderStyle().addString("abc").#^TC_UNSOLVED_VARIABLES_2^#
 }
 // TC_UNSOLVED_VARIABLES_2: Begin completions
-// TC_UNSOLVED_VARIABLES_2-NEXT: Keyword[self]/CurrNominal: self[#BuilderStyle<_>#]; name=self
-// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceVar]/CurrNominal:    count[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<_>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): _#})[#BuilderStyle<_>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_2-NEXT: End completions
+// TC_UNSOLVED_VARIABLES_2-DAG: Keyword[self]/CurrNominal: self[#BuilderStyle<_>#]; name=self
+// TC_UNSOLVED_VARIABLES_2-DAG: Decl[InstanceVar]/CurrNominal:    count[#Int#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_2-DAG: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<_>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_2-DAG: Decl[InstanceMethod]/CurrNominal: add({#(t): _#})[#BuilderStyle<_>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_2-DAG: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_2: End completions
 
 func testTypeCheckWithUnsolvedVariables3() {
   BuilderStyle().addString("abc").add(42).#^TC_UNSOLVED_VARIABLES_3^#
 }
 // TC_UNSOLVED_VARIABLES_3: Begin completions
-// TC_UNSOLVED_VARIABLES_3-NEXT: Keyword[self]/CurrNominal: self[#BuilderStyle<Int>#]; name=self
-// TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceVar]/CurrNominal:    count[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<Int>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): Int#})[#BuilderStyle<Int>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_3-NEXT: Keyword[self]/CurrNominal: self[#BuilderStyle<Double>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<Double>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): Double#})[#BuilderStyle<Double>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_3-NEXT: End completions
+// TC_UNSOLVED_VARIABLES_3-DAG: Keyword[self]/CurrNominal: self[#BuilderStyle<Int>#]; name=self
+// TC_UNSOLVED_VARIABLES_3-DAG: Decl[InstanceVar]/CurrNominal:    count[#Int#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_3-DAG: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<Int>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_3-DAG: Decl[InstanceMethod]/CurrNominal: add({#(t): Int#})[#BuilderStyle<Int>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_3-DAG: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_3-DAG: Keyword[self]/CurrNominal: self[#BuilderStyle<Double>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_3-DAG: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<Double>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_3-DAG: Decl[InstanceMethod]/CurrNominal: add({#(t): Double#})[#BuilderStyle<Double>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_3: End completions
 
 func testTypeCheckNil() {
   nil#^TC_UNSOLVED_VARIABLES_4^#
@@ -1705,29 +1718,29 @@ func testDeDuped(_ x: dedupS) {
 // FIXME: Should produce 3 items (?)
 
 // PROTOCOL_EXT_DEDUP_1: Begin completions, 5 items
-// PROTOCOL_EXT_DEDUP_1: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
-// PROTOCOL_EXT_DEDUP_1: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
-// PROTOCOL_EXT_DEDUP_1: Decl[Subscript]/CurrNominal:        [{#(x): Int#}][#Int#]; name=[:]
-// PROTOCOL_EXT_DEDUP_1: Decl[InstanceVar]/Super:            .bar[#Int#]; name=bar
-// PROTOCOL_EXT_DEDUP_1: Keyword[self]/CurrNominal:          .self[#dedupS#]; name=self
+// PROTOCOL_EXT_DEDUP_1-DAG: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
+// PROTOCOL_EXT_DEDUP_1-DAG: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
+// PROTOCOL_EXT_DEDUP_1-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}][#Int#]; name=[:]
+// PROTOCOL_EXT_DEDUP_1-DAG: Decl[InstanceVar]/Super:            .bar[#Int#]; name=bar
+// PROTOCOL_EXT_DEDUP_1-DAG: Keyword[self]/CurrNominal:          .self[#dedupS#]; name=self
 // PROTOCOL_EXT_DEDUP_1: End completions
 }
 func testDeDuped2(_ x: dedupP) {
   x#^PROTOCOL_EXT_DEDUP_2^#
 // PROTOCOL_EXT_DEDUP_2: Begin completions, 5 items
-// PROTOCOL_EXT_DEDUP_2: Decl[InstanceMethod]/CurrNominal:   .foo()[#dedupP.T#]; name=foo()
-// PROTOCOL_EXT_DEDUP_2: Decl[InstanceVar]/CurrNominal:      .bar[#dedupP.T#]; name=bar
-// PROTOCOL_EXT_DEDUP_2: Decl[Subscript]/CurrNominal:        [{#(x): dedupP.T#}][#dedupP.T#]; name=[:]
-// PROTOCOL_EXT_DEDUP_2: Keyword[self]/CurrNominal:          .self[#dedupP#]; name=self
+// PROTOCOL_EXT_DEDUP_2-DAG: Decl[InstanceMethod]/CurrNominal:   .foo()[#dedupP.T#]; name=foo()
+// PROTOCOL_EXT_DEDUP_2-DAG: Decl[InstanceVar]/CurrNominal:      .bar[#dedupP.T#]; name=bar
+// PROTOCOL_EXT_DEDUP_2-DAG: Decl[Subscript]/CurrNominal:        [{#(x): dedupP.T#}][#dedupP.T#]; name=[:]
+// PROTOCOL_EXT_DEDUP_2-DAG: Keyword[self]/CurrNominal:          .self[#dedupP#]; name=self
 // PROTOCOL_EXT_DEDUP_2: End completions
 }
 func testDeDuped3<T : dedupP where T.T == Int>(_ x: T) {
   x#^PROTOCOL_EXT_DEDUP_3^#
 // PROTOCOL_EXT_DEDUP_3: Begin completions, 5 items
-// PROTOCOL_EXT_DEDUP_3: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
-// PROTOCOL_EXT_DEDUP_3: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
-// PROTOCOL_EXT_DEDUP_3: Decl[Subscript]/CurrNominal:        [{#(x): Int#}][#Int#]; name=[:]
-// PROTOCOL_EXT_DEDUP_3: Keyword[self]/CurrNominal:          .self[#T#]; name=self
+// PROTOCOL_EXT_DEDUP_3-DAG: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
+// PROTOCOL_EXT_DEDUP_3-DAG: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
+// PROTOCOL_EXT_DEDUP_3-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}][#Int#]; name=[:]
+// PROTOCOL_EXT_DEDUP_3-DAG: Keyword[self]/CurrNominal:          .self[#T#]; name=self
 // PROTOCOL_EXT_DEDUP_3: End completions
 }
 
@@ -1872,7 +1885,7 @@ func testKeyword(cat: Cat) {
 // KEYWORD_2: Begin completions
 // KEYWORD_2-DAG: Decl[InstanceVar]/CurrNominal:      .prop1[#String#]; name=prop1
 // KEYWORD_2-DAG: Decl[InstanceVar]/CurrNominal:      .prop2[#String#]; name=prop2
-// KEYWORD_2-DAG: BuiltinOperator/None:                = {#Cat.Inner#}[#Void#]; name==
+// KEYWORD_2-DAG: BuiltinOperator/None:                = {#Cat.Inner#}; name==
 // KEYWORD_2: End completions
 
   let _ = cat.class.#^KEYWORD_3^#
