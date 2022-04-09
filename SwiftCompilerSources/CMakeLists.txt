@@ -74,7 +74,7 @@ function(add_swift_compiler_modules_library name)
 
   set(swift_compile_options
       "-Xfrontend" "-validate-tbd-against-ir=none"
-      "-Xfrontend" "-enable-experimental-cxx-interop"
+      "-Xfrontend" "-enable-cxx-interop"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
 
   if(CMAKE_BUILD_TYPE STREQUAL Debug)
