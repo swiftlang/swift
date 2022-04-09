@@ -1,4 +1,5 @@
 // RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -emit-sil -o - %s | %FileCheck -check-prefix=SIL %s
 // RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -emit-ir -o - %s | %FileCheck %s
 // RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -c %s -o %t/out.o
 // RUN: %llvm-dwarfdump --show-children %t/out.o | %FileCheck -check-prefix=DWARF %s
@@ -34,6 +35,11 @@ public var falseValue: Bool { false }
 
 public func use<T>(_ t: T) {}
 public func forceSplit() async {}
+public func forceSplit1() async {}
+public func forceSplit2() async {}
+public func forceSplit3() async {}
+public func forceSplit4() async {}
+public func forceSplit5() async {}
 
 ///////////
 // Tests //
@@ -278,4 +284,171 @@ public func varSimpleTestVar() async {
     k = Klass()
     k.doSomething()
     print("stop here")
+}
+
+////////////////////////////////////
+// Conditional Control Flow Tests //
+////////////////////////////////////
+
+// CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalF"(
+// CHECK:  call void @llvm.dbg.addr(
+// CHECK:  musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit1yyYaF"(
+// CHECK-NEXT: ret void
+// CHECK-NEXT: }
+
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTQ0_"(
+// CHECK:  call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata !{{[0-9]+}}, metadata !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 8, DW_OP_deref)),
+// CHECK:  musttail call swifttailcc void @swift_task_switch(%swift.context* swiftasync %{{[0-9]+}}, i8* bitcast (void (i8*)* @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTY1_" to i8*), i64 0, i64 0) #4,
+// CHECK-NEXT: ret void
+// CHECK-NEXT: }
+
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTY1_"(
+// CHECK: call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata ![[METADATA:[0-9]*]], metadata !DIExpression(DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 8, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK-NEXT: br label %[[BLOCK:[a-zA-Z\.0-9]*]],
+//
+// CHECK: [[BLOCK]]:
+// CHECK:    br i1 %{{[0-9]}}, label %[[LHS_BLOCK:[a-zA-Z\.0-9]*]], label %[[RHS_BLOCK:[a-zA-Z\.0-9]*]],
+//
+// CHECK: [[LHS_BLOCK]]:
+// CHECK:  call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:  musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit2yyYaF"(
+// CHECK-NEXT:  ret void
+//
+// CHECK: [[RHS_BLOCK]]:
+// CHECK-NOT: call void @llvm.dbg.value(
+// CHECK-NOT: call void @llvm.dbg.addr(
+// CHECK:  musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit3yyYaF"(
+// CHECK-NEXT:  ret void
+//
+// We have two undef here due to the coroutine cloner functionally tail
+// duplicating the true and the continuation. This causes us to have a
+// debug_value undef from the merge point and one that was propagated from the
+// _move.
+//
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTQ2_"(
+// CHECK:  call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[METADATA:[0-9]*]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK:  call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:  musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit4yyYaF"(
+// CHECK-NEXT:  ret void
+//
+// This is the false branch.
+//
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTQ3_"(
+// CHECK:  call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata !{{[0-9]+}}, metadata !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 8, DW_OP_deref))
+// CHECK:   musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit4yyYaF"(
+// CHECK-NEXT:   ret void,
+// CHECK-NEXT: }
+//
+// This is the continuation block
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20letArgCCFlowTrueTestyyxnYalFTQ4_"(
+// CHECK:  call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata !{{.*}}, metadata !DIExpression(DW_OP_deref)),
+public func letArgCCFlowTrueTest<T>(_ msg: __owned T) async {
+    await forceSplit1()
+    if trueValue {
+        use(_move(msg))
+        await forceSplit2()
+    } else {
+        await forceSplit3()
+    }
+    await forceSplit4()
+}
+
+// We do an extra SIL check here to make sure we propagate merge points
+// correctly.
+// SIL-LABEL: sil @$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlF : $@convention(thin) @async <T where T : P> (@inout T) -> () {
+// SIL: bb0([[ARG:%[0-9]+]] : $*T):
+// SIL:   debug_value [moved] [[ARG]]
+// SIL:   [[FORCE_SPLIT_1:%[0-9]+]] = function_ref @$s27move_function_dbginfo_async11forceSplit1yyYaF : $@convention(thin) @async () -> ()
+// SIL:   apply [[FORCE_SPLIT_1]]
+// SIL-NEXT: debug_value [moved] [[ARG]]
+// SIL:   hop_to_executor
+// SIL-NEXT: debug_value [moved] [[ARG]]
+// SIL:   cond_br {{%[0-9]+}}, bb1, bb2
+//
+// SIL: bb1:
+// SIL:   debug_value [moved] undef
+// SIL:   [[FORCE_SPLIT_2:%[0-9]+]] = function_ref @$s27move_function_dbginfo_async11forceSplit2yyYaF : $@convention(thin) @async () -> ()
+// SIL:   apply [[FORCE_SPLIT_2]]()
+// SIL-NEXT:  debug_value [moved] undef
+// SIL:   hop_to_executor
+// SIL-NEXT: debug_value [moved] undef
+// SIL:   br bb3
+//
+// SIL: bb2:
+// SIL:   [[FORCE_SPLIT_3:%[0-9]+]] = function_ref @$s27move_function_dbginfo_async11forceSplit3yyYaF : $@convention(thin) @async () -> ()
+// SIL:   apply [[FORCE_SPLIT_3]]
+// SIL-NEXT: debug_value [moved] [[ARG]]
+// SIL:   debug_value [moved] undef
+// SIL:   hop_to_executor
+// SIL-NEXT: debug_value [moved] undef
+//
+// SIL: bb3:
+// SIL-NEXT: debug_value [moved] undef
+// SIL: debug_value [moved] [[ARG]]
+// SIL: [[FORCE_SPLIT_4:%[0-9]+]] = function_ref @$s27move_function_dbginfo_async11forceSplit4yyYaF : $@convention(thin) @async () -> ()
+// SIL: apply [[FORCE_SPLIT_4]]
+// SIL-NEXT: debug_value [moved] %0
+// SIL: } // end sil function '$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlF'
+
+// CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlF"(
+// CHECK: call void @llvm.dbg.addr(metadata %swift.context* %{{[0-9]+}}, metadata !{{[0-9]+}}, metadata !DIExpression(DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 48, DW_OP_deref)),
+// CHECK: musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit1yyYaF"(
+
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlFTQ0_"(
+// CHECK: call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata !{{[0-9]+}}, metadata !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 48, DW_OP_deref)),
+
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlFTY1_"(
+// CHECK:   call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata ![[METADATA:[0-9]+]], metadata !DIExpression(DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 48, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]+]]
+// CHECK:   br i1 %{{[0-9]+}}, label %[[LHS_BLOCK:[a-zA-Z0-9]+]], label %[[RHS_BLOCK:[a-zA-Z0-9]+]]
+
+// CHECK: [[LHS_BLOCK]]:
+// CHECK:    call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:    musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit2yyYaF"(
+
+// CHECK: [[RHS_BLOCK]]:
+// CHECK-NOT: call void @llvm.dbg.value
+// CHECK:   musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit3yyYaF"(
+
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlFTQ2_"(
+// CHECK-NOT: @llvm.dbg.addr
+// CHECK:   call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata !{{[0-9]+}}, metadata !DIExpression(DW_OP_deref)),
+// CHECK-NOT: @llvm.dbg.addr
+// CHECK:   musttail call swifttailcc void @swift_task_switch(%swift.context* swiftasync %{{[0-9]+}}, i8* bitcast (void (i8*)* @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlFTY3_" to i8*), i64 0, i64 0)
+
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlFTY3_"(
+// CHECK-NOT: @llvm.dbg.addr
+// CHECK:   call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]+]]
+// CHECK:   call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:  call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata ![[METADATA]], metadata !DIExpression(DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 48, DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:  musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit4yyYaF"(
+
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlFTQ4_"(
+// CHECK-NOT: @llvm.dbg.value
+// CHECK:  call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata ![[METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 48, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]+]]
+// CHECK:  call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:  musttail call swifttailcc void @swift_task_switch(%swift.context* swiftasync %{{[0-9]+}}, i8* bitcast (void (i8*)* @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlFTY5_" to i8*),
+
+// CHECK: define internal swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlFTY5_"(
+// CHECK:  call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]+]]
+// CHECK:  call void @llvm.dbg.value(metadata %swift.opaque* undef, metadata ![[METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:  call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata ![[METADATA]], metadata !DIExpression(DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 48, DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:  musttail call swifttailcc void @"$s27move_function_dbginfo_async11forceSplit4yyYaF"(
+
+// CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlFTQ6_"(
+// CHECK-NOT: @llvm.dbg.value(
+// CHECK: call void @llvm.dbg.addr(metadata i8* %{{[0-9]+}}, metadata !{{[0-9]+}}, metadata !DIExpression(DW_OP_deref, DW_OP_plus_uconst, 16, DW_OP_plus_uconst, 48, DW_OP_deref)),
+// CHECK-NOT: @llvm.dbg.value(
+// CHECK:  musttail call swifttailcc void %{{[0-9]+}}(%swift.context* swiftasync
+// CHECK-NEXT:  ret void,
+// CHECK-NEXT: }
+public func varArgCCFlowTrueTest<T : P>(_ msg: inout T) async {
+    await forceSplit1()
+    if trueValue {
+        use(_move(msg))
+        await forceSplit2()
+    } else {
+        await forceSplit3()
+    }
+    msg = T.value as! T
+    await forceSplit4()
 }
