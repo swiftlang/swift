@@ -3682,6 +3682,16 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   auto properties = getFunctionRecursiveProperties(params, result, globalActor);
   auto arena = getArena(properties);
 
+  if (info.hasValue()) {
+    // Canonicalize all thin functions to be escaping (to keep compatibility
+    // with generic parameters). Note that one can pass SIL-level representation
+    // here, so we need additional check for maximum non-SIL value.
+    Representation rep = info.getValue().getRepresentation();
+    if (rep <= FunctionTypeRepresentation::Last &&
+        isThinRepresentation(rep))
+      info = info->withNoEscape(false);
+  }
+
   llvm::FoldingSetNodeID id;
   FunctionType::Profile(id, params, result, info);
 
@@ -3962,13 +3972,6 @@ SILFunctionType::SILFunctionType(
   if (!ext.getClangTypeInfo().empty())
     *getTrailingObjects<ClangTypeInfo>() = ext.getClangTypeInfo();
 
-  // Canonicalize all thin functions to be escaping (to keep compatibility
-  // with generic parameters)
-  if (ext.getRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer) {
-    auto extInfoBuilder = ext.intoBuilder().withNoEscape(false);
-    Bits.SILFunctionType.ExtInfoBits = extInfoBuilder.bits;
-  }
-
 #ifndef NDEBUG
   if (ext.getRepresentation() == Representation::WitnessMethod)
     assert(!WitnessMethodConformance.isInvalid() &&
@@ -4106,6 +4109,10 @@ CanSILFunctionType SILFunctionType::get(
     ext = ext.intoBuilder().withClangFunctionType(nullptr).build();
   }
 
+  // Canonicalize all thin functions to be escaping (to keep compatibility
+  // with generic parameters)
+  if (isThinRepresentation(ext.getRepresentation()))
+    ext = ext.intoBuilder().withNoEscape(false);
   
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,

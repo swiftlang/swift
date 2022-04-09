@@ -3088,14 +3088,6 @@ protected:
       static_assert(
           ASTExtInfoBuilder::NumMaskBits == NumAFTExtInfoBits,
           "ExtInfo and AnyFunctionTypeBitfields must agree on bit size");
-
-      // Canonicalize all thin functions to be escaping (to keep compatibility
-      // with generic parameters).
-      Representation rep = Info.getValue().getRepresentation();
-      if (rep == FunctionTypeRepresentation::CFunctionPointer) {
-        auto extInfoBuilder = Info->intoBuilder().withNoEscape(false);
-        Bits.AnyFunctionType.ExtInfoBits = extInfoBuilder.bits;
-      }
     } else {
       Bits.AnyFunctionType.HasExtInfo = false;
       Bits.AnyFunctionType.HasClangTypeInfo = false;
