@@ -32,6 +32,7 @@ struct ExistentialLayout {
   ExistentialLayout() {
     hasExplicitAnyObject = false;
     containsNonObjCProtocol = false;
+    containsParameterized = false;
     singleProtocol = nullptr;
   }
 
@@ -47,6 +48,9 @@ struct ExistentialLayout {
 
   /// Whether any protocol members are non-@objc.
   bool containsNonObjCProtocol : 1;
+
+  /// Whether any protocol members are parameterized.s
+  bool containsParameterized : 1;
 
   /// Return the kind of this existential (class/error/opaque).
   Kind getKind() {
