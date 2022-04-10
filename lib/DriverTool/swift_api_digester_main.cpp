@@ -273,10 +273,10 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
   }
 
   static bool isNameTooSimple(StringRef N) {
-    static std::unordered_set<std::string> SimpleNames = {"unit", "data", "log", "coding",
+    static llvm::StringSet<> SimpleNames = {"unit", "data", "log", "coding",
       "url", "name", "date", "datecomponents", "notification", "urlrequest",
       "personnamecomponents", "measurement", "dateinterval", "indexset"};
-    return SimpleNames.find(N.str()) != SimpleNames.end();
+    return SimpleNames.contains(N);
   }
 
   static bool isSimilarName(StringRef L, StringRef R) {
