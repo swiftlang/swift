@@ -54,7 +54,7 @@ extension String: BidirectionalCollection {
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
-    let i = _guts.roundDownToNearestCharacter(_guts.validateScalarIndex(i))
+    let i = _guts.validateCharacterIndex(i)
     return _uncheckedIndex(after: i)
   }
 
@@ -83,8 +83,7 @@ extension String: BidirectionalCollection {
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
-    let i = _guts.roundDownToNearestCharacter(
-      _guts.validateInclusiveScalarIndex(i))
+    let i = _guts.validateInclusiveCharacterIndex(i)
     // Note: Aligning an index may move it closer towards the `startIndex`, so
     // the `i > startIndex` check needs to come after rounding.
     _precondition(i > startIndex, "String index is out of bounds")
@@ -138,8 +137,7 @@ extension String: BidirectionalCollection {
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
-    var i = _guts.roundDownToNearestCharacter(
-      _guts.validateInclusiveScalarIndex(i))
+    var i = _guts.validateInclusiveCharacterIndex(i)
 
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
@@ -214,8 +212,7 @@ extension String: BidirectionalCollection {
     let limit = _guts.ensureMatchingEncoding(limit)
     let start = _guts.ensureMatchingEncoding(i)
 
-    var i = _guts.roundDownToNearestCharacter(
-      _guts.validateInclusiveScalarIndex(i))
+    var i = _guts.validateInclusiveCharacterIndex(i)
 
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
@@ -253,10 +250,8 @@ extension String: BidirectionalCollection {
     // grapheme breaks -- swapping `start` and `end` may change the magnitude of
     // the result.
 
-    let start = _guts.roundDownToNearestCharacter(
-      _guts.validateInclusiveScalarIndex(start))
-    let end = _guts.roundDownToNearestCharacter(
-      _guts.validateInclusiveScalarIndex(end))
+    let start = _guts.validateInclusiveCharacterIndex(start)
+    let end = _guts.validateInclusiveCharacterIndex(end)
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 

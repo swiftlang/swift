@@ -479,6 +479,18 @@ extension String.Index {
   }
 }
 
+extension String.Index {
+  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  internal var _isUTF8CharacterIndex: Bool {
+    _canBeUTF8 && _isCharacterAligned
+  }
+
+  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  internal var _isUTF8ScalarIndex: Bool {
+    _canBeUTF8 && _isScalarAligned
+  }
+}
+
 extension String.Index: Equatable {
   @inlinable @inline(__always)
   public static func == (lhs: String.Index, rhs: String.Index) -> Bool {

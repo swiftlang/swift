@@ -169,32 +169,6 @@ extension Substring {
 }
 
 extension Substring {
-  @inline(__always)
-  internal func _validateScalarIndex(_ i: String.Index) -> String.Index {
-    _wholeGuts.validateScalarIndex(i, in: _bounds)
-  }
-
-  @inline(__always)
-  internal func _validateInclusiveScalarIndex(
-    _ i: String.Index
-  ) -> String.Index {
-    _wholeGuts.validateInclusiveScalarIndex(i, in: _bounds)
-  }
-
-  @inline(__always)
-  internal func _validateScalarRange(
-    _ range: Range<String.Index>
-  ) -> Range<String.Index> {
-    _wholeGuts.validateScalarRange(range, in: _bounds)
-  }
-
-  @inline(__always)
-  internal func _roundDownToNearestCharacter(
-    _ i: String.Index
-  ) -> String.Index {
-    _wholeGuts.roundDownToNearestCharacter(i, in: _bounds)
-  }
-
   /// Return true if and only if `i` is a valid index in this substring,
   /// that is to say, it exactly addresses one of the `Character`s in it.
   ///
@@ -209,7 +183,9 @@ extension Substring {
     else {
       return false
     }
-    return i == _roundDownToNearestCharacter(i._scalarAligned)
+    let c = _wholeGuts.roundDownToNearestCharacter(
+      i._scalarAligned, in: _bounds)
+    return i == c
   }
 }
 
@@ -231,7 +207,7 @@ extension Substring: StringProtocol {
     // leads to Collection conformance issues when the `Substring`'s bounds do
     // not fall on grapheme boundaries in `base`.
 
-    let i = _roundDownToNearestCharacter(_validateScalarIndex(i))
+    let i = _wholeGuts.validateCharacterIndex(i, in: _bounds)
     let r = _uncheckedIndex(after: i)
     return _wholeGuts.markEncoding(r)
   }
@@ -287,7 +263,7 @@ extension Substring: StringProtocol {
     // leads to Collection conformance issues when the `Substring`'s bounds do
     // not fall on grapheme boundaries in `base`.
 
-    let i = _roundDownToNearestCharacter(_validateInclusiveScalarIndex(i))
+    let i = _wholeGuts.validateInclusiveCharacterIndex(i, in: _bounds)
     // Note: Aligning an index may move it closer towards the `startIndex`, so
     // this `i > startIndex` check needs to come after all the
     // alignment/validation work.
@@ -340,8 +316,7 @@ extension Substring: StringProtocol {
     // `Substring`'s bounds do not fall on grapheme boundaries in `base`.
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    var i = _roundDownToNearestCharacter(
-      _validateInclusiveScalarIndex(i))
+    var i = _wholeGuts.validateInclusiveCharacterIndex(i, in: _bounds)
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
         _precondition(i < endIndex, "String index is out of bounds")
@@ -377,7 +352,7 @@ extension Substring: StringProtocol {
     let limit = _wholeGuts.ensureMatchingEncoding(limit)
     let start = _wholeGuts.ensureMatchingEncoding(i)
 
-    var i = _roundDownToNearestCharacter(_validateInclusiveScalarIndex(i))
+    var i = _wholeGuts.validateInclusiveCharacterIndex(i, in: _bounds)
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
         guard limit < start || i < limit else { return nil }
@@ -409,10 +384,8 @@ extension Substring: StringProtocol {
     // grapheme breaks -- swapping `start` and `end` may change the magnitude of
     // the result.
 
-    let start = _roundDownToNearestCharacter(
-      _validateInclusiveScalarIndex(start))
-    let end = _roundDownToNearestCharacter(
-      _validateInclusiveScalarIndex(end))
+    let start = _wholeGuts.validateInclusiveCharacterIndex(start, in: _bounds)
+    let end = _wholeGuts.validateInclusiveCharacterIndex(end, in: _bounds)
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
@@ -440,7 +413,7 @@ extension Substring: StringProtocol {
   public subscript(i: Index) -> Character {
     // Note: SE-0180 requires us not to round `i` down to the nearest whole
     // `Character` boundary.
-    let i = _validateScalarIndex(i)
+    let i = _wholeGuts.validateScalarIndex(i, in: _bounds)
     let stride = _characterStride(startingAt: i)
     // Don't let the subscript return data outside this substring.
     let endOffset = Swift.min(
@@ -469,7 +442,7 @@ extension Substring: StringProtocol {
     // Note: SE-0180 requires us to use `subrange` bounds even if they aren't
     // `Character` aligned. (We still have to round things down to the nearest
     // scalar boundary, though, or we may generate ill-formed encodings.)
-    let subrange = _validateScalarRange(subrange)
+    let subrange = _wholeGuts.validateScalarRange(subrange, in: _bounds)
 
     // Replacing the range is easy -- we can just reuse `String`'s
     // implementation. However, we must also update `startIndex` and `endIndex`
@@ -1258,7 +1231,19 @@ extension Substring: ExpressibleByStringLiteral {
 extension String {
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
-    let r = _guts.validateScalarRange(r)
+    var r = _guts.validateScalarRange(r)
+
+    // Older binaries may generate `startIndex` without the
+    // `_isCharacterAligned` flag. Compensate for that here so that substrings
+    // that start at the beginning will never get the sad path in
+    // `index(after:)`. Note that we don't need to do this for `upperBound` and
+    // we don't need to compare against the `endIndex` -- those aren't nearly as
+    // critical.
+    if r.lowerBound._encodedOffset == 0 {
+      r = Range(_uncheckedBounds:
+        (r.lowerBound._characterAligned, r.upperBound))
+    }
+
     return Substring(_unchecked: Slice(base: self, bounds: r))
   }
 }
@@ -1266,7 +1251,7 @@ extension String {
 extension Substring {
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
-    let r = _validateScalarRange(r)
+    let r = _wholeGuts.validateScalarRange(r, in: _bounds)
     return Substring(_unchecked: Slice(base: base, bounds: r))
   }
 }
