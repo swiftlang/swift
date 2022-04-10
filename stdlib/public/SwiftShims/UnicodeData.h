@@ -108,6 +108,10 @@ const __swift_uint8_t *_swift_stdlib_getScriptExtensions(
                                                         __swift_uint32_t scalar,
                                                         __swift_uint8_t *count);
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_stdlib_getCaseMapping(__swift_uint32_t scalar,
+                                  __swift_uint32_t *buffer);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
