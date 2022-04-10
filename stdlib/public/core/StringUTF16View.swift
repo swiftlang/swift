@@ -145,7 +145,7 @@ extension String.UTF16View: BidirectionalCollection {
       "String index is out of bounds")
     if _slowPath(_guts.isForeign) { return _foreignIndex(after: idx) }
     if _guts.isASCII {
-      return idx.nextEncoded._scalarAligned._knownUTF8._knownUTF16
+      return idx.nextEncoded._scalarAligned._encodingIndependent
     }
 
     // For a BMP scalar (1-3 UTF-8 code units), advance past it. For a non-BMP
@@ -173,7 +173,7 @@ extension String.UTF16View: BidirectionalCollection {
       "String index is out of bounds")
     if _slowPath(_guts.isForeign) { return _foreignIndex(before: idx) }
     if _guts.isASCII {
-      return idx.priorEncoded._scalarAligned._knownUTF8._knownUTF16
+      return idx.priorEncoded._scalarAligned._encodingIndependent
     }
 
     if idx.transcodedOffset != 0 {
@@ -709,7 +709,7 @@ extension String.UTF16View {
     if _guts.isASCII {
       return Index(
         _encodedOffset: offset
-      )._scalarAligned._knownUTF8._knownUTF16
+      )._scalarAligned._encodingIndependent
     }
 
     guard _guts._useBreadcrumbs(forEncodedOffset: offset) else {

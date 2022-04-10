@@ -313,7 +313,7 @@ extension String: BidirectionalCollection {
   /// present!)
   ///
   /// This method is called from inlinable `subscript` implementations in
-  /// current and previous versions of the stdlib, wich require this contract
+  /// current and previous versions of the stdlib, which require this contract
   /// not to be violated.
   @usableFromInline
   @inline(__always)
