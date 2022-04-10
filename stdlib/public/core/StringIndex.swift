@@ -516,37 +516,3 @@ extension String.Index: Hashable {
     hasher.combine(orderingValue)
   }
 }
-
-// FIXME: This is for debugging only; remove before merging.
-extension String.Index {
-  @_alwaysEmitIntoClient
-  @inline(never)
-  public var description: String {
-    var d = "String.Index("
-    d += "offset: \(_encodedOffset)"
-    if transcodedOffset != 0 {
-      d += "+\(transcodedOffset)"
-    }
-
-    d += ", encoding: "
-    switch (_rawBits & Self.__utf8Bit != 0, _rawBits & Self.__utf16Bit != 0) {
-    case (false, false): d += "unknown"
-    case (true, false): d += "utf8"
-    case (false, true): d += "utf16"
-    case (true, true): d += "any"
-    }
-    if _isCharacterAligned {
-      d += ", aligned: character"
-    } else if _isScalarAligned {
-      d += ", aligned: scalar"
-    }
-    if let stride = characterStride {
-      d += ", stride: \(stride)"
-    }
-    d += ")"
-    return d
-  }
-}
-
-@available(SwiftStdlib 5.7, *)
-extension String.Index: CustomStringConvertible {}
