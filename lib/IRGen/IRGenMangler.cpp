@@ -241,7 +241,7 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
     Buffer << 'T';
     auto protocols = layout.getProtocols();
     for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-      appendProtocolName(protocols[i]->getDecl());
+      appendProtocolName(protocols[i]);
       if (i == 0)
         appendOperator("_");
     }

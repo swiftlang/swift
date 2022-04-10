@@ -390,12 +390,12 @@ class InheritedProtocolCollector {
 
       bool canPrintNormally = canPrintProtocolTypeNormally(inheritedTy, D);
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
-      for (ProtocolType *protoTy : layout.getProtocols()) {
+      for (ProtocolDecl *protoDecl : layout.getProtocols()) {
         if (canPrintNormally)
-          IncludedProtocols.push_back(protoTy->getDecl());
+          IncludedProtocols.push_back(protoDecl);
         else
           ExtraProtocols.push_back(
-            ProtocolAndAvailability(protoTy->getDecl(),
+            ProtocolAndAvailability(protoDecl,
                                     getAvailabilityAttrs(D, availableAttrs),
                                     inherited.isUnchecked,
                                     getOtherAttrList(D)));
@@ -433,7 +433,8 @@ class InheritedProtocolCollector {
         continue;
 
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
-      for (ProtocolType *protoTy : layout.getProtocols()) {
+      for (ProtocolDecl *protoDecl : layout.getProtocols()) {
+        auto protoTy = protoDecl->getDeclaredInterfaceType()->castTo<ProtocolType>();
         if (!isPublicOrUsableFromInline(protoTy))
           continue;
         ConditionalConformanceProtocols.push_back(protoTy);

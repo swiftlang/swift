@@ -218,9 +218,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
     // Find a protocol that is not @objc.
     bool sawErrorProtocol = false;
-    for (auto P : layout.getProtocols()) {
-      auto *PD = P->getDecl();
-
+    for (auto PD : layout.getProtocols()) {
       if (PD->isSpecificProtocol(KnownProtocolKind::Error)) {
         sawErrorProtocol = true;
         break;
