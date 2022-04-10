@@ -132,8 +132,8 @@ extension String: BidirectionalCollection {
   ///   `index(before:)`.
   /// - Complexity: O(*n*), where *n* is the absolute value of `distance`.
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
-    // Note: in Swift 5.6 and below, this method used to be inlinable,
-    // forwarding to `_index(_:offsetBy:)`.
+    // Note: prior to Swift 5.7, this method used to be inlinable, forwarding to
+    // `_index(_:offsetBy:)`.
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
 
@@ -194,8 +194,8 @@ extension String: BidirectionalCollection {
   public func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
-    // Note: In Swift 5.6 and below, this function used to be inlinable,
-    // forwarding to `BidirectionalCollection._index(_:offsetBy:limitedBy:)`.
+    // Note: Prior to Swift 5.7, this function used to be inlinable, forwarding
+    // to `BidirectionalCollection._index(_:offsetBy:limitedBy:)`.
     // Unfortunately, that approach isn't compatible with SE-0180, as it doesn't
     // support cases where `i` or `limit` aren't character aligned.
 
@@ -242,8 +242,8 @@ extension String: BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the resulting distance.
   public func distance(from start: Index, to end: Index) -> Int {
-    // Note: In Swift 5.6 and below, this function used to be inlinable,
-    // forwarding to `BidirectionalCollection._distance(from:to:)`.
+    // Note: Prior to Swift 5.7, this function used to be inlinable, forwarding
+    // to `BidirectionalCollection._distance(from:to:)`.
 
     // FIXME: Due to the `index(after:)` problem above, this function doesn't
     // always return consistent results when the given indices fall between
@@ -266,8 +266,7 @@ extension String: BidirectionalCollection {
         count += 1
         i = _uncheckedIndex(after: i)
       }
-    }
-    else if i > end {
+    } else if i > end {
       while i > end { // Note `<` instead of `==`
         count -= 1
         i = _uncheckedIndex(before: i)

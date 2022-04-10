@@ -31,9 +31,6 @@ internal struct _StringGutsSlice {
   internal init(_ guts: _StringGuts, _ offsetRange: Range<Int>) {
     _internalInvariant(
       offsetRange.lowerBound >= 0 && offsetRange.upperBound <= guts.count)
-    _internalInvariant(
-      guts.isOnUnicodeScalarBoundary(offsetRange.lowerBound)
-      && guts.isOnUnicodeScalarBoundary(offsetRange.upperBound))
     self._guts = guts
     self._offsetRange = offsetRange
   }

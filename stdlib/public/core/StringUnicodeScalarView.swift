@@ -183,8 +183,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
         count += 1
         i = _uncheckedIndex(after: i)
       }
-    }
-    else if i > end {
+    } else if i > end {
       while i > end {
         count -= 1
         i = _uncheckedIndex(before: i)

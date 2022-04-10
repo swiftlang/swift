@@ -200,9 +200,9 @@ extension Substring: StringProtocol {
   public var endIndex: Index { _slice._endIndex }
 
   public func index(after i: Index) -> Index {
-    // Note: in Swift 5.6 and below, this method used to be inlinable,
-    // forwarding to `_slice.base.index(after:)`. Unfortunately, that approach
-    // isn't compatible with SE-0180, as it allows Unicode scalars outside the
+    // Note: Prior to Swift 5.7, this method used to be inlinable, forwarding to
+    // `_slice.base.index(after:)`. Unfortunately, that approach isn't
+    // compatible with SE-0180, as it allows Unicode scalars outside the
     // substring to affect grapheme breaking results within the substring. This
     // leads to Collection conformance issues when the `Substring`'s bounds do
     // not fall on grapheme boundaries in `base`.
@@ -256,9 +256,9 @@ extension Substring: StringProtocol {
   }
 
   public func index(before i: Index) -> Index {
-    // Note: in Swift 5.6 and below, this method used to be inlinable,
-    // forwarding to `_slice.base.index(before:)`. Unfortunately, that approach
-    // isn't compatible with SE-0180, as it allows Unicode scalars outside the
+    // Note: Prior to Swift 5.7, this method used to be inlinable, forwarding to
+    // `_slice.base.index(before:)`. Unfortunately, that approach isn't
+    // compatible with SE-0180, as it allows Unicode scalars outside the
     // substring to affect grapheme breaking results within the substring. This
     // leads to Collection conformance issues when the `Substring`'s bounds do
     // not fall on grapheme boundaries in `base`.
@@ -294,26 +294,26 @@ extension Substring: StringProtocol {
     _internalInvariant(priorOffset >= startIndex._encodedOffset)
 
     var r = Index(
-      encodedOffset: priorOffset, characterStride: priorStride)
+      encodedOffset: priorOffset, characterStride: priorStride
+    )._scalarAligned
 
     // Don't set the `_isCharacterAligned` bit in indices of exotic substrings
     // whose startIndex isn't aligned on a grapheme cluster boundary. (Their
     // grapheme breaks may not match with those in `base`.)
     if _startIsCharacterAligned {
       r = r._characterAligned
-    } else {
-      r = r._scalarAligned
     }
+
     return r
   }
 
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
-    // Note: in Swift 5.6 and below, this method used to be inlinable,
-    // forwarding to `_slice.base.index(_:offsetBy:)`. Unfortunately, that
-    // approach isn't compatible with SE-0180, as it allows Unicode scalars
-    // outside the substring to affect grapheme breaking results within the
-    // substring. This leads to Collection conformance issues when the
-    // `Substring`'s bounds do not fall on grapheme boundaries in `base`.
+    // Note: Prior to Swift 5.7, this method used to be inlinable, forwarding to
+    // `_slice.base.index(_:offsetBy:)`. Unfortunately, that approach isn't
+    // compatible with SE-0180, as it allows Unicode scalars outside the
+    // substring to affect grapheme breaking results within the substring. This
+    // leads to Collection conformance issues when the `Substring`'s bounds do
+    // not fall on grapheme boundaries in `base`.
 
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
     var i = _wholeGuts.validateInclusiveCharacterIndex(i, in: _bounds)
@@ -334,12 +334,12 @@ extension Substring: StringProtocol {
   public func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
-    // Note: in Swift 5.6 and below, this method used to be inlinable,
-    // forwarding to `_slice.base.index(_:offsetBy:limitedBy:)`. Unfortunately,
-    // that approach isn't compatible with SE-0180, as it allows Unicode scalars
-    // outside the substring to affect grapheme breaking results within the
-    // substring. This leads to Collection conformance issues when the
-    // `Substring`'s bounds do not fall on grapheme boundaries in `base`.
+    // Note: Prior to Swift 5.7, this method used to be inlinable, forwarding to
+    // `_slice.base.index(_:offsetBy:limitedBy:)`. Unfortunately, that approach
+    // isn't compatible with SE-0180, as it allows Unicode scalars outside the
+    // substring to affect grapheme breaking results within the substring. This
+    // leads to Collection conformance issues when the `Substring`'s bounds do
+    // not fall on grapheme boundaries in `base`.
 
     // Per SE-0180, `i` and `limit` are allowed to fall in between grapheme
     // breaks, in which case this function must still terminate without trapping
@@ -372,12 +372,12 @@ extension Substring: StringProtocol {
   }
 
   public func distance(from start: Index, to end: Index) -> Int {
-    // Note: in Swift 5.6 and below, this method used to be inlinable,
-    // forwarding to `_slice.base.distance(from:to:)`. Unfortunately, that
-    // approach isn't compatible with SE-0180, as it allows Unicode scalars
-    // outside the substring to affect grapheme breaking results within the
-    // substring. This leads to Collection conformance issues when the
-    // `Substring`'s bounds do not fall on grapheme boundaries in `base`.
+    // Note: Prior to Swift 5.7, this method used to be inlinable, forwarding to
+    // `_slice.base.distance(from:to:)`. Unfortunately, that approach isn't
+    // compatible with SE-0180, as it allows Unicode scalars outside the
+    // substring to affect grapheme breaking results within the substring. This
+    // leads to Collection conformance issues when the `Substring`'s bounds do
+    // not fall on grapheme boundaries in `base`.
 
     // FIXME: Due to the `index(after:)` problem above, this function doesn't
     // always return consistent results when the given indices fall between
@@ -400,8 +400,7 @@ extension Substring: StringProtocol {
         count += 1
         i = _uncheckedIndex(after: i)
       }
-    }
-    else if i > end {
+    } else if i > end {
       while i > end { // Note `<` instead of `==`
         count -= 1
         i = _uncheckedIndex(before: i)
