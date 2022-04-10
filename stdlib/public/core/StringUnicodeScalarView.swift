@@ -143,7 +143,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
         _utf8ScalarLength(utf8, endingAt: i._encodedOffset)
       }
       _internalInvariant(len <= 4, "invalid UTF8")
-      return i.encoded(offsetBy: -len)._scalarAligned._knownUTF8
+      return i.encoded(offsetBy: 0 &- len)._scalarAligned._knownUTF8
     }
 
     return _foreignIndex(before: i)

@@ -178,6 +178,7 @@ extension _StringGuts {
 
   @inline(never) // slow-path
   @_alwaysEmitIntoClient // Swift 5.1
+  @_effects(releasenone)
   internal func scalarAlignSlow(_ idx: Index) -> Index {
     _internalInvariant_5_1(!idx._isScalarAligned)
 
