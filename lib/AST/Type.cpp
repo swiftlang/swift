@@ -271,6 +271,7 @@ ExistentialLayout::ExistentialLayout(ProtocolType *type) {
 
   hasExplicitAnyObject = false;
   containsNonObjCProtocol = !protoDecl->isObjC();
+  containsParameterized = false;
 
   singleProtocol = type;
 }
@@ -280,16 +281,24 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
 
   hasExplicitAnyObject = type->hasExplicitAnyObject();
   containsNonObjCProtocol = false;
+  containsParameterized = false;
 
-  auto members = type->getMembers();
+  auto members = type.getMembers();
   if (!members.empty() &&
-      isa<ClassDecl>(members[0]->getAnyNominal())) {
+      isa<ClassDecl>(members[0].getAnyNominal())) {
     explicitSuperclass = members[0];
     members = members.slice(1);
   }
 
   for (auto member : members) {
-    auto *protoDecl = member->castTo<ProtocolType>()->getDecl();
+    ProtocolDecl *protoDecl;
+    if (auto protocolType = dyn_cast<ProtocolType>(member)) {
+      protoDecl = protocolType->getDecl();
+    } else {
+      auto parameterized = cast<ParameterizedProtocolType>(member);
+      protoDecl = parameterized->getProtocol();
+      containsParameterized = true;
+    }
     containsNonObjCProtocol |= !protoDecl->isObjC();
   }
 
@@ -302,6 +311,7 @@ ExistentialLayout::ExistentialLayout(ParameterizedProtocolType *type) {
 
   *this = ExistentialLayout(type->getBaseType());
   sameTypeRequirements = type->getArgs();
+  containsParameterized = true;
 }
 
 ExistentialLayout TypeBase::getExistentialLayout() {
