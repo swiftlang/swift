@@ -150,7 +150,7 @@ public:
 
   /// Unconditionally initialize a fresh tracking state on the
   /// current state, shadowing any previous tracking state.
-  /// leave() must be called beforet the object goes out of scope.
+  /// leave() must be called before the object goes out of scope.
   void enterAndShadow(ExecutorRef currentExecutor) {
     ActiveExecutor = currentExecutor;
     SavedInfo = ActiveInfoInThread.get();
