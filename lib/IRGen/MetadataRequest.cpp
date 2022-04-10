@@ -1682,9 +1682,9 @@ namespace {
 
       auto layout = type.getExistentialLayout();
 
-      SmallVector<ProtocolType *, 4> protocols;
+      SmallVector<ProtocolDecl *, 4> protocols;
       for (auto proto : layout.getProtocols()) {
-        if (!proto->getDecl()->isMarkerProtocol())
+        if (!proto->isMarkerProtocol())
           protocols.push_back(proto);
       }
 
@@ -1701,8 +1701,7 @@ namespace {
                                IGF.IGM.ProtocolDescriptorRefTy->getPointerTo());
       
       unsigned index = 0;
-      for (auto *protoTy : protocols) {
-        auto *protoDecl = protoTy->getDecl();
+      for (auto *protoDecl : protocols) {
         llvm::Value *ref = emitProtocolDescriptorRef(IGF, protoDecl);
 
         Address slot = IGF.Builder.CreateConstArrayGEP(descriptorArray,

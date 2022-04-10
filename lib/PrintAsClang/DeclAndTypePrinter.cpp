@@ -1795,10 +1795,7 @@ private:
       os << (isMetatype ? "Class" : "id");
     }
 
-    SmallVector<ProtocolDecl *, 2> protos;
-    for (auto proto : layout.getProtocols())
-      protos.push_back(proto->getDecl());
-    printProtocols(protos);
+    printProtocols(layout.getProtocols());
 
     if (layout.explicitSuperclass && !isMetatype)
       os << " *";

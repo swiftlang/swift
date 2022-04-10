@@ -4471,7 +4471,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         // getLookupConformanceFns used in here don't use that parameter anyway.
         auto dependentType = CanType();
         auto conformance =
-            getLookupConformanceFn()(dependentType, subjectType, proto->getDecl());
+            getLookupConformanceFn()(dependentType, subjectType, proto);
 
         // FIXME: diagnose if there's no conformance.
         if (conformance) {
@@ -4551,8 +4551,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         anyErrors = true;
     }
 
-    for (auto *proto : layout.getProtocols()) {
-      auto *protoDecl = proto->getDecl();
+    for (auto *protoDecl : layout.getProtocols()) {
       if (isErrorResult(addConformanceRequirement(resolvedSubject, protoDecl,
                                                   source)))
         anyErrors = true;

@@ -1384,7 +1384,7 @@ createErrorExistentialTypeInfo(IRGenModule &IGM,
   // The Error existential has a special boxed representation. It has
   // space only for witnesses to the Error protocol.
   assert(layout.isErrorExistential());
-  auto *protocol = layout.getProtocols()[0]->getDecl();
+  auto *protocol = layout.getProtocols()[0];
 
   auto refcounting = (!IGM.ObjCInterop
                       ? ReferenceCounting::Native
@@ -1464,9 +1464,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   // constraints are.
   bool allowsTaggedPointers = true;
 
-  for (auto protoTy : layout.getProtocols()) {
-    auto *protoDecl = protoTy->getDecl();
-
+  for (auto protoDecl : layout.getProtocols()) {
     if (protoDecl->getAttrs().hasAttribute<UnsafeNoObjCTaggedPointerAttr>())
       allowsTaggedPointers = false;
 
@@ -1588,9 +1586,7 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
   auto spareBits = BitPatternBuilder(IGM.Triple.isLittleEndian());
   spareBits.append(baseTI.getSpareBits());
 
-  for (auto protoTy : layout.getProtocols()) {
-    auto *protoDecl = protoTy->getDecl();
-
+  for (auto protoDecl : layout.getProtocols()) {
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protoDecl))
       continue;
 
@@ -1625,7 +1621,7 @@ static void forEachProtocolWitnessTable(
   assert(destProtocols.size() == conformances.size() &&
          "mismatched protocol conformances");
   for (unsigned i = 0, size = destProtocols.size(); i < size; ++i) {
-    auto destProtocol = destProtocols[i]->getDecl();
+    auto destProtocol = destProtocols[i];
     if (Lowering::TypeConverter::protocolRequiresWitnessTable(destProtocol))
       witnessConformances.push_back(conformances[i]);
   }

@@ -264,28 +264,25 @@ bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
   return getCanonicalType().allowsOwnership(sig);
 }
 
-ExistentialLayout::ExistentialLayout(ProtocolType *type) {
-  assert(type->isCanonical());
-
+ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   auto *protoDecl = type->getDecl();
 
   hasExplicitAnyObject = false;
   containsNonObjCProtocol = !protoDecl->isObjC();
   containsParameterized = false;
 
-  singleProtocol = type;
+  protocols.push_back(protoDecl);
 }
 
-ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
-  assert(type->isCanonical());
-
+ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
   hasExplicitAnyObject = type->hasExplicitAnyObject();
   containsNonObjCProtocol = false;
   containsParameterized = false;
 
   auto members = type.getMembers();
   if (!members.empty() &&
-      isa<ClassDecl>(members[0].getAnyNominal())) {
+      (members[0].getClassOrBoundGenericClass() ||
+       isa<UnboundGenericType>(members[0]))) {
     explicitSuperclass = members[0];
     members = members.slice(1);
   }
@@ -300,16 +297,12 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
       containsParameterized = true;
     }
     containsNonObjCProtocol |= !protoDecl->isObjC();
+    protocols.push_back(protoDecl);
   }
-
-  singleProtocol = nullptr;
-  protocols = { members.data(), members.size() };
 }
 
-ExistentialLayout::ExistentialLayout(ParameterizedProtocolType *type) {
-  assert(type->isCanonical());
-
-  *this = ExistentialLayout(type->getBaseType());
+ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
+    : ExistentialLayout(type.getBaseType()) {
   sameTypeRequirements = type->getArgs();
   containsParameterized = true;
 }
@@ -320,10 +313,10 @@ ExistentialLayout TypeBase::getExistentialLayout() {
 
 ExistentialLayout CanType::getExistentialLayout() {
   if (auto existential = dyn_cast<ExistentialType>(*this))
-    return existential->getConstraintType()->getExistentialLayout();
+    return existential.getConstraintType().getExistentialLayout();
 
   if (auto metatype = dyn_cast<ExistentialMetatypeType>(*this))
-    return metatype->getInstanceType()->getExistentialLayout();
+    return metatype.getInstanceType().getExistentialLayout();
 
   if (auto proto = dyn_cast<ProtocolType>(*this))
     return ExistentialLayout(proto);
@@ -351,11 +344,10 @@ Type ExistentialLayout::getSuperclass() const {
   if (explicitSuperclass)
     return explicitSuperclass;
 
-  for (auto proto : getProtocols()) {
+  for (auto protoDecl : getProtocols()) {
     // If we have a generic signature, check there, because it
     // will pick up superclass constraints from protocols that we
     // refine as well.
-    auto *protoDecl = proto->getDecl();
     if (auto genericSig = protoDecl->getGenericSignature()) {
       if (auto superclass = genericSig->getSuperclassBound(
             protoDecl->getSelfInterfaceType()))
@@ -429,7 +421,7 @@ bool TypeBase::isActorType() {
     }
 
     for (auto proto : layout.getProtocols()) {
-      if (proto->isActorType())
+      if (proto->isActor())
         return true;
     }
 
@@ -464,9 +456,9 @@ bool TypeBase::isDistributedActor() {
 
     auto layout = getExistentialLayout();
     return llvm::any_of(layout.getProtocols(),
-                        [&actorProto](ProtocolType *protocol) {
-                          return protocol->getDecl() == actorProto ||
-                                 protocol->isDistributedActor();
+                        [&actorProto](ProtocolDecl *protocol) {
+                          return protocol == actorProto ||
+                                 protocol->inheritsFrom(actorProto);
                         });
   }
 
@@ -1005,15 +997,14 @@ bool ExistentialLayout::isErrorExistential() const {
   return (!hasExplicitAnyObject &&
           !explicitSuperclass &&
           protocols.size() == 1 &&
-          protocols[0]->getDecl()->isSpecificProtocol(KnownProtocolKind::Error));
+          protocols[0]->isSpecificProtocol(KnownProtocolKind::Error));
 }
 
 bool ExistentialLayout::isExistentialWithError(ASTContext &ctx) const {
   auto errorProto = ctx.getProtocol(KnownProtocolKind::Error);
   if (!errorProto) return false;
 
-  for (auto proto : getProtocols()) {
-    auto *protoDecl = proto->getDecl();
+  for (auto protoDecl : getProtocols()) {
     if (protoDecl == errorProto || protoDecl->inheritsFrom(errorProto))
       return true;
   }
@@ -3985,7 +3976,7 @@ void ParameterizedProtocolType::Profile(llvm::FoldingSetNodeID &ID,
 
 void ParameterizedProtocolType::getRequirements(
     Type baseType, SmallVectorImpl<Requirement> &reqs) const {
-  auto *protoDecl = getBaseType()->getDecl();
+  auto *protoDecl = getProtocol();
 
   auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
   auto argTypes = getArgs();
