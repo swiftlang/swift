@@ -49,15 +49,10 @@ isn't frozen.
 
 <resilience barrier>
 
-  * b3: UTF-16 encoding
+  * b0: `_isScalarAligned`
 
-    If set, the position is known to be expressed in UTF-16 code units.
-    (Introduced in Swift 5.7)
-
-  * b2: UTF-8 encoding
-
-    If set, the position is known to be expressed in UTF-8 code units.
-    (Introduced in Swift 5.7)
+    If set, index is known to be on a Unicode scalar boundary (see below).
+    (Introduced in Swift 5.1)
 
   * b1: `_isCharacterAligned`
 
@@ -65,10 +60,15 @@ isn't frozen.
     boundary (i.e., on a Swift `Character`.)
     (Introduced in Swift 5.7)
 
-  * b0: `_isScalarAligned`
+  * b2: UTF-8 encoding
 
-    If set, index is known to be on a Unicode scalar boundary (see below).
-    (Introduced in Swift 5.1)
+    If set, the position is known to be expressed in UTF-8 code units.
+    (Introduced in Swift 5.7)
+
+  * b3: UTF-16 encoding
+
+    If set, the position is known to be expressed in UTF-16 code units.
+    (Introduced in Swift 5.7)
 
 Before Swift 5.7, bits b1, b2 and b3 used to be part of the resilient slice. See
 the notes on Character Alignment and Index Encoding below to see how this works.
