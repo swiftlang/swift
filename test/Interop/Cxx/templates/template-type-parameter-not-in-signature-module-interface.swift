@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=TemplateTypeParameterNotInSignature -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=TemplateTypeParameterNotInSignature -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: func templateTypeParamNotUsedInSignature<T>(T: T.Type)
 // CHECK: func multiTemplateTypeParamNotUsedInSignature<T, U>(T: T.Type, U: U.Type)

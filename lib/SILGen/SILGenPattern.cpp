@@ -1638,8 +1638,8 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // temporary if necessary.
 
   // Figure out if we need the value to be in a temporary.
-  bool requiresAddress = !canUseScalarCheckedCastInstructions(SGF.SGM.M,
-                                                        sourceType, targetType);
+  bool requiresAddress =
+    !canSILUseScalarCheckedCastInstructions(SGF.SGM.M, sourceType, targetType);
 
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);

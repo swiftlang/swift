@@ -44,6 +44,7 @@ class DeadEndBlocks;
 class ValueBaseUseIterator;
 class ConsumingUseIterator;
 class NonConsumingUseIterator;
+class TypeDependentUseIterator;
 class NonTypeDependentUseIterator;
 class SILValue;
 class SILModuleConventions;
@@ -376,6 +377,8 @@ public:
   /// same type as the result of this instruction.
   void replaceAllUsesWithUndef();
 
+  void replaceAllTypeDependentUsesWith(ValueBase *RHS);
+
   /// Is this value a direct result of the given instruction?
   bool isResultOf(SILInstruction *I) const;
 
@@ -390,6 +393,8 @@ public:
   using consuming_use_range = iterator_range<consuming_use_iterator>;
   using non_consuming_use_iterator = NonConsumingUseIterator;
   using non_consuming_use_range = iterator_range<non_consuming_use_iterator>;
+  using typedependent_use_iterator = TypeDependentUseIterator;
+  using typedependent_use_range = iterator_range<typedependent_use_iterator>;
   using non_typedependent_use_iterator = NonTypeDependentUseIterator;
   using non_typedependent_use_range =
       iterator_range<non_typedependent_use_iterator>;
@@ -402,6 +407,9 @@ public:
 
   inline non_consuming_use_iterator non_consuming_use_begin() const;
   inline non_consuming_use_iterator non_consuming_use_end() const;
+
+  inline typedependent_use_iterator typedependent_use_begin() const;
+  inline typedependent_use_iterator typedependent_use_end() const;
 
   inline non_typedependent_use_iterator non_typedependent_use_begin() const;
   inline non_typedependent_use_iterator non_typedependent_use_end() const;
@@ -429,6 +437,10 @@ public:
 
   /// Returns a range of all non consuming uses
   inline non_consuming_use_range getNonConsumingUses() const;
+
+  /// Returns a range of uses that are classified as a type dependent
+  /// operand of the user.
+  inline typedependent_use_range getTypeDependentUses() const;
 
   /// Returns a range of uses that are not classified as a type dependent
   /// operand of the user.
@@ -1104,6 +1116,7 @@ private:
   friend class ValueBaseUseIterator;
   friend class ConsumingUseIterator;
   friend class NonConsumingUseIterator;
+  friend class TypeDependentUseIterator;
   friend class NonTypeDependentUseIterator;
   template <unsigned N> friend class FixedOperandList;
   friend class TrailingOperandsList;
@@ -1231,6 +1244,39 @@ ValueBase::non_consuming_use_end() const {
   return ValueBase::non_consuming_use_iterator(nullptr);
 }
 
+class TypeDependentUseIterator : public ValueBaseUseIterator {
+public:
+  explicit TypeDependentUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
+  TypeDependentUseIterator &operator++() {
+    assert(Cur && "incrementing past end()!");
+    while ((Cur = Cur->NextUse)) {
+      if (Cur->isTypeDependent())
+        break;
+    }
+    return *this;
+  }
+
+  TypeDependentUseIterator operator++(int unused) {
+    TypeDependentUseIterator copy = *this;
+    ++*this;
+    return copy;
+  }
+};
+
+inline ValueBase::typedependent_use_iterator
+ValueBase::typedependent_use_begin() const {
+  auto cur = FirstUse;
+  while (cur && !cur->isTypeDependent()) {
+    cur = cur->NextUse;
+  }
+  return ValueBase::typedependent_use_iterator(cur);
+}
+
+inline ValueBase::typedependent_use_iterator
+ValueBase::typedependent_use_end() const {
+  return ValueBase::typedependent_use_iterator(nullptr);
+}
+
 class NonTypeDependentUseIterator : public ValueBaseUseIterator {
 public:
   explicit NonTypeDependentUseIterator(Operand *cur)
@@ -1309,6 +1355,11 @@ inline ValueBase::consuming_use_range ValueBase::getConsumingUses() const {
 inline ValueBase::non_consuming_use_range
 ValueBase::getNonConsumingUses() const {
   return {non_consuming_use_begin(), non_consuming_use_end()};
+}
+
+inline ValueBase::typedependent_use_range
+ValueBase::getTypeDependentUses() const {
+  return {typedependent_use_begin(), typedependent_use_end()};
 }
 
 inline ValueBase::non_typedependent_use_range

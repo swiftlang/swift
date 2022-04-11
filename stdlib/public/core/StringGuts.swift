@@ -167,8 +167,7 @@ extension _StringGuts {
     _ f: (UnsafeBufferPointer<CChar>) throws -> R
   ) rethrows -> R {
     return try self.withFastUTF8 { utf8 in
-      let ptr = utf8.baseAddress._unsafelyUnwrappedUnchecked._asCChar
-      return try f(UnsafeBufferPointer(start: ptr, count: utf8.count))
+      return try utf8.withMemoryRebound(to: CChar.self, f)
     }
   }
 }

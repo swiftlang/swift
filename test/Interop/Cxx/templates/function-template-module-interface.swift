@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=FunctionTemplates -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=FunctionTemplates -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: func addSameTypeParams<T>(_ a: T, _ b: T) -> T
 // CHECK: func addMixedTypeParams<A, B>(_ a: A, _ b: B) -> A

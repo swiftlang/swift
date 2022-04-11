@@ -292,7 +292,8 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
       // Check if the subject type actually conforms.
       auto *protoDecl = constraintType->castTo<ProtocolType>()->getDecl();
       auto *module = protoDecl->getParentModule();
-      auto conformance = module->lookupConformance(subjectType, protoDecl);
+      auto conformance = module->lookupConformance(
+          subjectType, protoDecl, /*allowMissing=*/true);
       if (conformance.isInvalid()) {
         errors.push_back(RequirementError::forInvalidRequirementSubject(
             {RequirementKind::Conformance, subjectType, constraintType}, loc));

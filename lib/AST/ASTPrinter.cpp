@@ -2588,12 +2588,12 @@ void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
     //   protocol Foo {}
     //   extension Foo where <requirments from ExtDecl> { ... }
     //   struct Bar {}
-    //   extension Bar: Foo where <requirments from TransformContext> { ... }
+    //   extension Bar: Foo where <requirements from TransformContext> { ... }
     //
     // should produce a synthesized extension of Bar with both sets of
-    // requirments:
+    // requirements:
     //
-    //   extension Bar where <requirments from ExtDecl+TransformContext { ... }
+    //   extension Bar where <requirements from ExtDecl+TransformContext> { ... }
     //
     if (!printCombinedRequirementsIfNeeded())
       printDeclGenericRequirements(ExtDecl);
@@ -3208,7 +3208,7 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
 ///   #endif
 ///   #endif
 /// ```
-bool swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
+void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
                                                 PrintOptions &options,
                                                 Decl *decl,
                                  llvm::function_ref<void()> printBody) {
@@ -3216,13 +3216,13 @@ bool swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
   // it should go around the whole decl.
   if (isa<AccessorDecl>(decl)) {
     printBody();
-    return false;
+    return;
   }
 
   FeatureSet features = getUniqueFeaturesUsed(decl);
   if (features.empty()) {
     printBody();
-    return false;
+    return;
   }
 
   // Enter a `#if` for the required features, if any.
@@ -3252,8 +3252,6 @@ bool swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
     printer.printNewline();
     printer << "#endif";
   }
-
-  return true;
 }
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {

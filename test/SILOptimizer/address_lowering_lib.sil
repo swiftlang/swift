@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -sil-verify-all %s | %FileCheck %s
+//
+import Builtin
+import Swift
+
+sil_stage raw
+
+// CHECK-LABEL: sil [ossa] @test_open_existential_box_value : $@convention(thin) (@in Error) -> () {
+// CHECK: [[ALLOC:%.*]]   = alloc_stack $Any
+// CHECK: [[VAL:%.*]] = load [take] %0 : $*Error
+// CHECK: [[BORROW:%.*]] = begin_borrow [lexical] [[VAL]] : $Error
+// CHECK: [[OPENADDR:%.*]] = open_existential_box [[BORROW]] : $Error to $*@opened("169A6848-B636-11EC-83C4-D0817AD59B9D") Error
+// CHECK: [[INIT:%.*]] = init_existential_addr [[ALLOC]] : $*Any, $@opened("169A6848-B636-11EC-83C4-D0817AD59B9D") Error
+// CHECK: copy_addr [[OPENADDR]] to [initialization] [[INIT]] : $*@opened("169A6848-B636-11EC-83C4-D0817AD59B9D") Error
+// CHECK: destroy_addr [[ALLOC]] : $*Any
+// CHECK: end_borrow [[BORROW]] : $Error
+// CHECK: destroy_value [[VAL]] : $Error
+// CHECK: dealloc_stack [[ALLOC]] : $*Any
+// CHECK-LABEL: } // end sil function 'test_open_existential_box_value'
+sil [ossa] @test_open_existential_box_value : $@convention(thin) (@in Error) -> () {
+bb0(%0 : @owned $Error):
+  %1 = begin_borrow [lexical] %0 : $Error
+  %2 = open_existential_box_value %1 : $Error to $@opened("169A6848-B636-11EC-83C4-D0817AD59B9D") Error
+  %3 = copy_value %2 : $@opened("169A6848-B636-11EC-83C4-D0817AD59B9D") Error
+  %4 = init_existential_value %3 : $@opened("169A6848-B636-11EC-83C4-D0817AD59B9D") Error, $@opened("169A6848-B636-11EC-83C4-D0817AD59B9D") Error, $Any
+  destroy_value %4 : $Any
+  end_borrow %1 : $Error
+  destroy_value %0 : $Error
+  %ret = tuple ()
+  return %ret : $()
+}

@@ -330,9 +330,9 @@ namespace swift {
     /// in calls to generic functions.
     bool EnableOpenedExistentialTypes = false;
 
-    /// Enable support for protocol types parameterized by primary
-    /// associated type.
-    bool EnableParameterizedProtocolTypes = false;
+    /// Enable support for parameterized protocol types in existential
+    /// position.
+    bool EnableParameterizedExistentialTypes = false;
 
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
@@ -751,10 +751,6 @@ namespace swift {
     /// Enable experimental support for type inference through multi-statement
     /// closures.
     bool EnableMultiStatementClosureInference = true;
-
-    /// Enable experimental support for generic parameter inference in
-    /// parameter positions from associated default expressions.
-    bool EnableTypeInferenceFromDefaultArguments = false;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;

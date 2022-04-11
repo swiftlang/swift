@@ -1891,7 +1891,7 @@ giveUpFastPath:
       XRefExtensionPathPieceLayout::readRecord(scratch, ownerID, rawGenericSig);
       M = getModule(ownerID);
       if (!M) {
-        return llvm::make_error<XRefError>("module is not loaded",
+        return llvm::make_error<XRefError>("module with extension is not loaded",
                                            pathTrace, getIdentifier(ownerID));
       }
       pathTrace.addExtension(M);
@@ -3517,7 +3517,50 @@ public:
                                        StringRef blobData) {
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
   }
-      
+
+  void deserializeConditionalSubstitutions(
+      SmallVectorImpl<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+          &limitedAvailability) {
+    SmallVector<uint64_t, 4> scratch;
+    StringRef blobData;
+
+    while (true) {
+      llvm::BitstreamEntry entry =
+          MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        break;
+
+      scratch.clear();
+      unsigned recordID = MF.fatalIfUnexpected(
+          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+      if (recordID != decls_block::CONDITIONAL_SUBSTITUTION)
+        break;
+
+      ArrayRef<uint64_t> rawConditions;
+      SubstitutionMapID substitutionMapRef;
+
+      decls_block::ConditionalSubstitutionLayout::readRecord(
+          scratch, substitutionMapRef, rawConditions);
+
+      SmallVector<VersionRange, 4> conditions;
+      llvm::transform(rawConditions, std::back_inserter(conditions),
+                      [&](uint64_t id) {
+                        llvm::VersionTuple lowerEndpoint;
+                        if (lowerEndpoint.tryParse(MF.getIdentifier(id).str()))
+                          MF.fatal();
+                        return VersionRange::allGTE(lowerEndpoint);
+                      });
+
+      auto subMapOrError = MF.getSubstitutionMapChecked(substitutionMapRef);
+      if (!subMapOrError)
+        MF.fatal();
+
+      limitedAvailability.push_back(
+          OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+              ctx, conditions, subMapOrError.get()));
+    }
+  }
+
   Expected<Decl *> deserializeOpaqueType(ArrayRef<uint64_t> scratch,
                                          StringRef blobData) {
     DeclID namingDeclID;
@@ -3568,7 +3611,24 @@ public:
       auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError)
         return subMapOrError.takeError();
-      opaqueDecl->setUniqueUnderlyingTypeSubstitutions(subMapOrError.get());
+
+      // Check whether there are any conditionally available substitutions.
+      // If there are, it means that "unique" we just read is a universally
+      // available substitution.
+      SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+          limitedAvailability;
+
+      deserializeConditionalSubstitutions(limitedAvailability);
+
+      if (limitedAvailability.empty()) {
+        opaqueDecl->setUniqueUnderlyingTypeSubstitutions(subMapOrError.get());
+      } else {
+        limitedAvailability.push_back(
+            OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+                ctx, VersionRange::empty(), subMapOrError.get()));
+
+        opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
+      }
     }
     return opaqueDecl;
   }

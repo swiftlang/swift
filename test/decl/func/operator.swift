@@ -82,7 +82,7 @@ prefix func +// this should be a comment, not an operator
 prefix func -/* this also should be a comment, not an operator */
 (arg: Int) -> Int { return arg }
 
-func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}} expected-error {{closure expression is unused}} expected-error{{top-level statement cannot begin with a closure expression}} expected-note{{did you mean to use a 'do' statement?}} {{13-13=do }}
+func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}}
 func errors() {
   */    // expected-error {{unexpected end of block comment}}
   

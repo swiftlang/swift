@@ -1405,13 +1405,16 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     return true;
   }
   case CompletionKind::AccessorBeginning:
+  case CompletionKind::CaseStmtBeginning:
   case CompletionKind::ForEachSequence:
   case CompletionKind::PostfixExprBeginning:
   case CompletionKind::StmtOrExpr: {
     assert(CurDeclContext);
 
-    ExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
-                                           CurDeclContext);
+    bool AddUnresolvedMemberCompletions =
+        (Kind == CompletionKind::CaseStmtBeginning);
+    ExprTypeCheckCompletionCallback Lookup(
+        CodeCompleteTokenExpr, CurDeclContext, AddUnresolvedMemberCompletions);
     if (CodeCompleteTokenExpr) {
       // 'CodeCompletionTokenExpr == nullptr' happens when completing e.g.
       //   var x: Int {
@@ -1583,6 +1586,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::PostfixExprBeginning:
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AccessorBeginning:
+  case CompletionKind::CaseStmtBeginning:
     llvm_unreachable("should be already handled");
     return;
 
@@ -1678,16 +1682,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::TypeIdentifierWithoutDot: {
     Lookup.getTypeCompletions(ParsedTypeLoc.getType());
-    break;
-  }
-
-  case CompletionKind::CaseStmtBeginning: {
-    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isImplicitSingleExpressionReturn());
-    Lookup.setIdealExpectedType(CodeCompleteTokenExpr->getType());
-    Lookup.getUnresolvedMemberCompletions(ContextInfo.getPossibleTypes());
-    DoPostfixExprBeginning();
     break;
   }
 

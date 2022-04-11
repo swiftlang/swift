@@ -190,7 +190,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
 
   // Add flags for C++ interop.
   if (inputArgs.hasArg(options::OPT_enable_experimental_cxx_interop)) {
-    arguments.push_back("-enable-cxx-interop");
+    arguments.push_back("-enable-experimental-cxx-interop");
   }
   if (const Arg *arg =
           inputArgs.getLastArg(options::OPT_experimental_cxx_stdlib)) {

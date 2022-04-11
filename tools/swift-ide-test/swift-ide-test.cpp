@@ -762,7 +762,7 @@ static llvm::cl::opt<bool>
                        llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-    EnableCxxInterop("enable-cxx-interop",
+    EnableCxxInterop("enable-experimental-cxx-interop",
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::cat(Category), llvm::cl::init(false));
 

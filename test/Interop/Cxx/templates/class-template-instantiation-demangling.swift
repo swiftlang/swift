@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop | grep 'define.*swiftcc.*$' | grep -o '[[:alnum:]]*__CxxTemplateInst[[:alnum:]]*' | xargs %swift-demangle | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop | grep 'define.*swiftcc.*$' | grep -o '[[:alnum:]]*__CxxTemplateInst[[:alnum:]]*' | xargs %swift-demangle | %FileCheck %s
 
 import Mangling
 

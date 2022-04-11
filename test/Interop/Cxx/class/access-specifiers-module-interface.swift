@@ -1,7 +1,7 @@
 // Test module interface produced for C++ access specifiers test.
 // In particular, we don't want any of the private members showing up here.
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=AccessSpecifiers -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=AccessSpecifiers -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK:      struct PublicPrivate {
 // CHECK-NEXT:   init()

@@ -1383,8 +1383,19 @@ func testVarInitializedByCallingClosure() {
       Bundle_main.vrl(forResource: "turnips", #^VAR_INITIALIZED_BY_CALLING_CLOSURE^#withExtension: "js")
     }()
   }
+}
 
 // VAR_INITIALIZED_BY_CALLING_CLOSURE: Begin completions, 1 items
 // VAR_INITIALIZED_BY_CALLING_CLOSURE-DAG: Pattern/Local/Flair[ArgLabels]:     {#withExtension: String?#}[#String?#];
 // VAR_INITIALIZED_BY_CALLING_CLOSURE: End completions
+
+func testTopLevelFuncWithErrorParam() {
+  enum A { case a }
+  func foo(x: A, b: Undefined) {}
+
+  foo(x: .#^TOP_LEVEL_FUNC_WITH_ERROR_PARAM^#)
+// TOP_LEVEL_FUNC_WITH_ERROR_PARAM: Begin completions, 2 items
+// TOP_LEVEL_FUNC_WITH_ERROR_PARAM-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: a[#A#]; name=a
+// TOP_LEVEL_FUNC_WITH_ERROR_PARAM-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): A#})[#(into: inout Hasher) -> Void#]; name=hash(:)
+// TOP_LEVEL_FUNC_WITH_ERROR_PARAM: End completions
 }

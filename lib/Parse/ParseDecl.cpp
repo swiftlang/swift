@@ -8066,19 +8066,8 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return Status;
 
   SmallVector<PrimaryAssociatedTypeName, 2> PrimaryAssociatedTypeNames;
-
-  if (Context.LangOpts.EnableParameterizedProtocolTypes) {
-    if (startsWithLess(Tok)) {
-      Status |= parsePrimaryAssociatedTypes(PrimaryAssociatedTypeNames);
-    }
-  } else {
-    // Protocols don't support generic parameters, but people often want them and
-    // we want to have good error recovery if they try them out.  Parse them and
-    // produce a specific diagnostic if present.
-    if (startsWithLess(Tok)) {
-      diagnose(Tok, diag::generic_arguments_protocol);
-      maybeParseGenericParams();
-    }
+  if (startsWithLess(Tok)) {
+    Status |= parsePrimaryAssociatedTypes(PrimaryAssociatedTypeNames);
   }
 
   DebuggerContextChange DCC (*this);

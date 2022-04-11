@@ -510,6 +510,53 @@ private:
     }
   }
 
+  Optional<SolutionApplicationTarget>
+  getTargetForPattern(PatternBindingDecl *patternBinding, unsigned index,
+                      Type patternType) {
+    auto hasPropertyWrapper = [&](Pattern *pattern) -> bool {
+      if (auto *singleVar = pattern->getSingleVar())
+        return singleVar->hasAttachedPropertyWrapper();
+      return false;
+    };
+
+    auto *pattern = patternBinding->getPattern(index);
+    auto *init = patternBinding->getInit(index);
+
+    if (!init && patternBinding->isDefaultInitializable(index) &&
+        pattern->hasStorage()) {
+      init = TypeChecker::buildDefaultInitializer(patternType);
+    }
+
+    if (init) {
+      return SolutionApplicationTarget::forInitialization(
+          init, patternBinding->getDeclContext(), patternType, patternBinding,
+          index,
+          /*bindPatternVarsOneWay=*/false);
+    }
+
+    // If there was no initializer, there could be one from a property
+    // wrapper which has to be pre-checked before use. This is not a
+    // problem in top-level code because pattern bindings go through
+    // `typeCheckExpression` which does pre-check automatically and
+    // result builders do not allow declaring local wrapped variables.
+    if (hasPropertyWrapper(pattern)) {
+      auto target = SolutionApplicationTarget::forInitialization(
+          init, patternBinding->getDeclContext(), patternType, patternBinding,
+          index,
+          /*bindPatternVarsOneWay=*/false);
+
+      if (ConstraintSystem::preCheckTarget(
+              target, /*replaceInvalidRefsWithErrors=*/true,
+              /*LeaveCLosureBodyUnchecked=*/false))
+        return None;
+
+      return target;
+    }
+
+    return SolutionApplicationTarget::forUninitializedVar(patternBinding, index,
+                                                          patternType);
+  }
+
   void visitPatternBindingElement(PatternBindingDecl *patternBinding) {
     assert(locator->isLastElement<LocatorPathElt::PatternBindingElement>());
 
@@ -527,28 +574,15 @@ private:
       return;
     }
 
-    auto *pattern = patternBinding->getPattern(index);
-    auto *init = patternBinding->getInit(index);
-
-    if (!init && patternBinding->isDefaultInitializable(index) &&
-        pattern->hasStorage()) {
-      init = TypeChecker::buildDefaultInitializer(patternType);
-    }
-
-    auto target = init ? SolutionApplicationTarget::forInitialization(
-                             init, patternBinding->getDeclContext(),
-                             patternType, patternBinding, index,
-                             /*bindPatternVarsOneWay=*/false)
-                       : SolutionApplicationTarget::forUninitializedVar(
-                             patternBinding, index, patternType);
-
-    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+    auto target = getTargetForPattern(patternBinding, index, patternType);
+    if (!target ||
+        cs.generateConstraints(*target, FreeTypeVariableBinding::Disallow)) {
       hadError = true;
       return;
     }
 
     // Keep track of this binding entry.
-    cs.setSolutionApplicationTarget({patternBinding, index}, target);
+    cs.setSolutionApplicationTarget({patternBinding, index}, *target);
   }
 
   void visitDecl(Decl *decl) {

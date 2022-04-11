@@ -18,6 +18,8 @@
 #define SWIFT_RUNTIME_ATOMIC_H
 
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Heap.h"
+
 #include <assert.h>
 #include <atomic>
 #if defined(_WIN64)
@@ -44,13 +46,72 @@
 namespace swift {
 namespace impl {
 
+// FIXME: why can we not use the definitions from Heap.h?  It seems that we
+// would fail to collapse the structure down in that case and end up with size
+// differences.
+template <std::size_t Alignment_>
+struct requires_aligned_alloc {
+#if defined(__cpp_aligned_new)
+  // If we have C++17 or newer we can use the alignment aware allocation
+  // implicitly.
+  static constexpr const bool value = false;
+#else
+#if defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__)
+  static constexpr const bool value =
+      Alignment_ > std::alignment_of<std::max_align_t>::value &&
+      Alignment_ > __STDCPP_DEFAULT_NEW_ALIGNMENT__;
+#else
+  static constexpr const bool value =
+      Alignment_ > std::alignment_of<std::max_align_t>::value;
+#endif
+#endif
+};
+
+template <std::size_t Alignment_,
+          bool = requires_aligned_alloc<Alignment_>::value>
+struct aligned_alloc;
+
+template <std::size_t Alignment_>
+struct aligned_alloc<Alignment_, false> {};
+
+template <std::size_t Alignment_>
+struct aligned_alloc<Alignment_, true> {
+  [[nodiscard]] void *operator new(std::size_t size) noexcept {
+#if defined(_WIN32)
+    return _aligned_malloc(size, Alignment_);
+#else
+    static_assert(Alignment_ >= sizeof(void *),
+                  "posix_memalign requires minimal alignment of pointer");
+    void *ptr = nullptr;
+    (void)posix_memalign(&ptr, Alignment_, size);
+    return ptr;
+#endif
+  }
+
+  void operator delete(void *ptr) noexcept {
+#if defined(_WIN32)
+    _aligned_free(ptr);
+#else
+    free(ptr);
+#endif
+  }
+
+#if defined(_WIN32)
+  // FIXME: why is this even needed?  This is not permitted as per the C++
+  // standrd new.delete.placement (§17.6.3.4).
+  [[nodiscard]] void *operator new(std::size_t size, void *where) noexcept {
+    return ::operator new(size, where);
+  }
+#endif
+};
+
 /// The default implementation for swift::atomic<T>, which just wraps
 /// std::atomic with minor differences.
 ///
 /// TODO: should we make this use non-atomic operations when the runtime
 /// is single-threaded?
 template <class Value, size_t Size = sizeof(Value)>
-class alignas(Size) atomic_impl {
+class alignas(Size) atomic_impl : public aligned_alloc<Size> {
   std::atomic<Value> value;
 public:
   constexpr atomic_impl(Value value) : value(value) {}

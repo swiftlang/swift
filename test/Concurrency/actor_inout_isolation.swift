@@ -25,11 +25,11 @@ struct Point {
 @available(SwiftStdlib 5.1, *)
 actor TestActor {
   // expected-note@+1{{mutation of this property is only permitted within the actor}}
-  var position = Point(x: 0, y: 0)
-  var nextPosition = Point(x: 0, y: 1)
-  var value1: Int = 0
-  var value2: Int = 1
-  var points: [Point] = []
+  var position = Point(x: 0, y: 0) // expected-note 2{{property declared here}}
+  var nextPosition = Point(x: 0, y: 1) // expected-note 2{{property declared here}}
+  var value1: Int = 0 // expected-note 6{{property declared here}}
+  var value2: Int = 1 // expected-note 4{{property declared here}}
+  var points: [Point] = [] // expected-note {{property declared here}}
 
   subscript(x : inout Int) -> Int { // expected-error {{'inout' must not be used on subscript parameters}}
     x += 1
@@ -162,11 +162,11 @@ extension TestActor {
 
 @available(SwiftStdlib 5.1, *)
 actor MyActor {
-  var points: [Point] = []
-  var int: Int = 0
-  var maybeInt: Int?
-  var maybePoint: Point?
-  var myActor: TestActor = TestActor()
+  var points: [Point] = [] // expected-note 2{{property declared here}}
+  var int: Int = 0 // expected-note 2{{property declared here}}
+  var maybeInt: Int? // expected-note 1{{property declared here}}
+  var maybePoint: Point? // expected-note 1{{property declared here}}
+  var myActor: TestActor = TestActor() // expected-note 1{{property declared here}}
 
   // Checking that various ways of unwrapping emit the right error messages at
   // the right times and that illegal operations are caught
@@ -206,7 +206,7 @@ struct MyGlobalActor {
 // expected-note@-3{{mutation of this var is only permitted within the actor}}
 
 // expected-error@+3{{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
-// expected-error@+2{{var 'number' isolated to global actor 'MyGlobalActor' can not be used 'inout' from a non-isolated context}}
+// expected-error@+2{{global actor 'MyGlobalActor'-isolated var 'number' can not be used 'inout' from a non-isolated context}}
 if #available(SwiftStdlib 5.1, *) {
 let _ = Task.detached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
 }

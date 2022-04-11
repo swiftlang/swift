@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -emit-ir -target %target-cpu-apple-macos12.3 %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-with-workaround %s
 
 // REQUIRES: OS=macosx
+// UNSUPPORTED: CPU=arm64e
  
 // rdar://90506708: Prior to Swift 5.7, the Swift concurrency runtime had a bug
 // that led to memory corruption in cases when an `async let` child task

@@ -88,8 +88,18 @@ protocol P14 {
 
 // Never inheritable: parameter is a function accepting a function
 // returning 'Self'.
+// Not Inheritable: method returning tuple containing 'Self'.
+// Not Inheritable: method returning array of 'Self'.
+// Not Inheritable: requirement with reference to covariant 'Self', if this
+// reference is not the uncurried type, stripped of any optionality.
 protocol P15 {
   func f15(_ s: (() -> Self) -> ())
+  func f16() -> (Self, Self)
+  func f17() -> Array<Self>
+  func f18() -> (Never, Array<Self>)
+}
+extension P15 {
+  func f18() -> (Never, Array<Self>) {} // expected-note {{'f18()' declared here}}
 }
 
 // Class A conforms to everything that can be conformed to by a
@@ -265,7 +275,9 @@ class A14 : P14 {
   func f14(_ s: ((A14) -> ()) -> ()) {}
 }
 
-class A15 : P15 {
+class A15 : P15 { // expected-error{{protocol 'P15' requirement 'f18()' cannot be satisfied by a non-final class ('A15') because it uses 'Self' in a non-parameter, non-result type position}}
   func f15(_ s: (() -> A15) -> ()) {} // expected-error{{protocol 'P15' requirement 'f15' cannot be satisfied by a non-final class ('A15') because it uses 'Self' in a non-parameter, non-result type position}}
+  func f16() -> (A15, A15) {} // expected-error{{protocol 'P15' requirement 'f16()' cannot be satisfied by a non-final class ('A15') because it uses 'Self' in a non-parameter, non-result type position}}
+  func f17() -> Array<A15> {} // expected-error{{protocol 'P15' requirement 'f17()' cannot be satisfied by a non-final class ('A15') because it uses 'Self' in a non-parameter, non-result type position}}
 }
 

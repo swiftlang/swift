@@ -1,0 +1,23 @@
+//===--- libstdcxx.modulemap ----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  In order to use a C++ stdlib from Swift, the stdlib needs to have a Clang
+//  module map. Currently libstdc++ does not have a module map. To work around
+//  this, Swift provides its own module map for libstdc++.
+//
+//===----------------------------------------------------------------------===//
+
+module std {
+  header "libstdcxx.h"
+  requires cplusplus
+  export *
+}
