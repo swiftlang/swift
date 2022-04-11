@@ -220,8 +220,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (!checkConformance(proto))
       return false;
 
-    // Now check any additional bounds on 'Self' from the where clause.
-    auto bounds = getSelfBoundsFromWhereClause(extension);
+    // Now check any additional bounds on 'Self' from the generic signature.
+    auto bounds = getSelfBoundsFromGenericSignature(extension);
     for (auto *decl : bounds.decls) {
       if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
         if (!checkConformance(proto))
