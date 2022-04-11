@@ -3,6 +3,7 @@ include(SwiftList)
 include(SwiftXcodeSupport)
 include(SwiftWindowsSupport)
 include(SwiftAndroidSupport)
+include(SwiftCXXUtils)
 
 function(_swift_gyb_target_sources target scope)
   file(GLOB GYB_UNICODE_DATA ${SWIFT_SOURCE_DIR}/utils/UnicodeData/*)
