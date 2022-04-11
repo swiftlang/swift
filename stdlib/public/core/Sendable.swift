@@ -60,6 +60,13 @@
 ///
 /// Otherwise, you need to declare conformance to `Sendable` explicitly.
 ///
+/// Structures that have nonsendable stored properties
+/// and enumerations that nonsendable associated values
+/// can be marked as `@unchecked Sendable`,
+/// disabling compile-time correctness checks,
+/// after you manually verify that
+/// they satisfy the `Sendable` protocol's semantic requirements.
+///
 /// ### Sendable Actors
 ///
 /// All actor types implicitly conform to `Sendable`
