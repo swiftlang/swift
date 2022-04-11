@@ -439,7 +439,7 @@ bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
   auto &C = func->getASTContext();
   return evaluateOrDefault(C.evaluator,
                            CheckDistributedFunctionRequest{func},
-                           true);
+                           false); // no error if cycle
 }
 
 bool CheckDistributedFunctionRequest::evaluate(
