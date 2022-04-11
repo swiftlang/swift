@@ -143,9 +143,19 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     // or pass the correct one down in here.
     auto *module = proto->getParentModule();
 
+    // For conformance to 'Sendable', allow synthesis of a missing conformance
+    // if the requirement is a concrete type requirement, that is, if we're
+    // looking at a signature of the form 'T == Foo, T : Sendable'.
+    //
+    // Otherwise, we have a superclass requirement, like 'T : C, T : Sendable'.
+    // Don't synthesize the conformance in this case since dropping
+    // 'T : Sendable' would be incorrect; we want to ensure that we only admit
+    // subclasses of 'C' which are 'Sendable'.
+    bool allowMissing = (requirementKind == RequirementKind::SameType);
+
     auto conformance = module->lookupConformance(concreteType,
                                                  const_cast<ProtocolDecl *>(proto),
-                                                 /*allowMissing=*/true);
+                                                 allowMissing);
     if (conformance.isInvalid()) {
       // For superclass rules, it is totally fine to have a signature like:
       //
