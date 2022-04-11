@@ -172,6 +172,13 @@ class BuilderClosureVisitor
     if (!cs)
       return nullptr;
 
+
+    if (cs->isForCodeCompletion() && !cs->containsCodeCompletionLoc(expr)) {
+      auto var = buildVar(expr->getStartLoc());
+      cs->setType(var, PlaceholderType::get(ctx, var));
+      return var;
+    }
+
     Expr *origExpr = expr;
 
     if (oneWay) {
@@ -511,6 +518,12 @@ protected:
                                  bool isTopLevel = false) {
     assert(payloadIndex < numPayloads);
 
+    if (cs && cs->isForCodeCompletion() && !cs->containsCodeCompletionLoc(ifStmt)) {
+      auto var = buildVar(ifStmt->getStartLoc());
+      cs->setType(var, PlaceholderType::get(ctx, var));
+      return var;
+    }
+
     // First generate constraints for the conditions. This can introduce
     // variable bindings that will be used within the "then" branch.
     if (cs && cs->generateConstraints(ifStmt->getCond(), dc)) {
@@ -714,6 +727,12 @@ protected:
   }
 
   VarDecl *visitSwitchStmt(SwitchStmt *switchStmt) {
+    if (cs && cs->isForCodeCompletion() && !cs->containsCodeCompletionLoc(switchStmt)) {
+      auto var = buildVar(switchStmt->getStartLoc());
+      cs->setType(var, PlaceholderType::get(ctx, var));
+      return var;
+    }
+
     // Generate constraints for the subject expression, and capture its
     // type for use in matching the various patterns.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
@@ -861,6 +880,14 @@ protected:
       return nullptr;
     }
 
+    SourceLoc loc = forEachStmt->getForLoc();
+
+    if (cs && cs->isForCodeCompletion() && !cs->containsCodeCompletionLoc(forEachStmt)) {
+      auto var = buildVar(loc);
+      cs->setType(var, PlaceholderType::get(ctx, var));
+      return var;
+    }
+
     // Generate constraints for the loop header. This also wires up the
     // types for the patterns.
     auto target = SolutionApplicationTarget::forForEachStmt(
@@ -886,7 +913,6 @@ protected:
     // Form a variable of array type that will capture the result of each
     // iteration of the loop. We need a fresh type variable to remove the
     // lvalue-ness of the array variable.
-    SourceLoc loc = forEachStmt->getForLoc();
     VarDecl *arrayVar = buildVar(loc);
     Type arrayElementType = cs->createTypeVariable(
         cs->getConstraintLocator(forEachStmt), 0);
