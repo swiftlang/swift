@@ -865,7 +865,7 @@ public:
       (Data & ~SpecialKindMask) | (int_type(kind) << SpecialKindShift));
   }
   constexpr ExtendedExistentialTypeShapeFlags
-  withHasTypeExpresssion(bool hasTypeExpression) const {
+  withHasTypeExpression(bool hasTypeExpression) const {
     return ExtendedExistentialTypeShapeFlags(
       hasTypeExpression ? (Data | HasTypeExpression)
                         : (Data & ~HasTypeExpression));

@@ -189,6 +189,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// The swift async context entry in the extended frame info.
   PointerAuthSchema AsyncContextExtendedFrameEntry;
+
+  /// Extended existential type shapes in flight.
+  PointerAuthSchema ExtendedExistentialTypeShape;
+
+  /// Non-unique extended existential type shapes in flight.
+  PointerAuthSchema NonUniqueExtendedExistentialTypeShape;
 };
 
 enum class JITDebugArtifact : unsigned {
