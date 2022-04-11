@@ -19,8 +19,11 @@
 /// All of the following can be marked as sendable:
 ///
 /// - Value types
+///
 /// - Reference types with no mutable storage
+///
 /// - Reference types that internally manage access to their state
+///
 /// - Functions and closures (via `@Sendable`)
 ///
 /// Although this protocol doesn't have any required methods or properties,
@@ -50,10 +53,10 @@
 /// In some cases, structures and enumerations
 /// that satisfy the requirements implicitly conform to `Sendable`:
 ///
-/// -   Frozen structures and enumerations
+/// - Frozen structures and enumerations
 ///
-/// -   Structures and enumerations
-///     that aren't public and aren't marked `@usableFromInline`.
+/// - Structures and enumerations
+///   that aren't public and aren't marked `@usableFromInline`.
 ///
 /// Otherwise, you need to declare conformance to `Sendable` explicitly.
 ///
