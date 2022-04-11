@@ -354,7 +354,9 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Promote box allocations to stack allocations.
   P.addAllocBoxToStack();
 
-  P.addSSADestroyHoisting();
+  if (P.getOptions().DestroyHoisting == DestroyHoistingOption::On) {
+    P.addSSADestroyHoisting();
+  }
 
   // Propagate copies through stack locations.  Should run after
   // box-to-stack promotion since it is limited to propagating through

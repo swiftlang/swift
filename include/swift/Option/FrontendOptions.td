@@ -248,6 +248,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
   def enable_lexical_lifetimes_noArg :
     Flag<["-"], "enable-lexical-lifetimes">,
     HelpText<"Enable lexical lifetimes">;
+  def enable_destroy_hoisting :
+    Joined<["-"], "enable-destroy-hoisting=">,
+    HelpText<"Whether to enable destroy hoisting">,
+    MetaVarName<"true|false">;
 }
 
 // Flags that are saved into module interfaces

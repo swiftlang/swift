@@ -58,6 +58,14 @@ enum class CopyPropagationOption : uint8_t {
   On
 };
 
+enum class DestroyHoistingOption : uint8_t {
+  // Do not run SSADestroyHoisting.
+  Off = 0,
+
+  // Run SSADestroyHoisting pass after AllocBoxToStack in the function passes.
+  On = 1
+};
+
 class SILModule;
 
 class SILOptions {
@@ -83,6 +91,11 @@ public:
   ///
   /// When this is 'On' the pipeline has default behavior.
   CopyPropagationOption CopyPropagation = CopyPropagationOption::On;
+
+  /// Whether to run the SSADestroyHoisting pass.
+  ///
+  /// When this 'On' the pipeline has the default behavior.
+  DestroyHoistingOption DestroyHoisting = DestroyHoistingOption::On;
 
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
