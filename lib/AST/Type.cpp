@@ -6131,7 +6131,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
     return tangentSpace;
   };
 
-  // For tuple types: the tangent space is a tuple of the elements'  tangent
+  // For tuple types: the tangent space is a tuple of the elements' tangent
   // space types, for the elements that have a tangent space.
   if (auto *tupleTy = getAs<TupleType>()) {
     SmallVector<TupleTypeElt, 8> newElts;
