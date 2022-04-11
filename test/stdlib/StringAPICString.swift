@@ -226,6 +226,7 @@ CStringTests.test("Substring.withCString") {
 }
 
 CStringTests.test("String.cString.with.Array.UInt8.input") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
@@ -248,6 +249,7 @@ CStringTests.test("String.cString.with.Array.UInt8.input") {
 }
 
 CStringTests.test("String.cString.with.Array.CChar.input") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
@@ -271,6 +273,7 @@ CStringTests.test("String.cString.with.Array.CChar.input") {
 }
 
 CStringTests.test("String.cString.with.String.input") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   let (u8p, dealloc) = getASCIIUTF8()
   defer { dealloc() }
   var str = String(cString: "ab")
@@ -284,6 +287,7 @@ CStringTests.test("String.cString.with.String.input") {
 }
 
 CStringTests.test("String.cString.with.inout.UInt8.conversion") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   var c = UInt8.zero
   var str = String(cString: &c)
   expectTrue(str.isEmpty)
@@ -297,6 +301,7 @@ CStringTests.test("String.cString.with.inout.UInt8.conversion") {
 }
 
 CStringTests.test("String.cString.with.inout.CChar.conversion") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   var c = CChar.zero
   var str = String(cString: &c)
   expectTrue(str.isEmpty)
@@ -310,6 +315,7 @@ CStringTests.test("String.cString.with.inout.CChar.conversion") {
 }
 
 CStringTests.test("String.validatingUTF8.with.Array.input") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
@@ -334,6 +340,7 @@ CStringTests.test("String.validatingUTF8.with.Array.input") {
 }
 
 CStringTests.test("String.validatingUTF8.with.String.input") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   let (u8p, dealloc) = getASCIIUTF8()
   defer { dealloc() }
   var str = String(validatingUTF8: "ab")
@@ -349,6 +356,7 @@ CStringTests.test("String.validatingUTF8.with.String.input") {
 }
 
 CStringTests.test("String.validatingUTF8.with.inout.conversion") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   var c = CChar.zero
   var str = String(validatingUTF8: &c)
   expectNotNil(str)
@@ -363,6 +371,7 @@ CStringTests.test("String.validatingUTF8.with.inout.conversion") {
 }
 
 CStringTests.test("String.decodeCString.with.Array.input") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
@@ -388,6 +397,7 @@ CStringTests.test("String.decodeCString.with.Array.input") {
 }
 
 CStringTests.test("String.decodeCString.with.String.input") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   let (u8p, dealloc) = getASCIIUTF8()
   defer { dealloc() }
   var result = String.decodeCString(
@@ -407,6 +417,7 @@ CStringTests.test("String.decodeCString.with.String.input") {
 }
 
 CStringTests.test("String.decodeCString.with.inout.conversion") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   var c = Unicode.UTF8.CodeUnit.zero
   var result = String.decodeCString(
     &c, as: Unicode.UTF8.self, repairingInvalidCodeUnits: true
@@ -424,6 +435,7 @@ CStringTests.test("String.decodeCString.with.inout.conversion") {
 }
 
 CStringTests.test("String.init.decodingCString.with.Array.input") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
@@ -447,6 +459,7 @@ CStringTests.test("String.init.decodingCString.with.Array.input") {
 }
 
 CStringTests.test("String.init.decodingCString.with.String.input") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   let (u8p, dealloc) = getASCIIUTF8()
   defer { dealloc() }
   var str = String(decodingCString: "ab", as: Unicode.UTF8.self)
@@ -460,6 +473,7 @@ CStringTests.test("String.init.decodingCString.with.String.input") {
 }
 
 CStringTests.test("String.init.decodingCString.with.inout.conversion") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   var c = Unicode.UTF8.CodeUnit.zero
   var str = String(decodingCString: &c, as: Unicode.UTF8.self)
   expectEqual(str.isEmpty, true)
