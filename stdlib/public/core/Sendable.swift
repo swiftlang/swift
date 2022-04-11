@@ -118,6 +118,10 @@
 /// To satisfy the requirements of the `Sendable` protocol,
 /// all of the elements of the tuple must be sendable.
 /// Tuples that satisfy the requirements implicitly conform to `Sendable`.
+///
+/// ### Sendable Metatypes
+///
+/// Metatypes such as `Int.Type` implicitly conform to the `Sendable` protocol.
 @_marker public protocol Sendable { }
 ///
 /// A type whose values can safely be passed across concurrency domains by copying,
