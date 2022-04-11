@@ -235,8 +235,11 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
     return [ 1: "One", 2: "Two" ]
   }
   ```
+
 Swift 5.6
 ---------
+
+### 2022-03-14 (Xcode 13.3)
 
 * [SE-0327][]:
 
@@ -465,8 +468,6 @@ Swift 5.6
       // iOS 15 functionality 
   }
   ```
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.5
 ---------
@@ -886,8 +887,6 @@ Swift 5.5
   Asynchronous for loops use asynchronous sequences, defined by the protocol
   `AsyncSequence` and its corresponding `AsyncIterator`.
 
-**Add new entries to the top of this section, not here!**
-
 Swift 5.4
 ---------
 
@@ -1053,8 +1052,6 @@ Swift 5.4
 
   let _: Foo? = .bar.anotherFoo.getFoo().optionalFoo?.optionalFoo![]
   ```
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.3
 ---------
