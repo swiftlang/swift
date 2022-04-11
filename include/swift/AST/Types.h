@@ -5337,6 +5337,28 @@ BEGIN_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
   }
 END_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
 
+/// The generalized shape of an existential type.
+struct ExistentialTypeGeneralization {
+  /// The generalized existential type.  May refer to type parameters
+  /// from the generalization signature.
+  Type Shape;
+
+  /// The generalization signature and substitutions.
+  SubstitutionMap Generalization;
+
+  /// Retrieve the generalization for the given existential type.
+  ///
+  /// Substituting the generalization substitutions into the shape
+  /// should produce the original existential type.
+  ///
+  /// If there is a generic type substitution which can turn existential
+  /// type A into existential type B, then:
+  /// - the generalized shape types of A and B must be equal and
+  /// - the generic signatures of the generalization substitutions of
+  ///   A and B must be equal.
+  static ExistentialTypeGeneralization get(Type existentialType);
+};
+
 /// An existential type, spelled with \c any .
 ///
 /// In Swift 5 mode, a plain protocol name in type
