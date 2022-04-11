@@ -30,7 +30,10 @@ using namespace swift;
 namespace {
 
 struct AccessibleFunctionsSection {
-  const AccessibleFunctionRecord *Begin, *End;
+  const AccessibleFunctionRecord *__ptrauth_swift_accessible_function_record
+      Begin;
+  const AccessibleFunctionRecord *__ptrauth_swift_accessible_function_record
+      End;
 
   AccessibleFunctionsSection(const AccessibleFunctionRecord *begin,
                              const AccessibleFunctionRecord *end)
@@ -51,7 +54,7 @@ private:
   const char *Name;
   size_t NameLength;
 
-  const AccessibleFunctionRecord *R;
+  const AccessibleFunctionRecord *__ptrauth_swift_accessible_function_record R;
 
 public:
   AccessibleFunctionCacheEntry(llvm::StringRef name,
