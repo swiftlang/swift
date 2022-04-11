@@ -22,6 +22,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/PrimitiveParsing.h"
+#include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
@@ -977,7 +978,7 @@ void ClangCommentPrinter::printDeclPost(const Decl *D,
     return;
 
   for (auto CommentText : PendingComments) {
-    *this << " " << ASTPrinter::sanitizeUtf8(CommentText);
+    *this << " " << unicode::sanitizeUTF8(CommentText);
   }
   PendingComments.clear();
   if (auto ClangN = swift::ide::getEffectiveClangNode(D))
@@ -1068,7 +1069,7 @@ void ClangCommentPrinter::printComment(StringRef RawText, unsigned StartCol) {
   trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
 
   for (auto Line : Lines) {
-    *this << ASTPrinter::sanitizeUtf8(Line) << "\n";
+    *this << unicode::sanitizeUTF8(Line) << "\n";
     printIndent();
   }
 }
