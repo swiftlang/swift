@@ -1320,10 +1320,14 @@ Type TypeBase::getMetatypeInstanceType() {
   return this;
 }
 
+using ParameterizedProtocolMap =
+  llvm::DenseMap<ProtocolDecl *, ParameterizedProtocolType *>;
+
 /// Collect the protocols in the existential type T into the given
 /// vector.
 static void addProtocols(Type T,
                          SmallVectorImpl<ProtocolDecl *> &Protocols,
+                         ParameterizedProtocolMap &Parameterized,
                          Type &Superclass,
                          bool &HasExplicitAnyObject) {
   if (auto Proto = T->getAs<ProtocolType>()) {
@@ -1335,7 +1339,14 @@ static void addProtocols(Type T,
     if (PC->hasExplicitAnyObject())
       HasExplicitAnyObject = true;
     for (auto P : PC->getMembers())
-      addProtocols(P, Protocols, Superclass, HasExplicitAnyObject);
+      addProtocols(P, Protocols, Parameterized, Superclass,
+                   HasExplicitAnyObject);
+    return;
+  }
+
+  if (auto PP = T->getAs<ParameterizedProtocolType>()) {
+    Parameterized.insert({PP->getProtocol(), PP});
+    Protocols.push_back(PP->getProtocol());
     return;
   }
 
@@ -1377,8 +1388,8 @@ bool ProtocolType::visitAllProtocols(
   return false;
 }
 
-void ProtocolType::canonicalizeProtocols(
-       SmallVectorImpl<ProtocolDecl *> &protocols) {
+static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols,
+                                  ParameterizedProtocolMap *parameterized) {
   llvm::SmallDenseMap<ProtocolDecl *, unsigned> known;
   bool zappedAny = false;
 
@@ -1410,6 +1421,10 @@ void ProtocolType::canonicalizeProtocols(
 
       auto found = known.find(inherited);
       if (found != known.end()) {
+        // Don't zap protocols associated with parameterized types.
+        if (parameterized && parameterized->count(inherited))
+          return TypeWalker::Action::Continue;
+
         protocols[found->second] = nullptr;
         zappedAny = true;
       }
@@ -1426,6 +1441,11 @@ void ProtocolType::canonicalizeProtocols(
   // Sort the set of protocols by module + name, to give a stable
   // ordering.
   llvm::array_pod_sort(protocols.begin(), protocols.end(), TypeDecl::compare);
+}
+
+void ProtocolType::canonicalizeProtocols(
+       SmallVectorImpl<ProtocolDecl *> &protocols) {
+  return ::canonicalizeProtocols(protocols, nullptr);
 }
 
 static void
@@ -4006,25 +4026,39 @@ Type ProtocolCompositionType::get(const ASTContext &C,
     
   Type Superclass;
   SmallVector<ProtocolDecl *, 4> Protocols;
+  ParameterizedProtocolMap Parameterized;
   for (Type t : Members) {
-    addProtocols(t, Protocols, Superclass, HasExplicitAnyObject);
+    addProtocols(t, Protocols, Parameterized, Superclass, HasExplicitAnyObject);
   }
-  
-  // Minimize the set of protocols composed together.
-  ProtocolType::canonicalizeProtocols(Protocols);
 
   // The presence of a superclass constraint makes AnyObject redundant.
   if (Superclass)
     HasExplicitAnyObject = false;
 
-  // Form the set of canonical protocol types from the protocol
-  // declarations, and use that to build the canonical composition type.
+  // If there are any parameterized protocols, the canonicalization
+  // algorithm gets more complex.
+
+  // Form the set of canonical component types.
   SmallVector<Type, 4> CanTypes;
   if (Superclass)
     CanTypes.push_back(Superclass->getCanonicalType());
-  llvm::transform(
-      Protocols, std::back_inserter(CanTypes),
-      [](ProtocolDecl *Proto) { return Proto->getDeclaredInterfaceType(); });
+
+  canonicalizeProtocols(Protocols, &Parameterized);
+
+  for (auto proto: Protocols) {
+    // If we have a parameterized type for this protocol, use the
+    // canonical type of that.  Sema should prevent us from building
+    // compositions with the same protocol and conflicting constraints.
+    if (!Parameterized.empty()) {
+      auto it = Parameterized.find(proto);
+      if (it != Parameterized.end()) {
+        CanTypes.push_back(it->second->getCanonicalType());
+        continue;
+      }
+    }
+
+    CanTypes.push_back(proto->getDeclaredInterfaceType());
+  }
 
   // If one member remains and no layout constraint, return that type.
   if (CanTypes.size() == 1 && !HasExplicitAnyObject)
