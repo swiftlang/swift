@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 683; // Remove associatedtype primary bit
+const uint16_t SWIFTMODULE_VERSION_MINOR = 684; // Cond. available underlying types for opaque
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1413,7 +1413,13 @@ namespace decls_block {
     // - the foreign error convention, if any
     // - inlinable body text, if any
   >;
-  
+
+  using ConditionalSubstitutionLayout = BCRecordLayout<
+    CONDITIONAL_SUBSTITUTION,
+    SubstitutionMapIDField,
+    BCArray<IdentifierIDField> // N conditions where each is <major>.<minor>.<patch>
+  >;
+
   using OpaqueTypeLayout = BCRecordLayout<
     OPAQUE_TYPE_DECL,
     DeclContextIDField, // decl context
@@ -1424,6 +1430,7 @@ namespace decls_block {
     SubstitutionMapIDField, // optional substitution map for underlying type
     AccessLevelField // access level
     // trailed by generic parameters
+    // trailed by conditional substitutions
   >;
 
   // TODO: remove the unnecessary FuncDecl components here

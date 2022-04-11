@@ -448,8 +448,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalNamedOpaqueTypes |=
       Args.hasArg(OPT_enable_experimental_named_opaque_types);
 
-  Opts.EnableParameterizedProtocolTypes |=
-      Args.hasArg(OPT_enable_parameterized_protocol_types);
+  Opts.EnableParameterizedExistentialTypes |=
+      Args.hasArg(OPT_enable_parameterized_existential_types);
 
   Opts.EnableOpenedExistentialTypes =
     Args.hasFlag(OPT_enable_experimental_opened_existential_types,
@@ -757,7 +757,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
 
-  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_cxx_interop);
+  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop) |
+                           Args.hasArg(OPT_enable_cxx_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());
@@ -795,10 +796,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // First, set up default minimum inlining target versions.
   auto getDefaultMinimumInliningTargetVersion =
       [&](const llvm::Triple &triple) -> llvm::VersionTuple {
+    // FIXME: Re-enable with rdar://91387029
+#if SWIFT_DEFAULT_API_TARGET_MIN_INLINING_VERSION_TO_MIN
     // In API modules, default to the version when Swift first became available.
     if (Opts.LibraryLevel == LibraryLevel::API)
       if (auto minTriple = minimumAvailableOSVersionForTriple(triple))
         return *minTriple;
+#endif
 
     // In other modules, assume that availability is used less consistently
     // and that library clients will generally raise deployment targets as the
@@ -1103,9 +1107,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   Opts.EnableMultiStatementClosureInference |=
       Args.hasArg(OPT_experimental_multi_statement_closures);
-
-  Opts.EnableTypeInferenceFromDefaultArguments |=
-      Args.hasArg(OPT_experimental_type_inference_from_defaults);
 
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);

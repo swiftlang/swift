@@ -31,6 +31,11 @@ public:
     /// functions is supported.
     bool IsInAsyncContext;
 
+    /// If unresolved member lookup is enabled in the completion callback,
+    /// the type that the unresolved member lookup should be performed on,
+    /// otherwise a null type.
+    Type UnresolvedMemberBaseType;
+
     /// Types of variables that were determined in the solution that produced
     /// this result. This in particular includes parameters of closures that
     /// were type-checked with the code completion expression.
@@ -54,6 +59,11 @@ private:
   /// in almost all cases and acceptable results in the other cases.
   SmallVector<Type, 4> ExpectedTypes;
 
+  /// When \c true, unresolved member completions of the expected types are
+  /// also reported when delivering results. Used in places that frequently
+  /// use unresolved members such as enum cases.
+  bool AddUnresolvedMemberCompletions;
+
   SmallVector<Result, 4> Results;
 
   /// Adds the given type to \c ExpectedTypes unless \c ExpectedTypes already
@@ -62,8 +72,11 @@ private:
 
   /// Adds the result with the given parameters to \c Results unless \c Results
   /// already contains an entry with exactly the same values.
+  /// If \c AddUnresolvedMemberCompletions is false, the
+  /// \p UnresolvedMemberBaseType is ignored.
   void addResult(
       bool IsImplicitSingleExpressionReturn, bool IsInAsyncContext,
+      Type UnresolvedMemberBaseType,
       llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes);
 
   void sawSolutionImpl(const constraints::Solution &solution) override;
@@ -71,8 +84,10 @@ private:
 public:
   /// \param DC The decl context in which the \p CompletionExpr occurs.
   ExprTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
-                                  DeclContext *DC)
-      : CompletionExpr(CompletionExpr), DC(DC) {}
+                                  DeclContext *DC,
+                                  bool AddUnresolvedMemberCompletions)
+      : CompletionExpr(CompletionExpr), DC(DC),
+        AddUnresolvedMemberCompletions(AddUnresolvedMemberCompletions) {}
 
   /// \param CCLoc The location of the code completion token.
   void deliverResults(SourceLoc CCLoc,

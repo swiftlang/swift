@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberTemplates -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberTemplates -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: struct HasMemberTemplates {
 // CHECK:   mutating func addSameTypeParams<T>(_ a: T, _ b: T) -> T

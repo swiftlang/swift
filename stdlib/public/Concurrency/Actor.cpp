@@ -150,7 +150,7 @@ public:
 
   /// Unconditionally initialize a fresh tracking state on the
   /// current state, shadowing any previous tracking state.
-  /// leave() must be called beforet the object goes out of scope.
+  /// leave() must be called before the object goes out of scope.
   void enterAndShadow(ExecutorRef currentExecutor) {
     ActiveExecutor = currentExecutor;
     SavedInfo = ActiveInfoInThread.get();
@@ -616,7 +616,8 @@ public:
 ///     achieved through careful arrangement of the storage for this in the
 ///     DefaultActorImpl. The additional alignment requirements are
 ///     enforced by static asserts below.
-class alignas(sizeof(void *) * 2) ActiveActorStatus {
+class alignas(2 * sizeof(void *)) ActiveActorStatus
+    : public swift::aligned_alloc<2 * sizeof(void *)> {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;
   dispatch_lock_t DrainLock;
@@ -1207,8 +1208,8 @@ void DefaultActorImpl::deallocateUnconditional() {
   if (JobStorageHeapObject.metadata != nullptr)
     JobStorage.~ProcessInlineJob();
   auto metadata = cast<ClassMetadata>(this->metadata);
-  swift_deallocObject(this, metadata->getInstanceSize(),
-                      metadata->getInstanceAlignMask());
+  swift_deallocClassInstance(this, metadata->getInstanceSize(),
+                             metadata->getInstanceAlignMask());
 }
 
 void DefaultActorImpl::scheduleActorProcessJob(JobPriority priority, bool useInlineJob) {

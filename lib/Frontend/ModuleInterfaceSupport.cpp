@@ -650,17 +650,8 @@ public:
         printer << " {}";
       };
 
-      bool printedNewline = false;
-      if (printOptions.PrintCompatibilityFeatureChecks) {
-        printedNewline =
-          printWithCompatibilityFeatureChecks(printer, curPrintOptions,
-                                              proto, printBody);
-      } else {
-        printBody();
-        printedNewline = false;
-      }
-      if (!printedNewline)
-        printer << "\n";
+      printBody();
+      printer << "\n";
     }
   }
 

@@ -16,8 +16,9 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -target-min-inlining-version min
 
 
+// FIXME: Re-enable with rdar://91387029
 // Check that `-library-level api` implies `-target-min-inlining-version min`
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -library-level api
+// RUN/: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -library-level api
 
 
 // Check that these rules are only applied when requested and that at least some

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -I %S/Inputs -enable-cxx-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
 
 // This test checks that we classify C++ types as loadable and address-only
 // correctly.

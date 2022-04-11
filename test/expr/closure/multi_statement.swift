@@ -292,3 +292,27 @@ func test_pattern_matches_only_cases() {
     }
   }
 }
+
+// rdar://91225620 - type of expression is ambiguous without more context in closure
+func test_wrapped_var_without_initializer() {
+  @propertyWrapper
+  struct Wrapper {
+    private let name: String
+
+    var wrappedValue: Bool {
+      didSet {}
+    }
+
+    init(name: String) {
+      self.wrappedValue = false
+      self.name = name
+    }
+  }
+
+  func fn(_: () -> Void) {}
+
+  fn {
+    @Wrapper(name: "foo")
+    var v;
+  }
+}

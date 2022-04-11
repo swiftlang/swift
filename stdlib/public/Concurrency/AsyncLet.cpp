@@ -21,6 +21,7 @@
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskOptions.h"
 #include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
@@ -33,7 +34,9 @@
 using namespace swift;
 
 namespace {
-class alignas(Alignment_AsyncLet) AsyncLetImpl: public ChildTaskStatusRecord {
+class alignas(Alignment_AsyncLet) AsyncLetImpl
+    : public swift::aligned_alloc<Alignment_AsyncLet>,
+      public ChildTaskStatusRecord {
 public:
   // This is where we could define a Status or other types important for async-let
 

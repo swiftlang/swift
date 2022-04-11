@@ -223,7 +223,8 @@ Optional<Type> ConcreteContraction::substTypeParameter(
 
     auto conformance = ((*substBaseType)->isTypeParameter()
                         ? ProtocolConformanceRef(proto)
-                        : module->lookupConformance(*substBaseType, proto));
+                        : module->lookupConformance(*substBaseType, proto,
+                                                    /*allowMissing=*/true));
 
     // The base type doesn't conform, in which case the requirement remains
     // unsubstituted.
@@ -363,7 +364,8 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
     auto *proto = req.getProtocolDecl();
     auto *module = proto->getParentModule();
     if (!substFirstType->isTypeParameter() &&
-        !module->lookupConformance(substFirstType, proto)) {
+        !module->lookupConformance(substFirstType, proto,
+                                   /*allowMissing=*/true)) {
       // Handle the case of <T where T : P, T : C> where C is a class and
       // C does not conform to P by leaving the conformance requirement
       // unsubstituted.

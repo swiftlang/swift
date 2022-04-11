@@ -2155,6 +2155,13 @@ ERROR(witness_not_accessible_proto,none,
       "requirement in %select{private|fileprivate|internal|public|%error}4 protocol "
       "%5",
       (RequirementKind, DeclName, bool, AccessLevel, AccessLevel, Identifier))
+ERROR(witness_not_as_sendable,none,
+      "sendability of function types in %0 %1 does not match requirement in "
+      "protocol %2",
+      (DescriptiveDeclKind, DeclName, Identifier))
+NOTE(less_sendable_reqt_here,none,
+     "expected sendability to match requirement here",
+     ())
 ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
@@ -2303,6 +2310,9 @@ NOTE(ambiguous_witnesses_type,none,
      "multiple matching types named %0", (Identifier))
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
+NOTE(protocol_witness_non_sendable,none,
+     "candidate matches except for closure sendability%0%select{; this will be "
+     "an error in Swift 6|}1", (StringRef, bool))
 NOTE(protocol_witness_renamed,none,
      "rename to %0 to satisfy this requirement%1", (DeclName, StringRef))
 NOTE(protocol_witness_kind_conflict,none,
@@ -2602,6 +2612,9 @@ WARNING(generic_param_usable_from_inline_warn,none,
 ERROR(override_multiple_decls_base,none,
       "declaration %0 cannot override more than one superclass declaration",
       (DeclName))
+ERROR(override_sendability_mismatch,none,
+      "declaration %0 has a type with different sendability from any potential "
+      "overrides", (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument labels from any potential "
       "overrides", (DeclName))
@@ -4457,14 +4470,11 @@ NOTE(note_add_nonisolated_to_decl,none,
      (DeclName, DescriptiveDeclKind))
 NOTE(note_add_async_and_throws_to_decl,none,
      "mark the protocol requirement %0 '%select{|async|throws|async throws}1' "
-     "in order witness it with 'distributed' function declared in distributed actor %2",
-     (DeclName, unsigned, DeclName))
+     "to allow actor-isolated conformances",
+     (DeclName, unsigned))
 NOTE(note_add_distributed_to_decl,none,
-     "add 'distributed' to %0 to make this %1 witness the protocol requirement",
+     "add 'distributed' to %0 to make this %1 satisfy the protocol requirement",
      (DeclName, DescriptiveDeclKind))
-NOTE(note_distributed_requirement_defined_here,none,
-     "distributed instance method requirement %0 declared here",
-     (DeclName))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
      (StringRef, DescriptiveDeclKind, DeclName, Type))
@@ -4541,13 +4551,16 @@ ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
       "explicitly defined", ())
 ERROR(actor_isolated_non_self_reference,none,
-        "actor-isolated %0 %1 can not be "
+        "%5 %0 %1 can not be "
         "%select{referenced|mutated|used 'inout'}2 "
-        "%select{on a non-isolated actor instance|"
+        "%select{from outside the actor|on a different actor instance|"
+        "on a non-isolated actor instance|"
         "from a Sendable function|from a Sendable closure|"
         "from an 'async let' initializer|from global actor %4|"
-        "from the main actor|from a non-isolated context|from a non-isolated autoclosure}3",
-        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
+        "from the main actor|from a non-isolated context|"
+        "from a non-isolated autoclosure}3",
+        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type,
+         ActorIsolation))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %0 %1 can not be accessed from a "
       "non-isolated context",
@@ -4562,18 +4575,6 @@ ERROR(actor_isolated_inout_state,none,
 ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
-ERROR(global_actor_from_instance_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from actor %3 %select{|in a synchronous context}5",
-      (DescriptiveDeclKind, DeclName, Type, DeclName, unsigned, bool))
-ERROR(global_actor_from_other_global_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from different global actor %3 %select{|in a synchronous context}5",
-      (DescriptiveDeclKind, DeclName, Type, Type, unsigned, bool))
-ERROR(global_actor_from_nonactor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from %select{this|a non-isolated}3%select{| synchronous}5 context",
-      (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
 ERROR(actor_isolated_call,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))
@@ -4667,19 +4668,9 @@ WARNING(shared_mutable_state_access,none,
         "reference to %0 %1 is not concurrency-safe because it involves "
         "shared mutable state", (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_witness,none,
-     "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
-     (DescriptiveDeclKind, DeclName))
-ERROR(distributed_actor_isolated_witness,none,
-     "distributed actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
-     (DescriptiveDeclKind, DeclName))
-ERROR(global_actor_isolated_witness,none,
-      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
-      "requirement from protocol %3",
-      (DescriptiveDeclKind, DeclName, Type, Identifier))
-ERROR(global_actor_isolated_requirement_witness_conflict,none,
-      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
-      "requirement from protocol %3 isolated to global actor %4",
-      (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
+     "%select{|distributed }0%1 %2 %3 cannot be used to satisfy %4 protocol "
+     "requirement",
+     (bool, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       "actor %0 cannot conform to global actor isolated protocol %1",
       (Type, Type))
@@ -4755,6 +4746,9 @@ ERROR(unchecked_not_existential,none,
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))
+ERROR(incorrect_optional_any,none,
+      "optional 'any' type must be written %0",
+      (Type))
 ERROR(existential_requires_any,none,
       "use of %select{protocol |}2%0 as a type must be written %1",
       (Type, Type, bool))

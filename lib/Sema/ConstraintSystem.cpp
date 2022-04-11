@@ -1397,6 +1397,38 @@ AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
       fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this});
 }
 
+/// For every parameter in \p type that has an error type, replace that
+/// parameter's type by a placeholder type, where \p value is the declaration
+/// that declared \p type. This is useful for code completion so we can match
+/// the types we do know instead of bailing out completely because \p type
+/// contains an error type.
+static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value) {
+  if (!type->is<AnyFunctionType>() || !isa<AbstractFunctionDecl>(value)) {
+    return type;
+  }
+  auto funcType = type->castTo<AnyFunctionType>();
+  auto funcDecl = cast<AbstractFunctionDecl>(value);
+
+  auto declParams = funcDecl->getParameters();
+  auto typeParams = funcType->getParams();
+  assert(declParams->size() == typeParams.size());
+  SmallVector<AnyFunctionType::Param, 4> newParams;
+  newParams.reserve(declParams->size());
+  for (auto i : indices(typeParams)) {
+    AnyFunctionType::Param param = typeParams[i];
+    if (param.getPlainType()->is<ErrorType>()) {
+      auto paramDecl = declParams->get(i);
+      auto placeholder =
+          PlaceholderType::get(paramDecl->getASTContext(), paramDecl);
+      newParams.push_back(param.withType(placeholder));
+    } else {
+      newParams.push_back(param);
+    }
+  }
+  assert(newParams.size() == declParams->size());
+  return FunctionType::get(newParams, funcType->getResult());
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
@@ -1457,6 +1489,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     openedType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
                                                      openedType->getAs<FunctionType>(),
                                                      locator);
+
+    if (isForCodeCompletion() && openedType->hasError()) {
+      // In code completion, replace error types by placeholder types so we can
+      // match the types we know instead of bailing out completely.
+      openedType = replaceParamErrorTypeByPlaceholder(openedType, value);
+    }
 
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
@@ -1948,38 +1986,6 @@ Type constraints::typeEraseOpenedExistentialReference(
     // Recurse.
     return None;
   });
-}
-
-/// For every parameter in \p type that has an error type, replace that
-/// parameter's type by a placeholder type, where \p value is the declaration
-/// that declared \p type. This is useful for code completion so we can match
-/// the types we do know instead of bailing out completely because \p type
-/// contains an error type.
-static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value) {
-  if (!type->is<AnyFunctionType>() || !isa<AbstractFunctionDecl>(value)) {
-    return type;
-  }
-  auto funcType = type->castTo<AnyFunctionType>();
-  auto funcDecl = cast<AbstractFunctionDecl>(value);
-
-  auto declParams = funcDecl->getParameters();
-  auto typeParams = funcType->getParams();
-  assert(declParams->size() == typeParams.size());
-  SmallVector<AnyFunctionType::Param, 4> newParams;
-  newParams.reserve(declParams->size());
-  for (auto i : indices(typeParams)) {
-    AnyFunctionType::Param param = typeParams[i];
-    if (param.getPlainType()->is<ErrorType>()) {
-      auto paramDecl = declParams->get(i);
-      auto placeholder =
-          PlaceholderType::get(paramDecl->getASTContext(), paramDecl);
-      newParams.push_back(param.withType(placeholder));
-    } else {
-      newParams.push_back(param);
-    }
-  }
-  assert(newParams.size() == declParams->size());
-  return FunctionType::get(newParams, funcType->getResult());
 }
 
 std::pair<Type, Type>

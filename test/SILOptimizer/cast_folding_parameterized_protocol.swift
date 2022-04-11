@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil -enable-parameterized-protocol-types -O -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-sil -enable-parameterized-existential-types -O -o - | %FileCheck %s
 
 public protocol P<T> {
   associatedtype T

@@ -1,5 +1,5 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=SomeModule -I %S/Inputs -source-filename=x -enable-cxx-interop -enable-objc-interop | %FileCheck -check-prefix=CHECK-IDE-TEST %s
-// RUN: %swift-frontend -c -enable-cxx-interop -enable-objc-interop -I %S/Inputs %s -o - -emit-sil | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=SomeModule -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-objc-interop | %FileCheck -check-prefix=CHECK-IDE-TEST %s
+// RUN: %swift-frontend -c -enable-experimental-cxx-interop -enable-objc-interop -I %S/Inputs %s -o - -emit-sil | %FileCheck %s
 
 import SomeModule
 

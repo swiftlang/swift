@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-opened-existential-types -enable-parameterized-protocol-types
+// RUN: %target-typecheck-verify-swift -enable-experimental-opened-existential-types
 
 protocol Q { }
 

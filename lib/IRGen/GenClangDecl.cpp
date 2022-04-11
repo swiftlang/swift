@@ -86,15 +86,15 @@ public:
 // the initializer of the variable.
 clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
   if (auto fd = dyn_cast<clang::FunctionDecl>(decl)) {
-    // If this is a potentially not-yet-instanciated template, we might
-    // still have a body.
-    if (fd->getTemplateInstantiationPattern())
-      return fd;
-
     const clang::FunctionDecl *definition;
     if (fd->hasBody(definition)) {
       return const_cast<clang::FunctionDecl *>(definition);
     }
+
+    // If this is a potentially not-yet-instanciated template, we might
+    // still have a body.
+    if (fd->getTemplateInstantiationPattern())
+      return fd;
   } else if (auto vd = dyn_cast<clang::VarDecl>(decl)) {
     clang::VarDecl *initializingDecl = vd->getInitializingDeclaration();
     if (initializingDecl) {
