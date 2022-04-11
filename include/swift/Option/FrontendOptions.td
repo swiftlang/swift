@@ -828,6 +828,11 @@ def enable_experimental_cxx_interop :
   HelpText<"Enable C++ interop code generation and config directives">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def enable_cxx_interop :
+  Flag<["-"], "enable-cxx-interop">,
+  HelpText<"Alias for -enable-experimental-cxx-interop">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
