@@ -1778,8 +1778,6 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // add a constraint from the parameter if necessary, otherwise
     // there is nothing to do but move to the next parameter.
     if (parameterBindings[paramIdx].empty() && callee) {
-      auto &ctx = cs.getASTContext();
-
       // Type inference from default value expressions.
       {
         auto *paramList = getParameterList(callee);
