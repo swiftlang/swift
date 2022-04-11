@@ -2972,7 +2972,7 @@ static void suppressingFeatureUnsafeInheritExecutor(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
-static bool usesFeaturePrimaryAssociatedTypes(Decl *decl) {
+static bool usesFeaturePrimaryAssociatedTypes2(Decl *decl) {
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
     if (protoDecl->getPrimaryAssociatedTypes().size() > 0)
       return true;
@@ -2981,7 +2981,7 @@ static bool usesFeaturePrimaryAssociatedTypes(Decl *decl) {
   return false;
 }
 
-static void suppressingFeaturePrimaryAssociatedTypes(PrintOptions &options,
+static void suppressingFeaturePrimaryAssociatedTypes2(PrintOptions &options,
                                          llvm::function_ref<void()> action) {
   bool originalPrintPrimaryAssociatedTypes = options.PrintPrimaryAssociatedTypes;
   options.PrintPrimaryAssociatedTypes = false;
