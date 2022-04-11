@@ -147,6 +147,42 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
   });
 }
 
+/// Return the formal linkage of the component restrictions of this
+/// generic signature.  Never returns PublicUnique.
+FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
+  // This can only be PublicNonUnique or HiddenUnique.  Signatures can
+  // never be PublicUnique in the first place, and we short-circuit on
+  // Private.  So we only ever update it when we see HiddenUnique linkage.
+  FormalLinkage linkage = FormalLinkage::PublicNonUnique;
+
+  for (auto &req : sig.getRequirements()) {
+    // The first type can be ignored because it should always be
+    // a dependent type.
+
+    switch (req.getKind()) {
+    case RequirementKind::Layout:
+      continue;
+
+    case RequirementKind::Conformance:
+    case RequirementKind::SameType:
+    case RequirementKind::Superclass:
+      switch (getTypeLinkage(CanType(req.getSecondType()))) {
+      case FormalLinkage::PublicUnique:
+      case FormalLinkage::PublicNonUnique:
+        continue;
+      case FormalLinkage::HiddenUnique:
+        linkage = FormalLinkage::HiddenUnique;
+        continue;
+      case FormalLinkage::Private:
+        // We can short-circuit with this.
+        return linkage;
+      }
+    }
+  }
+
+  return linkage;
+}
+
 /// Return the minimum linkage structurally required to reference the given formal type.
 FormalLinkage swift::getTypeLinkage(CanType t) {
   assert(t->isLegalFormalType());
