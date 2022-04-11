@@ -148,7 +148,10 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
 }
 
 /// Return the formal linkage of the component restrictions of this
-/// generic signature.  Never returns PublicUnique.
+/// generic signature.  This is the appropriate linkage for a lazily-
+/// emitted entity derived from the generic signature.
+///
+/// This function never returns PublicUnique.
 FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
   // This can only be PublicNonUnique or HiddenUnique.  Signatures can
   // never be PublicUnique in the first place, and we short-circuit on
@@ -166,7 +169,7 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
     case RequirementKind::Superclass:
-      switch (getTypeLinkage(CanType(req.getSecondType()))) {
+      switch (getTypeLinkage_correct(CanType(req.getSecondType()))) {
       case FormalLinkage::PublicUnique:
       case FormalLinkage::PublicNonUnique:
         continue;
@@ -183,14 +186,35 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
   return linkage;
 }
 
-/// Return the minimum linkage structurally required to reference the given formal type.
+/// Return the formal linkage of the given formal type.
+///
+/// Note that this function is buggy and generally should not be
+/// used in new code; we should migrate all callers to
+/// getTypeLinkage_correct and then consolidate them.
 FormalLinkage swift::getTypeLinkage(CanType t) {
+  assert(t->isLegalFormalType());
+  // Due to a bug, this always returns PublicUnique.
+  // It's a bit late in the 5.7 timeline to be changing that, but
+  // we can optimize it!
+  return FormalLinkage::PublicUnique;
+}
+
+/// Return the formal linkage of the given formal type.
+/// This in the appropriate linkage for a lazily-emitted entity
+/// derived from the type.
+///
+/// This function never returns PublicUnique, which means that,
+/// even if a type is simply a reference to a non-generic
+/// uniquely-emitted nominal type, the formal linkage of that
+/// type may differ from the formal linkage of the underlying
+/// type declaration.
+FormalLinkage swift::getTypeLinkage_correct(CanType t) {
   assert(t->isLegalFormalType());
   
   class Walker : public TypeWalker {
   public:
     FormalLinkage Linkage;
-    Walker() : Linkage(FormalLinkage::PublicUnique) {}
+    Walker() : Linkage(FormalLinkage::PublicNonUnique) {}
 
     Action walkToTypePre(Type ty) override {
       // Non-nominal types are always available.
@@ -198,7 +222,7 @@ FormalLinkage swift::getTypeLinkage(CanType t) {
       if (!decl)
         return Action::Continue;
       
-      Linkage = std::min(Linkage, getDeclLinkage(decl));
+      Linkage = std::max(Linkage, getDeclLinkage(decl));
       return Action::Continue;
     }
   };
