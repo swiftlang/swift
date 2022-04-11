@@ -19,9 +19,9 @@
 /// All of the following can be marked as sendable:
 ///
 /// - Value types
-/// - References to immutable reference types
+/// - Reference types with no mutable storage
 /// - Reference types that internally manage access to their state
-/// - Functions and closures
+/// - Functions and closures (via `@Sendable`)
 ///
 /// Although this protocol doesn't have any required methods or properties,
 /// it does have semantic requirements that are enforced at compile time.
@@ -31,7 +31,7 @@
 ///
 /// To declare conformance to `Sendable` without any compiler enforcement,
 /// write `@unchecked Sendable`.
-/// You are responsible for the correctness of unchecked sendable types.
+/// You are responsible for the correctness of unchecked sendable types, for example, by protecting all access to its state with a lock or a queue.
 /// Unchecked conformance to `Sendable` also disables enforcement
 /// of the rule that conformance must be in the same file.
 ///
