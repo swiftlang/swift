@@ -299,16 +299,6 @@ extension _StringGuts {
   }
 }
 
-@_alwaysEmitIntoClient
-@inline(__always)
-func _isSwiftStdlib_5_7() -> Bool {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) { // SwiftStdlib 5.7
-    return true
-  } else {
-    return false
-  }
-}
-
 // Encoding
 extension _StringGuts {
   /// Returns whether this string has a UTF-8 storage representation.
