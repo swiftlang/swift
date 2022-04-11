@@ -1424,6 +1424,9 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Dispatch integration.
   const uint16_t DispatchInvokeFunction = 0xf493; // = 62611
+
+  /// Functions accessible at runtime (i.e. distributed method accessors).
+  const uint16_t AccessibleFunctionRecord = 0x438c; // = 17292
 }
 
 /// The number of arguments that will be passed directly to a generic
