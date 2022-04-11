@@ -759,6 +759,18 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.AsyncContextExtendedFrameEntry = PointerAuthSchema(
       dataKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::SwiftAsyncContextExtendedFrameEntry);
+
+  opts.ExtendedExistentialTypeShape =
+      PointerAuthSchema(dataKey, /*address*/ false,
+                        Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators
+                          ::ExtendedExistentialTypeShape);
+
+  opts.NonUniqueExtendedExistentialTypeShape =
+      PointerAuthSchema(dataKey, /*address*/ false,
+                        Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators
+                          ::NonUniqueExtendedExistentialTypeShape);
 }
 
 std::unique_ptr<llvm::TargetMachine>
