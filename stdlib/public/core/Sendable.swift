@@ -31,7 +31,8 @@
 ///
 /// To declare conformance to `Sendable` without any compiler enforcement,
 /// write `@unchecked Sendable`.
-/// You are responsible for the correctness of unchecked sendable types, for example, by protecting all access to its state with a lock or a queue.
+/// You are responsible for the correctness of unchecked sendable types,
+/// for example, by protecting all access to its state with a lock or a queue.
 /// Unchecked conformance to `Sendable` also disables enforcement
 /// of the rule that conformance must be in the same file.
 ///
@@ -56,17 +57,32 @@
 ///
 /// Otherwise, you need to declare conformance to `Sendable` explicitly.
 ///
-/// ### Sendable Actors and Classes
+/// ### Sendable Actors
 ///
-/// All actor types implicitly conform to `Sendable`.
+/// All actor types implicitly conform to `Sendable`
+/// because actors ensure that all access to their mutable state
+/// is performed sequentially.
+///
+/// ### Sendable Classes
 ///
 /// To satisfy the requirements of the `Sendable` protocol,
-/// final classes must contain only immutable stored properties,
-/// and must either be a subclass of `NSObject` or have no superclass.
+/// a class must:
 ///
-/// Other classes can be marked as `@unchecked Sendable`,
+/// - Be marked `final`
+///
+/// - Contain only stored properties that are immutable and sendable
+///
+/// - Have no superclass or have `NSObject` as the superclass
+///
+/// Classes marked with `@MainActor` are implicitly sendable,
+/// because the main actor coordinates all access to its state.
+/// These classes can have stored properties that are mutable and nonsendable.
+///
+/// Classes that don't meet the requirements above
+/// can be marked as `@unchecked Sendable`,
 /// disabling compile-time correctness checks,
-/// after you manually verify that they satisfy the semantic requirements.
+/// after you manually verify that
+/// they satisfy the `Sendable` protocol's semantic requirements.
 ///
 /// ### Sendable Functions and Closures
 ///
