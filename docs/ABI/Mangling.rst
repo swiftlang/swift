@@ -189,6 +189,8 @@ Globals
   global ::= global 'MN'                 // noncanonical specialized generic type metadata for global
   global ::= global 'Mz'                 // canonical specialized generic type metadata caching token
 
+  global ::= global 'Mq'                 // global with a uniquing prefix
+
   #if SWIFT_RUNTIME_VERSION >= 5.4
     global ::= context (decl-name '_')+ 'WZ' // global variable one-time initialization function
     global ::= context (decl-name '_')+ 'Wz' // global variable one-time initialization token
@@ -914,6 +916,23 @@ than the module of the conforming type or the conformed-to protocol), it is
 mangled with its offset into the set of conformance requirements, the
 root protocol conformance, and the suffix 'g'.
 
+::
+
+  // No generalization signature, no type expression.
+  extended-existential-shape ::= generic-signature 'Xg' extended-existential-value-storage
+
+  // Generalization signature (the second one), no type expression.
+  extended-existential-shape ::= generic-signature generic-signature 'XG' extended-existential-value-storage
+
+  // No generalization signature, type expression.
+  extended-existential-shape ::= generic-signature type 'Xh' extended-existential-value-storage
+
+  // Generalization signature (the second one), type expression.
+  extended-existential-shape ::= generic-signature generic-signature type 'Xh' extended-existential-value-storage
+
+  extended-existential-value-storage ::= 'o' // opaque
+  extended-existential-value-storage ::= 'c' // class
+  extended-existential-value-storage ::= 'm' // metatype
 
 Identifiers
 ~~~~~~~~~~~
