@@ -8,7 +8,7 @@
 
 set(dependencies)
 list(APPEND dependencies Basic SIL)
-if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
   list(APPEND dependencies _CompilerRegexParser)
 endif()
 
