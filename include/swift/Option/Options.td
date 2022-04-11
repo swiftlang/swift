@@ -676,9 +676,9 @@ def disable_actor_data_race_checks :
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Disable runtime checks for actor data races">;
 
-def enable_regex_literals : Flag<["-"], "enable-regex-literals">,
+def enable_bare_slash_regex : Flag<["-"], "enable-bare-slash-regex">,
   Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
-  HelpText<"Enable the use of regular-expression literals">;
+  HelpText<"Enable the use of forward slash regular-expression literal syntax">;
 
 def warn_implicit_overrides :
   Flag<["-"], "warn-implicit-overrides">,
