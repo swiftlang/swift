@@ -15,7 +15,6 @@ target_sources(swiftSILOptimizer PRIVATE
   ConstantEvaluableSubsetChecker.cpp
   EpilogueARCMatcherDumper.cpp
   EpilogueRetainReleaseMatcherDumper.cpp
-  EscapeAnalysisDumper.cpp
   FunctionOrderPrinter.cpp
   IVInfoPrinter.cpp
   InstCount.cpp
