@@ -119,11 +119,13 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
 }
 } // end anonymous namespace
 
-bool swift::ide::DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind) {
+bool swift::ide::DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind,
+                               DynamicLookupInfo dynamicLookupInfo) {
   return true;
 }
 
-bool swift::ide::KeyPathFilter(ValueDecl *decl, DeclVisibilityKind) {
+bool swift::ide::KeyPathFilter(ValueDecl *decl, DeclVisibilityKind,
+                               DynamicLookupInfo dynamicLookupInfo) {
   return isa<TypeDecl>(decl) ||
          (isa<VarDecl>(decl) && decl->getDeclContext()->isTypeContext());
 }
@@ -1799,7 +1801,7 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
   if (D->shouldHideFromEditor())
     return;
 
-  if (IsKeyPathExpr && !KeyPathFilter(D, Reason))
+  if (IsKeyPathExpr && !KeyPathFilter(D, Reason, dynamicLookupInfo))
     return;
 
   if (IsSwiftKeyPathExpr && !SwiftKeyPathFilter(D, Reason))
@@ -2695,7 +2697,8 @@ void CompletionLookup::getUnresolvedMemberCompletions(Type T) {
   // type and has the same type (or if the member is a function, then the
   // same result type) as the contextual type.
   FilteredDeclConsumer consumer(*this,
-                                [=](ValueDecl *VD, DeclVisibilityKind Reason) {
+                                [=](ValueDecl *VD, DeclVisibilityKind Reason,
+                                    DynamicLookupInfo dynamicLookupInfo) {
                                   // In optional context, ignore
                                   // '.init(<some>)', 'init(nilLiteral:)',
                                   return !isInitializerOnOptional(T, VD);
@@ -3117,4 +3120,33 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
                                         SemanticContextKind::Local);
     Builder.addTextChunk(name.str());
   }
+}
+
+void CompletionLookup::getOptionalBindingCompletions(SourceLoc Loc) {
+  ExprType = Type();
+  Kind = LookupKind::ValueInDeclContext;
+  NeedLeadingDot = false;
+
+  AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext, *this);
+
+  // Suggest only 'Optional' type var decls (incl. parameters)
+  FilteredDeclConsumer FilteringConsumer(
+      AccessFilteringConsumer,
+      [&](ValueDecl *VD, DeclVisibilityKind Reason,
+          DynamicLookupInfo dynamicLookupInfo) -> bool {
+        auto *VarD = dyn_cast<VarDecl>(VD);
+        if (!VarD)
+          return false;
+
+        auto Ty = getTypeOfMember(VD, dynamicLookupInfo);
+        return Ty->isOptional();
+      });
+
+  // FIXME: Currently, it doesn't include top level decls for performance
+  // reason. Enabling 'IncludeTopLevel' pulls everything including imported
+  // modules. For suggesting top level results, we need a way to filter cached
+  // results.
+
+  lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
+                     /*IncludeTopLevel=*/false, Loc);
 }

@@ -1590,6 +1590,13 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
       ThePattern = makeParserResult(Status, P);
     }
 
+  } else if (Tok.is(tok::code_complete)) {
+    if (CodeCompletion) {
+      CodeCompletion->completeOptionalBinding();
+    }
+    ThePattern = makeParserResult(new (Context) AnyPattern(Tok.getLoc()));
+    ThePattern.setHasCodeCompletionAndIsError();
+    consumeToken(tok::code_complete);
   } else {
     ConditionCtxt.setCreateSyntax(SyntaxKind::OptionalBindingCondition);
     // Otherwise, this is an implicit optional binding "if let".
