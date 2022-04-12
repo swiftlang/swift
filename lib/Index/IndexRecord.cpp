@@ -22,6 +22,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/PathRemapper.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Index/Index.h"
 #include "clang/Basic/FileManager.h"
@@ -381,6 +382,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
                                  IndexUnitWriter &parentUnitWriter,
+                                 const PathRemapper &pathRemapper,
                                  SourceFile *initialFile);
 
 static void addModuleDependencies(ArrayRef<ImportedModule> imports,
@@ -392,6 +394,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                   DiagnosticEngine &diags,
                                   IndexUnitWriter &unitWriter,
                                   StringScratchSpace &moduleNameScratch,
+                                  const PathRemapper &pathRemapper,
                                   SourceFile *initialFile = nullptr) {
   auto &fileMgr = clangCI.getFileManager();
 
@@ -442,7 +445,9 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
               emitDataForSwiftSerializedModule(mod, indexStorePath,
                                                indexSystemModules, skipStdlib,
                                                targetTriple, clangCI, diags,
-                                               unitWriter, initialFile);
+                                               unitWriter,
+                                               pathRemapper,
+                                               initialFile);
               withoutUnitName = false;
             }
 
@@ -473,6 +478,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
                                  IndexUnitWriter &parentUnitWriter,
+                                 const PathRemapper &pathRemapper,
                                  SourceFile *initialFile) {
   StringRef filename = module->getModuleFilename();
   std::string moduleName = module->getNameStr().str();
@@ -567,11 +573,13 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   // For indexing serialized modules 'debug compilation' is irrelevant, so
   // set it to true by default.
   bool isDebugCompilation = true;
+  auto clangRemapper = pathRemapper.asClangPathRemapper();
 
   IndexUnitWriter unitWriter(fileMgr, indexStorePath,
     "swift", swiftVersion, indexUnitToken, moduleName,
     /*MainFile=*/nullptr, isSystem, /*IsModuleUnit=*/true,
-    isDebugCompilation, targetTriple, sysrootPath, getModuleInfoFromOpaqueModule);
+    isDebugCompilation, targetTriple, sysrootPath,
+    clangRemapper, getModuleInfoFromOpaqueModule);
 
   auto FE = fileMgr.getFile(filename);
   bool isSystemModule = module->isSystemModule();
@@ -590,7 +598,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules, skipStdlib,
                         targetTriple, clangCI, diags, unitWriter,
-                        moduleNameScratch, initialFile);
+                        moduleNameScratch, pathRemapper, initialFile);
 
   if (unitWriter.write(error)) {
     diags.diagnose(SourceLoc(), diag::error_write_index_unit, error);
@@ -607,11 +615,13 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      StringRef targetTriple,
                      ArrayRef<const clang::FileEntry *> fileDependencies,
                      const clang::CompilerInstance &clangCI,
+                     const PathRemapper &pathRemapper,
                      DiagnosticEngine &diags) {
   auto &fileMgr = clangCI.getFileManager();
   auto *module = primarySourceFile->getParentModule();
   bool isSystem = module->isSystemModule();
   auto mainFile = fileMgr.getFile(primarySourceFile->getFilename());
+  auto clangRemapper = pathRemapper.asClangPathRemapper();
   // FIXME: Get real values for the following.
   StringRef swiftVersion;
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
@@ -619,7 +629,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
       fileMgr, indexStorePath, "swift", swiftVersion, indexUnitToken,
       module->getNameStr(), mainFile ? *mainFile : nullptr, isSystem,
       /*isModuleUnit=*/false, isDebugCompilation, targetTriple, sysrootPath,
-      getModuleInfoFromOpaqueModule);
+      clangRemapper, getModuleInfoFromOpaqueModule);
 
   // Module dependencies.
   SmallVector<ImportedModule, 8> imports;
@@ -630,7 +640,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules, skipStdlib,
                         targetTriple, clangCI, diags, unitWriter,
-                        moduleNameScratch, primarySourceFile);
+                        moduleNameScratch, pathRemapper, primarySourceFile);
 
   // File dependencies.
   for (auto *F : fileDependencies)
@@ -684,7 +694,8 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
                            bool skipStdlib,
                            bool isDebugCompilation,
                            StringRef targetTriple,
-                           const DependencyTracker &dependencyTracker) {
+                           const DependencyTracker &dependencyTracker,
+                           const PathRemapper &pathRemapper) {
   auto &astContext = primarySourceFile->getASTContext();
   auto &clangCI = astContext.getClangModuleLoader()->getClangInstance();
   auto &diags = astContext.Diags;
@@ -712,7 +723,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
                               indexStorePath, indexSystemModules, skipStdlib,
                               isDebugCompilation, targetTriple,
                               fileDependencies.getArrayRef(),
-                              clangCI, diags);
+                              clangCI, pathRemapper, diags);
 }
 
 bool index::indexAndRecord(ModuleDecl *module,
@@ -723,7 +734,8 @@ bool index::indexAndRecord(ModuleDecl *module,
                            bool skipStdlib,
                            bool isDebugCompilation,
                            StringRef targetTriple,
-                           const DependencyTracker &dependencyTracker) {
+                           const DependencyTracker &dependencyTracker,
+                           const PathRemapper &pathRemapper) {
   auto &astContext = module->getASTContext();
   auto &clangCI = astContext.getClangModuleLoader()->getClangInstance();
   auto &diags = astContext.Diags;
@@ -759,7 +771,7 @@ bool index::indexAndRecord(ModuleDecl *module,
                                indexStorePath, indexSystemModules, skipStdlib,
                                isDebugCompilation, targetTriple,
                                fileDependencies.getArrayRef(),
-                               clangCI, diags))
+                               clangCI, pathRemapper, diags))
         return true;
       unitIndex += 1;
     }
