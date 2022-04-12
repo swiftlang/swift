@@ -212,8 +212,6 @@ PASS(EarlyInliner, "early-inline",
      "Early Inlining Preserving Semantic Functions")
 PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
-PASS(EscapeAnalysisDumper, "escapes-dump",
-     "Dump Escape Analysis Results")
 SWIFT_FUNCTION_PASS(DeadEndBlockDumper, "dump-deadendblocks",
      "Tests the DeadEndBlocks utility")
 SWIFT_FUNCTION_PASS(EscapeInfoDumper, "dump-escape-info",
