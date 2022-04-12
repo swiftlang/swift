@@ -53,8 +53,8 @@ class ConcreteDelegateProxy {
   // CHECK-LABEL: .ConcreteDelegateProxy.init(_:_:_:)@
   // CHECK-NEXT: <P, D, Proxy where P == SomeClass, D == SomeStruct, Proxy : ConcreteDelegateProxy, Proxy : DelegateProxyType, Proxy.[DelegateProxyType]Delegate == SomeStruct, Proxy.[DelegateProxyType]Parent == SomeClass>
 
-  // expected-error@+2 {{same-type requirement makes generic parameter 'P' non-generic}}
-  // expected-error@+1 {{same-type requirement makes generic parameter 'D' non-generic}}
+  // expected-warning@+2 {{same-type requirement makes generic parameter 'P' non-generic}}
+  // expected-warning@+1 {{same-type requirement makes generic parameter 'D' non-generic}}
   init<P, D, Proxy: DelegateProxyType>(_: P, _: D, _: Proxy.Type)
     where Proxy: ConcreteDelegateProxy,
           Proxy.Parent == P,

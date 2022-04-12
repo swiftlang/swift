@@ -901,11 +901,13 @@ InferredGenericSignatureRequestRQM::evaluate(
 
         if (canonical->isTypeParameter()) {
           ctx.Diags.diagnose(loc, diag::requires_generic_params_made_equal,
-                             genericParam, result->getSugaredType(canonical));
+                             genericParam, result->getSugaredType(canonical))
+            .warnUntilSwiftVersion(6);
         } else {
           ctx.Diags.diagnose(loc,
                              diag::requires_generic_param_made_equal_to_concrete,
-                             genericParam);
+                             genericParam)
+            .warnUntilSwiftVersion(6);
         }
       }
     }
