@@ -815,6 +815,11 @@ static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
     llvm::cl::desc("Enable experimental string processing"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> EnableBareSlashRegexLiterals(
+    "enable-bare-slash-regex",
+    llvm::cl::desc("Enable the ability to write '/.../' regex literals"),
+    llvm::cl::init(false));
+
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
                 llvm::cl::cat(Category));
@@ -4288,7 +4293,11 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableExperimentalNamedOpaqueTypes = true;
   }
   if (options::EnableExperimentalStringProcessing) {
-    InitInvok.getLangOptions().EnableExperimentalStringProcessing= true;
+    InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
+  }
+  if (options::EnableBareSlashRegexLiterals) {
+    InitInvok.getLangOptions().EnableBareSlashRegexLiterals = true;
+    InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
 
   if (!options::Triple.empty())
