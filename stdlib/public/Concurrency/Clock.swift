@@ -32,7 +32,8 @@ import Swift
 /// `SuspendingClock`.
 @available(SwiftStdlib 5.7, *)
 public protocol Clock: Sendable {
-  associatedtype Instant: InstantProtocol
+  associatedtype Duration: DurationProtocol
+  associatedtype Instant: InstantProtocol where Instant.Duration == Duration
 
   var now: Instant { get }
   var minimumResolution: Instant.Duration { get }
