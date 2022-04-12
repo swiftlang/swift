@@ -2152,6 +2152,17 @@ getDirectReadAccessStrategy(const AbstractStorageDecl *storage) {
 }
 
 static AccessStrategy
+getDirectToDistributedThunkAccessorStrategy(const AbstractStorageDecl *storage) {
+  switch (storage->getReadImpl()) {
+  case ReadImplKind::Get:
+    return AccessStrategy::getDistributedGetAccessor(AccessorKind::Get);
+  default:
+    llvm_unreachable("bad impl kind for distributed property accessor");
+  }
+  llvm_unreachable("bad impl kind for distributed property accessor");
+}
+
+static AccessStrategy
 getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
   switch (storage->getWriteImpl()) {
   case WriteImplKind::Immutable:
@@ -2283,6 +2294,14 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
 
       if (shouldUseNativeDynamicDispatch())
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
+
+      if (auto var = dyn_cast<VarDecl>(this)) {
+        if (var->isDistributed()) {
+          fprintf(stderr, "[%s:%d] (%s) DIST STRATEGY!!\n", __FILE__, __LINE__, __FUNCTION__);
+          var->dump();
+          return getDirectToDistributedThunkAccessorStrategy(this);
+        }
+      }
 
       // If the storage is resilient from the given module and resilience
       // expansion, we cannot use direct access.

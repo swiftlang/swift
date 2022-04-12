@@ -33,6 +33,22 @@ distributed actor D {
     "dist"
   }
 
+  // OK:
+  distributed var distGet: String {
+    distributed get {
+      "okey"
+    }
+  }
+
+  distributed var distSetGet: String {
+    distributed set {
+      _ = newValue
+    }
+    distributed get {
+      "okey"
+    }
+  }
+
   // expected-error@+1{{'distributed' property 'hello' cannot be 'static'}}
   static distributed var hello: String {
     "nope!"
