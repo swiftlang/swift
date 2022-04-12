@@ -515,6 +515,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // forward slash regex `/.../`.
     if (!Opts.EnableExperimentalStringProcessing)
       Opts.EnableBareSlashRegexLiterals = false;
+  } else {
+    Opts.EnableExperimentalStringProcessing = true;
   }
 
   Opts.EnableExperimentalBoundGenericExtensions |=
