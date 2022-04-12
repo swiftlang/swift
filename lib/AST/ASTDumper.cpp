@@ -742,6 +742,8 @@ namespace {
 
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
+      if (VD->isDistributed())
+        PrintWithColorRAII(OS, DeclModifierColor) << " distributed";
       if (VD->isLet())
         PrintWithColorRAII(OS, DeclModifierColor) << " let";
       if (VD->getAttrs().hasAttribute<LazyAttr>())
@@ -2020,6 +2022,9 @@ public:
 
   void visitMemberRefExpr(MemberRefExpr *E) {
     printCommon(E, "member_ref_expr");
+    if (E->shouldApplyLookupDistributedThunk()) {
+      OS << " distributed";
+    }
     PrintWithColorRAII(OS, DeclColor) << " decl=";
     printDeclRef(E->getMember());
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)

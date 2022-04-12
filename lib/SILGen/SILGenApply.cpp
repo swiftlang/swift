@@ -1087,7 +1087,7 @@ public:
 
     // If this is a direct reference to a vardecl, just emit its value directly.
     // Recursive references to callable declarations are allowed.
-    if (isa<VarDecl>(e->getDecl())) {
+    if (auto var = dyn_cast<VarDecl>(e->getDecl())) {
       visitExpr(e);
       return;
     }
@@ -1123,6 +1123,8 @@ public:
 
     /// Some special handling may be necessary for thunks:
     if (callSite && callSite->shouldApplyDistributedThunk()) {
+      fprintf(stderr, "[%s:%d] (%s) SHOULD APPLY DIST THUNK\n", __FILE__, __LINE__, __FUNCTION__);
+
       if (auto distributedThunk = cast<AbstractFunctionDecl>(e->getDecl())->getDistributedThunk()) {
         constant = SILDeclRef(distributedThunk).asDistributed();
       }
@@ -5366,6 +5368,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
                                          ArgumentSource &selfValue,
                                          bool isSuper,
                                          bool isDirectUse,
+                                         bool isDistributed,
                                          SubstitutionMap subs,
                                          bool isOnSelfParameter) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
@@ -5445,12 +5448,13 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &SGF,
                                    ArgumentSource &selfValue,
                                    bool isSuper,
                                    bool isDirectUse,
+                                   bool isDistributed,
                                    bool isOnSelfParameter)
 {
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(SGF, loc, constant, selfValue,
-                                             isSuper, isDirectUse,
+                                             isSuper, isDirectUse, isDistributed,
                                              substitutions, isOnSelfParameter);
   
   // Collect captures if the accessor has them.
@@ -5762,15 +5766,23 @@ SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {
 RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
                                        SubstitutionMap substitutions,
                                        ArgumentSource &&selfValue, bool isSuper,
-                                       bool isDirectUse,
+                                       bool isDirectUse, bool isDistributed,
                                        PreparedArguments &&subscriptIndices,
-                                       SGFContext c, bool isOnSelfParameter) {
+                                       SGFContext c,
+                                       bool isOnSelfParameter) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
+  auto constant = get;
+
+//  if (isDistributed) {
+//    get.dump();
+//    assert(false && "should use dist thunk");
+//  }
+
   Callee getter = emitSpecializedAccessorFunctionRef(
-      *this, loc, get, substitutions, selfValue, isSuper, isDirectUse,
-      isOnSelfParameter);
+      *this, loc, constant, substitutions, selfValue, isSuper, isDirectUse,
+      isDistributed, isOnSelfParameter);
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
@@ -5803,7 +5815,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 
   Callee setter = emitSpecializedAccessorFunctionRef(
       *this, loc, set, substitutions, selfValue, isSuper, isDirectUse,
-      isOnSelfParameter);
+      /*isDistributed=*/false, isOnSelfParameter);
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = setter.getSubstFormalType();
 
@@ -5838,14 +5850,14 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 ManagedValue SILGenFunction::emitAddressorAccessor(
     SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
     ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
-    PreparedArguments &&subscriptIndices, SILType addressType,
-    bool isOnSelfParameter) {
+    bool isDistributed, PreparedArguments &&subscriptIndices,
+    SILType addressType, bool isOnSelfParameter) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
   Callee callee = emitSpecializedAccessorFunctionRef(
       *this, loc, addressor, substitutions, selfValue, isSuper, isDirectUse,
-      isOnSelfParameter);
+      isDistributed,  isOnSelfParameter);
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = callee.getSubstFormalType();
 
@@ -5900,7 +5912,9 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   Callee callee =
     emitSpecializedAccessorFunctionRef(*this, loc, accessor,
                                        substitutions, selfValue,
-                                       isSuper, isDirectUse, isOnSelfParameter);
+                                       isSuper, isDirectUse,
+                                       /*isDistributed=*/false,
+                                       isOnSelfParameter);
 
   // We're already in a full formal-evaluation scope.
   // Make a dead writeback scope; applyCoroutine won't try to pop this.
