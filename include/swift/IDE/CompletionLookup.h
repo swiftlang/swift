@@ -348,7 +348,7 @@ public:
 
   static bool hasInterestingDefaultValue(const ParamDecl *param);
 
-  bool addItemWithoutDefaultArgs(const AbstractFunctionDecl *func);
+  bool shouldAddItemWithoutDefaultArgs(const AbstractFunctionDecl *func);
 
   /// Build argument patterns for calling. Returns \c true if any content was
   /// added to \p Builder. If \p declParams is non-empty, the size must match

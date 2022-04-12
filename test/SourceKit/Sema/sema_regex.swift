@@ -1,9 +1,9 @@
 public func retRegex() -> Regex<Substring> {
-  #/foo/#
+  /foo/
 }
 
 // REQUIRES: swift_in_compiler
-// RUN: %sourcekitd-test -req=sema %s -- %s -Xfrontend -enable-experimental-string-processing | %FileCheck %s
+// RUN: %sourcekitd-test -req=sema %s -- %s -Xfrontend -enable-bare-slash-regex | %FileCheck %s
 
 // CHECK: [
 // CHECK:   {

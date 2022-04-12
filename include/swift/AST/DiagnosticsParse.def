@@ -94,6 +94,9 @@ ERROR(forbidden_extended_escaping_string,none,
 ERROR(regex_literal_parsing_error,none,
       "%0", (StringRef))
 
+ERROR(prefix_slash_not_allowed,none,
+      "prefix operator may not contain '/'", ())
+
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -140,7 +143,10 @@ ERROR(lex_invalid_escape_delimiter,none,
 ERROR(lex_invalid_closing_delimiter,none,
       "too many '#' characters in closing delimiter", ())
 
-ERROR(lex_unterminated_regex,none,
+ERROR(lex_regex_literal_invalid_starting_char,none,
+      "regex literal may not start with %0; add backslash to escape",
+      (StringRef))
+ERROR(lex_regex_literal_unterminated,none,
       "unterminated regex literal", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
