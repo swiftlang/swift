@@ -13,7 +13,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 import Darwin
-@_predatesConcurrency import Dispatch
+@preconcurrency import Dispatch
 import StdlibUnittest
 
 func loopUntil(priority: TaskPriority) async {
