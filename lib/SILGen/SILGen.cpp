@@ -1835,7 +1835,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:
   case AccessStrategy::MaterializeToTemporary:
-  case AccessStrategy::DirectToDistributedThunkAccessor:
+//  case AccessStrategy::DirectToDistributedThunkAccessor:
     return false;
   }
   llvm_unreachable("unhandled strategy");
