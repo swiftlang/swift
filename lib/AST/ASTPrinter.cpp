@@ -46,6 +46,7 @@
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
@@ -300,31 +301,6 @@ Type TypeTransformContext::getBaseType() const {
 
 bool TypeTransformContext::isPrintingSynthesizedExtension() const {
   return !Decl.isNull();
-}
-
-std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
-  llvm::SmallString<256> Builder;
-  Builder.reserve(Text.size());
-  const llvm::UTF8* Data = reinterpret_cast<const llvm::UTF8*>(Text.begin());
-  const llvm::UTF8* End = reinterpret_cast<const llvm::UTF8*>(Text.end());
-  StringRef Replacement = u8"\ufffd";
-  while (Data < End) {
-    auto Step = llvm::getNumBytesForUTF8(*Data);
-    if (Data + Step > End) {
-      Builder.append(Replacement);
-      break;
-    }
-
-    if (llvm::isLegalUTF8Sequence(Data, Data + Step)) {
-      Builder.append(Data, Data + Step);
-    } else {
-
-      // If malformed, add replacement characters.
-      Builder.append(Replacement);
-    }
-    Data += Step;
-  }
-  return std::string(Builder.str());
 }
 
 void ASTPrinter::anchor() {}
@@ -633,9 +609,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
     bool FirstLine = true;
     for (auto Line : Lines) {
       if (FirstLine)
-        Printer << sanitizeClangDocCommentStyle(ASTPrinter::sanitizeUtf8(Line));
+        Printer << sanitizeClangDocCommentStyle(unicode::sanitizeUTF8(Line));
       else
-        Printer << ASTPrinter::sanitizeUtf8(Line);
+        Printer << unicode::sanitizeUTF8(Line);
       Printer.printNewline();
       FirstLine = false;
     }
@@ -2972,7 +2948,7 @@ static void suppressingFeatureUnsafeInheritExecutor(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
-static bool usesFeaturePrimaryAssociatedTypes(Decl *decl) {
+static bool usesFeaturePrimaryAssociatedTypes2(Decl *decl) {
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
     if (protoDecl->getPrimaryAssociatedTypes().size() > 0)
       return true;
@@ -2981,7 +2957,7 @@ static bool usesFeaturePrimaryAssociatedTypes(Decl *decl) {
   return false;
 }
 
-static void suppressingFeaturePrimaryAssociatedTypes(PrintOptions &options,
+static void suppressingFeaturePrimaryAssociatedTypes2(PrintOptions &options,
                                          llvm::function_ref<void()> action) {
   bool originalPrintPrimaryAssociatedTypes = options.PrintPrimaryAssociatedTypes;
   options.PrintPrimaryAssociatedTypes = false;

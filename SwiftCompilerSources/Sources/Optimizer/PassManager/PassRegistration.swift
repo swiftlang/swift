@@ -13,8 +13,8 @@
 import SIL
 import OptimizerBridging
 
-#if canImport(_RegexParser)
-import _RegexParser
+#if canImport(_CompilerRegexParser)
+import _CompilerRegexParser
 #endif
 
 @_cdecl("initializeSwiftModules")
@@ -22,7 +22,7 @@ public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftPasses()
 
-  #if canImport(_RegexParser)
+  #if canImport(_CompilerRegexParser)
   registerRegexParser()
   #endif
 }

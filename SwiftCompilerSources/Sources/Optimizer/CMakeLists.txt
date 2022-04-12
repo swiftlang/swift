@@ -9,7 +9,7 @@
 set(dependencies)
 list(APPEND dependencies Basic SIL)
 if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-  list(APPEND dependencies _RegexParser)
+  list(APPEND dependencies _CompilerRegexParser)
 endif()
 
 add_swift_compiler_module(Optimizer DEPENDS ${dependencies})

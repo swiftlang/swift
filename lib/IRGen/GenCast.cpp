@@ -30,6 +30,7 @@
 #include "llvm/IR/Module.h"
 
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -1061,8 +1062,8 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
                                                 llvm::Value *instance,
                                                 CanType sourceFormalType,
                                                 CanType targetFormalType) {
-  if (!doesCastPreserveOwnershipForTypes(IGF.IGM.getSILModule(), sourceFormalType,
-                                         targetFormalType)) {
+  if (!doesCastPreserveOwnershipForTypes(IGF.IGM.getSILModule(),
+                                         sourceFormalType, targetFormalType)) {
     return nullptr;
   }
 
@@ -1089,6 +1090,17 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
 
   // Get the metadata pointer of the destination class type.
   llvm::Value *destMetadata = IGF.IGM.getAddrOfTypeMetadata(targetFormalType);
+  if (IGF.IGM.IRGen.Opts.LazyInitializeClassMetadata) {
+    llvm::Function *accessor =
+        IGF.IGM.getAddrOfTypeMetadataAccessFunction(targetFormalType,
+                                                    NotForDefinition);
+    auto request = DynamicMetadataRequest(MetadataState::Complete);
+    // We know that we are not in a gneric class context, so we can safely
+    // determine that the call here does not need to take that into account.
+    auto response =
+        IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, {}, request);
+    destMetadata = response.getMetadata();
+  }
   llvm::Value *lhs = IGF.Builder.CreateBitCast(destMetadata, IGF.IGM.Int8PtrTy);
     
   // Load the isa pointer.
