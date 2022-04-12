@@ -57,6 +57,20 @@
           key.name: "_Concurrency",
           key.filepath: _Concurrency.swiftmodule,
           key.is_system: 1
+        },
+        {
+          key.kind: source.lang.swift.import.module.swift,
+          key.name: "_StringProcessing",
+          key.filepath: _StringProcessing.swiftmodule,
+          key.is_system: 1,
+          key.dependencies: [
+            {
+              key.kind: source.lang.swift.import.module.swift,
+              key.name: "Swift",
+              key.filepath: Swift.swiftmodule,
+              key.is_system: 1
+            }
+          ]
         }
       ]
     }
