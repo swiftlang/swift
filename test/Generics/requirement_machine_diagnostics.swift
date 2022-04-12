@@ -47,7 +47,7 @@ func concreteSameTypeRedundancy<T>(_: T) where Int == Int {}
 
 func concreteSameTypeRedundancy<T>(_: T) where Array<Int> == Array<T> {}
 // expected-warning@-1{{redundant same-type constraint 'Array<Int>' == 'Array<T>'}}
-// expected-error@-2{{same-type requirement makes generic parameter 'T' non-generic}}
+// expected-warning@-2{{same-type requirement makes generic parameter 'T' non-generic}}
 
 protocol P {}
 struct S: P {}
@@ -199,7 +199,7 @@ func inferred6<T : P11>(_: T) where T.Y : Hashable, T.Z == Set<T.X>, T.X == T.Y 
 func typeMatcherSugar<T>(_: T) where Array<Int> == Array<T>, Array<Int> == Array<T> {}
 // expected-warning@-1 2{{redundant same-type constraint 'Array<Int>' == 'Array<T>'}}
 // expected-warning@-2{{redundant same-type constraint 'T' == 'Int'}}
-// expected-error@-3{{same-type requirement makes generic parameter 'T' non-generic}}
+// expected-warning@-3{{same-type requirement makes generic parameter 'T' non-generic}}
 
 
 struct ConcreteSelf: ConcreteProtocol {}

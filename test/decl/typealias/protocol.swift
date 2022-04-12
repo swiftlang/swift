@@ -254,7 +254,7 @@ protocol P9 {
   typealias A = Int
 }
 
-func testT9a<T: P9, U>(_: T, _: U) where T.A == U { } // expected-error {{same-type requirement makes generic parameter 'U' non-generic}}
+func testT9a<T: P9, U>(_: T, _: U) where T.A == U { } // expected-warning {{same-type requirement makes generic parameter 'U' non-generic}}
 func testT9b<T: P9>(_: T) where T.A == Float { } // expected-error{{no type for 'T.A' can satisfy both 'T.A == Int' and 'T.A == Float'}}
 
 
