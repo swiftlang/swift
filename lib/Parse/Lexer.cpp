@@ -183,9 +183,12 @@ Lexer::Lexer(const PrincipalTag &, const LangOptions &LangOpts,
              HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
              TriviaRetentionMode TriviaRetention)
     : LangOpts(LangOpts), SourceMgr(SourceMgr), BufferID(BufferID),
-      Diags(Diags), LexMode(LexMode),
+      LexMode(LexMode),
       IsHashbangAllowed(HashbangAllowed == HashbangMode::Allowed),
-      RetainComments(RetainComments), TriviaRetention(TriviaRetention) {}
+      RetainComments(RetainComments), TriviaRetention(TriviaRetention) {
+  if (Diags)
+    DiagQueue.emplace(*Diags, /*emitOnDestruction*/ false);
+}
 
 void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   assert(Offset <= EndOffset);
@@ -245,7 +248,7 @@ Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
 
 Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
     : Lexer(PrincipalTag(), Parent.LangOpts, Parent.SourceMgr, Parent.BufferID,
-            Parent.Diags, Parent.LexMode,
+            Parent.getUnderlyingDiags(), Parent.LexMode,
             Parent.IsHashbangAllowed
                 ? HashbangMode::Allowed
                 : HashbangMode::Disallowed,
@@ -261,7 +264,7 @@ Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
 }
 
 InFlightDiagnostic Lexer::diagnose(const char *Loc, Diagnostic Diag) {
-  if (Diags)
+  if (auto *Diags = getTokenDiags())
     return Diags->diagnose(getSourceLoc(Loc), Diag);
   
   return InFlightDiagnostic();
@@ -272,7 +275,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
                          SourceMgr.findBufferContainingLoc(Loc)) &&
          "location from the wrong buffer");
 
-  Lexer L(LangOpts, SourceMgr, BufferID, Diags, LexMode,
+  Lexer L(LangOpts, SourceMgr, BufferID, getUnderlyingDiags(), LexMode,
           HashbangMode::Allowed, CommentRetentionMode::None,
           TriviaRetentionMode::WithoutTrivia);
   L.restoreState(State(Loc));
@@ -330,6 +333,7 @@ void Lexer::formStringLiteralToken(const char *TokStart,
     return;
   NextToken.setStringLiteral(IsMultilineString, CustomDelimiterLen);
 
+  auto *Diags = getTokenDiags();
   if (IsMultilineString && Diags)
     validateMultilineIndents(NextToken, Diags);
 }
@@ -416,7 +420,8 @@ static bool advanceToEndOfLine(const char *&CurPtr, const char *BufferEnd,
 }
 
 void Lexer::skipToEndOfLine(bool EatNewline) {
-  bool isEOL = advanceToEndOfLine(CurPtr, BufferEnd, CodeCompletionPtr, Diags);
+  bool isEOL =
+      advanceToEndOfLine(CurPtr, BufferEnd, CodeCompletionPtr, getTokenDiags());
   if (EatNewline && isEOL) {
     ++CurPtr;
     NextToken.setAtStartOfLine(true);
@@ -514,8 +519,8 @@ static bool skipToEndOfSlashStarComment(const char *&CurPtr,
 /// skipSlashStarComment - /**/ comments are skipped (treated as whitespace).
 /// Note that (unlike in C) block comments can be nested.
 void Lexer::skipSlashStarComment() {
-  bool isMultiline =
-      skipToEndOfSlashStarComment(CurPtr, BufferEnd, CodeCompletionPtr, Diags);
+  bool isMultiline = skipToEndOfSlashStarComment(
+      CurPtr, BufferEnd, CodeCompletionPtr, getTokenDiags());
   if (isMultiline)
     NextToken.setAtStartOfLine(true);
 }
@@ -1360,7 +1365,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
       if (!IsMultilineString && !CustomDelimiterLen)
         return ~0U;
 
-      DiagnosticEngine *D = EmitDiagnostics ? Diags : nullptr;
+      DiagnosticEngine *D = EmitDiagnostics ? getTokenDiags() : nullptr;
       auto TmpPtr = CurPtr;
       if (IsMultilineString &&
           !advanceIfMultilineDelimiter(CustomDelimiterLen, TmpPtr, D))
@@ -1385,7 +1390,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     return CurPtr[-1];
   case '\\':  // Escapes.
     if (!delimiterMatches(CustomDelimiterLen, CurPtr,
-                          EmitDiagnostics ? Diags : nullptr))
+                          EmitDiagnostics ? getTokenDiags() : nullptr))
       return '\\';
     break;
   }
@@ -1799,7 +1804,7 @@ static void validateMultilineIndents(const Token &Str,
 void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
                                              const char *TokEnd) {
   assert(*TokStart == '\'' && TokEnd[-1] == '\'');
-  if (!Diags) // or assert?
+  if (!getTokenDiags()) // or assert?
     return;
 
   auto startLoc = Lexer::getSourceLoc(TokStart);
@@ -1836,7 +1841,7 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
   replacement.append(OutputPtr, Ptr - 1);
   replacement.push_back('"');
 
-  Diags->diagnose(startLoc, diag::lex_single_quote_string)
+  getTokenDiags()->diagnose(startLoc, diag::lex_single_quote_string)
       .fixItReplaceChars(startLoc, endLoc, replacement);
 }
 
@@ -1852,8 +1857,8 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
   // diagnostics about changing them to double quotes.
   assert((QuoteChar == '"' || QuoteChar == '\'') && "Unexpected start");
 
-  bool IsMultilineString = advanceIfMultilineDelimiter(CustomDelimiterLen,
-                                                       CurPtr, Diags, true);
+  bool IsMultilineString = advanceIfMultilineDelimiter(
+      CustomDelimiterLen, CurPtr, getTokenDiags(), true);
   if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r')
     diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
         .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
@@ -2380,6 +2385,11 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
+  // If we're re-lexing, clear out any previous diagnostics that weren't
+  // emitted.
+  if (DiagQueue)
+    DiagQueue->clear();
+
   const char *LeadingTriviaStart = CurPtr;
   if (CurPtr == BufferStart) {
     if (BufferStart < ContentStart) {
@@ -2467,8 +2477,9 @@ void Lexer::lexImpl() {
   case ':': return formToken(tok::colon, TokStart);
   case '\\': return formToken(tok::backslash, TokStart);
 
-  case '#':
+  case '#': {
     // Try lex a raw string literal.
+    auto *Diags = getTokenDiags();
     if (unsigned CustomDelimiterLen = advanceIfCustomDelimiter(CurPtr, Diags))
       return lexStringLiteral(CustomDelimiterLen);
 
@@ -2479,8 +2490,8 @@ void Lexer::lexImpl() {
 
     // Otherwise try lex a magic pound literal.
     return lexHash();
-
-      // Operator characters.
+  }
+  // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
       skipSlashSlashComment(/*EatNewline=*/true);
@@ -2656,7 +2667,7 @@ Restart:
   case 0:
     switch (getNulCharacterKind(CurPtr - 1)) {
     case NulCharacterKind::Embedded: {
-      diagnoseEmbeddedNul(Diags, CurPtr - 1);
+      diagnoseEmbeddedNul(getTokenDiags(), CurPtr - 1);
       goto Restart;
     }
     case NulCharacterKind::CodeCompletion:
