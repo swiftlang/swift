@@ -94,6 +94,9 @@ ERROR(forbidden_extended_escaping_string,none,
 ERROR(regex_literal_parsing_error,none,
       "%0", (StringRef))
 
+ERROR(prefix_slash_not_allowed,none,
+      "prefix operator may not contain '/'", ())
+
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
