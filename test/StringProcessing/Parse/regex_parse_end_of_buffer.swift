@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-string-processing
+// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex
 // REQUIRES: swift_in_compiler
 
 // Note there is purposefully no trailing newline here.

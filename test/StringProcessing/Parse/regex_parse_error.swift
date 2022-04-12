@@ -1,9 +1,11 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-string-processing
+// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex
 // REQUIRES: swift_in_compiler
 
+_ = /(/ // expected-error {{expected ')'}}
 _ = #/(/# // expected-error {{expected ')'}}
 
 // FIXME: Should be 'group openings'
+_ = /)/ // expected-error {{closing ')' does not balance any groups openings}}
 _ = #/)/# // expected-error {{closing ')' does not balance any groups openings}}
 
 _ = #/\\/''/ // expected-error {{unterminated regex literal}}
@@ -25,11 +27,21 @@ do {
 
 _ = #/\(?'abc/#
 
-_ = #/\
-/#
-// expected-error@-2 {{unterminated regex literal}}
-// expected-error@-3 {{expected escape sequence}}
-// expected-error@-3 {{expected expression}}
+do {
+  _ = /\
+  /
+  // expected-error@-2 {{unterminated regex literal}}
+  // expected-error@-3 {{expected escape sequence}}
+} // expected-error {{expected expression after operator}}
+
+do {
+  _ = #/\
+  /#
+  // expected-error@-2 {{unterminated regex literal}}
+  // expected-error@-3 {{expected escape sequence}}
+  // expected-error@-3 {{unterminated regex literal}}
+  // expected-warning@-4 {{regular expression literal is unused}}
+}
 
 func foo<T>(_ x: T, _ y: T) {}
 foo(#/(?/#, #/abc/#) // expected-error {{expected group specifier}}
