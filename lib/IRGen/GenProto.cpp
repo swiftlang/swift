@@ -3172,7 +3172,7 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
   // For now, treat all archetypes independently.
   enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
     llvm::Value *requiredValue =
-      emitGenericRequirementFromSubstitutions(IGF, Generics, M,
+      emitGenericRequirementFromSubstitutions(IGF, Generics,
                                               requirement, subs);
     out.add(requiredValue);
   });
@@ -3294,14 +3294,17 @@ NecessaryBindings NecessaryBindings::computeBindings(
 /// that takes the (thick) parent metatype as an argument.
 GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
                                                  NominalTypeDecl *typeDecl)
-    : TheDecl(typeDecl) {
+  : GenericTypeRequirements(IGM, typeDecl->getGenericSignatureOfContext()) {}
+
+GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
+                                                 GenericSignature ncGenerics) {
   // We only need to do something here if the declaration context is
   // somehow generic.
-  auto ncGenerics = typeDecl->getGenericSignatureOfContext();
   if (!ncGenerics || ncGenerics->areAllParamsConcrete()) return;
 
   // Construct a representative function type.
   auto generics = ncGenerics.getCanonicalSignature();
+  Generics = generics;
   auto fnType = SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 SILCoroutineKind::None,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
@@ -3345,12 +3348,9 @@ void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
                                                Address buffer) {
   if (Requirements.empty()) return;
 
-  auto generics =
-      TheDecl->getGenericSignatureOfContext().getCanonicalSignature();
-  auto &module = *TheDecl->getParentModule();
   emitInitOfGenericRequirementsBuffer(IGF, Requirements, buffer,
                                       [&](GenericRequirement requirement) {
-    return emitGenericRequirementFromSubstitutions(IGF, generics, module,
+    return emitGenericRequirementFromSubstitutions(IGF, Generics,
                                                    requirement, subs);
   });
 }
@@ -3383,7 +3383,6 @@ void irgen::emitInitOfGenericRequirementsBuffer(IRGenFunction &IGF,
 llvm::Value *
 irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                                CanGenericSignature generics,
-                                               ModuleDecl &module,
                                                GenericRequirement requirement,
                                                SubstitutionMap subs) {
   CanType depTy = requirement.TypeParameter;
