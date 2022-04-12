@@ -61,6 +61,16 @@ enum class LexerMode {
   SIL
 };
 
+/// Whether or not the lexer should attempt to lex a `/.../` regex literal.
+enum class LexerForwardSlashRegexMode {
+  /// No `/.../` regex literals will be lexed.
+  None,
+  /// A `/.../` regex literal will be lexed, but only if successful.
+  Tentative,
+  /// A `/.../` regex literal will always be lexed for a '/' character.
+  Always
+};
+
 /// Kinds of conflict marker which the lexer might encounter.
 enum class ConflictMarkerKind {
   /// A normal or diff3 conflict marker, initiated by at least 7 "<"s,
@@ -75,7 +85,10 @@ class Lexer {
   const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
   const unsigned BufferID;
-  DiagnosticEngine *Diags;
+
+  /// A queue of diagnostics to emit when a token is consumed. We want to queue
+  /// them, as the parser may backtrack and re-lex a token.
+  Optional<DiagnosticQueue> DiagQueue;
 
   using State = LexerState;
 
@@ -108,6 +121,10 @@ class Lexer {
   /// module interfaces, or enables things like the 'sil' keyword if lexing
   /// a .sil file.
   const LexerMode LexMode;
+
+  /// Whether or not a `/.../` literal will be lexed.
+  LexerForwardSlashRegexMode ForwardSlashRegexMode =
+      LexerForwardSlashRegexMode::None;
 
   /// True if we should skip past a `#!` line at the start of the file.
   const bool IsHashbangAllowed;
@@ -153,6 +170,19 @@ class Lexer {
         TriviaRetentionMode TriviaRetention);
 
   void initialize(unsigned Offset, unsigned EndOffset);
+
+  /// Retrieve the diagnostic engine for emitting diagnostics for the current
+  /// token.
+  DiagnosticEngine *getTokenDiags() {
+    return DiagQueue ? &DiagQueue->getDiags() : nullptr;
+  }
+
+  /// Retrieve the underlying diagnostic engine we emit diagnostics to. Note
+  /// this should only be used for diagnostics not concerned with the current
+  /// token.
+  DiagnosticEngine *getUnderlyingDiags() {
+    return DiagQueue ? &DiagQueue->getUnderlyingDiags() : nullptr;
+  }
 
 public:
   /// Create a normal lexer that scans the whole source buffer.
@@ -209,6 +239,10 @@ public:
       LeadingTriviaResult = LeadingTrivia;
       TrailingTriviaResult = TrailingTrivia;
     }
+    // Emit any diagnostics recorded for this token.
+    if (DiagQueue)
+      DiagQueue->emit();
+
     if (Result.isNot(tok::eof))
       lexImpl();
   }
@@ -298,11 +332,11 @@ public:
   void restoreState(State S, bool enableDiagnostics = false) {
     assert(S.isValid());
     CurPtr = getBufferPtrForSourceLoc(S.Loc);
-    // Don't reemit diagnostics while readvancing the lexer.
-    llvm::SaveAndRestore<DiagnosticEngine*>
-      D(Diags, enableDiagnostics ? Diags : nullptr);
-
     lexImpl();
+
+    // Don't re-emit diagnostics from readvancing the lexer.
+    if (DiagQueue && !enableDiagnostics)
+      DiagQueue->clear();
 
     // Restore Trivia.
     if (TriviaRetention == TriviaRetentionMode::WithTrivia)
@@ -505,7 +539,7 @@ public:
 
   void getStringLiteralSegments(const Token &Str,
                                 SmallVectorImpl<StringSegment> &Segments) {
-    return getStringLiteralSegments(Str, Segments, Diags);
+    return getStringLiteralSegments(Str, Segments, getTokenDiags());
   }
 
   static SourceLoc getSourceLoc(const char *Loc) {
@@ -530,6 +564,11 @@ public:
     SILBodyRAII(const SILBodyRAII&) = delete;
     void operator=(const SILBodyRAII&) = delete;
   };
+
+  /// Attempt to re-lex a regex literal with forward slashes `/.../` from a
+  /// given lexing state. If \p mustBeRegex is set to true, a regex literal will
+  /// always be lexed. Otherwise, it will not be lexed if it may be ambiguous.
+  void tryLexForwardSlashRegexLiteralFrom(State S, bool mustBeRegex);
 
 private:
   /// Nul character meaning kind.
@@ -595,8 +634,8 @@ private:
   void lexStringLiteral(unsigned CustomDelimiterLen = 0);
   void lexEscapedIdentifier();
 
-  /// Attempt to lex a regex literal, returning true if a regex literal was
-  /// lexed, false if this is not a regex literal.
+  /// Attempt to lex a regex literal, returning true if lexing should continue,
+  /// false if this is not a regex literal.
   bool tryLexRegexLiteral(const char *TokStart);
 
   void tryLexEditorPlaceholder();

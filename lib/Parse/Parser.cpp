@@ -579,13 +579,16 @@ const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
 
-SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
-  SourceLoc Loc = Tok.getLoc();
+SourceLoc Parser::discardToken() {
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
-
-  recordTokenHash(Tok);
-
+  SourceLoc Loc = Tok.getLoc();
   L->lex(Tok, LeadingTrivia, TrailingTrivia);
+  return Loc;
+}
+
+SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
+  recordTokenHash(Tok);
+  auto Loc = discardToken();
   PreviousLoc = Loc;
   return Loc;
 }
