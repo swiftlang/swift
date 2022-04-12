@@ -1292,6 +1292,7 @@ namespace {
     bool IsSuper;
     bool IsDirectAccessorUse;
     bool IsOnSelfParameter;
+    bool IsDistributedAccessor;
     SubstitutionMap Substitutions;
     Optional<ActorIsolation> ActorIso;
 
@@ -1304,12 +1305,15 @@ namespace {
                            ArgumentList *argListForDiagnostics,
                            PreparedArguments &&indices,
                            bool isOnSelfParameter = false,
+                           bool isDistributedAccessor = false,
                            Optional<ActorIsolation> actorIso = None)
         : super(kind, decl, baseFormalType, typeData, argListForDiagnostics,
                 std::move(indices)),
           Accessor(accessor), IsSuper(isSuper),
           IsDirectAccessorUse(isDirectAccessorUse),
-          IsOnSelfParameter(isOnSelfParameter), Substitutions(substitutions),
+          IsOnSelfParameter(isOnSelfParameter),
+          IsDistributedAccessor(isDistributedAccessor),
+          Substitutions(substitutions),
           ActorIso(actorIso) {}
 
     AccessorBasedComponent(const AccessorBasedComponent &copied,
@@ -1320,6 +1324,7 @@ namespace {
         IsSuper(copied.IsSuper),
         IsDirectAccessorUse(copied.IsDirectAccessorUse),
         IsOnSelfParameter(copied.IsOnSelfParameter),
+        IsDistributedAccessor(copied.IsDistributedAccessor),
         Substitutions(copied.Substitutions),
         ActorIso(copied.ActorIso) {}
 
@@ -1341,11 +1346,13 @@ namespace {
                            ArgumentList *subscriptArgList,
                            PreparedArguments &&indices,
                            bool isOnSelfParameter,
+                           bool isDistributedAccessor,
                            Optional<ActorIsolation> actorIso)
       : AccessorBasedComponent(GetterSetterKind, decl, accessor, isSuper,
                                isDirectAccessorUse, substitutions,
                                baseFormalType, typeData, subscriptArgList,
-                               std::move(indices), isOnSelfParameter, actorIso)
+                               std::move(indices), isOnSelfParameter,
+                               isDistributedAccessor, actorIso)
     {
       assert(getAccessorDecl()->isGetterOrSetter());
     }
@@ -1650,7 +1657,8 @@ namespace {
 
         rvalue = SGF.emitGetAccessor(
             loc, getter, Substitutions, std::move(args.base), IsSuper,
-            IsDirectAccessorUse, std::move(args.Indices), c, IsOnSelfParameter);
+            IsDirectAccessorUse, std::move(args.Indices), c,
+            IsOnSelfParameter, IsDistributedAccessor);
 
       } // End the evaluation scope before any hop back to the current executor.
 

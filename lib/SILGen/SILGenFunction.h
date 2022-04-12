@@ -1445,7 +1445,8 @@ public:
                          ArgumentSource &&optionalSelfValue, bool isSuper,
                          bool isDirectAccessorUse,
                          PreparedArguments &&optionalSubscripts, SGFContext C,
-                         bool isOnSelfParameter);
+                         bool isOnSelfParameter,
+                         bool shouldUseDistributedThunk);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
