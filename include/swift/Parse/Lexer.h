@@ -75,7 +75,10 @@ class Lexer {
   const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
   const unsigned BufferID;
-  DiagnosticEngine *Diags;
+
+  /// A queue of diagnostics to emit when a token is consumed. We want to queue
+  /// them, as the parser may backtrack and re-lex a token.
+  Optional<DiagnosticQueue> DiagQueue;
 
   using State = LexerState;
 
@@ -154,6 +157,19 @@ class Lexer {
 
   void initialize(unsigned Offset, unsigned EndOffset);
 
+  /// Retrieve the diagnostic engine for emitting diagnostics for the current
+  /// token.
+  DiagnosticEngine *getTokenDiags() {
+    return DiagQueue ? &DiagQueue->getDiags() : nullptr;
+  }
+
+  /// Retrieve the underlying diagnostic engine we emit diagnostics to. Note
+  /// this should only be used for diagnostics not concerned with the current
+  /// token.
+  DiagnosticEngine *getUnderlyingDiags() {
+    return DiagQueue ? &DiagQueue->getUnderlyingDiags() : nullptr;
+  }
+
 public:
   /// Create a normal lexer that scans the whole source buffer.
   ///
@@ -209,6 +225,10 @@ public:
       LeadingTriviaResult = LeadingTrivia;
       TrailingTriviaResult = TrailingTrivia;
     }
+    // Emit any diagnostics recorded for this token.
+    if (DiagQueue)
+      DiagQueue->emit();
+
     if (Result.isNot(tok::eof))
       lexImpl();
   }
@@ -298,11 +318,11 @@ public:
   void restoreState(State S, bool enableDiagnostics = false) {
     assert(S.isValid());
     CurPtr = getBufferPtrForSourceLoc(S.Loc);
-    // Don't reemit diagnostics while readvancing the lexer.
-    llvm::SaveAndRestore<DiagnosticEngine*>
-      D(Diags, enableDiagnostics ? Diags : nullptr);
-
     lexImpl();
+
+    // Don't re-emit diagnostics from readvancing the lexer.
+    if (DiagQueue && !enableDiagnostics)
+      DiagQueue->clear();
 
     // Restore Trivia.
     if (TriviaRetention == TriviaRetentionMode::WithTrivia)
@@ -505,7 +525,7 @@ public:
 
   void getStringLiteralSegments(const Token &Str,
                                 SmallVectorImpl<StringSegment> &Segments) {
-    return getStringLiteralSegments(Str, Segments, Diags);
+    return getStringLiteralSegments(Str, Segments, getTokenDiags());
   }
 
   static SourceLoc getSourceLoc(const char *Loc) {
