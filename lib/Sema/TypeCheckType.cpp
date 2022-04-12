@@ -4292,8 +4292,7 @@ public:
       // existential type.
       if (type->isConstraintType()) {
         auto layout = type->getExistentialLayout();
-        for (auto *proto : layout.getProtocols()) {
-          auto *protoDecl = proto->getDecl();
+        for (auto *protoDecl : layout.getProtocols()) {
           if (!protoDecl->existentialRequiresAny())
             continue;
 

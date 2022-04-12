@@ -119,6 +119,16 @@ class LinkEntity {
     // This field appears in SILFunction.
     IsDynamicallyReplaceableImplShift = 8,
     IsDynamicallyReplaceableImplMask = ~KindMask,
+
+    // These fields appear in ExtendedExistentialTypeShape.
+    ExtendedExistentialIsUniqueShift = 8,
+    ExtendedExistentialIsUniqueMask = 0x100,
+    ExtendedExistentialIsSharedShift = 9,
+    ExtendedExistentialIsSharedMask = 0x200,
+    ExtendedExistentialMetatypeDepthShift = 10,
+    ExtendedExistentialMetatypeDepthMask =
+      ~(KindMask | ExtendedExistentialIsUniqueMask |
+        ExtendedExistentialIsSharedMask),
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -493,6 +503,11 @@ class LinkEntity {
     /// Accessible function record, which describes a function that can be
     /// looked up by name by the runtime.
     AccessibleFunctionRecord,
+
+    /// Extended existential type shape.
+    /// Pointer is the (generalized) existential type.
+    /// SecondaryPointer is the GenericSignatureImpl*.
+    ExtendedExistentialTypeShape,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -1352,6 +1367,24 @@ public:
     return entity;
   }
 
+  static LinkEntity forExtendedExistentialTypeShape(CanGenericSignature genSig,
+                                                    CanExistentialType
+                                                      existentialType,
+                                                    unsigned metatypeDepth,
+                                                    bool isUnique,
+                                                    bool isShared) {
+    LinkEntity entity;
+    entity.Pointer = existentialType.getPointer();
+    entity.SecondaryPointer =
+      const_cast<GenericSignatureImpl*>(genSig.getPointer());
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ExtendedExistentialTypeShape))
+      | LINKENTITY_SET_FIELD(ExtendedExistentialIsUnique, unsigned(isUnique))
+      | LINKENTITY_SET_FIELD(ExtendedExistentialIsShared, unsigned(isShared))
+      | LINKENTITY_SET_FIELD(ExtendedExistentialMetatypeDepth, metatypeDepth);
+    return entity;
+  }
+
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   std::string mangleAsString() const;
@@ -1443,6 +1476,32 @@ public:
            getKind() == Kind::MethodDescriptorDerivative);
     return reinterpret_cast<AutoDiffDerivativeFunctionIdentifier*>(
         SecondaryPointer);
+  }
+
+  CanGenericSignature getExtendedExistentialTypeShapeGenSig() const {
+    assert(getKind() == Kind::ExtendedExistentialTypeShape);
+    return CanGenericSignature(
+             reinterpret_cast<const GenericSignatureImpl*>(SecondaryPointer));
+  }
+
+  CanExistentialType getExtendedExistentialTypeShapeType() const {
+    assert(getKind() == Kind::ExtendedExistentialTypeShape);
+    return cast<ExistentialType>(CanType(reinterpret_cast<TypeBase*>(Pointer)));
+  }
+
+  bool isExtendedExistentialTypeShapeUnique() const {
+    assert(getKind() == Kind::ExtendedExistentialTypeShape);
+    return LINKENTITY_GET_FIELD(Data, ExtendedExistentialIsUnique);
+  }
+
+  bool isExtendedExistentialTypeShapeShared() const {
+    assert(getKind() == Kind::ExtendedExistentialTypeShape);
+    return LINKENTITY_GET_FIELD(Data, ExtendedExistentialIsShared);
+  }
+
+  unsigned getExtendedExistentialTypeShapeMetatypeDepth() const {
+    assert(getKind() == Kind::ExtendedExistentialTypeShape);
+    return LINKENTITY_GET_FIELD(Data, ExtendedExistentialMetatypeDepth);
   }
 
   bool isDynamicallyReplaceable() const {

@@ -156,6 +156,10 @@ public:
   void addSignedPointer(llvm::Constant *pointer,
                         const clang::PointerAuthSchema &schema,
                         uint16_t otherDiscriminator);
+
+  /// Add a UniqueHash metadata structure to this builder which stores
+  /// a hash of the given string.
+  void addUniqueHash(StringRef ofString);
 };
 
 class ConstantArrayBuilder

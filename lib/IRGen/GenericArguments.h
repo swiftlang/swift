@@ -73,10 +73,14 @@ struct GenericArguments {
   }
 
   void collect(IRGenFunction &IGF, CanType type) {
-    auto *decl = type.getNominalOrBoundGenericNominal();
-    GenericTypeRequirements requirements(IGF.IGM, decl);
-
+    auto decl = type.getNominalOrBoundGenericNominal();
     auto subs = type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
+    collect(IGF, subs);
+  }
+
+  void collect(IRGenFunction &IGF, SubstitutionMap subs) {
+    GenericTypeRequirements requirements(IGF.IGM, subs.getGenericSignature());
+
     requirements.enumerateFulfillments(
         IGF.IGM, subs,
         [&](unsigned reqtIndex, CanType type, ProtocolConformanceRef conf) {
@@ -87,7 +91,7 @@ struct GenericArguments {
           }
         });
 
-    collectTypes(IGF.IGM, decl);
+    collectTypes(IGF.IGM, requirements);
     assert(Types.size() == Values.size());
   }
 };

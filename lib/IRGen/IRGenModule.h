@@ -1062,6 +1062,10 @@ public:
 
   ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
 
+  llvm::Constant *getOrCreateLazyGlobalVariable(LinkEntity entity,
+      llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> build,
+      llvm::function_ref<void(llvm::GlobalVariable *)> finish);
+
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
