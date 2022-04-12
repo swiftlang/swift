@@ -983,9 +983,6 @@ SelfBounds swift::getSelfBoundsFromWhereClause(
 SelfBounds SelfBoundsFromGenericSignatureRequest::evaluate(
     Evaluator &evaluator, const ExtensionDecl *extDecl) const {
   SelfBounds result;
-  if (!extDecl->hasComputedGenericSignature())
-    return result;
-
   ASTContext &ctx = extDecl->getASTContext();
   auto selfType = extDecl->getSelfInterfaceType();
   for (const auto &req : extDecl->getGenericRequirements()) {
