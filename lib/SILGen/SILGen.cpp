@@ -1769,16 +1769,27 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
     vd->visitAuxiliaryDecls([&](VarDecl *var) {
         if (auto *patternBinding = var->getParentPatternBinding()){
             if (TopLevelSGF){
-            TopLevelSGF->visitPatternBindingDecl(patternBinding);
+                TopLevelSGF->visitPatternBindingDecl(patternBinding);
+                TopLevelSGF->visit(var);
+
             } else {
                 //Call SGM::visitPatternBindingDecl if not in script mode
                 visitPatternBindingDecl(patternBinding);
+                visit(var);
             }
         }
-        TopLevelSGF->visit(var);
 
         if (var->hasStorage())
           addGlobalVariable(var);
+
+        var->visitEmittedAccessors([&](AccessorDecl *accessor){
+          emitFunction(accessor);
+        });
+
+        /*auto *asd = dyn_cast<AbstractStorageDecl>(var);
+        asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+          visitFuncDecl(accessor);
+        });*/
     });
 
   if (vd->hasStorage())
