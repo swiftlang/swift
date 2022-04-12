@@ -13,7 +13,6 @@ target_sources(swiftSILOptimizer PRIVATE
   DeadEndBlocksAnalysis.cpp
   DestructorAnalysis.cpp
   DifferentiableActivityAnalysis.cpp
-  EscapeAnalysis.cpp
   EpilogueARCAnalysis.cpp
   FunctionOrder.cpp
   IVAnalysis.cpp
