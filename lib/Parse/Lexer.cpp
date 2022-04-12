@@ -1969,7 +1969,75 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
     return false;
 
-  // Ask libswift to try and lex a regex literal.
+  bool MustBeRegex = true;
+  bool IsForwardSlash = (*TokStart == '/');
+
+  // Check if we're able to lex a `/.../` regex.
+  if (IsForwardSlash) {
+    switch (ForwardSlashRegexMode) {
+    case LexerForwardSlashRegexMode::None:
+      return false;
+    case LexerForwardSlashRegexMode::Tentative:
+      MustBeRegex = false;
+      break;
+    case LexerForwardSlashRegexMode::Always:
+      break;
+    }
+
+    // For `/.../` regex literals, we need to ban space and tab at the start of
+    // a regex to avoid ambiguity with operator chains, e.g:
+    //
+    // Builder {
+    //   0
+    //   / 1 /
+    //   2
+    // }
+    //
+    // This takes advantage of the consistent operator spacing rule. We also
+    // need to ban ')' to avoid ambiguity with unapplied operator references e.g
+    // `reduce(1, /)`. This would be invalid regex syntax anyways. Note this
+    // doesn't totally save us from e.g `foo(/, 0)`, but it should at least
+    // help, and it ensures users can always surround their operator ref in
+    // parens `(/)` to fix the issue.
+    // TODO: This heuristic should be sunk into the Swift library once we have a
+    // way of doing fix-its from there.
+    auto *RegexContentStart = TokStart + 1;
+    switch (*RegexContentStart) {
+    case ')': {
+      if (!MustBeRegex)
+        return false;
+
+      // ')' is invalid anyway, so we can let the parser diagnose it.
+      break;
+    }
+    case ' ':
+    case '\t': {
+      if (!MustBeRegex)
+        return false;
+
+      // We must have a regex, so emit an error for space and tab.
+      StringRef DiagChar;
+      switch (*RegexContentStart) {
+      case ' ':
+        DiagChar = "space";
+        break;
+      case '\t':
+        DiagChar = "tab";
+        break;
+      default:
+        llvm_unreachable("Unhandled case");
+      }
+      diagnose(RegexContentStart, diag::lex_regex_literal_invalid_starting_char,
+               DiagChar)
+          .fixItInsert(getSourceLoc(RegexContentStart), "\\");
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
+  // Ask the Swift library to try and lex a regex literal.
   // - Ptr will not be advanced if this is not for a regex literal.
   // - ErrStr will be set if there is any error to emit.
   // - CompletelyErroneous will be set if there was an error that cannot be
@@ -1977,13 +2045,32 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   auto *Ptr = TokStart;
   const char *ErrStr = nullptr;
   bool CompletelyErroneous = regexLiteralLexingFn(&Ptr, BufferEnd, &ErrStr);
-  if (ErrStr)
-    diagnose(TokStart, diag::regex_literal_parsing_error, ErrStr);
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
   if (Ptr == TokStart)
     return false;
+
+  if (ErrStr) {
+    if (!MustBeRegex)
+      return false;
+
+    diagnose(TokStart, diag::regex_literal_parsing_error, ErrStr);
+  }
+
+  // If we're lexing `/.../`, error if we ended on the opening of a comment.
+  // We prefer to lex the comment as it's more likely than not that is what
+  // the user is expecting.
+  // TODO: This should be sunk into the Swift library.
+  if (IsForwardSlash && Ptr[-1] == '/' && (*Ptr == '*' || *Ptr == '/')) {
+    if (!MustBeRegex)
+      return false;
+
+    diagnose(TokStart, diag::lex_regex_literal_unterminated);
+
+    // Move the pointer back to the '/' of the comment.
+    Ptr--;
+  }
 
   // Update to point to where we ended regex lexing.
   assert(Ptr > TokStart && Ptr <= BufferEnd);
@@ -1996,10 +2083,21 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
     return true;
   }
 
-  // Otherwise, we either had a successful lex, or something that was
-  // recoverable.
+  // We either had a successful lex, or something that was recoverable.
   formToken(tok::regex_literal, TokStart);
   return true;
+}
+
+void Lexer::tryLexForwardSlashRegexLiteralFrom(State S, bool mustBeRegex) {
+  if (!LangOpts.EnableBareSlashRegexLiterals)
+    return;
+
+  // Try re-lex with forward slash enabled.
+  llvm::SaveAndRestore<LexerForwardSlashRegexMode> RegexLexingScope(
+      ForwardSlashRegexMode, mustBeRegex
+                                 ? LexerForwardSlashRegexMode::Always
+                                 : LexerForwardSlashRegexMode::Tentative);
+  restoreState(S, /*enableDiagnostics*/ true);
 }
 
 /// lexEscapedIdentifier:
@@ -2483,8 +2581,7 @@ void Lexer::lexImpl() {
     if (unsigned CustomDelimiterLen = advanceIfCustomDelimiter(CurPtr, Diags))
       return lexStringLiteral(CustomDelimiterLen);
 
-    // If we have experimental string processing enabled, try lex a regex
-    // literal.
+    // Try lex a regex literal.
     if (tryLexRegexLiteral(TokStart))
       return;
 
@@ -2505,6 +2602,10 @@ void Lexer::lexImpl() {
              "Non token comment should be eaten by lexTrivia as LeadingTrivia");
       return formToken(tok::comment, TokStart);
     }
+    // Try lex a regex literal.
+    if (tryLexRegexLiteral(TokStart))
+      return;
+
     return lexOperatorIdentifier();
   case '%':
     // Lex %[0-9a-zA-Z_]+ as a local SIL value
