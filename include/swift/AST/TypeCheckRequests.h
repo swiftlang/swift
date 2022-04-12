@@ -1083,6 +1083,33 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Check a distributed function declaration and cache if it was valid or not.
+///
+/// This is used because we not only type-check to emit errors, but also use
+/// the information to potentially avoid emitting the distributed thunk for
+/// methods which are invalid (e.g. their parameters dont conform to
+/// SerializationRequirement), as otherwise we'd be causing errors in synthesized
+/// code which looks very confusing to end-users.
+///
+class CheckDistributedFunctionRequest :
+    public SimpleRequest<CheckDistributedFunctionRequest,
+                         bool(AbstractFunctionDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  /// \returns \c true if there was a problem with the function declaration,
+  /// \c false otherwise.
+  bool evaluate(Evaluator &evaluator, AbstractFunctionDecl *) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Obtain the 'remoteCall' function of a 'DistributedActorSystem'.
 class GetDistributedActorSystemRemoteCallFunctionRequest :
     public SimpleRequest<GetDistributedActorSystemRemoteCallFunctionRequest,
