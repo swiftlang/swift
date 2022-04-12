@@ -1444,9 +1444,9 @@ public:
                          SubstitutionMap substitutions,
                          ArgumentSource &&optionalSelfValue, bool isSuper,
                          bool isDirectAccessorUse,
+                         bool isDistributed,
                          PreparedArguments &&optionalSubscripts, SGFContext C,
-                         bool isOnSelfParameter,
-                         bool shouldUseDistributedThunk);
+                         bool isOnSelfParameter);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
@@ -1478,7 +1478,8 @@ public:
   ManagedValue emitAddressorAccessor(
       SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
       ArgumentSource &&optionalSelfValue, bool isSuper,
-      bool isDirectAccessorUse, PreparedArguments &&optionalSubscripts,
+      bool isDirectAccessorUse, bool isDistributed,
+      PreparedArguments &&optionalSubscripts,
       SILType addressType, bool isOnSelfParameter);
 
   CleanupHandle emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,

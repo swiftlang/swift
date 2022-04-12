@@ -35,16 +35,16 @@ distributed actor D {
 
   // OK:
   distributed var distGet: String {
-    distributed get {
+    get distributed {
       "okey"
     }
   }
 
   distributed var distSetGet: String {
-    distributed set {
+    set distributed {
       _ = newValue
     }
-    distributed get {
+    get distributed {
       "okey"
     }
   }
