@@ -223,7 +223,8 @@ Optional<Type> ConcreteContraction::substTypeParameter(
 
     auto conformance = ((*substBaseType)->isTypeParameter()
                         ? ProtocolConformanceRef(proto)
-                        : module->lookupConformance(*substBaseType, proto));
+                        : module->lookupConformance(*substBaseType, proto,
+                                                    /*allowMissing=*/true));
 
     // The base type doesn't conform, in which case the requirement remains
     // unsubstituted.
@@ -362,8 +363,25 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
 
     auto *proto = req.getProtocolDecl();
     auto *module = proto->getParentModule();
+
+    // For conformance to 'Sendable', allow synthesis of a missing conformance
+    // if the generic parameter is concrete, that is, if we're looking at a
+    // signature of the form 'T == Foo, T : Sendable'.
+    //
+    // Otherwise, we have a superclass requirement, like 'T : C, T : Sendable';
+    // don't synthesize the conformance in this case since dropping
+    // 'T : Sendable' would be incorrect; we want to ensure that we only admit
+    // subclasses of 'C' which are 'Sendable'.
+    bool allowMissing = false;
+    if (auto *rootParam = firstType->getAs<GenericTypeParamType>()) {
+      auto key = GenericParamKey(rootParam);
+      if (ConcreteTypes.count(key) > 0)
+        allowMissing = true;
+    }
+
     if (!substFirstType->isTypeParameter() &&
-        !module->lookupConformance(substFirstType, proto)) {
+        !module->lookupConformance(substFirstType, proto,
+                                   allowMissing)) {
       // Handle the case of <T where T : P, T : C> where C is a class and
       // C does not conform to P by leaving the conformance requirement
       // unsubstituted.
