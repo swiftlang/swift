@@ -61,6 +61,16 @@ enum class LexerMode {
   SIL
 };
 
+/// Whether or not the lexer should attempt to lex a `/.../` regex literal.
+enum class LexerForwardSlashRegexMode {
+  /// No `/.../` regex literals will be lexed.
+  None,
+  /// A `/.../` regex literal will be lexed, but only if successful.
+  Tentative,
+  /// A `/.../` regex literal will always be lexed for a '/' character.
+  Always
+};
+
 /// Kinds of conflict marker which the lexer might encounter.
 enum class ConflictMarkerKind {
   /// A normal or diff3 conflict marker, initiated by at least 7 "<"s,
@@ -111,6 +121,10 @@ class Lexer {
   /// module interfaces, or enables things like the 'sil' keyword if lexing
   /// a .sil file.
   const LexerMode LexMode;
+
+  /// Whether or not a `/.../` literal will be lexed.
+  LexerForwardSlashRegexMode ForwardSlashRegexMode =
+      LexerForwardSlashRegexMode::None;
 
   /// True if we should skip past a `#!` line at the start of the file.
   const bool IsHashbangAllowed;
@@ -551,6 +565,11 @@ public:
     void operator=(const SILBodyRAII&) = delete;
   };
 
+  /// Attempt to re-lex a regex literal with forward slashes `/.../` from a
+  /// given lexing state. If \p mustBeRegex is set to true, a regex literal will
+  /// always be lexed. Otherwise, it will not be lexed if it may be ambiguous.
+  void tryLexForwardSlashRegexLiteralFrom(State S, bool mustBeRegex);
+
 private:
   /// Nul character meaning kind.
   enum class NulCharacterKind {
@@ -615,8 +634,8 @@ private:
   void lexStringLiteral(unsigned CustomDelimiterLen = 0);
   void lexEscapedIdentifier();
 
-  /// Attempt to lex a regex literal, returning true if a regex literal was
-  /// lexed, false if this is not a regex literal.
+  /// Attempt to lex a regex literal, returning true if lexing should continue,
+  /// false if this is not a regex literal.
   bool tryLexRegexLiteral(const char *TokStart);
 
   void tryLexEditorPlaceholder();
