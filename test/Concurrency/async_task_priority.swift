@@ -3,6 +3,7 @@
 // RUN: %target-codesign %t/async_task_priority
 // RUN: %target-run %t/async_task_priority
 
+// REQUIRES: VENDOR=apple
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
