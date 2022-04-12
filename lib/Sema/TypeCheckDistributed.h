@@ -51,7 +51,7 @@ bool checkDistributedActorSystemAdHocProtocolRequirements(
     bool diagnose);
 
 /// Typecheck a distributed method declaration
-bool checkDistributedFunction(FuncDecl *decl, bool diagnose);
+bool checkDistributedFunction(AbstractFunctionDecl *decl);
 
 /// Typecheck a distributed computed (get-only) property declaration.
 /// They are effectively checked the same way as argument-less methods.

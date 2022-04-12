@@ -2941,7 +2941,7 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   }
   if (decl->getAttrs().hasAttribute<DistributedActorAttr>()) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
-      checkDistributedFunction(func, /*diagnose=*/true);
+      checkDistributedFunction(func);
     }
   }
 }
