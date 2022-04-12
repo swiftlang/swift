@@ -224,8 +224,10 @@ getOperatorCompletionTypes(DeclContext *DC, Type LHSType, OperatorDecl *Op) {
 
   UnresolvedDeclRefExpr UDRE(DeclNameRef(Op->getName()),
                              getDeclRefKindOfOperator(Op), DeclNameLoc(Loc));
+  DiagnosticTransaction IgnoreDiags(DC->getASTContext().Diags);
   Expr *OpExpr =
       resolveDeclRefExpr(&UDRE, DC, /*replaceInvalidRefsWithErrors=*/true);
+  IgnoreDiags.abort();
   if (isa<ErrorExpr>(OpExpr)) {
     // If we couldn't resolve the operator (e.g. because there is only an
     // operator definition but no decls that implement it), we can't call the
