@@ -3,7 +3,7 @@
 // RUN: echo '[ { "module": "OriginalModule", "platforms": ["macOS"], "install_name": "/System/OriginalModule.dylib"} ]' > %t/install-name.json
 // RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE -previous-module-installname-map-file %t/install-name.json | %FileCheck %s -check-prefix=CHECK-SYMBOLS
 
-// RUN: NOT %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE -previous-module-installname-map-file %t/nil.json >& %t/error.txt
+// RUN: not %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE -previous-module-installname-map-file %t/nil.json >& %t/error.txt
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR < %t/error.txt
 
 @available(OSX 10.8, *)
