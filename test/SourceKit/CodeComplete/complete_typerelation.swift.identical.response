@@ -7,7 +7,7 @@
       key.description: "bar(Int)",
       key.typename: "MyEnum",
       key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.identical,
+      key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:21complete_typerelation6MyEnumO3baryACSicACmF",
       key.modulename: "complete_typerelation"
@@ -19,7 +19,7 @@
       key.description: "foo",
       key.typename: "MyEnum",
       key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.identical,
+      key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:21complete_typerelation6MyEnumO3fooyA2CmF",
       key.modulename: "complete_typerelation"
@@ -78,7 +78,7 @@
       key.description: "staticReturnMyEnum()",
       key.typename: "MyEnum",
       key.context: source.codecompletion.context.thisclass,
-      key.typerelation: source.codecompletion.typerelation.identical,
+      key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:21complete_typerelation6MyEnumO012staticReturncD0ACyFZ",
       key.modulename: "complete_typerelation"

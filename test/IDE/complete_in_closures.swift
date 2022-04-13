@@ -15,7 +15,7 @@ struct FooStruct {
 // FOO_OBJECT_DOT: Begin completions
 // FOO_OBJECT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc0()[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: End completions
 
 // WITH_GLOBAL_DECLS: Begin completions
@@ -312,8 +312,8 @@ func testIIFE() {
   }()
 }
 // IN_IIFE_1: Begin completions
-// IN_IIFE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: north[#SomeEnum#]
-// IN_IIFE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: south[#SomeEnum#]
+// IN_IIFE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: north[#SomeEnum#]
+// IN_IIFE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: south[#SomeEnum#]
 
 extension Error {
   var myErrorNumber: Int { return 0 }

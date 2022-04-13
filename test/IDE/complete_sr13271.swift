@@ -48,8 +48,8 @@ func test() {
     .#^B^#
   }
 // B: Begin completions, 2 items
-// B-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: baz[#B#]; name=baz
-// B-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#B#]; name=init()
+// B-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: baz[#B#]; name=baz
+// B-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#B#]; name=init()
 // B: End completions
 }
 
