@@ -50,6 +50,9 @@ bool checkDistributedActorSystemAdHocProtocolRequirements(
     Type Adoptee,
     bool diagnose);
 
+/// Check 'DistributedActorSystem' implementations for additional restrictions.
+bool checkDistributedActorSystem(const NominalTypeDecl *system);
+
 /// Typecheck a distributed method declaration
 bool checkDistributedFunction(AbstractFunctionDecl *decl);
 
