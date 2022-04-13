@@ -105,6 +105,42 @@ enum class FreeTypeVariableBinding {
 
 namespace constraints {
 
+struct ResultBuilder {
+private:
+  DeclContext *DC;
+  Type BuilderType;
+  llvm::SmallDenseMap<DeclName, bool> SupportedOps;
+
+  Identifier BuildOptionalId;
+
+public:
+  ResultBuilder(DeclContext *DC, Type builderType)
+      : DC(DC), BuilderType(builderType) {
+    auto &ctx = DC->getASTContext();
+    // Use buildOptional(_:) if available, otherwise fall back to buildIf
+    // when available.
+    BuildOptionalId =
+        (supports(ctx.Id_buildOptional) || !supports(ctx.Id_buildIf))
+            ? ctx.Id_buildOptional
+            : ctx.Id_buildIf;
+  }
+
+  DeclContext *getDeclContext() const { return DC; }
+
+  Type getType() const { return BuilderType; }
+
+  NominalTypeDecl *getBuilderDecl() const {
+    return BuilderType->getAnyNominal();
+  }
+
+  Identifier getBuildOptionalId() const { return BuildOptionalId; }
+
+  bool supports(Identifier fnBaseName, ArrayRef<Identifier> argLabels = {},
+                bool checkAvailability = false);
+
+  bool supportsOptional() { return supports(getBuildOptionalId()); }
+};
+
 /// Describes the algorithm to use for trailing closure matching.
 enum class TrailingClosureMatching {
   /// Match a trailing closure to the first parameter that appears to work.

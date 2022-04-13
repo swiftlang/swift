@@ -68,10 +68,8 @@ class BuilderClosureVisitor
   ConstraintSystem *cs;
   DeclContext *dc;
   ASTContext &ctx;
-  Type builderType;
-  NominalTypeDecl *builder = nullptr;
-  Identifier buildOptionalId;
-  llvm::SmallDenseMap<DeclName, bool> supportedOps;
+
+  ResultBuilder builder;
 
   /// The variable used as a base for all `build*` operations added
   /// by this transform.
@@ -119,21 +117,6 @@ class BuilderClosureVisitor
 
     auto *argList = ArgumentList::createImplicit(ctx, openLoc, args, closeLoc);
     return CallExpr::createImplicit(ctx, memberRef, argList);
-  }
-
-  /// Check whether the builder supports the given operation.
-  bool builderSupports(Identifier fnBaseName,
-                       ArrayRef<Identifier> argLabels = {},
-                       bool checkAvailability = false) {
-    DeclName name(dc->getASTContext(), fnBaseName, argLabels);
-    auto known = supportedOps.find(name);
-    if (known != supportedOps.end()) {
-      return known->second;
-    }
-
-    return supportedOps[name] = TypeChecker::typeSupportsBuilderOp(
-               builderType, dc, fnBaseName, argLabels, /*allResults*/ {},
-               checkAvailability);
   }
 
   /// Build an implicit variable in this context.
@@ -192,18 +175,10 @@ class BuilderClosureVisitor
 public:
   BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs, DeclContext *dc,
                         Type builderType, Type bodyResultType)
-      : cs(cs), dc(dc), ctx(ctx), builderType(builderType) {
-    builder = builderType->getAnyNominal();
-    applied.builderType = builderType;
+      : cs(cs), dc(dc), ctx(ctx),
+        builder(dc, cs ? cs->simplifyType(builderType) : builderType) {
+    applied.builderType = builder.getType();
     applied.bodyResultType = bodyResultType;
-
-    // Use buildOptional(_:) if available, otherwise fall back to buildIf
-    // when available.
-    if (builderSupports(ctx.Id_buildOptional) ||
-        !builderSupports(ctx.Id_buildIf))
-      buildOptionalId = ctx.Id_buildOptional;
-    else
-      buildOptionalId = ctx.Id_buildIf;
 
     // If we are about to generate constraints, let's establish builder
     // variable for the base of `build*` calls.
@@ -212,7 +187,7 @@ public:
           /*isStatic=*/false, VarDecl::Introducer::Let,
           /*nameLoc=*/SourceLoc(), ctx.Id_builderSelf, dc);
       builderVar->setImplicit();
-      cs->setType(builderVar, MetatypeType::get(cs->simplifyType(builderType)));
+      cs->setType(builderVar, MetatypeType::get(builder.getType()));
     }
   }
 
@@ -226,7 +201,7 @@ public:
 
     // If there is a buildFinalResult(_:), call it.
     ASTContext &ctx = cs->getASTContext();
-    if (builderSupports(ctx.Id_buildFinalResult, { Identifier() })) {
+    if (builder.supports(ctx.Id_buildFinalResult, {Identifier()})) {
       applied.returnExpr = buildCallIfWanted(
           applied.returnExpr->getLoc(), ctx.Id_buildFinalResult,
           { applied.returnExpr }, { Identifier() });
@@ -350,7 +325,7 @@ protected:
       }
 
       auto expr = node.get<Expr *>();
-      if (cs && builderSupports(ctx.Id_buildExpression)) {
+      if (cs && builder.supports(ctx.Id_buildExpression)) {
         expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
                                  { expr }, { Identifier() });
       }
@@ -366,11 +341,11 @@ protected:
     // `buildPartialBlock(accumulated:next:)`, use this to combine
     // subexpressions pairwise.
     if (!expressions.empty() &&
-        builderSupports(ctx.Id_buildPartialBlock, {ctx.Id_first},
-                        /*checkAvailability*/ true) &&
-        builderSupports(ctx.Id_buildPartialBlock,
-                        {ctx.Id_accumulated, ctx.Id_next},
-                        /*checkAvailability*/ true)) {
+        builder.supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
+                         /*checkAvailability*/ true) &&
+        builder.supports(ctx.Id_buildPartialBlock,
+                         {ctx.Id_accumulated, ctx.Id_next},
+                         /*checkAvailability*/ true)) {
       // NOTE: The current implementation uses one-way constraints in between
       // subexpressions. It's functionally equivalent to the following:
       //   let v0 = Builder.buildPartialBlock(first: arg_0)
@@ -391,11 +366,11 @@ protected:
     // If `buildBlock` does not exist at this point, it could be the case that
     // `buildPartialBlock` did not have the sufficient availability for this
     // call site.  Diagnose it.
-    else if (!builderSupports(ctx.Id_buildBlock)) {
+    else if (!builder.supports(ctx.Id_buildBlock)) {
       ctx.Diags.diagnose(
           braceStmt->getStartLoc(),
           diag::result_builder_missing_available_buildpartialblock,
-          builderType);
+          builder.getType());
       return nullptr;
     }
     // Otherwise, call `buildBlock` on all subexpressions.
@@ -462,14 +437,14 @@ protected:
       return false;
 
     // If there's a missing 'else', we need 'buildOptional' to exist.
-    if (isOptional && !builderSupports(buildOptionalId))
+    if (isOptional && !builder.supportsOptional())
       return false;
 
     // If there are multiple clauses, we need 'buildEither(first:)' and
     // 'buildEither(second:)' to both exist.
     if (numPayloads > 1) {
-      if (!builderSupports(ctx.Id_buildEither, {ctx.Id_first}) ||
-          !builderSupports(ctx.Id_buildEither, {ctx.Id_second}))
+      if (!builder.supports(ctx.Id_buildEither, {ctx.Id_first}) ||
+          !builder.supports(ctx.Id_buildEither, {ctx.Id_second}))
         return false;
     }
 
@@ -543,7 +518,7 @@ protected:
     // buildLimitedAvailability(_:).
     auto availabilityCond = findAvailabilityCondition(ifStmt->getCond());
     bool supportsAvailability =
-        availabilityCond && builderSupports(ctx.Id_buildLimitedAvailability);
+        availabilityCond && builder.supports(ctx.Id_buildLimitedAvailability);
     if (supportsAvailability &&
         !availabilityCond->getAvailability()->isUnavailability()) {
       thenVarRefExpr = buildCallIfWanted(ifStmt->getThenStmt()->getEndLoc(),
@@ -592,10 +567,12 @@ protected:
     // The operand should have optional type if we had optional results,
     // so we just need to call `buildIf` now, since we're at the top level.
     if (isOptional && isTopLevel) {
-      thenExpr = buildCallIfWanted(ifStmt->getEndLoc(), buildOptionalId,
-                                   thenExpr,  /*argLabels=*/{ });
-      elseExpr = buildCallIfWanted(ifStmt->getEndLoc(), buildOptionalId,
-                                   elseExpr,  /*argLabels=*/{ });
+      thenExpr =
+          buildCallIfWanted(ifStmt->getEndLoc(), builder.getBuildOptionalId(),
+                            thenExpr, /*argLabels=*/{});
+      elseExpr =
+          buildCallIfWanted(ifStmt->getEndLoc(), builder.getBuildOptionalId(),
+                            elseExpr, /*argLabels=*/{});
     }
 
     thenExpr = cs->generateConstraints(thenExpr, dc);
@@ -832,7 +809,7 @@ protected:
   VarDecl *visitForEachStmt(ForEachStmt *forEachStmt) {
     // for...in statements are handled via buildArray(_:); bail out if the
     // builder does not support it.
-    if (!builderSupports(ctx.Id_buildArray)) {
+    if (!builder.supports(ctx.Id_buildArray)) {
       if (!unhandledNode)
         unhandledNode = forEachStmt;
       return nullptr;
@@ -2219,4 +2196,18 @@ void swift::printResultBuilderBuildFunction(
     printer.printNewline();
     printer << "}";
   }
+}
+
+bool ResultBuilder::supports(Identifier fnBaseName,
+                             ArrayRef<Identifier> argLabels,
+                             bool checkAvailability) {
+  DeclName name(DC->getASTContext(), fnBaseName, argLabels);
+  auto known = SupportedOps.find(name);
+  if (known != SupportedOps.end()) {
+    return known->second;
+  }
+
+  return SupportedOps[name] = TypeChecker::typeSupportsBuilderOp(
+             BuilderType, DC, fnBaseName, argLabels, /*allResults*/ {},
+             checkAvailability);
 }
