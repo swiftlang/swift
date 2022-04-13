@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Exercise the SwiftRemoteMirrorLegacyInterop API. This works with
 # multiple versions of Swift. It builds Swift code using all versions,

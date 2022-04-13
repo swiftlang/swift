@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # cmpcodesize/main.py - Command-line entry point for cmpcodesize -*- python -*-
 #
 # This source file is part of the Swift.org open source project

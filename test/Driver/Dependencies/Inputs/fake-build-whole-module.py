@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # fake-build-for-whole-module.py - Optimized fake build -*- python -*-
 #
 # This source file is part of the Swift.org open source project

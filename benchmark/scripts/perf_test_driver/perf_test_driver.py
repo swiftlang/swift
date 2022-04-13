@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # ===--- perf_test_driver.py ---------------------------------------------===//
 #

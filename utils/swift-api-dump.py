@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This tool dumps imported Swift APIs to help validate changes in the
 # projection of (Objective-)C APIs into Swift, which is a function of the

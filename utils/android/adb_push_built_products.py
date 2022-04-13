@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # adb_push_build_products.py - Push libraries to Android device -*- python -*-
 #
 # This source file is part of the Swift.org open source project
