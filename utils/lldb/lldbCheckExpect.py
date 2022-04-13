@@ -21,7 +21,6 @@ this, e.g:
       Expected value  : 98
       Actual value    : ...
 '''
-from __future__ import print_function
 
 
 def unwrap(s):
