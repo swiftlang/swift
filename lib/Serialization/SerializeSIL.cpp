@@ -468,7 +468,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   IdentifierID usedAdHocWitnessFunctionID = 0;
-  if (auto *fun = F.getUsedAdHocRequirementWitnessFunction()) {
+  if (auto *fun = F.getReferencedAdHocRequirementWitnessFunction()) {
     addReferencedSILFunction(fun, true);
     usedAdHocWitnessFunctionID = S.addUniquedStringRef(fun->getName());
   }

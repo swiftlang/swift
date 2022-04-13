@@ -2258,9 +2258,6 @@ class ValueDecl : public Decl {
     /// Whether this declaration produces an implicitly unwrapped
     /// optional result.
     unsigned isIUO : 1;
-//
-//    /// Whether this declaration is a witness to an ad-hoc requirement.
-//    unsigned isAdHocRequirementWitness : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
@@ -2597,14 +2594,6 @@ public:
 
   /// Returns true if this decl can be found by id-style dynamic lookup.
   bool canBeAccessedByDynamicLookup() const;
-
-//  /// Set whether this declaration is a witness to an ad-hoc requirement or not.
-//  void setIsAdHocRequirementWitness(bool value);
-//
-//  /// Whether this declaration is a witness to an ad-hoc requirement.
-//  bool isAdHocRequirementWitness() const {
-//    return LazySemanticInfo.isAdHocRequirementWitness;
-//  }
 
   /// Returns true if this declaration has an implicitly unwrapped optional
   /// result. The precise meaning depends on the declaration kind:

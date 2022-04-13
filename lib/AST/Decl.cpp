@@ -3167,10 +3167,6 @@ void ValueDecl::setIsDynamic(bool value) {
   LazySemanticInfo.isDynamic = value;
 }
 
-//void ValueDecl::setIsAdHocRequirementWitness(bool value) {
-//  LazySemanticInfo.isAdHocRequirementWitness = true;
-//}
-
 ValueDecl *ValueDecl::getDynamicallyReplacedDecl() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            DynamicallyReplacedDeclRequest{

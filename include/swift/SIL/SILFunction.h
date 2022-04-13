@@ -55,10 +55,6 @@ enum IsDynamicallyReplaceable_t {
   IsNotDynamic,
   IsDynamic
 };
-//enum IsAdHocRequirementWitness_t {
-//  IsNotAdHocWitness,
-//  IsAdHocWitness
-//};
 enum IsExactSelfClass_t {
   IsNotExactSelfClass,
   IsExactSelfClass,
@@ -216,14 +212,16 @@ private:
   /// @_dynamicReplacement(for:) function.
   SILFunction *ReplacedFunction = nullptr;
 
-  /// Ad-hoc requirements may need to be retained explicitly, such that they
-  /// do not get optimized away as it might seem tha they are un-used.
+  /// This SILFunction REFerences an ad-hoc protocol requirement witness in
+  /// order to keep it alive, such that it main be obtained in IRGen. Without
+  /// this explicit reference, the witness would seem not-used, and not be
+  /// accessible for IRGen.
   ///
-  /// Specifically, e.g. the DistributedTargetInvocationDecoder's
-  /// 'decodeNextArgument' must be retained, as it is only used from IRGen
+  /// Specifically, one such case is the DistributedTargetInvocationDecoder's
+  /// 'decodeNextArgument' which must be retained, as it is only used from IRGen
   /// and such, appears as-if unused in SIL and would get optimized away.
-  // TODO: rename: referenced ad hoc requirement witnesses
-  SILFunction *AdHocRequirementFunction = nullptr;
+  // TODO: Consider making this a general "references adhoc functions" and make it an array?
+  SILFunction *RefAdHocRequirementFunction = nullptr;
 
   Identifier ObjCReplacementFor;
 
@@ -363,9 +361,6 @@ private:
   /// The function is in a statically linked module.
   unsigned IsStaticallyLinked : 1;
 
-//  /// The function is a witness to an ad-hoc requirement.
-//  unsigned IsAdHocRequirementWitness : 1;
-
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -490,28 +485,25 @@ public:
     ReplacedFunction = nullptr;
   }
 
-  SILFunction *getUsedAdHocRequirementWitnessFunction() const {
-    return AdHocRequirementFunction;
+  SILFunction *getReferencedAdHocRequirementWitnessFunction() const {
+    return RefAdHocRequirementFunction;
   }
   // Marks that this `SILFunction` uses the passed in ad-hoc protocol
   // requirement witness `f` and therefore must retain it explicitly,
   // otherwise we might not be able to get a reference to it.
-  void setUsedAdHocRequirementWitnessFunction(SILFunction *f) {
-    assert(AdHocRequirementFunction == nullptr && "already set");
-
-    fprintf(stderr, "[%s:%d] (%s) SET AD HOC WITNESS [%s] ON [%s]\n", __FILE__, __LINE__, __FUNCTION__, f->getName().str().c_str(), this->getName().str().c_str());
-    f->dump();
+  void setReferencedAdHocRequirementWitnessFunction(SILFunction *f) {
+    assert(RefAdHocRequirementFunction == nullptr && "already set");
 
     if (f == nullptr)
       return;
-    AdHocRequirementFunction = f;
-    AdHocRequirementFunction->incrementRefCount();
+    RefAdHocRequirementFunction = f;
+    RefAdHocRequirementFunction->incrementRefCount();
   }
-  void dropAdHocRequirementFunction() {
-    if (!AdHocRequirementFunction)
+  void dropReferencedAdHocRequirementWitnessFunction() {
+    if (!RefAdHocRequirementFunction)
       return;
-    AdHocRequirementFunction->decrementRefCount();
-    AdHocRequirementFunction = nullptr;
+    RefAdHocRequirementFunction->decrementRefCount();
+    RefAdHocRequirementFunction = nullptr;
   }
 
   bool hasObjCReplacement() const {
@@ -789,15 +781,6 @@ public:
     assert(!Transparent || !IsDynamicReplaceable);
   }
 
-  /// Returns whether this function implementation can be dynamically replaced.
-//  IsAdHocRequirementWitness_t isAdHocRequirementWitness() const {
-//    return IsAdHocRequirementWitness_t(IsAdHocRequirementWitness);
-//  }
-//  void setIsAdHocRequirementWitness(IsAdHocRequirementWitness_t value = IsAdHocWitness) {
-//    IsAdHocRequirementWitness = value;
-//    assert(!IsDynamicReplaceable);
-//  }
-    
   IsExactSelfClass_t isExactSelfClass() const {
     return IsExactSelfClass_t(ExactSelfClass);
   }

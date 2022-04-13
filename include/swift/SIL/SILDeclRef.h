@@ -555,12 +555,7 @@ struct SILDeclRef {
 
   bool canBeDynamicReplacement() const;
 
-//  /// True if the function was a witness to an ad-hoc requirement.
-//  /// Useful in order to e.g. not optimize away the function even
-//  /// if it seems not-used to the optimizer based on information in SIL.
-//  bool isAdHocRequirementWitness() const;
-
-    bool isAutoDiffDerivativeFunction() const {
+  bool isAutoDiffDerivativeFunction() const {
     return pointer.is<AutoDiffDerivativeFunctionIdentifier *>() &&
            pointer.get<AutoDiffDerivativeFunctionIdentifier *>() != nullptr;
   }

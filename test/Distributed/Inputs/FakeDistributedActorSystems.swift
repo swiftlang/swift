@@ -304,6 +304,9 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
 
 // === decoding --------------------------------------------------------------
 
+// !!! WARNING !!!
+// This is a 'final class' on purpose, to see that we retain the ad-hoc witness
+// for 'decodeNextArgument'; Do not change it to just a class!
 @available(SwiftStdlib 5.7, *)
 public final class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
   public typealias SerializationRequirement = Codable

@@ -1090,8 +1090,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
-    } else if (usedAdHocRequirementWitness && SP.P.Tok.getText() == "used_adhoc_requirement_witness") {
-      fprintf(stderr, "[%s:%d] (%s) PARSING THE... used_adhoc_requirement_witness\n", __FILE__, __LINE__, __FUNCTION__);
+    } else if (usedAdHocRequirementWitness && SP.P.Tok.getText() == "ref_adhoc_requirement_witness") {
       SP.P.consumeToken(tok::identifier);
       if (SP.P.Tok.getKind() != tok::string_literal) {
         SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
@@ -1102,7 +1101,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
       SILFunction *Func = M.lookUpFunction(witnessFunc.str());
       if (!Func) {
         Identifier Id = SP.P.Context.getIdentifier(witnessFunc);
-        SP.P.diagnose(SP.P.Tok, diag::sil_dynamically_replaced_func_not_found, // FIXME: bettererror
+        SP.P.diagnose(SP.P.Tok, diag::sil_adhoc_requirement_witness_func_not_found,
                       Id);
         return true;
       }
@@ -6401,10 +6400,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setIsExactSelfClass(isExactSelfClass);
     FunctionState.F->setDynamicallyReplacedFunction(
         DynamicallyReplacedFunction);
-    if (AdHocWitnessFunction) {
-      fprintf(stderr, "[%s:%d] (%s) PARSED AdHocWitnessFunction\n", __FILE__, __LINE__, __FUNCTION__);
-    }
-    FunctionState.F->setUsedAdHocRequirementWitnessFunction(
+    FunctionState.F->setReferencedAdHocRequirementWitnessFunction(
         AdHocWitnessFunction);
     if (!objCReplacementFor.empty())
       FunctionState.F->setObjCReplacement(objCReplacementFor);

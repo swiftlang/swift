@@ -680,7 +680,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     if (!replacedObjectiveCFunc.empty())
       fn->setObjCReplacement(replacedObjectiveCFunc);
     if (usedAdHocWitnessFunction)
-      fn->setUsedAdHocRequirementWitnessFunction(usedAdHocWitnessFunction);
+      fn->setReferencedAdHocRequirementWitnessFunction(usedAdHocWitnessFunction);
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {

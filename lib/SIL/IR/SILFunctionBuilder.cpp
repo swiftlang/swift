@@ -223,9 +223,6 @@ void SILFunctionBuilder::addFunctionAttributes(
   }
 
   if (constant.isDistributedThunk()) {
-    fprintf(stderr, "[%s:%d] (%s) IS DIST THUNK!\n", __FILE__, __LINE__, __FUNCTION__);
-    constant.dump();
-
     auto *actor = decl->getDeclContext()->getSelfNominalTypeDecl();
     if (actor && actor->isDistributedActor()) {
       auto &C = decl->getASTContext();
@@ -241,9 +238,7 @@ void SILFunctionBuilder::addFunctionAttributes(
           decoderTy->getAnyNominal());
       auto decodeRef = SILDeclRef(decodeFunc);
       auto *adHocWitness = getOrCreateDeclaration(decodeFunc, decodeRef);
-      F->setUsedAdHocRequirementWitnessFunction(adHocWitness);
-
-      F->dump();
+      F->setReferencedAdHocRequirementWitnessFunction(adHocWitness);
     }
   }
 }
