@@ -345,6 +345,6 @@ struct A<T>: MyProto {
 // BROKEN_CONFORMANCE_UNASSIGNABLE: End completions
 
 // BROKEN_CONFORMANCE_ASSIGNABLE: Begin completions
-// BROKEN_CONFORMANCE_ASSIGNABLE-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: exact[#(Int, (Int, Int))#]; name=exact
-// BROKEN_CONFORMANCE_ASSIGNABLE-DAG: Decl[InstanceVar]/Super/TypeRelation[Identical]: matches[#(Int, (Int, Int))#]; name=matches
+// BROKEN_CONFORMANCE_ASSIGNABLE-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: exact[#(Int, (Int, Int))#]; name=exact
+// BROKEN_CONFORMANCE_ASSIGNABLE-DAG: Decl[InstanceVar]/Super/TypeRelation[Convertible]: matches[#(Int, (Int, Int))#]; name=matches
 // BROKEN_CONFORMANCE_ASSIGNABLE: End completions

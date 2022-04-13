@@ -68,7 +68,7 @@ func testGlobalLookup() {
   @TupleBuilder<String> var x5 {
     if #^GLOBAL_LOOKUP_IN_IF_CONDITION^# {
 // GLOBAL_LOOKUP_IN_IF_CONDITION: Begin completions
-// GLOBAL_LOOKUP_IN_IF_CONDITION: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: MyConstantBool[#Bool#]; name=MyConstantBool
+// GLOBAL_LOOKUP_IN_IF_CONDITION: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: MyConstantBool[#Bool#]; name=MyConstantBool
 // GLOBAL_LOOKUP_IN_IF_CONDITION: End completions
     }
   }
@@ -105,9 +105,9 @@ func testPatternMatching() {
     let x = Letters.b
     if case .#^COMPLETE_PATTERN_MATCHING_IN_IF?check=COMPLETE_CASE^# = x {
 // COMPLETE_CASE: Begin completions
-// COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: a[#Letters#];
-// COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: b[#Letters#];
-// COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: c[#Letters#];
+// COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: a[#Letters#];
+// COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: b[#Letters#];
+// COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: c[#Letters#];
 // COMPLETE_CASE: End completions
     }
   }
@@ -124,8 +124,8 @@ func testPatternMatching() {
     let x: FooStruct? = FooStruct()
     guard case .#^GUARD_CASE_PATTERN_1?check=OPTIONAL_FOOSTRUCT^# = x {}
     // OPTIONAL_FOOSTRUCT: Begin completions, 2 items
-    // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<FooStruct>#]; name=none
-    // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some()
+    // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: none[#Optional<FooStruct>#]; name=none
+    // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some()
     // OPTIONAL_FOOSTRUCT: End completions
   }
 
@@ -148,7 +148,7 @@ func testCompleteFunctionArgument() {
   @TupleBuilder<String> var x1 {
     StringFactory.makeString(x: #^ARGUMENT_LOOKUP^#)
     // ARGUMENT_LOOKUP: Begin completions
-    // ARGUMENT_LOOKUP: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: MyConstantString[#String#];
+    // ARGUMENT_LOOKUP: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: MyConstantString[#String#];
     // ARGUMENT_LOOKUP: End completions
   }
 

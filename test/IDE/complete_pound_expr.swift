@@ -20,29 +20,29 @@ func test1() {
 // POUND_EXPR_INTCONTEXT-DAG: Keyword[#file]/None:                file[#String#]; name=file
 // POUND_EXPR_INTCONTEXT-DAG: Keyword[#fileID]/None: fileID[#String#]; name=fileID
 // POUND_EXPR_INTCONTEXT-DAG: Keyword[#filePath]/None: filePath[#String#]; name=filePath
-// POUND_EXPR_INTCONTEXT-DAG: Keyword[#line]/None/TypeRelation[Identical]: line[#Int#]; name=line
-// POUND_EXPR_INTCONTEXT-DAG: Keyword[#column]/None/TypeRelation[Identical]: column[#Int#]; name=column
+// POUND_EXPR_INTCONTEXT-DAG: Keyword[#line]/None/TypeRelation[Convertible]: line[#Int#]; name=line
+// POUND_EXPR_INTCONTEXT-DAG: Keyword[#column]/None/TypeRelation[Convertible]: column[#Int#]; name=column
 // POUND_EXPR_INTCONTEXT-DAG: Keyword[#dsohandle]/None:           dsohandle[#UnsafeRawPointer#]; name=dsohandle
 // POUND_EXPR_INTCONTEXT: End completions
 
 // POUND_EXPR_STRINGCONTEXT: Begin completions, 8 items
-// POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#function]/None/TypeRelation[Identical]: function[#String#];
-// POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#file]/None/TypeRelation[Identical]: file[#String#];
-// POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#fileID]/None/TypeRelation[Identical]: fileID[#String#];
-// POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#filePath]/None/TypeRelation[Identical]: filePath[#String#];
+// POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#function]/None/TypeRelation[Convertible]: function[#String#];
+// POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#file]/None/TypeRelation[Convertible]: file[#String#];
+// POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#fileID]/None/TypeRelation[Convertible]: fileID[#String#];
+// POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#filePath]/None/TypeRelation[Convertible]: filePath[#String#];
 // POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#line]/None:                line[#Int#];
 // POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#column]/None:              column[#Int#];
 // POUND_EXPR_STRINGCONTEXT-DAG: Keyword[#dsohandle]/None:           dsohandle[#UnsafeRawPointer#];
-// POUND_EXPR_STRINGCONTEXT-DAG: Keyword/None/TypeRelation[Identical]: keyPath({#@objc property sequence#})[#String#];
+// POUND_EXPR_STRINGCONTEXT-DAG: Keyword/None/TypeRelation[Convertible]: keyPath({#@objc property sequence#})[#String#];
 // POUND_EXPR_STRINGCONTEXT: End completions
 
 // POUND_EXPR_SELECTORCONTEXT: Begin completions, 8 items
-// POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#function]/None/TypeRelation[Identical]: function[#Selector#];
-// POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#file]/None/TypeRelation[Identical]: file[#Selector#];
-// POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#fileID]/None/TypeRelation[Identical]: fileID[#Selector#];
-// POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#filePath]/None/TypeRelation[Identical]: filePath[#Selector#];
+// POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#function]/None/TypeRelation[Convertible]: function[#Selector#];
+// POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#file]/None/TypeRelation[Convertible]: file[#Selector#];
+// POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#fileID]/None/TypeRelation[Convertible]: fileID[#Selector#];
+// POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#filePath]/None/TypeRelation[Convertible]: filePath[#Selector#];
 // POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#line]/None:                line[#Int#];
 // POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#column]/None:              column[#Int#];
 // POUND_EXPR_SELECTORCONTEXT-DAG: Keyword[#dsohandle]/None:           dsohandle[#UnsafeRawPointer#];
-// POUND_EXPR_SELECTORCONTEXT-DAG: Keyword/None/TypeRelation[Identical]: selector({#@objc method#})[#Selector#];
+// POUND_EXPR_SELECTORCONTEXT-DAG: Keyword/None/TypeRelation[Convertible]: selector({#@objc method#})[#Selector#];
 // POUND_EXPR_SELECTORCONTEXT: End completions

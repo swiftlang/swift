@@ -89,13 +89,13 @@ func testImplicitMember() -> MyStruct {
   return .#^EXPR_IMPLICITMEMBER^#
 }
 // EXPR_IMPLICITMEMBER: Begin completions, 7 items
-// EXPR_IMPLICITMEMBER-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: <name>init</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
-// EXPR_IMPLICITMEMBER-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: <name>instance</name>; typename=<typeid.user>MyStruct</typeid.user>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: <name>init</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: <name>instance</name>; typename=<typeid.user>MyStruct</typeid.user>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>labelNameParamName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: (<keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) <keyword>throws</keyword> -&gt; <typeid.user>MyStruct</typeid.user>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>labelName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: (<attribute>@autoclosure</attribute> () -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>sameName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: <keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>paramName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(<typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
-// EXPR_IMPLICITMEMBER-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: <name>create</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: <name>create</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
 // EXPR_IMPLICITMEMBER: End completions
 
 func testArgument() -> MyStruct {
