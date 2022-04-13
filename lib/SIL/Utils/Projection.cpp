@@ -389,7 +389,11 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
       Projection AP(Iter);
       if (!AP.isValid())
         break;
-      P.Path.push_back(AP);
+      // We _must_ ignore zero-indexing projections so that alias analysis
+      // recognizes an "alias" between two addresses where one has such an
+      // `index_addr 0` instruction and the other doesn't.
+      if (AP.getKind() != ProjectionKind::Index || AP.getIndex() != 0)
+        P.Path.push_back(AP);
     }
     Iter = cast<SingleValueInstruction>(*Iter).getOperand(0);
   }
