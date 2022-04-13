@@ -64,9 +64,9 @@ func test() -> MyProto {
 // CHECK-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: Foo[#Foo#];
 // CHECK-DAG: Decl[GlobalVar]/OtherModule[Lib]/TypeRelation[Convertible]: GLOBAL_FOO[#Foo#];
 // CHECK-DAG: Decl[Struct]/OtherModule[Lib]:      Bar[#Bar#];
-// CHECK-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Identical]: MyProto[#MyProto#];
+// CHECK-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Convertible]: MyProto[#MyProto#];
 // CHECK-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: makeFoo()[#Foo#];
-// CHECK-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Identical]: returnSomeMyProto()[#MyProto#];
+// CHECK-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: returnSomeMyProto()[#MyProto#];
 // CHECK: End completions
 
 
@@ -97,7 +97,7 @@ func testAlsoConsiderMetatype() -> MyClass.Type {
   return #^ALSO_CONSIDER_METATYPE^#
 }
 // ALSO_CONSIDER_METATYPE: Begin completions
-// ALSO_CONSIDER_METATYPE-DAG: Decl[Class]/OtherModule[Lib]/TypeRelation[Identical]: MyClass[#MyClass#];
+// ALSO_CONSIDER_METATYPE-DAG: Decl[Class]/OtherModule[Lib]/TypeRelation[Convertible]: MyClass[#MyClass#];
 // FIXME: MySubclass should be 'Convertible' but we don't currently store metatype supertypes in USRBasedType.
 // ALSO_CONSIDER_METATYPE-DAG: Decl[Class]/OtherModule[Lib]: MySubclass[#MySubclass#];
 // ALSO_CONSIDER_METATYPE: End completions
@@ -128,7 +128,7 @@ func testGenericReturn<T: MyProto>() -> T {
   return #^GENERIC_RETURN^#
 }
 
-// FIXME: We don't support USR-based type comparison in generic contexts. MyProto and returnMyProto should be 'Identical'. makeFoo and FooBar should be 'Convertible'
+// FIXME: We don't support USR-based type comparison in generic contexts. MyProto, returnMyProto, makeFoo and FooBar should be 'Convertible'
 // GENERIC_RETURN: Begin completions
 // GENERIC_RETURN-DAG: Decl[Struct]/OtherModule[Lib]: Foo[#Foo#];
 // GENERIC_RETURN-DAG: Decl[GlobalVar]/OtherModule[Lib]: GLOBAL_FOO[#Foo#];
@@ -171,7 +171,7 @@ func testGenericReturn() -> MyBaseProto {
 // TRANSITIVE_CONFORMANCE-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: Foo[#Foo#];
 // TRANSITIVE_CONFORMANCE-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: returnSomeMyProto()[#MyProto#];
 // TRANSITIVE_CONFORMANCE-DAG: Decl[GlobalVar]/OtherModule[Lib]/TypeRelation[Convertible]: GLOBAL_FOO[#Foo#];
-// TRANSITIVE_CONFORMANCE-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Identical]: MyBaseProto[#MyBaseProto#];
+// TRANSITIVE_CONFORMANCE-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Convertible]: MyBaseProto[#MyBaseProto#];
 // TRANSITIVE_CONFORMANCE-DAG: Decl[Struct]/OtherModule[Lib]:      Bar[#Bar#];
 // TRANSITIVE_CONFORMANCE-DAG: Decl[Class]/OtherModule[Lib]/TypeRelation[Convertible]: MySubclassConformingToMyProto[#MySubclassConformingToMyProto#];
 // TRANSITIVE_CONFORMANCE-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: FooBar[#FooBar#];
@@ -190,8 +190,8 @@ func protoWithAssocType() -> ProtoWithAssocType {
 
 // PROTO_WITH_ASSOC_TYPE: Begin completions
 // PROTO_WITH_ASSOC_TYPE-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: StructWithAssocType[#StructWithAssocType#];
-// PROTO_WITH_ASSOC_TYPE-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Identical]: makeProtoWithAssocType()[#ProtoWithAssocType#];
-// PROTO_WITH_ASSOC_TYPE-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Identical]: ProtoWithAssocType[#ProtoWithAssocType#];
+// PROTO_WITH_ASSOC_TYPE-DAG: Decl[FreeFunction]/OtherModule[Lib]/TypeRelation[Convertible]: makeProtoWithAssocType()[#ProtoWithAssocType#];
+// PROTO_WITH_ASSOC_TYPE-DAG: Decl[Protocol]/OtherModule[Lib]/Flair[RareType]/TypeRelation[Convertible]: ProtoWithAssocType[#ProtoWithAssocType#];
 // PROTO_WITH_ASSOC_TYPE: End completions
 
 // RUN: %empty-directory(%t/completion-cache)

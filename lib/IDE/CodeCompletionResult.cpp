@@ -490,9 +490,6 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
   case CodeCompletionResultTypeRelation::Invalid:
     Prefix.append("/TypeRelation[Invalid]");
     break;
-  case CodeCompletionResultTypeRelation::Identical:
-    Prefix.append("/TypeRelation[Identical]");
-    break;
   case CodeCompletionResultTypeRelation::Convertible:
     Prefix.append("/TypeRelation[Convertible]");
     break;

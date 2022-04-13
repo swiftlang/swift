@@ -29,14 +29,14 @@ struct TestStruct {
   var test2
 // ARG_MyEnum_NODOT: Begin completions
 // ARG_MyEnum_NODOT-DAG: Decl[Struct]/CurrModule:            TestStruct[#TestStruct#]; name=TestStruct
-// ARG_MyEnum_NODOT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: globalMyEnum[#MyEnum#]; name=globalMyEnum
+// ARG_MyEnum_NODOT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: globalMyEnum[#MyEnum#]; name=globalMyEnum
 // ARG_MyEnum_NODOT: End completions
 
   @MyStruct(arg1: .#^ARG_MyEnum_DOT^#
   var test3
 // ARG_MyEnum_DOT: Begin completions, 3 items
-// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     east[#MyEnum#]; name=east
-// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     west[#MyEnum#]; name=west
+// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]:     east[#MyEnum#]; name=east
+// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]:     west[#MyEnum#]; name=west
 // ARG_MyEnum_DOT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
 // ARG_MyEnum_DOT: End completions
 

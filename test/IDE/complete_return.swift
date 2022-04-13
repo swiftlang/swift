@@ -83,8 +83,8 @@ func testTR1() -> Int? {
 	return #^RETURN_TR1^#
 
 // RETURN_TR1: Begin completions
-// RETURN_TR1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: oi[#Int?#]{{; name=.+$}}
-// RETURN_TR1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: testTR1()[#Int?#]{{; name=.+$}}
+// RETURN_TR1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: oi[#Int?#]{{; name=.+$}}
+// RETURN_TR1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]: testTR1()[#Int?#]{{; name=.+$}}
 // RETURN_TR1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: i[#Int#]{{; name=.+$}}
 // RETURN_TR1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testReturnInt1()[#Void#]{{; name=.+$}}
 // RETURN_TR1-DAG: Decl[LocalVar]/Local:               fs[#FooStruct#]{{; name=.+$}}
@@ -96,7 +96,7 @@ func testTR2(_ g : Gen) -> Int? {
 
 // RETURN_TR2: Begin completions
 // RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntGen()[#Int#]{{; name=.+$}}
-// RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntOpGen()[#Int?#]{{; name=.+$}}
+// RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntOpGen()[#Int?#]{{; name=.+$}}
 // RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal:   StringGen()[#String#]{{; name=.+$}}
 // RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]{{; name=.+$}}
 // RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]{{; name=.+$}}
@@ -108,7 +108,7 @@ func testTR3(_ g : Gen) -> Int? {
 
 // RETURN_TR3: Begin completions
 // RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: InternalIntGen()[#Int#]{{; name=.+$}}
-// RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: InternalIntOpGen()[#Int?#]{{; name=.+$}}
+// RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: InternalIntOpGen()[#Int?#]{{; name=.+$}}
 // RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringGen()[#String#]{{; name=.+$}}
 // RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]{{; name=.+$}}
 // RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]{{; name=.+$}}
