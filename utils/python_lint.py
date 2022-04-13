@@ -18,6 +18,7 @@ sources.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import importlib.util
 import os
 import subprocess
 import sys
@@ -43,7 +44,7 @@ _INSTALL_FLAKE8_MESSAGE = """
 The flake8 and flake8-import-order Python packages are required for linting,
 but these were not found on your system.
 
-You can install these using:
+You can install these using your system's package manager, or using pip:
 
     python3 -m pip install flake8
     python3 -m pip install flake8-import-order
@@ -56,20 +57,11 @@ For more help, see http://flake8.pycqa.org.
 # Helpers
 
 def _is_package_installed(name):
-    """Runs the pip command to check if a package is installed.
+    """Checks for module availability
     """
+    spec = importlib.util.find_spec(name)
 
-    command = [
-        sys.executable,
-        '-m', 'pip',
-        'show', '--quiet',
-        name,
-    ]
-
-    with open(os.devnull, 'w') as devnull:
-        status = subprocess.call(command, stderr=devnull)
-
-    return not status
+    return spec is not None
 
 
 # -----------------------------------------------------------------------------
