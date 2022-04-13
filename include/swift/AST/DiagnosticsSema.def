@@ -4538,6 +4538,10 @@ NOTE(note_distributed_actor_system_can_be_defined_using_defaultdistributedactors
 ERROR(distributed_actor_protocol_illegal_inheritance,none,
       "non-distributed actor type %0 cannot conform to the 'DistributedActor' protocol",
       (DeclName))
+ERROR(actor_cannot_inherit_distributed_actor_protocol,none,
+      "actor type %0 cannot conform to the 'DistributedActor' protocol. "
+      "Isolation rules of these actor types are not interchangeable.",
+      (DeclName))
 ERROR(broken_distributed_actor_requirement,none,
       "DistributedActor protocol is broken: unexpected requirement", ())
 ERROR(distributed_actor_system_conformance_missing_adhoc_requirement,none,

@@ -42,13 +42,14 @@ import _Concurrency
 /// actor system for the decoding initializer when decoding a distributed actor.
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedActor: AnyActor, Identifiable, Hashable
-  where ID == ActorSystem.ActorID {
+  where ID == ActorSystem.ActorID,
+        SerializationRequirement == ActorSystem.SerializationRequirement {
   
   /// The type of transport used to communicate with actors of this type.
   associatedtype ActorSystem: DistributedActorSystem
 
   /// The serialization requirement to apply to all distributed declarations inside the actor.
-  typealias SerializationRequirement = ActorSystem.SerializationRequirement
+  associatedtype SerializationRequirement
 
   /// Logical identity of this distributed actor.
   ///
