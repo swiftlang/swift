@@ -51,7 +51,7 @@ public func testConcrete() -> Any.Type {
   // CHECK:   [[T0:%.*]] = getelementptr inbounds [1 x i8*], [1 x i8*]* [[ARGS]], i32 0, i32 0
   // CHECK:   store i8*  bitcast (%swift.type* @"$sSiN" to i8*), i8** [[T0]], align
   // CHECK:   [[T0:%.*]] = bitcast [1 x i8*]* [[ARGS]] to i8**
-  // CHECK:   [[CALL:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq" to i8*), i8** [[T0]])
+  // CHECK:   [[CALL:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
   // CHECK:   store atomic %swift.type* [[CALL]], %swift.type** @"$s26existential_shape_metadata2Q0_pySiXPML" release, align
   // CHECK:   br label %[[CONT]]
   // CHECK: [[CONT]]:
@@ -68,7 +68,7 @@ public func testDependent<T>(t: T.Type) -> Any.Type {
   // CHECK: [[T1:%.*]] = bitcast %swift.type* %T to i8*
   // CHECK: store i8* [[T1]], i8** [[T0]], align
   // CHECK: [[T0:%.*]] = bitcast [1 x i8*]* [[ARGS]] to i8**
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq" to i8*), i8** [[T0]])
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
   // CHECK: ret %swift.type* [[METADATA]]
   return (any Q0<T>).self
 }
@@ -83,7 +83,7 @@ public func testComplexApplication<T>(t: T.Type) -> Any.Type {
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[B_T]] to i8*
   // CHECK: store i8* [[T1]], i8** [[T0]], align
   // CHECK: [[T0:%.*]] = bitcast [1 x i8*]* [[ARGS]] to i8**
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq" to i8*), i8** [[T0]])
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
   // CHECK: ret %swift.type* [[METADATA]]
   return (any Q0<B<T>>).self
 }
@@ -97,7 +97,7 @@ public func test_private<T>(t: T.Type) -> Any.Type {
   // CHECK: store i8* [[T1]], i8** [[T0]], align
   // CHECK: [[T0:%.*]] = bitcast [1 x i8*]* [[ARGS]] to i8**
   //   FIXME: this should be unique?
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata_unique({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2R033_881A0B6978EB4286E7CFF1E27030ACACLLRd__llXGo" to i8*), i8** [[T0]])
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata_unique({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2R033_881A0B6978EB4286E7CFF1E27030ACACLLRd__llXGo{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
   // CHECK: ret %swift.type* [[METADATA]]
   return (any R0<T>).self
 }
@@ -119,4 +119,4 @@ public func test_privateApplication<T>(t: T.Type) -> Any.Type {
   // CHECK: [[T0:%.*]] = getelementptr inbounds [1 x i8*], [1 x i8*]* [[ARGS]], i32 0, i32 0
   // CHECK: store i8* {{.*}}"$s26existential_shape_metadata1C33_881A0B6978EB4286E7CFF1E27030ACACLLVMf"{{.*}}, i8** [[T0]], align
   // CHECK: [[T0:%.*]] = bitcast [1 x i8*]* [[ARGS]] to i8**
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq" to i8*), i8** [[T0]])
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
