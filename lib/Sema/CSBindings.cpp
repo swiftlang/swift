@@ -2017,6 +2017,12 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       if (TypeVar->getImpl().getGenericParameter())
         return false;
 
+      // Don't penalize solutions if we couldn't determine the type of the code
+      // completion token. We still want to examine the surrounding types in
+      // that case.
+      if (TypeVar->getImpl().isCodeCompletionToken())
+        return false;
+
       // Don't penalize solutions with holes due to missing arguments after the
       // code completion position.
       auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
