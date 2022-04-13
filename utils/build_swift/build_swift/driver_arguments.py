@@ -90,6 +90,15 @@ def _apply_default_arguments(args):
     if args.libicu_build_variant is None:
         args.libicu_build_variant = args.build_variant
 
+    if args.libxml2_build_variant is None:
+        args.libxml2_build_variant = args.build_variant
+
+    if args.zlib_build_variant is None:
+        args.zlib_build_variant = args.build_variant
+
+    if args.curl_build_variant is None:
+        args.curl_build_variant = args.build_variant
+
     # Assertions are enabled by default.
     if args.assertions is None:
         args.assertions = True
@@ -709,6 +718,15 @@ def create_argument_parser():
     option('--libicu', toggle_true('build_libicu'),
            help='build libicu')
 
+    option('--static-libxml2', toggle_true('build_libxml2'), default=False,
+           help='build static libxml2')
+
+    option('--static-zlib', toggle_true('build_zlib'), default=False,
+           help='build static zlib')
+
+    option('--static-curl', toggle_true('build_curl'), default=False,
+           help='build static curl libraries')
+
     option('--playgroundsupport', toggle_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
     option('--install-playgroundsupport',
@@ -819,6 +837,18 @@ def create_argument_parser():
     option('--debug-libicu', store('libicu_build_variant'),
            const='Debug',
            help='build the Debug variant of libicu')
+
+    option('--debug-libxml2', store('libxml2_build_variant'),
+           const='Debug',
+           help='build the Debug variant of libxml2')
+
+    option('--debug-zlib', store('zlib_build_variant'),
+           const='Debug',
+           help='build the Debug variant of zlib')
+
+    option('--debug-curl', store('curl_build_variant'),
+           const='Debug',
+           help='build the Debug variant of libcurl')
 
     # -------------------------------------------------------------------------
     # Assertions group
@@ -1252,6 +1282,12 @@ def create_argument_parser():
            help='skip building llvm')
     option('--skip-build-swift', toggle_false('build_swift'),
            help='skip building swift')
+    option('--skip-build-libxml2', toggle_false('build_libxml2'),
+           help='skip building libxml2')
+    option('--skip-build-zlib', toggle_false('build_zlib'),
+           help='skip building zlib')
+    option('--skip-build-curl', toggle_false('build_curl'),
+           help='skip building curl')
 
     # We need to list --skip-test-swift explicitly because otherwise argparse
     # will auto-expand arguments like --skip-test-swift to the only known
@@ -1330,6 +1366,9 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /swift-corelibs-foundation  (optional)
                      /swift-corelibs-libdispatch (optional)
                      /icu                        (optional)
+                     /libxml2                    (optional)
+                     /zlib                       (optional)
+                     /curl                       (optional)
 
 SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
                   Defaults to "$SWIFT_SOURCE_ROOT/build/".
