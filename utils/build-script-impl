@@ -265,6 +265,9 @@ components=(
   libcxx
   libdispatch
   libicu
+  libxml2
+  zlib
+  curl
   llbuild
   lldb
   llvm
@@ -1262,6 +1265,7 @@ LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/libcxx"
 EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${WORKSPACE}/swift-experimental-string-processing"
+LIBXML2_SOURCE_DIR="${WORKSPACE}/libxml2"
 
 # We cannot currently apply the normal rules of skipping here for LLVM. Even if
 # we are skipping building LLVM, we still need to at least build a few tools
@@ -2524,6 +2528,61 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=()
                 fi
 
+                if [[ ! "${SKIP_BUILD_LIBXML2}" ]]; then
+                    BASE_INSTALL_DIR="$(get_host_install_destdir ${host})"
+                    LIBXML2_HEADERS="${BASE_INSTALL_DIR}/usr/include/libxml2"
+                    LIBXML2_LIBRARY="${BASE_INSTALL_DIR}/usr/lib/libxml2.a"
+
+                    if [[ -z "${DRY_RUN}" && ! -d "${LIBXML2_HEADERS}" ]]; then
+                        echo "Error: '${LIBXML2_HEADERS}' does not exist" 1>&2
+                        exit 1
+                    fi
+
+                    if [[ -z "${DRY_RUN}" && ! -e "${LIBXML2_LIBRARY}" ]]; then
+                        echo "Error: '${LIBXML2_LIBRARY}' does not exist" 1>&2
+                        exit 1
+                    fi
+
+                    LIBXML2_BUILD_ARGS=(
+                        -DLIBXML2_INCLUDE_DIR:PATH="${LIBXML2_HEADERS}"
+                        -DLIBXML2_LIBRARY:PATH="${LIBXML2_LIBRARY}"
+                        -DLIBXML2_DEFINITIONS="-DLIBXML_STATIC"
+                    )
+                else
+                    LIBXML2_BUILD_ARGS=()
+                fi
+
+                if [[ ! "${SKIP_BUILD_ZLIB}" ]]; then
+                    BASE_INSTALL_DIR="$(get_host_install_destdir ${host})"
+                    ZLIB_HEADERS="${BASE_INSTALL_DIR}/usr/include"
+                    # Note: On Windows, the spelling is 'zlibstatic.lib',
+                    #       so if this is ported to python, that case will need
+                    #       to be handled.
+                    ZLIB_LIBRARY="${BASE_INSTALL_DIR}/usr/lib/libz.a"
+
+                    if [[ -z "${DRY_RUN}" && ! -d "${ZLIB_HEADERS}" ]]; then
+                        echo "Error: '${ZLIB_HEADERS}' does not exist" 1>&2
+                        exit 1
+                    fi
+
+                    if [[ -z "${DRY_RUN}" && ! -e "${ZLIB_LIBRARY}" ]]; then
+                        echo "Error: '${ZLIB_LIBRARY}' does not exist" 1>&2
+                        exit 1
+                    fi
+
+                    ZLIB_BUILD_ARGS=(
+                        -DZLIB_INCLUDE_DIR:PATH="${ZLIB_HEADERS}"
+                        -DZLIB_LIBRARY:PATH="${ZLIB_LIBRARY}"
+                    )
+                fi
+
+                if [[ ! "${SKIP_BUILD_CURL}" ]]; then
+                    BASE_INSTALL_DIR="$(get_host_install_destdir ${host})"
+                    CURL_BUILD_ARGS=(
+                        -DCURL_DIR="${BASE_INSTALL_DIR}/usr/lib/cmake/CURL"
+                    )
+                fi
+
                 if [[ "${SKIP_CLEAN_FOUNDATION}" == "0" ]]
                 then
                   # The Swift project might have been changed, but CMake might
@@ -2549,6 +2608,12 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
+
+                  ${LIBXML2_BUILD_ARGS[@]}
+
+                  ${ZLIB_BUILD_ARGS[@]}
+
+                  ${CURL_BUILD_ARGS[@]}
 
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
                   -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=$(build_directory ${host} libdispatch)
