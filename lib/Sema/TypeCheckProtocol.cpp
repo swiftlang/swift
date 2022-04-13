@@ -5408,6 +5408,16 @@ void swift::diagnoseConformanceFailure(Type T,
     if (!nominal)
       return;
 
+    if (isa<ClassDecl>(nominal) &&
+        !nominal->isDistributedActor()) {
+      if (nominal->isActor()) {
+        diags.diagnose(ComplainLoc,
+                       diag::actor_cannot_inherit_distributed_actor_protocol,
+                       nominal->getName());
+      } // else, already diagnosed elsewhere
+      return;
+    }
+
     // If it is missing the ActorSystem type, suggest adding it:
     auto systemTy = getDistributedActorSystemType(/*actor=*/nominal);
     if (!systemTy || systemTy->hasError()) {
@@ -6322,12 +6332,12 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         if (!classDecl->isDistributedActor()) {
           if (classDecl->isActor()) {
             dc->getSelfNominalTypeDecl()
-            ->diagnose(diag::distributed_actor_protocol_illegal_inheritance,
+            ->diagnose(diag::actor_cannot_inherit_distributed_actor_protocol,
                        dc->getSelfNominalTypeDecl()->getName())
                        .fixItInsert(classDecl->getStartLoc(), "distributed ");
           } else {
             dc->getSelfNominalTypeDecl()
-            ->diagnose(diag::actor_protocol_illegal_inheritance,
+            ->diagnose(diag::distributed_actor_protocol_illegal_inheritance,
                        dc->getSelfNominalTypeDecl()->getName())
                        .fixItReplace(nominal->getStartLoc(), "distributed actor");
           }
@@ -6841,6 +6851,7 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
 
   case KnownDerivableProtocolKind::DistributedActor:
     return derived.deriveDistributedActor(Requirement);
+
   case KnownDerivableProtocolKind::DistributedActorSystem:
     return derived.deriveDistributedActorSystem(Requirement);
 
