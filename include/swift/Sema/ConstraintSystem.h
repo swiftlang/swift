@@ -108,22 +108,15 @@ namespace constraints {
 struct ResultBuilder {
 private:
   DeclContext *DC;
+  /// An implicit variable that represents `Self` type of the result builder.
+  VarDecl *BuilderSelf;
   Type BuilderType;
   llvm::SmallDenseMap<DeclName, bool> SupportedOps;
 
   Identifier BuildOptionalId;
 
 public:
-  ResultBuilder(DeclContext *DC, Type builderType)
-      : DC(DC), BuilderType(builderType) {
-    auto &ctx = DC->getASTContext();
-    // Use buildOptional(_:) if available, otherwise fall back to buildIf
-    // when available.
-    BuildOptionalId =
-        (supports(ctx.Id_buildOptional) || !supports(ctx.Id_buildIf))
-            ? ctx.Id_buildOptional
-            : ctx.Id_buildIf;
-  }
+  ResultBuilder(ConstraintSystem *CS, DeclContext *DC, Type builderType);
 
   DeclContext *getDeclContext() const { return DC; }
 
@@ -139,6 +132,10 @@ public:
                 bool checkAvailability = false);
 
   bool supportsOptional() { return supports(getBuildOptionalId()); }
+
+  Expr *buildCall(SourceLoc loc, Identifier fnName,
+                  ArrayRef<Expr *> argExprs,
+                  ArrayRef<Identifier> argLabels) const;
 };
 
 /// Describes the algorithm to use for trailing closure matching.

@@ -71,10 +71,6 @@ class BuilderClosureVisitor
 
   ResultBuilder builder;
 
-  /// The variable used as a base for all `build*` operations added
-  /// by this transform.
-  VarDecl *builderVar = nullptr;
-
   SkipUnhandledConstructInResultBuilder::UnhandledNode unhandledNode;
 
   /// Whether an error occurred during application of the builder closure,
@@ -96,27 +92,7 @@ class BuilderClosureVisitor
     if (!cs)
       return nullptr;
 
-    SmallVector<Argument, 4> args;
-    for (auto i : indices(argExprs)) {
-      auto *expr = argExprs[i];
-      auto label = argLabels.empty() ? Identifier() : argLabels[i];
-      auto labelLoc = argLabels.empty() ? SourceLoc() : expr->getStartLoc();
-      args.emplace_back(labelLoc, label, expr);
-    }
-
-    auto *baseExpr = new (ctx) DeclRefExpr({builderVar}, DeclNameLoc(loc),
-                                           /*isImplicit=*/true);
-
-    auto memberRef = new (ctx) UnresolvedDotExpr(
-        baseExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
-        /*implicit=*/true);
-    memberRef->setFunctionRefKind(FunctionRefKind::SingleApply);
-
-    auto openLoc = args.empty() ? loc : argExprs.front()->getStartLoc();
-    auto closeLoc = args.empty() ? loc : argExprs.back()->getEndLoc();
-
-    auto *argList = ArgumentList::createImplicit(ctx, openLoc, args, closeLoc);
-    return CallExpr::createImplicit(ctx, memberRef, argList);
+    return builder.buildCall(loc, fnName, argExprs, argLabels);
   }
 
   /// Build an implicit variable in this context.
@@ -175,20 +151,9 @@ class BuilderClosureVisitor
 public:
   BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs, DeclContext *dc,
                         Type builderType, Type bodyResultType)
-      : cs(cs), dc(dc), ctx(ctx),
-        builder(dc, cs ? cs->simplifyType(builderType) : builderType) {
+      : cs(cs), dc(dc), ctx(ctx), builder(cs, dc, builderType) {
     applied.builderType = builder.getType();
     applied.bodyResultType = bodyResultType;
-
-    // If we are about to generate constraints, let's establish builder
-    // variable for the base of `build*` calls.
-    if (cs) {
-      builderVar = new (ctx) VarDecl(
-          /*isStatic=*/false, VarDecl::Introducer::Let,
-          /*nameLoc=*/SourceLoc(), ctx.Id_builderSelf, dc);
-      builderVar->setImplicit();
-      cs->setType(builderVar, MetatypeType::get(builder.getType()));
-    }
   }
 
   /// Apply the builder transform to the given statement.
@@ -2198,6 +2163,26 @@ void swift::printResultBuilderBuildFunction(
   }
 }
 
+ResultBuilder::ResultBuilder(ConstraintSystem *CS, DeclContext *DC,
+                             Type builderType)
+    : DC(DC), BuilderType(CS ? CS->simplifyType(builderType) : builderType) {
+  auto &ctx = DC->getASTContext();
+  // Use buildOptional(_:) if available, otherwise fall back to buildIf
+  // when available.
+  BuildOptionalId =
+      (supports(ctx.Id_buildOptional) || !supports(ctx.Id_buildIf))
+          ? ctx.Id_buildOptional
+          : ctx.Id_buildIf;
+
+  if (CS) {
+    BuilderSelf = new (ctx) VarDecl(
+        /*isStatic=*/false, VarDecl::Introducer::Let,
+        /*nameLoc=*/SourceLoc(), ctx.Id_builderSelf, DC);
+    BuilderSelf->setImplicit();
+    CS->setType(BuilderSelf, MetatypeType::get(BuilderType));
+  }
+}
+
 bool ResultBuilder::supports(Identifier fnBaseName,
                              ArrayRef<Identifier> argLabels,
                              bool checkAvailability) {
@@ -2210,4 +2195,34 @@ bool ResultBuilder::supports(Identifier fnBaseName,
   return SupportedOps[name] = TypeChecker::typeSupportsBuilderOp(
              BuilderType, DC, fnBaseName, argLabels, /*allResults*/ {},
              checkAvailability);
+}
+
+Expr *ResultBuilder::buildCall(SourceLoc loc, Identifier fnName,
+                               ArrayRef<Expr *> argExprs,
+                               ArrayRef<Identifier> argLabels) const {
+  assert(BuilderSelf);
+
+  auto &ctx = DC->getASTContext();
+
+  SmallVector<Argument, 4> args;
+  for (auto i : indices(argExprs)) {
+    auto *expr = argExprs[i];
+    auto label = argLabels.empty() ? Identifier() : argLabels[i];
+    auto labelLoc = argLabels.empty() ? SourceLoc() : expr->getStartLoc();
+    args.emplace_back(labelLoc, label, expr);
+  }
+
+  auto *baseExpr = new (ctx) DeclRefExpr({BuilderSelf}, DeclNameLoc(loc),
+                                         /*isImplicit=*/true);
+
+  auto memberRef = new (ctx)
+      UnresolvedDotExpr(baseExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
+                        /*implicit=*/true);
+  memberRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+
+  auto openLoc = args.empty() ? loc : argExprs.front()->getStartLoc();
+  auto closeLoc = args.empty() ? loc : argExprs.back()->getEndLoc();
+
+  auto *argList = ArgumentList::createImplicit(ctx, openLoc, args, closeLoc);
+  return CallExpr::createImplicit(ctx, memberRef, argList);
 }
