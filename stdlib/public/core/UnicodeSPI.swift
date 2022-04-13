@@ -165,3 +165,37 @@ extension Unicode.Scalar.Properties {
     return result
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Case folding
+//===----------------------------------------------------------------------===//
+
+extension Unicode.Scalar.Properties {
+  @_spi(_Unicode)
+  @available(SwiftStdlib 5.7, *)
+  public var _caseFolded: String {
+    var buffer: (UInt32, UInt32, UInt32) = (.max, .max, .max)
+
+    withUnsafeMutableBytes(of: &buffer) {
+      // This is safe because the memory is already UInt32
+      let ptr = $0.baseAddress!.assumingMemoryBound(to: UInt32.self)
+      _swift_stdlib_getCaseMapping(_scalar.value, ptr)
+    }
+
+    var result = ""
+    // Max mapping is 3 scalars and the max UTF8 bytes of a scalar is 4.
+    result.reserveCapacity(12)
+
+    withUnsafeBytes(of: &buffer) {
+      for scalar in $0.bindMemory(to: UInt32.self) {
+        guard scalar != .max else {
+          break
+        }
+
+        result.unicodeScalars.append(Unicode.Scalar(scalar)!)
+      }
+    }
+
+    return result
+  }
+}
