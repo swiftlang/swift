@@ -1,5 +1,10 @@
 // REQUIRES: objc_interop
 
+// TODO: Add some way to specify extra options to symbolgraph-extract and then
+//       split this test into parts under the SymbolGraph directory. The SK
+//       tests should just check that we run the generation on 1. the correct
+//       symbol and 2. with the correct options.
+
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
 
@@ -9,6 +14,9 @@ import MyMod
 func test(s: ObjCStruct) {
   // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):3 -req-opts=retrieve_symbol_graph=1 %t/use.swift -- -I %t/mod -target %target-triple %t/use.swift | %FileCheck -check-prefix=CHECK-FUNC %s
   someFunc()
+
+  // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):3 -req-opts=retrieve_symbol_graph=1 %t/use.swift -- -I %t/mod -target %target-triple %t/use.swift | %FileCheck -check-prefix=CHECK-DIRECTIVE-FUNC %s
+  funcUnderDirective()
 
   // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):9 -req-opts=retrieve_symbol_graph=1 %t/use.swift -- -I %t/mod -target %target-triple %t/use.swift | %FileCheck -check-prefix=CHECK-NO %s
   _ = s.noDoc
@@ -99,6 +107,9 @@ func test(s: ObjCStruct) {
 // CHECK-FUNC:       "kind": {
 // CHECK-FUNC:         "displayName": "Function",
 // CHECK-FUNC:         "identifier": "swift.func"
+// CHECK-FUNC:       },
+// CHECK-FUNC:       "location": {
+// CHECK-FUNC:         "uri": "file://{{.*}}mod{{\\\\|/}}M.h"
 // CHECK-FUNC:       },
 // CHECK-FUNC:       "names": {
 // CHECK-FUNC:         "subHeading": [
@@ -266,3 +277,9 @@ struct ObjCStruct {
   // CHECK-MIXED-DOC-NEXT:    ]
   // CHECK-MIXED-DOC-NEXT:  }
 };
+
+#line 10 "other.h"
+void funcUnderDirective(void);
+// CHECK-DIRECTIVE-FUNC:  "location": {
+// CHECK-DIRECTIVE-FUNC:    "uri": "file://{{.*}}other.h"
+// CHECK-DIRECTIVE-FUNC:  }
