@@ -1991,17 +1991,17 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
 /// Collect conformances by looking up the conformance from replacement
 /// type and protocol decl.
 static bool getConformancesForSubstitution(Parser &P,
-              ExistentialLayout::ProtocolTypeArrayRef protocols,
+              ArrayRef<ProtocolDecl*> protocols,
               Type subReplacement,
               SourceLoc loc,
               SmallVectorImpl<ProtocolConformanceRef> &conformances) {
   auto M = P.SF.getParentModule();
 
-  for (auto protoTy : protocols) {
-    auto conformance = M->lookupConformance(subReplacement,
-                                            protoTy->getDecl());
+  for (auto protoDecl : protocols) {
+    auto conformance = M->lookupConformance(subReplacement, protoDecl);
     if (conformance.isInvalid()) {
-      P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement, protoTy);
+      P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement,
+                 protoDecl->getDeclaredInterfaceType());
       return true;
     }
     conformances.push_back(conformance);

@@ -594,6 +594,9 @@ private:
     case Node::Kind::AccessibleFunctionRecord:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
+    case Node::Kind::ExtendedExistentialTypeShape:
+    case Node::Kind::ExtendedExistentialValueStorage:
+    case Node::Kind::Uniquable:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2961,6 +2964,41 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << ")";
       Printer << " suspend resume partial function for ";
     }
+    return nullptr;
+  case Node::Kind::Uniquable:
+    Printer << "uniquable ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::ExtendedExistentialTypeShape: {
+    // Printing the requirement signature is pretty useless if we
+    // don't print `where` clauses.
+    auto savedDisplayWhereClauses = Options.DisplayWhereClauses;
+    Options.DisplayWhereClauses = true;
+
+    NodePointer reqSig = Node->getChild(0);
+    NodePointer genSig = nullptr, type = nullptr;
+    if (Node->getNumChildren() == 4) {
+      genSig = Node->getChild(1);
+      type = Node->getChild(2);
+    } else {
+      type = Node->getChild(1);
+    }
+
+    Printer << "existential shape for ";
+    if (genSig) {
+      print(genSig, depth + 1);
+      Printer << " ";
+    }
+    Printer << "any";
+    print(reqSig, depth + 1);
+    Printer << " ";
+    print(type, depth + 1);
+
+    Options.DisplayWhereClauses = savedDisplayWhereClauses;
+    return nullptr;
+  }
+  case Node::Kind::ExtendedExistentialValueStorage:
+    Printer << Node->getText();
     return nullptr;
   }
 

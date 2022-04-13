@@ -65,8 +65,8 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
   if (type.isExistentialType()) {
     auto layout = type->getExistentialLayout();
     for (auto proto : layout.getProtocols()) {
-      if (proto->getDecl() == errorProtocol ||
-          proto->getDecl()->inheritsFrom(errorProtocol)) {
+      if (proto == errorProtocol ||
+          proto->inheritsFrom(errorProtocol)) {
         return true;
       }
     }

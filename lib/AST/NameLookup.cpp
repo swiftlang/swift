@@ -1624,8 +1624,7 @@ void namelookup::extractDirectlyReferencedNominalTypes(
   if (auto compositionTy = type->getAs<ProtocolCompositionType>()) {
     auto layout = compositionTy->getExistentialLayout();
 
-    for (auto proto : layout.getProtocols()) {
-      auto *protoDecl = proto->getDecl();
+    for (auto protoDecl : layout.getProtocols()) {
       decls.push_back(protoDecl);
     }
 
@@ -2304,8 +2303,8 @@ static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
     }
 
     // Protocols.
-    for (auto protocolTy : layout.getProtocols())
-      result.push_back(protocolTy->getDecl());
+    for (auto protoDecl : layout.getProtocols())
+      result.push_back(protoDecl);
     return result;
   }
 

@@ -529,6 +529,7 @@ protected:
   NodePointer demangleArchetype();
   NodePointer demangleAssociatedTypeSimple(NodePointer GenericParamIdx);
   NodePointer demangleAssociatedTypeCompound(NodePointer GenericParamIdx);
+  NodePointer demangleExtendedExistentialShape(char kind);
 
   NodePointer popAssocTypeName();
   NodePointer popAssocTypePath();

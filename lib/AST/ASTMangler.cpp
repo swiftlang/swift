@@ -1045,8 +1045,7 @@ void ASTMangler::appendExistentialLayout(
   bool First = true;
   bool DroppedRequiresClass = false;
   bool SawRequiresClass = false;
-  for (Type protoTy : layout.getProtocols()) {
-    auto proto = protoTy->castTo<ProtocolType>()->getDecl();
+  for (auto proto : layout.getProtocols()) {
     // If we aren't allowed to emit marker protocols, suppress them here.
     if (!AllowMarkerProtocols && proto->isMarkerProtocol()) {
       if (proto->requiresClass())
@@ -1058,7 +1057,7 @@ void ASTMangler::appendExistentialLayout(
     if (proto->requiresClass())
       SawRequiresClass = true;
 
-    appendProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
+    appendProtocolName(proto);
     appendListSeparator(First);
   }
   if (First)
@@ -1258,7 +1257,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::Protocol: {
       return appendExistentialLayout(
-          ExistentialLayout(cast<ProtocolType>(tybase)), sig, forDecl);
+          ExistentialLayout(CanProtocolType(cast<ProtocolType>(tybase))),
+          sig, forDecl);
     }
 
     case TypeKind::ProtocolComposition: {
