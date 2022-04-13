@@ -157,7 +157,6 @@ Double-check that running `pwd` prints a path ending with `swift`.
 1. The latest Linux dependencies are listed in the respective Dockerfiles:
    * [Ubuntu 20.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
    * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
-   * [CentOS 8](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/8/Dockerfile)
    * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
 
 2. To install sccache (optional):
