@@ -226,11 +226,10 @@ void SILFunctionBuilder::addFunctionAttributes(
     fprintf(stderr, "[%s:%d] (%s) IS DIST THUNK!\n", __FILE__, __LINE__, __FUNCTION__);
     constant.dump();
 
-    // TODO: also handle protocol / extension
-    auto actor = dyn_cast<ClassDecl>(decl->getDeclContext());
+    auto *actor = decl->getDeclContext()->getSelfNominalTypeDecl();
     if (actor && actor->isDistributedActor()) {
       auto &C = decl->getASTContext();
-      auto systemTy = getDistributedActorSystemType(actor);
+      auto systemTy = getConcreteReplacementForProtocolActorSystemType(decl);
       assert(systemTy);
 
       auto decoderTy =

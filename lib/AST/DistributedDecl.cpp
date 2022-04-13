@@ -97,6 +97,10 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
 }
 
 Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
+  assert(!dyn_cast<ProtocolDecl>(actor) &&
+         "Use getConcreteReplacementForProtocolActorSystemType instead to get"
+         "the concrete ActorSystem, if bound, for this DistributedActor "
+         "constrained ProtocolDecl!");
   assert(actor->isDistributedActor());
   auto &C = actor->getASTContext();
 
