@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Unicode scalar tests are currently only avaible on Darwin, awaiting a sensible
+// Unicode scalar tests are currently only available on Darwin, awaiting a sensible
 // file API...
 #if _runtime(_ObjC)
 import Foundation
@@ -634,6 +634,54 @@ public let names: [Unicode.Scalar: String] = {
 
   let derivedName = readInputFile("DerivedName.txt")
   parseNames(derivedName, into: &result)
+
+  return result
+}()
+
+//===----------------------------------------------------------------------===//
+// Case Folding
+//===----------------------------------------------------------------------===//
+
+func parseCaseFoldings(
+  _ data: String,
+  into result: inout [Unicode.Scalar: String]
+) {
+  for line in data.split(separator: "\n") {
+    // Skip comments
+    guard !line.hasPrefix("#") else {
+      continue
+    }
+    
+    let components = line.split(separator: ";")
+    
+    let status = components[1].filter { !$0.isWhitespace }
+    
+    // We only care about Common and Full case mappings.
+    guard status == "C" || status == "F" else {
+      continue
+    }
+    
+    let scalar = Unicode.Scalar(parseScalars(String(components[0])).lowerBound)!
+    
+    let mapping = components[2].split(separator: " ").map {
+      Unicode.Scalar(UInt32($0, radix: 16)!)!
+    }
+    
+    var mappingString = ""
+
+    for scalar in mapping {
+      mappingString.unicodeScalars.append(scalar)
+    }
+
+    result[scalar] = mappingString
+  }
+}
+
+public let caseFolding: [Unicode.Scalar: String] = {
+  var result: [Unicode.Scalar: String] = [:]
+
+  let caseFolding = readInputFile("CaseFolding.txt")
+  parseCaseFoldings(caseFolding, into: &result)
 
   return result
 }()
