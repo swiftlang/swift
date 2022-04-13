@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # modify-non-primary-files.py - Fake build while modifying files -*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -15,8 +15,6 @@
 # source files during compilation.
 #
 # ----------------------------------------------------------------------------
-
-from __future__ import print_function
 
 import os
 import sys

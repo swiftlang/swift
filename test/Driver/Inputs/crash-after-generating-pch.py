@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # crash.py - Sends SIGKILL to self. -*- python -*-
 #
 # This source file is part of the Swift.org open source project

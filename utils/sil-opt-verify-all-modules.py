@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # utils/sil-opt-verify-all-modules.py - Verifies Swift modules -*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -8,8 +8,6 @@
 #
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-
-from __future__ import print_function
 
 import argparse
 import glob

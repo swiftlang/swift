@@ -2,8 +2,6 @@
 # GYB: Generate Your Boilerplate (improved names welcome; at least
 # this one's short).  See -h output for instructions
 
-from __future__ import print_function
-
 import io
 import os
 import re

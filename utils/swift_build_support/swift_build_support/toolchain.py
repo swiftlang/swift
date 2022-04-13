@@ -14,8 +14,6 @@ Represent toolchain - the versioned executables.
 """
 # ----------------------------------------------------------------------------
 
-from __future__ import absolute_import
-
 import os
 import platform
 
