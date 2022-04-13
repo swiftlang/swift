@@ -1129,24 +1129,14 @@ protected:
   }
 
 public:
-  /// If an instruction is directly forwarding, then any operand op whose
-  /// ownership it forwards into a result r must have the property that op and r
-  /// are "rc identical". This means that they are representing the same set of
-  /// underlying lifetimes (plural b/c of aggregates).
+  /// A forwarding instruction preserved ownership if it has a
+  /// dynamically non-trivial result in which all references are forwarded from
+  /// the operand.
   ///
-  /// An instruction that is not directly forwarding, can not have guaranteed
-  /// ownership since without direct forwarding, there isn't necessarily any
-  /// connection in between the operand's lifetime and the value's lifetime.
-  ///
-  /// An example of this is checked_cast_br where when performing the following:
-  ///
-  ///   __SwiftValue(AnyHashable(Klass())) to OtherKlass()
-  ///
-  /// we will look through the __SwiftValue(AnyHashable(X)) any just cast Klass
-  /// to OtherKlass. This means that the result argument would no longer be
-  /// rc-identical to the operand and default case and thus we can not propagate
-  /// forward any form of guaranteed ownership.
-  bool isDirectlyForwarding() const { return directlyForwards; }
+  /// A cast can only forward guaranteed values if it preserves ownership. Such
+  /// casts cannot release any references within their operand's value and
+  /// cannot retain any references owned by their result.
+  bool preservesOwnership() const { return preservesOwnershipFlag; }
 
   /// Forwarding ownership is determined by the forwarding instruction's
   /// constant ownership attribute. If forwarding ownership is owned, then the
@@ -9064,16 +9054,12 @@ class CheckedCastBranchInst final
                         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
                         ProfileCounter Target1Count,
                         ProfileCounter Target2Count,
-                        ValueOwnershipKind forwardingOwnershipKind)
+                        ValueOwnershipKind forwardingOwnershipKind,
+                        bool preservesOwnership)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, SuccessBB, FailureBB,
             Target1Count, Target2Count, forwardingOwnershipKind,
-            // We are always directly forwarding unless we are casting an
-            // AnyObject. This is b/c an AnyObject could contain a boxed
-            // AnyObject(Class()) that we unwrap as part of the cast. In such a
-            // case, we would return a different value and potentially end the
-            // lifetime of the operand value.
-            !Operand->getType().isAnyObject()),
+            preservesOwnership),
         DestLoweredTy(DestLoweredTy), DestFormalTy(DestFormalTy),
         IsExact(IsExact) {}
 

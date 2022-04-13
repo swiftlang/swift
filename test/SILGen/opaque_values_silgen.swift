@@ -4,6 +4,8 @@
 
 // FIXME: "HECK" lines all need to be updated for OSSA.
 
+class C {}
+
 func genericInout<T>(_: inout T) {}
 
 func hasVarArg(_ args: Any...) {}
