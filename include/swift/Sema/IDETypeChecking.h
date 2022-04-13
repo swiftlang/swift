@@ -19,9 +19,11 @@
 #ifndef SWIFT_SEMA_IDETYPECHECKING_H
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/SourceLoc.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/SourceLoc.h"
 #include <memory>
 #include <tuple>
 
@@ -144,8 +146,9 @@ namespace swift {
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
-  /// Type check a function body element which is at \p TagetLoc .
-  bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
+  /// Type check a function body element which is at \p TagetLoc.
+  bool typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
+                             SourceLoc TargetLoc);
 
   /// Thunk around \c TypeChecker::typeCheckForCodeCompletion to make it
   /// available to \c swift::ide.
@@ -162,6 +165,11 @@ namespace swift {
   bool typeCheckForCodeCompletion(
       constraints::SolutionApplicationTarget &target, bool needsPrecheck,
       llvm::function_ref<void(const constraints::Solution &)> callback);
+
+  /// Thunk around \c TypeChecker::typeCheckASTNode to make it available to
+  /// \c swift::ide.
+  void typeCheckASTNode(ASTNode &node, DeclContext *DC,
+                        bool LeaveBodyUnchecked = false);
 
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);

@@ -480,12 +480,13 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                        /*patternType=*/Type(), options);
 }
 
-bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
-  auto &Ctx = DC->getASTContext();
+bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
+                                  SourceLoc TargetLoc) {
+  auto &Ctx = TypeCheckCtx.getDeclContext()->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  return !evaluateOrDefault(Ctx.evaluator,
-                            TypeCheckASTNodeAtLocRequest{DC, TargetLoc},
-                            true);
+  return !evaluateOrDefault(
+      Ctx.evaluator, TypeCheckASTNodeAtLocRequest{TypeCheckCtx, TargetLoc},
+      true);
 }
 
 bool swift::typeCheckForCodeCompletion(
@@ -493,6 +494,11 @@ bool swift::typeCheckForCodeCompletion(
     llvm::function_ref<void(const constraints::Solution &)> callback) {
   return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
                                                  callback);
+}
+
+void swift::typeCheckASTNode(ASTNode &node, DeclContext *DC,
+                             bool LeaveBodyUnchecked) {
+  return TypeChecker::typeCheckASTNode(node, DC, LeaveBodyUnchecked);
 }
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {

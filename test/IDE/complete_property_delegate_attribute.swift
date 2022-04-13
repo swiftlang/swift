@@ -1,7 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AFTER_PAREN | %FileCheck %s -check-prefix=AFTER_PAREN
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_MyEnum_NODOT | %FileCheck %s -check-prefix=ARG_MyEnum_NODOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_MyEnum_DOT | %FileCheck %s -check-prefix=ARG_MyEnum_DOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_MyEnum_NOBINDING | %FileCheck %s -check-prefix=ARG_MyEnum_NOBINDING
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 enum MyEnum {
   case east, west
@@ -42,7 +40,12 @@ struct TestStruct {
 
   @MyStruct(arg1: MyEnum.#^ARG_MyEnum_NOBINDING^#)
 // ARG_MyEnum_NOBINDING: Begin completions
-// ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal: east[#MyEnum#];
-// ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal: west[#MyEnum#];
-// ARG_MyEnum_NOBINDING: End completions
+// ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: east[#MyEnum#];
+// ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: west[#MyEnum#];
+// ARG_MyEnum_NOBINDINaG: End completions
+
+  // FIXME: No call patterns are suggested if we are completing in variable with multiple property wrappers (rdar://91480982)
+  func sync() {}
+
+  @MyStruct(#^WITHOUT_VAR?check=AFTER_PAREN^#
 }

@@ -3109,15 +3109,22 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   ArgumentList *argList = nullptr;
   if (Tok.isFollowingLParen() && isCustomAttributeArgument()) {
     if (peekToken().is(tok::code_complete)) {
-      consumeToken(tok::l_paren);
+      auto lParenLoc = consumeToken(tok::l_paren);
+      auto typeE = new (Context) TypeExpr(type.get());
+      auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
       if (CodeCompletion) {
-        auto typeE = new (Context) TypeExpr(type.get());
-        auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
         CodeCompletion->completePostfixExprParen(typeE, CCE);
       }
       consumeToken(tok::code_complete);
-      skipUntil(tok::r_paren);
-      consumeIf(tok::r_paren);
+      skipUntilDeclStmtRBrace(tok::r_paren);
+      auto rParenLoc = PreviousLoc;
+      if (Tok.is(tok::r_paren)) {
+        rParenLoc = consumeToken(tok::r_paren);
+      }
+
+      argList = ArgumentList::createParsed(
+          Context, lParenLoc, {Argument::unlabeled(CCE)}, rParenLoc,
+          /*trailingClosureIdx=*/None);
       status.setHasCodeCompletionAndIsError();
     } else {
       // If we have no local context to parse the initial value into, create
@@ -3147,6 +3154,9 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   auto *TE = new (Context) TypeExpr(type.get());
   auto *customAttr = CustomAttr::create(Context, atLoc, TE, initContext,
                                         argList);
+  if (status.hasCodeCompletion() && CodeCompletion) {
+    CodeCompletion->setCompletingInAttribute(customAttr);
+  }
   return makeParserResult(status, customAttr);
 }
 

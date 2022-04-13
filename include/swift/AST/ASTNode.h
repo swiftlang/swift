@@ -84,6 +84,10 @@ namespace swift {
       V.Val = decltype(V.Val)::getFromOpaqueValue(VP);
       return V;
     }
+
+    friend llvm::hash_code hash_value(ASTNode N) {
+      return llvm::hash_value(N.getOpaqueValue());
+    }
   };
 } // namespace swift
 
