@@ -327,7 +327,7 @@ func resyncParserB14() {}
 var stringInterp = "\(#^STRING_INTERP_3?check=STRING_INTERP^#)"
 _ = "" + "\(#^STRING_INTERP_4?check=STRING_INTERP^#)" + ""
 // STRING_INTERP: Begin completions
-// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]/IsSystem: ['(']{#(value): T#}[')'][#Void#];
+// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]/IsSystem: ['(']{#(value): Any.Type#}[')'][#Void#];
 // STRING_INTERP-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: FooStruct[#FooStruct#]; name=FooStruct
 // STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: fooFunc1()[#Void#];
 // STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: optStr()[#String?#];

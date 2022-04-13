@@ -165,7 +165,7 @@ func rdar22834017() {
   Foo(#^RDAR_22834017^#)
 }
 // RDAR_22834017: Begin completions, 1 items
-// RDAR_22834017: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#a: <<error type>>#}, {#b: <<error type>>#}, {#c: <<error type>>#}[')'][#Foo#];
+// RDAR_22834017: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#a: _#}, {#b: _#}, {#c: _#}[')'][#Foo#];
 // RDAR_22834017: End completions
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | %FileCheck %s -check-prefix=RDAR_23173692

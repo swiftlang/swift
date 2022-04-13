@@ -33,39 +33,42 @@ let MyConstantString = "MyConstant"
 let MyConstantBool = true
 
 func testGlobalLookup() {
-  @TupleBuilder<String> var x1 {
+  @TupleBuilder<String> var x1: String {
     #^GLOBAL_LOOKUP^#
     // GLOBAL_LOOKUP: Begin completions
-    // GLOBAL_LOOKUP: Decl[GlobalVar]/CurrModule:         MyConstantString[#String#];
+    // GLOBAL_LOOKUP: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]:         MyConstantString[#String#];
     // GLOBAL_LOOKUP: End completions
   }
 
-  @TupleBuilder<String> var x2 {
+  @TupleBuilder<String> var x2: String {
     if true {
-      #^GLOBAL_LOOKUP_IN_IF_BODY?check=GLOBAL_LOOKUP^#
+      #^GLOBAL_LOOKUP_IN_IF_BODY^#
+      // GLOBAL_LOOKUP_IN_IF_BODY: Begin completions
+      // GLOBAL_LOOKUP_IN_IF_BODY: Decl[GlobalVar]/CurrModule:         MyConstantString[#String#];
+      // GLOBAL_LOOKUP_IN_IF_BODY: End completions
     }
   }
 
-  @TupleBuilder<String> var x3 {
+  @TupleBuilder<String> var x3: String {
     if {
-      #^GLOBAL_LOOKUP_IN_IF_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP^#
+      #^GLOBAL_LOOKUP_IN_IF_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP_IN_IF_BODY^#
     }
   }
 
-  @TupleBuilder<String> var x4 {
+  @TupleBuilder<String> var x4: String {
     guard else {
-      #^GLOBAL_LOOKUP_IN_GUARD_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP^#
+      #^GLOBAL_LOOKUP_IN_GUARD_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP_IN_IF_BODY^#
     }
   }
 
-  @TupleBuilder<String> var x5 {
+  @TupleBuilder<String> var x5: String {
     "hello: \(#^GLOBAL_LOOKUP_IN_STRING_LITERAL^#)"
 // GLOBAL_LOOKUP_IN_STRING_LITERAL: Begin completions
 // GLOBAL_LOOKUP_IN_STRING_LITERAL: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: MyConstantString[#String#];
 // GLOBAL_LOOKUP_IN_STRING_LITERAL: End completions
   }
 
-  @TupleBuilder<String> var x5 {
+  @TupleBuilder<String> var x5: String {
     if #^GLOBAL_LOOKUP_IN_IF_CONDITION^# {
 // GLOBAL_LOOKUP_IN_IF_CONDITION: Begin completions
 // GLOBAL_LOOKUP_IN_IF_CONDITION: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: MyConstantBool[#Bool#]; name=MyConstantBool
@@ -75,21 +78,27 @@ func testGlobalLookup() {
 }
 
 func testStaticMemberLookup() {
-  @TupleBuilder<String> var x1 {
+  @TupleBuilder<String> var x1: String {
     StringFactory.#^COMPLETE_STATIC_MEMBER^#
     // COMPLETE_STATIC_MEMBER: Begin completions
-    // COMPLETE_STATIC_MEMBER: Decl[StaticMethod]/CurrNominal:     makeString({#x: String#})[#String#];
+    // COMPLETE_STATIC_MEMBER: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]:     makeString({#x: String#})[#String#];
     // COMPLETE_STATIC_MEMBER: End completions
   }
 
-  @TupleBuilder<String> var x2 {
+  @TupleBuilder<String> var x2: String {
     if true {
-      StringFactory.#^COMPLETE_STATIC_MEMBER_IN_IF_BODY?check=COMPLETE_STATIC_MEMBER^#
+      StringFactory.#^COMPLETE_STATIC_MEMBER_IN_IF_BODY^#
+    // COMPLETE_STATIC_MEMBER_IN_IF_BODY: Begin completions
+    // COMPLETE_STATIC_MEMBER_IN_IF_BODY: Decl[StaticMethod]/CurrNominal:     makeString({#x: String#})[#String#];
+    // COMPLETE_STATIC_MEMBER_IN_IF_BODY: End completions
     }
   }
 
-  @TupleBuilder<String> var x3 {
-    "hello: \(StringFactory.#^COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL?check=COMPLETE_STATIC_MEMBER;xfail=rdar78015646^#)"
+  @TupleBuilder<String> var x3: String {
+    "hello: \(StringFactory.#^COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL^#)"
+    // COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: Begin completions
+    // COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]:     makeString({#x: String#})[#String#];
+    // COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: End completions
   }
 }
 
@@ -101,7 +110,7 @@ struct FooStruct {
 }
 
 func testPatternMatching() {
-  @TupleBuilder<String> var x1 {
+  @TupleBuilder<String> var x1: String {
     let x = Letters.b
     if case .#^COMPLETE_PATTERN_MATCHING_IN_IF?check=COMPLETE_CASE^# = x {
 // COMPLETE_CASE: Begin completions
@@ -112,7 +121,7 @@ func testPatternMatching() {
     }
   }
 
-  @TupleBuilder<String> var x2 {
+  @TupleBuilder<String> var x2: String {
     let x = Letters.a
     switch x {
     case .#^COMPLETE_CASE_IN_SWITCH?check=COMPLETE_CASE^#:
@@ -120,7 +129,7 @@ func testPatternMatching() {
     }
   }
 
-  @TupleBuilder<String> var x3 {
+  @TupleBuilder<String> var x3: String {
     let x: FooStruct? = FooStruct()
     guard case .#^GUARD_CASE_PATTERN_1?check=OPTIONAL_FOOSTRUCT^# = x {}
     // OPTIONAL_FOOSTRUCT: Begin completions, 2 items
@@ -129,30 +138,30 @@ func testPatternMatching() {
     // OPTIONAL_FOOSTRUCT: End completions
   }
 
-  @TupleBuilder<String> var x4 {
+  @TupleBuilder<String> var x4: String {
     let x: FooStruct? = FooStruct()
     guard case .#^GUARD_CASE_PATTERN_2?check=OPTIONAL_FOOSTRUCT^#some() = x {}
   }
 }
 
 func testCompleteFunctionArgumentLabels() {
-  @TupleBuilder<String> var x1 {
+  @TupleBuilder<String> var x1: String {
     StringFactory.makeString(#^FUNCTION_ARGUMENT_LABEL^#)
     // FUNCTION_ARGUMENT_LABEL: Begin completions, 1 item
-    // FUNCTION_ARGUMENT_LABEL: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#x: String#}[')'][#String#];
+    // FUNCTION_ARGUMENT_LABEL: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#x: String#}[')'][#String#];
     // FUNCTION_ARGUMENT_LABEL: End completions
   }
 }
 
 func testCompleteFunctionArgument() {
-  @TupleBuilder<String> var x1 {
+  @TupleBuilder<String> var x1: String {
     StringFactory.makeString(x: #^ARGUMENT_LOOKUP^#)
     // ARGUMENT_LOOKUP: Begin completions
     // ARGUMENT_LOOKUP: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: MyConstantString[#String#];
     // ARGUMENT_LOOKUP: End completions
   }
 
-  @TupleBuilder<String> var x2 {
+  @TupleBuilder<String> var x2: String {
     if true {
       StringFactory.makeString(x: #^ARGUMENT_LOOKUP_IN_IF_BODY?check=ARGUMENT_LOOKUP^#)
     }
@@ -164,7 +173,7 @@ func testCompleteErrorTypeInCatch() {
     case E1
     case E2(Int32)
   }
-  @TupleBuilder<String> var x1 {
+  @TupleBuilder<String> var x1: String {
     do {} catch Error4.#^CATCH2^#
   }
 // CATCH2: Begin completions

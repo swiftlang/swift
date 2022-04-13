@@ -1387,6 +1387,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
     return true;
   }
+  case CompletionKind::PostfixExprParen:
   case CompletionKind::CallArg: {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);

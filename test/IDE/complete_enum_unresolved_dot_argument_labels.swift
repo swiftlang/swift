@@ -11,7 +11,7 @@ func testInit() {
   var state = DragState.inactive
   state = .dragging(#^SIGNATURE^#)
   // SIGNATURE: Begin completions, 1 item
-  // SIGNATURE: Pattern/CurrModule/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#translationX: Int#}, {#translationY: Int#}[')'][#DragState#];
+  // SIGNATURE: Pattern/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#translationX: Int#}, {#translationY: Int#}[')'][#DragState#];
   // SIGNATURE: End completions
 
   state = .dragging(translationX: 2, #^ARGUMENT^#)
@@ -21,7 +21,7 @@ func testInit() {
 
   state = .defaulted(#^DEFAULTED^#)
   // DEFAULTED: Begin completions, 1 items
-  // DEFAULTED: Pattern/CurrModule/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#x: Int#}, {#y: Int#}, {#z: Int#}, {#extra: Int#}[')'][#DragState#];
+  // DEFAULTED: Pattern/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#x: Int#}, {#y: Int#}, {#z: Int#}, {#extra: Int#}[')'][#DragState#];
   // DEFAULTED: End completions
 
   state = .defaulted(x: 1, #^DEFAULTEDARG^#)

@@ -239,7 +239,7 @@ class C3 {
 // OVERLOAD6-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#(a1): C1#}, {#b1: C2#}[')'][#Void#]; name=:b1:
 // OVERLOAD6-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#a2: C2#}, {#b2: C1#}[')'][#Void#]; name=a2:b2:
 // OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: C1I[#C1#]; name=C1I
-// OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
+// OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      C2I[#C2#]; name=C2I
 // OVERLOAD6: End completions
 
 extension C3 {
@@ -254,7 +254,7 @@ extension C3 {
 }
 
 // HASERROR1: Begin completions
-// HASERROR1-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#a1: C1#}, {#b1: <<error type>>#}[')'][#Int#];
+// HASERROR1-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#a1: C1#}, {#b1: _#}[')'][#Int#];
 // HASERROR1: End completions
 
 // HASERROR2: Begin completions
@@ -468,8 +468,8 @@ func curry<T1, T2, R>(_ f: @escaping (T1, T2) -> R) -> (T1) -> (T2) -> R {
   return { t1 in { t2 in f(#^NESTED_CLOSURE^#, t2) } }
   // NESTED_CLOSURE: Begin completions
   // FIXME: Should be '/TypeRelation[Invalid]: t2[#T2#]'
-  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2; name=t2
-  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t1[#T1#]; name=t1
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2[#T2#]; name=t2
+  // NESTED_CLOSURE: Decl[LocalVar]/Local/TypeRelation[Convertible]: t1[#T1#]; name=t1
 }
 
 func trailingClosureLocal(x: Int, fn: (Int) -> Void) {
@@ -608,8 +608,8 @@ func testStaticMemberCall() {
 
   let _ = TestStaticMemberCall.create2(#^STATIC_METHOD_AFTERPAREN_2^#)
 // STATIC_METHOD_AFTERPAREN_2: Begin completions
-// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
-// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
+// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
+// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
 // STATIC_METHOD_AFTERPAREN_2-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem/TypeRelation[Convertible]: Int[#Int#];
 // STATIC_METHOD_AFTERPAREN_2-DAG: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#];
 // STATIC_METHOD_AFTERPAREN_2: End completions
@@ -664,9 +664,8 @@ func testImplicitMember() {
 // IMPLICIT_MEMBER_SKIPPED: End completions
 
   let _: TestStaticMemberCall = .createOverloaded(#^IMPLICIT_MEMBER_OVERLOADED^#)
-// IMPLICIT_MEMBER_OVERLOADED: Begin completions, 2 items
+// IMPLICIT_MEMBER_OVERLOADED: Begin completions, 1 item
 // IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
-// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: String#}[')'][#String#]; name=arg1:
 // IMPLICIT_MEMBER_OVERLOADED: End completions
 }
 func testImplicitMemberInArrayLiteral() {
@@ -730,7 +729,7 @@ struct TestHasErrorAutoclosureParam {
   func test() {
     hasErrorAutoclosureParam(#^PARAM_WITH_ERROR_AUTOCLOSURE^#
 // PARAM_WITH_ERROR_AUTOCLOSURE: Begin completions, 1 items
-// PARAM_WITH_ERROR_AUTOCLOSURE: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#value: <<error type>>#}[')'][#Void#];
+// PARAM_WITH_ERROR_AUTOCLOSURE: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#value: _#}[')'][#Void#];
 // PARAM_WITH_ERROR_AUTOCLOSURE: End completions
   }
 }
