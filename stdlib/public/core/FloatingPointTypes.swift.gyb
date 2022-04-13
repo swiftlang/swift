@@ -13,7 +13,6 @@
 import SwiftShims
 
 %{
-from __future__ import division
 from SwiftIntTypes import all_integer_types
 from SwiftFloatingPointTypes import all_floating_point_types
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This is a simple script that reads in a csv file, selects a column, and then
 # forms an "s-curve" graph of that column.
