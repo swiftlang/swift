@@ -420,13 +420,17 @@ public:
 class UsableFilteringDeclConsumer final : public VisibleDeclConsumer {
   const SourceManager &SM;
   const DeclContext *DC;
+  const DeclContext *typeContext;
   SourceLoc Loc;
+  llvm::DenseMap<DeclBaseName, std::pair<ValueDecl *, DeclVisibilityKind>>
+      SeenNames;
   VisibleDeclConsumer &ChainedConsumer;
 
 public:
   UsableFilteringDeclConsumer(const SourceManager &SM, const DeclContext *DC,
                               SourceLoc loc, VisibleDeclConsumer &consumer)
-      : SM(SM), DC(DC), Loc(loc), ChainedConsumer(consumer) {}
+      : SM(SM), DC(DC), typeContext(DC->getInnermostTypeContext()), Loc(loc),
+        ChainedConsumer(consumer) {}
 
   void foundDecl(ValueDecl *D, DeclVisibilityKind reason,
                  DynamicLookupInfo dynamicLookupInfo) override;

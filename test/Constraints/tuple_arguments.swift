@@ -1712,7 +1712,6 @@ class Mappable<T> {
 }
 
 let x = Mappable(())
-// expected-note@-1 4{{'x' declared here}}
 x.map { (_: Void) in return () }
 x.map { (_: ()) in () }
 
