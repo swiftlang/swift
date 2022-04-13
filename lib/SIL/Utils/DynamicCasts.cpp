@@ -320,8 +320,18 @@ bool swift::doesCastPreserveOwnershipForTypes(SILModule &module,
   if (!canIRGenUseScalarCheckedCastInstructions(module, sourceType, targetType))
     return false;
 
-  return !sourceType->isPotentiallyAnyObject()
-    && !targetType->isPotentiallyAnyObject();
+  // (B2) unwrapping
+  if (sourceType->isPotentiallyAnyObject())
+    return false;
+
+  // (B1) wrapping
+  if (targetType->isPotentiallyAnyObject()) {
+    // A class type cannot be wrapped in __SwiftValue, so casting
+    // from a class to AnyObject preserves ownership.
+    return
+      sourceType->mayHaveSuperclass() || sourceType->isClassExistentialType();
+  }
+  return true;
 }
 
 bool SILDynamicCastInst::isRCIdentityPreserving() const {
