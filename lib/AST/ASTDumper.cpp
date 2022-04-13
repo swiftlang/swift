@@ -820,6 +820,11 @@ namespace {
 
     void visitClassDecl(ClassDecl *CD) {
       printCommon(CD, "class_decl");
+      if (CD->isExplicitActor()) {
+        OS << " actor";
+      } else if (CD->isExplicitDistributedActor()) {
+        OS << " distributed actor";
+      }
       if (CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
         OS << " @_staticInitializeObjCMetadata";
       printCommonPost(CD);
