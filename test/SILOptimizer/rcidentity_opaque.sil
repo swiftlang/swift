@@ -10,11 +10,23 @@ class Base {}
 
 class Sub : Base {}
 
+struct Bool {
+  var value : Builtin.Int1
+}
+
 protocol P {}
 
 protocol PClass : AnyObject {}
 
 protocol PBase : Base {}
+
+public protocol Hashable {}
+
+public struct AnyHashable: Hashable {
+  internal var base: Any
+
+  public init<H: Hashable>(_ base: H)
+}
 
 // Test dynamic casts that preserve ownership. See DynamicCasts.cpp
 // swift::doesCastPreserveOwnershipForTypes.
@@ -24,6 +36,7 @@ protocol PBase : Base {}
 //   (A) one type is a bridged value and the other is an object:
 //      (A1) Boxing: <trivial> as! Object
 //      (A2) Unboxing: Object as! <trivial>
+//      (A3) Class-bridging: Error as! NSError
 //
 //   (B) one type is transparently wrapped in __SwiftValue, while the other is
 //       unwrapped. Given:
@@ -270,33 +283,46 @@ bb0(%0 : @owned $T):
 }
 
 // =============================================================================
-// (B1) Wrapped casts - may forward through a wrapper object
-//
-// Note: the AnyHashable-to-AnyObject cases are currently covered
-// by the potentially bridged casts.
+// (A3) Class bridging
 
-// TODO: The compiler could recognize this case as forwarded. Casting
-// *from* a class to AnyObject will not wrap the class.
+// Casting to NSError is indirect since it may conform to Error and
+// require Error-to-NSError bridging, unless we can statically see
+// that the source type inherits NSError.
 //
-// CHECK-LABEL: @testClassToClassArchetypeIsWrapped
+// A class-constrained archetype may be bound to NSError, unless it has a
+// non-NSError superclass constraint. Casts to archetypes thus must always be
+// indirect.
+//
+// CHECK-LABEL: @testClassToClassArchetypeIsBridged
 // CHECK: RESULT #0: 0 = 0
 // CHECK: RESULT #1: 1 = 1
-sil [ossa] @testClassToClassArchetypeIsWrapped : $@convention(thin) <U : AnyObject>(@owned Base) -> @owned U {
+sil [ossa] @testClassToClassArchetypeIsBridged : $@convention(thin) <U : AnyObject>(@owned Base) -> @owned U {
 bb0(%0 : @owned $Base):
   %1 = unconditional_checked_cast %0 : $Base to U
   return %1 : $U
 }
 
 // =============================================================================
-// (B2) Wrapped casts - may forward through a wrapper object
+// (B1) __SwiftValue Wrapping
 //
-// Note: (B1) the AnyHashable-to-AnyObject cases are currently covered
-// by the potentially bridged casts.
+// Note: the AnyHashable-to-AnyObject cases are currently covered by
+// the same logic that checks for potentially bridged casts. We
+// include it here for completeness.
+
+// CHECK-LABEL: @testNonClassToClassArchetypeIsWrapped
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+sil [ossa] @testNonClassToClassArchetypeIsWrapped : $@convention(thin) <U : AnyObject>(@owned AnyHashable) -> @owned U {
+bb0(%0 : @owned $AnyHashable):
+  %1 = unconditional_checked_cast %0 : $AnyHashable to U
+  return %1 : $U
+}
+
+// =============================================================================
+// (B2) __SwiftValue Unwrapping
 //
 // TODO: In the future, when the runtime stops wrapping nontrivial types inside
-// __SwiftValue, cases (B1) and (B2) above will no longer apply. At that time,
-// expand ownership preserving cast types to AnyObject. Then remove the
-// isPotentiallyAnyObject() check.
+// __SwiftValue, cases (B1) and (B2) will no longer apply.
 
 // CHECK-LABEL: @testAnyObjectToClassIsWrapped
 // CHECK: RESULT #0: 0 = 0
@@ -310,9 +336,9 @@ bb0(%0 : @owned $AnyObject):
 // CHECK-LABEL: @testClassArchetypeToClassIsWrapped
 // CHECK: RESULT #0: 0 = 0
 // CHECK: RESULT #1: 1 = 1
-sil [ossa] @testClassArchetypeToClassIsWrapped : $@convention(thin) <U : AnyObject>(@owned U) -> @owned Sub {
-bb0(%0 : @owned $U):
-  %1 = unconditional_checked_cast %0 : $U to Sub
+sil [ossa] @testClassArchetypeToClassIsWrapped : $@convention(thin) <T : AnyObject>(@owned T) -> @owned Sub {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 : $T to Sub
   return %1 : $Sub
 }
 
@@ -401,4 +427,13 @@ sil [ossa] @testClassToClassIsForwarded : $@convention(thin) (@owned Base) -> @o
 bb0(%0 : @owned $Base):
   %1 = unconditional_checked_cast %0 : $Base to Sub
   return %1 : $Sub
+}
+
+// CHECK-LABEL: @testClassToAnyObjectIsForwarded
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+sil [ossa] @testClassToAnyObjectIsForwarded : $@convention(thin) (@owned Base) -> @owned AnyObject {
+bb0(%0 : @owned $Base):
+  %1 = unconditional_checked_cast %0 : $Base to AnyObject
+  return %1 : $AnyObject
 }
