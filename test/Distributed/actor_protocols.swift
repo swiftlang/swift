@@ -43,12 +43,10 @@ distributed actor DA: DistributedActor {
   typealias ActorSystem = FakeActorSystem
 }
 
-// FIXME: Ideally, we should only emit the tailored conformance error.
-// expected-error@+1 {{type 'A2' does not conform to protocol 'DistributedActor'}}
+// FIXME(distributed): error reporting is a bit whacky here; needs cleanup
+// expected-error@+2{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
+// expected-error@+1{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
 actor A2: DistributedActor {
-  // expected-error@-1{{non-distributed actor type 'A2' cannot conform to the 'DistributedActor' protocol}} {{1-1=distributed }}
-  // expected-error@-2{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
-  // expected-note@-3{{requirement specified as 'Self.ID' == 'Self.ActorSystem.ActorID' [with Self = A2]}}
   nonisolated var id: ID {
     fatalError()
   }
@@ -65,12 +63,8 @@ actor A2: DistributedActor {
   }
 }
 
-// FIXME: Ideally, we should only emit the tailored conformance error.
-// expected-error@+1 {{type 'C2' does not conform to protocol 'DistributedActor'}}
+// expected-error@+1{{non-distributed actor type 'C2' cannot conform to the 'DistributedActor' protocol}}
 final class C2: DistributedActor {
-  // expected-error@-1{{non-actor type 'C2' cannot conform to the 'Actor' protocol}}
-  // expected-error@-2{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
-  // expected-note@-3{{requirement specified as 'Self.ID' == 'Self.ActorSystem.ActorID' [with Self = C2]}}
   nonisolated var id: ID {
     fatalError()
   }
