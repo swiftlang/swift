@@ -1972,18 +1972,18 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     if (Type builderType = getResultBuilderType(func)) {
       auto optBody =
           TypeChecker::applyResultBuilderBodyTransform(func, builderType);
+      if (ctx.CompletionCallback && ctx.CompletionCallback->gotCallback()) {
+        // We already informed the completion callback of solutions found by
+        // type checking the entire result builder from
+        // applyResultBuilderBodyTransform. No need to typecheck the requested
+        // AST node individually anymore.
+        return false;
+      }
       if (optBody && *optBody) {
         // Wire up the function body now.
         func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
         return false;
       }
-      // FIXME: We failed to apply the result builder transform. Fall back to
-      // just type checking the node that contains the code completion token.
-      // This may be missing some context from the result builder but in
-      // practice it often contains sufficient information to provide a decent
-      // level of code completion that's better than providing nothing at all.
-      // The proper solution would be to only partially type check the result
-      // builder so that this fall back would not be necessary.
     } else if (func->hasSingleExpressionBody() &&
                 func->getResultInterfaceType()->isVoid()) {
        // The function returns void.  We don't need an explicit return, no matter
