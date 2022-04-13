@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
-// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -typecheck -verify %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // rdar://problem/39481178 - Introducing a superclass constraint does not add
 // same-type constraints on nested types
@@ -19,10 +19,10 @@ extension P {
   // CHECK-LABEL: .f1@
   // CHECK-NEXT: <Self, T where Self : C, T == Int>
   func f1<T>(_: T) where T == Q, Self : C {}
-  // expected-error@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
+  // expected-warning@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
 
   // CHECK-LABEL: .f2@
   // CHECK-NEXT: <Self, T where Self : C, T == Int>
   func f2<T>(_: T) where Self : C, T == Q {}
-  // expected-error@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
+  // expected-warning@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
 }
