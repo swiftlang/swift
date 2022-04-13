@@ -2200,13 +2200,22 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ $(true_false "${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}") == "TRUE" && \
-                      -d "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}" && \
+                if [[ -d "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}" && \
                       -n "$(ls -A "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}")" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=TRUE
                         -DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}"
+                    )
+                    if [[ $(true_false "${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}") == "TRUE" ]] ; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=TRUE
+                        )
+                    fi
+                else
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_BUILD_REGEX_PARSER_IN_COMPILER:BOOL=FALSE
                     )
                 fi
 
