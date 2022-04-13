@@ -1090,7 +1090,7 @@ ERROR(conditional_var_valid_identifiers_only,none,
 ERROR(expected_condition_if,PointsToFirstBadToken,
       "expected expression, var, or let in 'if' condition", ())
 ERROR(missing_condition_after_if,none,
-      "missing condition in an 'if' statement", ())
+      "missing condition in 'if' statement", ())
 ERROR(expected_lbrace_after_if,PointsToFirstBadToken,
       "expected '{' after 'if' condition", ())
 ERROR(expected_lbrace_or_if_after_else,PointsToFirstBadToken,
@@ -1106,7 +1106,7 @@ NOTE(suggest_removing_else,none,
 ERROR(expected_condition_guard,PointsToFirstBadToken,
       "expected expression, var, let or case in 'guard' condition", ())
 ERROR(missing_condition_after_guard,none,
-      "missing condition in an 'guard' statement", ())
+      "missing condition in 'guard' statement", ())
 ERROR(expected_else_after_guard,PointsToFirstBadToken,
       "expected 'else' after 'guard' condition", ())
 ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
@@ -1116,7 +1116,7 @@ ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
 ERROR(expected_condition_while,PointsToFirstBadToken,
       "expected expression, var, or let in 'while' condition", ())
 ERROR(missing_condition_after_while,none,
-      "missing condition in a 'while' statement", ())
+      "missing condition in 'while' statement", ())
 ERROR(expected_lbrace_after_while,PointsToFirstBadToken,
       "expected '{' after 'while' condition", ())
 

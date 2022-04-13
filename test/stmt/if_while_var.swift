@@ -136,7 +136,7 @@ if 1 != 2, 4 == 57, let x = opt {} // expected-warning {{immutable value 'x' was
 
 // Test that these don't cause the parser to crash.
 if true { if a == 0; {} }   // expected-error {{cannot find 'a' in scope}} expected-error {{expected '{' after 'if' condition}}
-if a == 0, where b == 0 {}  // expected-error 4{{}} expected-note {{}} {{25-25=do }}
+if a == 0, where b == 0 {}  // expected-error {{cannot find 'a' in scope}} expected-error {{expected expression in conditional}}
 
 
 

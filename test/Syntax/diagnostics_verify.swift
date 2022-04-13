@@ -14,9 +14,6 @@ if false {
 
 class { // expected-error {{unknown declaration syntax exists in the source}}
   // expected-error@-1 {{expected identifier in class declaration}}
-  // expected-note@-2 {{did you mean to use a 'do' statement?}}
-  // expected-error@-3 {{closure expression is unused}}
-  // expected-error@-4 {{top-level statement cannot begin with a closure expression}}
 
 }
 
