@@ -9,6 +9,8 @@
 // This test is specific to libstdc++ and only runs on platforms where libstdc++ is used.
 // REQUIRES: OS=linux-gnu
 
+// REQUIRES: rdar91670704
+
 // CHECK-STD: enum std {
 // CHECK-STD:   enum __cxx11 {
 // CHECK-STD:     struct __CxxTemplateInstNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE {
