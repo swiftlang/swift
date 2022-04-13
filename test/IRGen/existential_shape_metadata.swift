@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s -swift-version 5  -disable-availability-checking -enable-parameterized-existential-types | %IRGenFileCheck %s
 
+// REQUIRES: rdar91669918
+
 // CHECK-LABEL: @"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq" = linkonce_odr hidden constant
 // CHECK-SAME:  { i32 {{.*}}sub ([[INT]] ptrtoint (i8** @{{[0-9]+}} to [[INT]])
 // CHECK-SAME:    [16 x i8] c"2\C6\0A\EA>\EE/`\DBphz\CB\FA7\8E",
