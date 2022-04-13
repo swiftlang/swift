@@ -413,6 +413,18 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       machine->computeRequirementDiagnostics(errors, proto->getLoc());
       diagnoseRequirementErrors(ctx, errors,
                                 AllowConcreteTypePolicy::NestedAssocTypes);
+
+      for (auto *protocol : machine->System.getProtocols()) {
+        auto selfType = protocol->getSelfInterfaceType();
+        auto concrete = machine->getConcreteType(selfType,
+                                                 machine->getGenericParams(),
+                                                 protocol);
+        if (!concrete || concrete->hasError())
+          continue;
+
+        protocol->diagnose(diag::requires_generic_param_made_equal_to_concrete,
+                           selfType);
+      }
     }
 
     if (!machine->getErrors()) {
@@ -859,8 +871,6 @@ InferredGenericSignatureRequestRQM::evaluate(
                                 : AllowConcreteTypePolicy::AssocTypes);
     }
 
-    // FIXME: Handle allowConcreteGenericParams
-
     // Don't bother splitting concrete equivalence classes if there were invalid
     // requirements, because the signature is not going to be ABI anyway.
     if (!errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements)) {
@@ -885,6 +895,28 @@ InferredGenericSignatureRequestRQM::evaluate(
       // performs queries.
       rewriteCtx.installRequirementMachine(result.getCanonicalSignature(),
                                            std::move(machine));
+    }
+
+    if (!allowConcreteGenericParams &&
+        ctx.LangOpts.RequirementMachineInferredSignatures ==
+        RequirementMachineMode::Enabled) {
+      for (auto genericParam : result.getInnermostGenericParams()) {
+        auto canonical = result.getCanonicalTypeInContext(genericParam);
+
+        if (canonical->hasError() || canonical->isEqual(genericParam))
+          continue;
+
+        if (canonical->isTypeParameter()) {
+          ctx.Diags.diagnose(loc, diag::requires_generic_params_made_equal,
+                             genericParam, result->getSugaredType(canonical))
+            .warnUntilSwiftVersion(6);
+        } else {
+          ctx.Diags.diagnose(loc,
+                             diag::requires_generic_param_made_equal_to_concrete,
+                             genericParam)
+            .warnUntilSwiftVersion(6);
+        }
+      }
     }
 
     if (!errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements)) {
