@@ -925,7 +925,7 @@ SILValue swift::findOwnershipReferenceAggregate(SILValue ref) {
       if (auto *term = arg->getSingleTerminator()) {
         if (term->isTransformationTerminator()) {
           auto *ti = cast<OwnershipForwardingTermInst>(term);
-          if (ti->isDirectlyForwarding()) {
+          if (ti->preservesOwnership()) {
             root = term->getOperand(0);
             continue;
           }
