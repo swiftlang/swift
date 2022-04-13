@@ -431,6 +431,47 @@ static bool checkDistributedTargetResultType(
   return false;
 }
 
+bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
+  auto nominal = const_cast<NominalTypeDecl *>(system);
+
+  // ==== Ensure the Distributed module is available,
+  // without it there's no reason to check the decl in more detail anyway.
+  if (!swift::ensureDistributedModuleLoaded(nominal))
+    return true;
+
+  auto &C = nominal->getASTContext();
+  auto DAS = C.getDistributedActorSystemDecl();
+
+  // === AssociatedTypes
+  // --- SerializationRequirement MUST be a protocol TODO(distributed): rdar://91663941
+  // we may lift this in the future and allow classes but this requires more
+  // work to enable associatedtypes to be constrained to class or protocol,
+  // which then will unlock using them as generic constraints in protocols.
+  Type requirementTy = getDistributedSerializationRequirementType(nominal, DAS);
+  requirementTy->dump();
+
+  if (auto existentialTy = requirementTy->getAs<ExistentialType>()) {
+    requirementTy = existentialTy->getConstraintType();
+  }
+
+  if (auto alias = dyn_cast<TypeAliasType>(requirementTy.getPointer())) {
+    auto concreteReqTy = alias->getDesugaredType();
+    if (auto comp = dyn_cast<ProtocolCompositionType>(concreteReqTy)) {
+      // ok, protocol composition is fine as requirement,
+      // since special case of just a single protocol
+    } else if (auto proto = dyn_cast<ProtocolType>(concreteReqTy)) {
+      // ok, protocols is exactly what we want to be used as constraints here
+    } else {
+      nominal->diagnose(diag::distributed_actor_system_serialization_req_must_be_protocol,
+                        requirementTy);
+      return true;
+    }
+  }
+
+  // all good, didn't find any errors
+  return false;
+}
+
 /// Check whether the function is a proper distributed function
 ///
 /// \returns \c true if there was a problem with adding the attribute, \c false
