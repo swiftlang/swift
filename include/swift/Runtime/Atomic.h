@@ -96,7 +96,7 @@ struct aligned_alloc<Alignment_, true> {
 #endif
   }
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__ANDROID__)
   // FIXME: why is this even needed?  This is not permitted as per the C++
   // standrd new.delete.placement (§17.6.3.4).
   [[nodiscard]] void *operator new(std::size_t size, void *where) noexcept {
