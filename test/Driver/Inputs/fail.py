@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # fail.py - Just exits with an error code -*- python -*-
 #
 # This source file is part of the Swift.org open source project

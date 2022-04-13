@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # ===--- perf_test_driver.py ---------------------------------------------===//
 #
@@ -11,8 +11,6 @@
 #  See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ===---------------------------------------------------------------------===//
-
-from __future__ import print_function
 
 import functools
 import glob

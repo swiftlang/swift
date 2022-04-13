@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # ===--- swift-bench.py ------------------------------*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
@@ -31,8 +31,6 @@
 #
 # Ideas for the harness improvement and development are welcomed here:
 # rdar://problem/18072938
-
-from __future__ import print_function
 
 import argparse
 import math

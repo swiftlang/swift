@@ -11,9 +11,6 @@
 Wrapper module around the 'xcrun' command-line utility.
 """
 
-
-from __future__ import absolute_import, unicode_literals
-
 import functools
 import re
 import shlex
