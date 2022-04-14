@@ -21,6 +21,7 @@
 #include "swift/Basic/Unicode.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/Basic/SourceManager.h"
 #include "AvailabilityMixin.h"
 #include "JSON.h"
 #include "Symbol.h"
@@ -409,6 +410,30 @@ void Symbol::serializeAccessLevelMixin(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
+  if (ClangNode ClangN = VD->getClangNode()) {
+    if (!Graph->Walker.Options.IncludeClangDocs)
+      return;
+
+    if (auto *ClangD = ClangN.getAsDecl()) {
+      clang::SourceManager &ClangSM =
+          ClangD->getASTContext().getSourceManager();
+
+      clang::PresumedLoc Loc = ClangSM.getPresumedLoc(ClangD->getLocation());
+      if (Loc.isValid()) {
+        // TODO: We should use a common function to fill in the location
+        // information for both cursor info and symbol graph gen, then also
+        // include position here.
+        OS.attributeObject("location", [&](){
+          SmallString<1024> FileURI("file://");
+          FileURI.append(Loc.getFilename());
+          OS.attribute("uri", FileURI.str());
+        });
+      }
+    }
+
+    return;
+  }
+
   auto Loc = VD->getLoc(/*SerializedOK=*/true);
   if (Loc.isInvalid()) {
     return;
