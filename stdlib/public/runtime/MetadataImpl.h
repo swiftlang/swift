@@ -51,6 +51,7 @@
 #include "EnumImpl.h"
 
 #include <cstring>
+#include <new>
 #include <type_traits>
 
 namespace swift {
