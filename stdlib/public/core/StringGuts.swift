@@ -316,6 +316,7 @@ extension _StringGuts {
   internal var isUTF16: Bool { _object.isUTF16 }
 
   @_alwaysEmitIntoClient // Swift 5.7
+  @inline(__always)
   internal func markEncoding(_ i: String.Index) -> String.Index {
     isUTF8 ? i._knownUTF8 : i._knownUTF16
   }

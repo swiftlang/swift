@@ -208,8 +208,7 @@ extension Substring: StringProtocol {
     // not fall on grapheme boundaries in `base`.
 
     let i = _wholeGuts.validateCharacterIndex(i, in: _bounds)
-    let r = _uncheckedIndex(after: i)
-    return _wholeGuts.markEncoding(r)
+    return _uncheckedIndex(after: i)
   }
 
   /// A version of `index(after:)` that assumes that the given index:
@@ -217,8 +216,6 @@ extension Substring: StringProtocol {
   /// - has the right encoding,
   /// - is within bounds, and
   /// - is character aligned within this substring.
-  ///
-  /// It does not mark the encoding of the returned index.
   internal func _uncheckedIndex(after i: Index) -> Index {
     _internalInvariant(_wholeGuts.hasMatchingEncoding(i))
     _internalInvariant(i._isScalarAligned)
@@ -252,7 +249,7 @@ extension Substring: StringProtocol {
       r = r._characterAligned
     }
 
-    return r
+    return _wholeGuts.markEncoding(r)
   }
 
   public func index(before i: Index) -> Index {
@@ -269,8 +266,7 @@ extension Substring: StringProtocol {
     // alignment/validation work.
     _precondition(i > startIndex, "Substring index is out of bounds")
 
-    let r = _uncheckedIndex(before: i)
-    return _wholeGuts.markEncoding(r)
+    return _uncheckedIndex(before: i)
   }
 
   /// A version of `index(before:)` that assumes that the given index:
@@ -278,8 +274,6 @@ extension Substring: StringProtocol {
   /// - has the right encoding,
   /// - is within bounds, and
   /// - is character aligned within this substring.
-  ///
-  /// It does not mark the encoding of the returned index.
   internal func _uncheckedIndex(before i: Index) -> Index {
     _internalInvariant(_wholeGuts.hasMatchingEncoding(i))
     _internalInvariant(i._isScalarAligned)
@@ -304,7 +298,7 @@ extension Substring: StringProtocol {
       r = r._characterAligned
     }
 
-    return r
+    return _wholeGuts.markEncoding(r)
   }
 
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
@@ -328,7 +322,7 @@ extension Substring: StringProtocol {
         i = _uncheckedIndex(before: i)
       }
     }
-    return _wholeGuts.markEncoding(i)
+    return i
   }
 
   public func index(
@@ -368,7 +362,7 @@ extension Substring: StringProtocol {
       }
       guard limit > start || i >= limit else { return nil }
     }
-    return _wholeGuts.markEncoding(i)
+    return i
   }
 
   public func distance(from start: Index, to end: Index) -> Int {

@@ -207,7 +207,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
         i = _uncheckedIndex(before: i)
       }
     }
-    return _guts.markEncoding(i)
+    return i
   }
 
   @_alwaysEmitIntoClient
@@ -238,7 +238,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
       }
       guard limit > start || i >= limit else { return nil }
     }
-    return _guts.markEncoding(i)
+    return i
   }
 }
 
