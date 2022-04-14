@@ -10,13 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  String is-not-a Sequence or Collection, but it exposes a
-//  collection of characters.
+//  String is a collection of characters.
 //
 //===----------------------------------------------------------------------===//
-
-// FIXME(ABI)#70 : The character string view should have a custom iterator type
-// to allow performance optimizations of linear traversals.
 
 import SwiftShims
 
@@ -43,23 +39,42 @@ extension String: BidirectionalCollection {
     return distance(from: startIndex, to: endIndex)
   }
 
+  /// Return true if and only if `i` is a valid index in this substring,
+  /// that is to say, it exactly addresses one of the `Character`s in it.
+  internal func _isValidIndex(_ i: Index) -> Bool {
+    return (
+      _guts.hasMatchingEncoding(i)
+      && i._encodedOffset <= _guts.count
+      && _guts.isOnGraphemeClusterBoundary(i))
+  }
+
   /// Returns the position immediately after the given index.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
-    _precondition(i < endIndex, "String index is out of bounds")
+    let i = _guts.validateCharacterIndex(i)
+    return _uncheckedIndex(after: i)
+  }
+
+  /// A version of `index(after:)` that assumes that the given index:
+  ///
+  /// - has the right encoding,
+  /// - is within bounds, and
+  /// - is scalar aligned.
+  internal func _uncheckedIndex(after i: Index) -> Index {
+    _internalInvariant(_guts.hasMatchingEncoding(i))
+    _internalInvariant(i < endIndex)
+    _internalInvariant(i._isCharacterAligned)
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
-    let i = _guts.scalarAlign(i)
     let stride = _characterStride(startingAt: i)
     let nextOffset = i._encodedOffset &+ stride
-    let nextStride = _characterStride(
-      startingAt: Index(_encodedOffset: nextOffset)._scalarAligned)
-
-    return Index(
-      encodedOffset: nextOffset, characterStride: nextStride)._scalarAligned
+    let nextIndex = Index(_encodedOffset: nextOffset)._characterAligned
+    let nextStride = _characterStride(startingAt: nextIndex)
+    let r = Index(encodedOffset: nextOffset, characterStride: nextStride)
+    return _guts.markEncoding(r._characterAligned)
   }
 
   /// Returns the position immediately before the given index.
@@ -68,21 +83,32 @@ extension String: BidirectionalCollection {
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
-    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
-
-    // Note: bounds checking in `index(before:)` is tricky as scalar aligning an
-    // index may need to access storage, but it may also move it closer towards
-    // the `startIndex`. Therefore, we must check against the `endIndex` before
-    // aligning, but we need to delay the `i > startIndex` check until after.
-    _precondition(i <= endIndex, "String index is out of bounds")
-    let i = _guts.scalarAlign(i)
+    let i = _guts.validateInclusiveCharacterIndex(i)
+    // Note: Aligning an index may move it closer towards the `startIndex`, so
+    // the `i > startIndex` check needs to come after rounding.
     _precondition(i > startIndex, "String index is out of bounds")
 
+    return _uncheckedIndex(before: i)
+  }
+
+  /// A version of `index(before:)` that assumes that the given index:
+  ///
+  /// - has the right encoding,
+  /// - is within bounds, and
+  /// - is character aligned.
+  internal func _uncheckedIndex(before i: Index) -> Index {
+    _internalInvariant(_guts.hasMatchingEncoding(i))
+    _internalInvariant(i > startIndex && i <= endIndex)
+    _internalInvariant(i._isCharacterAligned)
+
+    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(endingAt: i)
     let priorOffset = i._encodedOffset &- stride
-    return Index(
-      encodedOffset: priorOffset, characterStride: stride)._scalarAligned
+
+    let r = Index(encodedOffset: priorOffset, characterStride: stride)
+    return _guts.markEncoding(r._characterAligned)
   }
+
   /// Returns an index that is the specified distance from the given index.
   ///
   /// The following example obtains an index advanced four positions from a
@@ -105,10 +131,26 @@ extension String: BidirectionalCollection {
   ///   is the same value as the result of `abs(distance)` calls to
   ///   `index(before:)`.
   /// - Complexity: O(*n*), where *n* is the absolute value of `distance`.
-  @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
+    // Note: prior to Swift 5.7, this method used to be inlinable, forwarding to
+    // `_index(_:offsetBy:)`.
+
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _index(i, offsetBy: distance)
+
+    var i = _guts.validateInclusiveCharacterIndex(i)
+
+    if distance >= 0 {
+      for _ in stride(from: 0, to: distance, by: 1) {
+        _precondition(i < endIndex, "String index is out of bounds")
+        i = _uncheckedIndex(after: i)
+      }
+    } else {
+      for _ in stride(from: 0, to: distance, by: -1) {
+        _precondition(i > startIndex, "String index is out of bounds")
+        i = _uncheckedIndex(before: i)
+      }
+    }
+    return i
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -149,12 +191,45 @@ extension String: BidirectionalCollection {
   ///   case, the method returns `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `distance`.
-  @inlinable @inline(__always)
   public func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
+    // Note: Prior to Swift 5.7, this function used to be inlinable, forwarding
+    // to `BidirectionalCollection._index(_:offsetBy:limitedBy:)`.
+    // Unfortunately, that approach isn't compatible with SE-0180, as it doesn't
+    // support cases where `i` or `limit` aren't character aligned.
+
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _index(i, offsetBy: distance, limitedBy: limit)
+
+    // Per SE-0180, `i` and `limit` are allowed to fall in between grapheme
+    // breaks, in which case this function must still terminate without trapping
+    // and return a result that makes sense.
+
+    // Note: `limit` is intentionally not scalar (or character-) aligned to
+    // ensure our behavior exactly matches the documentation above. We do need
+    // to ensure it has a matching encoding, though. The same goes for `start`,
+    // which is used to determine whether the limit applies at all.
+    let limit = _guts.ensureMatchingEncoding(limit)
+    let start = _guts.ensureMatchingEncoding(i)
+
+    var i = _guts.validateInclusiveCharacterIndex(i)
+
+    if distance >= 0 {
+      for _ in stride(from: 0, to: distance, by: 1) {
+        guard limit < start || i < limit else { return nil }
+        _precondition(i < endIndex, "String index is out of bounds")
+        i = _uncheckedIndex(after: i)
+      }
+      guard limit < start || i <= limit else { return nil }
+    } else {
+      for _ in stride(from: 0, to: distance, by: -1) {
+        guard limit > start || i > limit else { return nil }
+        _precondition(i > startIndex, "String index is out of bounds")
+        i = _uncheckedIndex(before: i)
+      }
+      guard limit > start || i >= limit else { return nil }
+    }
+    return i
   }
 
   /// Returns the distance between two indices.
@@ -166,10 +241,33 @@ extension String: BidirectionalCollection {
   /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(*n*), where *n* is the resulting distance.
-  @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> Int {
+    // Note: Prior to Swift 5.7, this function used to be inlinable, forwarding
+    // to `BidirectionalCollection._distance(from:to:)`.
+
+    let start = _guts.validateInclusiveCharacterIndex(start)
+    let end = _guts.validateInclusiveCharacterIndex(end)
+
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _distance(from: _guts.scalarAlign(start), to: _guts.scalarAlign(end))
+
+    // Per SE-0180, `start` and `end` are allowed to fall in between Character
+    // boundaries, in which case this function must still terminate without
+    // trapping and return a result that makes sense.
+
+    var i = start
+    var count = 0
+    if i < end {
+      while i < end { // Note `<` instead of `==`
+        count += 1
+        i = _uncheckedIndex(after: i)
+      }
+    } else if i > end {
+      while i > end { // Note `<` instead of `==`
+        count -= 1
+        i = _uncheckedIndex(before: i)
+      }
+    }
+    return count
   }
 
   /// Accesses the character at the given position.
@@ -187,19 +285,34 @@ extension String: BidirectionalCollection {
   ///
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
-  @inlinable @inline(__always)
   public subscript(i: Index) -> Character {
-    _boundsCheck(i)
+    // Prior to Swift 5.7, this function used to be inlinable.
 
-    let i = _guts.scalarAlign(i)
+    // Note: SE-0180 requires us not to round `i` down to the nearest whole
+    // `Character` boundary.
+    let i = _guts.validateScalarIndex(i)
     let distance = _characterStride(startingAt: i)
-
     return _guts.errorCorrectedCharacter(
       startingAt: i._encodedOffset, endingAt: i._encodedOffset &+ distance)
   }
 
-  @inlinable @inline(__always)
+  /// Return the length of the `Character` starting at the given index, measured
+  /// in encoded code units, and without looking back at any scalar that
+  /// precedes `i`.
+  ///
+  /// Note: if `i` isn't `Character`-aligned, then this operation must still
+  /// finish successfully and return the length of the grapheme cluster starting
+  /// at `i` _as if the string started on that scalar_. (This can be different
+  /// from the length of the whole character when the preceding scalars are
+  /// present!)
+  ///
+  /// This method is called from inlinable `subscript` implementations in
+  /// current and previous versions of the stdlib, which require this contract
+  /// not to be violated.
+  @usableFromInline
+  @inline(__always)
   internal func _characterStride(startingAt i: Index) -> Int {
+    // Prior to Swift 5.7, this function used to be inlinable.
     _internalInvariant_5_1(i._isScalarAligned)
 
     // Fast check if it's already been measured, otherwise check resiliently
@@ -210,8 +323,10 @@ extension String: BidirectionalCollection {
     return _guts._opaqueCharacterStride(startingAt: i._encodedOffset)
   }
 
-  @inlinable @inline(__always)
+  @usableFromInline
+  @inline(__always)
   internal func _characterStride(endingAt i: Index) -> Int {
+    // Prior to Swift 5.7, this function used to be inlinable.
     _internalInvariant_5_1(i._isScalarAligned)
 
     if i == startIndex { return 0 }
@@ -238,8 +353,8 @@ extension String {
       self._guts = guts
     }
 
-    @inlinable
     public mutating func next() -> Character? {
+      // Prior to Swift 5.7, this function used to be inlinable.
       guard _fastPath(_position < _end) else { return nil }
 
       let len = _guts._opaqueCharacterStride(startingAt: _position)
