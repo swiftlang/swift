@@ -31,6 +31,8 @@
 #include <dlfcn.h>
 #endif
 
+#include <new>
+
 using namespace swift;
 
 namespace {
