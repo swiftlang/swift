@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -module-name ParameterizedProtocols -emit-module-interface-path %t/ParameterizedProtocols.swiftinterface %s
+// RUN: %target-swift-emit-module-interface(%t/ParameterizedProtocols.swiftinterface) %s -module-name ParameterizedProtocols
+// RUN: %target-swift-typecheck-module-from-interface(%t/ParameterizedProtocols.swiftinterface) -module-name ParameterizedProtocols
 // RUN: %FileCheck %s < %t/ParameterizedProtocols.swiftinterface
 
 public struct S1 : P1 {

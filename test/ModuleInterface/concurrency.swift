@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -enable-library-evolution -enable-experimental-concurrency -emit-module-interface-path %t/Library.swiftinterface -DLIBRARY -module-name Library %s
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -enable-experimental-concurrency -DLIBRARY -module-name Library
+// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -enable-experimental-concurrency
 
 // REQUIRES: concurrency
 
@@ -36,5 +37,6 @@ func callFn() async {
 // CHECK: public func reasyncFn(_: () async -> ()) reasync
 // CHECK: public func takesSendable(_ block: @escaping @Sendable () async throws ->
 
-// RUN: %target-swift-frontend -typecheck -enable-library-evolution -enable-experimental-concurrency -emit-module-interface-path %t/Library.swiftinterface -DLIBRARY -module-name Library %s -module-interface-preserve-types-as-written
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -enable-experimental-concurrency -DLIBRARY -module-name Library -module-interface-preserve-types-as-written
+// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -enable-experimental-concurrency
 // RUN: %FileCheck %s <%t/Library.swiftinterface
