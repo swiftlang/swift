@@ -16,7 +16,11 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Unicode.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "AvailabilityMixin.h"
 #include "JSON.h"
 #include "Symbol.h"
@@ -193,6 +197,41 @@ const ValueDecl *Symbol::getDeclInheritingDocs() const {
 }
 
 void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
+  if (ClangNode ClangN = VD->getClangNode()) {
+    if (!Graph->Walker.Options.IncludeClangDocs)
+      return;
+
+    if (auto *ClangD = ClangN.getAsDecl()) {
+      const clang::ASTContext &ClangContext = ClangD->getASTContext();
+      const clang::RawComment *RC =
+          ClangContext.getRawCommentForAnyRedecl(ClangD);
+      if (!RC || !RC->isDocumentation())
+        return;
+
+      // TODO: Replace this with `getFormattedLines` when it's in and add the
+      // line and column ranges. Also consider handling cross-language
+      // hierarchies, ie. if there's no comment on the ObjC decl we should
+      // look up the hierarchy (and vice versa).
+      std::string Text = RC->getFormattedText(ClangContext.getSourceManager(),
+                                              ClangContext.getDiagnostics());
+      Text = unicode::sanitizeUTF8(Text);
+
+      SmallVector<StringRef, 8> Lines;
+      splitIntoLines(Text, Lines);
+
+      OS.attributeObject("docComment", [&]() {
+        OS.attributeArray("lines", [&]() {
+          for (StringRef Line : Lines) {
+            OS.object([&](){
+              OS.attribute("text", Line);
+            });
+          }
+        });
+      });
+    }
+    return;
+  }
+
   const auto *DocCommentProvidingDecl = VD;
   if (!Graph->Walker.Options.SkipInheritedDocs) {
     DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(

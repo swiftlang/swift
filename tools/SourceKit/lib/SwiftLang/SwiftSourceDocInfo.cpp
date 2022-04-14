@@ -984,10 +984,11 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
         Invoc.getLangOptions().Target,
         /*PrettyPrint=*/false,
         AccessLevel::Private,
-        /*EmitSynthesizedMembers*/ false,
-        /*PrintMessages*/ false,
-        /*SkipInheritedDocs*/ false,
-        /*IncludeSPISymbols*/ true,
+        /*EmitSynthesizedMembers=*/false,
+        /*PrintMessages=*/false,
+        /*SkipInheritedDocs=*/false,
+        /*IncludeSPISymbols=*/true,
+        /*IncludeClangDocs=*/true
     };
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
