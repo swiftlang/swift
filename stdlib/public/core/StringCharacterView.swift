@@ -245,11 +245,6 @@ extension String: BidirectionalCollection {
     // Note: Prior to Swift 5.7, this function used to be inlinable, forwarding
     // to `BidirectionalCollection._distance(from:to:)`.
 
-    // FIXME: Due to the `index(after:)` problem above, this function doesn't
-    // always return consistent results when the given indices fall between
-    // grapheme breaks -- swapping `start` and `end` may change the magnitude of
-    // the result.
-
     let start = _guts.validateInclusiveCharacterIndex(start)
     let end = _guts.validateInclusiveCharacterIndex(end)
 
