@@ -9,6 +9,8 @@
 // CHECK: struct HasMutableProperty {
 // CHECK:   func annotatedNonMutating() -> Int32
 // CHECK:   mutating func noAnnotation() -> Int32
+// CHECK:   mutating func contradictingAnnotations() -> Int32
+// CHECK:   func duplicateAnnotations() -> Int32
 // CHECK:   var a: Int32
 // CHECK:   var b: Int32
 // CHECK: }

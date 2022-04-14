@@ -24,6 +24,15 @@ struct HasMutableProperty {
   }
 
   int noAnnotation() const { return b; }
+
+  // expected-warning@+1 {{attribute 'nonmutating' is ignored when combined with attribute 'mutating'}}
+  int contradictingAnnotations() const __attribute__((__swift_attr__("nonmutating"))) __attribute__((__swift_attr__("mutating"))) {
+    return b;
+  }
+
+  int duplicateAnnotations() const __attribute__((__swift_attr__("nonmutating"))) __attribute__((__swift_attr__("nonmutating"))) {
+    return b;
+  }
 };
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_MUTABILITY_ANNOTATIONS_H
