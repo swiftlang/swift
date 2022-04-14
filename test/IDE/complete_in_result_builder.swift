@@ -36,7 +36,7 @@ func testGlobalLookup() {
   @TupleBuilder<String> var x1 {
     #^GLOBAL_LOOKUP^#
     // GLOBAL_LOOKUP: Begin completions
-    // GLOBAL_LOOKUP: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]:         MyConstantString[#String#];
+    // GLOBAL_LOOKUP: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]:         MyConstantString[#String#];
     // GLOBAL_LOOKUP: End completions
   }
 
@@ -81,7 +81,7 @@ func testStaticMemberLookup() {
   @TupleBuilder<String> var x1 {
     StringFactory.#^COMPLETE_STATIC_MEMBER^#
     // COMPLETE_STATIC_MEMBER: Begin completions
-    // COMPLETE_STATIC_MEMBER: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]:     makeString({#x: String#})[#String#];
+    // COMPLETE_STATIC_MEMBER: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]:     makeString({#x: String#})[#String#];
     // COMPLETE_STATIC_MEMBER: End completions
   }
 
