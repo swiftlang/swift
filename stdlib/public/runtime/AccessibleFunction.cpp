@@ -23,6 +23,7 @@
 #include "swift/Runtime/Metadata.h"
 
 #include <cstdint>
+#include <new>
 
 using namespace swift;
 
@@ -153,7 +154,7 @@ swift::runtime::swift_findAccessibleFunction(const char *targetNameStart,
     S.Cache.getOrInsert(
         name, [&](AccessibleFunctionCacheEntry *entry, bool created) {
           if (created)
-            new (entry) AccessibleFunctionCacheEntry{name, record};
+            ::new (entry) AccessibleFunctionCacheEntry{name, record};
           return true;
         });
   }

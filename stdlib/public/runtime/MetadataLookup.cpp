@@ -38,6 +38,7 @@
 #include <functional>
 #include <vector>
 #include <list>
+#include <new>
 
 using namespace swift;
 using namespace Demangle;
@@ -774,7 +775,7 @@ _findContextDescriptor(Demangle::NodePointer node,
                                                     *entry,
                                                 bool created) {
       if (created)
-        new (entry) NominalTypeDescriptorCacheEntry{mangledName, foundContext};
+        ::new (entry) NominalTypeDescriptorCacheEntry{mangledName, foundContext};
       return true;
     });
 
@@ -931,7 +932,7 @@ _findProtocolDescriptor(NodePointer node,
                                                      *entry,
                                                  bool created) {
       if (created)
-        new (entry) ProtocolDescriptorCacheEntry{mangledName, foundProtocol};
+        ::new (entry) ProtocolDescriptorCacheEntry{mangledName, foundProtocol};
       return true;
     });
   }

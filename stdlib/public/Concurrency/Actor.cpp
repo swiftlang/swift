@@ -17,6 +17,7 @@
 
 #include "swift/Runtime/Concurrency.h"
 #include <atomic>
+#include <new>
 
 #ifdef _WIN32
 // On Windows, an include below triggers an indirect include of minwindef.h

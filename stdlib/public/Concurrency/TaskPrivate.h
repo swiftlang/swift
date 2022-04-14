@@ -29,6 +29,7 @@
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include <atomic>
+#include <new>
 
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
@@ -655,11 +656,11 @@ AsyncTask::OpaquePrivateStorage::get() const {
   return reinterpret_cast<const PrivateStorage &>(*this);
 }
 inline void AsyncTask::OpaquePrivateStorage::initialize(JobPriority basePri) {
-  new (this) PrivateStorage(basePri);
+  ::new (this) PrivateStorage(basePri);
 }
 inline void AsyncTask::OpaquePrivateStorage::initializeWithSlab(
     JobPriority basePri, void *slab, size_t slabCapacity) {
-  new (this) PrivateStorage(basePri, slab, slabCapacity);
+  ::new (this) PrivateStorage(basePri, slab, slabCapacity);
 }
 inline void AsyncTask::OpaquePrivateStorage::complete(AsyncTask *task) {
   get().complete(task);
