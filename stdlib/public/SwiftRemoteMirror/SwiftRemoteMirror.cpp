@@ -54,7 +54,7 @@ struct SwiftReflectionContext {
     auto Reader = std::make_shared<CMemoryReader>(impl);
     nativeContext = new NativeReflectionContext(Reader);
   }
-  
+
   ~SwiftReflectionContext() {
     freeTemporaryAllocation();
     delete nativeContext;
@@ -203,9 +203,9 @@ ReflectionSection<Iterator> sectionFromInfo(const swift_reflection_info_t &Info,
   auto RemoteSectionStart = (uint64_t)(uintptr_t)Section.section.Begin
     - Info.LocalStartAddress
     + Info.RemoteStartAddress;
-  
+
   auto Start = RemoteRef<void>(RemoteSectionStart, Section.section.Begin);
-  
+
   return ReflectionSection<Iterator>(Start,
              (uintptr_t)Section.section.End - (uintptr_t)Section.section.Begin);
 }
@@ -225,7 +225,7 @@ void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
   auto Context = ContextRef->nativeContext;
-  
+
   // The `offset` fields must be zero.
   if (Info.field.offset != 0
       || Info.associated_types.offset != 0
@@ -246,7 +246,7 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
     sectionFromInfo<const void *>(Info, Info.reflection_strings),
     ReflectionSection<const void *>(nullptr, 0),
     ReflectionSection<MultiPayloadEnumDescriptorIterator>(0, 0)};
-  
+
   Context->addReflectionInfo(ContextInfo);
 }
 
@@ -821,10 +821,23 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
 swift_async_task_slab_return_t
 swift_reflection_asyncTaskSlabPointer(SwiftReflectionContextRef ContextRef,
                                       swift_reflection_ptr_t AsyncTaskPtr) {
-  auto Info = swift_reflection_asyncTaskInfo(ContextRef, AsyncTaskPtr);
+  auto Context = ContextRef->nativeContext;
+
+  // We only care about the AllocatorSlabPtr field. Disable child task and async
+  // backtrace iteration to save wasted work.
+  unsigned ChildTaskLimit = 0;
+  unsigned AsyncBacktraceLimit = 0;
+
+  llvm::Optional<std::string> Error;
+  NativeReflectionContext::AsyncTaskInfo TaskInfo;
+  std::tie(Error, TaskInfo) =
+      Context->asyncTaskInfo(AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
+
   swift_async_task_slab_return_t Result = {};
-  Result.Error = Info.Error;
-  Result.SlabPtr = Info.AllocatorSlabPtr;
+  if (Error) {
+    Result.Error = returnableCString(ContextRef, Error);
+  }
+  Result.SlabPtr = TaskInfo.AllocatorSlabPtr;
   return Result;
 }
 
@@ -866,9 +879,16 @@ swift_async_task_info_t
 swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
                                swift_reflection_ptr_t AsyncTaskPtr) {
   auto Context = ContextRef->nativeContext;
+
+  // Limit the child task and async backtrace iteration to semi-reasonable
+  // numbers to avoid doing excessive work on bad data.
+  unsigned ChildTaskLimit = 1000000;
+  unsigned AsyncBacktraceLimit = 1000;
+
   llvm::Optional<std::string> Error;
   NativeReflectionContext::AsyncTaskInfo TaskInfo;
-  std::tie(Error, TaskInfo) = Context->asyncTaskInfo(AsyncTaskPtr);
+  std::tie(Error, TaskInfo) =
+      Context->asyncTaskInfo(AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
 
   swift_async_task_info_t Result = {};
   if (Error) {
