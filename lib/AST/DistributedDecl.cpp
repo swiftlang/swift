@@ -203,6 +203,32 @@ Type swift::getDistributedSerializationRequirementType(
   return conformance.getTypeWitnessByName(selfType, ctx.Id_SerializationRequirement);
 }
 
+AbstractFunctionDecl *
+swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
+    ValueDecl *thunk) {
+  assert(thunk);
+  auto &C = thunk->getASTContext();
+
+  auto *actor = thunk->getDeclContext()->getSelfNominalTypeDecl();
+  if (!actor)
+    return nullptr;
+  if (!actor->isDistributedActor())
+    return nullptr;
+
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
+  if (!systemTy)
+    return nullptr;
+
+  auto decoderTy =
+      getDistributedActorSystemInvocationDecoderType(
+          systemTy->getAnyNominal());
+  if (!decoderTy)
+    return nullptr;
+
+  return C.getDecodeNextArgumentOnDistributedInvocationDecoder(
+      decoderTy->getAnyNominal());
+}
+
 Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
     NominalTypeDecl *actor, Identifier member) {
   auto &ctx = actor->getASTContext();

@@ -813,6 +813,7 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
     decoder = instance.claimNext();
   }
 
+  // TODO(distributed): this can be removed most likely now
   if (isa<StructDecl>(decoderDecl) || isa<EnumDecl>(decoderDecl) ||
       decoderDecl->isFinal()) {
     auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));

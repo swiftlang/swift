@@ -220,25 +220,14 @@ void SILFunctionBuilder::addFunctionAttributes(
 
       F->setDynamicallyReplacedFunction(replacedFunc);
     }
-  }
+  } else if (constant.isDistributedThunk()) {
+    if (auto decodeFuncDecl =
+            getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
+                decl)) {
 
-  if (constant.isDistributedThunk()) {
-    auto *actor = decl->getDeclContext()->getSelfNominalTypeDecl();
-    if (actor && actor->isDistributedActor()) {
-      auto &C = decl->getASTContext();
-      auto systemTy = getConcreteReplacementForProtocolActorSystemType(decl);
-      assert(systemTy);
-
-      auto decoderTy =
-          getDistributedActorSystemInvocationDecoderType(
-              systemTy->getAnyNominal());
-      assert(decoderTy);
-
-      auto decodeFunc = C.getDecodeNextArgumentOnDistributedInvocationDecoder(
-          decoderTy->getAnyNominal());
-      auto decodeRef = SILDeclRef(decodeFunc);
-      auto *adHocWitness = getOrCreateDeclaration(decodeFunc, decodeRef);
-      F->setReferencedAdHocRequirementWitnessFunction(adHocWitness);
+      auto decodeRef = SILDeclRef(decodeFuncDecl);
+      auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
+      F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
     }
   }
 }

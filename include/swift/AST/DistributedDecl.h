@@ -53,6 +53,13 @@ Type getDistributedActorIDType(NominalTypeDecl *actor);
 Type getDistributedSerializationRequirementType(
     NominalTypeDecl *nominal, ProtocolDecl *protocol);
 
+/// Given a distributed thunk declaration, inside a 'distributed actor',
+/// finds the ad-hoc witness for 'decodeNextArgument' on the associated
+/// 'ActorSystem.InvocationDecoder' of the actor, or null.
+AbstractFunctionDecl *
+getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
+    ValueDecl *thunk);
+
 /// Get the specific 'InvocationEncoder' type of a specific distributed actor
 /// system.
 Type getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *system);
