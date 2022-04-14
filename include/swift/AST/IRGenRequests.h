@@ -114,16 +114,6 @@ public:
   llvm::TargetMachine *getTargetMachine() { return Target.get(); }
 
 public:
-  /// Release ownership of the context and module to the caller, consuming
-  /// this value in the process.
-  ///
-  /// The REPL is the only caller that needs this. New uses of this function
-  /// should be avoided at all costs.
-  std::pair<llvm::LLVMContext *, llvm::Module *> release() && {
-    return { Context.release(), Module.release() };
-  }
-
-public:
   /// Transfers ownership of the underlying module and context to an
   /// ORC-compatible context.
   llvm::orc::ThreadSafeModule intoThreadSafeContext() &&;
