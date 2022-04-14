@@ -15,4 +15,15 @@ struct HasConstMethodAnnotatedAsMutating {
   }
 };
 
+struct HasMutableProperty {
+  mutable int a;
+  int b;
+
+  int annotatedNonMutating() const __attribute__((__swift_attr__("nonmutating"))) {
+    return b;
+  }
+
+  int noAnnotation() const { return b; }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_MUTABILITY_ANNOTATIONS_H

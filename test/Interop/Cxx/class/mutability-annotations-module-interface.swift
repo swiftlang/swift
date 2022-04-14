@@ -5,3 +5,10 @@
 // CHECK:   mutating func annotatedMutatingWithOtherAttrs() -> Int32
 // CHECK:   var a: Int32
 // CHECK: }
+
+// CHECK: struct HasMutableProperty {
+// CHECK:   func annotatedNonMutating() -> Int32
+// CHECK:   mutating func noAnnotation() -> Int32
+// CHECK:   var a: Int32
+// CHECK:   var b: Int32
+// CHECK: }
