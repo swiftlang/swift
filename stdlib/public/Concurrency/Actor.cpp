@@ -17,6 +17,7 @@
 
 #include "swift/Runtime/Concurrency.h"
 #include <atomic>
+#include <new>
 
 #ifdef _WIN32
 // On Windows, an include below triggers an indirect include of minwindef.h
@@ -1217,7 +1218,7 @@ void DefaultActorImpl::scheduleActorProcessJob(JobPriority priority, bool useInl
   if (useInlineJob) {
     if (JobStorageHeapObject.metadata != nullptr)
       JobStorage.~ProcessInlineJob();
-    job = new (&JobStorage) ProcessInlineJob(priority);
+    job = ::new (&JobStorage) ProcessInlineJob(priority);
   } else {
     assert(false && "Should not be here - we don't have support for any OOL actor process jobs yet");
     // TODO (rokhinip): Don't we need to take a +1 per ref count rules specified?
