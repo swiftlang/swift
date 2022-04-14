@@ -36,25 +36,28 @@ func testGlobalLookup() {
   @TupleBuilder<String> var x1 {
     #^GLOBAL_LOOKUP^#
     // GLOBAL_LOOKUP: Begin completions
-    // GLOBAL_LOOKUP: Decl[GlobalVar]/CurrModule:         MyConstantString[#String#];
+    // GLOBAL_LOOKUP: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]:         MyConstantString[#String#];
     // GLOBAL_LOOKUP: End completions
   }
 
   @TupleBuilder<String> var x2 {
     if true {
-      #^GLOBAL_LOOKUP_IN_IF_BODY?check=GLOBAL_LOOKUP^#
+      #^GLOBAL_LOOKUP_IN_IF_BODY?check=GLOBAL_LOOKUP_NO_TYPE_RELATION^#
+// GLOBAL_LOOKUP_NO_TYPE_RELATION: Begin completions
+// GLOBAL_LOOKUP_NO_TYPE_RELATION: Decl[GlobalVar]/CurrModule:         MyConstantString[#String#];
+// GLOBAL_LOOKUP_NO_TYPE_RELATION: End completions
     }
   }
 
   @TupleBuilder<String> var x3 {
     if {
-      #^GLOBAL_LOOKUP_IN_IF_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP^#
+      #^GLOBAL_LOOKUP_IN_IF_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP_NO_TYPE_RELATION^#
     }
   }
 
   @TupleBuilder<String> var x4 {
     guard else {
-      #^GLOBAL_LOOKUP_IN_GUARD_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP^#
+      #^GLOBAL_LOOKUP_IN_GUARD_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP_NO_TYPE_RELATION^#
     }
   }
 
@@ -78,13 +81,16 @@ func testStaticMemberLookup() {
   @TupleBuilder<String> var x1 {
     StringFactory.#^COMPLETE_STATIC_MEMBER^#
     // COMPLETE_STATIC_MEMBER: Begin completions
-    // COMPLETE_STATIC_MEMBER: Decl[StaticMethod]/CurrNominal:     makeString({#x: String#})[#String#];
+    // COMPLETE_STATIC_MEMBER: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]:     makeString({#x: String#})[#String#];
     // COMPLETE_STATIC_MEMBER: End completions
   }
 
   @TupleBuilder<String> var x2 {
     if true {
-      StringFactory.#^COMPLETE_STATIC_MEMBER_IN_IF_BODY?check=COMPLETE_STATIC_MEMBER^#
+      StringFactory.#^COMPLETE_STATIC_MEMBER_IN_IF_BODY^#
+// COMPLETE_STATIC_MEMBER_IN_IF_BODY: Begin completions
+// COMPLETE_STATIC_MEMBER_IN_IF_BODY: Decl[StaticMethod]/CurrNominal:     makeString({#x: String#})[#String#];
+// COMPLETE_STATIC_MEMBER_IN_IF_BODY: End completions
     }
   }
 
@@ -208,13 +214,37 @@ func testCompleteInStringLiteral() {
 // STRING_LITERAL_VAR-DAG: Keyword[self]/CurrNominal:          self[#Island#]; name=self
 // STRING_LITERAL_VAR-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: turnipPrice[#String#]; name=turnipPrice
 // STRING_LITERAL_VAR: End completions
+  }
 
-
-    func bar(island: Island) {
+  func bar(island: Island) {
     BStack {
       Text("\(island.#^STRING_LITERAL_AS_ARGUMENT?check=STRING_LITERAL_VAR^#turnipPrice)")
       takeTrailingClosure {}
-    }
+    } 
+  }
+}
+
+func testTypeRelationInResultBuilder() {
+  protocol View2 {}
+
+  @resultBuilder public struct ViewBuilder2 {
+    static func buildBlock<Content>(_ content: Content) -> Content where Content : View2 { fatalError() }
+    static func buildBlock<C0, C1>(_ c0: C0, _ c1: C1) -> C0 where C0 : View2, C1: View2 { fatalError() }
   }
 
+  struct MyText: View2 {}
+
+  struct MyView {
+    @ViewBuilder2 var body: some View2 {
+      #^SINGLE_ELEMENT^#
+    }
+    // SINGLE_ELEMENT: Begin completions
+    // SINGLE_ELEMENT-DAG: Decl[Struct]/Local/TypeRelation[Convertible]: MyText[#MyText#];
+    // SINGLE_ELEMENT: End completions
+
+    @ViewBuilder2 var body2: some View2 {
+      MyText()
+      #^SECOND_ELEMENT?check=SINGLE_ELEMENT^#
+    }
+  }
 }

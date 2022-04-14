@@ -5296,18 +5296,21 @@ public:
                                  = FreeTypeVariableBinding::Disallow,
                                  bool allowFixes = false);
 
-  /// Construct and solve a system of constraints based on the given expression
-  /// and its contextual information.
+  /// Assuming that constraints have already been generated, solve the
+  /// constraint system for code completion, writing all solutions to
+  /// \p solutions.
   ///
   /// This method is designed to be used for code completion which means that
   /// it doesn't mutate given expression, even if there is a single valid
   /// solution, and constraint solver is allowed to produce partially correct
   /// solutions. Such solutions can have any number of holes in them.
   ///
-  /// \param target The expression involved in code completion.
-  ///
   /// \param solutions The solutions produced for the given target without
   /// filtering.
+  void solveForCodeCompletion(SmallVectorImpl<Solution> &solutions);
+
+  /// Generate constraints for \p target and solve the resulting constraint
+  /// system for code completion (see overload above).
   ///
   /// \returns `false` if this call fails (e.g. pre-check or constraint
   /// generation fails), `true` otherwise.
