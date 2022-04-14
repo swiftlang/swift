@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This tool dumps imported Swift APIs to help validate changes in the
 # projection of (Objective-)C APIs into Swift, which is a function of the
@@ -20,8 +20,6 @@
 #  /path/to/bin/dir/swift-api-dump.py -swift-version 4.2 -o output-dir \
 #      -s macosx iphoneos watchos appletvos
 #
-
-from __future__ import print_function
 
 import argparse
 import multiprocessing

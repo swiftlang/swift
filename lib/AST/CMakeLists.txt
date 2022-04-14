@@ -48,6 +48,7 @@ add_swift_host_library(swiftAST STATIC
   DocComment.cpp
   Effects.cpp
   Evaluator.cpp
+  ExistentialGeneralization.cpp
   Expr.cpp
   ExtInfo.cpp
   FineGrainedDependencies.cpp

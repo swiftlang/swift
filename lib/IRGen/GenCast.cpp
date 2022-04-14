@@ -572,9 +572,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
 
   bool hasSuperclassConstraint = bool(layout.explicitSuperclass);
 
-  for (auto protoTy : layout.getProtocols()) {
-    auto *protoDecl = protoTy->getDecl();
-
+  for (auto protoDecl : layout.getProtocols()) {
     // If the protocol introduces a class constraint, track whether we need
     // to check for it independent of protocol witnesses.
     if (protoDecl->requiresClass()) {

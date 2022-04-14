@@ -4,6 +4,8 @@
 
 // FIXME: "HECK" lines all need to be updated for OSSA.
 
+class C {}
+
 func genericInout<T>(_: inout T) {}
 
 func hasVarArg(_ args: Any...) {}
@@ -384,3 +386,50 @@ func testEmptyReturnClosure() {
   let b = nil ?? { bar() }
 }
 
+// Test that PatternMatchEmission::emitIsDispatch can emit a
+// class-to-AnyObject cast as a guaranteed scalar cast
+// (doesCastPreserveOwnershipForTypes returns true).
+//
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen24testCastClassToAnyObjectyyXlAA1CCF : $@convention(thin) (@guaranteed C) -> @owned AnyObject {
+// CHECK: bb0(%0 : @guaranteed $C):
+// CHECK:   checked_cast_br %0 : $C to AnyObject, bb2, bb1
+// CHECK: bb1(%{{.*}} : @guaranteed $C):
+// CHECK: bb2(%{{.*}} : @guaranteed $AnyObject):
+// CHECK-LABEL: } // end sil function
+func testCastClassToAnyObject(_ c: C) -> AnyObject {
+  switch (c) {
+  case let x as AnyObject:
+    _ = x
+    break
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen24testCastAnyObjectToClassyAA1CCyXlF : $@convention(thin) (@guaranteed AnyObject) -> @owned C {
+// CHECK: bb0(%0 : @guaranteed $AnyObject):
+// CHECK:   [[CP:%.*]] = copy_value %0 : $AnyObject
+// CHECK:   checked_cast_br [[CP]] : $AnyObject to C, bb1, bb2
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen24testCastAnyObjectToClassyAA1CCyXlF'
+func testCastAnyObjectToClass(_ o: AnyObject) -> C {
+  switch (o) {
+  case let x as C:
+    _ = x
+    break
+  default:
+    break
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen024testCastClassArchetypeToF0yAA1CCxRlzClF : $@convention(thin) <T where T : AnyObject> (@guaranteed T) -> @owned C {
+// CHECK: bb0(%0 : @guaranteed $T):
+// CHECK:   [[CP:%.*]] = copy_value %0 : $T
+// CHECK:   checked_cast_br [[CP]] : $T to C, bb1, bb2
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen024testCastClassArchetypeToF0yAA1CCxRlzClF'
+func testCastClassArchetypeToClass<T : AnyObject>(_ o: T) -> C {
+  switch (o) {
+  case let x as C:
+    _ = x
+    break
+  default:
+    break
+  }
+}

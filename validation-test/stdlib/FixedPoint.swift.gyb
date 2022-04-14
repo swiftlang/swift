@@ -13,7 +13,6 @@ var FixedPoint = TestSuite("FixedPoint")
 
 %{
 
-from __future__ import division
 import gyb
 from SwiftIntTypes import all_integer_types
 

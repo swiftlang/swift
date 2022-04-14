@@ -3357,6 +3357,20 @@ static llvm::Constant *getElementBitCast(llvm::Constant *ptr,
   }
 }
 
+llvm::Constant *
+IRGenModule::getOrCreateLazyGlobalVariable(LinkEntity entity,
+    llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> build,
+    llvm::function_ref<void(llvm::GlobalVariable *)> finish) {
+  auto defaultType = entity.getDefaultDeclarationType(*this);
+
+  LazyConstantInitializer lazyInitializer = {
+    defaultType, build, finish
+  };
+  return getAddrOfLLVMVariable(entity,
+                               ConstantInit::getLazy(&lazyInitializer),
+                               DebugTypeInfo(), defaultType);
+}
+
 /// Return a reference to an object that's suitable for being used for
 /// the given kind of reference.
 ///
@@ -3429,7 +3443,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
 
     // If we're looking to define something, we may need to replace a
     // forward declaration.
-    if (definitionType) {
+    if (!definition.isLazy() && definitionType) {
       assert(existing->isDeclaration() && "already defined");
       updateLinkageForDefinition(*this, existing, entity);
 
@@ -3461,6 +3475,21 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   if (auto existing = Module.getNamedGlobal(link.getName()))
     return getElementBitCast(existing, defaultType);
 
+  const LazyConstantInitializer *lazyInitializer = nullptr;
+  Optional<ConstantInitBuilder> lazyBuilder;
+  if (definition.isLazy()) {
+    lazyInitializer = definition.getLazy();
+    lazyBuilder.emplace(*this);
+
+    // Build the lazy initializer as a future.
+    auto future = lazyInitializer->Build(*lazyBuilder);
+
+    // Set the future as our definition and set its type as the
+    // definition type.
+    definitionType = future.getType();
+    definition = future;
+  }
+
   // If we're not defining the object now, forward declare it with the default
   // type.
   if (!definitionType) definitionType = defaultType;
@@ -3472,6 +3501,11 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   // Install the concrete definition if we have one.
   if (definition && definition.hasInit()) {
     definition.getInit().installInGlobal(var);
+  }
+
+  // Call the creation callback.
+  if (lazyInitializer) {
+    lazyInitializer->Create(var);
   }
 
   // If we have an existing entry, destroy it, replacing it with the

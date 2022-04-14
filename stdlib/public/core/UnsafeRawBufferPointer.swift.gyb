@@ -410,7 +410,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     with `type`.
   @inlinable
   public func storeBytes<T>(
-    of value: T, toByteOffset offset: Int = 0, as: T.Type
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
     _debugPrecondition(offset >= 0, "${Self}.storeBytes with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-string-processing)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-bare-slash-regex)
 
 // REQUIRES: swift_in_compiler,string_processing,executable_test
 

@@ -3096,10 +3096,11 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   SmallVector<std::string, 8> missingProtoTypeStrings;
   SmallVector<ProtocolDecl *, 8> missingProtocols;
   for (auto protocol : layout.getProtocols()) {
-    if (!TypeChecker::conformsToProtocol(fromType, protocol->getDecl(),
+    if (!TypeChecker::conformsToProtocol(fromType, protocol,
                                          getParentModule())) {
-      missingProtoTypeStrings.push_back(protocol->getString());
-      missingProtocols.push_back(protocol->getDecl());
+      auto protoTy = protocol->getDeclaredInterfaceType();
+      missingProtoTypeStrings.push_back(protoTy->getString());
+      missingProtocols.push_back(protocol);
     }
   }
 

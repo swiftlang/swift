@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # ===--- convertToJSON.py ------------------------------------------------===//
 #
@@ -56,8 +56,6 @@
 #         }
 #     ]
 # }
-
-from __future__ import print_function
 
 import json
 import re

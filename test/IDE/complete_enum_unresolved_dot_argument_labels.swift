@@ -11,7 +11,7 @@ func testInit() {
   var state = DragState.inactive
   state = .dragging(#^SIGNATURE^#)
   // SIGNATURE: Begin completions, 1 item
-  // SIGNATURE: Pattern/CurrModule/Flair[ArgLabels]/TypeRelation[Identical]: ['(']{#translationX: Int#}, {#translationY: Int#}[')'][#DragState#];
+  // SIGNATURE: Pattern/CurrModule/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#translationX: Int#}, {#translationY: Int#}[')'][#DragState#];
   // SIGNATURE: End completions
 
   state = .dragging(translationX: 2, #^ARGUMENT^#)
@@ -21,7 +21,7 @@ func testInit() {
 
   state = .defaulted(#^DEFAULTED^#)
   // DEFAULTED: Begin completions, 1 items
-  // DEFAULTED: Pattern/CurrModule/Flair[ArgLabels]/TypeRelation[Identical]: ['(']{#x: Int#}, {#y: Int#}, {#z: Int#}, {#extra: Int#}[')'][#DragState#];
+  // DEFAULTED: Pattern/CurrModule/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#x: Int#}, {#y: Int#}, {#z: Int#}, {#extra: Int#}[')'][#DragState#];
   // DEFAULTED: End completions
 
   state = .defaulted(x: 1, #^DEFAULTEDARG^#)
@@ -45,7 +45,7 @@ func testMatch() {
   case .dragging(translationX: 2, #^MATCH_ARGY^#):
     // MATCH_ARGY: Begin completions
     // FIXME: This should have an identical type relation
-    // MATCH_ARGY: Decl[LocalVar]/Local/TypeRelation[Identical]: localInt[#Int#]; name=localInt
+    // MATCH_ARGY: Decl[LocalVar]/Local/TypeRelation[Convertible]: localInt[#Int#]; name=localInt
     // FIXME: We should offer 'translationY:' (without any flair since it's optional), `let translationY`, and `_`
     // MATCH_ARGY: End completions
     break

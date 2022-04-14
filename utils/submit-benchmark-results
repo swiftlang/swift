@@ -1,8 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """Utility script for submitting benchmark results to an LNT server."""
-
-from __future__ import print_function
 
 import datetime
 import errno

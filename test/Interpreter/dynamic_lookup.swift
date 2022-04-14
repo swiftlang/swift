@@ -39,6 +39,15 @@ func test_dynamic_lookup_f(_ obj: AnyObject) {
   }
 }
 
+func test_dynamic_lookup_f_unbound(_ obj: AnyObject) {
+  var of = AnyObject.f(obj)
+  if of != nil {
+    of!()
+  } else {
+    print("Object does not respond to the selector \"f\".\n", terminator: "")
+  }
+}
+
 func test_dynamic_lookup_g(_ obj: AnyObject) {
   var og = type(of: obj).g
   if og != nil {
@@ -63,6 +72,15 @@ test_dynamic_lookup_f(X())
 test_dynamic_lookup_f(Y())
 // CHECK: Z.f()
 test_dynamic_lookup_f(Z())
+
+// CHECK-NEXT: (AnyObject) -> Optional<() -> ()>
+print(type(of: AnyObject.f))
+// CHECK-NEXT: X.f()
+test_dynamic_lookup_f_unbound(X())
+// CHECK-NEXT: Object does not respond to the selector "f"
+test_dynamic_lookup_f_unbound(Y())
+// CHECK-NEXT: Z.f()
+test_dynamic_lookup_f_unbound(Z())
 
 // CHECK: Class does not respond to the selector "g"
 test_dynamic_lookup_g(X())

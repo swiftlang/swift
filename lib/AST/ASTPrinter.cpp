@@ -2744,8 +2744,8 @@ static bool usesFeatureRethrowsProtocol(
       if (auto inheritedType = inheritedEntry.getType()) {
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
-          for (ProtocolType *protoTy : layout.getProtocols()) {
-            if (usesFeatureRethrowsProtocol(protoTy->getDecl(), checked))
+          for (ProtocolDecl *proto : layout.getProtocols()) {
+            if (usesFeatureRethrowsProtocol(proto, checked))
               return true;
           }
         }

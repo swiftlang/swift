@@ -241,7 +241,7 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
     Buffer << 'T';
     auto protocols = layout.getProtocols();
     for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-      appendProtocolName(protocols[i]->getDecl());
+      appendProtocolName(protocols[i]);
       if (i == 0)
         appendOperator("_");
     }
@@ -397,3 +397,69 @@ std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
   appendGenericSignature(genericSig);
   return finalize();
 }
+
+std::string
+IRGenMangler::mangleExtendedExistentialTypeShape(bool isUnique,
+                                                 CanGenericSignature genSig,
+                                                 CanExistentialType type,
+                                                 unsigned metatypeDepth) {
+  beginMangling();
+
+  appendExtendedExistentialTypeShape(genSig, type, metatypeDepth);
+
+  // If this is non-unique, add a suffix to avoid accidental misuse
+  // (and to make it easier to analyze in an image).
+  if (!isUnique)
+    appendOperator("Mq");
+
+  return finalize();
+}
+
+std::string
+IRGenMangler::mangleExtendedExistentialTypeShapeForUniquing(
+                                                 CanGenericSignature genSig,
+                                                 CanExistentialType type,
+                                                 unsigned metatypeDepth) {
+  beginManglingWithoutPrefix();
+  appendExtendedExistentialTypeShape(genSig, type, metatypeDepth);
+  return finalize();
+}
+void
+IRGenMangler::appendExtendedExistentialTypeShape(CanGenericSignature genSig,
+                                                 CanExistentialType type,
+                                                 unsigned metatypeDepth) {
+  // Append the requirement signature of the existential.
+  auto &ctx = type->getASTContext();
+  auto reqSig = ctx.getOpenedArchetypeSignature(type, genSig);
+  appendGenericSignature(reqSig, genSig);
+
+  // Append the generalization signature.
+  if (genSig) appendGenericSignature(genSig);
+
+  // Append the type expression, if we have metatypes.
+  // Metatypes are called out because they're currently the only
+  // type expression we support.
+  if (metatypeDepth) {
+    assert(reqSig.getGenericParams().size() == 1);
+    Type type = reqSig.getGenericParams()[0];
+    for (unsigned i = 0; i != metatypeDepth; ++i)
+      type = MetatypeType::get(type);
+    appendType(type, reqSig);
+  }
+
+  // Append the shape operator.
+  if (!genSig) {
+    appendOperator(metatypeDepth ? "Xh" : "Xg");
+  } else {
+    appendOperator(metatypeDepth ? "XH" : "XG");
+  }
+
+  // Append the value storage.
+  if (metatypeDepth)
+    appendOperator("m");
+  else if (type->requiresClass())
+    appendOperator("c");
+  else
+    appendOperator("o");
+}
+

@@ -511,6 +511,10 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   SyntaxParsingContext UnaryContext(SyntaxContext, SyntaxContextKind::Expr);
   UnresolvedDeclRefExpr *Operator;
+
+  // First check to see if we have the start of a regex literal `/.../`.
+  tryLexRegexLiteral(/*mustBeRegex*/ true);
+
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
@@ -532,16 +536,32 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   case tok::backslash:
     return parseExprKeyPath();
 
-  case tok::oper_postfix:
+  case tok::oper_postfix: {
     // Postfix operators cannot start a subexpression, but can happen
     // syntactically because the operator may just follow whatever precedes this
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
-    LLVM_FALLTHROUGH;
-  case tok::oper_prefix:
     Operator = parseExprOperator();
     break;
+  }
+  case tok::oper_prefix: {
+    // Check to see if we can split a prefix operator containing `/`, e.g `!/`,
+    // which might be a prefix operator on a regex literal.
+    if (Context.LangOpts.EnableBareSlashRegexLiterals) {
+      auto slashIdx = Tok.getText().find("/");
+      if (slashIdx != StringRef::npos) {
+        auto prefix = Tok.getText().take_front(slashIdx);
+        if (!prefix.empty()) {
+          Operator = makeExprOperator({Tok.getKind(), prefix});
+          consumeStartingCharacterOfCurrentToken(Tok.getKind(), prefix.size());
+          break;
+        }
+      }
+    }
+    Operator = parseExprOperator();
+    break;
+  }
   case tok::oper_binary_spaced:
   case tok::oper_binary_unspaced: {
     // For recovery purposes, accept an oper_binary here.
@@ -860,17 +880,50 @@ static DeclRefKind getDeclRefKindForOperator(tok kind) {
   }
 }
 
-/// parseExprOperator - Parse an operator reference expression.  These
-/// are not "proper" expressions; they can only appear in binary/unary
-/// operators.
-UnresolvedDeclRefExpr *Parser::parseExprOperator() {
+UnresolvedDeclRefExpr *Parser::makeExprOperator(const Token &Tok) {
   assert(Tok.isAnyOperator());
   DeclRefKind refKind = getDeclRefKindForOperator(Tok.getKind());
   SourceLoc loc = Tok.getLoc();
   DeclNameRef name(Context.getIdentifier(Tok.getText()));
-  consumeToken();
   // Bypass local lookup.
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
+}
+
+/// parseExprOperator - Parse an operator reference expression.  These
+/// are not "proper" expressions; they can only appear in binary/unary
+/// operators.
+UnresolvedDeclRefExpr *Parser::parseExprOperator() {
+  auto *op = makeExprOperator(Tok);
+  consumeToken();
+  return op;
+}
+
+void Parser::tryLexRegexLiteral(bool mustBeRegex) {
+  if (!Context.LangOpts.EnableBareSlashRegexLiterals)
+    return;
+
+  // Check to see if we have the start of a regex literal `/.../`.
+  switch (Tok.getKind()) {
+  case tok::oper_prefix:
+  case tok::oper_binary_spaced:
+  case tok::oper_binary_unspaced: {
+    if (!Tok.getText().startswith("/"))
+      break;
+
+    // Try re-lex as a `/.../` regex literal.
+    auto state = getParserPosition().LS;
+    L->tryLexForwardSlashRegexLiteralFrom(state, mustBeRegex);
+
+    // Discard the current token, which will be replaced by the re-lexed token,
+    // which may or may not be a regex literal token.
+    discardToken();
+
+    assert(Tok.getText().startswith("/"));
+    break;
+  }
+  default:
+    break;
+  }
 }
 
 /// parseExprSuper
@@ -3159,6 +3212,11 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     Identifier FieldName;
     SourceLoc FieldNameLoc;
     parseOptionalArgumentLabel(FieldName, FieldNameLoc);
+
+    // First check to see if we have the start of a regex literal `/.../`. We
+    // need to do this before handling unapplied operator references, as e.g
+    // `(/, /)` might be a regex literal.
+    tryLexRegexLiteral(/*mustBeRegex*/ false);
 
     // See if we have an operator decl ref '(<op>)'. The operator token in
     // this case lexes as a binary operator because it neither leads nor

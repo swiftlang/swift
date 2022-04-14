@@ -302,6 +302,9 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_dispatch_invoke_function                               \
   __ptrauth(ptrauth_key_process_independent_code, 1,                           \
             SpecialPointerAuthDiscriminators::DispatchInvokeFunction)
+#define __ptrauth_swift_accessible_function_record                             \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::AccessibleFunctionRecord)
 #define __ptrauth_swift_objc_superclass                                        \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             swift::SpecialPointerAuthDiscriminators::ObjCSuperclass)
@@ -334,6 +337,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_cancellation_notification_function
 #define __ptrauth_swift_escalation_notification_function
 #define __ptrauth_swift_dispatch_invoke_function
+#define __ptrauth_swift_accessible_function_record
 #define __ptrauth_swift_objc_superclass
 #define __ptrauth_swift_runtime_function_entry
 #define __ptrauth_swift_runtime_function_entry_with_key(__key)

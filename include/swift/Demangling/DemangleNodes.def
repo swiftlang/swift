@@ -335,6 +335,9 @@ NODE(CompileTimeConst)
 NODE(OpaqueReturnTypeIndexed)
 NODE(BackDeploymentThunk)
 NODE(BackDeploymentFallback)
+NODE(ExtendedExistentialTypeShape)
+NODE(ExtendedExistentialValueStorage)
+NODE(Uniquable)
 
 #undef CONTEXT_NODE
 #undef NODE
