@@ -115,6 +115,10 @@ private:
 
   Identifier BuildOptionalId;
 
+  /// Counter used to give unique names to the variables that are
+  /// created implicitly.
+  unsigned VarCounter = 0;
+
 public:
   ResultBuilder(ConstraintSystem *CS, DeclContext *DC, Type builderType);
 
@@ -136,6 +140,9 @@ public:
   Expr *buildCall(SourceLoc loc, Identifier fnName,
                   ArrayRef<Expr *> argExprs,
                   ArrayRef<Identifier> argLabels) const;
+
+  /// Build an implicit variable in this context.
+  VarDecl *buildVar(SourceLoc loc);
 };
 
 /// Describes the algorithm to use for trailing closure matching.

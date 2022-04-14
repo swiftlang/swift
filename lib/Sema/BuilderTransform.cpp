@@ -77,10 +77,6 @@ class BuilderClosureVisitor
   /// e.g., during constraint generation.
   bool hadError = false;
 
-  /// Counter used to give unique names to the variables that are
-  /// created implicitly.
-  unsigned varCounter = 0;
-
   /// The record of what happened when we applied the builder transform.
   AppliedBuilderTransform applied;
 
@@ -93,17 +89,6 @@ class BuilderClosureVisitor
       return nullptr;
 
     return builder.buildCall(loc, fnName, argExprs, argLabels);
-  }
-
-  /// Build an implicit variable in this context.
-  VarDecl *buildVar(SourceLoc loc) {
-    // Create the implicit variable.
-    Identifier name = ctx.getIdentifier(
-        ("$__builder" + Twine(varCounter++)).str());
-    auto var = new (ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
-                                 loc, name, dc);
-    var->setImplicit();
-    return var;
   }
 
   /// Capture the given expression into an implicitly-generated variable.
@@ -127,7 +112,7 @@ class BuilderClosureVisitor
     }
 
     // Create the implicit variable.
-    auto var = buildVar(expr->getStartLoc());
+    auto var = builder.buildVar(expr->getStartLoc());
 
     // Record the new variable and its corresponding expression & statement.
     if (auto forStmt = forEntity.dyn_cast<Stmt *>()) {
@@ -563,7 +548,7 @@ protected:
     }
 
     // Create a variable to capture the result of this expression.
-    auto ifVar = buildVar(ifStmt->getStartLoc());
+    auto ifVar = builder.buildVar(ifStmt->getStartLoc());
     cs->setType(ifVar, resultType);
     applied.capturedStmts.insert({ifStmt, { ifVar, { thenExpr, elseExpr }}});
     return ifVar;
@@ -730,7 +715,7 @@ protected:
     }
 
     // Create a variable to capture the result of evaluating the switch.
-    auto switchVar = buildVar(switchStmt->getStartLoc());
+    auto switchVar = builder.buildVar(switchStmt->getStartLoc());
     cs->setType(switchVar, resultType);
     applied.capturedStmts.insert(
         {switchStmt, { switchVar, std::move(injectedCaseExprs) } });
@@ -820,7 +805,7 @@ protected:
     // iteration of the loop. We need a fresh type variable to remove the
     // lvalue-ness of the array variable.
     SourceLoc loc = forEachStmt->getForLoc();
-    VarDecl *arrayVar = buildVar(loc);
+    VarDecl *arrayVar = builder.buildVar(loc);
     Type arrayElementType = cs->createTypeVariable(
         cs->getConstraintLocator(forEachStmt), 0);
     cs->addConstraint(ConstraintKind::Equal, cs->getType(bodyVar),
@@ -879,7 +864,7 @@ protected:
 
     // Form a final variable for the for-each expression itself, which will
     // be initialized with the call to the result builder's buildArray(_:).
-    auto finalForEachVar = buildVar(loc);
+    auto finalForEachVar = builder.buildVar(loc);
     cs->setType(finalForEachVar, cs->getType(buildArrayCall));
     applied.capturedStmts.insert(
       {forEachStmt, {
@@ -2225,4 +2210,15 @@ Expr *ResultBuilder::buildCall(SourceLoc loc, Identifier fnName,
 
   auto *argList = ArgumentList::createImplicit(ctx, openLoc, args, closeLoc);
   return CallExpr::createImplicit(ctx, memberRef, argList);
+}
+
+VarDecl *ResultBuilder::buildVar(SourceLoc loc) {
+  auto &ctx = DC->getASTContext();
+  // Create the implicit variable.
+  Identifier name =
+      ctx.getIdentifier(("$__builder" + Twine(VarCounter++)).str());
+  auto var = new (ctx)
+      VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var, loc, name, DC);
+  var->setImplicit();
+  return var;
 }
