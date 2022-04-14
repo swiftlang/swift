@@ -604,12 +604,13 @@ suite.test("Fully exhaustive index interchange")
   fullyExhaustiveIndexInterchange(string)
 }
 
+#if _runtime(_ObjC)
 suite.test("Fully exhaustive index interchange/GraphemeBreakTests") {
   for string in graphemeBreakTests.map { $0.0 } {
     fullyExhaustiveIndexInterchange(string)
   }
 }
-
+#endif
 
 suite.test("Global vs local grapheme cluster boundaries") {
   guard #available(SwiftStdlib 5.7, *) else {

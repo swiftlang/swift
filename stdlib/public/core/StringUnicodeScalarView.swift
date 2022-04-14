@@ -319,7 +319,7 @@ extension String {
     @inline(__always) get { return UnicodeScalarView(_guts) }
     @inline(__always) set { _guts = newValue._guts }
 
-    @_alwaysEmitIntoClient @inline(__always) // 5.7
+    @inlinable @inline(__always)
     _modify {
       var view = self.unicodeScalars
       self = ""

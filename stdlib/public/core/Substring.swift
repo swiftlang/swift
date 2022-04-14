@@ -141,7 +141,7 @@ extension Substring {
   @inlinable @inline(__always)
   internal var _offsetRange: Range<Int> { _slice._bounds._encodedOffsetRange }
 
-  @inlinable @inline(__always)
+  @_alwaysEmitIntoClient @inline(__always)
   internal var _bounds: Range<Index> { _slice._bounds }
 }
 
