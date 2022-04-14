@@ -498,6 +498,47 @@ UnsafeRawBufferPointerTestSuite.test("load.after")
   }
 }
 
+UnsafeRawBufferPointerTestSuite.test("load.aligned") {
+  var data: [UInt8] = [0, 0, 0, 0, .max, .max, .max, .max]
+  data.withUnsafeBytes {
+    let x = $0.load(fromByteOffset: 4, as: UInt32.self)
+    expectEqual(x, .max)
+  }
+  data.withUnsafeMutableBytes {
+    let x = $0.load(fromByteOffset: 0, as: UInt32.self)
+    expectEqual(x, 0)
+  }
+}
+
+UnsafeRawBufferPointerTestSuite.test("load.invalid")
+.skip(.custom({ !_isDebugAssertConfiguration() }, // require debugAssert
+              reason: "This tests a debug precondition.."))
+.code {
+  let data: [UInt8] = [0, 0, 0, .max, .max, .max, .max, 0]
+  let i = data.firstIndex(of: .max)!
+  expectCrashLater()
+  _ = data.withUnsafeBytes {
+    $0.load(fromByteOffset: i, as: UInt32.self)
+  }
+}
+
+UnsafeRawBufferPointerTestSuite.test("load.unaligned")
+.skip(.custom({ // require SwiftStdlib 5.7
+  if #available(SwiftStdlib 5.7, *) { return false } else { return true }
+}, reason: "Requires stdlib from Swift 5.7"))
+.code {
+  var data: [UInt8] = [0, 0, 0, .max, .max, .max, .max, 0]
+  let i = data.firstIndex(of: .max)!
+  data.withUnsafeBytes {
+    let x = $0.loadUnaligned(fromByteOffset: i, as: UInt32.self)
+    expectEqual(x, .max)
+  }
+  data.withUnsafeMutableBytes {
+    let x = $0.loadUnaligned(fromByteOffset: i-1, as: UInt32.self)
+    expectEqual(UInt32(littleEndian: x), 0xffffff00)
+  }
+}
+
 UnsafeRawBufferPointerTestSuite.test("store.before")
 .skip(.custom(
     { !_isDebugAssertConfiguration() },
@@ -519,6 +560,33 @@ UnsafeRawBufferPointerTestSuite.test("store.after")
   withUnsafeMutableBytes(of: &x) {
     $0.storeBytes(of: UInt64(0), as: UInt64.self)
   }
+}
+
+UnsafeRawBufferPointerTestSuite.test("store.invalid")
+.skip(.custom({ !_isDebugAssertConfiguration() }, // require debugAssert
+              reason: "This tests a debug precondition.."))
+.skip(.custom({ // require SwiftStdlib 5.7
+  if #available(SwiftStdlib 5.7, *) { return false } else { return true }
+}, reason: "Requires stdlib from Swift 5.7"))
+.code {
+  let t = "Text that is longer than fits in a small String."
+  let p1 = UnsafeMutableRawPointer.allocate(
+    byteCount: MemoryLayout<String>.size,
+    alignment: MemoryLayout<String>.alignment
+  )
+  defer { p1.deallocate() }
+  expectCrashLater()
+  p1.storeBytes(of: t, as: String.self)
+  expectUnreachable()
+}
+
+UnsafeRawBufferPointerTestSuite.test("store.valid") {
+  let value32 = UInt32.max
+  var value64 = Int64.zero
+  withUnsafeMutableBytes(of: &value64) {
+    $0.storeBytes(of: value32, toByteOffset: MemoryLayout<UInt32>.stride, as: UInt32.self)
+  }
+  expectEqual(value64, 0xffffffff << 32)
 }
 
 UnsafeRawBufferPointerTestSuite.test("copy.bytes.overflow")
