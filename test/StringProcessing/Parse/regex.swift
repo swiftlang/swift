@@ -1,17 +1,20 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-string-processing
+// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex
 // REQUIRES: swift_in_compiler
 
+_ = /abc/
 _ = #/abc/#
 _ = ##/abc/##
 
 func foo<T>(_ x: T...) {}
-foo(#/abc/#, ##/abc/##)
+foo(/abc/, #/abc/#, ##/abc/##)
 
-let arr = [#/abc/#, ##/abc/##]
+let arr = [/abc/, #/abc/#, ##/abc/##]
 
+_ = /\w+/.self
 _ = #/\w+/#.self
 _ = ##/\w+/##.self
 
+_ = /#\/\#\\/
 _ = #/#/\/\#\\/#
 _ = ##/#|\|\#\\/##
 

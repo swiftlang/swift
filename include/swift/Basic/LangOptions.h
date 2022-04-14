@@ -564,8 +564,9 @@ namespace swift {
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
-    /// Enables `/.../` syntax regular-expression literals
-    bool EnableForwardSlashRegexLiterals = false;
+    /// Enables `/.../` syntax regular-expression literals. This requires
+    /// experimental string processing. Note this does not affect `#/.../#`.
+    bool EnableBareSlashRegexLiterals = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

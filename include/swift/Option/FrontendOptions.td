@@ -562,6 +562,9 @@ def disable_deserialization_recovery :
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
+def disable_experimental_string_processing :
+  Flag<["-"], "disable-experimental-string-processing">,
+  HelpText<"Disable experimental string processing">;
 
 def enable_experimental_variadic_generics :
   Flag<["-"], "enable-experimental-variadic-generics">,
