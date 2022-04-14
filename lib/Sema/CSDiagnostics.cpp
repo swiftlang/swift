@@ -3035,10 +3035,8 @@ bool ContextualFailure::tryTypeCoercionFixIt(
     }
   }
 
-  CheckedCastKind Kind =
-      TypeChecker::typeCheckCheckedCast(fromType, toType,
-                                        CheckedCastContextKind::None, getDC(),
-                                        SourceLoc(), nullptr, SourceRange());
+  CheckedCastKind Kind = TypeChecker::typeCheckCheckedCast(
+      fromType, toType, CheckedCastContextKind::None, getDC());
 
   if (Kind != CheckedCastKind::Unresolved) {
     bool canUseAs = Kind == CheckedCastKind::Coercion ||
@@ -7982,7 +7980,7 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseConditionalCastExpr() const {
   return true;
 }
 
-bool NoopCheckedCast::diagnoseIfExpr() const {
+bool NoopCheckedCast::diagnoseIsExpr() const {
   auto *expr = getAsExpr<IsExpr>(CastExpr);
   if (!expr)
     return false;
@@ -8028,7 +8026,7 @@ bool NoopCheckedCast::diagnoseForcedCastExpr() const {
 }
 
 bool NoopCheckedCast::diagnoseAsError() {
-  if (diagnoseIfExpr())
+  if (diagnoseIsExpr())
     return true;
 
   if (diagnoseForcedCastExpr())
@@ -8038,6 +8036,11 @@ bool NoopCheckedCast::diagnoseAsError() {
     return true;
 
   llvm_unreachable("Shouldn't reach here");
+}
+
+bool NoopExistentialToCFTypeCheckedCast::diagnoseAsError() {
+  emitDiagnostic(diag::isa_is_foreign_check, getToType());
+  return true;
 }
 
 bool CoercibleOptionalCheckedCastFailure::diagnoseAsError() {
@@ -8059,6 +8062,42 @@ bool UnsupportedRuntimeCheckedCastFailure::diagnoseAsError() {
                  isExpr<IsExpr>(anchor) ? 0 : 1);
   emitDiagnostic(diag::checked_cast_not_supported_coerce_instead)
       .fixItReplace(getCastRange(), "as");
+  return true;
+}
+
+bool CheckedCastToUnrelatedFailure::diagnoseAsError() {
+  const auto toType = getToType();
+  auto *sub = CastExpr->getSubExpr()->getSemanticsProvidingExpr();
+  // FIXME: This literal diagnostics needs to be revisited by a proposal
+  // to unify casting semantics for literals.
+  // https://bugs.swift.org/browse/SR-12093
+  auto &ctx = getASTContext();
+  auto *dc = getDC();
+  if (isa<LiteralExpr>(sub)) {
+    auto *protocol = TypeChecker::getLiteralProtocol(ctx, sub);
+    // Special handle for literals conditional checked cast when they can
+    // be statically coerced to the cast type.
+    if (protocol && TypeChecker::conformsToProtocol(toType, protocol,
+                                                    dc->getParentModule())) {
+      emitDiagnostic(diag::literal_conditional_downcast_to_coercion, toType);
+      return true;
+    }
+  }
+
+  emitDiagnostic(diag::downcast_to_unrelated, getFromType(), toType)
+      .highlight(getFromRange())
+      .highlight(getToRange());
+  // If we're referring to a function with a return value (not Void) then
+  // emit a fix-it suggesting to add `()` to call the function
+  if (auto DRE = dyn_cast<DeclRefExpr>(sub)) {
+    if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
+      if (!FD->getResultInterfaceType()->isVoid()) {
+        emitDiagnostic(diag::downcast_to_unrelated_fixit,
+                       FD->getBaseIdentifier())
+            .fixItInsertAfter(sub->getEndLoc(), "()");
+      }
+    }
+  }
   return true;
 }
 
