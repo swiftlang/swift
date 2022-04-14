@@ -19,7 +19,9 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleNameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Frontend/Frontend.h"
@@ -570,13 +572,14 @@ public:
       });
     }
 
+    // Preserve the behavior of previous implementations which formatted of
+    // empty extensions compactly with '{}' on the same line.
+    PrintOptions extensionPrintOptions = printOptions;
+    extensionPrintOptions.PrintEmptyMembersOnSameLine = true;
+
     // Then walk the remaining ones, and see what we need to print.
-    // Note: We could do this in one pass, but the logic is easier to
-    // understand if we build up the list and then print it, even if it takes
-    // a bit more memory.
     // FIXME: This will pick the availability attributes from the first sight
     // of a protocol rather than the maximally available case.
-    SmallVector<ProtocolAndAvailability, 16> protocolsToPrint;
     for (const auto &protoAndAvailability : ExtraProtocols) {
       auto proto = std::get<0>(protoAndAvailability);
       auto availability = std::get<1>(protoAndAvailability);
@@ -602,58 +605,64 @@ public:
         if (isPublicOrUsableFromInline(inherited) &&
             conformanceDeclaredInModule(M, nominal, inherited) &&
             !M->isImportedImplementationOnly(inherited->getParentModule())) {
-          protocolsToPrint.push_back(
-            ProtocolAndAvailability(inherited, availability, isUnchecked,
-                                    otherAttrs));
+          auto protoAndAvailability = ProtocolAndAvailability(
+              inherited, availability, isUnchecked, otherAttrs);
+          printSynthesizedExtension(out, extensionPrintOptions, M, nominal,
+                                    protoAndAvailability);
           return TypeWalker::Action::SkipChildren;
         }
 
         return TypeWalker::Action::Continue;
       });
     }
-    if (protocolsToPrint.empty())
-      return;
+  }
 
-    for (const auto &protoAndAvailability : protocolsToPrint) {
-      StreamPrinter printer(out);
-      auto proto = std::get<0>(protoAndAvailability);
-      auto availability = std::get<1>(protoAndAvailability);
-      auto isUnchecked = std::get<2>(protoAndAvailability);
-      auto otherAttrs = std::get<3>(protoAndAvailability);
+  /// Prints a dummy extension on \p nominal to \p out for a public conformance
+  /// to the protocol contained by \p protoAndAvailability.
+  static void
+  printSynthesizedExtension(raw_ostream &out, const PrintOptions &printOptions,
+                            ModuleDecl *M, const NominalTypeDecl *nominal,
+                            ProtocolAndAvailability &protoAndAvailability) {
+    StreamPrinter printer(out);
 
-      PrintOptions curPrintOptions = printOptions;
-      auto printBody = [&] {
-        // FIXME: Shouldn't this be an implicit conversion?
-        TinyPtrVector<const DeclAttribute *> attrs;
-        attrs.insert(attrs.end(), availability.begin(), availability.end());
-        auto spiAttributes = proto->getAttrs().getAttributes<SPIAccessControlAttr>();
-        attrs.insert(attrs.end(), spiAttributes.begin(), spiAttributes.end());
-        attrs.insert(attrs.end(), otherAttrs.begin(), otherAttrs.end());
-        DeclAttributes::print(printer, curPrintOptions, attrs);
+    auto proto = std::get<0>(protoAndAvailability);
+    auto availability = std::get<1>(protoAndAvailability);
+    auto isUnchecked = std::get<2>(protoAndAvailability);
+    auto otherAttrs = std::get<3>(protoAndAvailability);
 
-        printer << "extension ";
-        {
-          bool oldFullyQualifiedTypesIfAmbiguous =
-            curPrintOptions.FullyQualifiedTypesIfAmbiguous;
-          curPrintOptions.FullyQualifiedTypesIfAmbiguous =
-            curPrintOptions.FullyQualifiedExtendedTypesIfAmbiguous;
-          nominal->getDeclaredType().print(printer, curPrintOptions);
-          curPrintOptions.FullyQualifiedTypesIfAmbiguous =
-            oldFullyQualifiedTypesIfAmbiguous;
-        }
-        printer << " : ";
+    // Create a synthesized ExtensionDecl for the conformance.
+    ASTContext &ctx = M->getASTContext();
+    auto inherits = ctx.AllocateCopy(llvm::makeArrayRef(InheritedEntry(
+        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked)));
+    auto extension =
+        ExtensionDecl::create(ctx, SourceLoc(), nullptr, inherits,
+                              nominal->getModuleScopeContext(), nullptr);
+    extension->setImplicit();
 
-        if (isUnchecked)
-          printer << "@unchecked ";
+    // Build up synthesized DeclAttributes for the extension.
+    TinyPtrVector<const DeclAttribute *> attrs;
+    attrs.insert(attrs.end(), availability.begin(), availability.end());
+    auto spiAttributes =
+        proto->getAttrs().getAttributes<SPIAccessControlAttr>();
+    attrs.insert(attrs.end(), spiAttributes.begin(), spiAttributes.end());
+    attrs.insert(attrs.end(), otherAttrs.begin(), otherAttrs.end());
 
-        proto->getDeclaredInterfaceType()->print(printer, curPrintOptions);
-
-        printer << " {}";
-      };
-
-      printBody();
-      printer << "\n";
+    // Since DeclAttributes is a linked list where each added attribute becomes
+    // the head, we need to add these attributes in reverse order to reproduce
+    // the order in which previous implementations printed these attributes.
+    DeclAttributes declAttrs;
+    for (auto attr = attrs.rbegin(), end = attrs.rend(); attr != end; ++attr) {
+      declAttrs.add(const_cast<DeclAttribute *>(*attr));
     }
+    extension->getAttrs() = declAttrs;
+
+    ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
+                              nominal->getDeclaredType());
+    ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
+                              const_cast<NominalTypeDecl *>(nominal));
+
+    extension->print(printer, printOptions);
+    printer << "\n";
   }
 
   /// If there were any conditional conformances that couldn't be printed,

@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -module-name FeatureTest -emit-module-interface-path - -enable-library-evolution  -disable-availability-checking %s | %FileCheck %s
-// REQUIRES: concurrency
+// RUN: %target-swift-frontend -typecheck -swift-version 5 -module-name FeatureTest -emit-module-interface-path %t/FeatureTest.swiftinterface -enable-library-evolution  -disable-availability-checking %s
+// RUN: %FileCheck %s < %t/FeatureTest.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -disable-availability-checking -swift-version 5 -module-name FeatureTest %t/FeatureTest.swiftinterface
 
 // REQUIRES: concurrency
 
@@ -166,7 +167,7 @@ public func unsafeInheritExecutor() async {}
 // CHECK-NEXT: #if $UnsafeInheritExecutor
 // CHECK-NEXT: @_specialize{{.*}}
 // CHECK-NEXT: @_unsafeInheritExecutor public func multipleSuppressible<T>(value: T) async
-// CHECK-NEXT: #elsif $SpecializeAttributeWithAvailability
+// CHECK-NEXT: #elseif $SpecializeAttributeWithAvailability
 // CHECK-NEXT: @_specialize{{.*}}
 // CHECK-NEXT: public func multipleSuppressible<T>(value: T) async
 // CHECK-NEXT: #else
@@ -195,3 +196,7 @@ public func unavailableFromAsyncFunc() { }
 public func noAsyncFunc() { }
 
 // CHECK-NOT: extension FeatureTest.MyActor : Swift.Sendable
+
+// CHECK: #if compiler(>=5.3) && $GlobalActors
+// CHECK-NEXT: extension FeatureTest.SomeGlobalActor : _Concurrency.GlobalActor {}
+// CHECK-NEXT: #endif

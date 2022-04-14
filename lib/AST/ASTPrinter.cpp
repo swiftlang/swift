@@ -2311,7 +2311,8 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
                             bool openBracket, bool closeBracket) {
   if (openBracket) {
     Printer << " {";
-    Printer.printNewline();
+    if (!Options.PrintEmptyMembersOnSameLine || !members.empty())
+      Printer.printNewline();
   }
   {
     IndentRAII indentMore(*this);
@@ -3104,13 +3105,12 @@ static FeatureSet getUniqueFeaturesUsed(Decl *decl) {
   return features;
 }
 
-static void printCompatibilityCheckIf(ASTPrinter &printer,
-                                      bool isElsif,
+static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
                                       bool includeCompilerCheck,
                                       const BasicFeatureSet &features) {
   assert(!features.empty());
 
-  printer << (isElsif ? "#elsif " : "#if ");
+  printer << (isElseIf ? "#elseif " : "#if ");
   if (includeCompilerCheck)
     printer << "compiler(>=5.3) && ";
 
@@ -3126,7 +3126,7 @@ static void printCompatibilityCheckIf(ASTPrinter &printer,
   printer.printNewline();
 }
 
-/// Generate a #if ... #elsif ... #endif chain for the given
+/// Generate a #if ... #elseif ... #endif chain for the given
 /// suppressible feature checks.
 static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
                                                PrintOptions &options,
@@ -3147,18 +3147,17 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
     return;
   }
 
-  // Otherwise, enter a `#if` or `#elsif` for the next feature.
+  // Otherwise, enter a `#if` or `#elseif` for the next feature.
   Feature feature = generator.next();
-  printCompatibilityCheckIf(printer, /*elsif*/ !firstInChain,
-                            includeCompilerCheck,
-                            {feature});
+  printCompatibilityCheckIf(printer, /*elseif*/ !firstInChain,
+                            includeCompilerCheck, {feature});
 
   // Print the body.
   printBody();
   printer.printNewline();
 
   // Start suppressing the feature and recurse to either generate
-  // more `#elsif` clauses or finish off with `#endif`.
+  // more `#elseif` clauses or finish off with `#endif`.
   suppressingFeature(options, feature, [&] {
     printWithSuppressibleFeatureChecks(printer, options, /*first*/ false,
                                        includeCompilerCheck, generator,
@@ -3171,13 +3170,13 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
 ///
 /// In the most general form, with both required features and multiple
 /// suppressible features in play, the generated code pattern looks like
-/// the following (assuming that feaature $bar implies feature $baz):
+/// the following (assuming that feature $bar implies feature $baz):
 ///
 /// ```
 ///   #if compiler(>=5.3) && $foo
 ///   #if $bar
 ///   @foo @bar @baz func @test() {}
-///   #elsif $baz
+///   #elseif $baz
 ///   @foo @baz func @test() {}
 ///   #else
 ///   @foo func @test() {}
@@ -3205,7 +3204,7 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
   bool hasRequiredFeatures = features.hasAnyRequired();
   if (hasRequiredFeatures) {
     printCompatibilityCheckIf(printer,
-                              /*elsif*/ false,
+                              /*elseif*/ false,
                               /*compiler check*/ true,
                               features.requiredFeatures());
   }
