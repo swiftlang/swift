@@ -7,12 +7,13 @@ import StdlibUnittest
 var RegexBasicTests = TestSuite("RegexBasic")
 
 extension String {
+  @available(SwiftStdlib 5.7, *)
   func expectMatch<T>(
     _ regex: Regex<T>,
     file: String = #file,
     line: UInt = #line
   ) -> Regex<T>.Match {
-    guard let result = matchWhole(regex) else {
+    guard let result = wholeMatch(of: regex) else {
       expectUnreachable("Failed match", file: file, line: line)
       fatalError()
     }
@@ -21,6 +22,7 @@ extension String {
 }
 
 RegexBasicTests.test("Basic") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   let input = "aabccd"
 
   let match1 = input.expectMatch(#/aabcc./#)
@@ -33,6 +35,7 @@ RegexBasicTests.test("Basic") {
 }
 
 RegexBasicTests.test("Modern") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   let input = "aabccd"
 
   let match1 = input.expectMatch(#/
@@ -43,6 +46,7 @@ RegexBasicTests.test("Modern") {
 }
 
 RegexBasicTests.test("Captures") {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   let input = """
     A6F0..A6F1    ; Extend # Mn   [2] BAMUM COMBINING MARK KOQNDON..BAMUM \
     COMBINING MARK TUKWENTIS
