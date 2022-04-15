@@ -59,17 +59,159 @@ const StmtConditionElement *findAvailabilityCondition(StmtCondition stmtCond) {
   return nullptr;
 }
 
+class BuilderTransformerBase {
+protected:
+  ASTContext &ctx;
+  DeclContext *dc;
+  ResultBuilder builder;
+
+public:
+  BuilderTransformerBase(ConstraintSystem *cs, DeclContext *dc,
+                         Type builderType)
+      : ctx(dc->getASTContext()), dc(dc), builder(cs, dc, builderType) {}
+
+  virtual ~BuilderTransformerBase() {}
+
+protected:
+  virtual Expr *buildCallIfWanted(SourceLoc loc, Identifier fnName,
+                                  ArrayRef<Expr *> argExprs,
+                                  ArrayRef<Identifier> argLabels) = 0;
+
+  /// Build an implicit reference to the given variable.
+  DeclRefExpr *buildVarRef(VarDecl *var, SourceLoc loc) {
+    return new (ctx) DeclRefExpr(var, DeclNameLoc(loc), /*Implicit=*/true);
+  }
+
+  static bool isBuildableIfChainRecursive(IfStmt *ifStmt, unsigned &numPayloads,
+                                          bool &isOptional) {
+    // The 'then' clause contributes a payload.
+    ++numPayloads;
+
+    // If there's an 'else' clause, it contributes payloads:
+    if (auto elseStmt = ifStmt->getElseStmt()) {
+      // If it's 'else if', it contributes payloads recursively.
+      if (auto elseIfStmt = dyn_cast<IfStmt>(elseStmt)) {
+        return isBuildableIfChainRecursive(elseIfStmt, numPayloads, isOptional);
+        // Otherwise it's just the one.
+      } else {
+        ++numPayloads;
+      }
+
+      // If not, the chain result is at least optional.
+    } else {
+      isOptional = true;
+    }
+
+    return true;
+  }
+
+  bool isBuildableIfChain(IfStmt *ifStmt, unsigned &numPayloads,
+                          bool &isOptional) {
+    if (!isBuildableIfChainRecursive(ifStmt, numPayloads, isOptional))
+      return false;
+
+    // If there's a missing 'else', we need 'buildOptional' to exist.
+    if (isOptional && !builder.supportsOptional())
+      return false;
+
+    // If there are multiple clauses, we need 'buildEither(first:)' and
+    // 'buildEither(second:)' to both exist.
+    if (numPayloads > 1) {
+      if (!builder.supports(ctx.Id_buildEither, {ctx.Id_first}) ||
+          !builder.supports(ctx.Id_buildEither, {ctx.Id_second}))
+        return false;
+    }
+
+    return true;
+  }
+
+  /// Wrap a payload value in an expression which will produce a chain
+  /// result (without `buildIf`).
+  Expr *buildWrappedChainPayload(Expr *operand, unsigned payloadIndex,
+                                 unsigned numPayloads, bool isOptional) {
+    assert(payloadIndex < numPayloads);
+
+    // Inject into the appropriate chain position.
+    //
+    // We produce a (left-biased) balanced binary tree of Eithers in order
+    // to prevent requiring a linear number of injections in the worst case.
+    // That is, if we have 13 clauses, we want to produce:
+    //
+    //                      /------------------Either------------\
+    //           /-------Either-------\                     /--Either--\
+    //     /--Either--\          /--Either--\          /--Either--\     \
+    //   /-E-\      /-E-\      /-E-\      /-E-\      /-E-\      /-E-\    \
+    // 0000 0001  0010 0011  0100 0101  0110 0111  1000 1001  1010 1011 1100
+    //
+    // Note that a prefix of length D of the payload index acts as a path
+    // through the tree to the node at depth D.  On the rightmost path
+    // through the tree (when this prefix is equal to the corresponding
+    // prefix of the maximum payload index), the bits of the index mark
+    // where Eithers are required.
+    //
+    // Since we naturally want to build from the innermost Either out, and
+    // therefore work with progressively shorter prefixes, we can do it all
+    // with right-shifts.
+    for (auto path = payloadIndex, maxPath = numPayloads - 1; maxPath != 0;
+         path >>= 1, maxPath >>= 1) {
+      // Skip making Eithers on the rightmost path where they aren't required.
+      // This isn't just an optimization: adding spurious Eithers could
+      // leave us with unresolvable type variables if `buildEither` has
+      // a signature like:
+      //    static func buildEither<T,U>(first value: T) -> Either<T,U>
+      // which relies on unification to work.
+      if (path == maxPath && !(maxPath & 1))
+        continue;
+
+      bool isSecond = (path & 1);
+      operand =
+          buildCallIfWanted(operand->getStartLoc(), ctx.Id_buildEither, operand,
+                            {isSecond ? ctx.Id_second : ctx.Id_first});
+    }
+
+    // Inject into Optional if required.  We'll be adding the call to
+    // `buildIf` after all the recursive calls are complete.
+    if (isOptional) {
+      operand = buildSomeExpr(operand);
+    }
+
+    return operand;
+  }
+
+  Expr *buildSomeExpr(Expr *arg) {
+    auto optionalDecl = ctx.getOptionalDecl();
+    auto optionalType = optionalDecl->getDeclaredType();
+
+    auto loc = arg->getStartLoc();
+    auto optionalTypeExpr =
+        TypeExpr::createImplicitHack(loc, optionalType, ctx);
+    auto someRef = new (ctx) UnresolvedDotExpr(
+        optionalTypeExpr, loc, DeclNameRef(ctx.getIdentifier("some")),
+        DeclNameLoc(loc), /*implicit=*/true);
+    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
+    return CallExpr::createImplicit(ctx, someRef, argList);
+  }
+
+  Expr *buildNoneExpr(SourceLoc endLoc) {
+    auto optionalDecl = ctx.getOptionalDecl();
+    auto optionalType = optionalDecl->getDeclaredType();
+
+    auto optionalTypeExpr =
+        TypeExpr::createImplicitHack(endLoc, optionalType, ctx);
+    return new (ctx) UnresolvedDotExpr(optionalTypeExpr, endLoc,
+                                       DeclNameRef(ctx.getIdentifier("none")),
+                                       DeclNameLoc(endLoc), /*implicit=*/true);
+  }
+};
+
 /// Visitor to classify the contents of the given closure.
 class BuilderClosureVisitor
-    : private StmtVisitor<BuilderClosureVisitor, VarDecl *> {
+    : private BuilderTransformerBase,
+      private StmtVisitor<BuilderClosureVisitor, VarDecl *> {
 
   friend StmtVisitor<BuilderClosureVisitor, VarDecl *>;
 
   ConstraintSystem *cs;
-  DeclContext *dc;
-  ASTContext &ctx;
-
-  ResultBuilder builder;
 
   SkipUnhandledConstructInResultBuilder::UnhandledNode unhandledNode;
 
@@ -84,7 +226,7 @@ class BuilderClosureVisitor
   /// arguments.
   Expr *buildCallIfWanted(SourceLoc loc, Identifier fnName,
                           ArrayRef<Expr *> argExprs,
-                          ArrayRef<Identifier> argLabels) {
+                          ArrayRef<Identifier> argLabels) override {
     if (!cs)
       return nullptr;
 
@@ -131,7 +273,7 @@ class BuilderClosureVisitor
 public:
   BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs, DeclContext *dc,
                         Type builderType, Type bodyResultType)
-      : cs(cs), dc(dc), ctx(ctx), builder(cs, dc, builderType) {
+      : BuilderTransformerBase(cs, dc, builderType), cs(cs) {
     applied.builderType = builder.getType();
     applied.bodyResultType = bodyResultType;
   }
@@ -345,51 +487,6 @@ protected:
   CONTROL_FLOW_STMT(Yield)
   CONTROL_FLOW_STMT(Defer)
 
-  static bool isBuildableIfChainRecursive(IfStmt *ifStmt,
-                                          unsigned &numPayloads,
-                                          bool &isOptional) {
-    // The 'then' clause contributes a payload.
-    ++numPayloads;
-
-    // If there's an 'else' clause, it contributes payloads:
-    if (auto elseStmt = ifStmt->getElseStmt()) {
-      // If it's 'else if', it contributes payloads recursively.
-      if (auto elseIfStmt = dyn_cast<IfStmt>(elseStmt)) {
-        return isBuildableIfChainRecursive(elseIfStmt, numPayloads,
-                                           isOptional);
-      // Otherwise it's just the one.
-      } else {
-        ++numPayloads;
-      }
-
-    // If not, the chain result is at least optional.
-    } else {
-      isOptional = true;
-    }
-
-    return true;
-  }
-
-  bool isBuildableIfChain(IfStmt *ifStmt, unsigned &numPayloads,
-                          bool &isOptional) {
-    if (!isBuildableIfChainRecursive(ifStmt, numPayloads, isOptional))
-      return false;
-
-    // If there's a missing 'else', we need 'buildOptional' to exist.
-    if (isOptional && !builder.supportsOptional())
-      return false;
-
-    // If there are multiple clauses, we need 'buildEither(first:)' and
-    // 'buildEither(second:)' to both exist.
-    if (numPayloads > 1) {
-      if (!builder.supports(ctx.Id_buildEither, {ctx.Id_first}) ||
-          !builder.supports(ctx.Id_buildEither, {ctx.Id_second}))
-        return false;
-    }
-
-    return true;
-  }
-
   VarDecl *visitIfStmt(IfStmt *ifStmt) {
     // Check whether the chain is buildable and whether it terminates
     // without an `else`.
@@ -542,83 +639,6 @@ protected:
     cs->setType(ifVar, resultType);
     applied.capturedStmts.insert({ifStmt, { ifVar, { thenExpr, elseExpr }}});
     return ifVar;
-  }
-
-  /// Wrap a payload value in an expression which will produce a chain
-  /// result (without `buildIf`).
-  Expr *buildWrappedChainPayload(Expr *operand, unsigned payloadIndex,
-                                 unsigned numPayloads, bool isOptional) {
-    assert(payloadIndex < numPayloads);
-
-    // Inject into the appropriate chain position.
-    //
-    // We produce a (left-biased) balanced binary tree of Eithers in order
-    // to prevent requiring a linear number of injections in the worst case.
-    // That is, if we have 13 clauses, we want to produce:
-    //
-    //                      /------------------Either------------\
-    //           /-------Either-------\                     /--Either--\
-    //     /--Either--\          /--Either--\          /--Either--\     \
-    //   /-E-\      /-E-\      /-E-\      /-E-\      /-E-\      /-E-\    \
-    // 0000 0001  0010 0011  0100 0101  0110 0111  1000 1001  1010 1011 1100
-    //
-    // Note that a prefix of length D of the payload index acts as a path
-    // through the tree to the node at depth D.  On the rightmost path
-    // through the tree (when this prefix is equal to the corresponding
-    // prefix of the maximum payload index), the bits of the index mark
-    // where Eithers are required.
-    //
-    // Since we naturally want to build from the innermost Either out, and
-    // therefore work with progressively shorter prefixes, we can do it all
-    // with right-shifts.
-    for (auto path = payloadIndex, maxPath = numPayloads - 1;
-         maxPath != 0; path >>= 1, maxPath >>= 1) {
-      // Skip making Eithers on the rightmost path where they aren't required.
-      // This isn't just an optimization: adding spurious Eithers could
-      // leave us with unresolvable type variables if `buildEither` has
-      // a signature like:
-      //    static func buildEither<T,U>(first value: T) -> Either<T,U>
-      // which relies on unification to work.
-      if (path == maxPath && !(maxPath & 1)) continue;
-
-      bool isSecond = (path & 1);
-      operand = buildCallIfWanted(operand->getStartLoc(),
-                                  ctx.Id_buildEither, operand,
-                                  {isSecond ? ctx.Id_second : ctx.Id_first});
-    }
-
-    // Inject into Optional if required.  We'll be adding the call to
-    // `buildIf` after all the recursive calls are complete.
-    if (isOptional) {
-      operand = buildSomeExpr(operand);
-    }
-
-    return operand;
-  }
-
-  Expr *buildSomeExpr(Expr *arg) {
-    auto optionalDecl = ctx.getOptionalDecl();
-    auto optionalType = optionalDecl->getDeclaredType();
-
-    auto loc = arg->getStartLoc();
-    auto optionalTypeExpr =
-      TypeExpr::createImplicitHack(loc, optionalType, ctx);
-    auto someRef = new (ctx) UnresolvedDotExpr(
-        optionalTypeExpr, loc, DeclNameRef(ctx.getIdentifier("some")),
-        DeclNameLoc(loc), /*implicit=*/true);
-    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
-    return CallExpr::createImplicit(ctx, someRef, argList);
-  }
-
-  Expr *buildNoneExpr(SourceLoc endLoc) {
-    auto optionalDecl = ctx.getOptionalDecl();
-    auto optionalType = optionalDecl->getDeclaredType();
-
-    auto optionalTypeExpr =
-      TypeExpr::createImplicitHack(endLoc, optionalType, ctx);
-    return new (ctx) UnresolvedDotExpr(
-        optionalTypeExpr, endLoc, DeclNameRef(ctx.getIdentifier("none")),
-        DeclNameLoc(endLoc), /*implicit=*/true);
   }
 
   VarDecl *visitSwitchStmt(SwitchStmt *switchStmt) {
