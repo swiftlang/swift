@@ -25,6 +25,7 @@
 #include "swift/Runtime/Debug.h"
 #include "llvm/Support/Alignment.h"
 #include <cstddef>
+#include <new>
 
 // Notes: swift::fatalError is not shared between libswiftCore and libswift_Concurrency
 // and libswift_Concurrency uses swift_Concurrency_fatalError instead.
@@ -170,7 +171,7 @@ private:
       assert(llvm::isAligned(llvm::Align(alignment), alignedSize));
       assert(canAllocate(alignedSize));
       void *buffer = getAddr(currentOffset);
-      auto *allocation = new (buffer) Allocation(lastAllocation, this);
+      auto *allocation = ::new (buffer) Allocation(lastAllocation, this);
       currentOffset += Allocation::includingHeader(alignedSize);
       if (guardAllocations) {
         uintptr_t *endOfCurrentAllocation = (uintptr_t *)getAddr(currentOffset);
@@ -251,7 +252,7 @@ private:
     size_t capacity = std::max(SlabCapacity,
                                Allocation::includingHeader(size));
     void *slabBuffer = malloc(Slab::includingHeader(capacity));
-    Slab *newSlab = new (slabBuffer) Slab(capacity);
+    Slab *newSlab = ::new (slabBuffer) Slab(capacity);
     if (slab)
       slab->next = newSlab;
     else
@@ -292,7 +293,7 @@ public:
     char *end = (char *)firstSlabBuffer + bufferCapacity;
     assert(start + Slab::headerSize() <= end &&
            "buffer for first slab too small");
-    firstSlab = new (start) Slab(end - start - Slab::headerSize());
+    firstSlab = ::new (start) Slab(end - start - Slab::headerSize());
     firstSlabIsPreallocated = true;
     numAllocatedSlabs = 0;
   }
