@@ -5,8 +5,8 @@
 import StdlibUnittest
 #if _runtime(_ObjC)
 import Foundation
-#endif
 import StdlibUnicodeUnittest
+#endif
 
 var suite = TestSuite("StringIndexTests")
 defer { runAllTests() }
