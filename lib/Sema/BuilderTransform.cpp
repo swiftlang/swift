@@ -73,6 +73,10 @@ class BuilderClosureVisitor
   Identifier buildOptionalId;
   llvm::SmallDenseMap<DeclName, bool> supportedOps;
 
+  /// The variable used as a base for all `build*` operations added
+  /// by this transform.
+  VarDecl *builderVar = nullptr;
+
   SkipUnhandledConstructInResultBuilder::UnhandledNode unhandledNode;
 
   /// Whether an error occurred during application of the builder closure,
@@ -94,32 +98,6 @@ class BuilderClosureVisitor
     if (!cs)
       return nullptr;
 
-    // FIXME: Setting a base on this expression is necessary in order
-    // to get diagnostics if something about this builder call fails,
-    // e.g. if there isn't a matching overload for `buildBlock`.
-    TypeExpr *typeExpr;
-    auto simplifiedTy = cs->simplifyType(builderType);
-    if (!simplifiedTy->hasTypeVariable()) {
-      typeExpr = TypeExpr::createImplicitHack(loc, simplifiedTy, ctx);
-    } else if (auto *decl = simplifiedTy->getAnyGeneric()) {
-      // HACK: If there's not enough information to completely resolve the
-      // builder type, but we have the base available to us, form an *explicit*
-      // TypeExpr pointing at it. We cannot form an implicit base without
-      // a fully-resolved concrete type. Really, whatever we put here has no
-      // bearing on the generated solution because we're going to use this node
-      // to stash the builder type and hand it back to the ambient
-      // constraint system.
-      typeExpr = TypeExpr::createForDecl(DeclNameLoc(loc), decl, dc);
-    } else {
-      // HACK: If there's not enough information in the constraint system,
-      // create a garbage base type to force it to diagnose
-      // this as an ambiguous expression.
-      // FIXME: We can also construct an UnresolvedMemberExpr here instead of
-      // an UnresolvedDotExpr and get a slightly better diagnostic.
-      typeExpr = TypeExpr::createImplicitHack(loc, ErrorType::get(ctx), ctx);
-    }
-    cs->setType(typeExpr, MetatypeType::get(builderType));
-
     SmallVector<Argument, 4> args;
     for (auto i : indices(argExprs)) {
       auto *expr = argExprs[i];
@@ -128,8 +106,11 @@ class BuilderClosureVisitor
       args.emplace_back(labelLoc, label, expr);
     }
 
+    auto *baseExpr = new (ctx) DeclRefExpr({builderVar}, DeclNameLoc(loc),
+                                           /*isImplicit=*/true);
+
     auto memberRef = new (ctx) UnresolvedDotExpr(
-        typeExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
+        baseExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
         /*implicit=*/true);
     memberRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
@@ -223,6 +204,16 @@ public:
       buildOptionalId = ctx.Id_buildOptional;
     else
       buildOptionalId = ctx.Id_buildIf;
+
+    // If we are about to generate constraints, let's establish builder
+    // variable for the base of `build*` calls.
+    if (cs) {
+      builderVar = new (ctx) VarDecl(
+          /*isStatic=*/false, VarDecl::Introducer::Let,
+          /*nameLoc=*/SourceLoc(), ctx.Id_builderSelf, dc);
+      builderVar->setImplicit();
+      cs->setType(builderVar, MetatypeType::get(cs->simplifyType(builderType)));
+    }
   }
 
   /// Apply the builder transform to the given statement.

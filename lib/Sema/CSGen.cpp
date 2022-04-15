@@ -1410,13 +1410,6 @@ namespace {
         type = CS.getInstanceType(CS.cacheType(E));
         assert(type && "Implicit type expr must have type set!");
         type = CS.replaceInferableTypesWithTypeVars(type, locator);
-      } else if (CS.hasType(E)) {
-        // If there's a type already set into the constraint system, honor it.
-        // FIXME: This supports the result builder transform, which sneakily
-        // stashes a type in the constraint system through a TypeExpr in order
-        // to pass it down to the rest of CSGen. This is a terribly
-        // unprincipled thing to do.
-        return CS.getType(E);
       } else {
         auto *repr = E->getTypeRepr();
         assert(repr && "Explicit node has no type repr!");
