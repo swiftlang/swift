@@ -31,11 +31,10 @@
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Casting.h"
-#include "swift/Runtime/Once.h"
-#include "swift/Runtime/Mutex.h"
-#include "swift/Runtime/ThreadLocal.h"
-#include "swift/Runtime/ThreadLocalStorage.h"
 #include "swift/Runtime/DispatchShims.h"
+#include "swift/Threading/Once.h"
+#include "swift/Threading/Mutex.h"
+#include "swift/Threading/ThreadLocalStorage.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
 #include "swift/Basic/ListMerger.h"
@@ -126,9 +125,9 @@ class ExecutorTrackingInfo {
   /// the right executor. It would make sense for that to be a
   /// separate thread-local variable (or whatever is most efficient
   /// on the target platform).
-  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-      Pointer<ExecutorTrackingInfo>, ActiveInfoInThread,
-      SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY);
+  static SWIFT_THREAD_LOCAL_TYPE(
+      Pointer<ExecutorTrackingInfo>,
+      SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY) ActiveInfoInThread;
 
   /// The active executor.
   ExecutorRef ActiveExecutor = ExecutorRef::generic();
@@ -194,8 +193,8 @@ public:
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
-  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(Pointer<AsyncTask>, Value,
-                                            SWIFT_CONCURRENCY_TASK_KEY);
+  static SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>,
+                                 SWIFT_CONCURRENCY_TASK_KEY) Value;
 
 public:
   static void set(AsyncTask *task) { Value.set(task); }
@@ -203,15 +202,14 @@ public:
 };
 
 /// Define the thread-locals.
-SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
+SWIFT_THREAD_LOCAL_TYPE(
   Pointer<AsyncTask>,
-  ActiveTask::Value,
-  SWIFT_CONCURRENCY_TASK_KEY);
+  SWIFT_CONCURRENCY_TASK_KEY) ActiveTask::Value;
 
-SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
+SWIFT_THREAD_LOCAL_TYPE(
   Pointer<ExecutorTrackingInfo>,
-  ExecutorTrackingInfo::ActiveInfoInThread,
-  SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY);
+  SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY)
+ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
 
@@ -351,8 +349,8 @@ void swift::swift_task_reportUnexpectedExecutor(
     const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
     uintptr_t line, ExecutorRef executor) {
   // Make sure we have an appropriate log level.
-  static swift_once_t logLevelToken;
-  swift_once(&logLevelToken, checkUnexpectedExecutorLogLevel, nullptr);
+  static swift::once_t logLevelToken;
+  swift::once(logLevelToken, checkUnexpectedExecutorLogLevel, nullptr);
 
   bool isFatalError = false;
   switch (unexpectedExecutorLogLevel) {

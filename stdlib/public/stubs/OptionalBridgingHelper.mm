@@ -15,9 +15,9 @@
 #if SWIFT_OBJC_INTEROP
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Portability.h"
+#include "swift/Threading/Mutex.h"
 #include <vector>
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -59,7 +59,7 @@ namespace {
 
 struct SwiftNullSentinelCache {
   std::vector<id> Cache;
-  StaticMutex Lock;
+  Mutex Lock;
 };
 
 static Lazy<SwiftNullSentinelCache> Sentinels;
@@ -73,7 +73,7 @@ static id getSentinelForDepth(unsigned depth) {
   auto &theSentinels = Sentinels.get();
   unsigned depthIndex = depth - 2;
   {
-    StaticMutex::ScopedLock lock(theSentinels.Lock);
+    Mutex::ScopedLock lock(theSentinels.Lock);
     const auto &cache = theSentinels.Cache;
     if (depthIndex < cache.size()) {
       id cached = cache[depthIndex];
@@ -83,7 +83,7 @@ static id getSentinelForDepth(unsigned depth) {
   }
   // Make one if we need to.
   {
-    StaticMutex::ScopedLock lock(theSentinels.Lock);
+    Mutex::ScopedLock lock(theSentinels.Lock);
     if (depthIndex >= theSentinels.Cache.size())
       theSentinels.Cache.resize(depthIndex + 1);
     auto &cached = theSentinels.Cache[depthIndex];

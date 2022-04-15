@@ -25,10 +25,10 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
+#include "swift/Threading/Mutex.h"
 #include "llvm/ADT/StringExtras.h"
 #include <algorithm>
 #include <cctype>
@@ -786,8 +786,8 @@ _cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
 static void
 cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description,
                                   swift_once_t *token) {
-  swift_once(
-      token,
+  swift::once(
+      *token,
       [](void *uncastDescription) {
         auto *description = (const TypeContextDescriptor *)uncastDescription;
         _cacheCanonicalSpecializedMetadata(description);
@@ -3148,8 +3148,8 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     self->Superclass = getRootSuperclass();
 
   // Register our custom implementation of class_getImageName.
-  static swift_once_t onceToken;
-  swift_once(&onceToken, [](void *unused) {
+  static swift::once_t onceToken;
+  swift::once(onceToken, [](void *unused) {
     (void)unused;
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
@@ -6282,8 +6282,8 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   assert(alignment <= alignof(void*));
   assert(size % alignof(void*) == 0);
 
-  static OnceToken_t getenvToken;
-  SWIFT_ONCE_F(getenvToken, checkAllocatorDebugEnvironmentVariables, nullptr);
+  static swift::once_t getenvToken;
+  swift::once(getenvToken, checkAllocatorDebugEnvironmentVariables);
 
   // If the size is larger than the maximum, just do a normal heap allocation.
   if (size > PoolRange::MaxPoolAllocationSize) {

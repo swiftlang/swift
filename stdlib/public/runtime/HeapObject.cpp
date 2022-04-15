@@ -41,7 +41,6 @@
 # include <objc/message.h>
 # include <objc/objc.h>
 # include "swift/Runtime/ObjCBridge.h"
-# include "swift/Runtime/Once.h"
 # include <dlfcn.h>
 #endif
 #include "Leaks.h"
@@ -162,13 +161,6 @@ struct InitStaticObjectContext {
   HeapMetadata const *metadata;
 };
 
-// Callback for swift_once.
-static void initStaticObjectWithContext(void *OpaqueCtx) {
-  InitStaticObjectContext *Ctx = (InitStaticObjectContext *)OpaqueCtx;
-  Ctx->object->metadata = Ctx->metadata;
-  Ctx->object->refCounts.initImmortal();
-}
-
 // TODO: We could generate inline code for the fast-path, i.e. the metadata
 // pointer is already set. That would be a performance/codesize tradeoff.
 HeapObject *
@@ -182,7 +174,11 @@ swift::swift_initStaticObject(HeapMetadata const *metadata,
   // refcount to 1 while another thread already incremented it - and would
   // decrement it to 0 afterwards.
   InitStaticObjectContext Ctx = { object, metadata };
-  swift_once(token, initStaticObjectWithContext, &Ctx);
+  swift::once(*token, [](void *OpaqueCtx) {
+    InitStaticObjectContext *Ctx = (InitStaticObjectContext *)OpaqueCtx;
+    Ctx->object->metadata = Ctx->metadata;
+    Ctx->object->refCounts.initImmortal();
+  }, &Ctx);
 
   return object;
 }
@@ -350,7 +346,7 @@ static HeapObject *_swift_retain_(HeapObject *object) {
 }
 
 HeapObject *swift::swift_retain(HeapObject *object) {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_retain(object);
 #else
   CALL_IMPL(swift_retain, (object));
@@ -377,7 +373,7 @@ static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
 }
 
 HeapObject *swift::swift_retain_n(HeapObject *object, uint32_t n) {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_retain_n(object, n);
 #else
   CALL_IMPL(swift_retain_n, (object, n));
@@ -403,7 +399,7 @@ static void _swift_release_(HeapObject *object) {
 }
 
 void swift::swift_release(HeapObject *object) {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   swift_nonatomic_release(object);
 #else
   CALL_IMPL(swift_release, (object));
@@ -428,7 +424,7 @@ static void _swift_release_n_(HeapObject *object, uint32_t n) {
 }
 
 void swift::swift_release_n(HeapObject *object, uint32_t n) {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   swift_nonatomic_release_n(object, n);
 #else
   CALL_IMPL(swift_release_n, (object, n));
@@ -460,7 +456,7 @@ size_t swift::swift_weakRetainCount(HeapObject *object) {
 }
 
 HeapObject *swift::swift_unownedRetain(HeapObject *object) {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   return static_cast<HeapObject *>(swift_nonatomic_unownedRetain(object));
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetain);
@@ -473,7 +469,7 @@ HeapObject *swift::swift_unownedRetain(HeapObject *object) {
 }
 
 void swift::swift_unownedRelease(HeapObject *object) {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   swift_nonatomic_unownedRelease(object);
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRelease);
@@ -520,7 +516,7 @@ void swift::swift_nonatomic_unownedRelease(HeapObject *object) {
 }
 
 HeapObject *swift::swift_unownedRetain_n(HeapObject *object, int n) {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_unownedRetain_n(object, n);
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetain_n);
@@ -533,7 +529,7 @@ HeapObject *swift::swift_unownedRetain_n(HeapObject *object, int n) {
 }
 
 void swift::swift_unownedRelease_n(HeapObject *object, int n) {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   swift_nonatomic_unownedRelease_n(object, n);
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRelease_n);
@@ -583,7 +579,7 @@ static HeapObject *_swift_tryRetain_(HeapObject *object) {
   if (!isValidPointerForNativeRetain(object))
     return nullptr;
 
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   if (object->refCounts.tryIncrementNonAtomic()) return object;
   else return nullptr;
 #else
@@ -612,7 +608,7 @@ void swift::swift_setDeallocating(HeapObject *object) {
 }
 
 HeapObject *swift::swift_unownedRetainStrong(HeapObject *object) {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_unownedRetainStrong(object);
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetainStrong);
@@ -640,7 +636,7 @@ HeapObject *swift::swift_nonatomic_unownedRetainStrong(HeapObject *object) {
 }
 
 void swift::swift_unownedRetainStrongAndRelease(HeapObject *object) {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   swift_nonatomic_unownedRetainStrongAndRelease(object);
 #else
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetainStrongAndRelease);

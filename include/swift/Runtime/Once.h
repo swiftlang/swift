@@ -17,40 +17,18 @@
 #ifndef SWIFT_RUNTIME_ONCE_H
 #define SWIFT_RUNTIME_ONCE_H
 
-#include "swift/Runtime/HeapObject.h"
-
-#if SWIFT_STDLIB_THREADING_DARWIN
-#include <dispatch/dispatch.h>
-#else
-#include <mutex>
-#endif
+#include "swift/Threading/Once.h"
 
 namespace swift {
 
-#ifdef SWIFT_STDLIB_THREADING_NONE
-
-typedef bool swift_once_t;
-
-#elif SWIFT_STDLIB_THREADING_DARWIN
-
-// On OS X and iOS, swift_once_t is really a dispatch_once_t.
-typedef dispatch_once_t swift_once_t;
-
-#elif defined(__CYGWIN__)
-
-// On Cygwin, std::once_flag can not be used because it is larger than the
-// platform word.
-typedef uintptr_t swift_once_t;
-#else
-
-// On other platforms swift_once_t is std::once_flag
-typedef std::once_flag swift_once_t;
-
-#endif
+typedef swift::once_t swift_once_t;
 
 /// Runs the given function with the given context argument exactly once.
 /// The predicate argument must point to a global or static variable of static
 /// extent of type swift_once_t.
+///
+/// Within the runtime, you should be using swift::once, which will be faster;
+/// this is exposed so that the compiler can generate calls to it.
 SWIFT_RUNTIME_EXPORT
 void swift_once(swift_once_t *predicate, void (*fn)(void *), void *context);
 

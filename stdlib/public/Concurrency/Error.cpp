@@ -10,10 +10,35 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Threading/Errors.h"
+#include <cstdio>
+
 #include "Error.h"
 
 // swift::fatalError is not exported from libswiftCore and not shared, so define another
 // internal function instead.
-SWIFT_NORETURN void swift::swift_Concurrency_fatalError(uint32_t flags, const char *format, ...) {
+SWIFT_NORETURN
+SWIFT_VFORMAT(2)
+void swift::swift_Concurrency_fatalErrorv(uint32_t flags, const char *format, va_list val) {
+  vfprintf(stderr, format, val);
   abort();
+}
+
+SWIFT_NORETURN
+SWIFT_FORMAT(2, 3)
+void swift::swift_Concurrency_fatalError(uint32_t flags, const char *format, ...) {
+  va_list val;
+
+  va_start(val, format);
+  swift_Concurrency_fatalErrorv(flags, format, val);
+}
+
+// Handle fatal errors from the threading library
+SWIFT_ATTRIBUTE_NORETURN
+SWIFT_FORMAT(1, 2)
+void swift::threading::fatal(const char *format, ...) {
+  va_list val;
+
+  va_start(val, format);
+  swift_Concurrency_fatalErrorv(0, format, val);
 }

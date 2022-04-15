@@ -4,6 +4,7 @@ include(SwiftXcodeSupport)
 include(SwiftWindowsSupport)
 include(SwiftAndroidSupport)
 include(SwiftCXXUtils)
+include(Threading)
 
 function(_swift_gyb_target_sources target scope)
   file(GLOB GYB_UNICODE_DATA ${SWIFT_SOURCE_DIR}/utils/UnicodeData/*)
@@ -307,6 +308,10 @@ function(_add_host_variant_c_compile_flags target)
     target_compile_definitions(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS>)
   endif()
+
+  threading_package_name("${SWIFT_HOST_VARIANT_SDK}" _threading_package)
+  target_compile_definitions(${target} PRIVATE
+    "SWIFT_THREADING_${_threading_package}")
 
   if(SWIFT_ANALYZE_CODE_COVERAGE)
     target_compile_options(${target} PRIVATE
