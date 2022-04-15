@@ -100,6 +100,7 @@ EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures)
 EXPERIMENTAL_FEATURE(MoveOnly)
 EXPERIMENTAL_FEATURE(OneWayClosureParameters)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
+EXPERIMENTAL_FEATURE(ResultBuilderASTTransform)
 
 /// Enable extensions of (sugared) bound generic types
 ///
