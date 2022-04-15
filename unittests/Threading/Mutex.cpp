@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Runtime/Mutex.h"
+#include "swift/Threading/Mutex.h"
 #include "gtest/gtest.h"
 #include <atomic>
 #include <chrono>
@@ -46,13 +46,13 @@ TEST(MutexTest, BasicLockableThreaded) {
   basicLockableThreaded(mutex);
 }
 
-TEST(StaticMutexTest, BasicLockableThreaded) {
-  static StaticMutex mutex;
+TEST(LazyMutexTest, BasicLockableThreaded) {
+  static LazyMutex mutex;
   basicLockableThreaded(mutex);
 }
 
-TEST(StaticUnsafeMutexTest, BasicLockableThreaded) {
-  static StaticUnsafeMutex mutex;
+TEST(LazyUnsafeMutexTest, BasicLockableThreaded) {
+  static LazyUnsafeMutex mutex;
   basicLockableThreaded(mutex);
 }
 
@@ -94,8 +94,8 @@ TEST(MutexTest, LockableThreaded) {
   lockableThreaded(mutex);
 }
 
-TEST(StaticMutexTest, LockableThreaded) {
-  static StaticMutex Mutex;
+TEST(LazyMutexTest, LockableThreaded) {
+  static LazyMutex Mutex;
   lockableThreaded(Mutex);
 }
 
@@ -126,9 +126,9 @@ TEST(MutexTest, ScopedLockThreaded) {
   scopedLockThreaded<Mutex::ScopedLock>(mutex);
 }
 
-TEST(StaticMutexTest, ScopedLockThreaded) {
-  static StaticMutex Mutex;
-  scopedLockThreaded<StaticMutex::ScopedLock>(Mutex);
+TEST(LazyMutexTest, ScopedLockThreaded) {
+  static LazyMutex Mutex;
+  scopedLockThreaded<LazyMutex::ScopedLock>(Mutex);
 }
 
 TEST(SmallMutexTest, ScopedLockThreaded) {
@@ -165,10 +165,10 @@ TEST(MutexTest, ScopedUnlockUnderScopedLockThreaded) {
       mutex);
 }
 
-TEST(StaticMutexTest, ScopedUnlockUnderScopedLockThreaded) {
-  static StaticMutex Mutex;
-  scopedUnlockUnderScopedLockThreaded<StaticMutex::ScopedLock,
-                                      StaticMutex::ScopedUnlock>(Mutex);
+TEST(LazyMutexTest, ScopedUnlockUnderScopedLockThreaded) {
+  static LazyMutex Mutex;
+  scopedUnlockUnderScopedLockThreaded<LazyMutex::ScopedLock,
+                                      LazyMutex::ScopedUnlock>(Mutex);
 }
 
 TEST(SmallMutexTest, ScopedUnlockUnderScopedLockThreaded) {
@@ -200,8 +200,8 @@ TEST(MutexTest, CriticalSectionThreaded) {
   criticalSectionThreaded(mutex);
 }
 
-TEST(StaticMutexTest, CriticalSectionThreaded) {
-  static StaticMutex Mutex;
+TEST(LazyMutexTest, CriticalSectionThreaded) {
+  static LazyMutex Mutex;
   criticalSectionThreaded(Mutex);
 }
 

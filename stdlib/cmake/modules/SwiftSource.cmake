@@ -327,8 +327,8 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
   endif()
 
-  threading_package_name(_threading_package)
-  list(APPEND result "-D" "SWIFT_STDLIB_THREADING_${_threading_package}")
+  threading_package_name("${sdk}" _threading_package)
+  list(APPEND result "-D" "SWIFT_THREADING_${_threading_package}")
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
@@ -483,7 +483,7 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-library-level"  "-Xfrontend" "api")
   endif()
 
-  if(SWIFT_STDLIB_THREADING_PACKAGE STREQUAL "none")
+  if(SWIFT_THREADING_PACKAGE STREQUAL "none")
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 

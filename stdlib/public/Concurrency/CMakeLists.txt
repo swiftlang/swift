@@ -112,7 +112,6 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskSleep.swift
   ThreadSanitizer.cpp
   TracingSignpost.cpp
-  Mutex.cpp
   AsyncStreamBuffer.swift
   AsyncStream.swift
   AsyncThrowingStream.swift
@@ -127,6 +126,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT
+
+  PRIVATE_LINK_LIBRARIES swiftThreading
 
   LINK_LIBRARIES ${swift_concurrency_link_libraries}
 

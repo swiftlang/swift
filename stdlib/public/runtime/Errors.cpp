@@ -30,8 +30,9 @@
 
 #include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Portability.h"
+#include "swift/Threading/Errors.h"
+#include "swift/Threading/Mutex.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -459,4 +460,14 @@ void swift::swift_abortDisabledUnicodeSupport() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
                     "Unicode normalization data is disabled on this platform");
 
+}
+
+/// Halt because of a problem in the threading library
+SWIFT_ATTRIBUTE_NORETURN
+SWIFT_FORMAT(1, 2)
+void swift::threading::fatal(const char *msg, ...) {
+  va_list val;
+  va_start(val, msg);
+
+  swift::fatalErrorv(0, msg, val);
 }

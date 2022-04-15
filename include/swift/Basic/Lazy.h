@@ -15,55 +15,26 @@
 
 #include <memory>
 
-#if SWIFT_STDLIB_THREADING_NONE
-// No dependencies on single-threaded environments.
-#elif SWIFT_STDLIB_THREADING_DARWIN
-#include <dispatch/dispatch.h>
-#else
-#include <mutex>
-#endif
-
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/type_traits.h"
+#include "swift/Threading/Once.h"
 
 namespace swift {
-
-#if SWIFT_STDLIB_THREADING_NONE
-  using OnceToken_t = bool;
-# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
-  do { if (!TOKEN) { TOKEN = true; (FUNC)(CONTEXT); } } while (0)
-#elif SWIFT_STDLIB_THREADING_DARWIN
-  using OnceToken_t = ::dispatch_once_t;
-# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
-  ::dispatch_once_f(&TOKEN, CONTEXT, FUNC)
-#elif defined(__CYGWIN__)
-  // _swift_once_f() is declared in Private.h.
-  // This prototype is copied instead including the header file.
-  void _swift_once_f(uintptr_t *predicate, void *context,
-                     void (*function)(void *));
-  using OnceToken_t = unsigned long;
-# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
-  _swift_once_f(&TOKEN, CONTEXT, FUNC)
-#else
-  using OnceToken_t = std::once_flag;
-# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
-  ::std::call_once(TOKEN, FUNC, CONTEXT)
-#endif
 
 /// A template for lazily-constructed, zero-initialized, leaked-on-exit
 /// global objects.
 template <class T> class Lazy {
   alignas(T) char Value[sizeof(T)] = { 0 };
 
-  OnceToken_t OnceToken = {};
+  swift::once_t OnceToken = {};
 
   static void defaultInitCallback(void *ValueAddr) {
     ::new (ValueAddr) T();
   }
-  
+
 public:
   using Type = T;
-  
+
   T &get(void (*initCallback)(void *) = defaultInitCallback);
 
   template<typename Arg1>
@@ -87,7 +58,7 @@ template <typename T> inline T &Lazy<T>::get(void (*initCallback)(void*)) {
   static_assert(std::is_literal_type<Lazy<T>>::value,
                 "Lazy<T> must be a literal type");
 
-  SWIFT_ONCE_F(OnceToken, initCallback, &Value);
+  swift::once(OnceToken, initCallback, &Value);
   return unsafeGetAlreadyInitialized();
 }
 
@@ -103,7 +74,7 @@ template <typename Arg1> inline T &Lazy<T>::getWithInit(Arg1 &&arg1) {
     }
   } data{&Value, static_cast<Arg1&&>(arg1)};
 
-  SWIFT_ONCE_F(OnceToken, &Data::init, &data);
+  swift::once(OnceToken, &Data::init, &data);
   return unsafeGetAlreadyInitialized();
 }
 

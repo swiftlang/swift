@@ -21,7 +21,7 @@
 #include "llvm/Support/Allocator.h"
 #include "Atomic.h"
 #include "Debug.h"
-#include "Mutex.h"
+#include "swift/Threading/Mutex.h"
 
 #if defined(__FreeBSD__) || defined(__CYGWIN__) || defined(__HAIKU__)
 #include <stdio.h>
@@ -624,7 +624,7 @@ using llvm::hash_value;
 /// process. It has no destructor, to avoid generating useless global destructor
 /// calls. The memory it allocates can be freed by calling clear() with no
 /// outstanding readers, but this won't destroy the static mutex it uses.
-template <class ElemTy, class MutexTy = StaticMutex>
+template <class ElemTy, class MutexTy = LazyMutex>
 struct ConcurrentReadableHashMap {
   // We don't call destructors. Make sure the elements will put up with this.
   static_assert(std::is_trivially_destructible<ElemTy>::value,
@@ -1171,7 +1171,7 @@ template <class ElemTy> struct HashMapElementWrapper {
 /// by allocating them separately and storing pointers to them. The elements of
 /// the hash table are instances of HashMapElementWrapper. A new getOrInsert
 /// method is provided that directly returns the stable element pointer.
-template <class ElemTy, class Allocator, class MutexTy = StaticMutex>
+template <class ElemTy, class Allocator, class MutexTy = LazyMutex>
 struct StableAddressConcurrentReadableHashMap
     : public ConcurrentReadableHashMap<HashMapElementWrapper<ElemTy>, MutexTy> {
   // Implicitly trivial destructor.

@@ -484,7 +484,7 @@ int _swift_stdlib_putc_stderr(int C) {
 }
 
 size_t _swift_stdlib_getHardwareConcurrency() {
-#ifdef SWIFT_STDLIB_THREADING_NONE
+#ifdef SWIFT_THREADING_NONE
   return 1;
 #else
   return std::thread::hardware_concurrency();
@@ -537,12 +537,12 @@ __swift_bool swift_stdlib_isStackAllocationSafe(__swift_size_t byteCount,
 
 __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
                                                  __swift_uintptr_t *outEnd) {
-#if SWIFT_STDLIB_THREADING_NONE
+#if SWIFT_THREADING_NONE
   // This platform does not support threads, so the API we'd call to get stack
   // bounds (i.e. libpthread) is not going to be usable.
   return false;
 
-#elif SWIFT_STDLIB_THREADING_DARWIN
+#elif SWIFT_THREADING_DARWIN
   pthread_t thread = pthread_self();
 
   // On Apple platforms, pthread_get_stackaddr_np() gets the address of the
@@ -556,11 +556,11 @@ __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
   *outBegin = *outEnd - pthread_get_stacksize_np(thread);
   return true;
 
-#elif SWIFT_STDLIB_THREADING_C11
+#elif SWIFT_THREADING_C11
   // We don't know any way to do this for C11 threads
   return false
 
-#elif SWIFT_STDLIB_THREADING_WIN32
+#elif SWIFT_THREADING_WIN32
 
 # if _WIN32_WINNT >= 0x0602
   ULONG_PTR lowLimit = 0;
@@ -576,7 +576,7 @@ __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
   return false;
 # endif
 
-#elif SWIFT_STDLIB_THREADING_PTHREADS
+#elif SWIFT_THREADING_PTHREADS
 
 # if defined(__OpenBSD__)
   stack_t sinfo;

@@ -1,8 +1,8 @@
-//===--- Mutex.h - Mutex ----------------------------------------*- C++ -*-===//
+//===--- Mutex.h - Mutex and ScopedLock ----------------------- -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,43 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Mutex and Scoped lock abstractions for use in Swift runtime.
-//
-// We intentionally do not provide a condition-variable abstraction.
-// Traditional condition-variable interfaces are subject to unavoidable
-// priority inversions, as well as making poor use of threads.
-// Prefer AtomicWaitQueue.
-//
-// We also intentionally avoid read/write locks.  It's difficult to implement a
-// performant and fair read/write lock, and indeed many common implementations
-// rely on condition variables, which, again, are subject to unavoidable
-// priority inversions.
+// Provides a system-independent Mutex abstraction, as well as some
+// related utilities like ScopedLock.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_RUNTIME_MUTEX_H
-#define SWIFT_RUNTIME_MUTEX_H
+#ifndef SWIFT_THREADING_MUTEX_H
+#define SWIFT_THREADING_MUTEX_H
 
 #include <type_traits>
 #include <utility>
 
-#if __has_include(<unistd.h>)
-#include <unistd.h>
-#endif
-
-#if SWIFT_STDLIB_THREADING_NONE
-#include "swift/Runtime/MutexSingleThreaded.h"
-#elif SWIFT_STDLIB_THREADING_PTHREADS || SWIFT_STDLIB_THREADING_DARWIN
-#include "swift/Runtime/MutexPThread.h"
-#elif SWIFT_STDLIB_THREADING_WIN32
-#include "swift/Runtime/MutexWin32.h"
-#elif SWIFT_STDLIB_THREADING_C11
-#include "swift/Runtime/MutexC11.h"
-#else
-#error "Implement equivalent of MutexPThread.h/cpp for your platform."
-#endif
+#include "Impl.h"
 
 namespace swift {
+
+// -- ScopedLock ---------------------------------------------------------------
 
 /// Compile time adjusted stack based object that locks/unlocks the supplied
 /// Mutex type. Use the provided typedefs instead of this directly.
@@ -78,6 +57,8 @@ private:
   T &Lock;
 };
 
+// -- Mutex --------------------------------------------------------------------
+
 /// A Mutex object that supports `BasicLockable` and `Lockable` C++ concepts.
 /// See http://en.cppreference.com/w/cpp/concept/BasicLockable
 /// See http://en.cppreference.com/w/cpp/concept/Lockable
@@ -97,9 +78,9 @@ public:
   /// fatalError when detected. If `checked` is false (the default) the
   /// mutex will make little to no effort to check for misuse (more efficient).
   explicit Mutex(bool checked = false) {
-    MutexPlatformHelper::init(Handle, checked);
+    threading_impl::mutex_init(Handle, checked);
   }
-  ~Mutex() { MutexPlatformHelper::destroy(Handle); }
+  ~Mutex() { threading_impl::mutex_destroy(Handle); }
 
   /// The lock() method has the following properties:
   /// - Behaves as an atomic operation.
@@ -110,7 +91,7 @@ public:
   /// - The behavior is undefined if the calling thread already owns
   ///   the mutex (likely a deadlock).
   /// - Does not throw exceptions but will halt on error (fatalError).
-  void lock() { MutexPlatformHelper::lock(Handle); }
+  void lock() { threading_impl::mutex_lock(Handle); }
 
   /// The unlock() method has the following properties:
   /// - Behaves as an atomic operation.
@@ -120,7 +101,7 @@ public:
   /// - The behavior is undefined if the calling thread does not own
   ///   the mutex.
   /// - Does not throw exceptions but will halt on error (fatalError).
-  void unlock() { MutexPlatformHelper::unlock(Handle); }
+  void unlock() { threading_impl::mutex_unlock(Handle); }
 
   /// The try_lock() method has the following properties:
   /// - Behaves as an atomic operation.
@@ -134,7 +115,7 @@ public:
   /// - The behavior is undefined if the calling thread already owns
   ///   the mutex (likely a deadlock)?
   /// - Does not throw exceptions but will halt on error (fatalError).
-  bool try_lock() { return MutexPlatformHelper::try_lock(Handle); }
+  bool try_lock() { return threading_impl::mutex_try_lock(Handle); }
 
   /// Acquires lock before calling the supplied critical section and releases
   /// lock on return from critical section.
@@ -167,38 +148,50 @@ public:
   /// Precondition: Mutex locked by this thread, undefined otherwise.
   typedef ScopedLockT<Mutex, true> ScopedUnlock;
 
-private:
-  MutexHandle Handle;
+protected:
+  threading_impl::mutex_handle Handle;
 };
 
-/// A static allocation variant of Mutex.
+/// An unsafe variant of the above (for use in the error handling path)
 ///
-/// Use Mutex instead unless you need static allocation.
-class StaticMutex {
+/// This is used to ensure that we can't infinitely recurse if the mutex
+/// itself generates errors.
+class UnsafeMutex : public Mutex {
+public:
+  UnsafeMutex() : Mutex() {}
 
-  StaticMutex(const StaticMutex &) = delete;
-  StaticMutex &operator=(const StaticMutex &) = delete;
-  StaticMutex(StaticMutex &&) = delete;
-  StaticMutex &operator=(StaticMutex &&) = delete;
+  void lock() { threading_impl::mutex_unsafe_unlock(Handle); }
+  void unlock() { threading_impl::mutex_unsafe_unlock(Handle); }
+};
+
+/// A lazily initialized variant of Mutex.
+///
+/// Use Mutex instead unless you need static allocation.  LazyMutex *may*
+/// be entirely statically initialized, on some platforms, but on others
+/// it might be a little larger than and slightly slower than Mutex.
+class LazyMutex {
+
+  LazyMutex(const LazyMutex &) = delete;
+  LazyMutex &operator=(const LazyMutex &) = delete;
+  LazyMutex(LazyMutex &&) = delete;
+  LazyMutex &operator=(LazyMutex &&) = delete;
 
 public:
-#if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
-  constexpr
-#endif
-  StaticMutex()
-      : Handle(MutexPlatformHelper::staticInit()) {
-  }
+  constexpr LazyMutex() : Handle(threading_impl::lazy_mutex_initializer()) {}
+
+  // No destructor; this is intentional; this class is for STATIC allocation
+  // and you don't need to delete mutexes on termination.
 
   /// See Mutex::lock
-  void lock() { MutexPlatformHelper::lock(Handle); }
+  void lock() { threading_impl::lazy_mutex_lock(Handle); }
 
   /// See Mutex::unlock
-  void unlock() { MutexPlatformHelper::unlock(Handle); }
+  void unlock() { threading_impl::lazy_mutex_unlock(Handle); }
 
   /// See Mutex::try_lock
-  bool try_lock() { return MutexPlatformHelper::try_lock(Handle); }
+  bool try_lock() { return threading_impl::lazy_mutex_try_lock(Handle); }
 
-  /// See Mutex::lock
+  /// See Mutex::withLock
   template <typename CriticalSection>
   auto withLock(CriticalSection &&criticalSection)
       -> decltype(std::forward<CriticalSection>(criticalSection)()) {
@@ -210,74 +203,28 @@ public:
   /// and unlocks it on destruction.
   ///
   /// Precondition: Mutex unlocked by this thread, undefined otherwise.
-  typedef ScopedLockT<StaticMutex, false> ScopedLock;
+  typedef ScopedLockT<LazyMutex, false> ScopedLock;
 
   /// A stack based object that unlocks the supplied mutex on construction
   /// and relocks it on destruction.
   ///
   /// Precondition: Mutex locked by this thread, undefined otherwise.
-  typedef ScopedLockT<StaticMutex, true> ScopedUnlock;
+  typedef ScopedLockT<LazyMutex, true> ScopedUnlock;
 
-private:
-  MutexHandle Handle;
+protected:
+  threading_impl::lazy_mutex_handle Handle;
 };
 
-/// A Mutex object that supports `BasicLockable` C++ concepts. It is
-/// considered
-/// unsafe to use because it doesn't do any error checking. It is only for
-/// use in pathways that deal with reporting fatalErrors to avoid the
-/// potential
-/// for recursive fatalErrors that could happen if you used Mutex.
+/// An unsafe variant of the above (for use in the error handling path)
 ///
-/// Always use Mutex, unless in the above mentioned error pathway situation.
-class StaticUnsafeMutex {
-
-  StaticUnsafeMutex(const StaticUnsafeMutex &) = delete;
-  StaticUnsafeMutex &operator=(const StaticUnsafeMutex &) = delete;
-  StaticUnsafeMutex(StaticUnsafeMutex &&) = delete;
-  StaticUnsafeMutex &operator=(StaticUnsafeMutex &&) = delete;
-
+/// This is used to ensure that we can't infinitely recurse if the mutex
+/// itself generates errors.
+class LazyUnsafeMutex : public LazyMutex {
 public:
-#if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
-  constexpr
-#endif
-  StaticUnsafeMutex()
-      : Handle(MutexPlatformHelper::staticInit()) {
-  }
+  constexpr LazyUnsafeMutex() : LazyMutex() {}
 
-  /// The lock() method has the following properties:
-  /// - Behaves as an atomic operation.
-  /// - Blocks the calling thread until exclusive ownership of the mutex
-  ///   can be obtained.
-  /// - Prior m.unlock() operations on the same mutex synchronize-with
-  ///   this lock operation.
-  /// - The behavior is undefined if the calling thread already owns
-  ///   the mutex (likely a deadlock).
-  /// - Ignores errors that may happen, undefined when an error happens.
-  void lock() { MutexPlatformHelper::unsafeLock(Handle); }
-
-  /// The unlock() method has the following properties:
-  /// - Behaves as an atomic operation.
-  /// - Releases the calling thread's ownership of the mutex and
-  ///   synchronizes-with the subsequent successful lock operations on
-  ///   the same object.
-  /// - The behavior is undefined if the calling thread does not own
-  ///   the mutex.
-  /// - Ignores errors that may happen, undefined when an error happens.
-  void unlock() { MutexPlatformHelper::unsafeUnlock(Handle); }
-
-  template <typename CriticalSection>
-  auto withLock(CriticalSection &&criticalSection)
-      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
-    ScopedLock guard(*this);
-    return std::forward<CriticalSection>(criticalSection)();
-  }
-
-  typedef ScopedLockT<StaticUnsafeMutex, false> ScopedLock;
-  typedef ScopedLockT<StaticUnsafeMutex, true> ScopedUnlock;
-
-private:
-  MutexHandle Handle;
+  void lock() { threading_impl::lazy_mutex_unsafe_lock(Handle); }
+  void unlock() { threading_impl::lazy_mutex_unsafe_unlock(Handle); }
 };
 
 /// An indirect variant of a Mutex. This allocates the mutex on the heap, for
@@ -327,25 +274,6 @@ private:
 using SmallMutex =
     std::conditional_t<sizeof(Mutex) <= sizeof(void *), Mutex, IndirectMutex>;
 
-// Enforce literal requirements for static variants.
-#if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
-static_assert(std::is_literal_type<StaticMutex>::value,
-              "StaticMutex must be literal type");
-static_assert(std::is_literal_type<StaticUnsafeMutex>::value,
-              "StaticUnsafeMutex must be literal type");
-#else
-// Your platform doesn't currently support statically allocated Mutex
-// you will possibly see global-constructors warnings
-#endif
+} // namespace swift
 
-#if SWIFT_CONDITION_SUPPORTS_CONSTEXPR
-static_assert(std::is_literal_type<StaticConditionVariable>::value,
-              "StaticConditionVariable must be literal type");
-#else
-// Your platform doesn't currently support statically allocated ConditionVar
-// you will possibly see global-constructors warnings
-#endif
-
-}
-
-#endif
+#endif // SWIFT_THREADING_MUTEX_H

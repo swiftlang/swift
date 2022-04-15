@@ -245,7 +245,7 @@ endif()
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 set(swift_core_framework_depends)
-set(swift_core_private_link_libraries)
+set(swift_core_private_link_libraries swiftThreading)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 
 if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL CYGWIN)

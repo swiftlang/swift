@@ -19,8 +19,7 @@
 
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/FunctionReplacement.h"
-#include "swift/Runtime/Once.h"
-#include "swift/Runtime/ThreadLocalStorage.h"
+#include "swift/Threading/ThreadLocalStorage.h"
 
 using namespace swift;
 
@@ -41,11 +40,11 @@ extern "C" char *swift_getFunctionReplacement50(char **ReplFnPtr, char *CurrFn) 
     return nullptr;
 
   auto origKey =
-      (uintptr_t)SWIFT_THREAD_GETSPECIFIC(SWIFT_COMPATIBILITY_50_TLS_KEY);
+    (uintptr_t)swift::tls_get(SWIFT_COMPATIBILITY_50_TLS_KEY);
   if ((origKey & 0x1) != 0) {
     auto mask = ((uintptr_t)-1) < 1;
     auto resetKey = origKey & mask;
-    SWIFT_THREAD_SETSPECIFIC(SWIFT_COMPATIBILITY_50_TLS_KEY, (void *)resetKey);
+    swift::tls_set(SWIFT_COMPATIBILITY_50_TLS_KEY, (void *)resetKey);
     return nullptr;
   }
   return ReplFn;
@@ -59,9 +58,9 @@ extern "C" char *swift_getOrigOfReplaceable50(char **OrigFnPtr) {
 
   char *OrigFn = *OrigFnPtr;
   auto origKey =
-      (uintptr_t)SWIFT_THREAD_GETSPECIFIC(SWIFT_COMPATIBILITY_50_TLS_KEY);
+    (uintptr_t)swift::tls_get(SWIFT_COMPATIBILITY_50_TLS_KEY);
   auto newKey = origKey | 0x1;
-  SWIFT_THREAD_SETSPECIFIC(SWIFT_COMPATIBILITY_50_TLS_KEY, (void *)newKey);
+  swift::tls_set(SWIFT_COMPATIBILITY_50_TLS_KEY, (void *)newKey);
   return OrigFn;
 }
 
