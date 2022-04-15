@@ -314,3 +314,9 @@ func testAnyFixIt() {
   // expected-error@+1 {{optional 'any' type must be written '(any HasAssoc.Type)?'}}{{10-28=(any HasAssoc.Type)?}}
   let _: any HasAssoc.Type? = nil
 }
+
+func testNestedMetatype() {
+  let _: (any P.Type).Type = (any P.Type).self
+  let _: (any (P.Type)).Type = (any P.Type).self
+  let _: ((any (P.Type))).Type = (any P.Type).self
+}
