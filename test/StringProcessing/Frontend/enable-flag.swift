@@ -9,4 +9,5 @@ prefix operator / // expected-error {{prefix operator may not contain '/'}}
 _ = /x/
 _ = #/x/#
 
+@available(SwiftStdlib 5.7, *)
 func foo(_ x: Regex<Substring>) {}
