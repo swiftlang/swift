@@ -1377,8 +1377,15 @@ public:
       return std::string("failure reading allocation pool contents");
     auto Pool = reinterpret_cast<const PoolRange *>(PoolBytes.get());
 
+    // Limit how many iterations of this loop we'll do, to avoid potential
+    // infinite loops when reading bad data. Limit to 1 million iterations. In
+    // normal operation, each pool allocation is 16kB, so that would be ~16GB of
+    // metadata which is far more than any normal program should have.
+    unsigned LoopCount = 0;
+    unsigned LoopLimit = 1000000;
+
     auto TrailerPtr = Pool->Begin + Pool->Remaining;
-    while (TrailerPtr) {
+    while (TrailerPtr && LoopCount++ < LoopLimit) {
       auto TrailerBytes = getReader()
         .readBytes(RemoteAddress(TrailerPtr), sizeof(PoolTrailer));
       if (!TrailerBytes)
@@ -1426,8 +1433,15 @@ public:
     if (!BacktraceListNextPtr)
       return llvm::None;
 
+    // Limit how many iterations of this loop we'll do, to avoid potential
+    // infinite loops when reading bad data. Limit to 1 billion iterations. In
+    // normal operation, a program shouldn't have anywhere near 1 billion
+    // metadata allocations.
+    unsigned LoopCount = 0;
+    unsigned LoopLimit = 1000000000;
+
     auto BacktraceListNext = BacktraceListNextPtr->getResolvedAddress();
-    while (BacktraceListNext) {
+    while (BacktraceListNext && LoopCount++ < LoopLimit) {
       auto HeaderBytes = getReader().readBytes(
           RemoteAddress(BacktraceListNext),
           sizeof(MetadataAllocationBacktraceHeader<Runtime>));
@@ -1473,30 +1487,40 @@ public:
     // provide the whole thing as one big chunk.
     size_t HeaderSize =
         llvm::alignTo(sizeof(*Slab), llvm::Align(MaximumAlignment));
-    AsyncTaskAllocationChunk Chunk;
 
-    Chunk.Start = SlabPtr + HeaderSize;
-    Chunk.Length = Slab->CurrentOffset;
-    Chunk.Kind = AsyncTaskAllocationChunk::ChunkKind::Unknown;
+    AsyncTaskAllocationChunk AllocatedSpaceChunk;
+    AllocatedSpaceChunk.Start = SlabPtr + HeaderSize;
+    AllocatedSpaceChunk.Length = Slab->CurrentOffset;
+    AllocatedSpaceChunk.Kind = AsyncTaskAllocationChunk::ChunkKind::Unknown;
+
+    // Provide a second chunk just for the Next pointer, so the client knows
+    // that there's an allocation there.
+    AsyncTaskAllocationChunk NextPtrChunk;
+    NextPtrChunk.Start =
+        SlabPtr + offsetof(typename StackAllocator::Slab, Next);
+    NextPtrChunk.Length = sizeof(Slab->Next);
+    NextPtrChunk.Kind = AsyncTaskAllocationChunk::ChunkKind::RawPointer;
 
     // Total slab size is the slab's capacity plus the header.
     StoredPointer SlabSize = Slab->Capacity + HeaderSize;
 
-    return {llvm::None, {Slab->Next, SlabSize, {Chunk}}};
+    return {llvm::None,
+            {Slab->Next, SlabSize, {NextPtrChunk, AllocatedSpaceChunk}}};
   }
 
   std::pair<llvm::Optional<std::string>, AsyncTaskInfo>
-  asyncTaskInfo(StoredPointer AsyncTaskPtr) {
+  asyncTaskInfo(StoredPointer AsyncTaskPtr, unsigned ChildTaskLimit,
+                unsigned AsyncBacktraceLimit) {
     loadTargetPointers();
 
     if (supportsPriorityEscalation)
       return asyncTaskInfo<
           AsyncTask<Runtime, ActiveTaskStatusWithEscalation<Runtime>>>(
-          AsyncTaskPtr);
+          AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
     else
       return asyncTaskInfo<
           AsyncTask<Runtime, ActiveTaskStatusWithoutEscalation<Runtime>>>(
-          AsyncTaskPtr);
+          AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
   }
 
   std::pair<llvm::Optional<std::string>, ActorInfo>
@@ -1588,7 +1612,8 @@ private:
 
   template <typename AsyncTaskType>
   std::pair<llvm::Optional<std::string>, AsyncTaskInfo>
-  asyncTaskInfo(StoredPointer AsyncTaskPtr) {
+  asyncTaskInfo(StoredPointer AsyncTaskPtr, unsigned ChildTaskLimit,
+                unsigned AsyncBacktraceLimit) {
     auto AsyncTaskObj = readObj<AsyncTaskType>(AsyncTaskPtr);
     if (!AsyncTaskObj)
       return {std::string("failure reading async task"), {}};
@@ -1620,8 +1645,9 @@ private:
     Info.RunJob = getRunJob(AsyncTaskObj.get());
 
     // Find all child tasks.
+    unsigned ChildTaskLoopCount = 0;
     auto RecordPtr = AsyncTaskObj->PrivateStorage.Status.Record;
-    while (RecordPtr) {
+    while (RecordPtr && ChildTaskLoopCount++ < ChildTaskLimit) {
       auto RecordObj = readObj<TaskStatusRecord<Runtime>>(RecordPtr);
       if (!RecordObj)
         break;
@@ -1661,7 +1687,8 @@ private:
     // Walk the async backtrace.
     if (Info.HasIsRunning && !Info.IsRunning) {
       auto ResumeContext = AsyncTaskObj->ResumeContextAndReserved[0];
-      while (ResumeContext) {
+      unsigned AsyncBacktraceLoopCount = 0;
+      while (ResumeContext && AsyncBacktraceLoopCount++ < AsyncBacktraceLimit) {
         auto ResumeContextObj = readObj<AsyncContext<Runtime>>(ResumeContext);
         if (!ResumeContextObj)
           break;
