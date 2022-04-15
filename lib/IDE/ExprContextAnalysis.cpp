@@ -21,6 +21,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
@@ -363,6 +364,9 @@ static void collectPossibleCalleesByQualifiedLookup(
   auto baseInstanceTy = baseTy->getMetatypeInstanceType();
   if (!baseInstanceTy->mayHaveMembers())
     return;
+
+  // Make sure we've resolved implicit members.
+  namelookup::installSemanticMembersIfNeeded(baseInstanceTy, name);
 
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
