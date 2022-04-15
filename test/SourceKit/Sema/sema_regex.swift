@@ -3,7 +3,7 @@ public func retRegex() -> Regex<Substring> {
 }
 
 // REQUIRES: swift_in_compiler
-// RUN: %sourcekitd-test -req=sema %s -- %s -Xfrontend -enable-bare-slash-regex | %FileCheck %s
+// RUN: %sourcekitd-test -req=sema %s -- %s -Xfrontend -enable-bare-slash-regex -Xfrontend -disable-availability-checking | %FileCheck %s
 
 // CHECK: [
 // CHECK:   {
