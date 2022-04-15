@@ -268,6 +268,16 @@ void swift::performTypeChecking(SourceFile &SF) {
 /// there were no diagnostics downgraded or suppressed due to that
 /// @preconcurrency, suggest that the attribute be removed.
 static void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
+  switch (sf.Kind) {
+  case SourceFileKind::Interface:
+  case SourceFileKind::SIL:
+    return;
+
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    break;
+  }
+
   ASTContext &ctx = sf.getASTContext();
   for (const auto &import : sf.getImports()) {
     if (import.options.contains(ImportFlags::Preconcurrency) &&

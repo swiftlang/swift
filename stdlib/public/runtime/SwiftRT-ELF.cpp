@@ -56,7 +56,7 @@ static void swift_image_constructor() {
   { reinterpret_cast<uintptr_t>(&__start_##name),                              \
     static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
 
-  new (&sections) swift::MetadataSections {
+  ::new (&sections) swift::MetadataSections {
       swift::CurrentSectionMetadataVersion,
       { __dso_handle },
 

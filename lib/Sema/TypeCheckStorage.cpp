@@ -3309,7 +3309,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     WriteImplKind writeImpl = WriteImplKind::Immutable;
     ReadWriteImplKind readWriteImpl = ReadWriteImplKind::Immutable;
 
-    if (storage->getParsedAccessor(AccessorKind::Set)) {
+    // TODO: Writing to optional storage requirements is not supported.
+    if (!storage->getAttrs().hasAttribute<OptionalAttr>() &&
+        storage->getParsedAccessor(AccessorKind::Set)) {
       readImpl = ReadImplKind::Get;
       writeImpl = WriteImplKind::Set;
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;

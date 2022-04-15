@@ -31,6 +31,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <new>
 #include <thread>
 #include "../SwiftShims/GlobalObjects.h"
 #include "../SwiftShims/RuntimeShims.h"
@@ -124,7 +125,7 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
   // check on the placement new allocator which we have observed on Windows,
   // Linux, and macOS.
-  new (object) HeapObject(metadata);
+  ::new (object) HeapObject(metadata);
 
   // If leak tracking is enabled, start tracking this object.
   SWIFT_LEAKS_START_TRACKING_OBJECT(object);

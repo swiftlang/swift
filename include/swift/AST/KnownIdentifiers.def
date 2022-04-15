@@ -303,6 +303,7 @@ IDENTIFIER(InvocationEncoder)
 IDENTIFIER(whenLocal)
 IDENTIFIER(decodeNextArgument)
 IDENTIFIER(SerializationRequirement)
+IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

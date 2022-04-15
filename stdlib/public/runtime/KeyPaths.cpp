@@ -14,6 +14,7 @@
 #include "swift/Runtime/Metadata.h"
 #include <cstdint>
 #include <cstring>
+#include <new>
 
 using namespace swift;
 
@@ -98,7 +99,7 @@ namespace {
     static OpaqueValue *allocateIn(const Metadata *type,
                                    YieldOnceBuffer *buffer) {
       auto *temp =
-        new (reinterpret_cast<void*>(buffer)) YieldOnceTemporary(type);
+        ::new (reinterpret_cast<void*>(buffer)) YieldOnceTemporary(type);
       return type->allocateBufferIn(&temp->Buffer);
     }
 

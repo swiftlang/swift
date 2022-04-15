@@ -288,11 +288,11 @@ public:
     case Context::GenericRequirement:
       return true;
     case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
       return opts.EnableParameterizedExistentialTypes;
     case Context::None:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
-    case Context::MetatypeBase:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:

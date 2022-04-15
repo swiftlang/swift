@@ -170,6 +170,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
       ParsedArgs.hasArg(OPT_v),
       ParsedArgs.hasArg(OPT_skip_inherited_docs),
       ParsedArgs.hasArg(OPT_include_spi_symbols),
+      /*IncludeClangDocs=*/false,
   };
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {

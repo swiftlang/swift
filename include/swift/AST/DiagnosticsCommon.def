@@ -38,9 +38,6 @@ ERROR(cannot_parse_group_info_file,none,
 ERROR(error_no_group_info,none,
       "no group info found for file: '%0'", (StringRef))
 
-NOTE(previous_decldef,none,
-     "previous definition of %0 is here", (DeclBaseName))
-
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 

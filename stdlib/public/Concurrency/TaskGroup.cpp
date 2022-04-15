@@ -33,6 +33,7 @@
 #include "string"
 #include "queue" // TODO: remove and replace with usage of our mpsc queue
 #include <atomic>
+#include <new>
 #include <assert.h>
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
@@ -469,7 +470,7 @@ SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
   SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
 
-  TaskGroupImpl *impl = new (group) TaskGroupImpl(T);
+  TaskGroupImpl *impl = ::new (group) TaskGroupImpl(T);
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");
 
