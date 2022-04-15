@@ -158,32 +158,43 @@ func dynamicMemberLookupMixedKeypaths(foo: DynamicClass<Foo>) {
   _ = foo.bar.foo.nonobjc.y 
 }
 
+@objc class Object: NSObject {
+  var name: String
+  init(name: String) {
+    self.name = name
+  }
+}
 @objc protocol ObjCProtoOptional {
-  @objc optional var optionalProperty: Bool { get }
+  @objc optional var object: Object { get set }
 
-  @objc optional subscript(_: Int) -> Bool { get }
+  @objc optional subscript(_: Bool) -> Object { get set }
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}0B28ProtocolOptionalRequirementsyyF
-// CHECK: keypath $KeyPath<ObjCProtoOptional, Optional<Bool>>, (objc "optionalProperty"; root $ObjCProtoOptional; gettable_property $Optional<Bool>,  id #ObjCProtoOptional.optionalProperty!getter.foreign : <Self where Self : ObjCProtoOptional> (Self) -> () -> Bool, getter @$[[PROP_GETTER:[_a-zA-Z0-9]+]]
-// CHECK: keypath $KeyPath<ObjCProtoOptional, Optional<Bool>>, (root $ObjCProtoOptional; gettable_property $Optional<Bool>,  id #ObjCProtoOptional.subscript!getter.foreign : <Self where Self : ObjCProtoOptional> (Self) -> (Int) -> Bool, getter @$[[SUBSCR_GETTER:[_a-zA-Z0-9]+]]
+// CHECK: keypath $KeyPath<ObjCProtoOptional, Optional<Object>>, (objc "object"; root $ObjCProtoOptional; gettable_property $Optional<Object>,  id #ObjCProtoOptional.object!getter.foreign : <Self where Self : ObjCProtoOptional> (Self) -> () -> Object, getter @$[[PROP_GETTER:[_a-zA-Z0-9]+]]
+// CHECK: keypath $KeyPath<ObjCProtoOptional, Optional<Object>>, (root $ObjCProtoOptional; gettable_property $Optional<Object>,  id #ObjCProtoOptional.subscript!getter.foreign : <Self where Self : ObjCProtoOptional> (Self) -> (Bool) -> Object, getter @$[[SUBSCR_GETTER:[_a-zA-Z0-9]+]]
+// CHECK: keypath $ReferenceWritableKeyPath<ObjCProtoOptional, String>, (root $ObjCProtoOptional; gettable_property $Optional<Object>,  id #ObjCProtoOptional.object!getter.foreign : <Self where Self : ObjCProtoOptional> (Self) -> () -> Object, getter @$[[PROP_GETTER]] : {{.*}}; optional_force : $Object; settable_property $String,
+// CHECK: keypath $ReferenceWritableKeyPath<ObjCProtoOptional, String>, (root $ObjCProtoOptional; gettable_property $Optional<Object>,  id #ObjCProtoOptional.subscript!getter.foreign : <Self where Self : ObjCProtoOptional> (Self) -> (Bool) -> Object, getter @$[[SUBSCR_GETTER]] : {{.*}}; optional_force : $Object; settable_property $String,
 // CHECK: } // end sil function '${{.*}}0B28ProtocolOptionalRequirementsyyF'
 //
-// CHECK: sil shared [thunk] [ossa] @$[[PROP_GETTER]] : $@convention(thin) (@in_guaranteed ObjCProtoOptional) -> @out Optional<Bool> {
+// CHECK: sil shared [thunk] [ossa] @$[[PROP_GETTER]] : $@convention(thin) (@in_guaranteed ObjCProtoOptional) -> @out Optional<Object> {
 // CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $ObjCProtoOptional to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) ObjCProtoOptional]]
-// CHECK:   dynamic_method_br [[BASE]] : $[[OPENED_TY]], #ObjCProtoOptional.optionalProperty!getter.foreign, bb1
-// CHECK: bb1({{%[0-9]+}} : $@convention(objc_method) ([[OPENED_TY]]) -> ObjCBool)
+// CHECK:   dynamic_method_br [[BASE]] : $[[OPENED_TY]], #ObjCProtoOptional.object!getter.foreign, bb1
+// CHECK: bb1({{%[0-9]+}} : $@convention(objc_method) ([[OPENED_TY]]) -> @autoreleased Object)
 // CHECK: } // end sil function '$[[PROP_GETTER]]'
 //
-// CHECK: sil shared [thunk] [ossa] @$[[SUBSCR_GETTER]] : $@convention(thin) (@in_guaranteed ObjCProtoOptional, UnsafeRawPointer) -> @out Optional<Bool> {
+// CHECK: sil shared [thunk] [ossa] @$[[SUBSCR_GETTER]] : $@convention(thin) (@in_guaranteed ObjCProtoOptional, UnsafeRawPointer) -> @out Optional<Object> {
 // CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $ObjCProtoOptional to $[[OPENED_TY:@opened\("[-A-F0-9]+"\) ObjCProtoOptional]]
-// CHECK:   [[INDEX:%[0-9]+]] = load [trivial] {{%[0-9]+}} : $*Int
+// CHECK:   [[INDEX:%[0-9]+]] = load [trivial] {{%[0-9]+}} : $*Bool
 // CHECK:   dynamic_method_br [[BASE]] : $[[OPENED_TY]], #ObjCProtoOptional.subscript!getter.foreign, bb1, bb2
-// CHECK: bb1({{%[0-9]+}} : $@convention(objc_method) (Int, [[OPENED_TY]]) -> ObjCBool):
-// CHECK:   %17 = apply {{%[0-9]+}}([[INDEX]]) : $@callee_guaranteed (Int) -> Bool
+// CHECK: bb1({{%[0-9]+}} : $@convention(objc_method) (ObjCBool, [[OPENED_TY]]) -> @autoreleased Object):
+// CHECK:   %17 = apply {{%[0-9]+}}([[INDEX]]) : $@callee_guaranteed (Bool) -> @owned Object
 // CHECK: bb2:
 // CHECK: } // end sil function '$[[SUBSCR_GETTER]]'
 func objcProtocolOptionalRequirements() {
-  _ = \ObjCProtoOptional.optionalProperty
-  _ = \ObjCProtoOptional.[0]
+  _ = \ObjCProtoOptional.object
+  _ = \ObjCProtoOptional.[true]
+
+  _ = \ObjCProtoOptional.object!.name
+  _ = \ObjCProtoOptional.[true]!.name
 }
