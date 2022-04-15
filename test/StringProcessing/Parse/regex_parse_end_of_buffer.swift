@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex
+// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking
 // REQUIRES: swift_in_compiler
 
 // Note there is purposefully no trailing newline here.

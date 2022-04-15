@@ -40,7 +40,6 @@ add_swift_target_library(swiftRegexBuilder ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     -DswiftRegexBuilder_EXPORTS
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    -Xfrontend -enable-experimental-pairwise-build-block
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS _StringProcessing
