@@ -666,18 +666,15 @@ bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 ///
 /// \param fromType       The source type of the cast.
 /// \param toType         The destination type of the cast.
+/// \param contextKind    The cast context in which this is being typechecked.
 /// \param dc             The context of the cast.
-/// \param diagLoc        The location at which to report diagnostics.
-/// \param fromExpr       The expression describing the input operand.
-/// \param diagToRange    The source range of the destination type.
 ///
 /// \returns a CheckedCastKind indicating the semantics of the cast. If the
 /// cast is invalid, Unresolved is returned. If the cast represents an implicit
 /// conversion, Coercion is returned.
 CheckedCastKind typeCheckCheckedCast(Type fromType, Type toType,
-                                     CheckedCastContextKind ctxKind,
-                                     DeclContext *dc, SourceLoc diagLoc,
-                                     Expr *fromExpr, SourceRange diagToRange);
+                                     CheckedCastContextKind contextKind,
+                                     DeclContext *dc);
 
 /// Find the Objective-C class that bridges between a value of the given
 /// dynamic type and the given value type.
