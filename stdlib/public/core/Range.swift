@@ -1027,3 +1027,14 @@ extension PartialRangeUpTo: Sendable where Bound: Sendable { }
 extension PartialRangeThrough: Sendable where Bound: Sendable { }
 extension PartialRangeFrom: Sendable where Bound: Sendable { }
 extension PartialRangeFrom.Iterator: Sendable where Bound: Sendable { }
+
+extension Range where Bound == String.Index {
+  @_alwaysEmitIntoClient // Swift 5.7
+  internal var _encodedOffsetRange: Range<Int> {
+    _internalInvariant(
+      (lowerBound._canBeUTF8 && upperBound._canBeUTF8)
+      || (lowerBound._canBeUTF16 && upperBound._canBeUTF16))
+    return Range<Int>(
+      _uncheckedBounds: (lowerBound._encodedOffset, upperBound._encodedOffset))
+  }
+}
