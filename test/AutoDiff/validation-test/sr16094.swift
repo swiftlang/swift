@@ -2,7 +2,6 @@
 // REQUIRES: executable_test
 
 import _Differentiation
-import Foundation
 import StdlibUnittest
 
 var PullbackTests = TestSuite("Pullback")
