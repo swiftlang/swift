@@ -20,6 +20,7 @@
 #define SWIFT_RUNTIME_ATOMICWAITQUEUE_H
 
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Mutex.h"
 #include <assert.h>
 
@@ -84,7 +85,7 @@ class AtomicWaitQueue {
   /// global lock and while *not* holding the wait queue lock.
   void release_locked() {
     if (referenceCount == 1) {
-      delete &asImpl();
+      swift_cxx_deleteObject(&asImpl());
     } else {
       referenceCount--;
     }
@@ -211,7 +212,7 @@ public:
       // If we created the queue but never published it, destroy it.
       if (CurrentQueue) {
         CurrentQueue->WaitQueueLock.unlock();
-        delete CurrentQueue;
+        swift_cxx_deleteObject(CurrentQueue);
       }
     }
 
@@ -425,12 +426,7 @@ public:
   private:
     template <class... Args>
     static Impl *createNewQueue(Args &&...args) {
-#if !defined(__cpp_aligned_new)
-      static_assert(!swift::requires_aligned_alloc<std::alignment_of<Impl>::value>::value ||
-                     is_aligned_alloc_aware<Impl>::value,
-                    "type is over-aligned for non-alignment aware operator new");
-#endif
-      auto queue = new Impl(std::forward<Args>(args)...);
+      auto queue = swift_cxx_newObject<Impl>(std::forward<Args>(args)...);
       queue->WaitQueueLock.lock();
       return queue;
     }
