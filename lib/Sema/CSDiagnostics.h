@@ -2574,11 +2574,23 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  bool diagnoseIfExpr() const;
+  bool diagnoseIsExpr() const;
 
   bool diagnoseForcedCastExpr() const;
 
   bool diagnoseConditionalCastExpr() const;
+};
+
+/// Warn situations where the compiler can statically know a runtime
+/// checked cast always succeed.
+class NoopExistentialToCFTypeCheckedCast final : public CheckedCastBaseFailure {
+public:
+  NoopExistentialToCFTypeCheckedCast(const Solution &solution, Type fromType,
+                                     Type toType, CheckedCastKind kind,
+                                     ConstraintLocator *locator)
+      : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Warn situations where the compiler can statically know a runtime
@@ -2589,6 +2601,18 @@ public:
   UnsupportedRuntimeCheckedCastFailure(const Solution &solution, Type fromType,
                                        Type toType, CheckedCastKind kind,
                                        ConstraintLocator *locator)
+      : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Emit a warning when compiler can detect that checked cast would fail at
+/// runtime based on statically known types.
+class CheckedCastToUnrelatedFailure final : public CheckedCastBaseFailure {
+public:
+  CheckedCastToUnrelatedFailure(const Solution &solution, Type fromType,
+                                Type toType, CheckedCastKind kind,
+                                ConstraintLocator *locator)
       : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
 
   bool diagnoseAsError() override;

@@ -1355,10 +1355,20 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         type, IP->getCastType(),
         type->hasError() ? CheckedCastContextKind::None
                          : CheckedCastContextKind::IsPattern,
-        dc, IP->getLoc(), nullptr, IP->getCastTypeRepr()->getSourceRange());
+        dc);
     switch (castKind) {
     case CheckedCastKind::Unresolved:
-      return nullptr;
+      if (type->hasError()) {
+        return nullptr;
+      }
+      diags
+          .diagnose(IP->getLoc(), diag::downcast_to_unrelated, type,
+                    IP->getCastType())
+          .highlight(IP->getLoc())
+          .highlight(IP->getCastTypeRepr()->getSourceRange());
+
+      IP->setCastKind(CheckedCastKind::ValueCast);
+      break;
     case CheckedCastKind::Coercion:
     case CheckedCastKind::BridgingCoercion:
       // If this is an 'as' pattern coercing between two different types, then
@@ -1521,16 +1531,17 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       // Otherwise, see if we can introduce a cast pattern to get from an
       // existential pattern type to the enum type.
       else if (type->isAnyExistentialType()) {
-        auto foundCastKind =
-          typeCheckCheckedCast(type, parentTy,
-                               CheckedCastContextKind::EnumElementPattern,
-                               dc,
-                               EEP->getLoc(),
-                               nullptr, SourceRange());
+        auto foundCastKind = typeCheckCheckedCast(
+            type, parentTy, CheckedCastContextKind::EnumElementPattern, dc);
         // If the cast failed, we can't resolve the pattern.
-        if (foundCastKind < CheckedCastKind::First_Resolved)
+        if (foundCastKind < CheckedCastKind::First_Resolved) {
+          diags
+              .diagnose(EEP->getLoc(), diag::downcast_to_unrelated, type,
+                        parentTy)
+              .highlight(EEP->getSourceRange());
           return nullptr;
-        
+        }
+
         // Otherwise, we can type-check as the enum type, and insert a cast
         // from the outer pattern type.
         castKind = foundCastKind;

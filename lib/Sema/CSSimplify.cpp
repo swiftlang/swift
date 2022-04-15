@@ -7563,8 +7563,21 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   }
 
   auto castKind = TypeChecker::typeCheckCheckedCast(
-      fromType, toType, CheckedCastContextKind::None, cs.DC, SourceLoc(),
-      nullptr, SourceRange());
+      fromType, toType, CheckedCastContextKind::None, cs.DC);
+
+  if (castKind == CheckedCastKind::Unresolved) {
+    return AllowCheckedCastToUnrelated::attempt(
+        cs, origFromType, origToType, castKind,
+        cs.getConstraintLocator(locator));
+  }
+
+  if (castKind == CheckedCastKind::ValueCast) {
+    // SR-1612: Special 'is' case diagnostics for CFTypes.
+    return AllowNoopExistentialToCFTypeCheckedCast::attempt(
+        cs, origFromType, origToType, castKind,
+        cs.getConstraintLocator(locator));
+  }
+
   if (!(castKind == CheckedCastKind::Coercion ||
         castKind == CheckedCastKind::BridgingCoercion))
     return nullptr;
@@ -12813,7 +12826,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
   case FixKind::AllowCheckedCastCoercibleOptionalType:
   case FixKind::AllowNoopCheckedCast:
+  case FixKind::AllowNoopExistentialToCFTypeCheckedCast:
   case FixKind::AllowUnsupportedRuntimeCheckedCast:
+  case FixKind::AllowCheckedCastToUnrelated:
   case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype:
   case FixKind::AllowWrappedValueMismatch:
   case FixKind::RemoveExtraneousArguments:
