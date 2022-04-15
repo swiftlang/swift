@@ -219,8 +219,6 @@ ERROR(number_cant_start_decl_name,none,
       (StringRef))
 ERROR(expected_identifier_after_case_comma, PointsToFirstBadToken,
       "expected identifier after comma in enum 'case' declaration", ())
-ERROR(decl_redefinition,none,
-      "definition conflicts with previous value", ())
 ERROR(let_cannot_be_computed_property,none,
       "'let' declarations cannot be computed properties", ())
 ERROR(let_cannot_be_observing_property,none,

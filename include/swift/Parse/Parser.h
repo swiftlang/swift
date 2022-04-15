@@ -784,9 +784,7 @@ public:
     return diagnose(Tok.getLoc(),
                     Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
   }
-  
-  void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New);
-  
+    
   /// Add a fix-it to remove the space in consecutive identifiers.
   /// Add a camel-cased option if it is different than the first option.
   void diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
