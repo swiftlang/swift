@@ -337,12 +337,6 @@ protected:
     return captureExpr(call, /*oneWay=*/true, braceStmt);
   }
 
-  VarDecl *visitReturnStmt(ReturnStmt *stmt) {
-    if (!unhandledNode)
-      unhandledNode = stmt;
-    return nullptr;
-  }
-
   VarDecl *visitDoStmt(DoStmt *doStmt) {
     auto childVar = visitBraceStmt(doStmt->getBody());
     if (!childVar)
@@ -904,6 +898,7 @@ protected:
   CONTROL_FLOW_STMT(Fallthrough)
   CONTROL_FLOW_STMT(Fail)
   CONTROL_FLOW_STMT(PoundAssert)
+  CONTROL_FLOW_STMT(Return)
 
 #undef CONTROL_FLOW_STMT
 };
