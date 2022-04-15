@@ -143,6 +143,10 @@ public:
 
   /// Build an implicit variable in this context.
   VarDecl *buildVar(SourceLoc loc);
+
+  /// Build a reference to a given variable and mark it
+  /// as located at a given source location.
+  DeclRefExpr *buildVarRef(VarDecl *var, SourceLoc loc);
 };
 
 /// Describes the algorithm to use for trailing closure matching.

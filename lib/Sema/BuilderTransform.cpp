@@ -128,11 +128,6 @@ class BuilderClosureVisitor
     return var;
   }
 
-  /// Build an implicit reference to the given variable.
-  DeclRefExpr *buildVarRef(VarDecl *var, SourceLoc loc) {
-    return new (ctx) DeclRefExpr(var, DeclNameLoc(loc), /*Implicit=*/true);
-  }
-
 public:
   BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs, DeclContext *dc,
                         Type builderType, Type bodyResultType)
@@ -147,7 +142,7 @@ public:
     if (!bodyVar)
       return None;
 
-    applied.returnExpr = buildVarRef(bodyVar, stmt->getEndLoc());
+    applied.returnExpr = builder.buildVarRef(bodyVar, stmt->getEndLoc());
 
     // If there is a buildFinalResult(_:), call it.
     ASTContext &ctx = cs->getASTContext();
@@ -227,7 +222,7 @@ protected:
       if (!childVar)
         return;
 
-      expressions.push_back(buildVarRef(childVar, childVar->getLoc()));
+      expressions.push_back(builder.buildVarRef(childVar, childVar->getLoc()));
     };
 
     for (auto node : braceStmt->getElements()) {
@@ -342,7 +337,7 @@ protected:
     if (!childVar)
       return nullptr;
 
-    auto childRef = buildVarRef(childVar, doStmt->getEndLoc());
+    auto childRef = builder.buildVarRef(childVar, doStmt->getEndLoc());
 
     return captureExpr(childRef, /*oneWay=*/true, doStmt);
   }
@@ -455,8 +450,8 @@ protected:
     if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
       return nullptr;
 
-    Expr *thenVarRefExpr = buildVarRef(
-        thenVar, ifStmt->getThenStmt()->getEndLoc());
+    Expr *thenVarRefExpr =
+        builder.buildVarRef(thenVar, ifStmt->getThenStmt()->getEndLoc());
 
     // If there is a #available in the condition, wrap the 'then' in a call to
     // buildLimitedAvailability(_:).
@@ -487,12 +482,13 @@ protected:
     // - If there's an `else if`, the chain expression from that
     //   should already be producing a chain result.
     } else if (isElseIf) {
-      elseExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
+      elseExpr = builder.buildVarRef(*elseChainVar, ifStmt->getEndLoc());
       elseLoc = ifStmt->getElseLoc();
 
       // - Otherwise, wrap it to produce a chain result.
     } else {
-      Expr *elseVarRefExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
+      Expr *elseVarRefExpr =
+          builder.buildVarRef(*elseChainVar, ifStmt->getEndLoc());
 
       // If there is a #unavailable in the condition, wrap the 'else' in a call
       // to buildLimitedAvailability(_:).
@@ -679,7 +675,7 @@ protected:
 
       // Build the expression that injects the case variable into appropriate
       // buildEither(first:)/buildEither(second:) chain.
-      Expr *caseVarRef = buildVarRef(caseVar, caseStmt->getEndLoc());
+      Expr *caseVarRef = builder.buildVarRef(caseVar, caseStmt->getEndLoc());
       Expr *injectedCaseExpr = buildWrappedChainPayload(
           caseVarRef, idx, capturedCaseVars.size(), /*isOptional=*/false);
 
@@ -826,13 +822,13 @@ protected:
     // Form a call to Array.append(_:) to add the result of executing each
     // iteration of the loop body to the array formed above.
     SourceLoc endLoc = forEachStmt->getEndLoc();
-    auto arrayVarRef = buildVarRef(arrayVar, endLoc);
+    auto arrayVarRef = builder.buildVarRef(arrayVar, endLoc);
     auto arrayAppendRef = new (ctx) UnresolvedDotExpr(
         arrayVarRef, endLoc, DeclNameRef(ctx.getIdentifier("append")),
         DeclNameLoc(endLoc), /*implicit=*/true);
     arrayAppendRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-    auto bodyVarRef = buildVarRef(bodyVar, endLoc);
+    auto bodyVarRef = builder.buildVarRef(bodyVar, endLoc);
     auto *argList = ArgumentList::createImplicit(
         ctx, endLoc, {Argument::unlabeled(bodyVarRef)}, endLoc);
     Expr *arrayAppendCall =
@@ -846,7 +842,7 @@ protected:
     // Form the final call to buildArray(arrayVar) to allow the function
     // builder to reshape the array into whatever it wants as the result of
     // the for-each loop.
-    auto finalArrayVarRef = buildVarRef(arrayVar, endLoc);
+    auto finalArrayVarRef = builder.buildVarRef(arrayVar, endLoc);
     auto buildArrayCall = buildCallIfWanted(
         endLoc, ctx.Id_buildArray, { finalArrayVarRef }, { Identifier() });
     assert(buildArrayCall);
@@ -2216,4 +2212,9 @@ VarDecl *ResultBuilder::buildVar(SourceLoc loc) {
       VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var, loc, name, DC);
   var->setImplicit();
   return var;
+}
+
+DeclRefExpr *ResultBuilder::buildVarRef(VarDecl *var, SourceLoc loc) {
+  return new (DC->getASTContext())
+      DeclRefExpr(var, DeclNameLoc(loc), /*Implicit=*/true);
 }
