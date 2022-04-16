@@ -3970,8 +3970,11 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
 
   // If the base expression is a reference to a function or subscript
   // parameter, offer a fixit that replaces the existential parameter type with
-  // its generic equivalent, e.g. func foo(p: any P) → func foo<T: P>(p: T).
-  // FIXME: Add an option to use 'some' vs. an explicit generic parameter.
+  // its generic equivalent, e.g. func foo(p: any P) → func foo(p: some P).
+  // Replacing 'any' with 'some' allows the code to compile without further
+  // changes, such as naming an explicit type parameter, and is future-proofed
+  // for same-type requirements on primary associated types instead of needing
+  // a where clause.
 
   if (!PD || !PD->getDeclContext()->getAsDecl())
     return true;
@@ -4020,70 +4023,42 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
   if (PD->isInOut())
     return true;
 
-  constexpr StringRef GPNamePlaceholder = "<#generic parameter name#>";
-  SourceRange TyReplacementRange;
-  SourceRange RemoveAnyRange;
-  SourceLoc GPDeclLoc;
-  std::string GPDeclStr;
-  {
-    llvm::raw_string_ostream OS(GPDeclStr);
-    auto *const GC = PD->getDeclContext()->getAsDecl()->getAsGenericContext();
-    if (GC->getParsedGenericParams()) {
-      GPDeclLoc = GC->getParsedGenericParams()->getRAngleLoc();
-      OS << ", ";
-    } else {
-      GPDeclLoc =
-          isa<AbstractFunctionDecl>(GC)
-              ? cast<AbstractFunctionDecl>(GC)->getParameters()->getLParenLoc()
-              : cast<SubscriptDecl>(GC)->getIndices()->getLParenLoc();
-      OS << "<";
-    }
-    OS << GPNamePlaceholder << ": ";
-
-    auto *TR = PD->getTypeRepr()->getWithoutParens();
-    if (auto *STR = dyn_cast<SpecifierTypeRepr>(TR)) {
-      TR = STR->getBase()->getWithoutParens();
-    }
-    if (auto *ETR = dyn_cast<ExistentialTypeRepr>(TR)) {
-      TR = ETR->getConstraint();
-      RemoveAnyRange = SourceRange(ETR->getAnyLoc(), TR->getStartLoc());
-      TR = TR->getWithoutParens();
-    }
-    if (auto *MTR = dyn_cast<MetatypeTypeRepr>(TR)) {
-      TR = MTR->getBase();
-
-      // (P & Q).Type -> T.Type
-      // (P).Type -> (T).Type
-      // ((P & Q)).Type -> ((T)).Type
-      if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
-        assert(TTR->isParenType());
-        if (!isa<CompositionTypeRepr>(TTR->getElementType(0))) {
-          TR = TR->getWithoutParens();
-        }
-      }
-    }
-    TyReplacementRange = TR->getSourceRange();
-
-    // Strip any remaining parentheses and print the conformance constraint.
-    TR->getWithoutParens()->print(OS);
-
-    if (!GC->getParsedGenericParams()) {
-      OS << ">";
-    }
+  auto *typeRepr = PD->getTypeRepr()->getWithoutParens();
+  if (auto *STR = dyn_cast<SpecifierTypeRepr>(typeRepr)) {
+    typeRepr = STR->getBase()->getWithoutParens();
   }
 
-  // First, replace the constraint type with the generic parameter type
-  // placeholder.
-  Diag.fixItReplace(TyReplacementRange, GPNamePlaceholder);
+  SourceRange anyRange;
+  TypeRepr *constraintRepr = typeRepr;
+  if (auto *existentialRepr = dyn_cast<ExistentialTypeRepr>(typeRepr)) {
+    constraintRepr = existentialRepr->getConstraint()->getWithoutParens();
+    auto anyStart = existentialRepr->getAnyLoc();
+    auto anyEnd = existentialRepr->getConstraint()->getStartLoc();
+    anyRange = SourceRange(anyStart, anyEnd);
+  }
 
-  // Remove 'any' if needed, using a character-based removal to pick up
+  bool needsParens = false;
+  while (auto *metatype = dyn_cast<MetatypeTypeRepr>(constraintRepr)) {
+    // The generic equivalent of 'any P.Type' is '(some P).Type'
+    constraintRepr = metatype->getBase()->getWithoutParens();
+    if (isa<SimpleIdentTypeRepr>(constraintRepr))
+      needsParens = !isa<TupleTypeRepr>(metatype->getBase());
+  }
+
+  std::string fix;
+  llvm::raw_string_ostream OS(fix);
+  if (needsParens)
+    OS << "(";
+  OS << "some ";
+  constraintRepr->print(OS);
+  if (needsParens)
+    OS << ")";
+
+  // When removing 'any', use a character-based removal to pick up
   // whitespaces between it and its constraint repr.
-  if (RemoveAnyRange.isValid()) {
-    Diag.fixItRemoveChars(RemoveAnyRange.Start, RemoveAnyRange.End);
-  }
-
-  // Finally, insert the generic parameter declaration.
-  Diag.fixItInsert(GPDeclLoc, GPDeclStr);
+  Diag
+    .fixItReplace(constraintRepr->getSourceRange(), fix)
+    .fixItRemoveChars(anyRange.Start, anyRange.End);
 
   return true;
 }
