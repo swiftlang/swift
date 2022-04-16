@@ -65,6 +65,13 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_bool _swift_stdlib_isLinkingConsonant(__swift_uint32_t scalar);
 
 //===----------------------------------------------------------------------===//
+// Word Breaking
+//===----------------------------------------------------------------------===//
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint8_t _swift_stdlib_getWordBreakProperty(__swift_uint32_t scalar);
+
+//===----------------------------------------------------------------------===//
 // Unicode.Scalar.Properties
 //===----------------------------------------------------------------------===//
 

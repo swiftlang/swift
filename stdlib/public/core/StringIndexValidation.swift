@@ -439,3 +439,20 @@ extension _StringGuts {
       scalarAlign(validateInclusiveSubscalarIndex_5_7(i)))
   }
 }
+
+// Word index validation (String)
+extension _StringGuts {
+  @available(SwiftStdlib 5.7, *)
+  internal func validateWordIndex(_ i: String.Index) -> String.Index {
+    // TODO: Maybe fast word index bit?
+    return roundDownToNearestWord(scalarAlign(validateSubscalarIndex(i)))
+  }
+
+  @available(SwiftStdlib 5.7, *)
+  internal func validateInclusiveWordIndex(_ i: String.Index) -> String.Index {
+    // TODO: Maybe fast word index bit?
+    return roundDownToNearestCharacter(
+      scalarAlign(validateInclusiveSubscalarIndex(i))
+    )
+  }
+}

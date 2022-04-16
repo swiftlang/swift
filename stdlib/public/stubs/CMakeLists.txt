@@ -10,6 +10,7 @@ set(swift_stubs_sources
     Unicode/UnicodeGrapheme.cpp
     Unicode/UnicodeNormalization.cpp
     Unicode/UnicodeScalarProps.cpp
+    Unicode/UnicodeWord.cpp
 )
 set(swift_stubs_objc_sources
     Availability.mm
