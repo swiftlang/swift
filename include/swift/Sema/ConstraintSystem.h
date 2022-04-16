@@ -1031,6 +1031,7 @@ public:
     pattern,
     patternBindingEntry,
     varDecl,
+    functionRef,
   };
 
 private:
@@ -1051,6 +1052,8 @@ private:
     } patternBindingEntry;
 
     const VarDecl *varDecl;
+
+    const DeclContext *functionRef;
   } storage;
 
 public:
@@ -1096,6 +1099,11 @@ public:
     storage.varDecl = varDecl;
   }
 
+  SolutionApplicationTargetsKey(const AnyFunctionRef functionRef) {
+    kind = Kind::functionRef;
+    storage.functionRef = functionRef.getAsDeclContext();
+  }
+
   friend bool operator==(
       SolutionApplicationTargetsKey lhs, SolutionApplicationTargetsKey rhs) {
     if (lhs.kind != rhs.kind)
@@ -1127,6 +1135,9 @@ public:
 
     case Kind::varDecl:
       return lhs.storage.varDecl == rhs.storage.varDecl;
+
+    case Kind::functionRef:
+      return lhs.storage.functionRef == rhs.storage.functionRef;
     }
     llvm_unreachable("invalid SolutionApplicationTargetsKey kind");
   }
@@ -1178,6 +1189,11 @@ public:
       return hash_combine(
           DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
           DenseMapInfo<void *>::getHashValue(storage.varDecl));
+
+    case Kind::functionRef:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.functionRef));
     }
     llvm_unreachable("invalid statement kind");
   }
