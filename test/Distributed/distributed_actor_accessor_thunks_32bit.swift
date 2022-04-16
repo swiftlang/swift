@@ -100,16 +100,9 @@ public distributed actor MyOtherActor {
 
 // CHECK: [[DECODER_PTR:%*]] = bitcast %swift.opaque* %1 to %T27FakeDistributedActorSystems0A17InvocationDecoderC**
 // CHECK-NEXT: [[DECODER:%.*]] = load %T27FakeDistributedActorSystems0A17InvocationDecoderC*, %T27FakeDistributedActorSystems0A17InvocationDecoderC** [[DECODER_PTR]]
-// CHECK-NEXT: [[DECODER_METADATA:%.*]] = bitcast %swift.type* [[DECODER_TYPE]] to void (%swift.opaque*, %swift.type*, i8**, i8**, %T27FakeDistributedActorSystems0A17InvocationDecoderC*, %swift.error**)**
-// CHECK-NEXT: [[DECODE_NEXT_ARG_REF:%.*]] = getelementptr inbounds void (%swift.opaque*, %swift.type*, i8**, i8**, %T27FakeDistributedActorSystems0A17InvocationDecoderC*, %swift.error**)*, void (%swift.opaque*, %swift.type*, i8**, i8**, %T27FakeDistributedActorSystems0A17InvocationDecoderC*, %swift.error**)** [[DECODER_METADATA]], i32 35
-// CHECK-NEXT: [[DECODE_NEXT_ARG:%.*]] = load void (%swift.opaque*, %swift.type*, i8**, i8**, %T27FakeDistributedActorSystems0A17InvocationDecoderC*, %swift.error**)*, void (%swift.opaque*, %swift.type*, i8**, i8**, %T27FakeDistributedActorSystems0A17InvocationDecoderC*, %swift.error**)** [[DECODE_NEXT_ARG_REF]]
+// CHECK-NEXT: [[DECODER_METADATA:%.*]] = bitcast i8* %2 to %swift.type*
+// CHECK-NEXT: [[DECODE_NEXT_ARG_REF:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[DECODER_METADATA]], i32
 
-
-// CHECK:  [[ARG_TYPES:%.*]] = bitcast i8* %2 to %swift.type**
-
-// CHECK: [[ARG_0_TYPE_LOC:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ARG_TYPES]], i32 0
-// CHECK-NEXT: %arg_type = load %swift.type*, %swift.type** [[ARG_0_TYPE_LOC]]
-// CHECK: %size = load i32, i32* {{.*}}
 // CHECK: [[ARG_0_SIZE_ADJ:%.*]] = add i32 %size, 15
 // CHECK-NEXT: [[ARG_0_SIZE:%.*]] = and i32 [[ARG_0_SIZE_ADJ]], -16
 // CHECK-NEXT: [[ARG_0_VALUE_BUF:%.*]] = call swiftcc i8* @swift_task_alloc(i32 [[ARG_0_SIZE]])
