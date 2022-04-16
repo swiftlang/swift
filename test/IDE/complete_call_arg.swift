@@ -1271,6 +1271,7 @@ func testSkippedCallArgInInvalidResultBuilderBody() {
     Other(action: 2) {
       MyImage(systemName: "", #^INVALID_RESULTBUILDER_ARG^#
     struct Invalid
+    }
   }
 
   // INVALID_RESULTBUILDER_ARG: Begin completions, 1 item
@@ -1398,4 +1399,18 @@ func testTopLevelFuncWithErrorParam() {
 // TOP_LEVEL_FUNC_WITH_ERROR_PARAM-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: a[#A#]; name=a
 // TOP_LEVEL_FUNC_WITH_ERROR_PARAM-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): A#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 // TOP_LEVEL_FUNC_WITH_ERROR_PARAM: End completions
+}
+
+struct Rdar89773376 {
+  var intVal: Int
+}
+extension Rdar89773376 {
+  init(string: String) { self.intVal = 1 }
+}
+func testRdar89773376(arry: [Int]) {
+  arry.map { Rdar89773376(#^RDAR89773376^#) }
+// RDAR89773376: Begin completions, 2 items
+// RDAR89773376-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#string: String#}[')'][#Rdar89773376#];
+// RDAR89773376-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#intVal: Int#}[')'][#Rdar89773376#];
+// RDAR89773376: End completions
 }

@@ -2956,7 +2956,7 @@ bool ConformanceChecker::checkActorIsolation(
 
   auto refResult = ActorReferenceResult::forReference(
       getConcreteWitness(), witness->getLoc(), DC, None, None,
-      requirementIsolation);
+      None, requirementIsolation);
   bool sameConcurrencyDomain = false;
   switch (refResult) {
   case ActorReferenceResult::SameConcurrencyDomain:
@@ -6343,6 +6343,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
           }
         }
       }
+    } else if (proto->isSpecificProtocol(
+                   KnownProtocolKind::DistributedActorSystem)) {
+      checkDistributedActorSystem(nominal);
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Actor)) {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
         if (!classDecl->isExplicitActor()) {

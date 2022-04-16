@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=ONONE
-// R/UN: %target-swift-frontend -O -disable-llvm-optzns -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=ONONE
+// RUN: %target-swift-frontend -O -disable-llvm-optzns -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=O
 
 @_silgen_name("useMetadata")
 func useMetadata<T>(_: T.Type)
@@ -25,7 +25,7 @@ private class PrivateNonfinal<T, U, V> {
 
   // Methods in general on nonfinal classes cannot use the self metadata as
   // is.
-  // CHECK-LABEL: define {{.*}}15PrivateNonfinal{{.*}}buttsyyF"
+  // CHECK-LABEL: define {{.*}}15PrivateNonfinal{{.*}}buttsyyF{{.*}}"
   @inline(never)
   final func butts() {
     // CHECK: [[INSTANTIATED_TYPE_RESPONSE:%.*]] = call {{.*}} @{{.*}}15PrivateNonfinal{{.*}}Ma
@@ -46,18 +46,24 @@ private class PrivateNonfinal<T, U, V> {
 // should figure out that it's effectively final because it has no
 // subclasses.
 private class PrivateNonfinalSubclass: PrivateNonfinal<Int, String, Float> {
+  // CHECK-O-LABEL: define {{.*}}PrivateNonfinalSubclass{{.*}}cfC
+  // CHECK-O:         call {{.*}}@swift_allocObject(%swift.type* %0
+
   @inline(never)
   final func borts() {
     useMetadata(PrivateNonfinalSubclass.self)
   }
 
-  // CHECK-LABEL: define {{.*}}PrivateNonfinalSubclass{{.*}}cfC
-  // CHECK:         call {{.*}}@swift_allocObject(%swift.type* %0
+  // CHECK-ONONE-LABEL: define {{.*}}PrivateNonfinalSubclass{{.*}}cfC
+  // CHECK-ONONE:         call {{.*}}@swift_allocObject(%swift.type* %0
 }
 
 final private class FinalPrivateNonfinalSubclass<U>: PrivateNonfinal<U, String, Float> {
   // The class is final, so we can always form metadata for
   // FinalPrivateNonfinalSubclass<U> from the self argument.
+
+  // CHECK-O-LABEL: define {{.*}}FinalPrivateNonfinalSubclass{{.*}}cfC"
+  // CHECK-O:         call {{.*}}@swift_allocObject(%swift.type* %0
 
   // CHECK-LABEL: define {{.*}}FinalPrivateNonfinalSubclass{{.*}}burts
   @inline(never)
@@ -71,9 +77,12 @@ final private class FinalPrivateNonfinalSubclass<U>: PrivateNonfinal<U, String, 
     useMetadata(FinalPrivateNonfinalSubclass<Int>.self)
   }
 
-  // CHECK-LABEL: define {{.*}}FinalPrivateNonfinalSubclass{{.*}}cfC"
-  // CHECK:         call {{.*}}@swift_allocObject(%swift.type* %0
+  // CHECK-ONONE-LABEL: define {{.*}}FinalPrivateNonfinalSubclass{{.*}}cfC"
+  // CHECK-ONONE:         call {{.*}}@swift_allocObject(%swift.type* %0
 }
+
+  // CHECK-O-LABEL: define {{.*}}FinalPrivateNonfinalSubclass{{.*}}cfC"
+  // CHECK-O:         call {{.*}}@swift_allocObject(%swift.type* %0
 
 final private class PrivateFinal<T, U, V> {
   // The class is final, so we can always form metadata for

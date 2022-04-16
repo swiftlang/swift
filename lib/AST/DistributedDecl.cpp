@@ -271,12 +271,24 @@ swift::getDistributedSerializationRequirements(
   if (existentialRequirementTy->isAny())
     return true; // we're done here, any means there are no requirements
 
-  auto serialReqType = existentialRequirementTy->castTo<ExistentialType>()
-                           ->getConstraintType()
-                           ->getDesugaredType();
+  if (auto alias = dyn_cast<TypeAliasType>(existentialRequirementTy.getPointer())) {
+    auto ty = alias->getDesugaredType();
+    if (isa<ClassType>(ty) || isa<StructType>(ty) || isa<EnumType>(ty)) {
+      // SerializationRequirement cannot be class or struct nowadays
+      return false;
+    }
+  }
+
+  ExistentialType *serialReqType = existentialRequirementTy
+                                       ->castTo<ExistentialType>();
+  if (!serialReqType || serialReqType->hasError()) {
+    return false;
+  }
+
+  auto desugaredTy = serialReqType->getConstraintType()->getDesugaredType();
   auto flattenedRequirements =
       flattenDistributedSerializationTypeToRequiredProtocols(
-          serialReqType);
+          desugaredTy);
   for (auto p : flattenedRequirements) {
     requirementProtos.insert(p);
   }
