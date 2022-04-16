@@ -533,3 +533,15 @@ func test_diagnostic_with_contextual_generic_params() {
     }
   }
 }
+
+// SR-10988 - Suggest `return` when the last statement of a multi-statement function body would be a valid return value
+func sr10988() {
+  struct S {
+    func test() -> some Numeric {
+      // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+      let x = 0
+      x // expected-note {{did you mean to return the last expression?}}
+      // expected-warning@-1 {{expression of type 'Int' is unused}}
+    }
+  }
+}

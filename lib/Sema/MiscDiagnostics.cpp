@@ -2636,7 +2636,7 @@ public:
   void check() {
     Body->walk(*this);
 
-    // If given function has any invalid returns in the body
+    // If given function has any invalid `return`s in the body
     // let's not try to validate the types, since it wouldn't
     // be accurate.
     if (HasInvalidReturn)
@@ -2645,6 +2645,46 @@ public:
     // If there are no candidates, then the body has no return statements, and
     // we have nothing to infer the underlying type from.
     if (Candidates.empty()) {
+      // We try to find valid candidates for return values to see if we can offer
+      // a fixit before presenting the default diagnosis.
+      if (Body->getNumElements() > 1) {
+        auto element = Body->getLastElement();
+        // Let's see if the last statement would make for a valid return value.
+        if (auto expr = element.dyn_cast<Expr *>()) {
+          bool conforms = true;
+
+          for (auto requirement :
+               OpaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements()) {
+            bool unwrappedIUO = true;
+            auto requirementFulfilled =
+                TypeChecker::typesSatisfyConstraint(expr->getType()->getRValueType(),
+                                                    requirement.getSecondType(),
+                                                    false,
+                                                    ConstraintKind::ConformsTo,
+                                                    OpaqueDecl->getDeclContext(),
+                                                    &unwrappedIUO);
+            if (!requirementFulfilled) {
+              conforms = false;
+              break;
+            }
+          }
+
+          // If all requirements are fulfilled, we offer to insert `return` to
+          // fix the issue.
+          if (conforms) {
+            Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
+            Ctx.Diags
+                .diagnose(expr->getStartLoc(),
+                          diag::opaque_type_missing_return_last_expr_note)
+                .fixItInsert(expr->getStartLoc(), "return ");
+
+            return;
+          }
+        }
+      }
+
+      // We have not found any candidates for where adding a `return` would fix
+      // the issue and are therefore falling back to the generic error message.
       Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
       return;
     }
