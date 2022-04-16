@@ -238,26 +238,9 @@ public:
       SourceLoc declRefLoc,
       const DeclContext *fromDC,
       Optional<VarRefUseEnv> useKind = None,
-      Optional<ReferencedActor> actorInstance = None);
-
-  /// Determine what happens when referencing the given declaration from the
-  /// given declaration context.
-  ///
-  ///
-  /// \param declRef The declaration that is being referenced.
-  ///
-  /// \param fromDC The declaration context from which the reference occurs.
-  ///
-  /// \param actorInstance When not \c None, the actor instance value that is
-  /// provided when referencing the declaration. This can be either the base
-  /// of a member access or a parameter passed to a function.
-  static ActorReferenceResult forReference(
-      ConcreteDeclRef declRef,
-      SourceLoc declRefLoc,
-      const DeclContext *fromDC,
-      Optional<VarRefUseEnv> useKind,
-      Optional<ReferencedActor> actorInstance,
-      ActorIsolation contextIsolation);
+      Optional<ReferencedActor> actorInstance = None,
+      Optional<ActorIsolation> knownDeclIsolation = None,
+      Optional<ActorIsolation> knownContextIsolation = None);
 
   operator Kind() const { return kind; }
 };

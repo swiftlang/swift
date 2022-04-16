@@ -2956,7 +2956,7 @@ bool ConformanceChecker::checkActorIsolation(
 
   auto refResult = ActorReferenceResult::forReference(
       getConcreteWitness(), witness->getLoc(), DC, None, None,
-      requirementIsolation);
+      None, requirementIsolation);
   bool sameConcurrencyDomain = false;
   switch (refResult) {
   case ActorReferenceResult::SameConcurrencyDomain:
