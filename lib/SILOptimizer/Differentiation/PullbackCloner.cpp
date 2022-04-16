@@ -549,6 +549,10 @@ private:
     if (auto adjProj = getAdjointProjection(origBB, originalValue))
       return (bufferMap[{origBB, originalValue}] = adjProj);
 
+    LLVM_DEBUG(getADDebugStream() << "Creating new adjoint buffer for"
+               << originalValue
+               << "in bb" << origBB->getDebugID() << '\n');
+
     auto bufType = getRemappedTangentType(originalValue->getType());
     // Set insertion point for local allocation builder: before the last local
     // allocation, or at the start of the pullback function's entry if no local
@@ -583,6 +587,12 @@ private:
     assert(originalValue->getFunction() == &getOriginal());
     assert(rhsAddress->getFunction() == &getPullback());
     auto adjointBuffer = getAdjointBuffer(origBB, originalValue);
+
+    LLVM_DEBUG(getADDebugStream() << "Adding"
+               << rhsAddress << "to adjoint of "
+               << originalValue
+               << "in bb" << origBB->getDebugID() << '\n');
+
     builder.emitInPlaceAdd(loc, adjointBuffer, rhsAddress);
   }
 
@@ -2340,7 +2350,9 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
   for (auto activeValue : predBBActiveValues) {
     LLVM_DEBUG(getADDebugStream()
                << "Propagating adjoint of active value " << activeValue
-               << " to predecessors' pullback blocks\n");
+               << "from bb" << origBB->getDebugID()
+               << " to predecessors' (bb" << origPredBB->getDebugID()
+               << ") pullback blocks\n");
     switch (getTangentValueCategory(activeValue)) {
     case SILValueCategory::Object: {
       auto activeValueAdj = getAdjointValue(origBB, activeValue);
@@ -2511,14 +2523,13 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
     case SILValueCategory::Address: {
       auto bbArgAdjBuf = getAdjointBuffer(bb, bbArg);
       for (auto pair : incomingValues) {
-        auto *predBB = std::get<0>(pair);
         auto incomingValue = std::get<1>(pair);
         // Handle `switch_enum` on `Optional`.
         auto termInst = bbArg->getSingleTerminator();
         if (isSwitchEnumInstOnOptional(termInst))
           accumulateAdjointForOptional(bb, incomingValue, bbArgAdjBuf);
         else
-          addToAdjointBuffer(predBB, incomingValue, bbArgAdjBuf, pbLoc);
+          addToAdjointBuffer(bb, incomingValue, bbArgAdjBuf, pbLoc);
       }
       break;
     }
