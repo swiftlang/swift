@@ -697,7 +697,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   builder.setHasOwnership(fn, hasQualifiedOwnership);
 
   // Mark this function as deserialized. This avoids rerunning diagnostic
-  // passes. Certain passes in the madatory pipeline may not work as expected
+  // passes. Certain passes in the mandatory pipeline may not work as expected
   // after arbitrary optimization and lowering.
   if (!MF->isSIB())
     fn->setWasDeserializedCanonical();
