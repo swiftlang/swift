@@ -865,7 +865,7 @@ struct InteriorPointerOperand {
   }
 
   /// Transitively compute the list of leaf uses that this interior pointer
-  /// operand puts on its parent guaranted value.
+  /// operand puts on its parent guaranteed value.
   ///
   /// If \p foundUses is nullptr, this simply returns true if no PointerEscapes
   /// were found.
