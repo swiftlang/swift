@@ -797,14 +797,14 @@ public:
 
 void detectRename(SDKNode *L, SDKNode *R);
 
-int dumpSwiftModules(const CompilerInvocation &InitInvok,
+int dumpSwiftModules(const CompilerInvocation &InitInvoke,
                      const llvm::StringSet<> &ModuleNames,
                      StringRef OutputDir,
                      const std::vector<std::string> PrintApis,
                      CheckerOptions Opts);
 
 SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
-                            const CompilerInvocation &InitInvok,
+                            const CompilerInvocation &InitInvoke,
                             const llvm::StringSet<> &ModuleNames);
 
 SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
@@ -812,7 +812,7 @@ SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
 void dumpSDKRoot(SDKNodeRoot *Root, PayLoad load, StringRef OutputFile);
 void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 
-int dumpSDKContent(const CompilerInvocation &InitInvok,
+int dumpSDKContent(const CompilerInvocation &InitInvoke,
                    const llvm::StringSet<> &ModuleNames,
                    StringRef OutputFile, CheckerOptions Opts);
 

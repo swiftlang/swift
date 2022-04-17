@@ -2397,10 +2397,10 @@ swift::ide::api::getEmptySDKNodeRoot(SDKContext &SDKCtx) {
 
 SDKNodeRoot*
 swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
-                                 const CompilerInvocation &InitInvok,
+                                 const CompilerInvocation &InitInvoke,
                                  const llvm::StringSet<> &ModuleNames) {
   CheckerOptions Opts = SDKCtx.getOpts();
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
 
   CompilerInstance &CI = SDKCtx.newCompilerInstance();
   // Display diagnostics to stderr.
@@ -2467,11 +2467,11 @@ void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile) {
   dumpSDKRoot(Root, PayLoad(), OutputFile);
 }
 
-int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
+int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvoke,
                                     const llvm::StringSet<> &ModuleNames,
                                     StringRef OutputFile, CheckerOptions Opts) {
   SDKContext SDKCtx(Opts);
-  SDKNodeRoot *Root = getSDKNodeRoot(SDKCtx, InitInvok, ModuleNames);
+  SDKNodeRoot *Root = getSDKNodeRoot(SDKCtx, InitInvoke, ModuleNames);
   if (!Root)
     return 1;
   dumpSDKRoot(Root, OutputFile);
