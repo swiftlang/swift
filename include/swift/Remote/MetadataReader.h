@@ -653,7 +653,7 @@ public:
         isBridged);
   }
 
-  /// Given a known-opaque existential, attemp to discover the pointer to its
+  /// Given a known-opaque existential, attempt to discover the pointer to its
   /// metadata address and its value.
   llvm::Optional<RemoteExistential>
   readMetadataAndValueOpaqueExistential(RemoteAddress ExistentialAddress) {
