@@ -30,7 +30,7 @@ func test2() {
 // VOID_1-NEXT: key.description:
 // VOID_1-NEXT: key.typename: "Never",
 // VOID_1-NEXT: key.context: source.codecompletion.context.othermodule,
-// VOID_1-NEXT: key.moduleimportdepth: 1,
+// VOID_1-NEXT: key.moduleimportedepth: 1,
 // VOID_1-NEXT: key.num_bytes_to_erase: 0,
 // VOID_1-NEXT: key.substructure:
 
@@ -39,7 +39,7 @@ func test2() {
 // VOID_1-NEXT: key.description:
 // VOID_1-NEXT: key.typename: "Int32",
 // VOID_1-NEXT: key.context: source.codecompletion.context.othermodule,
-// VOID_1-NEXT: key.moduleimportdepth: 2,
+// VOID_1-NEXT: key.moduleimportedepth: 2,
 // VOID_1-NEXT: key.num_bytes_to_erase: 0,
 // VOID_1-NEXT: key.substructure:
 

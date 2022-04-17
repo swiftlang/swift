@@ -16,7 +16,7 @@ func test() {
 // CHECK-NEXT:   key.typename: "Comparable & SignedNumeric",
 // CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// CHECK-NEXT:   key.moduleimportdepth: 1,
+// CHECK-NEXT:   key.moduleimportedepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
 // CHECK-NOT:    key.modulename
 // CHECK:        key.modulename: "Swift"
@@ -28,7 +28,7 @@ func test() {
 // CHECK-NEXT:   key.description: "fooHelperExplicitFrameworkFunc1(a: Int32)",
 // CHECK-NEXT:   key.typename: "Int32",
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// CHECK-NEXT:   key.moduleimportdepth: 1,
+// CHECK-NEXT:   key.moduleimportedepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
 // CHECK-NOT:    key.modulename
 // CHECK:        key.modulename: "FooHelper.FooHelperExplicit"
@@ -40,7 +40,7 @@ func test() {
 // CHECK-NEXT:   key.description: "importsImportsFoo()",
 // CHECK-NEXT:   key.typename: "Void",
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// CHECK-NEXT:   key.moduleimportdepth: 1,
+// CHECK-NEXT:   key.moduleimportedepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
 // CHECK-NOT:    key.modulename
 // CHECK:        key.modulename: "ImportsImportsFoo"
@@ -52,7 +52,7 @@ func test() {
 // CHECK-NEXT:   key.description: "BarForwardDeclaredClass",
 // CHECK-NEXT:   key.typename: "BarForwardDeclaredClass",
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// CHECK-NEXT:   key.moduleimportdepth: 2,
+// CHECK-NEXT:   key.moduleimportedepth: 2,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
 // CHECK-NOT:    key.modulename
 // CHECK:        key.modulename: "Bar"
@@ -64,7 +64,7 @@ func test() {
 // CHECK-NEXT:   key.description: "importsFoo()",
 // CHECK-NEXT:   key.typename: "Void",
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// CHECK-NEXT:   key.moduleimportdepth: 2,
+// CHECK-NEXT:   key.moduleimportedepth: 2,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
 // CHECK-NOT:    key.modulename
 // CHECK:        key.modulename: "ImportsFoo"
@@ -76,7 +76,7 @@ func test() {
 // CHECK-NEXT:   key.description: "FooClassBase",
 // CHECK-NEXT:   key.typename: "FooClassBase",
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// CHECK-NEXT:   key.moduleimportdepth: 3,
+// CHECK-NEXT:   key.moduleimportedepth: 3,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
 // CHECK-NOT:    key.modulename
 // CHECK:        key.modulename: "Foo"
@@ -87,7 +87,7 @@ func test() {
 // CHECK-NEXT:   key.description: "FooSubEnum1",
 // CHECK-NEXT:   key.typename: "FooSubEnum1",
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// CHECK-NEXT:   key.moduleimportdepth: 3,
+// CHECK-NEXT:   key.moduleimportedepth: 3,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
 // CHECK-NOT:    key.modulename
 // CHECK:        key.modulename: "Foo.FooSub"
@@ -101,7 +101,7 @@ func test() {
 // xCHECK-NEXT:   key.description: "FooHelperUnnamedEnumeratorA2",
 // xCHECK-NEXT:   key.typename: "Int",
 // xCHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// xCHECK-NEXT:   key.moduleimportdepth: 4,
+// xCHECK-NEXT:   key.moduleimportedepth: 4,
 // xCHECK-NEXT:   key.num_bytes_to_erase: 0,
 // xCHECK-NOT:    key.modulename
 // xCHECK:        key.modulename: "FooHelper"

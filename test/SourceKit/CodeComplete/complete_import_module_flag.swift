@@ -12,7 +12,7 @@ func test() {
 // CHECK-LABEL: key.name: "fromAuxFile()
 // CHECK-NOT: context
 // CHECK: key.context: source.codecompletion.context.othermodule
-// CHECK-NEXT: key.moduleimportdepth: 0
+// CHECK-NEXT: key.moduleimportedepth: 0
 
 // CHECK-LABEL: key.name: "fromMainModule()
 // CHECK-NOT: context
@@ -21,7 +21,7 @@ func test() {
 // CHECK-LABEL: key.name: "fromImportedByAuxFile()
 // CHECK-NOT: context
 // CHECK: key.context: source.codecompletion.context.othermodule
-// CHECK-NEXT: key.moduleimportdepth: 1
+// CHECK-NEXT: key.moduleimportedepth: 1
 
 // WITH_HIDING: fromAuxFile()
 // WITH_HIDING: fromMainModule()
