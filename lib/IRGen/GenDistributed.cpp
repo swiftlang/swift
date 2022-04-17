@@ -624,7 +624,7 @@ void DistributedAccessor::emit() {
   // Metadata that represents passed in the invocation decoder.
   auto *decoderType = params.claimNext();
 
-  // If the distributed thunk is declarated in a protocol that conforms
+  // If the distributed thunk is declared in a protocol that conforms
   // to `DistributedActor` protocol, there is an extract parameter that
   // represents a type of protocol witness.
   if (isa<ProtocolDecl>(actor))
