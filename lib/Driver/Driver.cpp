@@ -1816,7 +1816,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_recover_EQ)) {
     // Just validate the args. The frontend will parse these again and actually
-    // use them. To avoid emitting warnings multiple times we surpress warnings
+    // use them. To avoid emitting warnings multiple times we suppress warnings
     // here but not in the frontend.
     (void)parseSanitizerRecoverArgValues(A, OI.SelectedSanitizers, Diags,
                                          /*emitWarnings=*/false);
