@@ -704,7 +704,7 @@ struct GenericSignatureBuilder::Implementation {
   llvm::DenseSet<ExplicitRequirement> ExplicitConformancesImpliedByConcrete;
 
 #ifndef NDEBUG
-  /// Whether we've already computed redundant requiremnts.
+  /// Whether we've already computed redundant requirements.
   bool computedRedundantRequirements = false;
 
   /// Whether we've already finalized the builder.
