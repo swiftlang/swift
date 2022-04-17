@@ -153,7 +153,7 @@ class ValidateIfConfigCondition :
     return UDRE->getName().getBaseIdentifier().str();
   }
 
-  /// True for expressions represeting either top level modules
+  /// True for expressions representing either top level modules
   /// or nested submodules.
   bool isModulePath(Expr *E) {
     auto UDE = dyn_cast<UnresolvedDotExpr>(E);
