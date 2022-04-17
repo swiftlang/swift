@@ -1199,7 +1199,7 @@ public:
 
 // Encapsulate the result of computing an AccessPath. AccessPath does not store
 // the base address of the formal access because it does not always uniquely
-// indentify the access, but AccessPath users may use the base address to to
+// identify the access, but AccessPath users may use the base address to to
 // recover the def-use chain for a specific global_addr or ref_element_addr.
 struct AccessPathWithBase {
   AccessPath accessPath;
