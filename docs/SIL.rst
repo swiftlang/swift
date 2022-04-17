@@ -2168,7 +2168,7 @@ payload from an enum, can consume the entire enum+payload.
 
 To handle cases where we want to use `struct_extract`_ in a consuming way, we
 instead are able to use the `destructure_struct`_ instruction that consumes the
-entire struct at once and gives one back the structs individual constituant
+entire struct at once and gives one back the structs individual constituent
 parts::
 
      struct KlassPair {
