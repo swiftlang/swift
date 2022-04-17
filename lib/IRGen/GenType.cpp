@@ -1985,7 +1985,7 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size, Alignment align) {
   // scalar.
   auto storageType = llvm::ArrayType::get(IGM.Int8Ty, size.getValue());
 
-  // Create chunks of MAX_INT_BITS integer scalar types if neccessary.
+  // Create chunks of MAX_INT_BITS integer scalar types if necessary.
   std::vector<llvm::IntegerType*> scalarTypes;
   Size chunkSize = size;
   auto maxChunkSize = Size(llvm::IntegerType::MAX_INT_BITS/8);
