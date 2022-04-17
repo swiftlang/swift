@@ -382,7 +382,7 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
   ASTContext &Ctx = CI.getASTContext();
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
 
-  // Load implict imports so that Clang importer can use them.
+  // Load implicit imports so that Clang importer can use them.
   for (auto unloadedImport :
        CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
     (void)Ctx.getModule(unloadedImport.module.getModulePath());
