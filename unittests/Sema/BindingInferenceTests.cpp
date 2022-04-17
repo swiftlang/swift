@@ -90,7 +90,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
           ->getDeclaredInterfaceType(),
       cs.getConstraintLocator(intLiteral));
 
-  // Float <covertible> $T_float
+  // Float <convertible> $T_float
   cs.addConstraint(ConstraintKind::Conversion, floatTy, floatLiteralTy,
                    cs.getConstraintLocator(intLiteral));
 
