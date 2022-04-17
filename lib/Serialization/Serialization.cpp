@@ -3150,7 +3150,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                           abbrCode, witnessIDs);
   }
 
-  /// Writes the body text of the provided funciton, if the function is
+  /// Writes the body text of the provided function, if the function is
   /// inlinable and has body text.
   void writeInlinableBodyTextIfNeeded(const AbstractFunctionDecl *AFD) {
     using namespace decls_block;
