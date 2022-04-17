@@ -4408,7 +4408,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 
   // If the class does not require dynamic initialization, or if it only
   // requires dynamic initialization on a newer Objective-C runtime, add it
-  // to the Objctive-C class list.
+  // to the Objective-C class list.
   if (IGM.ObjCInterop) {
     switch (strategy) {
     case ClassMetadataStrategy::Resilient:
