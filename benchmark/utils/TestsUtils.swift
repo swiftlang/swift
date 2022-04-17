@@ -31,7 +31,7 @@ public enum BenchmarkCategory : String {
   case exclusivity, differentiation
 
   // Algorithms are "micro" that test some well-known algorithm in isolation:
-  // sorting, searching, hashing, fibonaci, crypto, etc.
+  // sorting, searching, hashing, fibonacci, crypto, etc.
   case algorithm
 
   // Miniapplications are contrived to mimic some subset of application behavior
