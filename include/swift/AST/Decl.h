@@ -7812,7 +7812,7 @@ public:
     case DeclKind::PostfixOperator:
       return OperatorFixity::Postfix;
     }
-    llvm_unreachable("inavlid decl kind");
+    llvm_unreachable("invalid decl kind");
   }
 
   SourceLoc getOperatorLoc() const { return OperatorLoc; }
