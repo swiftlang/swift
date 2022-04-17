@@ -1704,7 +1704,7 @@ public:
   /// \param inLoc The location of the 'in' keyword, if present.
   ///
   /// \returns ParserStatus error if an error occurred. Success if no signature
-  /// is present or succssfully parsed.
+  /// is present or successfully parsed.
   ParserStatus parseClosureSignatureIfPresent(
           DeclAttributes &attributes,
           SourceRange &bracketRange,
