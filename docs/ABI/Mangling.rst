@@ -305,7 +305,7 @@ witness functions for a type.
   AUTODIFF-FUNCTION-KIND ::= 'd'        // differential
   AUTODIFF-FUNCTION-KIND ::= 'p'        // pullback
 
-``<AUTODIFF-FUNCTION-KIND>`` differentiates the kinds of functions assocaited
+``<AUTODIFF-FUNCTION-KIND>`` differentiates the kinds of functions associated
 with a differentiable function used for differentiable programming.
 
 ::
