@@ -236,7 +236,7 @@ ATTRIBUTE_NODES = [
     # objc-selector-piece -> identifier? ':'?
     Node('ObjCSelectorPiece', kind='Syntax',
          description='''
-         A piece of an Objective-C selector. Either consisiting of just an
+         A piece of an Objective-C selector. Either consisting of just an
          identifier for a nullary selector, an identifier and a colon for a
          labeled argument or just a colon for an unlabeled argument
          ''',
