@@ -62,7 +62,7 @@ func testMemberAsyncRethrows(_ x: HasAsyncMembers) async {
 // CHECK_memberAsyncRethrows: End completions
 }
 
-func testAsyncIntiializers() async {
+func testAsyncInitializers() async {
   HasAsyncMembers(#^CHECK_initializers^#
 // CHECK_initializers: Begin completions
 // CHECK_initializers-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['('][')'][' async'][#HasAsyncMembers#]; name={{$}}
