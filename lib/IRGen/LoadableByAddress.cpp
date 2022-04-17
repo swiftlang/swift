@@ -1205,7 +1205,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
   optimizableLoad->getParent()->erase(optimizableLoad);
 }
 
-static bool isYieldUseRewriteable(StructLoweringState &pass,
+static bool isYieldUseRewritable(StructLoweringState &pass,
                                   YieldInst *inst, Operand *operand) {
   assert(inst == operand->getUser());
   return pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
@@ -1236,7 +1236,7 @@ static bool hasMandatoryRewriteUse(StructLoweringState &pass,
       return true;
     }
     case SILInstructionKind::YieldInst:
-      if (isYieldUseRewriteable(pass, cast<YieldInst>(userIns), user))
+      if (isYieldUseRewritable(pass, cast<YieldInst>(userIns), user))
         return true;
       break;
     default:
@@ -1291,7 +1291,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
       break;
     }
     case SILInstructionKind::YieldInst: {
-      if (isYieldUseRewriteable(pass, cast<YieldInst>(userIns), use))
+      if (isYieldUseRewritable(pass, cast<YieldInst>(userIns), use))
         usesToMod.push_back(use);
       break;
     }
@@ -1840,7 +1840,7 @@ static bool allUsesAreReplaceable(StructLoweringState &pass,
       break;
     }
     case SILInstructionKind::YieldInst:
-      if (!isYieldUseRewriteable(pass, cast<YieldInst>(userIns), user))
+      if (!isYieldUseRewritable(pass, cast<YieldInst>(userIns), user))
         return false;
       break;
     case SILInstructionKind::StructExtractInst:
