@@ -174,8 +174,8 @@ func testCompleteErrorTypeInCatch() {
     do {} catch Error4.#^CATCH2^#
   }
 // CATCH2: Begin completions
-// CATHC2-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: E1[#Error4#]; name=E1
-// CATHC2-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: E2({#Int32#})[#Error4#]; name=E2(Int32)
+// CATCH2-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: E1[#Error4#]; name=E1
+// CATCH2-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: E2({#Int32#})[#Error4#]; name=E2(Int32)
 // CATCH2: End completions
 }
 
