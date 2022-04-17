@@ -55,7 +55,7 @@ public enum BenchmarkCategory : String {
   // counterproductive.
   case unstable
 
-  // CPU benchmarks represent instrinsic Swift performance. They are useful for
+  // CPU benchmarks represent intrinsic Swift performance. They are useful for
   // measuring a fully baked Swift implementation across different platforms and
   // hardware. The benchmark should also be reasonably applicable to real Swift
   // code--it should exercise a known performance critical area. Typically these
