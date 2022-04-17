@@ -140,7 +140,7 @@ class Test_parse_args(unittest.TestCase):
         self.assertTrue(parse_args(["check", "-v"]).verbose)
         self.assertTrue(parse_args(["check", "--verbose"]).verbose)
 
-    def test_check_supports_mardown_output(self):
+    def test_check_supports_markdown_output(self):
         self.assertFalse(parse_args(["check"]).markdown)
         self.assertTrue(parse_args(["check", "-md"]).markdown)
         self.assertTrue(parse_args(["check", "--markdown"]).markdown)
