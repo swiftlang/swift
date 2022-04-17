@@ -6359,7 +6359,7 @@ bool VarDecl::isActorSelf() const {
   while (!dc->isTypeContext() && !dc->isModuleScopeContext())
     dc = dc->getParent();
 
-  // Check if this `self` parameter belogs to an actor declaration or
+  // Check if this `self` parameter belongs to an actor declaration or
   // extension.
   auto nominal = dc->getSelfNominalTypeDecl();
   return nominal && nominal->isActor();
