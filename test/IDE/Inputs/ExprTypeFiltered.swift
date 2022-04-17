@@ -4,9 +4,9 @@ protocol Prot {}
 
 protocol Prot1 {}
 
-class Clas: Prot {
-  var value: Clas { return self }
-  func getValue() -> Clas { return self }
+class Clazz: Prot {
+  var value: Clazz { return self }
+  func getValue() -> Clazz { return self }
 }
 
 struct Stru: Prot, Prot1 {
@@ -22,7 +22,7 @@ func ArrayC(_ a: [C]) {
 	_ = a[0]
 }
 
-func ArrayClass(_ a: [Clas]) {
+func ArrayClass(_ a: [Clazz]) {
 	_ = a[0].value.getValue().value
 }
 
