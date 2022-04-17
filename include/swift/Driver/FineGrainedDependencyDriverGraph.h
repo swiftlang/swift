@@ -368,7 +368,7 @@ private:
   /// Integrate the \p integrand, a node that represents a Decl in the swiftDeps
   /// file being integrated. \p preexistingNodeInPlace holds the node
   /// representing the same Decl that already exists, if there is one. \p
-  /// prexisintExpat holds a node with the same key that already exists, but was
+  /// preexistingExpat holds a node with the same key that already exists, but was
   /// not known to reside in any swiftDeps file. Return a bool indicating if
   /// this node represents a change that must be propagated, and the integrated
   /// ModuleDepGraphNode.
