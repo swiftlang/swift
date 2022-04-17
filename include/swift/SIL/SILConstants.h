@@ -695,7 +695,7 @@ private:
   // known.
   bool hasNonConstantCaptures = true;
 
-  // A substitution map that partially maps the generic paramters of the
+  // A substitution map that partially maps the generic parameters of the
   // applied function to the generic arguments of passed to the call.
   SubstitutionMap substitutionMap;
 

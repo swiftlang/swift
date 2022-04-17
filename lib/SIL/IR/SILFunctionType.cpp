@@ -716,7 +716,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
         std::distance(originalFnTy->getParameters().begin(), &*inoutParamIt);
     auto inoutParam = originalFnTy->getParameters()[paramIndex];
     // The pullback parameter convention depends on whether the original `inout`
-    // paramater is a differentiability parameter.
+    // parameter is a differentiability parameter.
     // - If yes, the pullback parameter convention is `@inout`.
     // - If no, the pullback parameter convention is `@in_guaranteed`.
     auto inoutParamTanType = getAutoDiffTangentTypeForLinearMap(

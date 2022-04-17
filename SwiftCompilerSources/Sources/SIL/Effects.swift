@@ -274,7 +274,7 @@ extension StringParser {
       }
       value = .argument(argIdx + function.numIndirectResultArguments)
     } else {
-      try throwError("paramter name or return expected")
+      try throwError("parameter name or return expected")
     }
 
     let valueType: Type
