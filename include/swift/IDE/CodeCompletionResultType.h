@@ -160,13 +160,13 @@ public:
   class ContextualType {
     /// The types that the result type must be identical/convertible to to
     /// compute the type relation. Needs to be a vector because for the
-    /// conextual type `some MyProto & MyOtherProto`, the return type must be
+    /// contextual type `some MyProto & MyOtherProto`, the return type must be
     /// convertible to both \c MyProto and \c MyOtherProto to be considered
     /// convertible.
     llvm::SmallVector<const USRBasedType *, 1> Types;
 
   public:
-    /// Compute the type relation of \p ResultType to this conextual type.
+    /// Compute the type relation of \p ResultType to this contextual type.
     CodeCompletionResultTypeRelation
     typeRelation(const USRBasedType *ResultType,
                  const USRBasedType *VoidType) const;
