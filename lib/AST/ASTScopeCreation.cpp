@@ -849,7 +849,7 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
 
   return {
       insertionPoint,
-      "For top-level code decls, need the scope under, say a guard statment."};
+      "For top-level code decls, need the scope under, say a guard statement."};
 }
 
 AnnotatedInsertionPoint

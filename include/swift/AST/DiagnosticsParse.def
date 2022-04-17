@@ -1062,7 +1062,7 @@ ERROR(expected_expr_throw,PointsToFirstBadToken,
 ERROR(expected_await_not_async,none,
       "found 'async' in expression; did you mean 'await'?", ())
 
-// Yield Statment
+// Yield Statement
 ERROR(expected_expr_yield,PointsToFirstBadToken,
       "expected expression in 'yield' statement", ())
 ERROR(unexpected_label_yield,none,
