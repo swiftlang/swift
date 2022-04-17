@@ -120,8 +120,8 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
     // '100000' is used as a version number in API that will be deprecated in an
     // upcoming release. This number is to match the 'API_TO_BE_DEPRECATED'
     // macro defined in Darwin platforms.
-    static llvm::VersionTuple DISTANT_FUTURE_VESION(100000);
-    bool isDistantFuture = DeprecatedVersion >= DISTANT_FUTURE_VESION;
+    static llvm::VersionTuple DISTANT_FUTURE_VERSION(100000);
+    bool isDistantFuture = DeprecatedVersion >= DISTANT_FUTURE_VERSION;
 
     if (Attr->Message.empty() && Attr->Rename.empty()) {
       getDiagnostics(severity, Out, diag::ide_availability_softdeprecated,
