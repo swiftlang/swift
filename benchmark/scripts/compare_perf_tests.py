@@ -205,7 +205,7 @@ class PerformanceTestSamples(object):
 
     @property
     def cv(self):
-        """Coeficient of Variation (%)."""
+        """Coefficient of Variation (%)."""
         return (self.sd / self.mean) if self.mean else 0
 
     @property
