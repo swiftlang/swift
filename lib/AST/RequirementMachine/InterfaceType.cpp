@@ -373,7 +373,7 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
     if (assocType == nullptr) {
       llvm::errs() << "Cannot build interface type for term "
                    << MutableTerm(begin, end) << "\n";
-      llvm::errs() << "Prefix term does not not have a nested type named "
+      llvm::errs() << "Prefix term does not have a nested type named "
                    << symbol.getName() << ": "
                    << prefix << "\n";
       llvm::errs() << "Property map entry: ";
