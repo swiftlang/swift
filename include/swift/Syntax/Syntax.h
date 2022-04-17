@@ -98,7 +98,7 @@ class OwnedSyntaxRef {
   SyntaxRefType Ref;
 
 public:
-  /// Create an *uninintialized* \c OwnedSyntaxRef. Its storage needs to be
+  /// Create an *unininitialized* \c OwnedSyntaxRef. Its storage needs to be
   /// initialised by writing a \c SyntaxDataRef to the pointer returned by
   /// \c getDataPtr()
   /// Implementation Note: We need to initialise \c Ref without validation,
