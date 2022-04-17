@@ -22,7 +22,7 @@ class `PerformanceTestSamples` is collection of `Sample`s and their statistics.
 class `PerformanceTestResult` is a summary of performance test execution.
 class `LogParser` converts log files into `PerformanceTestResult`s.
 class `ResultComparison` compares new and old `PerformanceTestResult`s.
-class `TestComparator` analyzes changes betweeen the old and new test results.
+class `TestComparator` analyzes changes between the old and new test results.
 class `ReportFormatter` creates the test comparison report in specified format.
 
 """
@@ -514,7 +514,7 @@ class LogParser(object):
 
 
 class TestComparator(object):
-    """Analyzes changes betweeen the old and new test results.
+    """Analyzes changes between the old and new test results.
 
     It determines which tests were `added`, `removed` and which can be
     compared. It then splits the `ResultComparison`s into 3 groups according to
