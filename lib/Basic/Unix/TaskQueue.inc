@@ -373,8 +373,8 @@ public:
 
 /// Concurrently execute the tasks in the TaskQueue, collecting the outputs from
 /// each task.
-/// Maintain invarients connecting tasks to execute, tasks currently executing,
-/// and fds being polled. These invarients include:
+/// Maintain invariants connecting tasks to execute, tasks currently executing,
+/// and fds being polled. These invariants include:
 /// A task is not in both TasksToBeExecuted and TasksBeingExecuted,
 /// A task is executing iff it is in TasksBeingExecuted,
 /// A task is executing iff any of its fds being polled are in FdsBeingPolled
