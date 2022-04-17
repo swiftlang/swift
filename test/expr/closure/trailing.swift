@@ -133,7 +133,7 @@ let someInt = 0
 let intArray = [someInt]
 limitXY(someInt, toGamut: intArray) {}  // expected-error{{extra trailing closure passed in call}}
 
-// <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics
+// <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lousy diagnostics
 func retBool(x: () -> Int) -> Bool {}
 func maybeInt(_: () -> Int) -> Int? {}
 func twoClosureArgs(_:()->Void, _:()->Void) -> Bool {}
