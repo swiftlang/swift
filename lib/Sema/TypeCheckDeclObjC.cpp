@@ -2313,7 +2313,7 @@ lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
                              OrderDeclarations());
   }
 
-  // If we've reached the bottom of the inheritance heirarchy, we're done.
+  // If we've reached the bottom of the inheritance hierarchy, we're done.
   if (!classDecl->hasSuperclass())
     return nullptr;
 
