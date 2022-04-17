@@ -1093,7 +1093,7 @@ static bool printSwiftFeature(CompilerInstance &instance) {
   out << "    \"LastOption\"\n";
   out << "  ],\n";
   out << "  \"SupportedFeatures\": [\n";
-  // Print supported featur names here.
+  // Print supported feature names here.
   out << "    \"LastFeature\"\n";
   out << "  ]\n";
   return false;
