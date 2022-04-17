@@ -39,7 +39,7 @@ namespace {
 class OperandOwnershipClassifier
   : public SILInstructionVisitor<OperandOwnershipClassifier, OperandOwnership> {
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
-  // Allow module conventions to be overriden while lowering between canonical
+  // Allow module conventions to be overridden while lowering between canonical
   // and lowered SIL stages.
   SILModuleConventions silConv;
 
