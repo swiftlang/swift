@@ -802,7 +802,7 @@ extension ThrowingTaskGroup: AsyncSequence {
   /// it's valid to make a new iterator for the task group,
   /// which you can use to iterate over the results of new tasks you add to the group.
   /// You can also make a new iterator to resume iteration
-  /// after a child task thows an error.
+  /// after a child task throws an error.
   /// For example:
   ///
   ///     group.addTask { 1 }
