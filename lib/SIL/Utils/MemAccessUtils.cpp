@@ -80,7 +80,7 @@ public:
       }
     }
     // If the result is now invalid, reset it and process the current phi as an
-    // unrecgonized access instead.
+    // unrecognized access instead.
     if (!useDefVisitor.isResultValid()) {
       useDefVisitor.restoreResult(savedResult);
       visitNonAccess(phiArg);
