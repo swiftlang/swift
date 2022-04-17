@@ -12,14 +12,14 @@ func testInsideFunctionCall_1(_ x: inout FooStruct) {
   x.instanceFunc(#^BEFORE_COMMA^#,
 // BEFORE_COMMA: Begin completions
 // BEFORE_COMMA-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
-// BOFORE_COMMA-NOT: Decl[InstanceMethod]/{{.*}}:{{.*}}({{.*}}{#Int#}
+// BEFORE_COMMA-NOT: Decl[InstanceMethod]/{{.*}}:{{.*}}({{.*}}{#Int#}
 // BEFORE_COMMA: End completions
 }
 func testInsideFunctionCall_2(_ x: inout FooStruct) {
   x.instanceFunc(#^BEFORE_PLACEHOLDER^#<#placeholder#>
 // BEFORE_PLACEHOLDER: Begin completions
 // BEFORE_PLACEHOLDER-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
-// BOFORE_PLACEHOLDER-NOT: Decl[InstanceMethod]/{{.*}}:{{.*}}({{.*}}{#Int#}
+// BEFORE_PLACEHOLDER-NOT: Decl[InstanceMethod]/{{.*}}:{{.*}}({{.*}}{#Int#}
 // BEFORE_PLACEHOLDER: End completions
 }
 func testConstructor() {
