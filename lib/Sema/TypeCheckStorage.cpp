@@ -3234,7 +3234,7 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
 ///   - Stored, if the decl is a 'var'.
 ///   - StoredWithObservers, if the decl has a setter
 ///     - This indicates that the original decl had a 'didSet' and/or 'willSet'
-///   - InheritedWithObservers, if the decl has a setter and is an overridde.
+///   - InheritedWithObservers, if the decl has a setter and is an override.
 ///   - Immutable, if the decl is a 'let' or it does not have a setter.
 /// ReadWrite:
 ///   - Stored, if the decl has no accessors listed.
