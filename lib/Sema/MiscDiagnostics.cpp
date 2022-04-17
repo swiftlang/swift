@@ -532,7 +532,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // `*SpelledAsFile` cases and various other File-related cases.
       //
       // The way we're going to do this is a bit magical. We will arrange the
-      // cases in MagicIdentifierLiteralExpr::Kind so that that they sort in
+      // cases in MagicIdentifierLiteralExpr::Kind so that they sort in
       // this order:
       //
       //     #fileID < Swift 6 #file < #filePath < Swift 5 #file < others

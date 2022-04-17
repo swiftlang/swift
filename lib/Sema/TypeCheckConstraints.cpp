@@ -484,7 +484,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // First, let's check whether:
   //  - Parameter type is a generic parameter; and
   //  - It's only used in the current position in the parameter list
-  //    or result. This check makes sure that that generic argument
+  //    or result. This check makes sure that generic argument
   //    could only come from an explicit argument or this expression.
   //
   // If both of aforementioned conditions are true, let's attempt

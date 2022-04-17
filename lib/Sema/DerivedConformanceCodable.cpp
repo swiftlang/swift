@@ -1416,7 +1416,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
         //     explicit that the key will not be decoded.
         // (b) If the type is Decodable only and the key does not exist in
         //     the enum, do nothing. This is because the user has explicitly
-        //     made it clear that that they don't want the key to be decoded.
+        //     made it clear that they don't want the key to be decoded.
         // (c) If the type is Codable, do nothing. This is because removing
         //     the key will break encoding which is most likely not what the
         //     user expects.
