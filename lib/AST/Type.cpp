@@ -3659,7 +3659,7 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
 
     return typeDecl->getEffectiveAccess() > AccessLevel::Internal;
   }
-  llvm_unreachable("invalid subsitution kind");
+  llvm_unreachable("invalid substitution kind");
 }
 
 ReplaceOpaqueTypesWithUnderlyingTypes::ReplaceOpaqueTypesWithUnderlyingTypes(
@@ -3685,7 +3685,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
   auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
-  // don't have a underlying subsitution.
+  // don't have a underlying substitution.
   if (!subs.hasValue())
     return maybeOpaqueType;
 
@@ -3796,7 +3796,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
   auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
-  // don't have a underlying subsitution.
+  // don't have a underlying substitution.
   if (!subs.hasValue())
     return abstractRef;
 
