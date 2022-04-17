@@ -390,7 +390,7 @@ void ConstraintGraphNode::retractFromInference(
   notifyReferencingVars();
 
   // TODO: This might be an overkill but it's (currently)
-  // the simpliest way to reliably ensure that all of the
+  // the simplest way to reliably ensure that all of the
   // no longer related constraints have been retracted.
   for (auto *referencedVar : referencedVars) {
     auto &node = CG[referencedVar];
