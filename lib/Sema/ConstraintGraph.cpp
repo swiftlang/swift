@@ -288,7 +288,7 @@ void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
     // Re-infer bindings for the current representative.
     resetBindingSet();
 
-    // Re-infer bindings all all of the newly made representatives.
+    // Re-infer bindings all of the newly made representatives.
     for (auto *typeVar : disconnectedVars)
       CG[typeVar].notifyReferencingVars();
   }
