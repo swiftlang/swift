@@ -567,28 +567,28 @@ func testPassSameResultTwice(completion: @escaping (Int?, Int?, Error?) -> Void)
 // PASS-SAME-RESULT-TWICE-NEXT: }
 
 
-// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL %s
 func testUseResultAfterAmbiguousCompletionHandlerCall(completion: @escaping (Int?, Error?) -> Void) {
   withoutAsyncAlternativeThrowing { (theResult, error) in
     completion(theResult, error)
     print(theResult as Any)
   }
 }
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL:      func testUseResultAfterAmbiguousCompletionHandlerCall() async throws -> Int {
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:   return try await withCheckedThrowingContinuation { continuation in 
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:     withoutAsyncAlternativeThrowing { (theResult, error) in
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:       if let error = error {
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:         continuation.resume(throwing: error)
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:       } else {
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:         guard let theResult1 = theResult else {
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:           fatalError("Expected non-nil result 'theResult1' in the non-error case")
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:         }
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:         continuation.resume(returning: theResult1)
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:       }
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:       print(theResult as Any)
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:     }
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT:   }
-// USE-RESULT-AFTER-AMBIGUOUS-HANLDER-CALL-NEXT: }
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL:      func testUseResultAfterAmbiguousCompletionHandlerCall() async throws -> Int {
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:   return try await withCheckedThrowingContinuation { continuation in 
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:     withoutAsyncAlternativeThrowing { (theResult, error) in
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:       if let error = error {
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:         continuation.resume(throwing: error)
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:       } else {
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:         guard let theResult1 = theResult else {
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:           fatalError("Expected non-nil result 'theResult1' in the non-error case")
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:         }
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:         continuation.resume(returning: theResult1)
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:       }
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:       print(theResult as Any)
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:     }
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT:   }
+// USE-RESULT-AFTER-AMBIGUOUS-HANDLER-CALL-NEXT: }
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=TWO-COMPLEITON-HANDLER-CALLS %s
 func testTwoCompletionHandlerCalls(completion: @escaping (Int?, Error?) -> Void) {
