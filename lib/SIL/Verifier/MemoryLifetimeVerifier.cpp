@@ -629,7 +629,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         // We don't want to check `debug_value` instructions that
         // are used to mark variable declarations (e.g. its SSA value is
         // an alloc_stack), which don't have any `op_deref` in its
-        // di-expression, because that memory does't need to be initialized
+        // di-expression, because that memory doesn't need to be initialized
         // when `debug_value` is referencing it.
         if (cast<DebugValueInst>(&I)->hasAddrVal() &&
             cast<DebugValueInst>(&I)->exprStartsWithDeref())
