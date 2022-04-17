@@ -90,7 +90,7 @@ enum class PrintStructureKind {
   DefaultArgumentClause,
   /// '<T, U: Requirement>'.
   DeclGenericParameterClause,
-  /// 'where T: Collection, T.Element: Equtable'.
+  /// 'where T: Collection, T.Element: Equitable'.
   DeclGenericRequirementClause,
   /// ' async throws'.
   EffectsSpecifiers,
