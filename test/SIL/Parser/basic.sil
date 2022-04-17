@@ -1232,7 +1232,7 @@ bb0:
 
 // CHECK-LABEL: sil @test_alloc_stack_flags
 sil @test_alloc_stack_flags : $() -> () {
-  // CHECK: alloc_stack $Builtin.NativeObjec
+  // CHECK: alloc_stack $Builtin.NativeObject
   %instance = alloc_stack $Builtin.NativeObject
   dealloc_stack %instance : $*Builtin.NativeObject
   // CHECK: alloc_stack [dynamic_lifetime]
