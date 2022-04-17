@@ -3367,7 +3367,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       // To accommodate that, let's increase the impact of this fix.
       impact += 2;
     } else {
-      // Increase the solution's score for each mismtach this fixes.
+      // Increase the solution's score for each mismatch this fixes.
       impact += mismatches.size() - 1;
     }
 
