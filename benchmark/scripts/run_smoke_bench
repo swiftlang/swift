@@ -15,7 +15,7 @@
 #
 # Performs a very fast check which benchmarks regressed and improved.
 #
-# Initially runs the benchmars with a low sample count and just re-runs those
+# Initially runs the benchmarks with a low sample count and just re-runs those
 # benchmarks which differ.
 # Also reports code size differences.
 #
