@@ -1625,7 +1625,7 @@ is ergonomics.
 
 While Swift structs are a bad match for non-movable C++ classes, Swift classes
 match semantics better. For example, instances of Swift classes, once allocated,
-stay at the same address until `deinit`. Instances of Swift clasess are always
+stay at the same address until `deinit`. Instances of Swift classes are always
 worked with indirectly, eliminating the need to move them around in memory.
 
 Although user-defined Swift classes have a certain memory layout determined by
