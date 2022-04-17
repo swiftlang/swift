@@ -33,7 +33,7 @@
 //
 // Note that the two access modes can also be mixed. When a syntax tree is
 // accessed by Syntax (memory-safe) nodes, they can be demoted to SyntaxRef
-// nodes to perform perfomance-critical tasks.
+// nodes to perform performance-critical tasks.
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SYNTAX_SYNTAX_H
