@@ -477,7 +477,7 @@ public:
         savedConsumer(receiver, this) {}
       void receive(const Token &tok) override { delayedTokens.push_back(tok); }
       Optional<std::vector<Token>> finalize() override {
-        llvm_unreachable("Cannot finalize a DelayedTokenReciever");
+        llvm_unreachable("Cannot finalize a DelayedTokenReceiver");
       }
       ~DelayedTokenReceiver() {
         if (!shouldTransfer)
