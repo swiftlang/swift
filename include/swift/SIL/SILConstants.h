@@ -53,7 +53,7 @@ public:
 
   /// Allocate storage for a given number of elements of a specific type
   /// provided as a template parameter. Precondition: \c T must have an
-  /// accesible zero argument constructor.
+  /// accessible zero argument constructor.
   /// \param numElts number of elements of the type to allocate.
   template <typename T> T *allocate(unsigned numElts) {
     T *res = (T *)allocate(sizeof(T) * numElts, alignof(T));
