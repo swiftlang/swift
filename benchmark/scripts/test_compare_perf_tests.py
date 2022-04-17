@@ -257,7 +257,7 @@ class TestPerformanceTestResult(unittest.TestCase):
     def test_init_oversampled_quantiles(self):
         """When num_samples is < quantile + 1, some of the measurements are
         repeated in the report summary. Samples should contain only true
-        values, discarding the repetated artifacts from quantile estimation.
+        values, discarding the repeated artifacts from quantile estimation.
 
         The test string is slightly massaged output of the following R script:
         subsample <- function(x, q) {
