@@ -2510,7 +2510,7 @@ bool ASTContext::hasDelayedConformanceErrors(
     if (entry != getImpl().DelayedConformanceDiags.end())
       return hasDelayedErrors(entry->second);
 
-    return false; // unknown conformance, so no delayed delayed diags either.
+    return false; // unknown conformance, so no delayed diags either.
   }
   
   // check all conformances for any delayed errors
