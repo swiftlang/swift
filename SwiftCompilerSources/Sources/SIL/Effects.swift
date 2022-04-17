@@ -262,7 +262,7 @@ extension StringParser {
       }
       if function.numIndirectResultArguments > 0 {
         if function.numIndirectResultArguments != 1 {
-          try throwError("mutli-value returns not supported yet")
+          try throwError("multi-value returns not supported yet")
         }
         value = .argument(0)
       } else {
