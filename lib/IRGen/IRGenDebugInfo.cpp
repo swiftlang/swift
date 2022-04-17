@@ -208,7 +208,7 @@ public:
   llvm::DISubprogram *emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
                                    SILFunctionTypeRepresentation Rep,
                                    SILType Ty, DeclContext *DeclCtx = nullptr,
-                                   StringRef oulinedFromName = StringRef());
+                                   StringRef outlinedFromName = StringRef());
   llvm::DISubprogram *emitFunction(SILFunction &SILFn, llvm::Function *Fn);
   void emitArtificialFunction(IRBuilder &Builder, llvm::Function *Fn,
                               SILType SILTy);
