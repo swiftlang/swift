@@ -142,7 +142,7 @@ public:
 };
 
 // Describing some attributes with ABI/API impact. The addition or removal of these
-// attributes is considerred breakage.
+// attributes is considered breakage.
 struct BreakingAttributeInfo {
   const DeclAttrKind Kind;
   const StringRef Content;
