@@ -2538,7 +2538,7 @@ public:
 
     auto layout = getAsyncContextLayout();
 
-    // Innitialize the async context for returning if we're not using
+    // Initialize the async context for returning if we're not using
     // the special convention which suppresses that.
     if (!getCallee().shouldPassContinuationDirectly()) {
       // Set the caller context to the current context.
