@@ -56,7 +56,7 @@ struct ConcreteMyProtocol : MyProtocol {
 // BEGINNING_WITHOUT_SOME-NOT: Keyword/None: some
 // BEGINNING_WITHOUT_SOME: End completions
 
-func gloabalFunc() -> #^GLOBAL_FUNC^#
+func globalFunc() -> #^GLOBAL_FUNC^#
 var globalVar: #^GLOBAL_VAR^#
 
 protocol SomeProto {
