@@ -1,4 +1,4 @@
-//===--- Dependencies.h -- Unified header for dependnecy tracing utilies --===//
+//===--- Dependencies.h -- Unified header for dependency tracing utilies --===//
 //
 // This source file is part of the Swift.org open source project
 //
