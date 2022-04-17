@@ -2963,7 +2963,7 @@ This brief sketch obviously leaves many questions unanswered on the detailed
 semantics that a `throws!` feature would have, for example whether user-written
 Swift code should be allowed to use `throws!` -- see also [this forum
 discussion](https://forums.swift.org/t/handling-c-exceptions/34823). Before we
-take any steps towards implementing C++ exception proagation, we will submit a
+take any steps towards implementing C++ exception propagation, we will submit a
 formal Swift Evolution proposal for the `throws!` feature.
 
 The other question to answer is how we would map the C++ exception to a
