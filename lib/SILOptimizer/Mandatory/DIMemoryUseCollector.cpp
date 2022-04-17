@@ -255,7 +255,7 @@ SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
 /// resigning the identity requires a call into the \p actorSystem.
 /// Since deinitialization consistently happens in-order, according to the
 /// listing returned by \p NominalTypeDecl::getStoredProperties
-/// it is important the the VarDecl for the \p id is synthesized before
+/// it is important the VarDecl for the \p id is synthesized before
 /// the \p actorSystem so that we get the right ordering in DI and deinits.
 ///
 /// \param nomDecl a distributed actor decl

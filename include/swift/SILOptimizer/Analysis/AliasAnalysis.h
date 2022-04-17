@@ -98,7 +98,7 @@ private:
 
   /// Set of instructions inside immutable-scopes.
   ///
-  /// Contains pairs of intructions: the first instruction is the begin-scope
+  /// Contains pairs of instructions: the first instruction is the begin-scope
   /// instruction (e.g. begin_access), the second instruction is an
   /// instruction inside the scope (only may-write instructions are considered).
   llvm::DenseSet<ScopeCacheKey> instsInImmutableScopes;

@@ -19,7 +19,7 @@
 /// The "extended lifetime" of the references defined by 'def' transitively
 /// includes the uses of 'def' itself along with the uses of any copies of
 /// 'def'. Canonicalization provably minimizes the OSSA lifetime and its copies
-/// by rewriting all copies and destroys. Only consusming uses that are not on
+/// by rewriting all copies and destroys. Only consuming uses that are not on
 /// the liveness boundary require a copy.
 ///
 /// Example #1: The last consuming use ends the reference lifetime.
@@ -281,7 +281,7 @@ private:
 
   /// Record all interesting debug_value instructions here rather then treating
   /// them like a normal use. An interesting debug_value is one that may lie
-  /// outisde the pruned liveness at the time it is discovered.
+  /// outside the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
   /// Visited set for general def-use traversal that prevents revisiting values.

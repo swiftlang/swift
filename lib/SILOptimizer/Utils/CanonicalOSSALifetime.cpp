@@ -311,7 +311,7 @@ endsAccessOverlappingPrunedBoundary(SILInstruction *inst) {
 //
 // Note that lifetime extension is iterative because adding a new liveness use
 // may create new overlapping access scopes. This can happen because there is no
-// guarantee of strict stack discpline across unrelated access. For example:
+// guarantee of strict stack discipline across unrelated access. For example:
 //
 //     %def
 //     begin_access A
@@ -575,7 +575,7 @@ void CanonicalizeOSSALifetime::findOrInsertDestroys() {
     switch (liveness.getBlockLiveness(bb)) {
     case PrunedLiveBlocks::LiveOut:
       // A lifetimeEndBlock may be determined to be LiveOut after analyzing the
-      // liveness. It is irrelevent for finding the boundary.
+      // liveness. It is irrelevant for finding the boundary.
       break;
     case PrunedLiveBlocks::LiveWithin: {
       // The liveness boundary is inside this block. Insert a final destroy

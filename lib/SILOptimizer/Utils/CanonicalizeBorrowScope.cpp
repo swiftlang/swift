@@ -97,7 +97,7 @@ bool CanonicalizeBorrowScope::isRewritableOSSAForward(SILInstruction *inst) {
     auto operOwnership = forwardedOper->getOperandOwnership();
     if (operOwnership == OperandOwnership::TrivialUse)
       return false;
-    // Don't mess with unowned conversions. They need to be copied immeidately.
+    // Don't mess with unowned conversions. They need to be copied immediately.
     if (operOwnership != OperandOwnership::ForwardingBorrow
         && operOwnership != OperandOwnership::ForwardingConsume) {
       return false;
@@ -542,7 +542,7 @@ public:
     }
     // If this use begins a borrow scope, check if any of the scope ending
     // instructions are outside the current scope (this can happen if any copy
-    // has occured on the def-use chain within the current scope).
+    // has occurred on the def-use chain within the current scope).
     if (auto borrowingOper = BorrowingOperand(use)) {
       if (!borrowingOper.visitExtendedScopeEndingUses(
             [&](Operand *endBorrow) {

@@ -29,7 +29,7 @@ func testSimpleInterpolation() {
   // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 12
   // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 8
 
-  // Check whether the header bytes: premable and argument count are constants.
+  // Check whether the header bytes: preamble and argument count are constants.
 
   // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s15OSLogTestHelper9serialize_2atys5UInt8V_SpyAEGztF
   // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
@@ -76,7 +76,7 @@ func testInterpolationWithFormatOptions() {
   // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 12
   // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 8
 
-  // Check whether the header bytes: premable and argument count are constants.
+  // Check whether the header bytes: preamble and argument count are constants.
 
   // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s15OSLogTestHelper9serialize_2atys5UInt8V_SpyAEGztF
   // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
@@ -124,7 +124,7 @@ func testInterpolationWithFormatOptionsAndPrivacy() {
   // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 12
   // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 8
 
-  // Check whether the header bytes: premable and argument count are constants.
+  // Check whether the header bytes: preamble and argument count are constants.
 
   // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s15OSLogTestHelper9serialize_2atys5UInt8V_SpyAEGztF
   // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
@@ -178,7 +178,7 @@ func testInterpolationWithMultipleArguments() {
   // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 32
   // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 20
 
-  // Check whether the header bytes: premable and argument count are constants.
+  // Check whether the header bytes: preamble and argument count are constants.
 
   // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s15OSLogTestHelper9serialize_2atys5UInt8V_SpyAEGztF
   // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
@@ -230,7 +230,7 @@ func testLogMessageWithoutData() {
   // CHECK-DAG: [[BUFFERSIZE]] = struct $Int ([[BUFFERSIZELIT:%[0-9]+]]
   // CHECK-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int{{[0-9]+}}, 2
 
-  // Check whether the header bytes: premable and argument count are constants.
+  // Check whether the header bytes: preamble and argument count are constants.
 
   // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s15OSLogTestHelper9serialize_2atys5UInt8V_SpyAEGztF
   // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
@@ -303,7 +303,7 @@ func testMessageWithTooManyArguments() {
   // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 482
   // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 290
 
-  // Check whether the header bytes: premable and argument count are constants.
+  // Check whether the header bytes: preamble and argument count are constants.
 
   // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s15OSLogTestHelper9serialize_2atys5UInt8V_SpyAEGztF
   // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
@@ -348,7 +348,7 @@ func testInt32Interpolation() {
   // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 8
   // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 8
 
-  // Check whether the header bytes: premable and argument count are constants.
+  // Check whether the header bytes: preamble and argument count are constants.
 
   // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s15OSLogTestHelper9serialize_2atys5UInt8V_SpyAEGztF
   // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
@@ -387,7 +387,7 @@ func testDynamicStringArguments() {
   // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 22
   // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 14
 
-  // Check whether the header bytes: premable and argument count are constants.
+  // Check whether the header bytes: preamble and argument count are constants.
 
   // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s15OSLogTestHelper9serialize_2atys5UInt8V_SpyAEGztF
   // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
@@ -440,7 +440,7 @@ func testNSObjectInterpolation() {
     // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 22
     // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 14
 
-    // Check whether the header bytes: premable and argument count are constants.
+    // Check whether the header bytes: preamble and argument count are constants.
 
     // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s15OSLogTestHelper9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
@@ -488,7 +488,7 @@ func testDoubleInterpolation() {
     // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 12
     // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 12
 
-    // Check whether the header bytes: premable and argument count are constants.
+    // Check whether the header bytes: preamble and argument count are constants.
 
     // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s15OSLogTestHelper9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})

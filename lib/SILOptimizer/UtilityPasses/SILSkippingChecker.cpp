@@ -83,7 +83,7 @@ namespace {
 /// This is a verification utility pass that's meant to be used with
 /// \c -experimental-skip-non-inlinable-function-bodies or
 /// \c -experimental-skip-all-function-bodies. It checks that SIL is only
-/// generated for for what's actually serialized.all functions
+/// generated for what's actually serialized.all functions
 /// that aren't serialized also have no generated SIL.
 class SILSkippingChecker : public SILModuleTransform {
   void run() override {

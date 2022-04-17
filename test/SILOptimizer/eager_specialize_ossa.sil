@@ -1002,7 +1002,7 @@ bb0(%0 : $*T, %1 : $@thick ClassUsingThrowingP.Type):
   return %10 : $ClassUsingThrowingP
 } // end sil function '$s34eager_specialize_throwing_function19ClassUsingThrowingPC1fyACXDxKAA0G1PRzlFZ'
 
-// g is a function that may throw according to its type and has a try_apply inisde
+// g is a function that may throw according to its type and has a try_apply inside
 // its body.
 // Check that this function is properly specialized by the eager specializer.
 // It should dispatch to its specialized version and use try_apply to invoke

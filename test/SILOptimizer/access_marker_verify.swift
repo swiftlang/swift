@@ -1071,7 +1071,7 @@ public final class HasStaticProp {
   public static let empty: HasStaticProp = HasStaticProp()
 }
 
-// A global addressor produces an unenforced RawPointer. This looke
+// A global addressor produces an unenforced RawPointer. This looks
 // like an Unidentified access with no access marker. Ensure that
 // verification doesn't assert.
 public func getStaticProp() -> HasStaticProp {

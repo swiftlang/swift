@@ -51,7 +51,7 @@ func testFloatConvertUnderflow() {
   let d4: Double = 5E-324
   _blackHole(d4)
 
-  // All warnings are disabled during explict conversions.
+  // All warnings are disabled during explicit conversions.
   _blackHole(Float(1E-400))
   _blackHole(Double(1E-309))
   _blackHole(Double(5E-324))
@@ -65,7 +65,7 @@ func testHexFloatImprecision() {
   let d4: Double = 0x1.00000000000001p-1000
   _blackHole(d4)
 
-  // All warnings are disabled during explict conversions.
+  // All warnings are disabled during explicit conversions.
   _blackHole(Float(0x1.00000000000001p-127))
   _blackHole(Float(0x1.0000000000001p-1023))
   _blackHole(Double(0x1.0000000000001p-1023))

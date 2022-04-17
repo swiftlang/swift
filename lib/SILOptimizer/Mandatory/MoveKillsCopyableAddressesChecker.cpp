@@ -932,7 +932,7 @@ bool GatherClosureUseVisitor::visitUse(Operand *op, AccessUseType useTy) {
   if (isa<DebugValueInst>(op->getUser()))
     return true;
 
-  // Ignore end_access. For our purposes, they are irrelevent and we do not want
+  // Ignore end_access. For our purposes, they are irrelevant and we do not want
   // to treat them like liveness uses.
   if (isa<EndAccessInst>(op->getUser()))
     return true;
