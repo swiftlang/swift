@@ -107,7 +107,7 @@ class AbstractTypeWitness {
   Type TheType;
 
   /// The defaulted associated type that was used to infer this type witness.
-  /// Need not necessarilly match \c AssocType, but their names must.
+  /// Need not necessarily match \c AssocType, but their names must.
   AssociatedTypeDecl *DefaultedAssocType;
 
 public:
