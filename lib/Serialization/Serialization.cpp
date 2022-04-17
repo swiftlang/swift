@@ -723,7 +723,7 @@ std::pair<StringRef, IdentifierID> Serializer::addUniquedString(StringRef str) {
 }
 
 IdentifierID Serializer::addFilename(StringRef filename) {
-  assert(!filename.empty() && "Attemping to add an empty filename");
+  assert(!filename.empty() && "Attempting to add an empty filename");
 
   return addUniquedString(filename).second;
 }
