@@ -1,4 +1,4 @@
-//===--- ExtendedExiential.cpp - Extended existential metadata unit tests -===//
+//===--- ExtendedExistential.cpp - Extended existential metadata unit tests -===//
 //
 // This source file is part of the Swift.org open source project
 //
