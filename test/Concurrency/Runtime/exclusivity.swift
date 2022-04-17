@@ -104,7 +104,7 @@ struct Runner {
         }
 
         // Then do a simple test with a single access to make sure that we do
-        // not hit any sccesses b/c we introduced the Task.
+        // not hit any successes b/c we introduced the Task.
         exclusivityTests.test("testDifferentTasksHaveDifferentExclusivityAccessSets") { @MainActor in
             let callee2 = { @MainActor (_ x: inout Int) -> Void in
                 debugLog("==> Enter callee2")
