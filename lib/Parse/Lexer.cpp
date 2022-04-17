@@ -1359,7 +1359,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   case '"':
   case '\'':
     if (CurPtr[-1] == StopQuote) {
-      // Mutliline and custom escaping are only enabled for " quote.
+      // Multiline and custom escaping are only enabled for " quote.
       if (LLVM_UNLIKELY(StopQuote != '"'))
         return ~0U;
       if (!IsMultilineString && !CustomDelimiterLen)
