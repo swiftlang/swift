@@ -143,7 +143,7 @@ public:
                                             size_t childIndex) const = 0;
 
   /// To verify \c ParsedRawSyntaxNode element ranges, the range of child nodes
-  /// returend by \c getDeferredChild needs to be determined. That's what this
+  /// returned by \c getDeferredChild needs to be determined. That's what this
   /// method does.
   /// It assumes that \p node is a deferred layout node starting at \p startLoc
   /// and returns the range of the child node at \p childIndex.
