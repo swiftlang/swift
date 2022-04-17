@@ -10,7 +10,7 @@
 // Step 2: build .swiftmodule from .swiftinterface and give the adjacent .swiftmodule as a candidate compiled module.
 // RUN: %target-swift-frontend -compile-module-from-interface %t/inputs/Foo.swiftinterface -o %t/inputs/Foo-from-interface.swiftmodule -module-name Foo -candidate-module-file %t/inputs/Foo.swiftmodule
 
-// Step 3: the new .swiftmodule should be a fowarding module.
+// Step 3: the new .swiftmodule should be a forwarding module.
 // RUN: %{python} %S/../ModuleInterface/ModuleCache/Inputs/check-is-forwarding-module.py %t/inputs/Foo-from-interface.swiftmodule
 
 // Step 4: using the forwarding module in explicit module map should be OK.
