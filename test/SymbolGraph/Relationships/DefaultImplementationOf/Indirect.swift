@@ -15,5 +15,5 @@ extension Q {
 
 // CHECK-DAG: "kind": "defaultImplementationOf",{{[[:space:]]*}}"source": "s:8Indirect1QPAAE3fooyyF",{{[[:space:]]*}}"target": "s:8Indirect1PP3fooyyF"
 
-// Since foo is a default implementation of a requirment, we don't consider this to be a "member"
+// Since foo is a default implementation of a requirement, we don't consider this to be a "member"
 // CHECK-NOT: memberOf
