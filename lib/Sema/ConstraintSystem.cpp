@@ -5225,7 +5225,7 @@ bool constraints::hasAppliedSelf(const OverloadChoice &choice,
          doesMemberRefApplyCurriedSelf(baseType, decl);
 }
 
-/// Check whether given type conforms to `RawPepresentable` protocol
+/// Check whether given type conforms to `RawRepresentable` protocol
 /// and return the witness type.
 Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   auto *DC = cs.DC;
