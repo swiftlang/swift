@@ -51,7 +51,7 @@ using ContextHashField = IdentifierIDField;
 /// A bit that indicates whether or not a module is a framework
 using IsFrameworkField = BCFixed<1>;
 
-/// Arrays of various identifiers, distinguised for readability
+/// Arrays of various identifiers, distinguished for readability
 using IdentifierIDArryField = llvm::BCArray<IdentifierIDField>;
 
 /// Identifiers used to refer to the above arrays
