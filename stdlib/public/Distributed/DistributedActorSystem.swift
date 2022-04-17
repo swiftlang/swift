@@ -95,7 +95,7 @@ public protocol DistributedActorSystem: Sendable {
     Act.ID == ActorID
 
   /// Called during when a distributed actor is deinitialized, or fails to initialize completely (e.g. by throwing
-  /// out of an `init` that did not completely initialize all of the the actors stored properties yet).
+  /// out of an `init` that did not completely initialize all of the actors stored properties yet).
   ///
   /// This method is guaranteed to be called at-most-once for a given id (assuming IDs are unique,
   /// and not re-cycled by the system), i.e. if it is called during a failure to initialize completely,
