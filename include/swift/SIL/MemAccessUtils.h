@@ -1819,7 +1819,7 @@ public:
 
   // Secondary entry point to check that cloning will succeed.
   bool canCloneUseDefChain(SILValue addr) {
-    // Use any valid address as a placeholder. It is innaccessible.
+    // Use any valid address as a placeholder. It is inaccessible.
     placeHolder = addr;
     return cloneRecursive(addr);
   }
