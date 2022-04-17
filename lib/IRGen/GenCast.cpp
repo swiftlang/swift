@@ -1093,7 +1093,7 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
         IGF.IGM.getAddrOfTypeMetadataAccessFunction(targetFormalType,
                                                     NotForDefinition);
     auto request = DynamicMetadataRequest(MetadataState::Complete);
-    // We know that we are not in a gneric class context, so we can safely
+    // We know that we are not in a generic class context, so we can safely
     // determine that the call here does not need to take that into account.
     auto response =
         IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, {}, request);
