@@ -2515,7 +2515,7 @@ blocks. Operationally, this implies that:
   terminate in a `return`_ or `throw`_. In contrast, a SIL value does not need to
   have a lifetime ending use along paths that end in an `unreachable`_.
 
-* `end_borrow`_ and `destroy_value`_ are redundent, albeit legal, in blocks
+* `end_borrow`_ and `destroy_value`_ are redundant, albeit legal, in blocks
   where all paths through the block end in an `unreachable`_.
 
 Consider the following legal SIL where we leak ``%0`` in blocks prefixed with
@@ -2563,7 +2563,7 @@ Consider the following legal SIL where we leak ``%0`` in blocks prefixed with
     // This block is also live, but since we do not return %0, we must insert a
     // destroy_value to cleanup %0.
     //
-    // NOTE: The copy_value/destroy_value here is redundent and can be removed by
+    // NOTE: The copy_value/destroy_value here is redundant and can be removed by
     // the optimizer. The author left it in for illustrative purposes.
     %1 = copy_value %0 : $Klass
     destroy_value %0 : $Klass
