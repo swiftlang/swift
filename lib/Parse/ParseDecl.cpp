@@ -1716,7 +1716,7 @@ void Parser::parseAllAvailabilityMacroArguments() {
   // The sub-parser is not actually parsing the source file but the LangOpts
   // AvailabilityMacros. No point creating a libSyntax tree for it. In fact, the
   // creation of a libSyntax tree would always fail because the
-  // AvailibilityMacro is not valid Swift source code.
+  // AvailabilityMacro is not valid Swift source code.
   LangOpts.BuildSyntaxTree = false;
 
   for (StringRef macro: LangOpts.AvailabilityMacros) {
