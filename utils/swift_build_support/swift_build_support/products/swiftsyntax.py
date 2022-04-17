@@ -102,7 +102,7 @@ class SwiftSyntax(product.Product):
 
     def install(self, target_name):
         # SwiftSyntax doesn't produce any products that should be installed
-        # into the toolchein. All tools using it link against SwiftSyntax
+        # into the toolchain. All tools using it link against SwiftSyntax
         # statically.
         pass
 
