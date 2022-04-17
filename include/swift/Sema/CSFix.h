@@ -103,7 +103,7 @@ enum class FixKind : uint8_t {
   GenericArgumentsMismatch,
 
   /// Fix up @autoclosure argument to the @autoclosure parameter,
-  /// to for a call to be able to foward it properly, since
+  /// to for a call to be able to forward it properly, since
   /// @autoclosure conversions are unsupported starting from
   /// Swift version 5.
   AutoClosureForwarding,
