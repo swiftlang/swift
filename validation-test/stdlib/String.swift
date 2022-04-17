@@ -1859,7 +1859,7 @@ struct COWStringTest {
 }
 
 var testCases: [COWStringTest] {
-  return [ COWStringTest(test: "abcdefghijklmnopqrxtuvwxyz", name: "ASCII"),
+  return [ COWStringTest(test: "abcdefghijklmnopqrstuvwxyz", name: "ASCII"),
            COWStringTest(test: "🐮🐄🤠👢🐴", name: "Unicode")
          ]
 }
