@@ -117,7 +117,7 @@ private:
   ///  SyntaxParsingContext
   enum class AccumulationMode {
     // Coerce the result to one of ContextKind.
-    // E.g. for ContextKind::Expr, passthroug if the result is CallExpr, whereas
+    // E.g. for ContextKind::Expr, passthrough if the result is CallExpr, whereas
     // <UnknownExpr><SomeDecl /></UnknownDecl> for non Exprs.
     CoerceKind,
 
