@@ -169,7 +169,7 @@ internal func serialize(
 }
 
 /// Return a pointer that points to a contiguous sequence of null-terminated,
-/// UTF8 charcters. If necessary, extends the lifetime of `stringValue` by
+/// UTF8 characters. If necessary, extends the lifetime of `stringValue` by
 /// using `stringArgumentOwners`.
 @_alwaysEmitIntoClient
 @inline(never)
