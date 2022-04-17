@@ -1442,7 +1442,7 @@ namespace {
           if (auto *subPattern = IP->getSubPattern()) {
             // Project the cast target's subpattern.
             Space castSubSpace = projectPattern(subPattern);
-            // If we recieved a type space from a named pattern or a wildcard
+            // If we received a type space from a named pattern or a wildcard
             // we have to re-project with the cast's target type to maintain
             // consistency with the scrutinee's type.
             if (castSubSpace.getKind() == SpaceKind::Type) {
