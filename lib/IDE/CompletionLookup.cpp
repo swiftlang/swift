@@ -447,7 +447,7 @@ bool CompletionLookup::isUnresolvedMemberIdealType(Type Ty) {
   if (!idealTy)
     return false;
   /// Consider optional object type is the ideal.
-  /// For exmaple:
+  /// For example:
   ///   enum MyEnum { case foo, bar }
   ///   func foo(_: MyEnum?)
   ///   fooo(.<HERE>)
