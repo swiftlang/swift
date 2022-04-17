@@ -342,7 +342,7 @@ protected:
 
 public:
   /// The tree is organized by source location and for most nodes this is also
-  /// what obtaines for scoping. However, guards are different. The scope after
+  /// what obtains for scoping. However, guards are different. The scope after
   /// the guard else must hop into the innermoset scope of the guard condition.
   virtual NullablePtr<const ASTScopeImpl> getLookupParent() const {
     return getParent();
