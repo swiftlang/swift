@@ -489,7 +489,7 @@ void CompletionInstance::performNewOperation(
       ShouldCacheCompilerInstance = false;
     } else {
       Callback(CancellableResult<CompletionInstanceResult>::success(
-          {CI, /*ReuisingASTContext=*/false, DidFindCodeCompletionToken}));
+          {CI, /*ReusingASTContext=*/false, DidFindCodeCompletionToken}));
       if (CancellationFlag &&
           CancellationFlag->load(std::memory_order_relaxed)) {
         ShouldCacheCompilerInstance = false;
