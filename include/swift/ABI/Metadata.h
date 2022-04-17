@@ -2025,7 +2025,7 @@ using ExtendedExistentialTypeShape
 /// existential shape.
 ///
 /// We'd like to use BLAKE3 for this, but pending acceptance of
-/// that into LLVM, we're using SHA-256.  We simply truncaate the
+/// that into LLVM, we're using SHA-256.  We simply truncate the
 /// hash to the desired length.
 struct UniqueHash {
   static_assert(NumBytes_UniqueHash % sizeof(uint32_t) == 0,
