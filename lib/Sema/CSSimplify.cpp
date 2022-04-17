@@ -3763,7 +3763,7 @@ ConstraintSystem::matchTypesBindTypeVar(
   // visible in the current context e.g. typealias
   // defined in constrained extension, substitution
   // of which might produce error type for base, so
-  // assignment should thead lightly and just fail
+  // assignment should tread lightly and just fail
   // if it encounters such types.
   if (type->hasError())
     return getTypeMatchFailure(locator);
