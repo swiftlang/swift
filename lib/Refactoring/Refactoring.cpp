@@ -2851,7 +2851,7 @@ class FillProtocolStubContext {
   getUnsatisfiedRequirements(const IterableDeclContext *IDC);
 
   /// Context in which the content should be filled; this could be either a
-  /// nominal type declaraion or an extension declaration.
+  /// nominal type declaration or an extension declaration.
   DeclContext *DC;
 
   /// The type that adopts the required protocol stubs. For nominal type decl, this
