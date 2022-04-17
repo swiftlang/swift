@@ -33,7 +33,7 @@ void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
 
   SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
                                              CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
+                                             /*isDiscarded=*/true);
   typeCheckForCodeCompletion(completionTarget, /*needsPrecheck=*/true,
                              [&](const Solution &S) { sawSolution(S); });
 }
