@@ -88,7 +88,7 @@ class ExprFinder : public ASTWalker {
   SourceRange TargetRange;
   Expr *FoundExpr = nullptr;
 
-  template <typename NodeType> bool isInterstingRange(NodeType *Node) {
+  template <typename NodeType> bool isInterestingRange(NodeType *Node) {
     return SM.rangeContains(Node->getSourceRange(), TargetRange);
   }
 
@@ -125,15 +125,15 @@ public:
       FoundExpr = E;
       return Action::Stop();
     }
-    return Action::VisitChildrenIf(isInterstingRange(E), E);
+    return Action::VisitChildrenIf(isInterestingRange(E), E);
   }
 
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-    return Action::VisitChildrenIf(isInterstingRange(P), P);
+    return Action::VisitChildrenIf(isInterestingRange(P), P);
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    return Action::VisitChildrenIf(isInterstingRange(S), S);
+    return Action::VisitChildrenIf(isInterestingRange(S), S);
   }
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
