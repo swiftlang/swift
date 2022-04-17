@@ -124,7 +124,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// In situations when \c SyntaxKind hints or determines
   /// completions, i.e. a precedence group attribute, this
   /// can be set and used to control the code completion scenario.
-  SyntaxKind SyntxKind;
+  SyntaxKind SyntaxKind_;
 
   int AttrParamIndex;
   bool IsInSil = false;
@@ -470,7 +470,7 @@ void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
 void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
   assert(P.Tok.is(tok::code_complete));
 
-  SyntxKind = SK;
+  SyntaxKind_ = SK;
   Kind = CompletionKind::PrecedenceGroup;
   CurDeclContext = P.CurDeclContext;
 }
@@ -1958,7 +1958,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::PrecedenceGroup:
-    Lookup.getPrecedenceGroupCompletions(SyntxKind);
+    Lookup.getPrecedenceGroupCompletions(SyntaxKind_);
     break;
   case CompletionKind::StmtLabel: {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
