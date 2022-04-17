@@ -44,7 +44,7 @@ import Swift
 /// =======================
 ///
 /// You can cancel a task group and all of its child tasks
-/// by calling the `cancellAll()` method on the task group,
+/// by calling the `cancelAll()` method on the task group,
 /// or by canceling the task in which the group is running.
 ///
 /// If you call `async(priority:operation:)` to create a new task in a canceled group,
@@ -118,7 +118,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// =======================
 ///
 /// You can cancel a task group and all of its child tasks
-/// by calling the `cancellAll()` method on the task group,
+/// by calling the `cancelAll()` method on the task group,
 /// or by canceling the task in which the group is running.
 ///
 /// If you call `async(priority:operation:)` to create a new task in a canceled group,
