@@ -98,7 +98,7 @@ static Class _swift_getObjCClassOfAllocated(const void *object) {
 const ClassMetadata *swift::swift_getObjCClassFromObject(HeapObject *object) {
   auto classAsMetadata = _swift_getClass(object);
 
-  // Walk up the superclass chain skipping over artifical Swift classes.
+  // Walk up the superclass chain skipping over artificial Swift classes.
   // If we find a non-Swift class use the result of [object class] instead.
 
   while (classAsMetadata && classAsMetadata->isTypeMetadata()) {
@@ -129,7 +129,7 @@ const Metadata *swift::swift_getObjectType(HeapObject *object) {
   auto classAsMetadata = _swift_getClass(object);
 
 #if SWIFT_OBJC_INTEROP
-  // Walk up the superclass chain skipping over artifical Swift classes.
+  // Walk up the superclass chain skipping over artificial Swift classes.
   // If we find a non-Swift class use the result of [object class] instead.
 
   while (classAsMetadata && classAsMetadata->isTypeMetadata()) {
