@@ -718,7 +718,7 @@ class BenchmarkDoctor(object):
         return measurements
 
     def analyze(self, benchmark_measurements):
-        """Analyze whether benchmark fulfills all requirtements."""
+        """Analyze whether benchmark fulfills all requirements."""
         self.log.debug("Analyzing %s", benchmark_measurements["name"])
         for rule in self.requirements:
             rule(benchmark_measurements)
