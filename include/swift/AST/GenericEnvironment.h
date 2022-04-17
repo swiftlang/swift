@@ -51,7 +51,7 @@ public:
   Type operator()(SubstitutableType *type) const;
 };
 
-/// Extra data in a generic environment for an opened existentiak.
+/// Extra data in a generic environment for an opened existential.
 struct OpenedGenericEnvironmentData {
   Type existential;
   UUID uuid;

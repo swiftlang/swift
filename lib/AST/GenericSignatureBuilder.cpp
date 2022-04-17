@@ -485,7 +485,7 @@ public:
     case RequirementSource::Concrete: {
       Type conformingType = source->getStoredType();
       if (conformingType) {
-        // A concrete requirement source for a self-conforming exitential type
+        // A concrete requirement source for a self-conforming existential type
         // stores the original type, and not the conformance, because there is
         // no way to recover the original type from the conformance.
         assert(conformingType->isExistentialType());
