@@ -5613,7 +5613,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   auto eltType = getFromType();
   auto contextualType = getToType();
 
-  auto diagnoseAllOccurances = [&](Diag<Type, Type> diagnostic) {
+  auto diagnoseAllOccurrences = [&](Diag<Type, Type> diagnostic) {
     assert(AffectedElements.size() > 1);
     for (auto *element : AffectedElements) {
       emitDiagnosticAt(element->getLoc(), diagnostic, eltType, contextualType);
@@ -5633,7 +5633,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   if (auto *AE = getAsExpr<ArrayExpr>(anchor)) {
     if (!(treatAsDictionary = isFixedToDictionary(AE))) {
       if (AffectedElements.size() > 1) {
-        diagnoseAllOccurances(diag::cannot_convert_array_element);
+        diagnoseAllOccurrences(diag::cannot_convert_array_element);
         return true;
       }
 
@@ -5647,7 +5647,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     switch (eltLoc.getIndex()) {
     case 0: { // key
       if (AffectedElements.size() > 1) {
-        diagnoseAllOccurances(diag::cannot_convert_dict_key);
+        diagnoseAllOccurrences(diag::cannot_convert_dict_key);
         return true;
       }
 
@@ -5658,7 +5658,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
 
     case 1: { // value
       if (AffectedElements.size() > 1) {
-        diagnoseAllOccurances(diag::cannot_convert_dict_value);
+        diagnoseAllOccurrences(diag::cannot_convert_dict_value);
         return true;
       }
 

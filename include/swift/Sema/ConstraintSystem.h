@@ -5715,7 +5715,7 @@ matchCallArguments(
 Expr *getArgumentLabelTargetExpr(Expr *fn);
 
 /// Given a type that includes an existential type that has been opened to
-/// the given type variable, type-erase occurences of that opened type
+/// the given type variable, type-erase occurrences of that opened type
 /// variable and anything that depends on it to their non-dependent bounds.
 Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
                                          TypeVariableType *openedTypeVar,
