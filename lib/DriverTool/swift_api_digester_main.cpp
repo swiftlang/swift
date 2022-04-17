@@ -436,7 +436,7 @@ class SameNameNodeMatcher : public NodeMatcher {
   };
 
   // Get the priority for the favored name match kind. Favored name match kind
-  // locats before less favored ones.
+  // locals before less favored ones.
   ArrayRef<NameMatchKind> getNameMatchKindPriority(SDKNodeKind Kind) {
     if (Kind == SDKNodeKind::DeclFunction) {
       static NameMatchKind FuncPriority[] = { NameMatchKind::PrintedNameAndUSR,
