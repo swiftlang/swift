@@ -732,7 +732,7 @@ retry:;
 /// task. Otherwise, if we reset the voucher and priority escalation too early, the
 /// thread may be preempted immediately before we can finish the enqueue of the
 /// high priority task to the next location. We will then have a priority inversion
-/// of waiting for a low priority thread to enqueue a high priorty task.
+/// of waiting for a low priority thread to enqueue a high priority task.
 ///
 /// In order to do this correctly, we need enqueue-ing of a task to the next
 /// executor, to have a "hand-over-hand locking" type of behaviour - until the
