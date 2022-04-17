@@ -802,7 +802,7 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
   }
   case swift::ModuleDependenciesKind::SwiftSource: {
     assert(!triple.hasValue() &&
-           "Did not expecte triple for serializing MODULE_NODE");
+           "Did not expect triple for serializing MODULE_NODE");
     auto swiftSourceDeps = dependencyInfo.getAsSwiftSourceModule();
     assert(swiftSourceDeps);
     unsigned bridgingHeaderFileId =
