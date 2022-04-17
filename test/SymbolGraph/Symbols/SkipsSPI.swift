@@ -29,11 +29,11 @@ public class ClassShouldntAppear {}
 // This struct should appear
 public struct StructShouldAppear {
 
-  // This shouldn't appear beacause it is @_spi(OtherModule), despite `StructShouldAppear`.
+  // This shouldn't appear because it is @_spi(OtherModule), despite `StructShouldAppear`.
   @_spi(OtherModule)
   public func functionShouldntAppear() {}
 
-  // This shouldn't appear beacause it is @_spi(OtherModule), despite `StructShouldAppear`.
+  // This shouldn't appear because it is @_spi(OtherModule), despite `StructShouldAppear`.
   @_spi(OtherModule)
   public struct InnerStructShouldntAppear {}
 }
