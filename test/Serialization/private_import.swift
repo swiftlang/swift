@@ -51,7 +51,7 @@
   }
 
   Base().foo()
-  // This should not be ambigious.
+  // This should not be ambiguous.
   Base().bar()
   // This should not conflict with the second declaration in
   // private_import_other_2.swift.
