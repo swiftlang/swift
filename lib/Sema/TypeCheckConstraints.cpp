@@ -577,7 +577,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   auto *requirementBaseLocator = cs.getConstraintLocator(
       locator, LocatorPathElt::OpenedGeneric(signature));
 
-  // Let's check all of the requirements this parameter is invoved in,
+  // Let's check all of the requirements this parameter is involved in,
   // If it's connected to any other generic types (directly or through
   // a dependent member type), that means it could be inferred through
   // them e.g. `T: X.Y` or `T == U`.
