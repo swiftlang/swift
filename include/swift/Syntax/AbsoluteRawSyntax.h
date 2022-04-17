@@ -129,7 +129,7 @@ public:
   }
 };
 
-/// Represents a node's position in a syntax tree, described by its overal
+/// Represents a node's position in a syntax tree, described by its overall
 /// textual offset and the position within its parent.
 class AbsoluteSyntaxPosition {
 public:
