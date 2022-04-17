@@ -694,10 +694,10 @@ BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
 }
 
 BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge) {
+          BridgedLocation loc, BridgedValue condition, BridgedStringRef message) {
   SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
   return {builder.createCondFail(getRegularLocation(loc),
-    castToSILValue(condition), getStringRef(messge))};
+    castToSILValue(condition), getStringRef(message))};
 }
 
 BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,
