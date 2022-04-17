@@ -1090,7 +1090,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
             }
           } else if (arg.startswith("-fdebug-prefix-map=")) {
             // We don't serialize the debug prefix map flags as these
-            // contain absoute paths that are not usable on different
+            // contain absolute paths that are not usable on different
             // machines. These flags are not necessary to compile the
             // clang modules again so are safe to remove.
             continue;
