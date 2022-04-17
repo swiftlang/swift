@@ -350,7 +350,7 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
     if (lhs.size() == 2)
       return nullptr;
 
-    // If we have a rule of the form X.[P:Y].[Q] => X.[P:Y] wih non-empty X,
+    // If we have a rule of the form X.[P:Y].[Q] => X.[P:Y] with non-empty X,
     // then the parent type is X.[P].
     return parentSymbol.getProtocol();
   }
