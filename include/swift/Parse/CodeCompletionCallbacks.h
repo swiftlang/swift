@@ -212,7 +212,7 @@ public:
 
   /// Complete a yield statement.  A missing yield index means that the
   /// completion immediately follows the 'yield' keyword; it may be either
-  /// an expresion or a parenthesized expression list.  A present yield
+  /// an expression or a parenthesized expression list.  A present yield
   /// index means that the completion is within the parentheses and is
   /// for a specific yield value.
   virtual void completeYieldStmt(CodeCompletionExpr *E,
