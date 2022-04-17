@@ -866,7 +866,7 @@ func testAfterVariadic() {
   }
 }
 
-func testClosurePlaceholderContainsInternalParameterNamesIfPresentInSiganture() {
+func testClosurePlaceholderContainsInternalParameterNamesIfPresentInSignature() {
   func sort(callback: (_ left: Int, _ right: Int) -> Bool) {}
   sort(#^CLOSURE_PARAM_WITH_INTERNAL_NAME^#)
 // CLOSURE_PARAM_WITH_INTERNAL_NAME: Begin completions, 1 item
