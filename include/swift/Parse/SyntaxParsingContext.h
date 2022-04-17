@@ -154,7 +154,7 @@ private:
 
   RootContextData *RootData;
 
-  // Offet for 'Storage' this context owns from.
+  // Offset for 'Storage' this context owns from.
   const size_t Offset;
 
   // Operation on destruction.
