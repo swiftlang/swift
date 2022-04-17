@@ -6626,7 +6626,7 @@ public:
   Optional<Fingerprint> getBodyFingerprint() const;
 
   /// Retrieve the fingerprint of the body including the local type members and
-  /// the local funcition bodies.
+  /// the local function bodies.
   Optional<Fingerprint> getBodyFingerprintIncludingLocalTypeMembers() const;
 
   /// Retrieve the source range of the *original* function body.
