@@ -367,7 +367,7 @@ protected:
     // Define bits for use in the AccessEnforcementOpts pass. Each begin_access
     // in the function is mapped to one instance of this subclass.  Reserve a
     // bit for a seenNestedConflict flag, which is the per-begin-access result
-    // of pass-specific analysis. The remaning bits are sufficient to index all
+    // of pass-specific analysis. The remaining bits are sufficient to index all
     // begin_[unpaired_]access instructions.
     //
     // `AccessRepresentation` refers to the AccessRepresentationBitfield defined
