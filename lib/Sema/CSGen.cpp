@@ -752,7 +752,7 @@ namespace {
   /// add the expressions of all arguments after the code completion token to
   /// \p ignoredArguments.
   /// Otherwise, returns an empty vector.
-  /// Asssumes that we are solving for code completion.
+  /// Assumes that we are solving for code completion.
   void getArgumentsAfterCodeCompletionToken(
       Expr *expr, ConstraintSystem &CS,
       SmallVectorImpl<Expr *> &ignoredArguments) {
