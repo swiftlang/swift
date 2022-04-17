@@ -389,7 +389,7 @@ void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
     
     // @transparent is always ok on implicitly generated accessors: they can
     // be dispatched (even in classes) when the references are within the
-    // class themself.
+    // class themselves.
     if (!(isa<AccessorDecl>(D) && D->isImplicit()))
       diagnoseAndRemoveAttr(attr, diag::transparent_in_classes_not_supported);
   }
