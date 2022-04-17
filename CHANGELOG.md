@@ -2684,7 +2684,7 @@ Swift 3.1
   result in a compilation error.
 
   Examples of functions that "return twice" include `vfork` and `setjmp`.
-  These functions change the control flow of a program in ways that that Swift
+  These functions change the control flow of a program in ways that Swift
   has never supported. For example, definitive initialization of variables,
   a core Swift language feature, could not be guaranteed when these functions
   were used.
