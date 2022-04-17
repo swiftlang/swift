@@ -4039,10 +4039,10 @@ isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
   
   // 'lazy' must not be used on a computed property
   // NSCopying and IBOutlet attribute requires property to be mutable
-  auto Attributies = SV->getAttrs();
-  if (Attributies.hasAttribute<LazyAttr>() ||
-      Attributies.hasAttribute<NSCopyingAttr>() ||
-      Attributies.hasAttribute<IBOutletAttr>()) {
+  auto Attributes = SV->getAttrs();
+  if (Attributes.hasAttribute<LazyAttr>() ||
+      Attributes.hasAttribute<NSCopyingAttr>() ||
+      Attributes.hasAttribute<IBOutletAttr>()) {
     return false;
   }
 
