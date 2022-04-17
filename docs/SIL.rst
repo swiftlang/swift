@@ -2282,7 +2282,7 @@ classify uses directly. Instead the verifier:
 Note that typically instructions in category (1) are instructions whose uses do
 not propagate the pointer value, so they are safe. In contrast, some other
 instructions in category (1) are escaping uses of the address such as
-`pointer_to_address`_. Those uses are unsafe--the user is reponsible for
+`pointer_to_address`_. Those uses are unsafe--the user is responsible for
 managing unsafe pointer lifetimes and the compiler must not extend those pointer
 lifetimes.
 
