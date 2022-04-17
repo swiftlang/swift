@@ -136,7 +136,7 @@ bool findExtendedUsesOfSimpleBorrowedValue(
 /// valid BorrowedValue), then its uses are discovered transitively by looking
 /// through forwarding operations. If any use is a PointerEscape, then this
 /// returns false without adding more uses--the guaranteed value's lifetime is
-/// indeterminite. If a use introduces a nested borrow scope, it creates use
+/// indeterminate. If a use introduces a nested borrow scope, it creates use
 /// points where the "extended" borrow scope ends. An extended borrow
 /// scope is found by looking through any reborrows that end the nested
 /// scope. Other uses within nested borrow scopes are ignored.
