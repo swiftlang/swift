@@ -2342,7 +2342,7 @@ function(add_swift_target_library name)
         endif()
       endforeach()
 
-      # Add the swiftmodule-only targets to the lipo target depdencies.
+      # Add the swiftmodule-only targets to the lipo target dependencies.
       foreach(arch ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
         set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
         if(maccatalyst_build_flavor STREQUAL "ios-like")
