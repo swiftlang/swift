@@ -145,7 +145,7 @@ class CompletionInstance {
   /// interpreting the results, since invalid results may be returned in case
   /// of cancellation.
   ///
-  /// NOTE: \p Args is only used for checking the equaity of the invocation.
+  /// NOTE: \p Args is only used for checking the equality of the invocation.
   /// Since this function assumes that it is already normalized, exact the same
   /// arguments including their order is considered as the same invocation.
   void performOperation(

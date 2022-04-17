@@ -71,7 +71,7 @@ public:
         DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         CachedCIInvalidated(false), CachedReuseCount(0) {}
 
-  /// NOTE: \p Args is only used for checking the equaity of the invocation.
+  /// NOTE: \p Args is only used for checking the equality of the invocation.
   /// Since this function assumes that it is already normalized, exact the same
   /// arguments including their order is considered as the same invocation.
   bool
