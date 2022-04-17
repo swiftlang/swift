@@ -807,7 +807,7 @@ func test23086402(a: A23086402) {
 
 // <rdar://problem/23550816> QoI: Poor diagnostic in argument list of "print" (varargs related)
 // The situation has changed. String now conforms to the RangeReplaceableCollection protocol
-// and `ss + s` becomes ambiguous. Diambiguation is provided with the unavailable overload
+// and `ss + s` becomes ambiguous. Disambiguation is provided with the unavailable overload
 // in order to produce a meaningful diagnostics. (Related: <rdar://problem/31763930>)
 func test23550816(ss: [String], s: String) {
   print(ss + s)  // expected-error {{'+' is unavailable: Operator '+' cannot be used to append a String to a sequence of strings}}
