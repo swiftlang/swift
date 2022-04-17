@@ -90,7 +90,7 @@ inline bool isForwardingConsume(SILValue value) {
 /// borrow scope and may be reborrowed.
 ///
 /// In valid OSSA, this should never be called on values that introduce a new
-/// scope (doing so would be extremely innefficient). The lifetime of a borrow
+/// scope (doing so would be extremely inefficient). The lifetime of a borrow
 /// introducing instruction is always determined by its direct EndBorrow uses
 /// (see BorrowedValue::visitLocalScopeEndingUses). None of the non-scope-ending
 /// uses are relevant, and there's no need to transively follow forwarding
