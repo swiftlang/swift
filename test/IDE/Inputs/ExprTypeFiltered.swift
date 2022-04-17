@@ -22,10 +22,10 @@ func ArrayC(_ a: [C]) {
 	_ = a[0]
 }
 
-func ArrayClas(_ a: [Clas]) {
+func ArrayClass(_ a: [Clas]) {
 	_ = a[0].value.getValue().value
 }
 
-func ArrayClas(_ a: [Stru]) {
+func ArrayClass(_ a: [Stru]) {
 	_ = a[0].value.getValue().value
 }
