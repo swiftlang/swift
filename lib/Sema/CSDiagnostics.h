@@ -874,7 +874,7 @@ private:
 ///
 /// ```swift
 /// func foo<T>(_ t: T) throws -> Void {}
-/// let _: (Int) -> Void = foo // `foo` can't be implictly converted to
+/// let _: (Int) -> Void = foo // `foo` can't be implicitly converted to
 ///                            // non-throwing type `(Int) -> Void`
 /// ```
 class ThrowingFunctionConversionFailure final : public ContextualFailure {
@@ -897,7 +897,7 @@ public:
 ///
 /// ```swift
 /// func foo<T>(_ t: T) async -> Void {}
-/// let _: (Int) -> Void = foo // `foo` can't be implictly converted to
+/// let _: (Int) -> Void = foo // `foo` can't be implicitly converted to
 ///                            // synchronous function type `(Int) -> Void`
 /// ```
 class AsyncFunctionConversionFailure final : public ContextualFailure {

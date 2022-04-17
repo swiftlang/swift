@@ -5857,7 +5857,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
       // If parameter is an autoclosure, we need to make sure that:
       //   - argument type is coerced to parameter result type
-      //   - impilict autoclosure is created to wrap argument expression
+      //   - implicit autoclosure is created to wrap argument expression
       //   - new types are propagated to constraint system
       auto *closureType = param.getPlainType()->castTo<FunctionType>();
 
