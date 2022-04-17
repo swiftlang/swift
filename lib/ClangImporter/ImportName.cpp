@@ -1678,7 +1678,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
-  // Spcial case: unnamed/anonymous fields.
+  // Special case: unnamed/anonymous fields.
   if (auto field = dyn_cast<clang::FieldDecl>(D)) {
     static_assert((clang::Decl::lastField - clang::Decl::firstField) == 2,
                   "update logic for new FieldDecl subclasses");
