@@ -88,4 +88,4 @@ func extendedEscapedMultilineMessage() {}
 
 // expected-error@+1{{'renamed' cannot be an extended escaping string literal}}
 @available(*, unavailable, renamed: #"available()"#)
-func extenedEscpaedRenamed() {}
+func extenedEscapedRenamed() {}
