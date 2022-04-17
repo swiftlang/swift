@@ -651,7 +651,7 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
       return deriveDifferentiable_move(*this);
   }
 
-  // Otheriwse, return nullptr.
+  // Otherwise, return nullptr.
   return nullptr;
 }
 
