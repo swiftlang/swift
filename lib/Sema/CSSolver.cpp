@@ -2021,7 +2021,7 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
   first = std::copy(concreteOverloads.begin(), concreteOverloads.end(), first);
 
   // Check if any of the known argument types conform to one of the standard
-  // arithmetic protocols. If so, the sovler should attempt the corresponding
+  // arithmetic protocols. If so, the solver should attempt the corresponding
   // overload choices first.
   for (auto arg : argFnType->getParams()) {
     auto argType = arg.getPlainType();
