@@ -7096,7 +7096,7 @@ public:
   /// attribute. For example a "mutating set" accessor.
   bool isExplicitNonMutating() const;
 
-  /// Is the accesor one of the kinds that's assumed nonmutating by default?
+  /// Is the accessor one of the kinds that's assumed nonmutating by default?
   bool isAssumedNonMutating() const;
 
   /// Is this accessor one of the kinds that's implicitly a coroutine?
