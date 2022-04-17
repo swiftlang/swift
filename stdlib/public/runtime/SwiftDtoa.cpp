@@ -967,7 +967,7 @@ size_t swift_dtoa_optimal_binary64_p(const void *d, char *dest, size_t length)
     // Calculations above used an estimate for the power-of-ten scale.
     // Here, we compensate for any error in that estimate by testing
     // whether we have the expected number of digits in the integer
-    // portion and correcting as necesssary.  This also serves to
+    // portion and correcting as necessary.  This also serves to
     // prune leading zeros from subnormals.
 
     // Except for subnormals, this loop should never run more than once.
