@@ -210,7 +210,7 @@ public:
   filter(llvm::function_ref<bool(LookupResultEntry, /*isOuter*/ bool)> pred);
 
   /// Shift down results by dropping inner results while keeping outer
-  /// results (if any), the innermost of which are recogized as inner
+  /// results (if any), the innermost of which are recognized as inner
   /// results afterwards.
   void shiftDownResults();
 };
