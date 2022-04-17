@@ -12734,7 +12734,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // Create a new tuple type the size of the smaller tuple with elements
     // from the larger tuple whenever either side contains a type variable.
     // For example (A, $0, B, $2) and (X, Y, $1) produces: (X, $0, B).
-    // This allows us to guarentee that the types will match, and all
+    // This allows us to guarantee that the types will match, and all
     // type variables will get bound to something as long as we default
     // excess types in the larger tuple to Any. In the prior example,
     // when the tuples (X, Y, $1) and (X, $0, B) get matched, $0 is equated
