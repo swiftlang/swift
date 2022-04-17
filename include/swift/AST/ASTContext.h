@@ -483,7 +483,7 @@ public:
                               setVector.size());
   }
 
-  /// Retrive the syntax node memory manager for this context.
+  /// Retrieve the syntax node memory manager for this context.
   llvm::IntrusiveRefCntPtr<syntax::SyntaxArena> getSyntaxArena() const;
 
   /// Set a new stats reporter.
