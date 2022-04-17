@@ -1453,7 +1453,7 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   bool prevFailed = false;
 
   // Advance the solver by taking a given step, which might involve
-  // a prelimilary "setup", if this is the first time this step is taken.
+  // a preliminary "setup", if this is the first time this step is taken.
   auto advance = [](SolverStep *step, bool prevFailed) -> StepResult {
     auto currentState = step->getState();
     if (currentState == StepState::Setup) {
