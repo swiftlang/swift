@@ -1525,7 +1525,7 @@ class AccessPathDefUseTraversal {
 
   // Indices of the path to match from inner to outer component.
   // A cursor is used to represent the most recently visited def.
-  // During def-use traversal, the cursor starts at the end of pathIndicies and
+  // During def-use traversal, the cursor starts at the end of pathIndices and
   // decrements with each projection.
   // The first index represents an exact match.
   // Index < 0 represents some subobject of the requested path.
