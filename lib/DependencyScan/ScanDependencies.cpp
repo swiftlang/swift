@@ -1440,7 +1440,7 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
       ASTDelegate, [&](ModuleDependencyID id) { allModules.insert(id); },
       currentImportPathSet);
 
-  // Dignose cycle in dependency graph.
+  // Diagnose cycle in dependency graph.
   if (diagnoseCycle(instance, cache, /*MainModule*/ allModules.front(),
                     ASTDelegate))
     return std::make_error_code(std::errc::not_supported);
