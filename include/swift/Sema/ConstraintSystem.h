@@ -2006,7 +2006,7 @@ public:
         !expression.pattern->isImplicit();
   }
 
-  /// Check whether this is an initializaion for `async let` pattern.
+  /// Check whether this is an initialization for `async let` pattern.
   bool isAsyncLetInitializer() const {
     if (!(kind == Kind::expression &&
           expression.contextualPurpose == CTP_Initialization))
