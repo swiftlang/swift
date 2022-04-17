@@ -400,7 +400,7 @@ private:
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);
 
-  /// Serializes the given dependnecy graph into the incremental information
+  /// Serializes the given dependency graph into the incremental information
   /// section of this swift module.
   void writeIncrementalInfo(
       const fine_grained_dependencies::SourceFileDepGraph *DepGraph);
