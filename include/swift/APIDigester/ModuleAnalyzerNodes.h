@@ -1,4 +1,4 @@
-//===--- ModuleAnaluzerNodes.h - Nodes for API differ tool ---------------====//
+//===--- ModuleAnalyzerNodes.h - Nodes for API differ tool ---------------====//
 //
 // This source file is part of the Swift.org open source project
 //
