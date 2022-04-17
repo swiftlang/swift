@@ -2657,13 +2657,12 @@ public:
 
           for (auto requirement :
                OpaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements()) {
-            auto requirementFulfilled =
-                TypeChecker::typesSatisfyConstraint(expr->getType()->getRValueType(),
-                                                    requirement.getSecondType(),
-                                                    /*openArchetypes=*/ false,
-                                                    ConstraintKind::ConformsTo,
-                                                    OpaqueDecl->getDeclContext());
-            if (!requirementFulfilled) {
+            auto protocolConformance =
+                TypeChecker::conformsToProtocol(expr->getType()->getRValueType(),
+                                                requirement.getProtocolDecl(),
+                                                Implementation->getModuleContext(),
+                                                /*allowMissing=*/ false);
+            if (protocolConformance.isInvalid()) {
               conforms = false;
               break;
             }
@@ -2677,7 +2676,6 @@ public:
                 .diagnose(expr->getStartLoc(),
                           diag::opaque_type_missing_return_last_expr_note)
                 .fixItInsert(expr->getStartLoc(), "return ");
-
             return;
           }
         }
