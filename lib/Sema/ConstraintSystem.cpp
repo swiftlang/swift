@@ -820,7 +820,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
     }
   }
 
-  // And now make sure sure the parent is okay, for things like X<T>.Y.Z.
+  // And now make sure the parent is okay, for things like X<T>.Y.Z.
   checkNestedTypeConstraints(cs, parentTy, locator);
 }
 
