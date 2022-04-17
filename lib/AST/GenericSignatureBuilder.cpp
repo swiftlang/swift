@@ -4691,7 +4691,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   // Consider the second equivalence class to be modified.
   // Transfer Same-type requirements and delayed requirements.
   if (equivClass2) {
-    // Mark as modified and transfer deplayed requirements to the primary queue.
+    // Mark as modified and transfer deployed requirements to the primary queue.
     equivClass2->modified(*this);
     equivClass->sameTypeConstraints.insert(
                                    equivClass->sameTypeConstraints.end(),
