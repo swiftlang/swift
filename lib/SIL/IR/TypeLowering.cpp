@@ -2115,7 +2115,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   auto loweredSubstType =
       computeLoweredRValueType(forExpansion, origType, substType);
 
-  // If that didn't change the type and the key is cachable, there's no
+  // If that didn't change the type and the key is cacheable, there's no
   // point in re-checking the table, so just construct a type lowering
   // and cache it.
   if (loweredSubstType == substType && key.isCacheable()) {
