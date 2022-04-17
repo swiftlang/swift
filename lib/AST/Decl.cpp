@@ -4020,7 +4020,7 @@ findGenericParameterReferences(CanGenericSignature genericSig,
   }
 
   // If the signature of an opaque result type has a same-type constraint
-  // that refereces Self, it's invariant.
+  // that references Self, it's invariant.
   if (auto opaque = type->getAs<OpaqueTypeArchetypeType>()) {
     auto info = GenericParameterReferenceInfo();
     auto opaqueSig = opaque->getDecl()->getOpaqueInterfaceGenericSignature();
