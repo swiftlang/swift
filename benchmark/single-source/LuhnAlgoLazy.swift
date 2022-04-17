@@ -219,7 +219,7 @@ let combineDoubleDigits = {
     (10...18).contains($0) ? $0-9 : $0
 }
 
-// first, the lazy version of checksum calcuation
+// first, the lazy version of checksum calculation
 let lazychecksum = { (ccnum: String) -> Bool in
     ccnum.lazy
     |> reverse
