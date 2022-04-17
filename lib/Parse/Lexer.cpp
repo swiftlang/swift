@@ -205,7 +205,7 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   // Check for Unicode BOM at start of file (Only UTF-8 BOM supported now).
   size_t BOMLength = contents.startswith("\xEF\xBB\xBF") ? 3 : 0;
 
-  // Keep information about existance of UTF-8 BOM for transparency source code
+  // Keep information about existence of UTF-8 BOM for transparency source code
   // editing with libSyntax.
   ContentStart = BufferStart + BOMLength;
 
