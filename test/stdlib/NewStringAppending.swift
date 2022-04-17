@@ -11,7 +11,7 @@
 // REQUIRES: CPU=x86_64, OS=macosx
 // UNSUPPORTED: use_os_stdlib
 
-// TODO: Adapt capacity checks into a non-FileCheck more exhuastive test that
+// TODO: Adapt capacity checks into a non-FileCheck more exhaustive test that
 // can run on older OSes and match their behavior...
 
 import Foundation
