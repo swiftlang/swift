@@ -1107,7 +1107,7 @@ bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
 llvm::VersionTuple
 swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
   llvm::VersionTuple result;
-  // Read the inteface file and extract its compiler arguments line
+  // Read the interface file and extract its compiler arguments line
   if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
     llvm::BumpPtrAllocator alloc;
     llvm::StringSaver argSaver(alloc);
