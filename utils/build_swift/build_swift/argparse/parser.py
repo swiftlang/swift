@@ -185,7 +185,7 @@ class _Builder(object):
 # -----------------------------------------------------------------------------
 
 class ArgumentParser(argparse.ArgumentParser):
-    """A thin extension class to the standard ArgumentParser which incluldes
+    """A thin extension class to the standard ArgumentParser which includes
     methods to interact with a builder instance.
     """
 
