@@ -5675,7 +5675,7 @@ case TypeKind::Id:
 
     if (auto genericFnType = dyn_cast<GenericFunctionType>(base)) {
 #ifndef NDEBUG
-      // Check that generic parameters won't be trasnformed.
+      // Check that generic parameters won't be transformed.
       // Transform generic parameters.
       for (auto param : genericFnType->getGenericParams()) {
         assert(Type(param)
