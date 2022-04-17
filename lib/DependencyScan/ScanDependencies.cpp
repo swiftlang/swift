@@ -1024,7 +1024,7 @@ static void updateCachedInstanceOpts(CompilerInstance &cachedInstance,
   cachedInstance.getASTContext().SearchPathOpts =
       invocationInstance.getASTContext().SearchPathOpts;
 
-  // The Clang Importer arguments must consiste of a combination of
+  // The Clang Importer arguments must consist of a combination of
   // Clang Importer arguments of the current invocation to inherit its Clang-specific
   // search path options, followed by the options speicific to the given batch-entry,
   // which may overload some of the invocation's options (e.g. target)
