@@ -290,7 +290,7 @@ private:
 
     // This is just for testing, so we check explicitly for the attribute instead
     // of asking if the class is weak imported. If the class has availability,
-    // we'll print a SWIFT_AVAIALBLE() which implies __attribute__((weak_imported))
+    // we'll print a SWIFT_AVAILABLE() which implies __attribute__((weak_imported))
     // already.
     if (CD->getAttrs().hasAttribute<WeakLinkedAttr>())
       os << "SWIFT_WEAK_IMPORT\n";
