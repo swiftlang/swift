@@ -52,7 +52,7 @@ Here are the passes:
 
    - API Diff Pass
 
-     This pass injests an *API Diff Data File*, a JSON file describing API changes
+     This pass ingests an *API Diff Data File*, a JSON file describing API changes
      from the previous SDK, and looks for API references, performing textual edits
      to update code for things like referenced type and argument names or optionality
      changes. This is where the majority of changes come from in the Migrator.
