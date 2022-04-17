@@ -130,7 +130,7 @@ void swift_storeEnumTagMultiPayload(OpaqueValue *value,
                                     unsigned whichCase);
 
 /// The unspecialized getEnumTagSinglePayload value witness to be used by the
-/// VWTs for for specialized generic enums that are multi-payload.
+/// VWTs for specialized generic enums that are multi-payload.
 ///
 /// Runtime availability: Swift 5.6
 SWIFT_RUNTIME_EXPORT
@@ -139,7 +139,7 @@ unsigned swift_getMultiPayloadEnumTagSinglePayload(const OpaqueValue *value,
                                                    const Metadata *enumType);
 
 /// The unspecialized storeEnumTagSinglePayload value witness to be used by the
-/// VWTs for for specialized generic enums that are multi-payload.
+/// VWTs for specialized generic enums that are multi-payload.
 ///
 /// Runtime availability: Swift 5.6
 SWIFT_RUNTIME_EXPORT
