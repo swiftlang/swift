@@ -799,7 +799,7 @@ struct InteriorPointerOperand {
   }
 
   /// If \p val is a result of an instruction that is an interior pointer,
-  /// return an interor pointer operand based off of the base value operand of
+  /// return an interior pointer operand based off of the base value operand of
   /// the instruction.
   static InteriorPointerOperand inferFromResult(SILValue resultValue) {
     auto kind = InteriorPointerOperandKind::inferFromResult(resultValue);
