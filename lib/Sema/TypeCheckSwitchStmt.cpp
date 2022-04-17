@@ -206,7 +206,7 @@ namespace {
       }
       static Space forConstructor(Type T, DeclName H, ArrayRef<Space> SP) {
         if (llvm::any_of(SP, std::mem_fn(&Space::isEmpty))) {
-          // A constructor with an unconstructible parameter can never actually
+          // A constructor with an unconstructable parameter can never actually
           // be used.
           return Space();
         }
