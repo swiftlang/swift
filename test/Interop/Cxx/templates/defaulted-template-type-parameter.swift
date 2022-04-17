@@ -24,8 +24,8 @@ DefaultedTemplateTestSuite.test("Function with defaulted template type parameter
   let _: Int = defaultedTemplateTypeParamUsedInReturn()
   defaultedTemplateTypeParamAndDefaultedParam(0)
   functionTemplateWithDefaultedParam(0)
-  defaultedTemplateTypeParamUsedInSignatureAndUnrealtedParam(0, 0)
-  defaultedTemplateTypeParamAndUnrealtedParam(0)
+  defaultedTemplateTypeParamUsedInSignatureAndUnrelatedParam(0, 0)
+  defaultedTemplateTypeParamAndUnrelatedParam(0)
 }
 
 DefaultedTemplateTestSuite.test("Overloaded function template is not ambiguous") {

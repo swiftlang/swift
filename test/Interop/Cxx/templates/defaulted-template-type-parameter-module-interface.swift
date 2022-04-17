@@ -10,8 +10,8 @@
 // CHECK: func defaultedTemplateTypeParamUsedInReturn<T>() -> T
 // CHECK: func defaultedTemplateTypeParamAndDefaultedParam<T>(_: T)
 // CHECK: func functionTemplateWithDefaultedParam<T>(_: T)
-// CHECK: func defaultedTemplateTypeParamUsedInSignatureAndUnrealtedParam<T>(_: Int32, _: T)
-// CHECK: func defaultedTemplateTypeParamAndUnrealtedParam(_: Int32)
+// CHECK: func defaultedTemplateTypeParamUsedInSignatureAndUnrelatedParam<T>(_: Int32, _: T)
+// CHECK: func defaultedTemplateTypeParamAndUnrelatedParam(_: Int32)
 // CHECK: func overloadedDefaultedTemplate<T>(_: T)
 // CHECK: func overloadedDefaultedTemplate(_: Int32)
 // CHECK: func defaultedTemplateReferenceTypeParam<T>(_ t: inout T)
