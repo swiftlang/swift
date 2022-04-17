@@ -1273,7 +1273,7 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
     isUnavailability = true;
   }
 
-  SyntaxParsingContext ConditonCtxt(SyntaxContext, Kind);
+  SyntaxParsingContext ConditionCtxt(SyntaxContext, Kind);
   SourceLoc PoundLoc;
 
   PoundLoc = consumeToken(MainToken);

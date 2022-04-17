@@ -3503,7 +3503,7 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
 /// Handle code completion after pound in expression position.
 ///
 /// In case it's in a stmt condition position, specify \p ParentKind to
-/// decide the position accepts #available(...) condtion.
+/// decide the position accepts #available(...) condition.
 ///
 /// expr-pound-codecompletion:
 ///   '#' code-completion-token
