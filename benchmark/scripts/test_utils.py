@@ -83,7 +83,7 @@ class Mock(object):
         )
 
     def assert_called_all_expected(self):
-        """Verify that all expeced invocations of tested method were called."""
+        """Verify that all expected invocations of tested method were called."""
         assert self.calls == self.expected, "\nExpected: {0}, \n  Called: {1}".format(
             self.expected, self.calls
         )
