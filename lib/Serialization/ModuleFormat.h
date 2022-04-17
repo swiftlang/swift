@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 684; // Cond. available underlying types for opaque
+const uint16_t SWIFTMODULE_VERSION_MINOR = 685; // Primary associated types
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1654,6 +1654,11 @@ namespace decls_block {
 
   using AssociatedTypeLayout = BCRecordLayout<
     ASSOCIATED_TYPE,
+    DeclIDField                  // associated type decl
+  >;
+
+  using PrimaryAssociatedTypeLayout = BCRecordLayout<
+    PRIMARY_ASSOCIATED_TYPE,
     DeclIDField                  // associated type decl
   >;
 
