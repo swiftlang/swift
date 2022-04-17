@@ -906,7 +906,7 @@ public:
                     llvm::function_ref<bool(AbstractFunctionDecl *)>predicate);
 };
 
-/// A system for recording and probing the intergrity of a type witness solution
+/// A system for recording and probing the integrity of a type witness solution
 /// for a set of unresolved associated type declarations.
 ///
 /// Right now can reason only about abstract type witnesses, i.e., same-type
