@@ -551,7 +551,7 @@ static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
 
   for (auto yield: type->getYields()) {
     // We can't mangle types on inout and indirect yields because they're
-    // absractable.
+    // abstractable.
     if (yield.isIndirectInOut()) {
       out << "inout";
     } else if (yield.isFormalIndirect()) {
