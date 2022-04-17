@@ -1100,7 +1100,7 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
     return context->ResumeParent(context);
   }
 
-  // Load the current task (we alreaady did this in assertions builds).
+  // Load the current task (we already did this in assertions builds).
 #ifdef NDEBUG
   auto task = swift_task_getCurrent();
 #endif
