@@ -761,24 +761,24 @@ func testTypecheckedTypeExpr() {
 // TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#(intVal): Int#}[')'][#MyType<Int>#]; name=:
 // TYPECHECKED_TYPEEXPR: End completions
 
-func testPamrameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosure () -> Int, iuoArg: Int!, variadicArg: Int...) {
+func testParameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosure () -> Int, iuoArg: Int!, variadicArg: Int...) {
   var intVal = 1
-  testPamrameterFlags(intVal, #^ARG_PARAMFLAG_INOUT^#)
+  testParameterFlags(intVal, #^ARG_PARAMFLAG_INOUT^#)
 // ARG_PARAMFLAG_INOUT: Begin completions, 1 items
 // ARG_PARAMFLAG_INOUT-DAG: Pattern/Local/Flair[ArgLabels]: {#inoutArg: &Int#}[#inout Int#]; name=inoutArg:
 // ARG_PARAMFLAG_INOUT: End completions
 
-  testPamrameterFlags(intVal, inoutArg: &intVal, #^ARG_PARAMFLAG_AUTOCLOSURE^#)
+  testParameterFlags(intVal, inoutArg: &intVal, #^ARG_PARAMFLAG_AUTOCLOSURE^#)
 // ARG_PARAMFLAG_AUTOCLOSURE: Begin completions, 1 items
 // ARG_PARAMFLAG_AUTOCLOSURE-DAG: Pattern/Local/Flair[ArgLabels]: {#autoclosureArg: Int#}[#Int#];
 // ARG_PARAMFLAG_AUTOCLOSURE: End completions
 
-  testPamrameterFlags(intVal, inoutArg: &intVal, autoclosureArg: intVal, #^ARG_PARAMFLAG_IUO^#)
+  testParameterFlags(intVal, inoutArg: &intVal, autoclosureArg: intVal, #^ARG_PARAMFLAG_IUO^#)
 // ARG_PARAMFLAG_IUO: Begin completions, 1 items
 // ARG_PARAMFLAG_IUO-DAG: Pattern/Local/Flair[ArgLabels]: {#iuoArg: Int?#}[#Int?#];
 // ARG_PARAMFLAG_IUO: End completions
 
-  testPamrameterFlags(intVal, inoutArg: &intVal, autoclosureArg: intVal, iuoArg: intVal, #^ARG_PARAMFLAG_VARIADIC^#)
+  testParameterFlags(intVal, inoutArg: &intVal, autoclosureArg: intVal, iuoArg: intVal, #^ARG_PARAMFLAG_VARIADIC^#)
 // ARG_PARAMFLAG_VARIADIC: Begin completions, 1 items
 // ARG_PARAMFLAG_VARIADIC-DAG: Pattern/Local/Flair[ArgLabels]: {#variadicArg: Int...#}[#Int#];
 // ARG_PARAMFLAG_VARIADIC: End completions
