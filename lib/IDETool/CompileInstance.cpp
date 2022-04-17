@@ -279,7 +279,7 @@ bool CompileInstance::setupCI(
   /// Declare the frontend to be used for multiple compilations.
   invocation.getFrontendOptions().ReuseFrontendForMultipleCompilations = true;
 
-  // Enable dependency trakcing (excluding system modules) to invalidate the
+  // Enable dependency tracking (excluding system modules) to invalidate the
   // compiler instance if any dependent files are modified.
   invocation.getFrontendOptions().IntermoduleDependencyTracking =
       IntermoduleDepTrackingMode::ExcludeSystem;
