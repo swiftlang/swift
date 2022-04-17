@@ -162,7 +162,7 @@ ATTRIBUTE_NODES = [
                    description='The label of the argument'),
              Child('Colon', kind='ColonToken',
                    description='The colon separating the label and the value'),
-             Child('Delcname', kind='DeclName',
+             Child('Declname', kind='DeclName',
                    description='The value for this argument'),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True, description='''
