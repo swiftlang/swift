@@ -53,7 +53,7 @@ class Symbol {
                          SourceManager &SourceMgr,
                          llvm::json::OStream &OS) const;
 
-  void serializeRange(size_t InitialIdentation,
+  void serializeRange(size_t InitialIndentation,
                       SourceRange Range, SourceManager &SourceMgr,
                       llvm::json::OStream &OS) const;
 
