@@ -260,10 +260,10 @@ public:
   Optional<Value> find(const Key2 &k2, Key1 &k1) const { return find(k1, k2); }
 
   /// Return the submap for a given Key1. May create one, after the fashion of
-  /// the standard libary.
+  /// the standard library.
   const Key2Map &operator[](const Key1 &k1) { return map1[k1]; }
   /// Return the submap for a given Key2. May create one, after the fashion of
-  /// the standard libary.
+  /// the standard library.
   const Key1Map &operator[](const Key2 &k2) { return map2[k2]; }
 
   NullablePtr<const Key2Map> find(const Key1 &k1) const {
