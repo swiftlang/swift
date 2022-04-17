@@ -1263,7 +1263,7 @@ NameImporter::considerAsyncImport(
       }
 
       // Check whether the parameter itself has a name that indicates that
-      // it is a completion handelr.
+      // it is a completion handler.
       if (isCompletionHandlerParamName(
               params[completionHandlerParamIndex]->getName()))
         break;
