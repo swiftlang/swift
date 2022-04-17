@@ -94,7 +94,7 @@ bool Parser::isStartOfStmt() {
     consumeToken(tok::identifier);
     consumeToken(tok::colon);
 
-    // We treating IDENTIIFIER: { as start of statement to provide missed 'do'
+    // We treating IDENTIFIER: { as start of statement to provide missed 'do'
     // diagnostics. This case will be handled in parseStmt().
     if (Tok.is(tok::l_brace)) {
       return true;
