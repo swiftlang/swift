@@ -1863,7 +1863,7 @@ public:
 private:
   void emitGenericSignatureNote(ASTNode anchor) const;
 
-  /// Retrieve representative locations for associated generic prameters.
+  /// Retrieve representative locations for associated generic parameters.
   ///
   /// \returns true if all of the parameters have been covered.
   bool findArgumentLocations(

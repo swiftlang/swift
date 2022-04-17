@@ -9763,7 +9763,7 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   // variables.
   if (builderType->hasTypeParameter()) {
     // Find the opened type for this callee and substitute in the type
-    // parametes.
+    // parameters.
     auto substitutions = cs.getOpenedTypes(calleeLocator);
     if (!substitutions.empty()) {
       OpenedTypeMap replacements(substitutions.begin(), substitutions.end());
