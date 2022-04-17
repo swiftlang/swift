@@ -2101,7 +2101,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   // Emit a branch around the caching code if we're working with responses
   // and the fetched result is not complete.  We can avoid doing this if
   // the response is statically known to be complete, and we don't need to
-  // do it if this is an in-place initiazation cache because the store
+  // do it if this is an in-place initialization cache because the store
   // is done within the runtime.
   llvm::BasicBlock *completionCheckBB = nullptr;
   llvm::Value *directState = nullptr;
