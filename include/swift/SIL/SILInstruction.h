@@ -2277,7 +2277,7 @@ public:
     return getAllOperands().slice(getNumTailTypes() + 1);
   }
   // Is the deinit and the size of the dynamic type known to be equivalent to
-  // the the base type (i.e `this->getType()`).
+  // the base type (i.e `this->getType()`).
   bool isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const;
 };
 
