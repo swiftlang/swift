@@ -182,7 +182,7 @@ TYPE_NODES = [
          ]),
 
     # attributed-type -> type-specifier? attribute-list? type
-    # type-specifiyer -> 'inout' | '__owned' | '__unowned'
+    # type-specifier -> 'inout' | '__owned' | '__unowned'
     Node('AttributedType', kind='Type',
          children=[
              Child('Specifier', kind='Token',
