@@ -770,7 +770,7 @@ class RefCounts {
       return;
     }
     // Immortal and no objc complications share a bit, so don't let setting
-    // the complications one clear the immmortal one
+    // the complications one clear the immortal one
     if (oldbits.isImmortal(true) || oldbits.pureSwiftDeallocation() == nonobjc){
       assert(!oldbits.hasSideTable());
       return;
