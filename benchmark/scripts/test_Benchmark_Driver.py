@@ -839,7 +839,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
         quantum used by macos scheduler. Linux scheduler's quantum is 6ms.
         Driver yielding the process before the 10ms quantum elapses helped
         a lot, but benchmarks with runtimes under 1ms usually exhibit a strong
-        mode which is best for accurate performance charaterization.
+        mode which is best for accurate performance characterization.
         To minimize the number of involuntary context switches that corrupt our
         measurements, we should strive to stay in the microbenchmark range.
 
