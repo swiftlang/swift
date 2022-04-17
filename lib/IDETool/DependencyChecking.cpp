@@ -74,7 +74,7 @@ static void cacheDependencyHashIfNeeded(CompilerInstance &CI,
     if (!stat)
       return false;
 
-    // We will check the hash only if the modification time of the dependecy
+    // We will check the hash only if the modification time of the dependency
     // is zero. See 'areAnyDependentFilesInvalidated() below'.
     if (stat->getLastModificationTime() != llvm::sys::TimePoint<>())
       return false;
