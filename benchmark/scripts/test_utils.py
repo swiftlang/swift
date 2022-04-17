@@ -69,7 +69,7 @@ class Mock(object):
     def expect(self, call_args, response):
         """Expect invocation of tested method with given arguments.
 
-        Stores the canned reponse in the `respond` dictionary.
+        Stores the canned response in the `respond` dictionary.
         """
         call_args = tuple(call_args)
         self.expected.append(call_args)
