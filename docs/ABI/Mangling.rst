@@ -596,7 +596,7 @@ Types
   FUNCTION-KIND ::= 'zB' C-TYPE              // objc block type with non-canonical C type
   FUNCTION-KIND ::= 'L'                      // objc block function type with canonical C type (escaping) (DWARF only; otherwise use 'B' or 'zB' C-TYPE)
   FUNCTION-KIND ::= 'C'                      // C function pointer / C++ method type
-  FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with with non-canonical C type
+  FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
 
