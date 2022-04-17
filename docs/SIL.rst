@@ -1748,7 +1748,7 @@ with partitioned defs/uses annotated inline::
     return %kls1Casted : $SuperKlass
   }
 
-Notice how every value in the SIL above has a partionable set of uses with
+Notice how every value in the SIL above has a partitionable set of uses with
 normal uses always before consuming uses. Any such violations of ownership
 semantics would trigger a SILVerifier error allowing us to know that we
 do not have any leaks or use-after-frees in the above code.
