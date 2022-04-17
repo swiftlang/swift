@@ -4112,7 +4112,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
     // If this is a conversion from optional chain to some
     // other type e.g. contextual type or a parameter type,
     // let's use `Bind` to match object types because
-    // object type of the optinal chain is a type variable.
+    // object type of the optional chain is a type variable.
     //
     // One exception is contextual conversion - in such cases
     // let's give optional chain a chance to infer its inner type
@@ -4146,7 +4146,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
       }
     } else {
       // In cases when sub-expression isn't optional, 'try?'
-      // always adds one level of optinality regardless of
+      // always adds one level of optionality regardless of
       // language mode, so we can safely try to bind its
       // object type to contextual type without risk of
       // causing more optionality mismatches down the road.
