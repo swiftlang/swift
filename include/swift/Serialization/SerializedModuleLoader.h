@@ -36,7 +36,7 @@ enum class ModuleLoadingMode {
 /// Helper type used to pass and compute the sets of related filenames used by
 /// \c SerializedModuleLoader subclasses.
 struct SerializedModuleBaseName {
-  /// The base filename, wtihout any extension.
+  /// The base filename, without any extension.
   SmallString<256> baseName;
 
   /// Creates a \c SerializedModuleBaseName.
