@@ -1047,7 +1047,7 @@ class ModuleInterfaceLoaderImpl {
       // file and removed the fallback interface file, we can rebuild the cache.
       fallbackBuilder.addExtraDependency(interfacePath);
       // Use cachedOutputPath as the output file path. This output path was
-      // calcualted using the canonical interface file path to make sure we
+      // calculated using the canonical interface file path to make sure we
       // can find it from the canonical interface file.
       auto failedAgain = fallbackBuilder.buildSwiftModule(cachedOutputPath,
           /*shouldSerializeDeps*/true, &moduleBuffer, remarkRebuild);
