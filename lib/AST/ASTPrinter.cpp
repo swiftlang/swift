@@ -2563,7 +2563,7 @@ void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
     // base NominalDecl itself (which can't). E.g:
     //
     //   protocol Foo {}
-    //   extension Foo where <requirments from ExtDecl> { ... }
+    //   extension Foo where <requirements from ExtDecl> { ... }
     //   struct Bar {}
     //   extension Bar: Foo where <requirements from TransformContext> { ... }
     //
