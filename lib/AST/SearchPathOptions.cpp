@@ -62,7 +62,7 @@ void ModuleSearchPathLookup::rebuildLookupTable(const SearchPathOptions *Opts,
   if (IsOSDarwin) {
     for (auto Entry : llvm::enumerate(Opts->getDarwinImplicitFrameworkSearchPaths())) {
       addFilesInPathToLookupTable(FS, Entry.value(),
-                                  ModuleSearchPathKind::DarwinImplictFramework,
+                                  ModuleSearchPathKind::DarwinImplicitFramework,
                                   /*isSystem=*/true, Entry.index());
     }
   }

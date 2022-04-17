@@ -32,7 +32,7 @@ namespace swift {
 enum class ModuleSearchPathKind {
   Import,
   Framework,
-  DarwinImplictFramework,
+  DarwinImplicitFramework,
   RuntimeLibrary,
 };
 

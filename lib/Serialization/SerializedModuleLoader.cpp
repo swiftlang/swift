@@ -104,7 +104,7 @@ Optional<bool> forEachModuleSearchPath(
   if (Ctx.LangOpts.Target.isOSDarwin()) {
     for (const auto &path : Ctx.getDarwinImplicitFrameworkSearchPaths())
       if (auto result =
-              callback(path, ModuleSearchPathKind::DarwinImplictFramework,
+              callback(path, ModuleSearchPathKind::DarwinImplicitFramework,
                        /*isSystem=*/true))
         return result;
   }
@@ -231,7 +231,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       return None;
     }
     case ModuleSearchPathKind::Framework:
-    case ModuleSearchPathKind::DarwinImplictFramework: {
+    case ModuleSearchPathKind::DarwinImplicitFramework: {
       // Look for:
       // $PATH/{name}.framework/Modules/{name}.swiftmodule/{arch}.{extension}
       forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
@@ -659,7 +659,7 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
       }
     }
     case ModuleSearchPathKind::Framework:
-    case ModuleSearchPathKind::DarwinImplictFramework: {
+    case ModuleSearchPathKind::DarwinImplicitFramework: {
       isFramework = true;
       llvm::sys::path::append(currPath, moduleName + ".framework");
 
