@@ -141,7 +141,7 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
                   Type witnessType, bool witnessTypeIsIUO,
                   VarianceKind variance) {
   // If the witness type is noescape but the requirement type is not,
-  // adjust the witness type to be escaping; likewisse for sendability. This
+  // adjust the witness type to be escaping; likewise for sendability. This
   // permits a limited form of covariance.
   auto applyAdjustment = [&](TypeAdjustment adjustment) {
     // Sometimes the witness has a function type, but the requirement has
