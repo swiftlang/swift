@@ -5787,7 +5787,7 @@ bool isPatternMatchingOperator(ASTNode node);
 /// "standard" comparison operator such as "==", "!=", ">" etc.
 bool isStandardComparisonOperator(ASTNode node);
 
-/// If given expression references operator overlaod(s)
+/// If given expression references operator overload(s)
 /// extract and produce name of the operator.
 Optional<Identifier> getOperatorName(Expr *expr);
 
