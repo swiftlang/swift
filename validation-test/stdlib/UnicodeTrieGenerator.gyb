@@ -35,7 +35,7 @@ def test_trie_generation(property_table, configure_generator=None):
         trie_generator.supp_data_bytes_offset - trie_generator.supp_lookup2_bytes_offset,
         len(trie_generator.trie_bytes) - trie_generator.supp_data_bytes_offset))
 
-class PerfectlyCompressableProperty(UnicodeProperty):
+class PerfectlyCompressibleProperty(UnicodeProperty):
     def __init__(self):
         pass
 
@@ -53,9 +53,9 @@ class PerfectlyCompressableProperty(UnicodeProperty):
     def get_numeric_value(self, cp):
         return self.to_numeric_value(self.get_value(cp))
 
-print('PerfectlyCompressableProperty')
-test_trie_generation(PerfectlyCompressableProperty())
-# CHECK-LABEL: PerfectlyCompressableProperty
+print('PerfectlyCompressibleProperty')
+test_trie_generation(PerfectlyCompressibleProperty())
+# CHECK-LABEL: PerfectlyCompressibleProperty
 # CHECK: (8, 8, 5, 8, 8,  1, 1, 1, 1, 1,  1041,  256, 256, 17, 256, 256)
 #
 # Explanation for table sizes above:
