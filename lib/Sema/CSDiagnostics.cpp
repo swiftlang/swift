@@ -5576,7 +5576,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
     // We only want to emit the note + fix-it if the function does not
     // have an explicit return type. The reason we also need to check
     // whether the parameter list has a valid loc is to guard against
-    // cases like like 'var foo: () { return 1 }' as here that loc will
+    // cases like 'var foo: () { return 1 }' as here that loc will
     // be invalid. We also need to check that the name is not empty,
     // because certain decls will have empty name (like setters).
     if (FD->getResultTypeRepr() == nullptr &&
