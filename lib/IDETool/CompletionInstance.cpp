@@ -233,14 +233,14 @@ bool CompletionInstance::performCachedOperationIfPossible(
   tmpSM.setCodeCompletionPoint(tmpBufferID, Offset);
 
   LangOptions langOpts = CachedCI->getASTContext().LangOpts;
-  TypeCheckerOptions typeckOpts = CachedCI->getASTContext().TypeCheckerOpts;
+  TypeCheckerOptions typecheckOpts = CachedCI->getASTContext().TypeCheckerOpts;
   SILOptions silOpts = CachedCI->getASTContext().SILOpts;
   SearchPathOptions searchPathOpts = CachedCI->getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
   ClangImporterOptions clangOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts;
   std::unique_ptr<ASTContext> tmpCtx(
-      ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
+      ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts, clangOpts,
                       symbolOpts, tmpSM, tmpDiags));
   tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);

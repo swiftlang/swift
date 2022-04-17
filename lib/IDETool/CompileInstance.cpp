@@ -120,14 +120,14 @@ getModifiedFunctionDeclList(const SourceFile &SF, SourceManager &tmpSM,
   // Parse the new buffer into temporary SourceFile.
 
   LangOptions langOpts = ctx.LangOpts;
-  TypeCheckerOptions typeckOpts = ctx.TypeCheckerOpts;
+  TypeCheckerOptions typecheckOpts = ctx.TypeCheckerOpts;
   SearchPathOptions searchPathOpts = ctx.SearchPathOpts;
   ClangImporterOptions clangOpts = ctx.ClangImporterOpts;
   SILOptions silOpts = ctx.SILOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts = ctx.SymbolGraphOpts;
 
   DiagnosticEngine tmpDiags(tmpSM);
-  auto &tmpCtx = *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
+  auto &tmpCtx = *ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts,
                                   clangOpts, symbolOpts, tmpSM, tmpDiags);
   registerParseRequestFunctions(tmpCtx.evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx.evaluator);
