@@ -9,7 +9,7 @@
 /// Check Bar.swiftmodule is created
 // RUN: test -f %t/Bar.swiftmodule
 
-/// Create a module Foo that imports Cat with -module-alias Cat=Bar with a serialized modue loader
+/// Create a module Foo that imports Cat with -module-alias Cat=Bar with a serialized module loader
 // RUN: %target-swift-frontend -module-name Foo %t/FileFoo.swift -module-alias Cat=Bar -I %t -emit-module -emit-module-path %t/Foo.swiftmodule -Rmodule-loading 2> %t/load-result-foo.output
 
 /// Check Foo.swiftmodule is created and Bar.swiftmodule is loaded
