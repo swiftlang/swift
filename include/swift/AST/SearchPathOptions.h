@@ -117,7 +117,7 @@ class ModuleSearchPathLookup {
   /// Scan the directory at \p SearchPath for files and add those files to the
   /// lookup table. \p Kind specifies the search path kind and \p Index the
   /// index of \p SearchPath within that search path kind. Search paths with
-  /// lower indicies are considered first.
+  /// lower indices are considered first.
   /// The \p SearchPath is stored by as a \c StringRef, so the string backing it
   /// must be alive as long as this lookup table is alive and not cleared.
   void addFilesInPathToLookupTable(llvm::vfs::FileSystem *FS,

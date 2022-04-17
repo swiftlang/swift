@@ -94,7 +94,7 @@ ModuleSearchPathLookup::searchPathsContainingFile(
   // Note that if a search path is specified twice by including it twice in
   // compiler arguments or by specifying it as different kinds (e.g. once as
   // import and once as framework search path), these search paths are
-  // considered different (because they have different indicies/kinds and may
+  // considered different (because they have different indices/kinds and may
   // thus still be included twice.
   llvm::SmallVector<const ModuleSearchPath *, 4> Result;
   llvm::SmallSet<std::pair<ModuleSearchPathKind, unsigned>, 4> ResultIds;
