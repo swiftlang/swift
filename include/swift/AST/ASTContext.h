@@ -1320,10 +1320,10 @@ public:
                                                const ValueDecl *derived);
 
   enum class OverrideGenericSignatureReqCheck {
-    /// Base method's generic requirements are satisifed by derived method
+    /// Base method's generic requirements are satisfied by derived method
     BaseReqSatisfiedByDerived,
 
-    /// Derived method's generic requirements are satisifed by base method
+    /// Derived method's generic requirements are satisfied by base method
     DerivedReqSatisfiedByBase
   };
 
