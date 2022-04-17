@@ -1446,16 +1446,16 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
                                                   const unsigned char *filename,
                                                   int32_t filenameLength,
                                                   int32_t line, int32_t column,
-                                                  unsigned verifcationType) {
-  assert((verifcationType == 0 || verifcationType == 1) &&
-         "Unknown verifcation type");
+                                                  unsigned verificationType) {
+  assert((verificationType == 0 || verificationType == 1) &&
+         "Unknown verification type");
 
   bool isEscaping =
       object != nullptr && !object->refCounts.isUniquelyReferenced();
 
   // Print a message if the closure escaped.
   if (isEscaping) {
-    auto *message = (verifcationType == 0)
+    auto *message = (verificationType == 0)
                         ? "closure argument was escaped in "
                           "withoutActuallyEscaping block"
                         : "closure argument passed as @noescape "
