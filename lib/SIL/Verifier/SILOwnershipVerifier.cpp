@@ -669,7 +669,7 @@ bool SILValueOwnershipChecker::checkUses() {
     }
   }
 
-  // Check if we are an instruction that forwards forwards guaranteed
+  // Check if we are an instruction that forwards guaranteed
   // ownership. In such a case, we are a subobject projection. We should not
   // have any lifetime ending uses.
   if (value.getOwnershipKind() == OwnershipKind::Guaranteed
