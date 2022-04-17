@@ -316,7 +316,7 @@ static void discoverCrossImportOverlayDependencies(
                   std::set<ModuleDependencyID>>
       allModules;
 
-  // Seed the all module list from the dummpy main module.
+  // Seed the all module list from the dummy main module.
   allModules.insert({dummyMainName.str(), dummyMainDependencies.getKind()});
 
   // Explore the dependencies of every module.
