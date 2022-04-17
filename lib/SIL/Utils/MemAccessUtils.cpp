@@ -2508,7 +2508,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
   }
   if (auto ID = builtin->getIntrinsicID()) {
     switch (ID.getValue()) {
-      // Exhaustively verifying all LLVM instrinsics that access memory is
+      // Exhaustively verifying all LLVM intrinsics that access memory is
       // impractical. Instead, we call out the few common cases and return in
       // the default case.
     default:
