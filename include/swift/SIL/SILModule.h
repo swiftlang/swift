@@ -684,7 +684,7 @@ public:
 
   // This is currently limited to VarDecl because the visibility of global
   // variables and class properties is straightforward, while the visibility of
-  // class methods (ValueDecls) depends on the subclass scope. "Visiblity" has
+  // class methods (ValueDecls) depends on the subclass scope. "Visibility" has
   // a different meaning when vtable layout is at stake.
   bool isVisibleExternally(const VarDecl *decl) {
     return isPossiblyUsedExternally(getDeclSILLinkage(decl), isWholeModule());
