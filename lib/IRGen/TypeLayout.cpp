@@ -904,7 +904,7 @@ bool AlignedGroupEntry::canValueWitnessExtraInhabitantsUpTo(
     IRGenModule &IGM, unsigned index) const {
   uint32_t currentMaxXICount = 0;
   uint32_t currentMaxXIField = 0;
-  // Choose the the field with the max xi count.
+  // Choose the field with the max xi count.
   for (unsigned i = 0; i < entries.size(); i++) {
     auto entryXICount = entries[i]->fixedXICount(IGM);
     if (!entryXICount) {
@@ -969,7 +969,7 @@ AlignedGroupEntry::fixedXICount(IRGenModule &IGM) const {
   if (_fixedXICount.hasValue())
     return *_fixedXICount;
   uint32_t currentMaxXICount = 0;
-  // Choose the the field with the max xi count.
+  // Choose the field with the max xi count.
   for (auto *entry : entries) {
     auto entryXICount = entry->fixedXICount(IGM);
     if (!entryXICount) {
@@ -983,7 +983,7 @@ AlignedGroupEntry::fixedXICount(IRGenModule &IGM) const {
 llvm::Value *AlignedGroupEntry::extraInhabitantCount(IRGenFunction &IGF) const {
   llvm::Value *currentMaxXICount = IGF.IGM.getInt32(0);
   auto &Builder = IGF.Builder;
-  // Choose the the field with the max xi count.
+  // Choose the field with the max xi count.
   for (auto *entry : entries) {
     auto entryXICount = entry->extraInhabitantCount(IGF);
     auto entryXICountGT =
