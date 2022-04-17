@@ -179,7 +179,7 @@ public struct AsyncStream<Element> {
     let storage: _Storage
 
     /// Resume the task awaiting the next iteration point by having it return
-    /// nomally from its suspension point with a given element.
+    /// normally from its suspension point with a given element.
     ///
     /// - Parameter value: The value to yield from the continuation.
     /// - Returns: A `YieldResult` that indicates the success or failure of the
