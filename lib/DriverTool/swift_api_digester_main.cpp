@@ -1642,7 +1642,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       return;
     }
 
-    // We should exlude those declarations that are pulled up to the super classes.
+    // We should exclude those declarations that are pulled up to the super classes.
     bool FoundInSuperclass = false;
     if (auto PD = dyn_cast<SDKNodeDecl>(Node->getParent())) {
       if (PD->isAnnotatedAs(NodeAnnotation::Updated)) {
