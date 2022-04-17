@@ -1375,7 +1375,7 @@ public:
 };
 
 /// Diagnose an attempt to construct an instance using non-constant
-/// metatype base without explictly specifying `init`:
+/// metatype base without explicitly specifying `init`:
 ///
 /// ```swift
 /// let foo = Int.self
