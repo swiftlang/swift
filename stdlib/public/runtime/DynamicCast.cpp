@@ -2079,7 +2079,7 @@ tryCast(
       || srcKind == MetadataKind::ObjCClassWrapper
       || srcKind == MetadataKind::ForeignClass) {
     auto srcObject = getNonNullSrcObject(srcValue, srcType, destType);
-    // If srcObject is null, we're in compability mode.
+    // If srcObject is null, we're in compatibility mode.
     // But we can't lookup dynamic type for a null class reference, so
     // just skip this in that case.
     if (srcObject != nullptr) {
