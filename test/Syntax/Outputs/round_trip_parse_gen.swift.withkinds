@@ -91,7 +91,7 @@ class C <MemberDeclBlock>{<MemberDeclListItem><FunctionDecl>
     super</SuperRefExpr>.init</MemberAccessExpr>()</FunctionCallExpr>
   }</CodeBlock></FunctionDecl></MemberDeclListItem><MemberDeclListItem><FunctionDecl>
 
-  func implictMember<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
+  func implicitMember<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr>.foo</MemberAccessExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><MemberAccessExpr>.foo</MemberAccessExpr>(<TupleExprElement>x: <IntegerLiteralExpr>12</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><MemberAccessExpr>.foo</MemberAccessExpr>() <ClosureExpr>{ <IntegerLiteralExpr>12 </IntegerLiteralExpr>}</ClosureExpr></FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
