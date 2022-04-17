@@ -2845,7 +2845,7 @@ public:
 
   /// FIXME: This is an egregious hack to turn off availability checking
   /// for specific functions that were missing availability in older versions
-  /// of existing libraries that we must nonethess still support.
+  /// of existing libraries that we must nonetheless still support.
   static bool hasHistoricallyWrongAvailability(FuncDecl *func) {
     return func->getName().isCompoundName("swift_deletedAsyncMethodError", { });
   }
