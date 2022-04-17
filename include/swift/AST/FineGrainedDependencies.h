@@ -637,11 +637,11 @@ class DepGraphNode {
   ///
   /// However, at present, the frontend does not record this information for
   /// every Decl; it only records it for the source-file-as-a-whole in the
-  /// interface hash. The inteface hash is a product of all the tokens that are
+  /// interface hash. The interface hash is a product of all the tokens that are
   /// not inside of function bodies. Thus, if there is no fingerprint, when the
   /// frontend creates an interface node,
   //  it adds a dependency to it from the implementation source file node (which
-  //  has the intefaceHash as its fingerprint).
+  //  has the interfaceHash as its fingerprint).
   Optional<Fingerprint> fingerprint;
 
   friend ::llvm::yaml::MappingTraits<DepGraphNode>;
