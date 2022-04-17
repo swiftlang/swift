@@ -82,7 +82,7 @@ private func isNotReferenceCounted(value: Value, context: PassContext) -> Bool {
       // releases, because they are no-ops on immortal objects.
       // Note that the `simplifyGlobalValuePass` pass is deleting balanced
       // retains/releases, which doesn't require a Swift 5.1 minimum deployment
-      // targert.
+      // target.
       return gvi.function.isSwift51RuntimeAvailable
     case let rptr as RawPointerToRefInst:
       // Like `global_value` but for the empty collection singletons from the
