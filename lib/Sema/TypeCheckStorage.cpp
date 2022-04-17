@@ -632,7 +632,7 @@ namespace  {
   /// Describes the information needed to perform property wrapper access via
   /// the enclosing self.
   struct EnclosingSelfPropertyWrapperAccess {
-    /// The (genreric) subscript that will be used to perform the access.
+    /// The (generic) subscript that will be used to perform the access.
     SubscriptDecl *subscript;
 
     /// The property being accessed.
