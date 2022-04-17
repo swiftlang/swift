@@ -6052,7 +6052,7 @@ private:
   /// be supertypes extracted from one of the current bindings
   /// or default literal types etc.
   ///
-  /// \returns true if some new bindings were sucessfully computed,
+  /// \returns true if some new bindings were successfully computed,
   /// false otherwise.
   bool computeNext();
 
