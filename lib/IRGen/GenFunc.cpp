@@ -725,9 +725,9 @@ static unsigned findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
     IRGenFunction &IGF, CanSILFunctionType substType,
     CanSILFunctionType outType) {
   auto substParameters = substType->getParameters();
-  auto outParamters = outType->getParameters();
+  auto outParameters = outType->getParameters();
   unsigned firstNonEmpty = -1U;
-  for (unsigned paramIdx = outParamters.size() ; paramIdx != substParameters.size(); ++paramIdx) {
+  for (unsigned paramIdx = outParameters.size() ; paramIdx != substParameters.size(); ++paramIdx) {
     bool isEmpty =
         isABIIgnoredParameterWithoutStorage(IGF.IGM, IGF, substType, paramIdx);
     assert((isEmpty || firstNonEmpty == -1U) && "Expect at most one partially "
