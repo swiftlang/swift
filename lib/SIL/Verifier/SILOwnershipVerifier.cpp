@@ -797,7 +797,7 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   //
   // NOTE: We purposely return if we do can not look up a module here to ensure
   // that if we run into something that we do not understand, we do not assert
-  // in user code even tohugh we aren't going to actually verify (the default
+  // in user code even though we aren't going to actually verify (the default
   // behavior when -sil-verify-all is disabled).
   auto *mod = Value->getModule();
   if (!mod || !mod->getOptions().VerifyAll)
@@ -841,7 +841,7 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   //
   // NOTE: We purposely return if we do can not look up a module here to ensure
   // that if we run into something that we do not understand, we do not assert
-  // in user code even tohugh we aren't going to actually verify (the default
+  // in user code even though we aren't going to actually verify (the default
   // behavior when -sil-verify-all is disabled).
   auto *mod = &getModule();
   if (!mod || !mod->getOptions().VerifyAll)
