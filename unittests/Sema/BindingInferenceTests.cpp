@@ -109,7 +109,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
   }
 
   // Let's test transitive literal requirement coverage,
-  // literal requirements are prepagated up the subtype chain.
+  // literal requirements are propagated up the subtype chain.
 
   auto *otherTy = cs.createTypeVariable(cs.getConstraintLocator({}),
                                         /*options=*/0);
