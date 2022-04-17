@@ -1894,7 +1894,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   unsigned defaultImpact = 1;
 
   if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
-    // If it is represetative for a key path root, let's emit a more
+    // If it is representative for a key path root, let's emit a more
     // specific diagnostic.
     auto *keyPathRoot =
         cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
