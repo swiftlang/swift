@@ -2228,7 +2228,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 // debugging, testing, generating module dumps, etc. (In other words, if you're
 // trying to get all the members of a namespace in another part of the compiler,
 // you're probably doing somethign wrong. This is a very expensive operation,
-// so we want to do it only when absolutely nessisary.)
+// so we want to do it only when absolutely necessary.)
 static void addNamespaceMembers(Decl *decl,
                                 llvm::SmallVector<Decl *, 16> &members) {
   auto &ctx = decl->getASTContext();
