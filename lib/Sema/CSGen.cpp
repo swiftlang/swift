@@ -2359,7 +2359,7 @@ namespace {
           // from the right-hand side (which is not the case for `OneWayEqual`)
           // e.g.:
           //
-          // sturct S { var x, y: Int }
+          // struct S { var x, y: Int }
           //
           // func test(s: S) {
           //   let (x, y) = (s.x, s.y)
