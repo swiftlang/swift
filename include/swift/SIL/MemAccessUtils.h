@@ -267,7 +267,7 @@ enum class AccessUseType { Exact, Inner, Overlapping };
 /// The enum values are ordered.  Each successive cast kind is more
 /// transformative than the last.
 ///
-/// TODO: Distinguish between LayoutEquivalent and LayoutCompatibile.
+/// TODO: Distinguish between LayoutEquivalent and LayoutCompatible.
 enum class AccessStorageCast { Identity, Type };
 
 /// The physical representation used to identify access information and common
