@@ -1241,8 +1241,8 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
       return false;
   }
 
-  for (auto Overriden: collectAllOverriddenDecls(D, /*IncludeProtocolReqs=*/false)) {
-    addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overriden);
+  for (auto Overridden: collectAllOverriddenDecls(D, /*IncludeProtocolReqs=*/false)) {
+    addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overridden);
   }
 
   if (auto Parent = getParentDecl()) {
