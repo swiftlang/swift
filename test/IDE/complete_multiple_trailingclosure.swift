@@ -177,7 +177,7 @@ func testOptionalInit() {
 // INIT_REQUIRED_SAMELINE_3: Begin completions, 2 items
 // INIT_REQUIRED_SAMELINE_3-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
 // INIT_REQUIRED_SAMELINE_3-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct3#];
-// INIT_REQIORED_SAMELINE_3: End completions
+// INIT_REQUIRED_SAMELINE_3: End completions
 
 // INIT_REQUIRED_NEWLINE_3: Begin completions
 // INIT_REQUIRED_NEWLINE_3-NOT: name=fn2
