@@ -102,7 +102,7 @@ using IdentifierNodeLayout = BCRecordLayout<IDENTIFIER_NODE, BCBlob>;
 //
 // These arrays are also referenced by their sequence number,
 // starting from 1, similar to identifiers above. Value 0 indicates an
-// empty array. This record is used because individiual array fields must
+// empty array. This record is used because individual array fields must
 // appear as the last field of whatever record they belong to, and several of
 // the below record layouts contain multiple arrays.
 using IdentifierArrayLayout =
