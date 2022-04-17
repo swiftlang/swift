@@ -33,7 +33,7 @@ umask 0022
 # The --skip-build parameter, with no product name, does not affect the
 # configuration (CMake parameters). You can turn this option on and
 # off in different invocations of the script for the same build
-# directory without affecting configutation.
+# directory without affecting configuration.
 #
 # skip-build-* and build-* parameters affect the CMake configuration
 # (enable/disable those components).
