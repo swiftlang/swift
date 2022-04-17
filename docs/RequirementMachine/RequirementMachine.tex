@@ -1390,7 +1390,7 @@ Finally, I can formalize the notion of ``reducing'' terms by making them ``small
 \begin{definition}[Reduction relation]\label{transinvdef} If $A^*$ is equipped with a reduction order $<$, then a relation $\rightarrow$ is a \emph{reduction relation} with respect to $<$ if $x\rightarrow y$ implies that $y<x$. Another equivalent definition is that a reduction relation $\rightarrow$ is a \emph{sub-relation} of $>$, the inverse relation of $<$. 
 \end{definition}
 \index{rewrite system}
-As you saw in the previous example, a reduction relation for a finitely-presented monoid can be constructed by orienting the equations from the presentation with respect to some reduction order, a process which converts the equations into rewrite rules. Such a set of rewrite rules is called a \emph{rewrite system}. There is a simple algorithm for for reducing a term into an irreducible form:
+As you saw in the previous example, a reduction relation for a finitely-presented monoid can be constructed by orienting the equations from the presentation with respect to some reduction order, a process which converts the equations into rewrite rules. Such a set of rewrite rules is called a \emph{rewrite system}. There is a simple algorithm for reducing a term into an irreducible form:
 \begin{algorithm}[Reducing a term]\label{reducingaterm} Let $t$ be a term in some rewrite system $R$.
 \begin{enumerate}
 \item Initialize the boolean flag to false.
