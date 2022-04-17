@@ -1437,7 +1437,7 @@ namespace {
 /// \returns If the argument type is existential and opening it can bind a
 /// generic parameter in the callee, returns the generic parameter, type
 /// variable (from the opened parameter type) the existential type that needs
-/// to be opened (from the argument type), and the adjustements that need to be
+/// to be opened (from the argument type), and the adjustments that need to be
 /// applied to the existential type after it is opened.
 static Optional<
     std::tuple<GenericTypeParamType *, TypeVariableType *, Type,
