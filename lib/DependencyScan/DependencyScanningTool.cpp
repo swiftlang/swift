@@ -74,7 +74,7 @@ DependencyScanningTool::getDependencies(
 
   // Local scan cache instance, wrapping the shared global cache.
   ModuleDependenciesCache cache(*SharedCache);
-  // Execute the scanning action, retreiving the in-memory result
+  // Execute the scanning action, retrieving the in-memory result
   auto DependenciesOrErr = performModuleScan(*Instance.get(), cache);
   if (DependenciesOrErr.getError())
     return std::make_error_code(std::errc::not_supported);
@@ -91,7 +91,7 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command) {
     return EC;
   auto Instance = std::move(*InstanceOrErr);
 
-  // Execute the scanning action, retreiving the in-memory result
+  // Execute the scanning action, retrieving the in-memory result
   auto DependenciesOrErr = performModulePrescan(*Instance.get());
   if (DependenciesOrErr.getError())
     return std::make_error_code(std::errc::not_supported);
