@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the \c PotentialBindings class and its auxiliary types
-// such as \c PotentialBinding, that are used to descibe bindings which
+// such as \c PotentialBinding, that are used to describe bindings which
 // a particular type variable could be bound to.
 //
 //===----------------------------------------------------------------------===//
