@@ -219,10 +219,10 @@ bool CompileInstance::performCachedSemaIfPossible(DiagnosticConsumer *DiagC) {
 
   // Collect modified function body.
   SmallVector<ModInfo, 2> modifiedFuncDecls;
-  bool isNotResuable = CI->forEachFileToTypeCheck([&](SourceFile &oldSF) {
+  bool isNotReusable = CI->forEachFileToTypeCheck([&](SourceFile &oldSF) {
     return getModifiedFunctionDeclList(oldSF, tmpSM, modifiedFuncDecls);
   });
-  if (isNotResuable)
+  if (isNotReusable)
     return true;
 
   // OK, we can reuse the AST.
