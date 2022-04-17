@@ -510,12 +510,12 @@ func testReturnNonOptionalValuesForResultAndError(completion: @escaping (Int?, E
 // NON-OPTIONAL-VALUE-FOR-RESULT-AND-ERROR-NEXT: }
 
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT %s
-func testMixedOptionalAnNonOptionaResults(completion: @escaping (Int?, String?, Error?) -> Void) {
+func testMixedOptionalAnNonOptionalResults(completion: @escaping (Int?, String?, Error?) -> Void) {
   withoutAsyncAlternativeThrowing { (theResult, error) in
     completion(theResult, "hi", nil)
   }
 }
-// MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT:      func testMixedOptionalAnNonOptionaResults() async throws -> (Int, String) {
+// MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT:      func testMixedOptionalAnNonOptionalResults() async throws -> (Int, String) {
 // MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:   return try await withCheckedThrowingContinuation { continuation in 
 // MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:     withoutAsyncAlternativeThrowing { (theResult, error) in
 // MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:       guard let theResult1 = theResult else {
