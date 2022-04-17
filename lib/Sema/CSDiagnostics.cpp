@@ -229,7 +229,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   };
 
   // TODO: potentially we are tracking more information than we need to here
-  // because the decl might also availiable via the contextual type. In the long
+  // because the decl might also available via the contextual type. In the long
   // run we probably want to refactor to get rid of get/set contextual.
   if (auto opaqueLocator =
           getLocator()->findFirst<LocatorPathElt::OpenedOpaqueArchetype>()) {
