@@ -1802,7 +1802,7 @@ This lattice is applied to SIL by requiring well formed SIL to:
    the same for all instances of an instruction) or dynamic (e.x.: forwarding
    instructions set their ownership upon construction). We call this subset of
    OwnershipKind to be the set of `Value Ownership Kind`_: `None`_, `Unowned`_,
-   `Guaranteed`_, `Owned`_ (note conspiciously missing `Any`). This is because
+   `Guaranteed`_, `Owned`_ (note conspicuously missing `Any`). This is because
    in our model `Any` represents an unknown ownership semantics and since our
    model is strict, we do not allow for values to have unknown ownership.
 
