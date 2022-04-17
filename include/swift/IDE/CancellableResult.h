@@ -147,7 +147,7 @@ public:
   /// \p Handle with either the transformed value or the failure or cancelled
   /// result.
   /// The \c async part of the map means that the transform might happen
-  /// asyncronously. This function does not introduce asynchronicity by itself.
+  /// asynchronously. This function does not introduce asynchronicity by itself.
   /// \p Transform might also invoke the callback synchronously.
   template <typename NewResultType>
   void
