@@ -790,7 +790,7 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
         consumeToken();
         
         // If the following token is either <identifier> or :, it means that
-        // this `var` or `let` shoud be interpreted as a label
+        // this `var` or `let` should be interpreted as a label
         if ((Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) ||
              peekToken().is(tok::colon)) {
           backtrack.cancelBacktrack();
