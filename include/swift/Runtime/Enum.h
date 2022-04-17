@@ -59,7 +59,7 @@ void swift_initEnumMetadataSinglePayload(EnumMetadata *enumType,
                                          unsigned emptyCases);
 
 using getExtraInhabitantTag_t =
-  SWIFT_CC(swift) unsigned (const OpaqueValue *vaue,
+  SWIFT_CC(swift) unsigned (const OpaqueValue *value,
                             unsigned numExtraInhabitants,
                             const Metadata *payloadType);
 
