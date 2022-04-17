@@ -76,7 +76,7 @@ struct SwiftReflectionContext {
   // call to allocateTemporaryObject, or until the context is destroyed. Does
   // NOT free any existing objects created with allocateTemporaryObject or
   // allocateSubsequentTemporaryObject. Use to allocate additional objects after
-  // a call to allocateTemporaryObject when muliple objects are needed
+  // a call to allocateTemporaryObject when multiple objects are needed
   // simultaneously.
   template <typename T>
   T *allocateSubsequentTemporaryObject() {
