@@ -445,7 +445,7 @@ public:
 
   /// Whether to reuse a frontend (i.e. compiler instance) for multiple
   /// compilations. This prevents ASTContext being freed.
-  bool ReuseFrontendForMutipleCompilations = false;
+  bool ReuseFrontendForMultipleCompilations = false;
 
   /// This is used to obfuscate the serialized search paths so we don't have
   /// to encode the actual paths into the .swiftmodule file.

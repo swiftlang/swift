@@ -1230,7 +1230,7 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
   if (forPrimary ||
       typeOpts.SkipFunctionBodies ==
           FunctionBodySkipping::NonInlinableWithoutTypes ||
-      frontendOpts.ReuseFrontendForMutipleCompilations) {
+      frontendOpts.ReuseFrontendForMultipleCompilations) {
     opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
   }
   return opts;

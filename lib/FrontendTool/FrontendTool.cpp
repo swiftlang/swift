@@ -1478,7 +1478,7 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // to live.
   if (Instance.getInvocation()
           .getFrontendOptions()
-          .ReuseFrontendForMutipleCompilations) {
+          .ReuseFrontendForMultipleCompilations) {
     return;
   }
 
