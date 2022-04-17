@@ -1160,7 +1160,7 @@ NOTE(unwrap_with_guard,none,
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))
-ERROR(invalid_optional_infered_keypath_root, none,
+ERROR(invalid_optional_inferred_keypath_root, none,
       "key path root inferred as optional type %0 must be unwrapped to refer to member %1 "
       "of unwrapped type %2", (Type, DeclNameRef, Type))
 NOTE(optional_base_chain,none,

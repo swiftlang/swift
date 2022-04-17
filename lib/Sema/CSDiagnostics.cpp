@@ -1298,7 +1298,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
           .fixItReplace(rootType->getSourceRange(),
                         unwrappedBaseType.getString());
     } else {
-      emitDiagnostic(diag::invalid_optional_infered_keypath_root, baseType,
+      emitDiagnostic(diag::invalid_optional_inferred_keypath_root, baseType,
                      Member, unwrappedBaseType);
       emitDiagnostic(diag::optional_key_path_root_base_chain, Member)
           .fixItInsert(sourceRange.End, "?.");
