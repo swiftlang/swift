@@ -40,7 +40,7 @@ namespace swift {
 /// Emit diagnostics for syntactic restrictions on a given expression.
 void performSyntacticExprDiagnostics(
     const Expr *E, const DeclContext *DC,
-    bool isExprStmt, bool disableExprAvailabiltyChecking = false);
+    bool isExprStmt, bool disableExprAvailabilityChecking = false);
 
 /// Emit diagnostics for a given statement.
 void performStmtDiagnostics(const Stmt *S, DeclContext *DC);

@@ -5654,7 +5654,7 @@ ERROR(attr_requires_availability_for_platform,none,
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked
 // unavailable, so it seems appropriate to put it here.
-ERROR(availabilty_string_subscript_migration, none,
+ERROR(availability_string_subscript_migration, none,
       "subscripts returning String were obsoleted in Swift 4; explicitly "
       "construct a String from subscripted result", ())
 

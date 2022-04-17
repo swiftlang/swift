@@ -5013,7 +5013,7 @@ void swift::checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl) {
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt,
-                                            bool disableExprAvailabiltyChecking) {
+                                            bool disableExprAvailabilityChecking) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -5025,7 +5025,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseComparisonWithNaN(E, DC);
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
-  if (!ctx.LangOpts.DisableAvailabilityChecking && !disableExprAvailabiltyChecking)
+  if (!ctx.LangOpts.DisableAvailabilityChecking && !disableExprAvailabilityChecking)
     diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);

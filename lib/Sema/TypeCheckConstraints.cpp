@@ -292,13 +292,13 @@ public:
 
 void constraints::performSyntacticDiagnosticsForTarget(
     const SolutionApplicationTarget &target,
-    bool isExprStmt, bool disableExprAvailabiltyChecking) {
+    bool isExprStmt, bool disableExprAvailabilityChecking) {
   auto *dc = target.getDeclContext();
   switch (target.kind) {
   case SolutionApplicationTarget::Kind::expression: {
     // First emit diagnostics for the main expression.
     performSyntacticExprDiagnostics(target.getAsExpr(), dc,
-                                    isExprStmt, disableExprAvailabiltyChecking);
+                                    isExprStmt, disableExprAvailabilityChecking);
 
     // If this is a for-in statement, we also need to check the where clause if
     // present.
