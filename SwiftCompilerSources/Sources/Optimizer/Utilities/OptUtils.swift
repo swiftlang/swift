@@ -1,4 +1,4 @@
-//===--- OptUtils.swift - Utilities for optimzations ----------------------===//
+//===--- OptUtils.swift - Utilities for optimizations ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
