@@ -32,7 +32,7 @@
     private func foo() {}
   }
 
-  public func unreleated() {}
+  public func unrelated() {}
 
 	// This should not conflict with Other from private_import_other_2.swift.
   struct Other {}
@@ -56,5 +56,5 @@
   // This should not conflict with the second declaration in
   // private_import_other_2.swift.
   Value().foo()
-  unreleated()
+  unrelated()
 #endif
