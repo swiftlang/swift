@@ -295,7 +295,7 @@ static CanType getHashableExistentialType(ModuleDecl *M) {
 // Potentially bridged values:
 // - includes struct, enum, non-class archetype, non-class existential,
 //   and non-objc-metatype
-// - these types are potentially trivial after subsitution. If so, then they
+// - these types are potentially trivial after substitution. If so, then they
 //   convert to a reference when casting to AnyObject or certain classes
 //
 // Any and AnyObject existentials:
