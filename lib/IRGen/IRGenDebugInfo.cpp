@@ -1440,7 +1440,7 @@ private:
       auto L = getFilenameAndLocation(*this, Decl);
       auto *File = getOrCreateFile(L.filename);
       // No line numbers are attached to type forward declarations.  This is
-      // intentional: It interfers with the efficacy of incremental builds. We
+      // intentional: It interferes with the efficacy of incremental builds. We
       // don't want a whitespace change to an secondary file trigger a
       // recompilation of the debug info of a primary source file.
       unsigned FwdDeclLine = 0;
