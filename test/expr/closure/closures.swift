@@ -553,7 +553,7 @@ class SR3186 {
   }
 }
 
-// Apply the explicit 'self' rule even if it referrs to a capture, if
+// Apply the explicit 'self' rule even if it refers to a capture, if
 // we're inside a nested closure
 class SR14120 {
   func operation() {}
