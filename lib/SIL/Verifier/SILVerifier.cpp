@@ -1301,7 +1301,7 @@ public:
     if (!varInfo)
       return;
 
-    // Retrive debug variable type
+    // Retrieve debug variable type
     SILType DebugVarTy;
     if (varInfo->Type)
       DebugVarTy = *varInfo->Type;
