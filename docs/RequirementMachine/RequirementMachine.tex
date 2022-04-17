@@ -3674,7 +3674,7 @@ Now, the time has finally come to describe the implementation of the four proper
 \item[\texttt{getRequiredProtocols()}] The list of protocol requirements satisfied by a type parameter $T$ is recorded in the form of protocol symbols in the property map. This list is transformed into a minimal canonical list of protocols using Definition~\ref{minimalproto}.
 \index{layout constraints}
 \index{join of layout constraints}
-\item[\texttt{getLayoutContraint()}] A type parameter $T$ might be subject to multiple layout constraints, in which case the property map entry will store a list of layout constraints $L_1,\ldots,L_n$. This query needs to compute their join, which is the largest layout constraint that simultaneously satisfies all of them:
+\item[\texttt{getLayoutConstraint()}] A type parameter $T$ might be subject to multiple layout constraints, in which case the property map entry will store a list of layout constraints $L_1,\ldots,L_n$. This query needs to compute their join, which is the largest layout constraint that simultaneously satisfies all of them:
 \[L_1\wedge\cdots\wedge L_n.\]
 Some layout constraints are disjoint on concrete types, meaning their join is the uninhabited ``bottom'' layout constraint, which precedes all other layout constraints in the partial order. In this case, the original generic signature is said to have conflicting requirements. While such a signature does not violate the requirement machine's invariants, it cannot be satisfied by any valid set of concrete substitutions. Detecting and diagnosing conflicting requirements is discussed later.
 
