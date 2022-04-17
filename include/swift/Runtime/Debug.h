@@ -183,7 +183,7 @@ struct RuntimeErrorDetails {
   const char *currentStackDescription;
 
   // Number of frames in the current stack that should be ignored when reporting
-  // the issue (exluding the reportToDebugger/_swift_runtime_on_report frame).
+  // the issue (excluding the reportToDebugger/_swift_runtime_on_report frame).
   // The remaining top frame should point to user's code where the bug is.
   uintptr_t framesToSkip;
 
