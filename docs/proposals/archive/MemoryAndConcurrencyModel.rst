@@ -219,7 +219,7 @@ can be performed. For example, "a.getvalue()" would be fine so long as the
 result is ignored or if the value is in an explicit async block structure.
 
 From an implementation perspective, the code above corresponds directly to GCD's
-dispatch_asynch on a per-actor queue.
+dispatch_async on a per-actor queue.
 
 Performing synchronous operations
 ---------------------------------
