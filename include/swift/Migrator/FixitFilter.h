@@ -65,7 +65,7 @@ struct FixitFilter {
     // primary file, so if a nominal type was renamed, for example, any members
     // users have added in an extension in a separate file may not be visible,
     // due to the extension rename not having been applied. The below diag(s)
-    // can provide undesireable fixits that rename references of these
+    // can provide undesirable fixits that rename references of these
     // no-longer-visible members to similar still-visible ones.
     // Note: missing_argument_labels and extra_argument_labels are filtered out
     // elsewhere
