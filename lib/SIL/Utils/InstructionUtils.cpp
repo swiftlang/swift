@@ -240,7 +240,7 @@ SILValue swift::stripBorrow(SILValue V) {
 // All instructions handled here must propagate their first operand into their
 // single result.
 //
-// This is guaranteed to handle all function-type converstions: ThinToThick,
+// This is guaranteed to handle all function-type conversions: ThinToThick,
 // ConvertFunction, and ConvertEscapeToNoEscapeInst.
 SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
   if (auto *convert = dyn_cast<ConversionInst>(I))
