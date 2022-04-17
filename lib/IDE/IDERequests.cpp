@@ -52,7 +52,7 @@ void swift::registerIDERequestFunctions(Evaluator &evaluator) {
 }
 
 //----------------------------------------------------------------------------//
-// Cusor info resolver
+// Cursor info resolver
 //----------------------------------------------------------------------------//
 
 class CursorInfoResolver : public SourceEntityWalker {
