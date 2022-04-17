@@ -709,7 +709,7 @@ Swift 5.5
   }
 
     
-  func hadWithdrawlOn(_ day: Date, from acct: BankAccount) async -> Bool {
+  func hadWithdrawalOn(_ day: Date, from acct: BankAccount) async -> Bool {
     return await !acct[day].allSatisfy { $0.amount >= Amount.zero }
     //            ^~~~~~~~~ this access is async
   }
