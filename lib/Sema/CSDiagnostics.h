@@ -1905,7 +1905,7 @@ private:
 ///
 /// ```swift
 /// func foo<T>(_ x: (T, Bool)) {}
-/// foo(1, false) // foo exptects a single argument of tuple type `(1, false)`
+/// foo(1, false) // foo expects a single argument of tuple type `(1, false)`
 /// ```
 class InvalidTupleSplatWithSingleParameterFailure final
     : public FailureDiagnostic {
