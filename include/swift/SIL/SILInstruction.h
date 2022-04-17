@@ -121,11 +121,11 @@ StringRef getSILInstructionName(SILInstructionKind Kind);
 /// that just from the number of elements we can infer the size of each element
 /// due to the restricted problem space. Specificially:
 ///
-/// 1. Size == 0 implies nothing is stored and thus element size is irrelevent.
+/// 1. Size == 0 implies nothing is stored and thus element size is irrelevant.
 /// 2. Size == 1 implies we either had a single value instruction or a multiple
 /// value instruction, but no matter what instruction we had, we are going to
 /// store the results at the same starting location so element size is
-/// irrelevent.
+/// irrelevant.
 /// 3. Size > 1 implies we must be storing multiple value instruction results
 /// implying that the size of each stored element must be
 /// sizeof(MultipleValueInstructionResult).
