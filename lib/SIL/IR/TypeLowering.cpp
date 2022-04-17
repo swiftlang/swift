@@ -1784,7 +1784,7 @@ namespace {
         //
         // Note: if the type is in a different module, the lowering does
         // not depend on the resilience expansion, so we do not need to set
-        // the isResilent() flag above.
+        // the isResilient() flag above.
         if (!sameModule || Expansion.getResilienceExpansion() ==
                                ResilienceExpansion::Minimal) {
           properties.addSubobject(RecursiveProperties::forOpaque());
