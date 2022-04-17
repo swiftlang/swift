@@ -718,7 +718,7 @@ function(add_swift_host_tool executable)
 
       elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
 
-        # Intentinally don't add the lib dir of the cross-compiled compiler, so that
+        # Intentionally don't add the lib dir of the cross-compiled compiler, so that
         # the stdlib is not picked up from there, but from the SDK.
         # This requires to explicitly add all the needed compatibility libraries. We
         # can take them from the current build.
