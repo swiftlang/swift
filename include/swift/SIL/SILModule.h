@@ -334,7 +334,7 @@ private:
   /// A mapping from root opened archetypes to the instructions which define
   /// them.
   ///
-  /// The value is either a SingleValueInstrution or a PlaceholderValue, in case
+  /// The value is either a SingleValueInstruction or a PlaceholderValue, in case
   /// an opened archetype definition is looked up during parsing or
   /// deserializing SIL, where opened archetypes can be forward referenced.
   ///

@@ -26,7 +26,7 @@
 /// Dead, LiveWithin, LiveOut.
 ///
 /// A LiveWithin block has a liveness boundary within the block. The client can
-/// determine the boundary's intruction position by searching for the last use.
+/// determine the boundary's instruction position by searching for the last use.
 ///
 /// LiveOut indicates that liveness extends into a successor edges, therefore,
 /// no uses within that block can be on the liveness boundary, unless that use
