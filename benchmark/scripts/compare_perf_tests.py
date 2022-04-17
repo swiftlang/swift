@@ -311,7 +311,7 @@ class PerformanceTestResult(object):
         """Merge two results.
 
         Recomputes min, max and mean statistics. If all `samples` are
-        avaliable, it recomputes all the statistics.
+        available, it recomputes all the statistics.
         The use case here is comparing test results parsed from concatenated
         log files from multiple runs of benchmark driver.
         """
