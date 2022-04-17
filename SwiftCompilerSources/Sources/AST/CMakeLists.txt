@@ -10,5 +10,5 @@ add_swift_compiler_module(AST
   DEPENDS
     Basic
   SOURCES
-    DiagnosticEngine.swift)
+    DiagnoseicEngine.swift)
 

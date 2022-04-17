@@ -1,4 +1,4 @@
-//===--- DiagnosticEngine.swift -------------------------------------------===//
+//===--- DiagnoseicEngine.swift -------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,7 +16,7 @@ import Basic
 
 public typealias DiagID = BridgedDiagID
 
-extension BridgedDiagnosticArgument {
+extension BridgedDiagnoseicArgument {
   init(stringRef val: BridgedStringRef) {
     self.init(kind: .stringRef, value: .init(stringRefValue: val))
   }
@@ -25,21 +25,21 @@ extension BridgedDiagnosticArgument {
   }
 }
 
-public protocol DiagnosticArgument {
-  func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void)
+public protocol DiagnoseicArgument {
+  func _withBridgedDiagnoseicArgument(_ fn: (BridgedDiagnoseicArgument) -> Void)
 }
-extension String: DiagnosticArgument {
-  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
-    withBridgedStringRef { fn(BridgedDiagnosticArgument(stringRef: $0)) }
+extension String: DiagnoseicArgument {
+  public func _withBridgedDiagnoseicArgument(_ fn: (BridgedDiagnoseicArgument) -> Void) {
+    withBridgedStringRef { fn(BridgedDiagnoseicArgument(stringRef: $0)) }
   }
 }
-extension Int: DiagnosticArgument {
-  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
-    fn(BridgedDiagnosticArgument(int: self))
+extension Int: DiagnoseicArgument {
+  public func _withBridgedDiagnoseicArgument(_ fn: (BridgedDiagnoseicArgument) -> Void) {
+    fn(BridgedDiagnoseicArgument(int: self))
   }
 }
 
-public struct DiagnosticFixIt {
+public struct DiagnoseicFixIt {
   public let start: SourceLoc
   public let byteLength: Int
   public let text: String
@@ -50,34 +50,34 @@ public struct DiagnosticFixIt {
     self.text = text
   }
 
-  func withBridgedDiagnosticFixIt(_ fn: (BridgedDiagnosticFixIt) -> Void) {
+  func withBridgedDiagnoseicFixIt(_ fn: (BridgedDiagnoseicFixIt) -> Void) {
     text.withBridgedStringRef { bridgedTextRef in
-      let bridgedDiagnosticFixIt = BridgedDiagnosticFixIt(
+      let bridgedDiagnoseicFixIt = BridgedDiagnoseicFixIt(
         start: start.bridged,
         byteLength: byteLength,
         text: bridgedTextRef)
-      fn(bridgedDiagnosticFixIt)
+      fn(bridgedDiagnoseicFixIt)
     }
   }
 }
 
-public struct DiagnosticEngine {
-  private let bridged: BridgedDiagnosticEngine
+public struct DiagnoseicEngine {
+  private let bridged: BridgedDiagnoseicEngine
 
-  public init(bridged: BridgedDiagnosticEngine) {
+  public init(bridged: BridgedDiagnoseicEngine) {
     self.bridged = bridged
   }
 
   public func diagnose(_ position: SourceLoc?,
                        _ id: DiagID,
-                       _ args: [DiagnosticArgument],
+                       _ args: [DiagnoseicArgument],
                        highlight: CharSourceRange? = nil,
-                       fixIts: [DiagnosticFixIt] = []) {
+                       fixIts: [DiagnoseicFixIt] = []) {
 
     let bridgedSourceLoc: BridgedSourceLoc = position.bridged
     let bridgedHighlightRange: BridgedCharSourceRange = highlight.bridged
-    var bridgedArgs: [BridgedDiagnosticArgument] = []
-    var bridgedFixIts: [BridgedDiagnosticFixIt] = []
+    var bridgedArgs: [BridgedDiagnoseicArgument] = []
+    var bridgedFixIts: [BridgedDiagnoseicFixIt] = []
 
     // Build a higher-order function to wrap every 'withBridgedXXX { ... }'
     // calls, so we don't escape anything from the closure. 'bridgedArgs' and
@@ -87,7 +87,7 @@ public struct DiagnosticEngine {
     var closure: () -> Void = {
       bridgedArgs.withBridgedArrayRef { bridgedArgsRef in
         bridgedFixIts.withBridgedArrayRef { bridgedFixItsRef in
-          DiagnosticEngine_diagnose(bridged, bridgedSourceLoc,
+          DiagnoseicEngine_diagnose(bridged, bridgedSourceLoc,
                                     id, bridgedArgsRef,
                                     bridgedHighlightRange, bridgedFixItsRef)
         }
@@ -96,7 +96,7 @@ public struct DiagnosticEngine {
     // 'reversed()' because the closure should be wrapped in that order.
     for arg in args.reversed() {
       closure = { [closure, arg] in
-        arg._withBridgedDiagnosticArgument { bridgedArg in
+        arg._withBridgedDiagnoseicArgument { bridgedArg in
           bridgedArgs.append(bridgedArg)
           closure()
         }
@@ -105,7 +105,7 @@ public struct DiagnosticEngine {
     // 'reversed()' because the closure should be wrapped in that order.
     for fixIt in fixIts.reversed() {
       closure = { [closure, fixIt] in
-        fixIt.withBridgedDiagnosticFixIt { bridgedFixIt in
+        fixIt.withBridgedDiagnoseicFixIt { bridgedFixIt in
           bridgedFixIts.append(bridgedFixIt)
           closure()
         }
@@ -117,9 +117,9 @@ public struct DiagnosticEngine {
 
   public func diagnose(_ position: SourceLoc?,
                        _ id: DiagID,
-                       _ args: DiagnosticArgument...,
+                       _ args: DiagnoseicArgument...,
                        highlight: CharSourceRange? = nil,
-                       fixIts: DiagnosticFixIt...) {
+                       fixIts: DiagnoseicFixIt...) {
     diagnose(position, id, args, highlight: highlight, fixIts: fixIts)
   }
 }
