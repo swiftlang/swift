@@ -484,7 +484,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::DebugValueInst:
-    // Ignore runtime calls of debug_vlaue
+    // Ignore runtime calls of debug_value
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::GetAsyncContinuationInst:

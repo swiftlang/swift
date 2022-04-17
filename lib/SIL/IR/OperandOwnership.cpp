@@ -271,7 +271,7 @@ OPERAND_OWNERSHIP(InteriorPointer, OpenExistentialBox)
 OPERAND_OWNERSHIP(InteriorPointer, HopToExecutor)
 OPERAND_OWNERSHIP(InteriorPointer, ExtractExecutor)
 
-// Instructions that propagate a value value within a borrow scope.
+// Instructions that propagate a value within a borrow scope.
 OPERAND_OWNERSHIP(ForwardingBorrow, TupleExtract)
 OPERAND_OWNERSHIP(ForwardingBorrow, StructExtract)
 OPERAND_OWNERSHIP(ForwardingBorrow, DifferentiableFunctionExtract)
