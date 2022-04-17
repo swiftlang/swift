@@ -2367,7 +2367,7 @@ namespace {
           //
           // Single type variable approach results in the following constraint:
           // `$T_x_y = ($T_s_x, $T_s_y)` where both `$T_s_x` and `$T_s_y` have
-          // to allow l-value, but `$T_x_y` does not. Early simplication of `=`
+          // to allow l-value, but `$T_x_y` does not. Early simplification of `=`
           // constraint (due to right-hand side being a "concrete" tuple type)
           // would drop l-value option from `$T_s_x` and `$T_s_y` which leads to
           // a failure during member lookup because `x` and `y` are both

@@ -450,7 +450,7 @@ public:
 
   /// Retrieve anchor expression associated with this fix.
   /// NOTE: such anchor comes directly from locator without
-  /// any simplication attempts.
+  /// any simplification attempts.
   ASTNode getAnchor() const;
   ConstraintLocator *getLocator() const { return Locator; }
 
