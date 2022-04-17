@@ -3101,7 +3101,7 @@ void ConstraintSystem::bindOverloadType(
                                             : FunctionRefKind::Unapplied,
                              /*outerAlternatives=*/{}, keyPathLoc);
 
-    // In case of subscript things are more compicated comparing to "dot"
+    // In case of subscript things are more complicated comparing to "dot"
     // syntax, because we have to get "applicable function" constraint
     // associated with index expression and re-bind it to match "member type"
     // looked up by dynamically.
