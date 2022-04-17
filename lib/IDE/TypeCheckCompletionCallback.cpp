@@ -160,7 +160,7 @@ bool swift::ide::isContextAsync(const constraints::Solution &S,
     return true;
   }
 
-  //  - the decl context is sync but it's used in a context that expectes an
+  //  - the decl context is sync but it's used in a context that expects an
   //    async function. This happens if the code completion token is in a
   //    closure that doesn't contain any async calles. Thus the closure is
   //    type-checked as non-async, but it might get converted to an async
