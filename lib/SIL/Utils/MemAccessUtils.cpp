@@ -1249,7 +1249,7 @@ class AccessPathVisitor : public FindAccessVisitorImpl<AccessPathVisitor> {
           pathLength(pathLength) {}
   };
 
-  // Only access projections affect this path. Since they are are not allowed
+  // Only access projections affect this path. Since they are not allowed
   // beyond phis, this path is not part of AccessPathVisitor::Result.
   llvm::SmallVector<AccessPath::Index, 8> reversePath;
   // Holds a non-zero value if an index_addr has been processed without yet
