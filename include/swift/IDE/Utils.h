@@ -371,7 +371,7 @@ struct ResolvedRangeInfo {
                       CommonExprParent(CommonExprParent) {}
   ResolvedRangeInfo(ArrayRef<Token> TokensInRange) :
   ResolvedRangeInfo(RangeKind::Invalid, {nullptr, ExitState::Unsure},
-                    TokensInRange, nullptr, /*Commom Expr Parent*/nullptr,
+                    TokensInRange, nullptr, /*Common Expr Parent*/nullptr,
                     /*Single entry*/true, /*UnhandledEffects*/{},
                     OrphanKind::None, {}, {}, {}) {}
   ResolvedRangeInfo(): ResolvedRangeInfo(ArrayRef<Token>()) {}
