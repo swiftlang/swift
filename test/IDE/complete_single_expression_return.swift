@@ -393,7 +393,7 @@ struct TestNonSingleExprAccessorGlobal {
 
 // TestNonSingleExprAccessorGlobal: Begin completions
 // TestNonSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
-// FIXME: should should not have type context.
+// FIXME: should not have type context.
 // TestNonSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestNonSingleExprAccessorGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 // TestNonSingleExprAccessorGlobal: End completions
