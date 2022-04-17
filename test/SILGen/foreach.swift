@@ -282,7 +282,7 @@ func existentialContinueBreak(_ xx: [P]) {
 }
 
 //===----------------------------------------------------------------------===//
-// Class Constrainted Existential
+// Class Constrained Existential
 //===----------------------------------------------------------------------===//
 
 func existentialClass(_ xx: [ClassP]) {

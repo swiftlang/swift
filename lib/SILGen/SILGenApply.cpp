@@ -1504,8 +1504,8 @@ public:
       // If we haven't allocated "self" yet at this point, do so.
       if (SGF.AllocatorMetatype) {
         bool usesObjCAllocation;
-        if (auto clas = dyn_cast<ClassDecl>(nominal)) {
-          usesObjCAllocation = usesObjCAllocator(clas);
+        if (auto clazz = dyn_cast<ClassDecl>(nominal)) {
+          usesObjCAllocation = usesObjCAllocator(clazz);
         } else {
           // In the protocol extension case, we should only be here if the callee
           // initializer is @objc.

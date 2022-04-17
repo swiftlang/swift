@@ -314,7 +314,7 @@ public protocol DangerousEscaper {
 // CHECK:  destroy_value [[BLOCK_CLOSURE_COPY]] : $@convention(block) @noescape () -> ()
 // CHECK:  return {{.*}} : $()
 
-public func couldActuallyEscape(_ closure: @escaping () -> (), _ villian: DangerousEscaper) {
-  villian.malicious(closure)
+public func couldActuallyEscape(_ closure: @escaping () -> (), _ villain: DangerousEscaper) {
+  villain.malicious(closure)
 }
 

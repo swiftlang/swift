@@ -251,7 +251,7 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 static FunctionSection
 functionSectionForConvention(Optional<ForeignAsyncConvention> foreignAsync) {
   // If there is a foreign async convention too, the error block branches to
-  // the block awaiting the conteinuation.
+  // the block awaiting the continuation.
   return foreignAsync ? FunctionSection::Ordinary : FunctionSection::Postmatter;
 }
 

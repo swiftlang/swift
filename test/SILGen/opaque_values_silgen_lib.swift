@@ -284,7 +284,7 @@ public func f060_callMultiResult(i: Builtin.Int64) -> (Builtin.Int64, (Builtin.I
 }
 
 // SILGen, prepareArchetypeCallee. Materialize a
-// non-class-constrainted self from a class-constrained archetype.
+// non-class-constrained self from a class-constrained archetype.
 // ---
 // CHECK-LABEL: sil hidden [ossa] @$ss20f070_materializeSelf1tyx_tRlzCs4FooPRzlF : $@convention(thin) <T where T : AnyObject, T : FooP> (@guaranteed T) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):

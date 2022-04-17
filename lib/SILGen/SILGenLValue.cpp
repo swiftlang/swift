@@ -1476,7 +1476,7 @@ namespace {
                               SGF.FunctionDC)) {
         // This is wrapped property. Instead of emitting a setter, emit an
         // assign_by_wrapper with the allocating initializer function and the
-        // setter function as arguments. DefiniteInitializtion will then decide
+        // setter function as arguments. DefiniteInitialization will then decide
         // between the two functions, depending if it's an initialization or a
         // re-assignment.
         //

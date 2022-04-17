@@ -2024,7 +2024,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     const SpecializationHandler &handleCase, const FailureHandler &outerFailure,
     ProfileCounter defaultCaseCount) {
-  // Why do we need to do this here (I just cargo culted this).
+  // Why do we need to do this here (I just cargo-culted this).
   RegularLocation loc(PatternMatchStmt, rows[0].Pattern, SGF.SGM.M);
 
   // If our source is an address that is loadable, perform a load_borrow.
@@ -2706,7 +2706,7 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   }
 
   // Ok, at this point we know that we have a multiple entrance block. Grab our
-  // shared destination in preperation for branching to it.
+  // shared destination in preparation for branching to it.
   //
   // NOTE: We do not emit anything yet, since we will emit the shared block
   // later.
@@ -2793,7 +2793,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   bool hasFallthrough = false;
   for (auto caseBlock : S->getCases()) {
     // If the previous block falls through into this block or we have multiple
-    // case label itmes, create a shared case block to generate the shared
+    // case label items, create a shared case block to generate the shared
     // block.
     if (hasFallthrough || caseBlock->getCaseLabelItems().size() > 1) {
       emission.initSharedCaseBlockDest(caseBlock, hasFallthrough);
@@ -3064,7 +3064,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
     }
 
     // Ok, at this point we know that we have a multiple entrance block. Grab
-    // our shared destination in preperation for branching to it.
+    // our shared destination in preparation for branching to it.
     //
     // NOTE: We do not emit anything yet, since we will emit the shared block
     // later.
@@ -3134,7 +3134,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   SmallVector<ClauseRow, 8> clauseRows;
   clauseRows.reserve(S->getCatches().size());
   for (auto caseBlock : S->getCatches()) {
-    // If we have multiple case label itmes, create a shared case block to
+    // If we have multiple case label items, create a shared case block to
     // generate the shared block.
     if (caseBlock->getCaseLabelItems().size() > 1) {
       emission.initSharedCaseBlockDest(caseBlock, /*hasFallthrough*/ false);

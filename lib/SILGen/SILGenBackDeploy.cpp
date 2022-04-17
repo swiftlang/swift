@@ -149,7 +149,7 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
     return;
   }
 
-  // The original function is neither throwing nor a couroutine. Apply it and
+  // The original function is neither throwing nor a coroutine. Apply it and
   // forward its results straight to the return block.
   auto *apply = SGF.B.createApply(loc, functionRef, subs, params);
   extractAllElements(apply, loc, SGF.B, directResults);

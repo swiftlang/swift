@@ -264,7 +264,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 
 // CHECK-LABEL: sil [serialized] [ossa] @$s17struct_resilience18inlinableInoutTestyyAA6MySizeVzF : $@convention(thin) (@inout MySize) -> ()
 @inlinable public func inlinableInoutTest(_ s: inout MySize) {
-  // Inlinable functions can be inlined in other resiliene domains.
+  // Inlinable functions can be inlined in other resilience domains.
   //
   // Make sure we use modify for an inout access of a resilient struct
   // property inside an inlinable function.

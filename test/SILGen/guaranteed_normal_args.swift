@@ -123,7 +123,7 @@ class KlassWithBuffer {
 
   // This test makes sure that we:
   //
-  // 1. Are able to propagate a +0 value value buffer.k into a +0 value and that
+  // 1. Are able to propagate a +0 value buffer.k into a +0 value and that
   // we then copy that +0 value into a +1 value, before we begin the epilog and
   // then return that value.
   // CHECK-LABEL: sil hidden [ossa] @$ss15KlassWithBufferC03getC14AsNativeObjectBoyF : $@convention(method) (@guaranteed KlassWithBuffer) -> @owned Builtin.NativeObject {

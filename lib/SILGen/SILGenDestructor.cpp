@@ -497,7 +497,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
 
   B.createApply(cleanupLoc, superclassDtorValue, subMap, superSelf);
 
-  // We know that the givne value came in at +1, but we pass the relevant value
+  // We know that the given value came in at +1, but we pass the relevant value
   // as unowned to the destructor. Create a fake balance for the verifier to be
   // happy.
   B.createEndLifetime(cleanupLoc, superSelf);

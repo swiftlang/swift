@@ -826,7 +826,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK: } // end sil function '$s6errors16supportStructure_4nameyAA6BridgeVz_SStKF'
 
 // ! peepholes its argument with getSemanticsProvidingExpr().
-// Test that that doesn't look through try!.
+// Test that doesn't look through try!.
 // rdar://21515402
 func testForcePeephole(_ f: () throws -> Int?) -> Int {
   let x = (try! f())!
