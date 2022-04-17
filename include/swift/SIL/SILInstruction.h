@@ -119,7 +119,7 @@ StringRef getSILInstructionName(SILInstructionKind Kind);
 ///
 /// *NOTE* The reason why this does not store the size of the stored element is
 /// that just from the number of elements we can infer the size of each element
-/// due to the restricted problem space. Specificially:
+/// due to the restricted problem space. Specifically:
 ///
 /// 1. Size == 0 implies nothing is stored and thus element size is irrelevant.
 /// 2. Size == 1 implies we either had a single value instruction or a multiple
