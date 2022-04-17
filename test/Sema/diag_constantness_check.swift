@@ -6,7 +6,7 @@
 
 // The following tests check different types of constants that are accepted
 // by the constantness Sema check. It creates helper functions with the
-// semnatics annotation: "oslog.requires_constant_arguments" which requires that
+// semantics annotation: "oslog.requires_constant_arguments" which requires that
 // all arguments passed to the function are constants. The annotation is meant
 // to be used only by the os log overlay. The test helpers use it here only for
 // the purpose of testing the functionality.
