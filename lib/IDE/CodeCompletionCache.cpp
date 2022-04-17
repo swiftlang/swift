@@ -368,15 +368,15 @@ static void writeCachedModule(llvm::raw_ostream &out,
     if (found != knownTypes.end()) {
       return found->second;
     }
-    std::vector<uint32_t> supertypeIndicies;
-    // IMPORTANT: To compute the supertype indicies, we might need to add
+    std::vector<uint32_t> supertypeIndices;
+    // IMPORTANT: To compute the supertype indices, we might need to add
     // entries to the type table by calling addType recursively. Thus, we must
     // perform this calculation before writing any bytes of this type to the
     // types table.
     auto supertypes = type->getSupertypes();
-    supertypeIndicies.reserve(supertypes.size());
+    supertypeIndices.reserve(supertypes.size());
     for (auto supertype : supertypes) {
-      supertypeIndicies.push_back(addType(supertype));
+      supertypeIndices.push_back(addType(supertype));
     }
 
     auto size = types.tell();
@@ -384,8 +384,8 @@ static void writeCachedModule(llvm::raw_ostream &out,
     StringRef USR = type->getUSR();
     LE.write(static_cast<uint32_t>(USR.size()));
     types << USR;
-    LE.write(static_cast<uint32_t>(supertypeIndicies.size()));
-    for (auto supertypeIndex : supertypeIndicies) {
+    LE.write(static_cast<uint32_t>(supertypeIndices.size()));
+    for (auto supertypeIndex : supertypeIndices) {
       LE.write(static_cast<uint32_t>(supertypeIndex));
     }
     OptionSet<CustomAttributeKind, uint8_t> customAttributeKinds =
