@@ -306,7 +306,7 @@ class PresetParser(object):
     @_catch_duplicate_option_error
     @_catch_duplicate_section_error
     def read_string(self, string):
-        """Reads and parses a string containing preset definintions.
+        """Reads and parses a string containing preset definitions.
         """
 
         fp = io.StringIO(string)
