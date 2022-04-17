@@ -2009,13 +2009,13 @@ protocol MetaProto {
   static func staticFunc() -> Int
   static var staticVar: Int { get }
   func instanceFunc() -> Int
-  var intanceVar: Int { get }
+  var instanceVar: Int { get }
 }
 extension MetaProto {
   static func staticFuncExtension() -> Int { 1 }
   static var staticVarExtension: Int { 1 }
   func instanceFuncExtension() -> Int { 1 }
-  var intanceVarExtension: Int { 1 }
+  var instanceVarExtension: Int { 1 }
 }
 func testProtocolMetatype(protoProto: MetaProto.Protocol, protoType: MetaProto.Type) {
     let _ = BrokenConformanceP.#^PROTOCOLMETA_1^#
