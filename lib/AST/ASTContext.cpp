@@ -583,7 +583,7 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
                             ClangImporterOptions &ClangImporterOpts,
                             symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                             SourceManager &SourceMgr, DiagnosticEngine &Diags) {
-  // If more than two data structures are concatentated, then the aggregate
+  // If more than two data structures are concatenated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
   // constraints.
   auto align = std::max(alignof(ASTContext), alignof(Implementation));
