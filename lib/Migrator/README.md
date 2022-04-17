@@ -133,7 +133,7 @@ Other controls for the frontend:
 
 For the pre- and post-fix-it passes, there are two basic rules for which fix-its the Migrator will take:
 
-1. Fix-its attached to *error* diagnosics are taken by default and are opt-out.
+1. Fix-its attached to *error* diagnostics are taken by default and are opt-out.
 2. Fix-its attached to *warning* or *note* diagnostics are not taken by default and so are opt-in.
 
 For the opt-out and opt-in cases, these are filtered in the `FixitFilter`, essentially just a small collection of Swift's compiler diagnostic IDs.
