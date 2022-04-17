@@ -278,7 +278,7 @@ usesExtendedExistentialMetadata(CanExistentialMetatypeType type) {
     depth++;
   }
 
-  // The only exitential types that don't currently use ExistentialType
+  // The only existential types that don't currently use ExistentialType
   // are Any and AnyObject, which don't use extended metadata.
   if (usesExtendedExistentialMetadata(cur))
     return std::make_pair(cast<ExistentialType>(cur), depth);
