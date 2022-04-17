@@ -3445,7 +3445,7 @@ for host in "${ALL_HOSTS[@]}"; do
         # the (shared) SYMROOT which can cause mutliple hosts to stomp on each
         # other.  As a hack, I'm segregating the hosts in the symroot but it
         # would probably be better to make the script behave as the usage
-        # descibes
+        # describes
         host_symroot="${INSTALL_SYMROOT}/${host}"
 
         set -x
