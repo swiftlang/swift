@@ -616,7 +616,7 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
   case Kind::AssociatedType:
   case Kind::AssociatedConformance:
   case Kind::SILFunction:
-    llvm_unreachable("no type for schema using type discriminiation");
+    llvm_unreachable("no type for schema using type discrimination");
 
   case Kind::CoroutineYieldTypes: {
     auto fnType = Storage.get<CanSILFunctionType>(StoredKind);
