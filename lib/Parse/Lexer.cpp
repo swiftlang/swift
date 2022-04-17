@@ -2722,7 +2722,7 @@ Restart:
     goto Restart;
   case '/':
     if (IsForTrailingTrivia || isKeepingComments()) {
-      // Don't lex comments as trailing trivias (for now).
+      // Don't lex comments as trailing trivia (for now).
       // Don't try to lex comments here if we are lexing comments as Tokens.
       break;
     } else if (*CurPtr == '/') {
