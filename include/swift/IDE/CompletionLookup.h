@@ -44,7 +44,7 @@ bool KeyPathFilter(ValueDecl *decl, DeclVisibilityKind,
                    DynamicLookupInfo dynamicLookupInfo);
 
 /// Returns \c true only if the completion is happening for top-level
-/// declrarations. i.e.:
+/// declarations. i.e.:
 ///
 ///     if condition {
 ///       #false#
