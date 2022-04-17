@@ -543,7 +543,7 @@ struct BorrowedValue {
   /// called with a scope that is not local.
   ///
   /// NOTE: To determine if a scope is a local scope, call
-  /// BorrowScopeIntoducingValue::isLocalScope().
+  /// BorrowScopeIntroducingValue::isLocalScope().
   void getLocalScopeEndingInstructions(
       SmallVectorImpl<SILInstruction *> &scopeEndingInsts) const;
 
@@ -559,7 +559,7 @@ struct BorrowedValue {
   /// instructions before storing them.
   ///
   /// NOTE: To determine if a scope is a local scope, call
-  /// BorrowScopeIntoducingValue::isLocalScope().
+  /// BorrowScopeIntroducingValue::isLocalScope().
   bool visitLocalScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
 
   bool isLocalScope() const { return kind.isLocalScope(); }
