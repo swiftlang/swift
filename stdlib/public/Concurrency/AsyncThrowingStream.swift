@@ -292,7 +292,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   /// initializer that produces 100 random numbers on a one-second interval,
   /// calling `yield(_:)` to deliver each element to the awaiting call point.
   /// When the `for` loop exits, the stream finishes by calling the
-  /// continuation's `finish()` method. If the random number is divisble by 5
+  /// continuation's `finish()` method. If the random number is divisible by 5
   /// with no remainder, the stream throws a `MyRandomNumberError`.
   ///
   ///     let stream = AsyncThrowingStream<Int, Error>(Int.self,
@@ -347,7 +347,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///
   /// The following example shows an `AsyncThrowingStream` created with this
   /// initializer that produces random numbers on a one-second interval. If the
-  /// random number is divisble by 5 with no remainder, the stream throws a
+  /// random number is divisible by 5 with no remainder, the stream throws a
   /// `MyRandomNumberError`.
   ///
   ///     let stream = AsyncThrowingStream<Int, Error> {
