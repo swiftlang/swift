@@ -840,7 +840,7 @@ namespace swift {
     /// When set, don't look for or load overlays.
     bool DisableOverlayModules = false;
 
-    /// When set, import SPI_AVAILABLE symbols with Swift SPI attribtues.
+    /// When set, import SPI_AVAILABLE symbols with Swift SPI attributes.
     bool EnableClangSPI = true;
 
     /// When set, don't enforce warnings with -Werror.
