@@ -254,7 +254,7 @@ public:
   }
 };
 
-/// A \c RawSyntax node that is enrichted with information of its position
+/// A \c RawSyntax node that is enriched with information of its position
 /// within the syntax tree it lives in.
 class AbsoluteRawSyntax {
   /// OptionalStorage is a friend so it can access the \c nullptr initializer
