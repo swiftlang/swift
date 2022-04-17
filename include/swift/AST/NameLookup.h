@@ -623,7 +623,7 @@ private:
 };
   
   
-/// The bridge between the legacy UnqualifedLookupFactory and the new ASTScope
+/// The bridge between the legacy UnqualifiedLookupFactory and the new ASTScope
 /// lookup system
 class AbstractASTScopeDeclConsumer {
 public:
