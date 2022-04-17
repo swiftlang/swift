@@ -99,7 +99,7 @@ public protocol DistributedActorSystem: Sendable {
   ///
   /// This method is guaranteed to be called at-most-once for a given id (assuming IDs are unique,
   /// and not re-cycled by the system), i.e. if it is called during a failure to initialize completely,
-  /// the call from the actor's deinitalizer will not happen (as under these circumstances, `deinit` will be run).
+  /// the call from the actor's deinitializer will not happen (as under these circumstances, `deinit` will be run).
   ///
   /// If `resignID` gets called with some unknown ID, it should crash immediately as it signifies some
   /// very unexpected use of the system.
