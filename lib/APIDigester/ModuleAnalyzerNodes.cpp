@@ -1343,7 +1343,7 @@ static std::vector<DeclAttrKind> collectDeclAttributes(Decl *D) {
     if (VD->COND && !llvm::is_contained(Results, DeclAttrKind::KIND_NAME))                        \
       Results.emplace_back(DeclAttrKind::KIND_NAME);
     // These attributes may be semantically applicable to the current decl but absent from
-    // the actual AST. Populting them to the nodes ensure we don't have false positives.
+    // the actual AST. Populating them to the nodes ensure we don't have false positives.
     HANDLE(isObjC(), DAK_ObjC)
     HANDLE(isFinal(), DAK_Final)
     HANDLE(isDynamic(), DAK_Dynamic)
