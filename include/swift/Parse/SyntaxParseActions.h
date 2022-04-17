@@ -138,7 +138,7 @@ public:
   /// retrieved using \c getDeferredChildRange if element ranges should be
   /// verified
   /// \p node is the parent node for which the child at position \p ChildIndex
-  /// should be retrieved. Furthmore, \p node starts at \p StartLoc.
+  /// should be retrieved. Furthermore, \p node starts at \p StartLoc.
   virtual DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node,
                                             size_t childIndex) const = 0;
 
