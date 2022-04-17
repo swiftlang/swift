@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This file defines extensions for interpolating strings into an OSLogMesage.
+// This file defines extensions for interpolating strings into an OSLogMessage.
 // It defines `appendInterpolation` function for String type. It also defines
 // extensions for serializing strings into the argument buffer passed to
 // os_log ABIs. Note that os_log requires passing a stable pointer to an
