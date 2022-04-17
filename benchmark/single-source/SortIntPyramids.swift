@@ -2,7 +2,7 @@ import TestsUtils
 
 // This benchmark aims to measure heapSort path of stdlib sorting function.
 // Datasets in this benchmark are influenced by stdlib partition function,
-// therefore if stdlib partion implementation changes we should correct these
+// therefore if stdlib partition implementation changes we should correct these
 // datasets or disable/skip this benchmark
 public let benchmarks = [
   BenchmarkInfo(
