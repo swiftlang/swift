@@ -1000,7 +1000,7 @@ extension _StringObject {
   @inline(__always)
   internal var isNFC: Bool {
     if isSmall {
-      // TODO(String performance): Worth implementing more sophisiticated
+      // TODO(String performance): Worth implementing more sophisticated
       // check, or else performing normalization on- construction. For now,
       // approximate it with isASCII
       return smallIsASCII
