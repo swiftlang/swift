@@ -3541,7 +3541,7 @@ public:
     return getTypeContextDescriptorFlags().hasSingletonMetadataInitialization();
   }
 
-  /// Does this type have "foreign" metadata initialiation?
+  /// Does this type have "foreign" metadata initialization?
   bool hasForeignMetadataInitialization() const {
     return getTypeContextDescriptorFlags().hasForeignMetadataInitialization();
   }
