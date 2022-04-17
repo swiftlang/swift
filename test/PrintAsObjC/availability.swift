@@ -139,15 +139,15 @@
 // CHECK-NEXT: @property (nonatomic) NSInteger alwaysUnavailableProperty SWIFT_UNAVAILABLE_MSG("'alwaysUnavailableProperty' has been renamed to 'baz': whatever");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger alwaysDeprecatedProperty SWIFT_DEPRECATED_MSG("use something else", "quux");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger replaceForDeprecatedObjCProperty;
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableDeprecatedObjCProperty
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplaceableDeprecatedObjCProperty
 // CHECK-SAME: SWIFT_DEPRECATED_MSG("use something else", "replaceForDeprecatedObjCProperty");
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableDeprecatedOnMacOSObjCProperty
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'replacableDeprecatedOnMacOSObjCProperty' has been renamed to 'replaceForDeprecatedObjCProperty': use something else");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplaceableDeprecatedOnMacOSObjCProperty
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'replaceableDeprecatedOnMacOSObjCProperty' has been renamed to 'replaceForDeprecatedObjCProperty': use something else");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger replaceForUnavailableObjCProperty;
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableUnavailableObjCProperty
-// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'replacableUnavailableObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableUnavailableOnMacOSObjCProperty
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'replacableUnavailableOnMacOSObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplaceableUnavailableObjCProperty
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'replaceableUnavailableObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplaceableUnavailableOnMacOSObjCProperty
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'replaceableUnavailableOnMacOSObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
 
 // CHECK-NEXT: @property (nonatomic, readonly, strong) Availability * _Null_unspecified singlePlatCombinedPropertyClass
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=10.7,deprecated=10.9,obsoleted=10.10);
@@ -487,13 +487,13 @@
         }
     }
     @available(*, deprecated, message: "use something else", renamed: "__replaceForDeprecatedObjCProperty")
-    @objc(numberOfReplacableDeprecatedObjCProperty) var replacableDeprecatedObjCProperty: Int {
+    @objc(numberOfReplaceableDeprecatedObjCProperty) var replaceableDeprecatedObjCProperty: Int {
         get {
             return -1
         }
     }
     @available(macOS, deprecated, message: "use something else", renamed: "__replaceForDeprecatedObjCProperty")
-    @objc(numberOfReplacableDeprecatedOnMacOSObjCProperty) var replacableDeprecatedOnMacOSObjCProperty: Int {
+    @objc(numberOfReplaceableDeprecatedOnMacOSObjCProperty) var replaceableDeprecatedOnMacOSObjCProperty: Int {
         get {
             return -1
         }
@@ -506,13 +506,13 @@
       }
     }
     @available(*, unavailable, message: "use something else", renamed: "__replaceForUnavailableObjCProperty")
-    @objc(numberOfReplacableUnavailableObjCProperty) var replacableUnavailableObjCProperty: Int {
+    @objc(numberOfReplaceableUnavailableObjCProperty) var replaceableUnavailableObjCProperty: Int {
       get {
         return -1
       }
     }
     @available(macOS, unavailable, message: "use something else", renamed: "__replaceForUnavailableObjCProperty")
-    @objc(numberOfReplacableUnavailableOnMacOSObjCProperty) var replacableUnavailableOnMacOSObjCProperty: Int {
+    @objc(numberOfReplaceableUnavailableOnMacOSObjCProperty) var replaceableUnavailableOnMacOSObjCProperty: Int {
       get {
         return -1
       }
