@@ -5497,7 +5497,7 @@ public:
   /// property wrapper with a \c projectedValue .
   VarDecl *getPropertyWrapperProjectionVar() const;
 
-  /// Retrieve the local wrapped value var for for a parameter that has
+  /// Retrieve the local wrapped value var for a parameter that has
   /// an attached property wrapper.
   VarDecl *getPropertyWrapperWrappedValueVar() const;
 
