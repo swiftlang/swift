@@ -2622,7 +2622,7 @@ static const uint64_t powersOf10_Binary128[] = {
 // * 64-bit fractions `lower` and `upper`
 // * integer `exponent`
 //
-// The returned values satisty the following:
+// The returned values satisfy the following:
 // ```
 //    lower * 2^exponent <= 10^p <= upper * 2^exponent
 // ```
@@ -2656,7 +2656,7 @@ static void intervalContainingPowerOf10_Binary32(int p, uint64_t *lower, uint64_
 // multiplications to accurately reconstruct the lower and upper
 // bounds.
 //
-// The returned values satisty the following:
+// The returned values satisfy the following:
 // ```
 //    lower * 2^exponent <= 10^p <= upper * 2^exponent
 // ```
