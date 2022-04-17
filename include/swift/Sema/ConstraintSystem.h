@@ -296,7 +296,7 @@ public:
   void setRawOptions(unsigned bits) {
     getTypeVariable()->Bits.TypeVariableType.Options = bits;
     assert(getTypeVariable()->Bits.TypeVariableType.Options == bits
-           && "Trucation");
+           && "Truncation");
   }
 
   /// Whether this type variable can bind to an lvalue type.
