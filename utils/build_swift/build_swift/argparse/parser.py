@@ -70,7 +70,7 @@ class _CompoundAction(Action):
 
 class _PartialAction(Action):
     """Action that is partially applied, creating a factory closure used to
-    defer initialization of acitons in the builder DSL.
+    defer initialization of actions in the builder DSL.
     """
 
     def __init__(self, action_class):
