@@ -225,7 +225,7 @@ func foo(
 }
 
 
-// Sequence expressions should indent realtive to their first element. Leading
+// Sequence expressions should indent relative to their first element. Leading
 // "=" should be considered part of the sequence when present.
 //
 let arrayA = [0]
