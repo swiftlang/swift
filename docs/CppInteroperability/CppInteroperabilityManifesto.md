@@ -2524,7 +2524,7 @@ there the Swift compiler infers the attribute for all users.
 This analysis relies on over-approximating the dynamic callgraph with the static
 callgraph. The static callgraph is feasible to compute in most cases, since
 Swift has very limited ways to abstract over an unspecialized generic function.
-Speicifically, Swift does not have generic closures. Swift does allow protocols
+Specifically, Swift does not have generic closures. Swift does allow protocols
 to have requirements for generic functions though.
 
 ### Function templates: importing as real generic functions
