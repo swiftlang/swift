@@ -784,7 +784,7 @@ bool swift::isRepresentableInObjC(
 
       completionHandlerParams.push_back(AnyFunctionType::Param(type));
 
-      // Make sure that the paraneter type is representable in Objective-C.
+      // Make sure that the parameter type is representable in Objective-C.
       if (!type->isRepresentableIn(
               ForeignLanguage::ObjectiveC, const_cast<FuncDecl *>(FD))) {
         softenIfAccessNote(AFD, Reason.getAttr(),
