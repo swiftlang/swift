@@ -334,7 +334,7 @@ public:
   /// A set of compiled modules that may be ready to use.
   std::vector<std::string> CandidateCompiledModules;
 
-  /// A map of explict Swift module information.
+  /// A map of explicit Swift module information.
   std::string ExplicitSwiftModuleMap;
 
   /// A map of placeholder Swift module dependency information.
