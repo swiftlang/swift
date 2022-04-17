@@ -87,7 +87,7 @@ class Task {
   /// A pipe for reading output from the child process.
   int Pipe;
 
-  /// A pipe for reading errors from the child prcess, if SeparateErrors is true.
+  /// A pipe for reading errors from the child process, if SeparateErrors is true.
   int ErrorPipe;
 
   /// The current state of the Task.
