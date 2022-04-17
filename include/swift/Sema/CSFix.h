@@ -251,7 +251,7 @@ enum class FixKind : uint8_t {
   /// inferred in current context e.g. because it's a multi-statement closure.
   SpecifyClosureReturnType,
 
-  /// Object literal type coudn't be inferred because the module where
+  /// Object literal type couldn't be inferred because the module where
   /// the default type that implements the associated literal protocol
   /// is declared was not imported.
   SpecifyObjectLiteralTypeImport,
