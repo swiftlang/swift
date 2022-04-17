@@ -544,6 +544,9 @@ public:
   /// Writes a protocol's associated type table.
   void writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes);
 
+  /// Writes a protocol's primary associated type table.
+  void writePrimaryAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes);
+
   bool allowCompilerErrors() const;
 };
 

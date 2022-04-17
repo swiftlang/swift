@@ -414,8 +414,14 @@ private:
                                 llvm::BitstreamCursor &Cursor);
 
   /// Read a list of associated type declarations in a protocol.
-  void readAssociatedTypes(SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
-                           llvm::BitstreamCursor &Cursor);
+  void readAssociatedTypes(
+      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
+      llvm::BitstreamCursor &Cursor);
+
+  /// Read a list of primary associated type declarations in a protocol.
+  void readPrimaryAssociatedTypes(
+      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
+      llvm::BitstreamCursor &Cursor);
 
   /// Populates the protocol's default witness table.
   ///
@@ -747,8 +753,14 @@ public:
                            SmallVectorImpl<ProtocolTypeAlias> &typeAliases) override;
 
   void
-  loadAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,
-                      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
+  loadAssociatedTypes(
+      const ProtocolDecl *proto, uint64_t contextData,
+      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
+
+  void
+  loadPrimaryAssociatedTypes(
+      const ProtocolDecl *proto, uint64_t contextData,
+      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;
   Optional<StringRef> getSourceFileNameById(unsigned Id) const;
