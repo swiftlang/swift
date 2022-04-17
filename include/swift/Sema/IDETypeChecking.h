@@ -144,7 +144,7 @@ namespace swift {
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
-  /// Type check a function body element which is at \p TagetLoc .
+  /// Type check a function body element which is at \p TargetLoc .
   bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
 
   /// Thunk around \c TypeChecker::typeCheckForCodeCompletion to make it
