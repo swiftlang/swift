@@ -3904,7 +3904,7 @@ bool RefactoringActionSimplifyNumberLiteral::performChange() {
 static CallExpr *findTrailingClosureTarget(
     SourceManager &SM, const ResolvedCursorInfo &CursorInfo) {
   if (CursorInfo.Kind == CursorInfoKind::StmtStart)
-    // StmtStart postion can't be a part of CallExpr.
+    // StmtStart position can't be a part of CallExpr.
     return nullptr;
 
   // Find inner most CallExpr
