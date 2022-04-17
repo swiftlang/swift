@@ -2262,14 +2262,14 @@ class ConstExtractor: public ASTWalker {
     allConsts.emplace_back(file, kind, offset, length, Value, ReferencedD);
   }
 
-  void record(Expr *E, Expr *ValueProvider, StringRef ReferecedD = "") {
+  void record(Expr *E, Expr *ValueProvider, StringRef ReferencedD = "") {
     std::string content;
     llvm::raw_string_ostream os(content);
     ValueProvider->printConstExprValue(&os, nullptr);
     assert(!content.empty());
     auto buffered = SCtx.buffer(content);
     switch(ValueProvider->getKind()) {
-#define CASE(X) case ExprKind::X: record(E, ConstKind::X, buffered, ReferecedD); break;
+#define CASE(X) case ExprKind::X: record(E, ConstKind::X, buffered, ReferencedD); break;
       CASE(StringLiteral)
       CASE(IntegerLiteral)
       CASE(FloatLiteral)
