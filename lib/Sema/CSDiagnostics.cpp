@@ -2587,7 +2587,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
           locator->getLastElementAs<LocatorPathElt::ContextualType>()) {
     CTP = contextualTy->getPurpose();
   } else {
-    // Here we need to figure out where where `nil` is located.
+    // Here we need to figure out where `nil` is located.
     // It could be e.g. an argument to a subscript/call, assignment
     // source like `s[0] = nil` or an array element like `[nil]` or
     // `[nil: 42]` as a sub-expression to a larger one.
