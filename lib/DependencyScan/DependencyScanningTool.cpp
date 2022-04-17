@@ -27,7 +27,7 @@ namespace swift {
 namespace dependencies {
 
 llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command) {
-  // We must reset option occurences because we are handling an unrelated
+  // We must reset option occurrences because we are handling an unrelated
   // command-line to those possibly parsed parsed before using the same tool.
   // We must do so because LLVM options parsing is done using a managed
   // static `GlobalParser`.
@@ -175,7 +175,7 @@ DependencyScanningTool::initCompilerInstanceForScan(
   SmallString<128> WorkingDirectory;
   llvm::sys::fs::current_path(WorkingDirectory);
 
-  // We must reset option occurences because we are handling an unrelated
+  // We must reset option occurrences because we are handling an unrelated
   // command-line to those possibly parsed parsed before using the same tool.
   // We must do so because LLVM options parsing is done using a managed
   // static `GlobalParser`.

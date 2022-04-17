@@ -1082,7 +1082,7 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       // those of the current scanner invocation.
       updateCachedInstanceOpts(*pInstance, invocationInstance, entry.arguments);
     } else {
-      // We must reset option occurences because we are handling an unrelated command-line
+      // We must reset option occurrences because we are handling an unrelated command-line
       // to those parsed before. We must do so because LLVM options parsing is done
       // using a managed static `GlobalParser`.
       llvm::cl::ResetAllOptionOccurrences();
