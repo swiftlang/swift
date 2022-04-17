@@ -49,7 +49,7 @@ protocol EquatableSequence<Element> {
 struct ConcreteEquatableSequence<Element : Equatable> : EquatableSequence {}
 
 
-/// Parametrized protocol in protocol inheritance clause
+/// Parameterized protocol in protocol inheritance clause
 
 // CHECK-LABEL: parameterized_protocol.(file).IntSequence@
 // CHECK: Requirement signature: <Self where Self : Sequence, Self.[Sequence]Element == Int>
@@ -63,7 +63,7 @@ struct SillyStruct : Sequence<Int> {}
 // expected-error@-2 {{type 'SillyStruct' does not conform to protocol 'Sequence'}}
 
 
-/// Parametrized protocol in generic parameter inheritance clause
+/// Parameterized protocol in generic parameter inheritance clause
 
 // CHECK-LABEL: parameterized_protocol.(file).IntSequenceWrapper@
 // CHECK: Generic signature: <S where S : Sequence, S.[Sequence]Element == Int>
@@ -74,7 +74,7 @@ struct IntSequenceWrapper<S : Sequence<Int>> {}
 struct SequenceWrapper<S : Sequence<E>, E> {}
 
 
-/// Parametrized protocol in associated type inheritance clause
+/// Parameterized protocol in associated type inheritance clause
 
 // CHECK-LABEL: parameterized_protocol.(file).IntSequenceWrapperProtocol@
 // CHECK: Requirement signature: <Self where Self.[IntSequenceWrapperProtocol]S : Sequence, Self.[IntSequenceWrapperProtocol]S.[Sequence]Element == Int>
@@ -99,7 +99,7 @@ protocol Recursive<B, C> {
   associatedtype D: Recursive<B, C> = Self
 }
 
-/// Parametrized protocol in where clause of concrete type
+/// Parameterized protocol in where clause of concrete type
 
 // CHECK-LABEL: parameterized_protocol.(file).IntSequenceWrapper2@
 // CHECK: Generic signature: <S where S : Sequence, S.[Sequence]Element == Int>
@@ -110,7 +110,7 @@ struct IntSequenceWrapper2<S> where S : Sequence<Int> {}
 struct SequenceWrapper2<S, E> where S : Sequence<E> {}
 
 
-/// Parametrized protocol in where clause of associated type
+/// Parameterized protocol in where clause of associated type
 
 // CHECK-LABEL: parameterized_protocol.(file).IntSequenceWrapperProtocol2@
 // CHECK: Requirement signature: <Self where Self.[IntSequenceWrapperProtocol2]S : Sequence, Self.[IntSequenceWrapperProtocol2]S.[Sequence]Element == Int>
@@ -142,7 +142,7 @@ func testCollectionBad2<T : Collection<String, Int, Float>>(_: T) {}
 func testCollectionGood<T : Collection<String, Int>>(_: T) {}
 
 
-/// Parametrized protocol in opaque result type
+/// Parameterized protocol in opaque result type
 
 struct OpaqueTypes<E> {
   func returnSequenceOfInt() -> some Sequence<Int> {
