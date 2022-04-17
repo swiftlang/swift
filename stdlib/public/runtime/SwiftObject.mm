@@ -1441,7 +1441,7 @@ bool swift::swift_isUniquelyReferenced_nonNull_bridgeObject(uintptr_t bits) {
 }
 
 // Given a non-@objc object reference, return true iff the
-// object is non-nil and has a strong reference count greather than 1
+// object is non-nil and has a strong reference count greater than 1
 bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
                                                   const unsigned char *filename,
                                                   int32_t filenameLength,
