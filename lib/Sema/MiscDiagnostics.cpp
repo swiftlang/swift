@@ -2667,7 +2667,7 @@ public:
       return;
     }
 
-    SmallVector<Candidate, 4> universalyUniqueCandidates;
+    SmallVector<Candidate, 4> universallyUniqueCandidates;
 
     for (const auto &entry : Candidates) {
       AvailabilityContext availability = entry.first;
@@ -2675,11 +2675,11 @@ public:
 
       // Unique candidate without availability context.
       if (!availability && std::get<2>(candidate))
-        universalyUniqueCandidates.push_back(candidate);
+        universallyUniqueCandidates.push_back(candidate);
     }
 
     // TODO(diagnostics): Need a tailored diagnostic for this case.
-    if (universalyUniqueCandidates.empty()) {
+    if (universallyUniqueCandidates.empty()) {
       Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
       return;
     }
@@ -2687,8 +2687,8 @@ public:
     // If there is a single universally available unique candidate
     // the underlying type would have to be determined at runtime
     // based on the results of availability checks.
-    if (universalyUniqueCandidates.size() == 1) {
-      finalizeOpaque(universalyUniqueCandidates.front());
+    if (universallyUniqueCandidates.size() == 1) {
+      finalizeOpaque(universallyUniqueCandidates.front());
       return;
     }
 
@@ -2705,7 +2705,7 @@ public:
 
       Type underlyingType = Type(genericParam).subst(underlyingSubs);
       bool found = false;
-      for (const auto &candidate : universalyUniqueCandidates) {
+      for (const auto &candidate : universallyUniqueCandidates) {
         Type otherType = Type(genericParam).subst(std::get<1>(candidate));
 
         if (!underlyingType->isEqual(otherType)) {
@@ -2737,7 +2737,7 @@ public:
           .highlight(opaqueRepr->getSourceRange());
     }
 
-    for (const auto &candidate : universalyUniqueCandidates) {
+    for (const auto &candidate : universallyUniqueCandidates) {
       Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
                          diag::opaque_type_underlying_type_candidate_here,
                          Type(mismatch->second).subst(std::get<1>(candidate)));
