@@ -6744,7 +6744,7 @@ public:
 
   /// If \p asyncAlternative is set, then compare its parameters to this
   /// (presumed synchronous) function's parameters to find the index of the
-  /// completion handler parameter. This should be the the only missing
+  /// completion handler parameter. This should be the only missing
   /// parameter in \p asyncAlternative, ignoring defaulted parameters if they
   /// have the same label. It must have a void-returning function type and be
   /// attributed with @escaping but not @autoclosure.

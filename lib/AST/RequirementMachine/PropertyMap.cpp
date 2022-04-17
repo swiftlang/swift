@@ -389,7 +389,7 @@ void PropertyMap::clear() {
 ///
 /// Also performs property unification, nested type concretization and
 /// concrete simplification. These phases can add new rules; if new rules
-/// were added, the the caller must run another round of Knuth-Bendix
+/// were added, the caller must run another round of Knuth-Bendix
 /// completion, and rebuild the property map again.
 void PropertyMap::buildPropertyMap() {
   if (System.getDebugOptions().contains(DebugFlags::PropertyMap)) {
