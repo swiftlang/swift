@@ -476,7 +476,7 @@ protected:
 /// or incorrect labels supplied by arguments, e.g.
 /// ```swift
 ///   func foo(q: String, _ a: Int) {}
-///   foo("ultimate quesiton", a: 42)
+///   foo("ultimate question", a: 42)
 /// ```
 /// Call to `foo` is going to be diagnosed as missing `q:`
 /// and having extraneous `a:` labels, with appropriate fix-its added.
