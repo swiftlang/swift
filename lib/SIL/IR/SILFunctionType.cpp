@@ -4630,7 +4630,7 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
 
     // Opaque types are compatible with their substitution.
     if (inFunction) {
-      auto opaqueTypesSubsituted = aa;
+      auto opaqueTypesSubstituted = aa;
       auto *dc = inFunction->getDeclContext();
       auto *currentModule = inFunction->getModule().getSwiftModule();
       if (!dc || !dc->isChildContextOf(currentModule))
@@ -4639,15 +4639,15 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
           dc, inFunction->getResilienceExpansion(),
           inFunction->getModule().isWholeModule());
       if (aa.getASTType()->hasOpaqueArchetype())
-        opaqueTypesSubsituted = aa.subst(inFunction->getModule(), replacer,
+        opaqueTypesSubstituted = aa.subst(inFunction->getModule(), replacer,
                                          replacer, CanGenericSignature(), true);
 
-      auto opaqueTypesSubsituted2 = bb;
+      auto opaqueTypesSubstituted2 = bb;
       if (bb.getASTType()->hasOpaqueArchetype())
-        opaqueTypesSubsituted2 =
+        opaqueTypesSubstituted2 =
             bb.subst(inFunction->getModule(), replacer, replacer,
                      CanGenericSignature(), true);
-      if (opaqueTypesSubsituted == opaqueTypesSubsituted2)
+      if (opaqueTypesSubstituted == opaqueTypesSubstituted2)
         continue;
     }
 
