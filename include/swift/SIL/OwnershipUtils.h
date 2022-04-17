@@ -1011,7 +1011,7 @@ public:
     /// An owned value from the formation of a new alloc_box.
     AllocBoxInit,
 
-    /// An owned value from the formataion of a new alloc_ref.
+    /// An owned value from the formation of a new alloc_ref.
     AllocRefInit,
   };
 
