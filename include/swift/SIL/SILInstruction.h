@@ -9309,7 +9309,7 @@ public:
   }
 };
 
-/// LinearFunctionInst - given a function, its derivative and traspose functions,
+/// LinearFunctionInst - given a function, its derivative and transpose functions,
 /// create an `@differentiable(_linear)` function that represents a bundle of these.
 class LinearFunctionInst final
     : public InstructionBaseWithTrailingOperands<
