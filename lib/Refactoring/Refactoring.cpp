@@ -7238,7 +7238,7 @@ private:
         }
       }
       if (Args.size() == 1) {
-        // We only have a single result. 'result' seems a resonable name.
+        // We only have a single result. 'result' seems a reasonable name.
         return createUniqueName("result");
       } else {
         // We are returning a tuple. Name the result elements 'result' +
