@@ -3202,7 +3202,7 @@ public:
   /// Determine whether this generic parameter represents an opaque type.
   ///
   /// \code
-  /// // "some P" is representated by a generic type parameter.
+  /// // "some P" is represented by a generic type parameter.
   /// func f() -> [some P] { ... }
   /// \endcode
   bool isOpaqueType() const {
