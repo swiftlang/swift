@@ -85,7 +85,7 @@ func testRawRepresentable() {
 // MYENUM_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem: hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
 // MYENUM_DOT: End completions
 }
-func testRawRepesentableInstance(value: MyEnum) {
+func testRawRepresentableInstance(value: MyEnum) {
   value.#^MYENUM_INSTANCE_DOT^#
 // MYENUM_INSTANCE_DOT: Begin completions, 4 items
 // MYENUM_INSTANCE_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyEnum#];
