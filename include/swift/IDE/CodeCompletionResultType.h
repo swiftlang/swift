@@ -286,7 +286,7 @@ class CodeCompletionResultType {
   ///    It would be nice if we could use a SmallVector to store those types
   ///    instead but \c CodeCompletionResultType is allocated in a bump
   ///    allocator and freeing the bump allocator does not call the
-  ///    SmallVecotor's destructor, leaking potential heap memory. Since we only
+  ///    SmallVector's destructor, leaking potential heap memory. Since we only
   ///    need two result types at the moment, I decided to implement it in a
   ///    hacky way with two pointers.
   /// The \c getResultTypes and \c isApplicable methods mask away this
