@@ -239,7 +239,7 @@ endif()
 foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     # macCatalyst needs to run two sets of tests: one with the normal macosx target triple
-    # and one with the the macCatalyst ios-macabi triple.  The build_flavors list will
+    # and one with the macCatalyst ios-macabi triple.  The build_flavors list will
     # have only the "default" flavor for all SDKs and architectures except
     # OSX when macCatalyst support is enabled.
     get_swift_test_build_flavors(build_flavors "${SDK}")
@@ -296,7 +296,7 @@ foreach(SDK ${SWIFT_SDKS})
             "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
         if(BUILD_FLAVOR STREQUAL "ios-like")
-          # When testing the iOS-like build flavor, use the the normal macOS
+          # When testing the iOS-like build flavor, use the normal macOS
           # swift-reflection-test-tool. That tool runs out of process so it
           # doesn't need to be build for macCatalyst.
           list(APPEND test_dependencies
