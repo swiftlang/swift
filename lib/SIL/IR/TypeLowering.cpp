@@ -3317,7 +3317,7 @@ public:
     return (isa<SubstitutableType>(type) || isa<DependentMemberType>(type));
   };
 
-  // We can fast-path some of these checks by proviing these two overrides:
+  // We can fast-path some of these checks by providing these two overrides:
   bool visitSubstitutableType(CanSubstitutableType type1,
                               CanSubstitutableType type2) {
     return false;
