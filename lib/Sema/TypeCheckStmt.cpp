@@ -1162,7 +1162,7 @@ public:
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, switchStmt);
 
-    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
+    // Preemptively visit all Decls (#if/#warning/#error) that still exist in
     // the list of raw cases.
     for (auto &node : switchStmt->getRawCases()) {
       if (!node.is<Decl *>())
