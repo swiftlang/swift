@@ -989,7 +989,7 @@ private:
 
   /// Schedule an inline processing job.  This can generally only be
   /// done if we know nobody else is trying to do it at the same time,
-  /// e.g. if this thread just sucessfully transitioned the actor from
+  /// e.g. if this thread just successfully transitioned the actor from
   /// Idle to Scheduled.
   void scheduleActorProcessJob(JobPriority priority,
                                      bool hasActiveInlineJob);
@@ -1455,7 +1455,7 @@ Job * DefaultActorImpl::drainOne() {
     // Dequeue the first job and set up a new head
     newState = newState.withFirstJob(getNextJobInQueue(firstJob));
     if (_status().compare_exchange_weak(oldState, newState,
-                            /* sucess */ std::memory_order_release,
+                            /* success */ std::memory_order_release,
                             /* failure */ std::memory_order_acquire)) {
       SWIFT_TASK_DEBUG_LOG("Drained first job %p from actor %p", firstJob, this);
       traceActorStateTransition(this, oldState, newState);
