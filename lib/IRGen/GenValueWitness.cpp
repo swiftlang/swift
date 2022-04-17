@@ -440,7 +440,7 @@ conditionallyGetTypeLayoutEntry(IRGenModule &IGM, SILType concreteType) {
   auto &typeLayoutEntry = IGM.getTypeLayoutEntry(concreteType);
 
   // Don't use type layout based generation for layouts that contain a resilient
-  // field but no archetype. We don't expect a speadup by using type layout
+  // field but no archetype. We don't expect a speedup by using type layout
   // based ir generation.
   if ((typeLayoutEntry.containsResilientField() &&
        !typeLayoutEntry.containsArchetypeField()) ||
