@@ -212,7 +212,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   return true;
 }
 
-/// Collect visble members from \p Parent into \p FoundDecls .
+/// Collect visible members from \p Parent into \p FoundDecls .
 static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
                                       Type BaseType,
                                       IterableDeclContext *Parent,
