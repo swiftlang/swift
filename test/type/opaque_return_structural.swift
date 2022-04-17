@@ -66,7 +66,7 @@ func funcToAnyOpaqueCoercion() -> S1<some Any> {
 }
 
 // TODO: We should give better error messages here. The opaque types have
-// underlying types 'Int' and 'String', but the return statments have underlying
+// underlying types 'Int' and 'String', but the return statements have underlying
 // types '(Int, Int)' and '(String, Int)'.
 func structuralMismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> (some P, Int) { // expected-error{{do not have matching underlying types}}
   if x {
