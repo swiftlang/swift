@@ -26,7 +26,7 @@
 //
 // RawSyntax nodes always live in a SyntaxArena. The user of the RawSyntax nodes
 // is responsible to ensure that the SyntaxArena stays alive while the RawSyntax
-// nodes are being accessed. During tree cration this is done by the
+// nodes are being accessed. During tree creation this is done by the
 // SyntaxTreeCreator holding on to the arena. In lib/Syntax, the root SyntaxData
 // node retains the syntax arena. Should a RawSyntaxNode A reference a node B
 // from a different arena, it automatically adds B's arena as a child arena of
