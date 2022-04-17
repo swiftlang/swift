@@ -97,13 +97,13 @@ public final class MySerialExecutor : SerialExecutor {
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-      debugLog("==> MyMainActor: Getting unowned exector!")
+      debugLog("==> MyMainActor: Getting unowned executor!")
       return executor.asUnownedSerialExecutor()
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-      debugLog("==> MyMainActor: Getting shared unowned exector!")
+      debugLog("==> MyMainActor: Getting shared unowned executor!")
       return MySerialExecutor.sharedUnownedExecutor
   }
 
@@ -124,14 +124,14 @@ public final class MySerialExecutor : SerialExecutor {
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-      debugLog("==> MyMainActorWithAccessInUnownedExecAccessor: Getting unowned exector!")
+      debugLog("==> MyMainActorWithAccessInUnownedExecAccessor: Getting unowned executor!")
       withExclusiveAccess(to: &global) { _ in debugLog("Crash!") }
       return executor.asUnownedSerialExecutor()
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-      debugLog("==> MyMainActorWithAccessInUnownedExecAccessor: Getting shared unowned exector!")
+      debugLog("==> MyMainActorWithAccessInUnownedExecAccessor: Getting shared unowned executor!")
       return MySerialExecutor.sharedUnownedExecutor
   }
 
