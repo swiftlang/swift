@@ -406,7 +406,7 @@ bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
         SourceMgr.getLocOffsetInBuffer(EditStartLoc, BufferID);
     auto EditEndOffset = SourceMgr.getLocOffsetInBuffer(EditEndLoc, BufferID);
     Cache->addEdit(EditStartOffset, EditEndOffset,
-                   /*ReplacmentLength=*/Matches[5].size());
+                   /*ReplacementLength=*/Matches[5].size());
   }
   return true;
 }
