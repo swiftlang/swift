@@ -6147,7 +6147,7 @@ class AsyncConverter : private SourceEntityWalker {
   llvm::DenseSet<const Decl *> Placeholders;
 
   // Mapping from decl -> name, used as the name of possible new local
-  // declarations of old completion handler parametes, as well as the
+  // declarations of old completion handler parameters, as well as the
   // replacement for other hoisted declarations and their references
   llvm::DenseMap<const Decl *, Identifier> Names;
 
