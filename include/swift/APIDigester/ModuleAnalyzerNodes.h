@@ -357,7 +357,7 @@ class SDKNodeDecl: public SDKNode {
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   // In ABI mode, this field is populated as a user-friendly version of GenericSig.
-  // Dignostic preferes the sugared versions if they differ as well.
+  // Diagnostic preferes the sugared versions if they differ as well.
   StringRef SugaredGenericSig;
   Optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;
