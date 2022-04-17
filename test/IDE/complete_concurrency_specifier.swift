@@ -24,7 +24,7 @@
 func testSpecifier() #^SPECIFIER^#
 func testSpecifierWithAsync() async #^SPECIFIER_WITHASYNC^#
 func testSpecifierWithThrows() throws #^SPECIFIER_WITHTHROWS^#
-func testSpecifierWithAsyncThorws() async throws #^SPECIFIER_WITHASYNCTHROWS^#
+func testSpecifierWithAsyncThrows() async throws #^SPECIFIER_WITHASYNCTHROWS^#
 
 func testTypeSpecifier(_: () #^TYPE_SPECIFIER?check=SPECIFIER^#) {}
 func testTypeSpecifierWithAsync(_: () async #^TYPE_SPECIFIER_WITHASYNC?check=SPECIFIER_WITHASYNC^#) {}
