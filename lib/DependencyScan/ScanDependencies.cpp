@@ -1053,7 +1053,7 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
                   llvm::function_ref<void(BatchScanInput, CompilerInstance &,
                                           ModuleDependenciesCache &)>
                       scanningAction) {
-  const CompilerInvocation &invok = invocationInstance.getInvocation();
+  const CompilerInvocation &invoke = invocationInstance.getInvocation();
   bool localSubInstanceMap = false;
   CompilerArgInstanceCacheMap *subInstanceMap;
   if (versionedPCMInstanceCache)
@@ -1100,15 +1100,15 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       pCache = std::get<2>((*subInstanceMap)[entry.arguments]).get();
       SmallVector<const char *, 4> args;
       llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
-      CompilerInvocation subInvok = invok;
+      CompilerInvocation subInvoke = invoke;
       pInstance->addDiagnosticConsumer(&FDC);
-      if (subInvok.parseArgs(args, diags)) {
+      if (subInvoke.parseArgs(args, diags)) {
         invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
       std::string InstanceSetupError;
-      if (pInstance->setup(subInvok, InstanceSetupError)) {
+      if (pInstance->setup(subInvoke, InstanceSetupError)) {
         invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
