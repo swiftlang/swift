@@ -269,7 +269,7 @@ func testProtocolMethods<T: Proto>(b: Bool, p: T, p2:  Proto, s: SConf) {
   s.method(arg1: 6, arg2: b)
 }
 
-// Check requiers annotation on a class method.
+// Check requires annotation on a class method.
 class ClassD {
   @_semantics("oslog.requires_constant_arguments")
   func method(_ arg1: Int, _ arg2: Bool)
