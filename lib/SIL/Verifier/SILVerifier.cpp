@@ -1011,7 +1011,7 @@ public:
 
         // Address-only values are potentially unmovable when borrowed. See also
         // checkOwnershipForwardingInst. A phi implies a move of its arguments
-        // because they can't necessarilly all reuse the same storage.
+        // because they can't necessarily all reuse the same storage.
         require((!arg->getType().isAddressOnly(F)
                  || arg->getOwnershipKind() != OwnershipKind::Guaranteed),
                 "Guaranteed address-only phi not allowed--implies a copy");

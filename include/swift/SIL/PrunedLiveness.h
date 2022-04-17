@@ -384,7 +384,7 @@ struct PrunedLivenessBoundary {
   /// If the jointly post-dominating destroys do not include dead end paths,
   /// then any uses on those paths will not be included in the boundary. The
   /// resulting partial boundary will have holes along those paths. The dead end
-  /// successors of blocks in this live set on are not necessarilly identified
+  /// successors of blocks in this live set on are not necessarily identified
   /// by DeadEndBlocks.
   void compute(const PrunedLiveness &liveness,
                ArrayRef<SILBasicBlock *> postDomBlocks);

@@ -329,7 +329,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       // The arguments to partial_apply are a suffix of the partial_apply's
       // callee. Note that getSubstCalleeConv is function type of the callee
-      // argument passed to this apply, not necessarilly the function type of
+      // argument passed to this apply, not necessarily the function type of
       // the underlying callee function (i.e. it is based on the `getCallee`
       // type, not the `getCalleeOrigin` type).
       //

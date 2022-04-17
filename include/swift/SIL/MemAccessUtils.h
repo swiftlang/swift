@@ -567,7 +567,7 @@ private:
 /// The base of a formal access.
 ///
 /// Note that the SILValue that represents a storage object is not
-/// necessarilly an address type. It may instead be a SILBoxType. So, even
+/// necessarily an address type. It may instead be a SILBoxType. So, even
 /// though address phis are not allowed, finding the base of an access may
 /// require traversing phis.
 class AccessBase : public AccessRepresentation {
