@@ -346,7 +346,7 @@ void verifyKeyPathComponent(SILModule &M,
       // TODO: This should probably be unconditionally +1 when we
       // can represent that.
       require(newValueParam.getConvention() == normalArgConvention,
-              "setter value parameter should havee normal arg convention");
+              "setter value parameter should have normal arg convention");
 
       auto baseParam = substSetterType->getParameters()[1];
       require(baseParam.getConvention() == normalArgConvention
