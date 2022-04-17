@@ -601,7 +601,7 @@ EXPR_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    # postfix '#if' expession
+    # postfix '#if' expression
     Node('PostfixIfConfigExpr', kind='Expr',
          children=[
              Child('Base', kind='Expr', is_optional=True),
