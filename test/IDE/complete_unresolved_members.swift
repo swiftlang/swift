@@ -505,7 +505,7 @@ func testHasStaticClosure() {
 }
 // STATIC_CLOSURE_1: Begin completions, 3 items
 // STATIC_CLOSURE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#HasCreator#];
-// FIXME: Suggest 'create()[#HasCreateor#]', not 'create'.
+// FIXME: Suggest 'create()[#HasCreator#]', not 'create'.
 // STATIC_CLOSURE_1-DAG: Decl[StaticVar]/CurrNominal:        create[#() -> HasCreator#];
 // STATIC_CLOSURE_1-DAG: Decl[StaticVar]/CurrNominal:        create_curried[#() -> () -> HasCreator#];
 // STATIC_CLOSURE_1: End completions
