@@ -8813,7 +8813,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   if (!baseType->is<AnyMetatypeType>()) {
     bool applicable = false;
     // Special case -- in a protocol extension initializer with a class
-    // constrainted Self type, 'self' has archetype type, and only
+    // constrained Self type, 'self' has archetype type, and only
     // required initializers can be called.
     if (baseExpr && !baseExpr->isSuperExpr()) {
       auto &ctx = cs.getASTContext();

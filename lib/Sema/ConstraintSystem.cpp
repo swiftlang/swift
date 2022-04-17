@@ -747,7 +747,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
                                        ConstraintLocatorBuilder locator) {
-  // If this is a type defined inside of constrainted extension, let's add all
+  // If this is a type defined inside of constrained extension, let's add all
   // of the generic requirements to the constraint system to make sure that it's
   // something we can use.
   GenericTypeDecl *decl = nullptr;
