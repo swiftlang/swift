@@ -6089,7 +6089,7 @@ public:
 ///
 /// Calls to functions with an async alternative will be replaced with a call
 /// to the alternative, possibly wrapped in a do/catch. The do/catch is skipped
-/// if the the closure either:
+/// if the closure either:
 ///   1. Has no error
 ///   2. Has an error but no error handling (eg. just ignores)
 ///   3. Has error handling that only calls the containing function's handler
@@ -6803,7 +6803,7 @@ private:
       if (ClosedScopeWasWrappedInContinuation &&
           !Scopes.back().isWrappedInContinuation()) {
         // The nested scope was wrapped in a continuation but the current one
-        // isn't anymore. Add the '}' that corresponds to the the call to
+        // isn't anymore. Add the '}' that corresponds to the call to
         // withChecked(Throwing)Continuation.
         insertCustom(S->getEndLoc(), [&]() { OS << tok::r_brace << '\n'; });
       }

@@ -1654,7 +1654,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     /// We set the type of ParsedExpr explicitly above. But we don't want an
     /// unresolved type in our AST when we type check again for operator
     /// completions. Remove the type of the ParsedExpr and see if we can come up
-    /// with something more useful based on the the full sequence expression.
+    /// with something more useful based on the full sequence expression.
     if (ParsedExpr->getType()->is<UnresolvedType>()) {
       ParsedExpr->setType(nullptr);
     }
