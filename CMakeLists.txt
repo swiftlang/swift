@@ -1154,7 +1154,7 @@ if(SWIFT_INCLUDE_TOOLS)
   # frontend is being built, so trying to include them for other builds
   # (like stdlib) fail!
   #
-  # Diagnoseics information is only useful for the frontend compiler
+  # Diagnostics information is only useful for the frontend compiler
   # anyway, so let's only include it if the compiler is being built,
   # which at the moment seems like if SWIFT_INCLUDE_TOOLS is defined.
   add_subdirectory(localization)
