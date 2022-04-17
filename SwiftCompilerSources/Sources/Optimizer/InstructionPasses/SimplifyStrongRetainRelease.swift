@@ -78,7 +78,7 @@ private func isNotReferenceCounted(value: Value, context: PassContext) -> Bool {
       return isNotReferenceCounted(value: urc.operand, context: context)
     case let gvi as GlobalValueInst:
       // Since Swift 5.1, statically allocated objects have "immortal" reference
-      // counts. Therefore we can safely eliminate unbalaced retains and
+      // counts. Therefore we can safely eliminate unbalanced retains and
       // releases, because they are no-ops on immortal objects.
       // Note that the `simplifyGlobalValuePass` pass is deleting balanced
       // retains/releases, which doesn't require a Swift 5.1 minimum deployment
