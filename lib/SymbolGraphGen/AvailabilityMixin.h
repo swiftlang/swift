@@ -67,7 +67,7 @@ struct Availability {
 
   /// Returns true if this availability item doesn't have
   /// any introduced version, deprecated version, obsoleted version,
-  /// or uncondtional deprecation status.
+  /// or unconditional deprecation status.
   ///
   /// \note \c message and \c renamed are not considered.
   bool empty() const;
