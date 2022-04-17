@@ -308,7 +308,7 @@ bool CompileInstance::performSema(
       CachedReuseCount < Opts.MaxASTReuseCount) {
     CI->getASTContext().CancellationFlag = CancellationFlag;
     if (!performCachedSemaIfPossible(DiagC)) {
-      // If we compileted cacehd Sema operation. We're done.
+      // If we compileted cached Sema operation. We're done.
       ++CachedReuseCount;
       return CI->getDiags().hadAnyError();
     }
