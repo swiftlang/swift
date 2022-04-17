@@ -1616,7 +1616,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILProcessing(*SM);
 
-  // Cancellation check after SILOptimzation.
+  // Cancellation check after SILOptimization.
   if (Instance.isCancellationRequested())
     return true;
 
