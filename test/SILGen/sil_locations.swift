@@ -109,7 +109,7 @@ func multipleReturnsImplicitAndExplicit() {
     return
   }
   x += 1
-  // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations34multipleReturnsImplicitAndExplicityyF
+  // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations34multipleReturnsImplicitAndExplicitlyyF
   // CHECK: cond_br
   // CHECK: br bb{{[0-9]+}}, loc "{{.*}}":[[@LINE-5]]:5, {{.*}}:return
   // CHECK: br bb{{[0-9]+}}, loc "{{.*}}":[[@LINE+2]]:1, {{.*}}:imp_return
