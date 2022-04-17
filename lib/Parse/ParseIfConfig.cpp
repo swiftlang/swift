@@ -807,8 +807,8 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       // We shouldn't skip code if we are building syntax tree.
       // The parser will keep running and we just discard the AST part.
       DiagnosticSuppression suppression(Context.Diags);
-      SmallVector<ASTNode, 16> dropedElements;
-      parseElements(dropedElements, false);
+      SmallVector<ASTNode, 16> droppedElements;
+      parseElements(droppedElements, false);
     } else {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();
