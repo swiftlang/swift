@@ -265,7 +265,7 @@ enum class NotRecommendedReason : uint8_t {
 };
 
 /// TODO: We consider deprecation warnings as context free although they don't
-/// produce deprecation warnings insdide context that have the same or a
+/// produce deprecation warnings inside context that have the same or a
 /// stronger deprecation attribute.
 /// E.g.
 /// In SDK:
