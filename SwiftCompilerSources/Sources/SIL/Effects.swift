@@ -93,7 +93,7 @@ public struct ArgumentEffect : CustomStringConvertible, CustomReflectable {
   public enum Kind {
     /// The selected argument value does not escape.
     ///
-    /// Synatx examples:
+    /// Syntax examples:
     ///    !%0       // argument 0 does not escape
     ///    !%0.**    // argument 0 and all transitively contained values do not escape
     ///
@@ -101,7 +101,7 @@ public struct ArgumentEffect : CustomStringConvertible, CustomReflectable {
     
     /// The selected argument value escapes to the specified selection (= first payload).
     ///
-    /// Synatx examples:
+    /// Syntax examples:
     ///    %0.s1 => %r   // field 2 of argument 0 exclusively escapes via return.
     ///    %0.s1 -> %1   // field 2 of argument 0 - and other values - escape to argument 1.
     ///
