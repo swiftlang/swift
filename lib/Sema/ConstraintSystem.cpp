@@ -4101,7 +4101,7 @@ static bool diagnoseAmbiguityWithContextualType(
   };
 
   auto resultType = getResultType(aggregateFix.front());
-  // If right-hand side of the conversion (result of the the AST node)
+  // If right-hand side of the conversion (result of the AST node)
   // is the same across all of the solutions let's diagnose it as if
   // it it as a single failure.
   if (llvm::all_of(

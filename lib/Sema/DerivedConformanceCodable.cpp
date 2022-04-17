@@ -301,7 +301,7 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 }
 
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
-/// match with the the given VarDecls.
+/// match with the given VarDecls.
 ///
 /// \param varDecls The \c var decls to validate against.
 /// \param codingKeysTypeDecl The \c CodingKeys enum decl to validate.

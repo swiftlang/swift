@@ -857,7 +857,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           }
 
           if (declToDiagnose) {
-            // Figure out if the the declaration we've redeclared is a
+            // Figure out if the declaration we've redeclared is a
             // synthesized witness for a protocol requirement.
             bool isProtocolRequirement = false;
             if (auto VD = dyn_cast<ValueDecl>(current->isImplicit() ? current

@@ -798,7 +798,7 @@ static bool matchCallArgumentsImpl(
         if (oldLabel == params[paramIdx].getLabel())
           break;
 
-        // If we are moving the the position with a different label
+        // If we are moving the position with a different label
         // and there is no default value for it, can't diagnose the
         // problem as a simple re-ordering.
         if (!paramInfo.hasDefaultArgument(paramIdx))
@@ -3630,7 +3630,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
       return getTypeMatchFailure(locator);
     }
 
-    // Line up the the arguments of the parameterized protocol.
+    // Line up the arguments of the parameterized protocol.
     // FIXME: Extend the locator path to point to the argument
     // inducing the requirement.
     for (const auto &pair : llvm::zip_first(shorterArgs, longerArgs)) {
@@ -9251,7 +9251,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
 
       auto impact = 2;
-      // Impact is higher if the the base type is any function type
+      // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
         impact += 10;

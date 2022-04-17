@@ -131,7 +131,7 @@ public:
   static ExportContext forFunctionBody(DeclContext *DC, SourceLoc loc);
 
   /// Create an instance describing associated conformances that can be
-  /// referenced from the the conformance defined by the given DeclContext,
+  /// referenced from the conformance defined by the given DeclContext,
   /// which must be a NominalTypeDecl or ExtensionDecl.
   static ExportContext forConformance(DeclContext *DC, ProtocolDecl *proto);
 

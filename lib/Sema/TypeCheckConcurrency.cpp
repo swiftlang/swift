@@ -3412,7 +3412,7 @@ static bool checkClassGlobalActorIsolation(
 
   case ActorIsolation::GlobalActor:
   case ActorIsolation::GlobalActorUnsafe: {
-    // If the the global actors match, we're fine.
+    // If the global actors match, we're fine.
     Type superclassGlobalActor = superIsolation.getGlobalActor();
     auto module = classDecl->getParentModule();
     SubstitutionMap subsMap = classDecl->getDeclaredInterfaceType()
