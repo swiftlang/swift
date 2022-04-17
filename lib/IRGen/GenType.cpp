@@ -1526,7 +1526,7 @@ const LoadableTypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
     getSpareBitsForAlignedPointer(IGM, IGM.getWitnessTableAlignment());
 
   // This is sub-optimal because it doesn't consider that there are
-  // also potential extra inhabitants in witnesss table pointers, but
+  // also potential extra inhabitants in witness table pointers, but
   // it's what we're currently doing, so we might be stuck.
   // TODO: it's likely that this never matters in the current ABI,
   // so we can just switch to using AlignedRawPointerTypeInfo; but
