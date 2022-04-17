@@ -269,7 +269,7 @@ getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
   return getLinkerPlatformName((uint8_t)getLinkerPlatformId(Ver));
 }
 
-/// Find the most relevant introducing version of the decl stack we have visted
+/// Find the most relevant introducing version of the decl stack we have visited
 /// so far.
 static Optional<llvm::VersionTuple>
 getInnermostIntroVersion(ArrayRef<Decl*> DeclStack, PlatformKind Platform) {
