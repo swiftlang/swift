@@ -548,12 +548,12 @@ bool NameMatcher::shouldSkip(Expr *E) {
     // instead.
 
     auto ExprStart = E->getStartLoc();
-    auto RemaingTokens = TokensToCheck.drop_while([&](const Token &tok) -> bool {
+    auto RemainingTokens = TokensToCheck.drop_while([&](const Token &tok) -> bool {
       return getSourceMgr().isBeforeInBuffer(tok.getRange().getStart(), ExprStart);
     });
 
-    if (!RemaingTokens.empty() && RemaingTokens.front().getLoc() == ExprStart)
-      return shouldSkip(RemaingTokens.front().getRange());
+    if (!RemainingTokens.empty() && RemainingTokens.front().getLoc() == ExprStart)
+      return shouldSkip(RemainingTokens.front().getRange());
   }
   return shouldSkip(E->getSourceRange());
 }
