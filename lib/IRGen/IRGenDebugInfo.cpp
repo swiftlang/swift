@@ -1969,7 +1969,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // command line. This does not include any macros defined by ClangImporter.
   llvm::raw_svector_ostream OS(ConfigMacros);
   unsigned I = 0;
-  // Translate the macro definitions back into a commmand line.
+  // Translate the macro definitions back into a command line.
   for (auto &Macro : Opts.ClangDefines) {
     if (++I > 1)
       OS << ' ';
