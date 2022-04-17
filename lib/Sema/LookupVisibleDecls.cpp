@@ -500,7 +500,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
                     DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal;
               } else if (!LS.isIncludingProtocolExtensionMembers() &&
                          WD->getDeclContext()->getExtendedProtocolDecl()) {
-                // Don't skip this requiement.
+                // Don't skip this requirement.
                 // Witnesses in protocol extensions aren't reported.
               } else {
                 // lookupVisibleMemberDecls() generally prefers witness members
