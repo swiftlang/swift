@@ -399,7 +399,7 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
 
         // The GSB used to drop requirements which reference non-existent
         // generic parameters, whereas the RequirementMachine asserts now.
-        // Filter thes requirements out explicitly to preserve the old
+        // Filter these requirements out explicitly to preserve the old
         // behavior.
         if (std::find_if(genericParams.begin(), genericParams.end(),
                          [interfaceTy](CanGenericTypeParamType t) -> bool {
