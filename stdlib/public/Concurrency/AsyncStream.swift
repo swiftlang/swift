@@ -305,7 +305,7 @@ public struct AsyncStream<Element> {
   ///     stream.
   ///   - onCancel: A closure to execute when canceling the stream's task.
   ///
-  /// Use this convenience initializer when you have an asychronous function
+  /// Use this convenience initializer when you have an asynchronous function
   /// that can produce elements for the stream, and don't want to invoke
   /// a continuation manually. This initializer "unfolds" your closure into
   /// an asynchronous stream. The created stream handles conformance

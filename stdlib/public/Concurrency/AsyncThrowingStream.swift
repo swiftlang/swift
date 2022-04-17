@@ -51,7 +51,7 @@ import Swift
 /// `Quake` instances every time it detects an earthquake. To receive callbacks,
 /// callers set a custom closure as the value of the monitor's
 /// `quakeHandler` property, which the monitor calls back as necessary. Callers
-/// can also set an `errorHandler` to receive asychronous error notifications,
+/// can also set an `errorHandler` to receive asynchronous error notifications,
 /// such as the monitor service suddenly becoming unavailable.
 ///
 ///     class QuakeMonitor {
@@ -338,7 +338,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///   - produce: A closure that asynchronously produces elements for the
   ///    stream.
   ///
-  /// Use this convenience initializer when you have an asychronous function
+  /// Use this convenience initializer when you have an asynchronous function
   /// that can produce elements for the stream, and don't want to invoke
   /// a continuation manually. This initializer "unfolds" your closure into
   /// a full-blown asynchronous stream. The created stream handles adherence to
