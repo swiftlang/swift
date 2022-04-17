@@ -392,7 +392,7 @@ public:
 
 private:
   bool walkToDeclPre(Decl *D) override {
-    // Adds in a parent TRC for decls which are syntatically nested but are not
+    // Adds in a parent TRC for decls which are syntactically nested but are not
     // represented that way in the AST. (Particularly, AbstractStorageDecl
     // parents for AccessorDecl children.)
     if (auto ParentTRC = getEffectiveParentContextForDecl(D)) {
