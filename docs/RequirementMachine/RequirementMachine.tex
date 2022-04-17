@@ -2208,7 +2208,7 @@ t&\leftrightarrow ab\\
 u&\leftrightarrow a\\
 v&\leftrightarrow b
 \end{align*}
-This means that adding a new \emph{generator} to $M$ made the presentation convergent. What does this generator represent in the world of Swift? Well, $u\in M'$ is $a\in M$, which is $\protosym{View}$ in Swift; and $v\in M'$ is $b\in M$, which is $\namesym{Body}$. Therefore $t\in M'$ is $ab\in M$, which is $\protosym{View}.\namesym{Body}$. You may guess that $t$ could be a new kind of symbol, perhaps representing a ``bound'' associated type inside a specific protcol.
+This means that adding a new \emph{generator} to $M$ made the presentation convergent. What does this generator represent in the world of Swift? Well, $u\in M'$ is $a\in M$, which is $\protosym{View}$ in Swift; and $v\in M'$ is $b\in M$, which is $\namesym{Body}$. Therefore $t\in M'$ is $ab\in M$, which is $\protosym{View}.\namesym{Body}$. You may guess that $t$ could be a new kind of symbol, perhaps representing a ``bound'' associated type inside a specific protocol.
 
 \index{associated type symbol}
  The crux of the issue is that name symbols like $\namesym{Body}$ don't carry any information, and little can be said about them unless they're prefixed with some other term that is known to conform to a protocol. Thus, you cannot simply add a rewrite rule to say that $\namesym{Body}$ conforms to $\protosym{View}$:
