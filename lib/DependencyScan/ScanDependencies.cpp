@@ -245,7 +245,7 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
   return std::vector<ModuleDependencyID>(result.begin(), result.end());
 }
 
-static void discoverCrosssImportOverlayDependencies(
+static void discoverCrossImportOverlayDependencies(
     CompilerInstance &instance, StringRef mainModuleName,
     ArrayRef<ModuleDependencyID> allDependencies,
     ModuleDependenciesCache &cache, InterfaceSubContextDelegate &ASTDelegate,
@@ -1434,7 +1434,7 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   }
 
   // We have all explicit imports now, resolve cross import overlays.
-  discoverCrosssImportOverlayDependencies(
+  discoverCrossImportOverlayDependencies(
       instance, mainModuleName,
       /*All transitive dependencies*/ allModules.getArrayRef().slice(1), cache,
       ASTDelegate, [&](ModuleDependencyID id) { allModules.insert(id); },
