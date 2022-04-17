@@ -166,7 +166,7 @@ struct IndentContext {
   /// The location to indent relative to.
   SourceLoc ContextLoc;
 
-  /// Indicates whether to indent relative to the extact column of ContextLoc
+  /// Indicates whether to indent relative to the extract column of ContextLoc
   /// (Exact) or to the start of the content of the line it appears on (LineStart).
   ContextKind Kind;
 
