@@ -1700,7 +1700,7 @@ class D_optionalTryUnusedImplicit {
 
 
 
-// Miscellanceous
+// Miscellaneous
 
 class CSuperExpr_Base { init() {} }
 class CSuperExpr_Derived : CSuperExpr_Base { override init() { super.init() } }
