@@ -4742,7 +4742,7 @@ bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure) {
     funcType = paramType->getAs<FunctionType>();
   } else if (locator->isLastElement<LocatorPathElt::ClosureResult>() ||
              locator->isLastElement<LocatorPathElt::ClosureBody>()) {
-    // Based on the locator we know this this is something like this:
+    // Based on the locator we know this is something like this:
     // `let _: () -> ((Int) -> Void) = { return {} }`.
     funcType = getType(getRawAnchor())
                    ->castTo<FunctionType>()
