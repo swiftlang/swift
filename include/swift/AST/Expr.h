@@ -958,7 +958,7 @@ public:
     return Loc;
   }
   
-  /// Could also be computed by relexing.
+  /// Could also be computed by relaxing.
   SourceLoc getTrailingQuoteLoc() const {
     return TrailingQuoteLoc;
   }
