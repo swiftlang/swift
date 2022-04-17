@@ -170,7 +170,7 @@ class HasTypealias : HasAssocWithConformanceConstraint {
 // OVERRIDE_HasTypealias: End completions
 }
 
-// MARK: Postfix expession for opaque result types.
+// MARK: Postfix expression for opaque result types.
 
 protocol TestProtocol {
   associatedtype Assoc1

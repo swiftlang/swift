@@ -469,7 +469,7 @@ void CompletionLookup::addValueBaseName(CodeCompletionResultBuilder &Builder,
     // `self`. E.g. 'func `init`()' must be called by 'expr.`init`()'.
     shouldEscapeKeywords = NameStr == "self" || NameStr == "init";
   } else {
-    // As primary expresson. We have to escape almost every keywords except
+    // As primary expression. We have to escape almost every keywords except
     // for 'self' and 'Self'.
     shouldEscapeKeywords = NameStr != "self" && NameStr != "Self";
   }
