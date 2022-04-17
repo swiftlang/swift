@@ -1300,7 +1300,7 @@ namespace {
 
         // If we're opening an existential:
         // - The type of 'memberRef' inside the thunk is written in terms of the
-        //   opened existental archetype.
+        //   opened existential archetype.
         // - The type of the thunk is written in terms of the
         //   erased existential bounds.
         Type opaqueValueTy = openedTy;
