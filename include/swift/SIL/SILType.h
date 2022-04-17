@@ -501,7 +501,7 @@ public:
   }
 
   /// Return the reference ownership of this type if it is a reference storage
-  /// type. Otherwse, return None.
+  /// type. Otherwise, return None.
   Optional<ReferenceOwnership> getReferenceStorageOwnership() const {
     auto type = getASTType()->getAs<ReferenceStorageType>();
     if (!type)
