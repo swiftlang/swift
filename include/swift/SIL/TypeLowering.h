@@ -421,7 +421,7 @@ public:
     DirectChildren, ///> Expand the value into its direct children and place
                     ///> operations on the children.
     MostDerivedDescendents, ///> Expand the value into its most derived
-                            ///> substypes and perform operations on these
+                            ///> subtypes and perform operations on these
                             ///> types.
   };
 
