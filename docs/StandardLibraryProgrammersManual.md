@@ -162,7 +162,7 @@ Please keep all stored properties together in a single uninterrupted list, follo
 
 We also have some recommendations for defining other members. These aren't strict rules, as the best way to present definitions varies; but it usually makes sense to break up the implementation into easily digestable, logical chunks.
 
-- In general, it is a good idea to keep the main `struct`/`class` definiton as short as possible: preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
+- In general, it is a good idea to keep the main `struct`/`class` definition as short as possible: preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
 
 - Everything else should go in standalone extensions, arranged by logical theme. For example, it's often nice to define protocol conformances in dedicated extensions. If it makes sense, feel free to add a comment to title these sectioning extensions.
 
