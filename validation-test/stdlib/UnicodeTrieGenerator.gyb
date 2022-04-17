@@ -67,7 +67,7 @@ test_trie_generation(PerfectlyCompressibleProperty())
 # supp_data:    1            x 1*256 = 256
 
 
-class UncompressableProperty(UnicodeProperty):
+class UncompressibleProperty(UnicodeProperty):
     def __init__(self):
         pass
 
@@ -93,9 +93,9 @@ class UncompressableProperty(UnicodeProperty):
     def get_numeric_value(self, cp):
         return self.to_numeric_value(self.get_value(cp))
 
-print('UncompressableProperty, default trie parameters')
-test_trie_generation(UncompressableProperty())
-# CHECK-LABEL: UncompressableProperty, default trie parameters
+print('UncompressibleProperty, default trie parameters')
+test_trie_generation(UncompressibleProperty())
+# CHECK-LABEL: UncompressibleProperty, default trie parameters
 # CHECK: (8, 8, 5, 8, 8,  2, 1, 1, 2, 1,  1123601,  512, 65536, 17, 8704, 1048832)
 #
 # Explanation for table sizes above:
@@ -112,10 +112,10 @@ def configure_generator_for_16_bit_indexes(trie_generator):
     trie_generator.supp_first_level_index_bits = 10
     trie_generator.supp_second_level_index_bits = 2
 
-print('UncompressableProperty, 16-bit indexes')
-test_trie_generation(UncompressableProperty(),
+print('UncompressibleProperty, 16-bit indexes')
+test_trie_generation(UncompressibleProperty(),
     configure_generator_for_16_bit_indexes)
-# CHECK-LABEL: UncompressableProperty, 16-bit indexes
+# CHECK-LABEL: UncompressibleProperty, 16-bit indexes
 # CHECK: (9, 7, 10, 2, 9,  2, 1, 2, 2, 1,  1120840,  1024, 65536, 1088, 4104, 1049088)
 #
 # Explanation for table sizes above:
