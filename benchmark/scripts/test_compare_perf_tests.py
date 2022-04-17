@@ -247,7 +247,7 @@ class TestPerformanceTestResult(unittest.TestCase):
     def test_init_delta_quantiles(self):
         # #,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX
         # 2-quantile from 2 samples in repeated min, when delta encoded,
-        # the difference is 0, which is ommited -- only separator remains
+        # the difference is 0, which is omitted -- only separator remains
         log = "202,DropWhileArray,2,265,,22"
         r = PerformanceTestResult(log.split(","), quantiles=True, delta=True)
         self.assertEqual((r.num_samples, r.min, r.median, r.max), (2, 265, 265, 287))
