@@ -104,7 +104,7 @@ std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, Arra
   // handle any unresolved locs past the end of the last AST node or comment
   std::vector<ResolvedLoc> Remaining(Locs.size() - ResolvedLocs.size(), {
     ASTWalker::ParentTy(), CharSourceRange(), {}, None, LabelRangeType::None,
-    /*isActice*/true, /*isInSelector*/false});
+    /*isActive*/true, /*isInSelector*/false});
   ResolvedLocs.insert(ResolvedLocs.end(), Remaining.begin(), Remaining.end());
 
   // return in the original order
