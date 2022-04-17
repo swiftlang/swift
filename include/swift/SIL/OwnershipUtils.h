@@ -901,7 +901,7 @@ private:
 /// scope and interiorPointerOp is irrelevant.
 ///
 /// If hasOwnership() is true, then interiorPointerOp refers to the operand that
-/// converts a non-address value into the address from which the contructor's
+/// converts a non-address value into the address from which the constructor's
 /// address is derived. If the best-effort to find an InteriorPointerOperand
 /// fails, then interiorPointerOp remains invalid, and clients must be
 /// conservative.
