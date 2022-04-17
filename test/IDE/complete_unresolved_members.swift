@@ -694,14 +694,14 @@ func testClosureReturnTypeForOverloaded() {
 
 func receiveAutoclosure(_: @autoclosure () -> SomeEnum1) {}
 func receiveAutoclosureOpt(_: @autoclosure () -> SomeEnum1?) {}
-func testAutoclosre() {
+func testAutoclosure() {
   receiveAutoclosure(.#^AUTOCLOSURE?check=UNRESOLVED_3^#)
   // Same as UNRESOLVED_3
 
   receiveAutoclosureOpt(.#^AUTOCLOSURE_OPT?check=UNRESOLVED_3_OPT^#)
   // Same as UNRESOLVED_3_OPT
 }
-func testAutoclosreFuncTy(fn: (@autoclosure () -> SomeEnum1) -> Void, fnOpt: (@autoclosure () -> SomeEnum1?) -> Void) {
+func testAutoclosureFuncTy(fn: (@autoclosure () -> SomeEnum1) -> Void, fnOpt: (@autoclosure () -> SomeEnum1?) -> Void) {
   fn(.#^AUTOCLOSURE_FUNCTY?check=UNRESOLVED_3^#)
   // Same as UNRESOLVED_3
   fnOpt(.#^AUTOCLOSURE_FUNCTY_OPT?check=UNRESOLVED_3_OPT^#)
