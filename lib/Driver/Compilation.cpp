@@ -1148,7 +1148,7 @@ namespace driver {
 
     /// Create \c NumberOfParallelCommands batches and assign each job to a
     /// batch either filling each partition in order or, if seeded with a
-    /// nonzero value, pseudo-randomly (but determinstically and nearly-evenly).
+    /// nonzero value, pseudo-randomly (but deterministically and nearly-evenly).
     void partitionIntoBatches(std::vector<const Job *> Batchable,
                               BatchPartition &Partition) {
       if (Comp.getShowJobLifecycle()) {
