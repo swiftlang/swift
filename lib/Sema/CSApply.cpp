@@ -8679,7 +8679,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
   // used again. Here, however, we recover from a rewriting failure and continue
   // using the Rewriter. To make sure we don't continue with an ExprStack that
   // is still in the state when rewriting was aborted, save it here and restore
-  // it once rewritingt this target has finished.
+  // it once rewriting this target has finished.
   llvm::SaveAndRestore<SmallVector<Expr *, 8>> RestoreExprStack(
       Rewriter.ExprStack);
   auto &solution = Rewriter.solution;
