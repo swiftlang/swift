@@ -492,7 +492,7 @@ public:
     return { job, 0 };
   }
 
-  /// Return a reference to a job that hasn't been preprocesssed yet.
+  /// Return a reference to a job that hasn't been preprocessed yet.
   static JobRef getUnpreprocessed(Job *job) {
     assert(job && "passing a null job");
     return { job, NeedsPreprocessing };
