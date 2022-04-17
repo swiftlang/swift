@@ -3180,7 +3180,7 @@ private:
   ///
   /// \param solutions The set of solutions to filter.
   ///
-  /// \param minimize The flag which idicates if the
+  /// \param minimize The flag which indicates if the
   /// set of solutions should be filtered even if there is
   /// no single best solution, see `findBestSolution` for
   /// more details.
