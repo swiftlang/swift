@@ -224,7 +224,7 @@ def measure(driver, tests, i):
 
 
 def merge(results, other_results):
-    """"Merge the other PreformanceTestResults into the first dictionary."""
+    """"Merge the other PerformanceTestResults into the first dictionary."""
     for test, result in other_results.items():
         results[test].merge(result)
     return results
