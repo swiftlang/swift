@@ -880,7 +880,7 @@ ArrayRef<ValueDecl*> swift::
 collectAllOverriddenDecls(ValueDecl *VD, bool IncludeProtocolRequirements,
                           bool Transitive) {
   return evaluateOrDefault(VD->getASTContext().evaluator,
-    CollectOverriddenDeclsRequest(OverridenDeclsOwner(VD,
+    CollectOverriddenDeclsRequest(OverriddenDeclsOwner(VD,
       IncludeProtocolRequirements, Transitive)), ArrayRef<ValueDecl*>());
 }
 
