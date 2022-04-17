@@ -72,7 +72,7 @@ extension MapSomeSequenceView: Sequence {
 }
 
 // now extend a lazy collection to return that view
-// from a call to mapSome.  In pracice, when doing this,
+// from a call to mapSome.  In practice, when doing this,
 // you should do it for all the lazy wrappers
 // (i.e. random-access, forward and sequence)
 extension LazyCollectionProtocol {
