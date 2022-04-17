@@ -276,7 +276,7 @@ class RawSyntax final
                                         Bits.Token.TrailingTriviaLength);
   }
 
-  /// Compute the node's text length by summing up the length of its childern
+  /// Compute the node's text length by summing up the length of its children
   size_t computeTextLength() {
     size_t TextLength = 0;
     for (size_t I = 0, NumChildren = getNumChildren(); I < NumChildren; ++I) {
