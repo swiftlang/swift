@@ -2760,7 +2760,7 @@ namespace {
       closure->walk(collectVarRefs);
 
       // If walker discovered error expressions, let's fail constraint
-      // genreation only if closure is going to participate
+      // generation only if closure is going to participate
       // in the type-check. This allows us to delay validation of
       // multi-statement closures until body is opened.
       if (CS.participatesInInference(closure) &&
