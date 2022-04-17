@@ -118,7 +118,7 @@
 
 // Only the bottom 56 bits are used, and heap objects are eight-byte-aligned.
 // This is conservative: in practice architectural limitations and other
-// compatiblity concerns likely constrain the address space to 52 bits.
+// compatibility concerns likely constrain the address space to 52 bits.
 #define SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK                                 \
   SWIFT_ABI_DEFAULT_64BIT_SPARE_BITS_MASK
 
