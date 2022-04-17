@@ -896,7 +896,7 @@ struct CompletionLikeOperationParams {
 /// In case there was an error setting up the parameters for the operation,
 /// this method returns \c true and does not call \p PerformOperation.
 static bool performWithCompletionLikeOperationParams(
-    const CompilerInvocation &InitInvok, StringRef SourceFilename,
+    const CompilerInvocation &InitInvoke, StringRef SourceFilename,
     StringRef SecondSourceFileName, StringRef CodeCompletionToken,
     bool CodeCompletionDiagnostics,
     llvm::function_ref<bool(CompletionLikeOperationParams Params)>
@@ -920,7 +920,7 @@ static bool performWithCompletionLikeOperationParams(
   llvm::errs() << "found code completion token " << CodeCompletionToken
                << " at offset " << Offset << "\n";
 
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
 
   if (!SecondSourceFileName.empty()) {
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
@@ -995,13 +995,13 @@ static int printTypeContextInfo(
       });
 }
 
-static int doTypeContextInfo(const CompilerInvocation &InitInvok,
+static int doTypeContextInfo(const CompilerInvocation &InitInvoke,
                              StringRef SourceFilename,
                              StringRef SecondSourceFileName,
                              StringRef CodeCompletionToken,
                              bool CodeCompletionDiagnostics) {
   return performWithCompletionLikeOperationParams(
-      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
+      InitInvoke, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
         CompletionInstance CompletionInst;
@@ -1063,7 +1063,7 @@ static int printConformingMethodList(
 }
 
 static int
-doConformingMethodList(const CompilerInvocation &InitInvok,
+doConformingMethodList(const CompilerInvocation &InitInvoke,
                        StringRef SourceFilename, StringRef SecondSourceFileName,
                        StringRef CodeCompletionToken,
                        bool CodeCompletionDiagnostics,
@@ -1073,7 +1073,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
     typeNames.push_back(name.c_str());
 
   return performWithCompletionLikeOperationParams(
-      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
+      InitInvoke, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
         CompletionInstance CompletionInst;
@@ -1197,7 +1197,7 @@ static int printCodeCompletionResults(
 }
 
 static int
-doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
+doCodeCompletion(const CompilerInvocation &InitInvoke, StringRef SourceFilename,
                  StringRef SecondSourceFileName, StringRef CodeCompletionToken,
                  bool CodeCompletionDiagnostics, bool CodeCompletionKeywords,
                  bool CodeCompletionComments,
@@ -1220,7 +1220,7 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
       CodeCompletionAddCallWithNoDefaultArgs);
 
   return performWithCompletionLikeOperationParams(
-      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
+      InitInvoke, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
         CompletionInstance Inst;
@@ -1411,7 +1411,7 @@ removeCodeCompletionTokens(llvm::MemoryBuffer *Input,
 
 } // namespace
 
-static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
+static int doBatchCodeCompletion(const CompilerInvocation &InitInvoke,
                                  StringRef SourceFilename,
                                  bool CodeCompletionDiagnostics,
                                  bool CodeCompletionKeywords,
@@ -1486,7 +1486,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                  std::default_random_engine(RandomSeed));
   }
 
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   auto FileSystem = llvm::vfs::getRealFileSystem();
 
   CompletionInstance CompletionInst;
@@ -1703,7 +1703,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   return 1;
 }
 
-static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
+static int doREPLCodeCompletion(const CompilerInvocation &InitInvoke,
                                 StringRef SourceFilename) {
   std::unique_ptr<llvm::MemoryBuffer> FileBuf;
   if (setBufferForFile(SourceFilename, FileBuf))
@@ -1714,7 +1714,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   if (BufferText.endswith("\n"))
     BufferText = BufferText.drop_back(1);
 
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   CompilerInstance CI;
 
   // Display diagnostics to stderr.
@@ -1918,12 +1918,12 @@ public:
 
 } // end anonymous namespace
 
-static int doSyntaxColoring(const CompilerInvocation &InitInvok,
+static int doSyntaxColoring(const CompilerInvocation &InitInvoke,
                             StringRef SourceFilename,
                             bool TerminalOutput,
                             bool RunTypeChecker,
                             bool Playground) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
   Invocation.getLangOptions().Playground = Playground;
@@ -1998,7 +1998,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
+static int doDumpImporterLookupTables(const CompilerInvocation &InitInvoke,
                                       StringRef SourceFilename) {
   if (options::ImportObjCHeader.empty()) {
     llvm::errs() << "implicit header required\n";
@@ -2006,7 +2006,7 @@ static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
     return 1;
   }
 
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI;
@@ -2187,13 +2187,13 @@ private:
   }
 };
 
-static int doStructureAnnotation(const CompilerInvocation &InitInvok,
+static int doStructureAnnotation(const CompilerInvocation &InitInvoke,
                                  StringRef SourceFilename) {
   std::unique_ptr<llvm::MemoryBuffer> FileBuf;
   if (setBufferForFile(SourceFilename, FileBuf))
     return 1;
 
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
@@ -2471,10 +2471,10 @@ private:
 
 } // unnamed namespace
 
-static int doSemanticAnnotation(const CompilerInvocation &InitInvok,
+static int doSemanticAnnotation(const CompilerInvocation &InitInvoke,
                                 StringRef SourceFilename,
                                 bool TerminalOutput) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI;
@@ -2532,13 +2532,13 @@ static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleNam
   return Result;
 }
 
-static int doPrintAST(const CompilerInvocation &InitInvok,
+static int doPrintAST(const CompilerInvocation &InitInvoke,
                       StringRef SourceFilename,
                       bool RunTypeChecker,
                       const PrintOptions &Options,
                       StringRef MangledNameToFind,
                       StringRef DebugClientDiscriminator) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   if (!RunTypeChecker)
@@ -2586,9 +2586,9 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   return EXIT_SUCCESS;
 }
 
-static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
+static int doPrintExpressionTypes(const CompilerInvocation &InitInvoke,
                                   StringRef SourceFilename) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(SourceFilename);
   CompilerInstance CI;
 
@@ -2646,11 +2646,11 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   return EXIT_SUCCESS;
 }
 
-static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
+static int doPrintLocalTypes(const CompilerInvocation &InitInvoke,
                              const std::vector<std::string> ModulesToPrint) {
   using NodeKind = Demangle::Node::Kind;
 
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -2872,9 +2872,9 @@ struct GroupNamesPrinter {
   }
 };
 
-static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
+static int doPrintModuleGroups(const CompilerInvocation &InitInvoke,
                                const std::vector<std::string> ModulesToPrint) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -2942,9 +2942,9 @@ static void printModuleMetadata(ModuleDecl *MD) {
   });
 }
 
-static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,
+static int doPrintModuleMetaData(const CompilerInvocation &InitInvoke,
                                  const std::vector<std::string> ModulesToPrint) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -3007,14 +3007,14 @@ static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,
   return ExitCode;
 }
 
-static int doPrintModules(const CompilerInvocation &InitInvok,
+static int doPrintModules(const CompilerInvocation &InitInvoke,
                           const std::vector<std::string> ModulesToPrint,
                           const std::vector<std::string> GroupsToPrint,
                           ide::ModuleTraversalOptions TraversalOptions,
                           const PrintOptions &Options,
                           bool AnnotatePrint,
                           bool SynthesizeExtensions) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -3077,11 +3077,11 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   return ExitCode;
 }
 
-static int doPrintHeaders(const CompilerInvocation &InitInvok,
+static int doPrintHeaders(const CompilerInvocation &InitInvoke,
                           const std::vector<std::string> HeadersToPrint,
                           const PrintOptions &Options,
                           bool AnnotatePrint) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -3131,10 +3131,10 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
   return ExitCode;
 }
 
-static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
+static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvoke,
                                      StringRef SourceFilename,
                                      bool AnnotatePrint) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(
       SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
@@ -3157,7 +3157,7 @@ static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
     Printer.reset(new StreamPrinter(llvm::outs()));
 
   PrintOptions Options = PrintOptions::printSwiftFileInterface(
-      InitInvok.getFrontendOptions().PrintFullConvention);
+      InitInvoke.getFrontendOptions().PrintFullConvention);
   if (options::PrintOriginalSourceText)
     Options.PrintOriginalSourceText = true;
   printSwiftSourceInterface(*CI.getPrimarySourceFile(), *Printer, Options);
@@ -3165,12 +3165,12 @@ static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doPrintDecls(const CompilerInvocation &InitInvok,
+static int doPrintDecls(const CompilerInvocation &InitInvoke,
                         StringRef SourceFilename,
                         ArrayRef<std::string> DeclsToPrint,
                         const PrintOptions &Options,
                         bool AnnotatePrint) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(
       SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
@@ -3287,10 +3287,10 @@ public:
 };
 } // unnamed namespace
 
-static int doPrintTypes(const CompilerInvocation &InitInvok,
+static int doPrintTypes(const CompilerInvocation &InitInvoke,
                         StringRef SourceFilename,
                         bool FullyQualifiedTypes) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI;
@@ -3516,9 +3516,9 @@ public:
 };
 } // unnamed namespace
 
-static int doDumpComments(const CompilerInvocation &InitInvok,
+static int doDumpComments(const CompilerInvocation &InitInvoke,
                           StringRef SourceFilename) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   CompilerInstance CI;
@@ -3541,10 +3541,10 @@ static int doDumpComments(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doPrintComments(const CompilerInvocation &InitInvok,
+static int doPrintComments(const CompilerInvocation &InitInvoke,
                            StringRef SourceFilename,
                            StringRef CommentsXMLSchema) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
@@ -3571,10 +3571,10 @@ static int doPrintComments(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doPrintModuleComments(const CompilerInvocation &InitInvok,
+static int doPrintModuleComments(const CompilerInvocation &InitInvoke,
                                  const std::vector<std::string> ModulesToPrint,
                                  StringRef CommentsXMLSchema) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -3613,9 +3613,9 @@ static int doPrintModuleComments(const CompilerInvocation &InitInvok,
   return ExitCode;
 }
 
-static int doPrintModuleImports(const CompilerInvocation &InitInvok,
+static int doPrintModuleImports(const CompilerInvocation &InitInvoke,
                                 const std::vector<std::string> ModulesToPrint) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -3674,13 +3674,13 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
 //===----------------------------------------------------------------------===//
 // Print type interfaces.
 //===----------------------------------------------------------------------===//
-static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
+static int doPrintTypeInterface(const CompilerInvocation &InitInvoke,
                                 const StringRef FileName,
                                 const StringRef LCPair) {
   auto Pair = parseLineCol(LCPair);
   if (!Pair.hasValue())
     return 1;
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   CompilerInstance CI;
   std::string InstanceSetupError;
@@ -3729,10 +3729,10 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
+static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvoke,
                                           const StringRef FileName,
                                           const StringRef Usr) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   CompilerInstance CI;
   std::string InstanceSetupError;
@@ -3895,9 +3895,9 @@ private:
   }
 };
 
-static int doReconstructType(const CompilerInvocation &InitInvok,
+static int doReconstructType(const CompilerInvocation &InitInvoke,
                              StringRef SourceFilename) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
 
@@ -3925,7 +3925,7 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
+static int doPrintRangeInfo(const CompilerInvocation &InitInvoke,
                             StringRef SourceFileName,
                             StringRef StartPos,
                             StringRef EndPos) {
@@ -3935,7 +3935,7 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
     return 1;
   auto StartLineCol = StartOp.getValue();
   auto EndLineCol = EndOp.getValue();
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFileName);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
   Invocation.getLangOptions().BuildSyntaxTree = true;
@@ -4038,10 +4038,10 @@ namespace {
 
 } // anonymous namespace
 
-static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
+static int doPrintIndexedSymbols(const CompilerInvocation &InitInvoke,
                                 StringRef SourceFileName, bool indexLocals) {
 
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFileName);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
   Invocation.getLangOptions().TypoCorrectionLimit = 0;
@@ -4076,9 +4076,9 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvok,
+static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvoke,
                                            StringRef ModuleName) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -4111,9 +4111,9 @@ static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doPrintUSRs(const CompilerInvocation &InitInvok,
+static int doPrintUSRs(const CompilerInvocation &InitInvoke,
                        StringRef SourceFilename) {
-  CompilerInvocation Invocation(InitInvok);
+  CompilerInvocation Invocation(InitInvoke);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
@@ -4290,80 +4290,80 @@ int main(int argc, char *argv[]) {
   if (options::PrintStats)
     llvm::EnableStatistics();
 
-  CompilerInvocation InitInvok;
+  CompilerInvocation InitInvoke;
 
-  InitInvok.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
+  InitInvoke.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
 
   for (auto &File : options::InputFilenames)
-    InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
+    InitInvoke.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
-  InitInvok.setMainExecutablePath(
+  InitInvoke.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
-  InitInvok.setModuleName(options::ModuleName);
+  InitInvoke.setModuleName(options::ModuleName);
 
-  InitInvok.setSDKPath(options::SDK);
+  InitInvoke.setSDKPath(options::SDK);
 
   for (auto macro : options::DefineAvailability) {
-    InitInvok.getLangOptions().AvailabilityMacros.push_back(macro);
+    InitInvoke.getLangOptions().AvailabilityMacros.push_back(macro);
   }
   for (auto map: options::SerializedPathObfuscate) {
     auto SplitMap = StringRef(map).split('=');
-    InitInvok.getFrontendOptions().serializedPathObfuscator
+    InitInvoke.getFrontendOptions().serializedPathObfuscator
       .addMapping(SplitMap.first, SplitMap.second);
-    InitInvok.getSearchPathOptions().DeserializedPathRecoverer
+    InitInvoke.getSearchPathOptions().DeserializedPathRecoverer
       .addMapping(SplitMap.first, SplitMap.second);
   }
-  InitInvok.getLangOptions().CollectParsedToken = true;
-  InitInvok.getLangOptions().BuildSyntaxTree = true;
-  InitInvok.getLangOptions().EnableCrossImportOverlays =
+  InitInvoke.getLangOptions().CollectParsedToken = true;
+  InitInvoke.getLangOptions().BuildSyntaxTree = true;
+  InitInvoke.getLangOptions().EnableCrossImportOverlays =
     options::EnableCrossImportOverlays;
   if (options::DisableObjCInterop) {
-    InitInvok.getLangOptions().EnableObjCInterop = false;
+    InitInvoke.getLangOptions().EnableObjCInterop = false;
   } else if (options::EnableObjCInterop) {
-    InitInvok.getLangOptions().EnableObjCInterop = true;
+    InitInvoke.getLangOptions().EnableObjCInterop = true;
   } else if (!options::Triple.empty()) {
-    InitInvok.getLangOptions().EnableObjCInterop =
+    InitInvoke.getLangOptions().EnableObjCInterop =
         llvm::Triple(options::Triple).isOSDarwin();
   }
   if (options::EnableCxxInterop) {
-    InitInvok.getLangOptions().EnableCXXInterop = true;
+    InitInvoke.getLangOptions().EnableCXXInterop = true;
   }
   if (options::CxxInteropGettersSettersAsProperties) {
-    InitInvok.getLangOptions().CxxInteropGettersSettersAsProperties = true;
+    InitInvoke.getLangOptions().CxxInteropGettersSettersAsProperties = true;
   }
   if (options::EnableExperimentalConcurrency) {
-    InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
+    InitInvoke.getLangOptions().EnableExperimentalConcurrency = true;
   }
   if (options::WarnConcurrency) {
-    InitInvok.getLangOptions().StrictConcurrencyLevel =
+    InitInvoke.getLangOptions().StrictConcurrencyLevel =
         StrictConcurrency::Complete;
   }
   if (options::DisableImplicitConcurrencyImport) {
-    InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
+    InitInvoke.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
   }
   if (options::DisableImplicitStringProcessingImport) {
-    InitInvok.getLangOptions().DisableImplicitStringProcessingModuleImport = true;
+    InitInvoke.getLangOptions().DisableImplicitStringProcessingModuleImport = true;
   }
   if (options::EnableExperimentalNamedOpaqueTypes) {
-    InitInvok.getLangOptions().Features.insert(Feature::NamedOpaqueTypes);
+    InitInvoke.getLangOptions().Features.insert(Feature::NamedOpaqueTypes);
   }
   if (options::EnableExperimentalStringProcessing) {
-    InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
+    InitInvoke.getLangOptions().EnableExperimentalStringProcessing = true;
   }
   if (options::EnableBareSlashRegexLiterals) {
-    InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
-    InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
+    InitInvoke.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
+    InitInvoke.getLangOptions().EnableExperimentalStringProcessing = true;
   }
 
   for (const auto &featureArg : options::EnableExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureArg)) {
-      InitInvok.getLangOptions().Features.insert(*feature);
+      InitInvoke.getLangOptions().Features.insert(*feature);
     }
   }
 
   if (!options::Triple.empty())
-    InitInvok.setTargetTriple(options::Triple);
+    InitInvoke.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
     // Honor the *last* -swift-version specified.
     const auto &LastSwiftVersion =
@@ -4371,31 +4371,31 @@ int main(int argc, char *argv[]) {
     if (auto swiftVersion = VersionParser::parseVersionString(
             LastSwiftVersion, SourceLoc(), nullptr)) {
       if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
-        InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
+        InitInvoke.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
   }
   if (!options::ToolsDirectory.empty()) {
     SmallString<128> toolsDir(options::ToolsDirectory);
     llvm::sys::path::append(toolsDir, "clang");
-    InitInvok.getClangImporterOptions().clangPath =
+    InitInvoke.getClangImporterOptions().clangPath =
         std::string(toolsDir);
   }
   if (!options::ModuleCachePath.empty()) {
     // Honor the *last* -module-cache-path specified.
-    InitInvok.getClangImporterOptions().ModuleCachePath =
+    InitInvoke.getClangImporterOptions().ModuleCachePath =
         options::ModuleCachePath[options::ModuleCachePath.size()-1];
   }
   if (!options::AccessNotesPath.empty()) {
-    InitInvok.getFrontendOptions().AccessNotesPath =
+    InitInvoke.getFrontendOptions().AccessNotesPath =
         options::AccessNotesPath[options::AccessNotesPath.size()-1];
   }
   if (options::ParseAsLibrary) {
-    InitInvok.getFrontendOptions().InputMode =
+    InitInvoke.getFrontendOptions().InputMode =
         swift::FrontendOptions::ParseInputMode::SwiftLibrary;
   }
-  InitInvok.getClangImporterOptions().PrecompiledHeaderOutputDir =
+  InitInvoke.getClangImporterOptions().PrecompiledHeaderOutputDir =
     options::PCHOutputDir;
-  InitInvok.setImportSearchPaths(options::ImportPaths);
+  InitInvoke.setImportSearchPaths(options::ImportPaths);
   std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
   for (const auto &path : options::FrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/false});
@@ -4403,44 +4403,44 @@ int main(int argc, char *argv[]) {
   for (const auto &path : options::SystemFrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/true});
   }
-  InitInvok.setFrameworkSearchPaths(FramePaths);
-  InitInvok.getFrontendOptions().EnableSourceImport |=
+  InitInvoke.setFrameworkSearchPaths(FramePaths);
+  InitInvoke.getFrontendOptions().EnableSourceImport |=
     options::EnableSourceImport;
-  InitInvok.getFrontendOptions().ImplicitObjCHeaderPath =
+  InitInvoke.getFrontendOptions().ImplicitObjCHeaderPath =
     options::ImportObjCHeader;
-  InitInvok.getClangImporterOptions().BridgingHeader =
+  InitInvoke.getClangImporterOptions().BridgingHeader =
     options::ImportObjCHeader;
-  InitInvok.getLangOptions().EnableAccessControl =
+  InitInvoke.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
-  InitInvok.getLangOptions().EnableSwift3ObjCInference =
+  InitInvoke.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
-  InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
+  InitInvoke.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   if (!options::ResourceDir.empty()) {
-    InitInvok.setRuntimeResourcePath(options::ResourceDir);
+    InitInvoke.setRuntimeResourcePath(options::ResourceDir);
   }
   for (auto &Arg : options::ClangXCC) {
-    InitInvok.getClangImporterOptions().ExtraArgs.push_back(Arg);
+    InitInvoke.getClangImporterOptions().ExtraArgs.push_back(Arg);
   }
-  InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
+  InitInvoke.getLangOptions().EnableObjCAttrRequiresFoundation =
     !options::DisableObjCAttrRequiresFoundationModule;
-  InitInvok.getTypeCheckerOptions().DebugForbidTypecheckPrefix =
+  InitInvoke.getTypeCheckerOptions().DebugForbidTypecheckPrefix =
     options::DebugForbidTypecheckPrefix;
-  InitInvok.getTypeCheckerOptions().DebugConstraintSolver =
+  InitInvoke.getTypeCheckerOptions().DebugConstraintSolver =
       options::DebugConstraintSolver;
 
   for (auto ConfigName : options::BuildConfigs)
-    InitInvok.getLangOptions().addCustomConditionalCompilationFlag(ConfigName);
+    InitInvoke.getLangOptions().addCustomConditionalCompilationFlag(ConfigName);
 
   if (!options::ExplicitSwiftModuleMap.empty()) {
-    InitInvok.getSearchPathOptions().ExplicitSwiftModuleMap =
+    InitInvoke.getSearchPathOptions().ExplicitSwiftModuleMap =
       options::ExplicitSwiftModuleMap;
-    InitInvok.getFrontendOptions().DisableImplicitModules = true;
+    InitInvoke.getFrontendOptions().DisableImplicitModules = true;
   }
 
   if (options::AllowCompilerErrors) {
-    InitInvok.getFrontendOptions().AllowModuleWithCompilerErrors = true;
-    InitInvok.getLangOptions().AllowModuleWithCompilerErrors = true;
+    InitInvoke.getFrontendOptions().AllowModuleWithCompilerErrors = true;
+    InitInvoke.getLangOptions().AllowModuleWithCompilerErrors = true;
   }
 
   if (!options::ModuleAliases.empty()) {
@@ -4448,7 +4448,7 @@ int main(int argc, char *argv[]) {
     SourceManager SM;
     DiagnosticEngine Diags(SM);
     Diags.addConsumer(PDC);
-    if (!InitInvok.setModuleAliasMap(options::ModuleAliases, Diags)) {
+    if (!InitInvoke.setModuleAliasMap(options::ModuleAliases, Diags)) {
       llvm::errs() << "invalid module alias arguments\n";
       return 1;
     }
@@ -4458,7 +4458,7 @@ int main(int argc, char *argv[]) {
   // set options.
   if (!CCArgs.empty()) {
     std::string Error;
-    if (initInvocationByClangArguments(CCArgs, InitInvok, Error)) {
+    if (initInvocationByClangArguments(CCArgs, InitInvoke, Error)) {
       llvm::errs() << "error initializing invocation with clang args: "
         << Error << '\n';
       return 1;
@@ -4468,7 +4468,7 @@ int main(int argc, char *argv[]) {
   PrintOptions PrintOpts;
   if (options::PrintInterface) {
     PrintOpts = PrintOptions::printModuleInterface(
-        InitInvok.getFrontendOptions().PrintFullConvention);
+        InitInvoke.getFrontendOptions().PrintFullConvention);
   } else if (options::PrintInterfaceForDoc) {
     PrintOpts = PrintOptions::printDocInterface();
   } else {
@@ -4506,7 +4506,7 @@ int main(int argc, char *argv[]) {
     PrintOpts.PrintOriginalSourceText = true;
 
   if (PrintOpts.PrintDocumentationComments) {
-    InitInvok.getLangOptions().AttachCommentsToDecls = true;
+    InitInvoke.getLangOptions().AttachCommentsToDecls = true;
   }
 
   int ExitCode;
@@ -4527,7 +4527,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     ExitCode = doBatchCodeCompletion(
-        InitInvok, options::SourceFilename, options::CodeCompletionDiagnostics,
+        InitInvoke, options::SourceFilename, options::CodeCompletionDiagnostics,
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
@@ -4542,7 +4542,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     ExitCode = doCodeCompletion(
-        InitInvok, options::SourceFilename, options::SecondSourceFilename,
+        InitInvoke, options::SourceFilename, options::SecondSourceFilename,
         options::CodeCompletionToken, options::CodeCompletionDiagnostics,
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
@@ -4553,7 +4553,7 @@ int main(int argc, char *argv[]) {
     break;
 
   case ActionType::REPLCodeCompletion:
-    ExitCode = doREPLCodeCompletion(InitInvok, options::SourceFilename);
+    ExitCode = doREPLCodeCompletion(InitInvoke, options::SourceFilename);
     break;
 
   case ActionType::TypeContextInfo:
@@ -4561,7 +4561,7 @@ int main(int argc, char *argv[]) {
       llvm::errs() << "token name required\n";
       return 1;
     }
-    ExitCode = doTypeContextInfo(InitInvok,
+    ExitCode = doTypeContextInfo(InitInvoke,
                                   options::SourceFilename,
                                   options::SecondSourceFilename,
                                   options::CodeCompletionToken,
@@ -4569,7 +4569,7 @@ int main(int argc, char *argv[]) {
     break;
 
   case ActionType::PrintExpressionTypes:
-    ExitCode = doPrintExpressionTypes(InitInvok,
+    ExitCode = doPrintExpressionTypes(InitInvoke,
                                       options::SourceFilename);
     break;
 
@@ -4579,7 +4579,7 @@ int main(int argc, char *argv[]) {
       llvm::errs() << "token name required\n";
       return 1;
     }
-    ExitCode = doConformingMethodList(InitInvok,
+    ExitCode = doConformingMethodList(InitInvoke,
                                       options::SourceFilename,
                                       options::SecondSourceFilename,
                                       options::CodeCompletionToken,
@@ -4588,7 +4588,7 @@ int main(int argc, char *argv[]) {
     break;
 
   case ActionType::SyntaxColoring:
-    ExitCode = doSyntaxColoring(InitInvok,
+    ExitCode = doSyntaxColoring(InitInvoke,
                                 options::SourceFilename,
                                 options::TerminalOutput,
                                 options::Typecheck,
@@ -4596,15 +4596,15 @@ int main(int argc, char *argv[]) {
     break;
 
   case ActionType::DumpImporterLookupTable:
-    ExitCode = doDumpImporterLookupTables(InitInvok, options::SourceFilename);
+    ExitCode = doDumpImporterLookupTables(InitInvoke, options::SourceFilename);
     break;
 
   case ActionType::Structure:
-    ExitCode = doStructureAnnotation(InitInvok, options::SourceFilename);
+    ExitCode = doStructureAnnotation(InitInvoke, options::SourceFilename);
     break;
 
   case ActionType::Annotation:
-    ExitCode = doSemanticAnnotation(InitInvok,
+    ExitCode = doSemanticAnnotation(InitInvoke,
                                     options::SourceFilename,
                                     options::TerminalOutput);
     break;
@@ -4616,7 +4616,7 @@ int main(int argc, char *argv[]) {
   case ActionType::PrintASTNotTypeChecked:
   case ActionType::PrintASTTypeChecked: {
     bool RunTypeChecker = (options::Action == ActionType::PrintASTTypeChecked);
-    ExitCode = doPrintAST(InitInvok,
+    ExitCode = doPrintAST(InitInvoke,
                           options::SourceFilename,
                           RunTypeChecker,
                           PrintOpts,
@@ -4625,7 +4625,7 @@ int main(int argc, char *argv[]) {
     break;
   }
   case ActionType::PrintLocalTypes:
-    ExitCode = doPrintLocalTypes(InitInvok, options::ModuleToPrint);
+    ExitCode = doPrintLocalTypes(InitInvoke, options::ModuleToPrint);
     break;
 
   case ActionType::PrintModuleGroups:
@@ -4639,96 +4639,96 @@ int main(int argc, char *argv[]) {
       TraversalOptions |= ide::ModuleTraversal::SkipOverlay;
 
     if (options::Action == ActionType::PrintModuleGroups)
-      ExitCode = doPrintModuleGroups(InitInvok, options::ModuleToPrint);
+      ExitCode = doPrintModuleGroups(InitInvoke, options::ModuleToPrint);
     else {
       if (options::NoEmptyLineBetweenMembers.getNumOccurrences() > 0)
         PrintOpts.EmptyLineBetweenMembers = !options::NoEmptyLineBetweenMembers;
       ExitCode = doPrintModules(
-        InitInvok, options::ModuleToPrint, options::ModuleGroupToPrint,
+        InitInvoke, options::ModuleToPrint, options::ModuleGroupToPrint,
         TraversalOptions, PrintOpts, options::AnnotatePrint,
         options::SynthesizeExtension);
     }
     break;
   }
   case ActionType::PrintModuleMetadata: {
-    ExitCode = doPrintModuleMetaData(InitInvok, options::ModuleToPrint);
+    ExitCode = doPrintModuleMetaData(InitInvoke, options::ModuleToPrint);
     break;
   }
   case ActionType::PrintHeader: {
     ExitCode = doPrintHeaders(
-        InitInvok, options::HeaderToPrint, PrintOpts,
+        InitInvoke, options::HeaderToPrint, PrintOpts,
         options::AnnotatePrint);
     break;
   }
 
   case ActionType::PrintSwiftFileInterface: {
     ExitCode = doPrintSwiftFileInterface(
-        InitInvok, options::SourceFilename,
+        InitInvoke, options::SourceFilename,
         options::AnnotatePrint);
     break;
   }
 
   case ActionType::PrintDecl: {
     ExitCode = doPrintDecls(
-        InitInvok, options::SourceFilename,
+        InitInvoke, options::SourceFilename,
         options::DeclToPrint, PrintOpts, options::AnnotatePrint);
     break;
   }
 
   case ActionType::PrintTypes:
-    ExitCode = doPrintTypes(InitInvok, options::SourceFilename,
+    ExitCode = doPrintTypes(InitInvoke, options::SourceFilename,
                             options::FullyQualifiedTypes);
     break;
 
   case ActionType::PrintComments:
-    ExitCode = doPrintComments(InitInvok, options::SourceFilename,
+    ExitCode = doPrintComments(InitInvoke, options::SourceFilename,
                                options::CommentsXMLSchema);
     break;
 
   case ActionType::DumpComments:
-    ExitCode = doDumpComments(InitInvok, options::SourceFilename);
+    ExitCode = doDumpComments(InitInvoke, options::SourceFilename);
     break;
 
   case ActionType::PrintModuleComments:
-    ExitCode = doPrintModuleComments(InitInvok, options::ModuleToPrint,
+    ExitCode = doPrintModuleComments(InitInvoke, options::ModuleToPrint,
                                      options::CommentsXMLSchema);
     break;
 
   case ActionType::PrintModuleImports:
-    ExitCode = doPrintModuleImports(InitInvok, options::ModuleToPrint);
+    ExitCode = doPrintModuleImports(InitInvoke, options::ModuleToPrint);
     break;
 
   case ActionType::PrintUSRs:
-    ExitCode = doPrintUSRs(InitInvok, options::SourceFilename);
+    ExitCode = doPrintUSRs(InitInvoke, options::SourceFilename);
     break;
   case ActionType::PrintTypeInterface:
     if (options::LineColumnPair.getNumOccurrences() == 1)
-      ExitCode = doPrintTypeInterface(InitInvok,
+      ExitCode = doPrintTypeInterface(InitInvoke,
                                       options::SourceFilename,
                                       options::LineColumnPair);
     else
-      ExitCode = doPrintTypeInterfaceForTypeUsr(InitInvok,
+      ExitCode = doPrintTypeInterfaceForTypeUsr(InitInvoke,
                                                 options::SourceFilename,
                                                 options::USR);
     break;
   case ActionType::ReconstructType:
-    ExitCode = doReconstructType(InitInvok, options::SourceFilename);
+    ExitCode = doReconstructType(InitInvoke, options::SourceFilename);
     break;
   case ActionType::Range:
-    ExitCode = doPrintRangeInfo(InitInvok, options::SourceFilename,
+    ExitCode = doPrintRangeInfo(InitInvoke, options::SourceFilename,
                                 options::LineColumnPair,
                                 options::EndLineColumnPair);
     break;
   case ActionType::PrintIndexedSymbols:
       if (options::ModuleToPrint.empty()) {
-        ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename,
+        ExitCode = doPrintIndexedSymbols(InitInvoke, options::SourceFilename,
                                          options::IncludeLocals);
       } else {
         if (options::ModuleToPrint.size() > 1) {
           llvm::errs() << "printing symbols for the first module name, the rest "
             "are ignored";
         }
-        ExitCode = doPrintIndexedSymbolsFromModule(InitInvok,
+        ExitCode = doPrintIndexedSymbolsFromModule(InitInvoke,
                                                options::ModuleToPrint.front());
       }
   }
