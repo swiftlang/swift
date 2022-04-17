@@ -558,10 +558,10 @@ public:
 
   bool verify() const;
 
-  /// Since I don't have Swift enums, ensure name corresspondence here.
+  /// Since I don't have Swift enums, ensure name correspondence here.
   static void verifyNodeKindNames();
 
-  /// Since I don't have Swift enums, ensure name corresspondence here.
+  /// Since I don't have Swift enums, ensure name correspondence here.
   static void verifyDeclAspectNames();
 
 private:
