@@ -1867,7 +1867,7 @@ function(add_swift_target_library name)
            ${SWIFTLIB_FRAMEWORK_DEPENDS_IOS_TVOS})
     endif()
 
-    # Collect architecutre agnostic compiler flags
+    # Collect architecture agnostic compiler flags
     set(swiftlib_swift_compile_flags_all ${SWIFTLIB_SWIFT_COMPILE_FLAGS})
     if(${sdk} STREQUAL OSX)
       list(APPEND swiftlib_swift_compile_flags_all
