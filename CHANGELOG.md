@@ -8994,7 +8994,7 @@ Swift 1.0
 [SE-0107]: <https://github.com/apple/swift-evolution/blob/main/proposals/0107-unsaferawpointer.md>
 [SE-0108]: <https://github.com/apple/swift-evolution/blob/main/proposals/0108-remove-assoctype-inference.md>
 [SE-0109]: <https://github.com/apple/swift-evolution/blob/main/proposals/0109-remove-boolean.md>
-[SE-0110]: <https://github.com/apple/swift-evolution/blob/main/proposals/0110-distingish-single-tuple-arg.md>
+[SE-0110]: <https://github.com/apple/swift-evolution/blob/main/proposals/0110-distinguish-single-tuple-arg.md>
 [SE-0111]: <https://github.com/apple/swift-evolution/blob/main/proposals/0111-remove-arg-label-type-significance.md>
 [SE-0112]: <https://github.com/apple/swift-evolution/blob/main/proposals/0112-nserror-bridging.md>
 [SE-0113]: <https://github.com/apple/swift-evolution/blob/main/proposals/0113-rounding-functions-on-floatingpoint.md>
