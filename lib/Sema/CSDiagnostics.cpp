@@ -4463,7 +4463,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
         locator->isLastElement<LocatorPathElt::ClosureBody>()))
     return false;
 
-  // If this is a misplaced `missng argument` situation, it would be
+  // If this is a misplaced `missing argument` situation, it would be
   // diagnosed by invalid conversion fix.
   if (isMisplacedMissingArgument(getSolution(), locator))
     return false;
