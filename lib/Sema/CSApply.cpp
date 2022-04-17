@@ -7156,7 +7156,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return cs.cacheType(new (ctx) UnresolvedTypeConversionExpr(expr, toType));
 
   // Use an opaque type to abstract a value of the underlying concrete type.
-  // The full check here would be that `toType` and `fromType` are structually
+  // The full check here would be that `toType` and `fromType` are structurally
   // equal except in any position where `toType` has an opaque archetype. The
   // below is just an approximate check since the above would be expensive to
   // verify and still relies on the type checker ensuing `fromType` is
