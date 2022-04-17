@@ -1,7 +1,7 @@
 // RUN: %target-build-swift %s
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
-// Test crashes related to differentiation and definite intiialization.
+// Test crashes related to differentiation and definite initialization.
 
 // SR-12886: SIL memory lifetime verification error due to
 // `SILCloner::visitAllocStack` not copying the `[dynamic_lifetime]` attribute.
