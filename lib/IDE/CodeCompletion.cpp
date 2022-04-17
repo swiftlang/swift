@@ -964,7 +964,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   }
 
   case CompletionKind::AccessorBeginning: {
-    // TODO: Omit already declared or mutally exclusive accessors.
+    // TODO: Omit already declared or mutually exclusive accessors.
     //       E.g. If 'get' is already declared, emit 'set' only.
     addAccessorKeywords(Sink);
 
