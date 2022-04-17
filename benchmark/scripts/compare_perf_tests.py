@@ -111,7 +111,7 @@ class PerformanceTestSamples(object):
 
         Experimentally, this rule seems to perform well-enough on the
         benchmark runtimes in the microbenchmark range to filter out
-        the environment noise caused by preemtive multitasking.
+        the environment noise caused by preemptive multitasking.
         """
         lo = (
             0
