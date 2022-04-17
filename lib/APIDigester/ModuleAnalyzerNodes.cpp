@@ -539,7 +539,7 @@ Optional<SDKNodeDeclType*> SDKNodeDeclType::getSuperclass() const {
   return None;
 }
 
-/// Finding the node through all children, including the inheritted ones,
+/// Finding the node through all children, including the inherited ones,
 /// whose printed name matches with the given name.
 Optional<SDKNodeDecl*>
 SDKNodeDeclType::lookupChildByPrintedName(StringRef Name) const {
