@@ -273,13 +273,13 @@ enum subject_enum: Int {
   // Fake for access notes: @objc(subject_enumElement3) // bad-access-note-move@+2{{subject_enum.subject_enumElement4}}
   @objc(subject_enumElement3) // bad-access-note-move{{subject_enum.subject_enumElement3}} expected-error {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}}{{3-31=}}
   case subject_enumElement3, subject_enumElement4
-  // Becuase of the fake access-note-move above, we expect to see extra diagnostics when we run this test with both explicit @objc attributes *and* access notes:
+  // Because of the fake access-note-move above, we expect to see extra diagnostics when we run this test with both explicit @objc attributes *and* access notes:
   // expected-remark@-2 * {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}} expected-note@-2 *{{attribute 'objc' was added by access note for fancy tests}}
 
   // Fake for access notes: @objc // bad-access-note-move@+2{{subject_enum.subject_enumElement6}}
   @objc // bad-access-note-move{{subject_enum.subject_enumElement5}} expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
   case subject_enumElement5, subject_enumElement6
-  // Becuase of the fake access-note-move above, we expect to see extra diagnostics when we run this test with both explicit @objc attributes *and* access notes:
+  // Because of the fake access-note-move above, we expect to see extra diagnostics when we run this test with both explicit @objc attributes *and* access notes:
   // expected-remark@-2 * {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} expected-note@-2 *{{attribute 'objc' was added by access note for fancy tests}}
 
   @nonobjc // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
