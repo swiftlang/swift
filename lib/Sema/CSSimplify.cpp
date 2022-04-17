@@ -1851,7 +1851,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
           }
         } else {
           // Matching @autoclosure argument to @autoclosure parameter
-          // directly would mean introducting a function conversion
+          // directly would mean introducing a function conversion
           // in Swift <= 4 mode.
           cs.increaseScore(SK_FunctionConversion);
           matchingAutoClosureResult = false;
