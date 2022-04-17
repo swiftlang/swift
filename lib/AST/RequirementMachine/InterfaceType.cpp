@@ -38,7 +38,7 @@
 // The rewrite system's reduction order differs from the canonical type order
 // used by Swift's ABI and name mangling. What this means in practice is that
 // converting a canonical type to a term does not necessarily produce a
-// canonical term; the term must further be simplifed to produce a canonical
+// canonical term; the term must further be simplified to produce a canonical
 // term. Converting a canonical term back to a type, however, does produce a
 // canonical type.
 //
