@@ -3943,7 +3943,7 @@ public:
     //   add the appropriate invocation substitutions.
     //
     // - Otherwise, if there are pattern substitutions, just substitute
-    //   those; the other components are inside the patttern generic
+    //   those; the other components are inside the pattern generic
     //   signature.
     //
     // - Otherwise, substitute the basic components.
