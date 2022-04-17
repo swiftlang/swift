@@ -2497,7 +2497,7 @@ static int compareDependentPaths(ArrayRef<AssociatedTypeDecl *> path1,
   if (path1.size() != path2.size())
     return path1.size() < path2.size() ? -1 : 1;
 
-  // The paths are the same length, so order by comparing the associted
+  // The paths are the same length, so order by comparing the associated
   // types.
   for (unsigned index : indices(path1)) {
     if (int result = compareAssociatedTypes(path1[index], path2[index]))
