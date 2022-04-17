@@ -449,7 +449,7 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
       moduleDecl, superclassDecl);
 
   if (superclassCtorSig.getPointer() != superclassSig.getPointer()) {
-    // If the base initiliazer's generic signature is different
+    // If the base initializer's generic signature is different
     // from that of the base class, the base class initializer either
     // has generic parameters or a 'where' clause.
     //
