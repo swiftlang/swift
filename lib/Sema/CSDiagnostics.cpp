@@ -1810,7 +1810,7 @@ AssignmentFailure::AssignmentFailure(Expr *destExpr, const Solution &solution,
                                      SourceLoc diagnosticLoc)
     : FailureDiagnostic(solution, destExpr), DestExpr(destExpr),
       Loc(diagnosticLoc),
-      DeclDiagnostic(findDeclDiagonstic(getASTContext(), destExpr)),
+      DeclDiagnostic(findDeclDiagnostic(getASTContext(), destExpr)),
       TypeDiagnostic(diag::assignment_lhs_not_lvalue) {}
 
 bool AssignmentFailure::diagnoseAsError() {
@@ -2200,7 +2200,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
   return member->choice;
 }
 
-Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
+Diag<StringRef> AssignmentFailure::findDeclDiagnostic(ASTContext &ctx,
                                                       const Expr *destExpr) {
   if (isa<ApplyExpr>(destExpr) || isa<SelfApplyExpr>(destExpr))
     return diag::assignment_lhs_is_apply_expression;

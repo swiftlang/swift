@@ -325,7 +325,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return { true, E };
     }
 
-    /// Visit each component of the keypath and emit a diganostic if they
+    /// Visit each component of the keypath and emit a diagnostic if they
     /// refer to a member that has effects.
     void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
       for (const auto &component : keyPath->getComponents()) {

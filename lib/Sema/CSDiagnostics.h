@@ -589,7 +589,7 @@ private:
     return resolveImmutableBase(const_cast<Expr *>(expr));
   }
 
-  static Diag<StringRef> findDeclDiagonstic(ASTContext &ctx,
+  static Diag<StringRef> findDeclDiagnostic(ASTContext &ctx,
                                             const Expr *destExpr);
 
   /// Retrive an member reference associated with given member

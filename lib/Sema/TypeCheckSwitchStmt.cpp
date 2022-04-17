@@ -1202,7 +1202,7 @@ namespace {
       // If there's nothing else to diagnose, bail.
       if (uncovered.isEmpty()) return;
 
-      // Check if we still have to emit the main diganostic.
+      // Check if we still have to emit the main diagnostic.
       if (mainDiagType.hasValue())
         DE.diagnose(startLoc, mainDiagType.getValue());
 
