@@ -1199,7 +1199,7 @@ ParameterListInfo::ParameterListInfo(
     return;
 
   // Now we have enough information to determine which parameters accept
-  // unlabled trailing closures.
+  // unlabeled trailing closures.
   acceptsUnlabeledTrailingClosures.resize(params.size());
 
   // Note which parameters have default arguments and/or accept unlabeled
