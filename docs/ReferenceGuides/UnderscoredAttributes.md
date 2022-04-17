@@ -46,7 +46,7 @@ available for emission into clients with deployment targets lower than the
 ABI availability of the function. When the client's deployment target is
 before the function's ABI availability, the compiler replaces calls to that
 function with a call to a thunk that checks at runtime whether the original
-library function is available. If the the original is available then it is
+library function is available. If the original is available then it is
 called. Otherwise, the fallback copy of the function that was emitted into the
 client is called instead.
 

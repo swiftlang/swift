@@ -261,7 +261,7 @@ But in this case, you may as well just peel off the $\namesym{Array}\langle\bull
 \[\genericparam{T}.\namesym{Element} == \namesym{Int}.\]
 
 \index{power set}
-One more small language feature is worth mentioning. You might want to define a function that constructs the the set of all subsets of a set, i.e., the power set. The $\namesym{Set}\langle\bullet\rangle$ type constructor requires that its argument conforms to $\proto{Hashable}$:
+One more small language feature is worth mentioning. You might want to define a function that constructs the set of all subsets of a set, i.e., the power set. The $\namesym{Set}\langle\bullet\rangle$ type constructor requires that its argument conforms to $\proto{Hashable}$:
 \begin{Verbatim}
 struct Set<Element : Hashable> {...}
 \end{Verbatim}
