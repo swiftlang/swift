@@ -18,7 +18,7 @@
 // There are two versions of the Syntax type.
 // SyntaxRef:
 // SyntaxRef is designed around efficiency. It *does not* retain the
-// SyntaxDataRef that stores its data - the user must gurantee that the
+// SyntaxDataRef that stores its data - the user must guarantee that the
 // SyntaxDataRef outlives the SyntaxRef that references it. Instead,
 // SyntaxDataRef provides a *view* into the SyntaxDataRef and the view provides
 // all convenience APIs. The advantage of this is that the underlying SyntaxData
