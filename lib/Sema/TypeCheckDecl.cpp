@@ -1911,7 +1911,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       for (DeclContext *CurContext = FD->getLocalContext();
            !isa<SourceFile>(CurContext);
            CurContext = CurContext->getParent()) {
-        // Skip over non-decl contexts (e.g. closure expresssions)
+        // Skip over non-decl contexts (e.g. closure expressions)
         if (auto *D = CurContext->getAsDecl())
             insertionLoc = D->getStartLoc();
       }
