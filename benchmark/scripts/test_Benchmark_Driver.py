@@ -486,7 +486,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
 
             shutil.rmtree(temp_dir)
 
-    def test_deterministing_hashing(self):
+    def test_deterministic_hashing(self):
         cmd = ["printenv", "SWIFT_DETERMINISTIC_HASHING"]
         driver = BenchmarkDriver(["no args"], tests=["ignored"])
         self.assertEqual(driver._invoke(cmd).strip(), "1")
