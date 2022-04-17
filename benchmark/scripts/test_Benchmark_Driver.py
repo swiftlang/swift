@@ -135,7 +135,7 @@ class Test_parse_args(unittest.TestCase):
         self.assertIsNone(parse_args(["run"]).output_dir)
         self.assertEqual(parse_args(["run", "--output-dir", "/log"]).output_dir, "/log")
 
-    def test_check_supports_vebose_output(self):
+    def test_check_supports_verbose_output(self):
         self.assertFalse(parse_args(["check"]).verbose)
         self.assertTrue(parse_args(["check", "-v"]).verbose)
         self.assertTrue(parse_args(["check", "--verbose"]).verbose)
