@@ -3969,7 +3969,7 @@ public:
 
     auto patternSubs = origType->getPatternSubstitutions();
 
-    // If we have an invocation signatture, we generally shouldn't
+    // If we have an invocation signature, we generally shouldn't
     // substitute into the pattern substitutions and component types.
     if (auto sig = origType->getInvocationGenericSignature()) {
       // Substitute the invocation substitutions if present.
