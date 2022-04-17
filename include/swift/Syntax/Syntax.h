@@ -310,7 +310,7 @@ public:
     return Data->getAbsolutePositionBeforeLeadingTrivia();
   }
 
-  /// Get the offset at which the actual content (i.e. non-triva) of this node
+  /// Get the offset at which the actual content (i.e. non-trivia) of this node
   /// starts.
   AbsoluteOffsetPosition getAbsolutePositionAfterLeadingTrivia() const {
     return Data->getAbsolutePositionAfterLeadingTrivia();
@@ -405,7 +405,7 @@ public:
     return getDataRef()->getAbsolutePositionBeforeLeadingTrivia();
   }
 
-  /// Get the offset at which the actual content (i.e. non-triva) of this node
+  /// Get the offset at which the actual content (i.e. non-trivia) of this node
   /// starts.
   AbsoluteOffsetPosition getAbsolutePositionAfterLeadingTrivia() const {
     return getDataRef()->getAbsolutePositionAfterLeadingTrivia();

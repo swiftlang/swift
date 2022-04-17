@@ -303,7 +303,7 @@ public:
     return Info;
   }
 
-  /// Get the position at which the leading triva of this node starts.
+  /// Get the position at which the leading trivia of this node starts.
   AbsoluteSyntaxPosition getPosition() const {
     return getInfo().getPosition();
   };
