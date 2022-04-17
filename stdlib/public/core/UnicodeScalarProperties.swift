@@ -153,7 +153,7 @@ extension Unicode.Scalar.Properties {
   }
 
   /// A Boolean value indicating whether the scalar is a format control
-  /// character that has a specific function in the Unicode Bidrectional
+  /// character that has a specific function in the Unicode Bidirectional
   /// Algorithm.
   ///
   /// This property corresponds to the "Bidi_Control" property in the
