@@ -235,7 +235,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     task->runInFullyEstablishedContext();
 
     assert(ActiveTask::get() == nullptr &&
-           "active task wasn't cleared before susspending?");
+           "active task wasn't cleared before suspending?");
   } else {
     // There's no extra bookkeeping to do for simple jobs besides swapping in
     // the voucher.
