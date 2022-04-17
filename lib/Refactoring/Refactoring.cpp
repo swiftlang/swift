@@ -7031,7 +7031,7 @@ private:
   /// depending on it.
   /// \p AddConvertedHandlerCall needs to add the converted version of the
   /// completion handler. Depending on the given \c HandlerResult, it must be
-  /// intepreted as a success or error call.
+  /// interpreted as a success or error call.
   /// \p AddConvertedErrorCall must add the converted equivalent of returning an
   /// error. The passed \c StringRef contains the name of a variable that is of
   /// type 'Error'.
