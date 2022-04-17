@@ -1462,7 +1462,7 @@ private:
         ISL->forEachSegment(SF.getASTContext(),
                             [&](bool IsInterpolation, CallExpr *CE) {
           if (IsInterpolation) {
-            // Handle the precedeing string segment.
+            // Handle the preceding string segment.
             CharSourceRange StringRange(SM, PrevStringStart, CE->getStartLoc());
             if (StringRange.contains(TargetLocation)) {
               StringLiteralRange =
