@@ -2112,7 +2112,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.UseTypeLayoutValueHandling
       = A->getOption().matches(OPT_enable_type_layouts);
   } else if (Opts.OptMode == OptimizationMode::NoOptimization) {
-    // Disable type layouts at Onone except if explictly requested.
+    // Disable type layouts at Onone except if explicitly requested.
     Opts.UseTypeLayoutValueHandling = false;
   }
 

@@ -1464,9 +1464,9 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   }
   // Pass down -explicit-swift-module-map-file
   // FIXME: we shouldn't need this. Remove it?
-  StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
+  StringRef explicitSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   genericSubInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
-    explictSwiftModuleMap.str();
+    explicitSwiftModuleMap.str();
   auto &subClangImporterOpts = genericSubInvocation.getClangImporterOptions();
   // Respect the detailed-record preprocessor setting of the parent context.
   // This, and the "raw" clang module format it implicitly enables, are
@@ -1474,7 +1474,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   subClangImporterOpts.DetailedPreprocessingRecord =
     clangImporterOpts.DetailedPreprocessingRecord;
 
-  // We need to add these extra clang flags because explict module building
+  // We need to add these extra clang flags because explicit module building
   // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
   // and -fmodule-file=.
   // If we don't add these flags, the interface will be built with implicit
