@@ -4754,7 +4754,7 @@ static bool isInvariantAddress(SILValue v) {
   }
   // TODO: We could be more aggressive about considering addresses based on
   // `let` variables as invariant when the type of the address is known not to
-  // have any sharably-mutable interior storage (in other words, no weak refs,
+  // have any shareably-mutable interior storage (in other words, no weak refs,
   // atomics, etc.). However, this currently miscompiles some programs.
   // if (accessedAddress->getType().isAddress() && isLetAddress(accessedAddress)) {
   //  return true;
