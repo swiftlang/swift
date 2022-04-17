@@ -531,7 +531,7 @@ struct StructLoweringState {
   llvm::MapVector<SILValue, SILValue> argsToLoadedValueMap;
   // All applies for which we did an alloc
   llvm::MapVector<SILInstruction *, SILValue> applyRetToAllocMap;
-  // recerse map of the one above
+  // reverse map of the one above
   llvm::MapVector<SILInstruction *, SILInstruction *> allocToApplyRetMap;
   // All call sites with SILArgument that needs to be re-written
   // Calls are removed from the set when rewritten.
