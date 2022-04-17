@@ -902,7 +902,7 @@ namespace driver {
         }
 
         const Optional<std::pair<bool, bool>> shouldSchedAndIsCascading =
-            computeShouldInitiallyScheduleJobAndDependendents(cmd);
+            computeShouldInitiallyScheduleJobAndDependents(cmd);
         if (!shouldSchedAndIsCascading)
           return getEveryCompileJob(); // Load error, just run them all
         const bool &shouldSchedule = shouldSchedAndIsCascading->first;
@@ -934,7 +934,7 @@ namespace driver {
     /// the job is cascading. Or if there was a dependency-read error, return
     /// \c None to indicate don't-know.
     Optional<std::pair<bool, bool>>
-    computeShouldInitiallyScheduleJobAndDependendents(const Job *Cmd) {
+    computeShouldInitiallyScheduleJobAndDependents(const Job *Cmd) {
       auto CondAndHasDepsIfNoError =
           loadDependenciesAndComputeCondition(Cmd);
       if (!CondAndHasDepsIfNoError)
@@ -1447,7 +1447,7 @@ namespace driver {
     /// \c loadDependenciesAndComputeCondition .
     /// Then, the cascading predicate is returned from
     /// \c isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation.
-    /// Then, in \c computeShouldInitiallyScheduleJobAndDependendents
+    /// Then, in \c computeShouldInitiallyScheduleJobAndDependents
     /// if the job needs a cascading build, it's dependents will be scheduled
     /// immediately. After the job finishes, it's dependencies will be processed
     /// again. If a non-cascading job failed, the driver will schedule all of
