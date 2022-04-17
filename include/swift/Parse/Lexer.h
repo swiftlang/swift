@@ -423,7 +423,7 @@ public:
   /// source location.
   ///
   /// If \c ExtraIndentation is not null, it will be set to an appropriate
-  /// additional intendation for adding code in a smaller scope "within" \c Loc.
+  /// additional indentation for adding code in a smaller scope "within" \c Loc.
   static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc,
                                          StringRef *ExtraIndentation = nullptr);
 
