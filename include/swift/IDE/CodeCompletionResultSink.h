@@ -38,7 +38,7 @@ struct CodeCompletionResultSink {
   /// position.
   bool addInitsToTopLevel = false;
 
-  /// Whether to perform "call pettern heuristics".
+  /// Whether to perform "call pattern heuristics".
   bool enableCallPatternHeuristics = false;
 
   /// Whether to include an item without any default arguments.
