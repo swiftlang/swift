@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
-// EMTPY: Token
+// EMPTY: Token
 // EMPTY-NOT: Begin completions
 
 //===--- Helper types that are used in this test
