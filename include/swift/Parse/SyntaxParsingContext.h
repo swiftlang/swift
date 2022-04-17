@@ -304,7 +304,7 @@ public:
   /// collection kind. If there're no nodes that can fit into the collection kind,
   /// this function does nothing. Otherwise, it creates a collection node in place
   /// to contain all sequential suitable nodes from back.
-  void collectNodesInPlace(SyntaxKind ColletionKind,
+  void collectNodesInPlace(SyntaxKind CollectionKind,
        SyntaxNodeCreationKind nodeCreateK = SyntaxNodeCreationKind::Recorded);
 
   /// On destruction, construct a specified kind of syntax node consuming the
