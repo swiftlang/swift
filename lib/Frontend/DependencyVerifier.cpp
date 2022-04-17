@@ -225,7 +225,7 @@ public:
 
 public:
   bool isOwed() const { return state == State::Owed; }
-  FullfillmentToken fullfill() {
+  FullfillmentToken fulfill() {
     assert(state == State::Owed &&
            "Cannot fulfill an obligation more than once!");
     state = State::Fulfilled;
@@ -440,13 +440,13 @@ bool DependencyVerifier::verifyObligations(
           case Expectation::Kind::Negative:
             llvm_unreachable("Should have been handled above!");
           case Expectation::Kind::Member:
-            return O.fullfill();
+            return O.fulfill();
           case Expectation::Kind::PotentialMember:
             assert(O.getName().empty());
-            return O.fullfill();
+            return O.fulfill();
           case Expectation::Kind::Provides:
           case Expectation::Kind::DynamicMember:
-            return O.fullfill();
+            return O.fulfill();
           }
 
           llvm_unreachable("Unhandled expectation kind!");
