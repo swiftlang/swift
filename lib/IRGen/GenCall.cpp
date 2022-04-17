@@ -408,10 +408,10 @@ namespace {
     // function type (the function to be called on returning).
     void expandAsyncReturnType();
 
-    // Expand the componends for the async suspend call of the function type.
+    // Expand the components for the async suspend call of the function type.
     void expandAsyncAwaitType();
 
-    // Expand the componends for the primary entrypoint of the async function
+    // Expand the components for the primary entrypoint of the async function
     // type.
     void expandAsyncEntryType();
 
