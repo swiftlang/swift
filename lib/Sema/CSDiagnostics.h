@@ -2214,9 +2214,9 @@ public:
 /// Here `max` refers to a global function `max<T>(_: T, _: T)` in `Swift`
 /// module and can only be accessed by adding `Swift.` to it, because `Sequence`
 /// has a member named `max` which accepts a single argument.
-class MissingQuialifierInMemberRefFailure final : public FailureDiagnostic {
+class MissingQualifierInMemberRefFailure final : public FailureDiagnostic {
 public:
-  MissingQuialifierInMemberRefFailure(const Solution &solution,
+  MissingQualifierInMemberRefFailure(const Solution &solution,
                                       ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 

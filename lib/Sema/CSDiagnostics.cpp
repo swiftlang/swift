@@ -7262,7 +7262,7 @@ bool UnableToInferProtocolLiteralType::diagnoseAsError() {
   return true;
 }
 
-bool MissingQuialifierInMemberRefFailure::diagnoseAsError() {
+bool MissingQualifierInMemberRefFailure::diagnoseAsError() {
   auto selectedOverload = getOverloadChoiceIfAvailable(getLocator());
   if (!selectedOverload)
     return false;
