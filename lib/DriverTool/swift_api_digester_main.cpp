@@ -1618,7 +1618,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       }
     }
 
-    // If we can find a hoisted member for this removed delcaration, we
+    // If we can find a hoisted member for this removed declaration, we
     // emit the diagnostics as rename instead of removal.
     auto It = std::find_if(MemberChanges.begin(), MemberChanges.end(),
       [&](TypeMemberDiffItem &Item) { return Item.usr == Node->getUsr(); });
