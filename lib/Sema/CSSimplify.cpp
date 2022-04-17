@@ -3620,7 +3620,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   auto ppt2 = constraintType2->getAs<ParameterizedProtocolType>();
 
   // With two parameterized protocols, we've already made sure conformance
-  // constraints are satisified. Try to match the arguments!
+  // constraints are satisfied. Try to match the arguments!
   if (ppt1 && ppt2) {
     ArrayRef<Type> longerArgs = ppt1->getArgs();
     ArrayRef<Type> shorterArgs = ppt2->getArgs();
