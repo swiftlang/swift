@@ -750,7 +750,7 @@ namespace {
 
   /// If \p expr is a call and that call contains the code completion token,
   /// add the expressions of all arguments after the code completion token to
-  /// \p ignoredArguemnts.
+  /// \p ignoredArguments.
   /// Otherwise, returns an empty vector.
   /// Asssumes that we are solving for code completion.
   void getArgumentsAfterCodeCompletionToken(
