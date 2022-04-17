@@ -1132,7 +1132,7 @@ StringTests.test("toInt") {
 
   // Make a String from an Int, mangle the String's characters,
   // then print if the new String is or is not still an Int.
-  func testConvertabilityOfStringWithModification(
+  func testConvertibilityOfStringWithModification(
     _ initialValue: Int,
     modification: (_ chars: inout [UTF8.CodeUnit]) -> Void
   ) {
@@ -1142,11 +1142,11 @@ StringTests.test("toInt") {
     expectNil(Int(str))
   }
 
-  testConvertabilityOfStringWithModification(Int.min) {
+  testConvertibilityOfStringWithModification(Int.min) {
     $0[2] += 1; ()  // underflow by lots
   }
 
-  testConvertabilityOfStringWithModification(Int.max) {
+  testConvertibilityOfStringWithModification(Int.max) {
     $0[1] += 1; ()  // overflow by lots
   }
 
