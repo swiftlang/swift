@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Convert localization YAML files to a srialized format.
+// Convert localization YAML files to a serialized format.
 //
 //===----------------------------------------------------------------------===//
 
