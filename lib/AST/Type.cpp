@@ -1170,7 +1170,7 @@ ParameterListInfo::ParameterListInfo(
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
   //
-  // FIXME: We ought to not request paramer list info in this case.
+  // FIXME: We ought to not request parameter list info in this case.
   if (!paramOwner)
     return;
 
@@ -6355,7 +6355,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       auto diffParam = diffParams[i];
       auto paramType = diffParam.getPlainType();
       auto paramTan = paramType->getAutoDiffTangentSpace(lookupConformance);
-      // Error if paraneter has no tangent space.
+      // Error if parameter has no tangent space.
       if (!paramTan) {
         return llvm::make_error<DerivativeFunctionTypeError>(
             this,
@@ -6396,7 +6396,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       auto diffParam = diffParams[i];
       auto paramType = diffParam.getPlainType();
       auto paramTan = paramType->getAutoDiffTangentSpace(lookupConformance);
-      // Error if paraneter has no tangent space.
+      // Error if parameter has no tangent space.
       if (!paramTan) {
         return llvm::make_error<DerivativeFunctionTypeError>(
             this,

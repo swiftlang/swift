@@ -291,7 +291,7 @@ enum class TypeMatchFlags {
   AllowABICompatible = 1 << 3,
   /// Allow escaping function parameters to override optional non-escaping ones.
   ///
-  /// This is necessary because Objective-C allows optional function paramaters
+  /// This is necessary because Objective-C allows optional function parameters
   /// to be non-escaping, but Swift currently does not.
   IgnoreNonEscapingForOptionalFunctionParam = 1 << 4,
   /// Allow compatible opaque archetypes.

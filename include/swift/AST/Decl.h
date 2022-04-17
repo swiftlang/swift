@@ -7969,7 +7969,7 @@ public:
   }
 };
 
-/// Find references to the given generic paramater in the type signature of the
+/// Find references to the given generic parameter in the type signature of the
 /// given declaration using the given generic signature.
 ///
 /// \param skipParamIndex If the value is a function or subscript declaration,
