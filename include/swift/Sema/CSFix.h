@@ -321,7 +321,7 @@ enum class FixKind : uint8_t {
   AllowNoopExistentialToCFTypeCheckedCast,
 
   /// Allow a runtime checked cast where at compile time the from is
-  /// convertible, but runtime does not support such convertions. e.g.
+  /// convertible, but runtime does not support such conversions. e.g.
   /// function type casts.
   AllowUnsupportedRuntimeCheckedCast,
 

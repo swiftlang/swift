@@ -5268,7 +5268,7 @@ bool ConstraintSystem::repairFailures(
       // Since `FunctionArgument` as a last locator element represents
       // a single parameter of the function type involved in a conversion
       // to another function type, see `matchFunctionTypes`. If there is already
-      // a fix for the this convertion, we can just ignore individual function
+      // a fix for the this conversion, we can just ignore individual function
       // argument in-out mismatch failure by considered this fixed.
       if (hasFixFor(parentLoc))
         return true;

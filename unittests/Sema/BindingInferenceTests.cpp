@@ -223,7 +223,7 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
 
 /// Let's try a more complicated situation where there protocols
 /// are inferred from multiple sources on different levels of
-/// convertion chain.
+/// conversion chain.
 ///
 ///  (P1) T0   T4 (T3)         T6 (P4)
 ///        \   /              /
