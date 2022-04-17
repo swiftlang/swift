@@ -1510,7 +1510,7 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
-  // If we emitted any errors while perfoming the end-of-pipeline actions, bail.
+  // If we emitted any errors while performing the end-of-pipeline actions, bail.
   if (Instance.getDiags().hadAnyError())
     return true;
 
