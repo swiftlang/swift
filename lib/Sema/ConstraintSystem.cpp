@@ -5062,7 +5062,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::ArgumentAttribute: {
       // At this point we should have already found argument expression
-      // this attribute belogs to, so we can leave this element in place
+      // this attribute belongs to, so we can leave this element in place
       // because it points out exact location useful for diagnostics.
       break;
     }
