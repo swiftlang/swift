@@ -991,7 +991,7 @@ namespace swift {
 /// this, we instead consider it an invalid AccessPath. This is the only case in
 /// which AccessPath::storage can differ from AccessStorage::compute().
 ///
-/// Storing an AccessPath ammortizes to constant space. To cache identification
+/// Storing an AccessPath amortizes to constant space. To cache identification
 /// of address locations, AccessPath should be used rather than the
 /// ProjectionPath which requires quadratic space in the number of address
 /// values and quadratic time when comparing addresses.
