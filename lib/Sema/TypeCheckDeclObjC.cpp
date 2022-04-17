@@ -399,11 +399,11 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   if (!type)
     return false;
 
-  auto clas = type->getClassOrBoundGenericClass();
-  if (!clas)
+  auto clazz = type->getClassOrBoundGenericClass();
+  if (!clazz)
     return false;
 
-  switch (clas->getForeignClassKind()) {
+  switch (clazz->getForeignClassKind()) {
   case ClassDecl::ForeignKind::Normal:
     return false;
 
@@ -417,7 +417,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   case ClassDecl::ForeignKind::RuntimeOnly:
     VD->diagnose(diag::objc_in_objc_runtime_visible,
                  VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
-                 clas->getName())
+                 clazz->getName())
         .limitBehavior(behavior);
     Reason.describe(VD);
     break;
