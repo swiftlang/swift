@@ -71,7 +71,7 @@ public:
 
   /// End the current \c AttributeAndModifierListBegin group if it's still open.
   /// This is automatically called before the main part of the signature.
-  void endPremable();
+  void endPreamble();
 
   /// Implement \c ASTPrinter .
 public:

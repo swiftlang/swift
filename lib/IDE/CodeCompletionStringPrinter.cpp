@@ -99,7 +99,7 @@ void CodeCompletionStringPrinter::startPreamble() {
   InPreamble = true;
 }
 
-void CodeCompletionStringPrinter::endPremable() {
+void CodeCompletionStringPrinter::endPreamble() {
   if (!InPreamble)
     return;
   InPreamble = false;
@@ -140,7 +140,7 @@ void CodeCompletionStringPrinter::printTypeRef(Type T, const TypeDecl *TD,
 }
 
 void CodeCompletionStringPrinter::printDeclLoc(const Decl *D) {
-  endPremable();
+  endPreamble();
   setNextChunkKind(ChunkKind::BaseName);
 }
 
@@ -150,7 +150,7 @@ void CodeCompletionStringPrinter::printDeclNameEndLoc(const Decl *D) {
 
 void CodeCompletionStringPrinter::printNamePre(PrintNameContext context) {
   if (context == PrintNameContext::IntroducerKeyword)
-    endPremable();
+    endPreamble();
   if (auto Kind = getChunkKindForPrintNameContext(context))
     setNextChunkKind(*Kind);
 }
