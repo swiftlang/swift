@@ -102,7 +102,7 @@ void diagnoseConstantArgumentRequirement(const Expr *expr,
 /// emitted.  Else the fixits are attached to the returned diagnostic.
 ///
 /// \returns true iff any fix-its were attached to \p diag.
-bool computeFixitsForOverridenDeclaration(
+bool computeFixitsForOverriddenDeclaration(
     ValueDecl *decl, const ValueDecl *base,
     llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag);
 

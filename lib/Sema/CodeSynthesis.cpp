@@ -1000,7 +1000,7 @@ static void collectNonOveriddenSuperclassInits(
   auto *superclassDecl = subclass->getSuperclassDecl();
   assert(superclassDecl);
 
-  // Record all of the initializers the subclass has overriden, excluding stub
+  // Record all of the initializers the subclass has overridden, excluding stub
   // overrides, which we don't want to consider as viable delegates for
   // convenience inits.
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
@@ -1073,11 +1073,11 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   if (!defaultInitable && !foundDesignatedInit)
     return;
 
-  SmallVector<ConstructorDecl *, 4> nonOverridenSuperclassCtors;
-  collectNonOveriddenSuperclassInits(decl, nonOverridenSuperclassCtors);
+  SmallVector<ConstructorDecl *, 4> nonOverriddenSuperclassCtors;
+  collectNonOveriddenSuperclassInits(decl, nonOverriddenSuperclassCtors);
 
   bool inheritDesignatedInits = canInheritDesignatedInits(ctx.evaluator, decl);
-  for (auto *superclassCtor : nonOverridenSuperclassCtors) {
+  for (auto *superclassCtor : nonOverriddenSuperclassCtors) {
     // We only care about required or designated initializers.
     if (!superclassCtor->isDesignatedInit()) {
       if (superclassCtor->isRequired()) {
@@ -1164,16 +1164,16 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
   if (canInheritDesignatedInits(eval, decl))
     return true;
 
-  // Otherwise we need to check whether the user has overriden all of the
+  // Otherwise we need to check whether the user has overridden all of the
   // superclass' designed inits.
-  SmallVector<ConstructorDecl *, 4> nonOverridenSuperclassCtors;
-  collectNonOveriddenSuperclassInits(decl, nonOverridenSuperclassCtors);
+  SmallVector<ConstructorDecl *, 4> nonOverriddenSuperclassCtors;
+  collectNonOveriddenSuperclassInits(decl, nonOverriddenSuperclassCtors);
 
-  auto allDesignatedInitsOverriden =
-      llvm::none_of(nonOverridenSuperclassCtors, [](ConstructorDecl *ctor) {
+  auto allDesignatedInitsOverridden =
+      llvm::none_of(nonOverriddenSuperclassCtors, [](ConstructorDecl *ctor) {
         return ctor->isDesignatedInit();
       });
-  return allDesignatedInitsOverriden;
+  return allDesignatedInitsOverridden;
 }
 
 static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {

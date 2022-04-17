@@ -2292,7 +2292,7 @@ namespace {
 /// given class or any of its superclasses. We intentionally don't respect
 /// access control, since everything is visible to the Objective-C runtime.
 static AbstractFunctionDecl *
-lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
+lookupOverriddenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
                           bool inheritingInits = true) {
   assert(classDecl);
 
@@ -2324,7 +2324,7 @@ lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
   if (isa<ConstructorDecl>(method) && !inheritingInits)
     return nullptr;
 
-  return lookupOverridenObjCMethod(classDecl->getSuperclassDecl(), method,
+  return lookupOverriddenObjCMethod(classDecl->getSuperclassDecl(), method,
                                    inheritingInits);
 }
 
@@ -2380,7 +2380,7 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     // purposes, but a subclass already depends on its superclasses and any
     // extensions for many other reasons.
     auto *overriddenMethod =
-        lookupOverridenObjCMethod(classDecl->getSuperclassDecl(), method);
+        lookupOverriddenObjCMethod(classDecl->getSuperclassDecl(), method);
     if (!overriddenMethod)
       continue;
 

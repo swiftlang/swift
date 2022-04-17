@@ -2578,7 +2578,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
   case MatchKind::TypeConflict: {
     if (!isa<TypeDecl>(req) && !isa<EnumElementDecl>(match.Witness)) {
-      computeFixitsForOverridenDeclaration(match.Witness, req, [&](bool){
+      computeFixitsForOverriddenDeclaration(match.Witness, req, [&](bool){
         return diags.diagnose(match.Witness,
                               diag::protocol_witness_type_conflict,
                               getTypeForDisplay(module, match.Witness),

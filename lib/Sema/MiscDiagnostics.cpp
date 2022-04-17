@@ -2331,7 +2331,7 @@ static bool fixItOverrideDeclarationTypesImpl(
 }
 }
 
-bool swift::computeFixitsForOverridenDeclaration(
+bool swift::computeFixitsForOverriddenDeclaration(
     ValueDecl *decl, const ValueDecl *base,
     llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag) {
   SmallVector<std::tuple<NoteKind_t, SourceRange, std::string>, 4> Notes;
