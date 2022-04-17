@@ -2699,7 +2699,7 @@ public:
 
     // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
-    // a member referenecs another declaration whose generic signature
+    // a member references another declaration whose generic signature
     // has a conformance requirement to this protocol.
     auto reqSig = PD->getRequirementSignature();
 
