@@ -5874,7 +5874,7 @@ public:
   /// references that we don't want to shadow with hoisted declarations.
   ///
   /// Also collect all declarations that are \c DeclContexts, which is an
-  /// over-appoximation but let's us ignore them elsewhere.
+  /// over-approximation but let's us ignore them elsewhere.
   static void collect(ASTNode Target, BraceStmt *Scope, SourceFile &SF,
                       llvm::DenseSet<const Decl *> &Decls) {
     ReferenceCollector Collector(Target, &SF.getASTContext().SourceMgr,
