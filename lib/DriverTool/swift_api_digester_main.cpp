@@ -1129,13 +1129,13 @@ class InterfaceTypeChangeDetector {
     bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
       R->getTypeKind() == KnownTypeKind::Optional;
     if (HasOptional) {
-      // Detect [String: Any]? to [StringRepresentableStruct: Any]? Chnage
+      // Detect [String: Any]? to [StringRepresentableStruct: Any]? Change
       KeyChangedTo =
         detectDictionaryKeyChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
                                           R->getOnlyChild()->getAs<SDKNodeType>(),
                                           Raw);
     } else {
-      // Detect [String: Any] to [StringRepresentableStruct: Any] Chnage
+      // Detect [String: Any] to [StringRepresentableStruct: Any] Change
       KeyChangedTo = detectDictionaryKeyChangeInternal(L, R, Raw);
     }
     if (!KeyChangedTo.empty()) {
@@ -1180,13 +1180,13 @@ class InterfaceTypeChangeDetector {
     bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
       R->getTypeKind() == KnownTypeKind::Optional;
     if (HasOptional) {
-      // Detect [String]? to [StringRepresentableStruct]? Chnage
+      // Detect [String]? to [StringRepresentableStruct]? Change
       KeyChangedTo =
         detectArrayMemberChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
                                         R->getOnlyChild()->getAs<SDKNodeType>(),
                                         Raw);
     } else {
-      // Detect [String] to [StringRepresentableStruct] Chnage
+      // Detect [String] to [StringRepresentableStruct] Change
       KeyChangedTo = detectArrayMemberChangeInternal(L, R, Raw);
     }
     if (!KeyChangedTo.empty()) {
