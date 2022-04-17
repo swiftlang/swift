@@ -3615,7 +3615,7 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
   //   }
   // Inside the constraint system
   //     let $__builder1 = #^COMPLETE^#
-  // gets type checked without context, so we can't know the contexutal type for
+  // gets type checked without context, so we can't know the contextual type for
   // the code completion token. But we know that $__builder1 (and thus the type
   // of #^COMPLETE^#) is used as the second argument to ViewBuilder.buildBlock,
   // so we can extract the contextual type from that call. To do this, figure
