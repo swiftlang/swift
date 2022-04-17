@@ -2363,7 +2363,7 @@ private:
   void fixIt(InFlightDiagnostic &diagnostic) const override;
 };
 
-/// Diagnose a key path optional base that should be unwraped in order to 
+/// Diagnose a key path optional base that should be unwrapped in order to 
 /// apply key path subscript.
 ///
 /// \code
