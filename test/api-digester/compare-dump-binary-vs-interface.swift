@@ -20,7 +20,7 @@
 // Dump Json file for cake ABI via .swiftmodule file
 // RUN: %api-digester -dump-sdk -module cake -o - -module-cache-path %t.module-cache %clang-importer-sdk-nosource -I %t.mod1 -I %S/Inputs/APINotesLeft -abi > %t.dump1.json
 
-// Dump Json file for cake ABI via .swiftinteface file
+// Dump Json file for cake ABI via .swiftinterface file
 // RUN: %api-digester -dump-sdk -module cake -o - -module-cache-path %t.module-cache %clang-importer-sdk-nosource -I %t.mod1 -I %S/Inputs/APINotesLeft -abi -use-interface-for-module cake > %t.dump2.json
 
 // Compare two Json files and we should see some differences.
