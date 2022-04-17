@@ -48,7 +48,7 @@ forEachDependencyUntilTrue(CompilerInstance &CI,
     }
   }
 
-  // Check other non-system depenencies (e.g. modules, headers).
+  // Check other non-system dependencies (e.g. modules, headers).
   for (auto &dep : CI.getDependencyTracker()->getDependencies()) {
     if (callback(dep))
       return true;
