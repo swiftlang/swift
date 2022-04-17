@@ -448,7 +448,7 @@ public:
       std::vector<ModuleDepGraphNode *> &foundDependents,
       ModuleDepGraphNode *definition);
 
-  /// Givien a set of nodes, return the set of swiftDeps for the jobs those
+  /// Given a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
   std::vector<std::string>
   computeSwiftDepsFromNodes(ArrayRef<const ModuleDepGraphNode *> nodes) const;
