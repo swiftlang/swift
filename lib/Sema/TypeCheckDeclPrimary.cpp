@@ -2697,7 +2697,7 @@ public:
     if (!PD->getPrimaryAssociatedTypeNames().empty())
       (void) PD->getPrimaryAssociatedTypes();
 
-    // Explicity compute the requirement signature to detect errors.
+    // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
     // a member referenecs another declaration whose generic signature
     // has a conformance requirement to this protocol.
