@@ -1646,14 +1646,14 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
                               /*Implicit=*/true);
 
       // generate: let onlyKey = allKeys.popFirst;
-      auto *allKeysPopFisrtCallExpr = CallExpr::createImplicitEmpty(
+      auto *allKeysPopFirstCallExpr = CallExpr::createImplicitEmpty(
           C, UnresolvedDotExpr::createImplicit(C, allKeysExpr, C.Id_popFirst));
 
       auto *theKeyPattern = BindingPattern::createImplicit(
           C, /*isLet=*/true, NamedPattern::createImplicit(C, theKeyDecl));
 
       guardElements.emplace_back(SourceLoc(), theKeyPattern,
-                                 allKeysPopFisrtCallExpr);
+                                 allKeysPopFirstCallExpr);
 
       // generate: allKeys.isEmpty;
       auto *allKeysIsEmptyExpr =
