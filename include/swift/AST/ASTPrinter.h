@@ -294,10 +294,10 @@ public:
 
   // MARK: Callback interface wrappers that perform ASTPrinter bookkeeping.
 
-   /// Make a callback to printDeclPre(), performing any necessary bookeeping.
+   /// Make a callback to printDeclPre(), performing any necessary bookkeeping.
   void callPrintDeclPre(const Decl *D, Optional<BracketOptions> Bracket);
 
-  /// Make a callback to printDeclPost(), performing any necessary bookeeping.
+  /// Make a callback to printDeclPost(), performing any necessary bookkeeping.
   void callPrintDeclPost(const Decl *D, Optional<BracketOptions> Bracket) {
     printDeclPost(D, Bracket);
   }
@@ -308,13 +308,13 @@ public:
     avoidPrintDeclPost(D);
   }
 
-   /// Make a callback to printDeclLoc(), performing any necessary bookeeping.
+   /// Make a callback to printDeclLoc(), performing any necessary bookkeeping.
   void callPrintDeclLoc(const Decl *D) {
     forceNewlines();
     printDeclLoc(D);
   }
 
-   /// Make a callback to printNamePre(), performing any necessary bookeeping.
+   /// Make a callback to printNamePre(), performing any necessary bookkeeping.
   void callPrintNamePre(PrintNameContext Context) {
     forceNewlines();
     printNamePre(Context);
