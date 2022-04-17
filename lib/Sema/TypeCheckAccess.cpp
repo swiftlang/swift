@@ -1874,7 +1874,7 @@ public:
   void checkPrecedenceGroup(const PrecedenceGroupDecl *PGD,
                             const Decl *refDecl, SourceLoc diagLoc,
                             SourceRange refRange) {
-    // Bail on invalid predence groups. This can happen when the user spells a
+    // Bail on invalid precedence groups. This can happen when the user spells a
     // relation element that doesn't actually exist.
     if (!PGD) {
       return;
