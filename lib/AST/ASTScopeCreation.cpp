@@ -770,7 +770,7 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   });
 
   // In local context, the PatternEntryDeclScope becomes the insertion point, so
-  // that all any bindings introduecd by the pattern are in scope for subsequent
+  // that all any bindings introduced by the pattern are in scope for subsequent
   // lookups.
   if (isLocalBinding)
     return {this, "All code that follows is inside this scope"};
