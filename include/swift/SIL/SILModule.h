@@ -935,7 +935,7 @@ public:
   /// See scheduledForDeletion for details.
   void scheduleForDeletion(SILInstruction *I);
 
-  /// Deletes all scheuled instructions for real.
+  /// Deletes all scheduled instructions for real.
   /// See scheduledForDeletion for details.
   void flushDeletedInsts();
 
