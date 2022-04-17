@@ -269,7 +269,7 @@ static BOOL callUnpatchedGetImageNameFromClass(
 /// implementation.
 ///
 /// The Swift implementation is always set up to chain to another
-/// implementation, so on older OSs we just have to make sure that that chained
+/// implementation, so on older OSs we just have to make sure that chained
 /// implementation is the original system version. See
 /// callUnpatchedGetImageNameFromClass.
 static const char *patchedGetImageNameFromClassForOldOSs(Class _Nullable cls) {
