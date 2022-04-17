@@ -353,7 +353,7 @@ void BindingSet::inferTransitiveProtocolRequirements(
     std::tie(parent, currentVar) = workList.pop_back_val();
 
     // At all of the protocols associated with current type variable
-    // are transitive to its parent, propogate them down the subtype/equivalence
+    // are transitive to its parent, propagate them down the subtype/equivalence
     // chain.
     if (parent) {
       propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
@@ -378,7 +378,7 @@ void BindingSet::inferTransitiveProtocolRequirements(
                                      inferredProtocols.end());
     }
 
-    // Propogate inferred protocols to all of the members of the
+    // Propagate inferred protocols to all of the members of the
     // equivalence class.
     for (const auto &equivalence : bindings.Info.EquivalentTo) {
       auto eqBindings = inferredBindings.find(equivalence.first);
