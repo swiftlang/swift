@@ -199,7 +199,7 @@ protected:
 /// if they don't occur on the liveness boundary. Lifetime-ending uses that end
 /// up on the final liveness boundary may be used to end the lifetime. It is up
 /// to the client to determine which uses are potentially lifetime-ending. In
-/// OSSA, the lifetime-ending property might be detemined by
+/// OSSA, the lifetime-ending property might be determined by
 /// OwnershipConstraint::isLifetimeEnding(). In non-OSSA, it might be determined
 /// by deallocation. If a lifetime-ending use ends up within the liveness
 /// boundary, then it is up to the client to figure out how to "extend" the
