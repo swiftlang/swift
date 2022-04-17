@@ -225,7 +225,7 @@ class PerformanceTestResult(object):
     Reported by the test driver (Benchmark_O, Benchmark_Onone, Benchmark_Osize
     or Benchmark_Driver).
 
-    It suppors 2 log formats emitted by the test driver. Legacy format with
+    It supports 2 log formats emitted by the test driver. Legacy format with
     statistics for normal distribution (MEAN, SD):
         #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
     And new quantiles format with variable number of columns:
