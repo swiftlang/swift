@@ -559,7 +559,7 @@ public:
 private:
   // Disable direct comparison because we allow subclassing with bitfields.
   // Currently, we use DenseMapInfo to unique storage, which defines key
-  // equalilty only in terms of the base AccessStorage class bits.
+  // equality only in terms of the base AccessStorage class bits.
   bool operator==(const AccessRepresentation &) const = delete;
   bool operator!=(const AccessRepresentation &) const = delete;
 };
