@@ -1691,7 +1691,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       //   1. There is an existing capture list which already has some
       //      entries. We need to insert 'self' into the capture list along
       //      with a separating comma.
-      //   2. There is an existing capture list, but it is empty (jusr '[]').
+      //   2. There is an existing capture list, but it is empty (just '[]').
       //      We can just insert 'self'.
       //   3. Arguments or types are already specified in the signature,
       //      but there is no existing capture list. We will need to insert
