@@ -382,7 +382,7 @@ ASTWalker::PreWalkResult<Expr *> NameMatcher::walkToExprPre(Expr *E) {
         break;
       }
       case ExprKind::StringLiteral:
-        // Handle multple locations in a single string literal
+        // Handle multiple locations in a single string literal
         do {
           tryResolve(ASTWalker::ParentTy(E), nextLoc());
         } while (!shouldSkip(E));
