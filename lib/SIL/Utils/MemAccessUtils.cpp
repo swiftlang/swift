@@ -1535,7 +1535,7 @@ class AccessPathDefUseTraversal {
   // prior to reaching the base address.
   struct DFSEntry {
     // Next potential use to visit and flag indicating whether traversal has
-    // reachaed the access base yet.
+    // reached the access base yet.
     llvm::PointerIntPair<Operand *, 1, bool> useAndIsRef;
     int pathCursor; // position within pathIndices
     int offset;     // index_addr offsets seen prior to this use
