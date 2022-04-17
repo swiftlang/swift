@@ -73,7 +73,7 @@ import ctypes
 // CLANG_DARWIN: Begin completions
 // CLANG_DARWIN-DAG: Decl[TypeAlias]/OtherModule[Darwin.MacTypes]/IsSystem: FourCharCode[#UInt32#]{{; name=.+$}}
 // CLANG_DARWIN_NEG-NOT: FixedPtr
-// CLANG_DARWIN_NEG-NOT: UniCharCoun
+// CLANG_DARWIN_NEG-NOT: UniCharCount
 // CLANG_DARWIN: End completions
 
 func testClangModule() {
