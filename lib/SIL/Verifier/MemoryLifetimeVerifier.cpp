@@ -304,7 +304,7 @@ void MemoryLifetimeVerifier::initDataflow(BitDataflow &dataFlow) {
     }
     bs.data.exitSet.set();
 
-    // Anything weired can happen in unreachable blocks. So just ignore them.
+    // Anything weird can happen in unreachable blocks. So just ignore them.
     // Note: while solving the dataflow, unreachable blocks are implicitly
     // ignored, because their entry/exit sets are all-ones and their gen/kill
     // sets are all-zeroes.
