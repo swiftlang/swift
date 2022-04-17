@@ -1106,7 +1106,7 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
       targetFormalType, GenericSignature(), /*suppress cast*/ true);
   llvm::Value *rhs = IGF.Builder.CreateBitCast(objMetadata, IGF.IGM.Int8PtrTy);
   
-  // return isa_ptr == metadat_ptr ? instance : nullptr
+  // return isa_ptr == metadata_ptr ? instance : nullptr
   llvm::Value *isEqual = IGF.Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ,
                                               lhs, rhs);
   auto *instanceTy = cast<llvm::PointerType>(instance->getType());
