@@ -125,7 +125,7 @@ void SILFunctionBuilder::addFunctionAttributes(
     if (ParameterList *paramList = fnDecl->getParameters()) {
       for (ParamDecl *pd : *paramList) {
         // Give up on tuples. Their elements are added as individual
-        // argumenst. It destroys the 1-1 relation ship between parameters
+        // arguments. It destroys the 1-1 relation ship between parameters
         // and arguments.
         if (isa<TupleType>(CanType(pd->getType())))
           break;
