@@ -21,7 +21,7 @@
 // SyntaxDataRef that stores its data - the user must gurantee that the
 // SyntaxDataRef outlives the SyntaxRef that references it. Instead,
 // SyntaxDataRef provides a *view* into the SyntaxDataRef and the view provides
-// all convinience APIs. The advantage of this is that the underlying SyntaxData
+// all convenience APIs. The advantage of this is that the underlying SyntaxData
 // can be stack-allocated and does not need to be copied when the the SyntaxRef
 // is being passsed around or when the SyntaxRef is being casted.
 //
