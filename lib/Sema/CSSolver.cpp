@@ -2216,7 +2216,7 @@ Constraint *ConstraintSystem::selectDisjunction() {
         }
 
         // Everything else equal, choose the disjunction with the greatest
-        // number of resoved argument types. The number of resolved argument
+        // number of resolved argument types. The number of resolved argument
         // types is always zero for disjunctions that don't represent applied
         // overloads.
         if (firstFavored == secondFavored) {
