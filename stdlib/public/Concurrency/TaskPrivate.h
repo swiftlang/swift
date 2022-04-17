@@ -212,7 +212,7 @@ public:
 ///
 /// 32 bit systems with SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION=1
 ///
-///          Flags               Exeuction Lock           Unused           TaskStatusRecord *
+///          Flags               Execution Lock           Unused           TaskStatusRecord *
 /// |----------------------|----------------------|----------------------|-------------------|
 ///          32 bits                32 bits                32 bits              32 bits
 ///
