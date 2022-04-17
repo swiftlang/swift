@@ -166,7 +166,7 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
     # markup for testing incremental parsing
     # =========================================================================
 
-    # Gather command line arguments for swift-syntax-test specifiying the
+    # Gather command line arguments for swift-syntax-test specifying the
     # performed edits in this list
     incremental_edit_args = []
     reparse_args = []
