@@ -4379,7 +4379,7 @@ using PrimaryAssociatedTypeName = std::pair<Identifier, SourceLoc>;
 /// Every protocol has an implicitly-created 'Self' generic parameter that
 /// stands for a type that conforms to the protocol. For example,
 ///
-///   protocol Cloneable {
+///   protocol Clonable {
 ///     func clone() -> Self
 ///   }
 ///
