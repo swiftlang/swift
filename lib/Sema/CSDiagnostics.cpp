@@ -167,7 +167,7 @@ Type RequirementFailure::getOwnerType() const {
   auto anchor = getRawAnchor();
 
   // If diagnostic is anchored at assignment expression
-  // it means that requirement failure happend while trying
+  // it means that requirement failure happened while trying
   // to convert source to destination, which means that
   // owner type is actually not an assignment expression
   // itself but its source.

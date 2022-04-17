@@ -974,7 +974,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
       // with information deduced from the conjunction.
       Snapshot->setupOuterContext(Solutions.pop_back_val());
 
-      // Pretend that conjunction never happend.
+      // Pretend that conjunction never happened.
       restoreOuterState();
 
       // Now that all of the information from the conjunction has
