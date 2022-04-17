@@ -3755,7 +3755,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       isa<AccessorDecl>(D))
     return;
 
-  // Don't add dynamic if decl is inlinable or tranparent.
+  // Don't add dynamic if decl is inlinable or transparent.
   if (shouldBlockImplicitDynamic(D))
    return;
 

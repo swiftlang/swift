@@ -2365,7 +2365,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     if (classDecl->checkAncestry(AncestryFlags::ObjC))
       return false;
 
-  // Accessors synthesized on-demand are never transaprent.
+  // Accessors synthesized on-demand are never transparent.
   if (accessor->hasForcedStaticDispatch())
     return false;
 
