@@ -366,7 +366,7 @@ class DisableOption(_BaseOption):
 
 
 class ChoicesOption(_BaseOption):
-    """Option that accepts an argument from a predifined list of choices."""
+    """Option that accepts an argument from a predefined list of choices."""
 
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices', None)
