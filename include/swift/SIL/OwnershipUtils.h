@@ -93,7 +93,7 @@ inline bool isForwardingConsume(SILValue value) {
 /// scope (doing so would be extremely inefficient). The lifetime of a borrow
 /// introducing instruction is always determined by its direct EndBorrow uses
 /// (see BorrowedValue::visitLocalScopeEndingUses). None of the non-scope-ending
-/// uses are relevant, and there's no need to transively follow forwarding
+/// uses are relevant, and there's no need to transitively follow forwarding
 /// uses. However, this utility may be used on borrow-introducing values when
 /// updating OSSA form to place EndBorrow uses after introducing new phis.
 ///
