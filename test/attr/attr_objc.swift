@@ -948,14 +948,14 @@ class infer_instanceVar1 {
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
   // Fake for access notes: @objc // access-note-move@-3{{infer_instanceVar1.instanceVar2_}}
 
-  var intstanceVar4: Int {
-  // CHECK: @objc var intstanceVar4: Int {
+  var instanceVar4: Int {
+  // CHECK: @objc var instanceVar4: Int {
     get {}
     // CHECK-NEXT: @objc get {}
   }
 
-  var intstanceVar5: Int {
-  // CHECK: @objc var intstanceVar5: Int {
+  var instanceVar5: Int {
+  // CHECK: @objc var instanceVar5: Int {
     get {}
     // CHECK-NEXT: @objc get {}
     set {}
@@ -1738,9 +1738,9 @@ protocol infer_instanceVar4 {
 class infer_instanceVar5 {
 // CHECK-LABEL: {{^}}class infer_instanceVar5 {
 
-  @objc // access-note-move{{infer_instanceVar5.intstanceVar1}}
-  var intstanceVar1: Int {
-  // CHECK: @objc var intstanceVar1: Int
+  @objc // access-note-move{{infer_instanceVar5.instanceVar1}}
+  var instanceVar1: Int {
+  // CHECK: @objc var instanceVar1: Int
     get {}
     // CHECK: @objc get {}
     set {}
