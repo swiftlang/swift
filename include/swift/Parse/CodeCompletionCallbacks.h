@@ -128,7 +128,7 @@ public:
   /// by user.
   virtual void completePostfixExprBeginning(CodeCompletionExpr *E) {};
 
-  /// Complete the beginning of expr-postfix in a for-each loop sequqence
+  /// Complete the beginning of expr-postfix in a for-each loop sequence
   /// -- no tokens provided by user.
   virtual void completeForEachSequenceBeginning(CodeCompletionExpr *E) {};
 

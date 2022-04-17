@@ -177,7 +177,7 @@ ParserResult<Expr> Parser::parseExprArrow() {
 ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isExprBasic,
                                              bool isForConditionalDirective) {
-  SyntaxParsingContext ExprSequnceContext(SyntaxContext, SyntaxContextKind::Expr);
+  SyntaxParsingContext ExprSequenceContext(SyntaxContext, SyntaxContextKind::Expr);
 
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
@@ -380,8 +380,8 @@ done:
   if (SequencedExprs.size() == 1)
     return makeParserResult(SequenceStatus, SequencedExprs[0]);
 
-  ExprSequnceContext.createNodeInPlace(SyntaxKind::ExprList);
-  ExprSequnceContext.setCreateSyntax(SyntaxKind::SequenceExpr);
+  ExprSequenceContext.createNodeInPlace(SyntaxKind::ExprList);
+  ExprSequenceContext.setCreateSyntax(SyntaxKind::SequenceExpr);
   return makeParserResult(SequenceStatus,
                           SequenceExpr::create(Context, SequencedExprs));
 }
