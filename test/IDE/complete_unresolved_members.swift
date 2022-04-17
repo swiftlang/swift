@@ -428,7 +428,7 @@ func testInStringInterpolation() {
   enum MyEnum { case foo, bar }
   func takeEnum(_ e: MyEnum) -> MyEnum { return e }
   let x = "enum: \(takeEnum(.#^STRING_INTERPOLATION_1^#))"
-  let y = "enum: \(.#^STRING_INTERPOLATION_INVALID?check=NOCRASH^#)" // Dont'crash.
+  let y = "enum: \(.#^STRING_INTERPOLATION_INVALID?check=NOCRASH^#)" // Don't crash.
 }
 // STRING_INTERPOLATION_1: Begin completions
 // STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: foo[#MyEnum#];
