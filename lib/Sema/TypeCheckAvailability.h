@@ -142,7 +142,7 @@ public:
   /// Produce a new context with the same properties as this one, except
   /// that if 'exported' is false, the resulting context can reference
   /// declarations that are not exported. If 'exported' is true, the
-  /// resulting context is indentical to this one.
+  /// resulting context is identical to this one.
   ///
   /// That is, this will perform a 'bitwise and' on the 'exported' bit.
   ExportContext withExported(bool exported) const;
