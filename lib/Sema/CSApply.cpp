@@ -132,7 +132,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
   if (!decl)
     return ConcreteDeclRef();
 
-  // Get the generic signatue of the decl and compute the substitutions.
+  // Get the generic signature of the decl and compute the substitutions.
   auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
   auto subst = computeSubstitutions(sig, locator);
 
