@@ -2220,7 +2220,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       // in the Context itself, used to postpone diagnostic emission
       // to a parent "try" expression. If something was diagnosed
       // during this ContextScope, the flag may have been set, and
-      // we need to preseve its value when restoring the old Context.
+      // we need to preserve its value when restoring the old Context.
       bool DiagnoseErrorOnTry = Self.CurContext.shouldDiagnoseErrorOnTry();
       OldContext.setDiagnoseErrorOnTry(DiagnoseErrorOnTry);
     }
