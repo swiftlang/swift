@@ -237,7 +237,7 @@ def main():
         description='Utility for testing incremental syntax parsing',
         epilog='''
     This utility can parse a special markup to dedicate a pre-edit and a
-    post-edit version of a file simulateously and generate a serialized version
+    post-edit version of a file simultaneously and generate a serialized version
     of the libSyntax tree by parsing either the pre-edit file, the post-edit
     file or the edits that are required to retrieve the post-edit file from the
     pre-edit file incrementally.
