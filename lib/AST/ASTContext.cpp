@@ -5014,15 +5014,15 @@ bool ASTContext::isTypeBridgedInExternalModule(
 }
 
 bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
-  auto clas = t->getClassOrBoundGenericClass();
-  if (!clas)
+  auto clazz = t->getClassOrBoundGenericClass();
+  if (!clazz)
     return false;
   
-  if (clas == getNSErrorDecl())
+  if (clazz == getNSErrorDecl())
     return true;
-  if (clas == getNSNumberDecl())
+  if (clazz == getNSNumberDecl())
     return true;
-  if (clas == getNSValueDecl())
+  if (clazz == getNSValueDecl())
     return true;
   
   return false;

@@ -4759,8 +4759,8 @@ bool NominalTypeDecl::hasDefaultInitializer() const {
 bool NominalTypeDecl::isTypeErasedGenericClass() const {
   // ObjC classes are type erased.
   // TODO: Unless they have magic methods...
-  if (auto clas = dyn_cast<ClassDecl>(this))
-    return clas->isTypeErasedGenericClass();
+  if (auto clazz = dyn_cast<ClassDecl>(this))
+    return clazz->isTypeErasedGenericClass();
   return false;
 }
 
