@@ -52,16 +52,16 @@
 // CHECK-NEXT: - (void)unavailableMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE_MSG("'unavailableMethodRenamedToOverloadMethod' has been renamed to 'overloadMethodWithFirst:second:'");
 // CHECK-NEXT: - (void)unavailableOnMacOSMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToOverloadMethod' has been renamed to 'overloadMethodWithFirst:second:'");
 
-// CHECK-NEXT: - (void)firstOverloadingMethodWithDiffernceNameWithFirst:(NSInteger)first second:(NSInteger)second;
-// CHECK-NEXT: - (void)secondOverloadingMethodWithDiffernceNameWithFirst:(double)first second:(double)second;
+// CHECK-NEXT: - (void)firstOverloadingMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second;
+// CHECK-NEXT: - (void)secondOverloadingMethodWithDifferenceNameWithFirst:(double)first second:(double)second;
 // CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "firstOverloadingMethodWithDiffernceNameWithFirst:second:");
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "firstOverloadingMethodWithDifferenceNameWithFirst:second:");
 // CHECK-NEXT: - (void)deprecatedOnMacOSMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDiffernceNameWithFirst:second:'");
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDifferenceNameWithFirst:second:'");
 // CHECK-NEXT: - (void)unavailableMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'unavailableMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDiffernceNameWithFirst:second:'");
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'unavailableMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDifferenceNameWithFirst:second:'");
 // CHECK-NEXT: - (void)unavailableOnMacOSMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDiffernceNameWithFirst:second:'");
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDifferenceNameWithFirst:second:'");
 
 // CHECK-NEXT: + (void)deprecatedAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: - (void)deprecatedInstanceMethodRenamedToClassMethodWithValue:(NSInteger)value
@@ -339,9 +339,9 @@
     @objc func unavailableOnMacOSMethodRenamedToOverloadMethod(first: Int, second: Int) {}
 
 
-    @objc(firstOverloadingMethodWithDiffernceNameWithFirst:second:)
+    @objc(firstOverloadingMethodWithDifferenceNameWithFirst:second:)
     func overloadMethodWithDifferenceObjCName(first: Int, second: Int) {}
-    @objc(secondOverloadingMethodWithDiffernceNameWithFirst:second:)
+    @objc(secondOverloadingMethodWithDifferenceNameWithFirst:second:)
     func overloadMethodWithDifferenceObjCName(first: Double, second: Double) {}
 
     @available(*, deprecated, renamed: "overloadMethodWithDifferenceObjCName(first:second:)")
