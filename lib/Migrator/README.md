@@ -81,7 +81,7 @@ Here are the passes:
    - Tuple Splat Migrator Pass
 
      This implements a few convenience transformations to ease the transition
-     for [SE-0110: Distinguish between single-tuple and multiple-argument function types](https://github.com/apple/swift-evolution/blob/master/proposals/0110-distingish-single-tuple-arg.md).
+     for [SE-0110: Distinguish between single-tuple and multiple-argument function types](https://github.com/apple/swift-evolution/blob/master/proposals/0110-distinguish-single-tuple-arg.md).
 
      In particular, this pass adds new variable bindings in closure expressions
      to destructure what are now are a single argument, a tuple. Prior to SE-0110,
