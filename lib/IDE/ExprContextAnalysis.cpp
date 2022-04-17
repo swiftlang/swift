@@ -1000,7 +1000,7 @@ class ExprContextAnalyzer {
               // let _: [Key : Value] = [key:#HERE#]
               // In this case, this is called by 'ExprKind::Tuple' case. Return
               // '(Key,Value)' here, 'ExprKind::Tuple' branch can decide which
-              // type in the tuple type is the exprected type.
+              // type in the tuple type is the expected type.
               SmallVector<TupleTypeElt, 2> elts;
               for (auto genericArg : boundGenericT->getGenericArgs())
                 elts.emplace_back(genericArg);
