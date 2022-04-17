@@ -556,7 +556,7 @@ checkGenericArguments(ModuleDecl *module, ArrayRef<Requirement> requirements,
 /// }
 /// \endcode
 ///
-/// \param module The module to use for conformace lookup.
+/// \param module The module to use for conformance lookup.
 /// \param contextSig The generic signature that should be used to map
 /// \p parentTy into context. We pass a generic signature to secure on-demand
 /// computation of the associated generic enviroment.
@@ -1111,7 +1111,7 @@ const AvailableAttr *getDeprecated(const Decl *D);
 void diagnoseIfDeprecated(SourceRange SourceRange, const ExportContext &Where,
                           const ValueDecl *DeprecatedDecl, const Expr *Call);
 
-/// Emits a diagnostic for a reference to a conformnace that is deprecated.
+/// Emits a diagnostic for a reference to a conformance that is deprecated.
 bool diagnoseIfDeprecated(SourceLoc loc,
                           const RootProtocolConformance *rootConf,
                           const ExtensionDecl *ext,
