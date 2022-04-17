@@ -7547,7 +7547,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
         if (lhs.source != rhs.source || lhs.target != rhs.target)
           return false;
 
-        // Check whethe we should diagnose redundancy for both constraints.
+        // Check whether we should diagnose redundancy for both constraints.
         if (!lhs.constraint.source->shouldDiagnoseRedundancy(true) ||
             !rhs.constraint.source->shouldDiagnoseRedundancy(false))
           return true;
