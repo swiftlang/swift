@@ -101,7 +101,7 @@ public:
     return SynthesizedBaseTypeDecl;
   }
 
-  /// Reteive the path components associated with this symbol, from outermost
+  /// Retrieve the path components associated with this symbol, from outermost
   /// to innermost (this symbol).
   void getPathComponents(SmallVectorImpl<PathComponent> &Components) const;
 
