@@ -627,7 +627,7 @@ struct TestingStruct {
 }
 
 func testDefaultArgument(arg: SomeEnum1 = .#^DEFAULT_ARG_1?check=UNRESOLVED_3^#) {}
-class TestDefalutArg {
+class TestDefaultArg {
   func method(arg: SomeEnum1 = .#^DEFAULT_ARG_2?check=UNRESOLVED_3^#) {}
   init(arg: SomeEnum1 = .#^DEFAULT_ARG_3?check=UNRESOLVED_3^#) {}
 }
