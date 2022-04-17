@@ -431,7 +431,7 @@ public:
   /// e.g. an open_existential_addr.
   ///
   /// In case the opened archetype is not defined yet (e.g. during parsing or
-  /// deserilization), a PlaceholderValue is returned. This should not be the
+  /// deserialization), a PlaceholderValue is returned. This should not be the
   /// case outside of parsing or deserialization.
   SILValue getRootOpenedArchetypeDef(CanOpenedArchetypeType archetype,
                                      SILFunction *inFunction);
