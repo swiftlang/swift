@@ -149,7 +149,7 @@ public:
 
 // MARK: Constraint generation
 
-/// Check whether it makes sense to convert this element into a constrant.
+/// Check whether it makes sense to convert this element into a constraint.
 static bool isViableElement(ASTNode element) {
   if (auto *decl = element.dyn_cast<Decl *>()) {
     // - Ignore variable declarations, they are handled by pattern bindings;

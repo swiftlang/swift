@@ -2843,7 +2843,7 @@ private:
 
     /// Disable the given constraint; this change will be rolled back
     /// when we exit the current solver scope.
-    void disableContraint(Constraint *constraint) {
+    void disableConstraint(Constraint *constraint) {
       constraint->setDisabled();
       disabledConstraints.push_back(constraint);
     }

@@ -1301,7 +1301,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       EquivalentTo.insert({bindingTypeVar, constraint});
 
       // Don't record adjacency between base and result types,
-      // this is just an auxiliary contraint to enforce ordering.
+      // this is just an auxiliary constraint to enforce ordering.
       break;
     }
 
@@ -2025,7 +2025,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
       // Don't penailze solutions that have holes for ignored arguments.
       if (cs.hasArgumentsIgnoredForCodeCompletion()) {
-        // Avoid simplifying the locator if the constriant system didn't ignore
+        // Avoid simplifying the locator if the constraint system didn't ignore
         // any arguments.
         auto argExpr = simplifyLocatorToAnchor(TypeVar->getImpl().getLocator());
         if (cs.isArgumentIgnoredForCodeCompletion(argExpr.dyn_cast<Expr *>())) {

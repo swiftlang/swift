@@ -481,7 +481,7 @@ ConstraintSystem::SolverState::~SolverState() {
     CS.activateConstraint(constraint);
   }
 
-  // If global constraing debugging is off and we are finished logging the
+  // If global constraint debugging is off and we are finished logging the
   // current solution attempt, switch debugging back off.
   const auto &tyOpts = CS.getASTContext().TypeCheckerOpts;
   if (!tyOpts.DebugConstraintSolver &&
@@ -1609,7 +1609,7 @@ ConstraintSystem::filterDisjunction(
       constraintsToRestoreOnFail.push_back(constraint);
 
     if (solverState)
-      solverState->disableContraint(constraint);
+      solverState->disableConstraint(constraint);
     else
       constraint->setDisabled();
   }
@@ -1643,7 +1643,7 @@ ConstraintSystem::filterDisjunction(
 
       for (auto *currentChoice : disjunction->getNestedConstraints()) {
         if (currentChoice != choice)
-          solverState->disableContraint(currentChoice);
+          solverState->disableConstraint(currentChoice);
       }
       return SolutionKind::Solved;
     }
