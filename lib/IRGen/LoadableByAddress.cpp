@@ -1079,7 +1079,7 @@ static AllocStackInst *allocate(StructLoweringState &pass, SILType type) {
   // Insert an alloc_stack at the beginning of the function.
   SILBuilderWithScope allocBuilder(&*pass.F->begin());
   // Don't put any variable debug info into the alloc_stack, there will be a
-  // debug_value insterted later. TODO: It may be more elegant to insert
+  // debug_value inserted later. TODO: It may be more elegant to insert
   // the variable info into the alloc_stack instead of additionally generating a
   // debug_value.
   AllocStackInst *alloc = allocBuilder.createAllocStack(
