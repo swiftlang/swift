@@ -752,7 +752,7 @@ EXPECTED_OPTIONS = [
     UnsupportedOption('--skip-test-optimize-none-with-implicit-dynamic'),
     UnsupportedOption('--skip-test-optimized'),
 
-    # Options forwared to build-script-impl
+    # Options forwarded to build-script-impl
     BuildScriptImplOption('--skip-test-swift', dest='impl_skip_test_swift'),
     BuildScriptImplOption('--install-swift', dest='impl_install_swift'),
 
