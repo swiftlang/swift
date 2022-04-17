@@ -2802,7 +2802,7 @@ public:
 
 private:
   /// The original declaration that "names" the opaque type. Although a specific
-  /// opaque type cannot be explicitly named, oapque types can propagate
+  /// opaque type cannot be explicitly named, opaque types can propagate
   /// arbitrarily through expressions, so we need to know *which* opaque type is
   /// propagated.
   ///
