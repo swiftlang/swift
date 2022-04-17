@@ -2796,7 +2796,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // in the entry block of each funclet.
     if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare) {
       // Function arguments in async functions are emitted without a shadow copy
-      // (that would interfer with coroutine splitting) but with a
+      // (that would interfere with coroutine splitting) but with a
       // llvm.dbg.declare to give CoroSplit.cpp license to emit a shadow copy
       // for them pointing inside the Swift Context argument that is valid
       // throughout the function.
