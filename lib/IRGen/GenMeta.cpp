@@ -5597,10 +5597,10 @@ bool irgen::requiresForeignTypeMetadata(CanType type) {
 }
 
 bool irgen::requiresForeignTypeMetadata(NominalTypeDecl *decl) {
-  if (auto *clas = dyn_cast<ClassDecl>(decl)) {
-    assert(!clas->isForeignReferenceType());
+  if (auto *clazz = dyn_cast<ClassDecl>(decl)) {
+    assert(!clazz->isForeignReferenceType());
     
-    switch (clas->getForeignClassKind()) {
+    switch (clazz->getForeignClassKind()) {
     case ClassDecl::ForeignKind::Normal:
     case ClassDecl::ForeignKind::RuntimeOnly:
       return false;

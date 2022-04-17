@@ -841,8 +841,8 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
       auto nominal = ext->getExtendedNominal();
       // If the extended type is an ObjC class, it won't have a nominal type
       // descriptor, so we'll just emit an extension context.
-      auto clas = dyn_cast<ClassDecl>(nominal);
-      if (!clas || clas->isForeign() || hasKnownSwiftMetadata(*this, clas)) {
+      auto clazz = dyn_cast<ClassDecl>(nominal);
+      if (!clazz || clazz->isForeign() || hasKnownSwiftMetadata(*this, clazz)) {
         IRGen.noteUseOfTypeContextDescriptor(nominal, DontRequireMetadata);
         return getAddrOfLLVMVariableOrGOTEquivalent(
                                 LinkEntity::forNominalTypeDescriptor(nominal));
@@ -3707,21 +3707,21 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
   }
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    auto clas = dyn_cast<ClassDecl>(decl);
-    if (!clas || clas->isForeignReferenceType()) {
+    auto clazz = dyn_cast<ClassDecl>(decl);
+    if (!clazz || clazz->isForeignReferenceType()) {
       return getTypeContextDescriptorEntityReference(*this, nominal);
     }
 
-    switch (clas->getForeignClassKind()) {
+    switch (clazz->getForeignClassKind()) {
     case ClassDecl::ForeignKind::RuntimeOnly:
-      return getObjCClassByNameReference(*this, clas);
+      return getObjCClassByNameReference(*this, clazz);
 
     case ClassDecl::ForeignKind::CFType:
-      return getTypeContextDescriptorEntityReference(*this, clas);
+      return getTypeContextDescriptorEntityReference(*this, clazz);
 
     case ClassDecl::ForeignKind::Normal:
-      if (hasKnownSwiftMetadata(*this, clas)) {
-        return getTypeContextDescriptorEntityReference(*this, clas);
+      if (hasKnownSwiftMetadata(*this, clazz)) {
+        return getTypeContextDescriptorEntityReference(*this, clazz);
       }
 
       // Note: we would like to use an Objective-C class reference, but the
@@ -3729,7 +3729,7 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
       // *after* computing a relative offset, causing incorrect relative
       // offsets in the metadata. Therefore, reference Objective-C classes by
       // their runtime names.
-      return getObjCClassByNameReference(*this, clas);
+      return getObjCClassByNameReference(*this, clazz);
     }
   }
   llvm_unreachable("bad foreign type kind");
