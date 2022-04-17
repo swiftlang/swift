@@ -192,7 +192,7 @@ static void createConjunction(ConstraintSystem &cs,
     referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
     // Body of the closure is always isolated from its context, only
     // its individual elements are allowed access to type information
-    // from the ouside e.g. parameters/result type.
+    // from the outside e.g. parameters/result type.
     isIsolated = true;
   }
 
