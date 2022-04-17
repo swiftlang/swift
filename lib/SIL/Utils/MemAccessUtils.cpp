@@ -534,7 +534,7 @@ isDistinctFrom(const AccessRepresentation &other) const {
     // Any type of nested/argument address may be within the same object.
     //
     // We also currently assume Unidentified access may be within an object
-    // purely to handle KeyPath accesses. The deriviation of the KeyPath
+    // purely to handle KeyPath accesses. The derivation of the KeyPath
     // address must separately appear to be a Class access so that all Class
     // accesses are accounted for.
     return false;
