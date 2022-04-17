@@ -23,7 +23,7 @@ using namespace swift;
 
 llvm::cl::opt<bool> DontAbortOnMemoryLifetimeErrors(
     "dont-abort-on-memory-lifetime-errors",
-    llvm::cl::desc("Don't abort compliation if the memory lifetime checker "
+    llvm::cl::desc("Don't abort compilation if the memory lifetime checker "
                    "detects an error."));
 
 namespace {
