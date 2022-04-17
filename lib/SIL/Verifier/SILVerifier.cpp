@@ -2304,7 +2304,7 @@ public:
     // those accesses.
     identifyFormalAccess(BAI);
     // FIXME: rdar://57291811 - the following check for valid storage will be
-    // reenabled shortly. A fix is planned. In the meantime, the possiblity that
+    // reenabled shortly. A fix is planned. In the meantime, the possibility that
     // a real miscompilation could be caused by this failure is insignificant.
     // I will probably enable a much broader SILVerification of address-type
     // block arguments first to ensure we never hit this check again.
