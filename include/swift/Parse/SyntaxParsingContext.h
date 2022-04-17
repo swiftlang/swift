@@ -116,7 +116,7 @@ private:
   /// Indicates what action should be performed on the destruction of
   ///  SyntaxParsingContext
   enum class AccumulationMode {
-    // Coerece the result to one of ContextKind.
+    // Coerce the result to one of ContextKind.
     // E.g. for ContextKind::Expr, passthroug if the result is CallExpr, whereas
     // <UnknownExpr><SomeDecl /></UnknownDecl> for non Exprs.
     CoerceKind,
