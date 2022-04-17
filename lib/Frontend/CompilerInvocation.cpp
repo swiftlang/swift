@@ -789,7 +789,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   // Collect -clang-target value if specified in the front-end invocation.
   // Usually, the driver will pass down a clang target with the
-  // exactly same value as the main target, so we could dignose the usage of
+  // exactly same value as the main target, so we could diagnose the usage of
   // unavailable APIs.
   // The reason we cannot infer clang target from -target is that not all
   // front-end invocation will include a -target to start with. For instance,
