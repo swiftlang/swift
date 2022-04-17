@@ -132,7 +132,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       CachedResults.reserve(Sink.Results.size());
       // Instead of copying the context free results out of the sink's allocator
       // retain the sink's entire allocator (which also includes the contextual
-      // properities) and simply store pointers to the context free results that
+      // properties) and simply store pointers to the context free results that
       // back the contextual results.
       for (auto Result : Sink.Results) {
         assert(
