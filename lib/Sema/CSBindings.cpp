@@ -2023,7 +2023,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       if (argLoc && argLoc->isAfterCodeCompletionLoc())
         return false;
 
-      // Don't penailze solutions that have holes for ignored arguments.
+      // Don't penalize solutions that have holes for ignored arguments.
       if (cs.hasArgumentsIgnoredForCodeCompletion()) {
         // Avoid simplifying the locator if the constraint system didn't ignore
         // any arguments.
