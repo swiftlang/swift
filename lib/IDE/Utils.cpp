@@ -769,7 +769,7 @@ ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
   // If it has a Clang node (directly),
   if (ext->hasClangNode()) return ext->getClangNode();
 
-  // Check whether it was syntheszed into a module-scope context.
+  // Check whether it was synthesized into a module-scope context.
   if (!isa<ClangModuleUnit>(ext->getModuleScopeContext()))
     return ClangNode();
 
