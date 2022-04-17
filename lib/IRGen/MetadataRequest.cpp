@@ -2959,7 +2959,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     call->setDoesNotAccessMemory();
     call->setCallingConv(IGM.SwiftCC);
 
-    // Store the result back to the cache. Metadata instantatiation should
+    // Store the result back to the cache. Metadata instantiation should
     // already have emitted the necessary barriers to publish the instantiated
     // metadata to other threads, so we only need to expose the pointer.
     // Worst case, another thread might race with us and reinstantiate the
