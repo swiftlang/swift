@@ -2570,7 +2570,7 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
   if (C->hasClangNode()) return C;
   
   // FIXME: If the root class specifies its own runtime ObjC base class,
-  // assume that that base class ultimately inherits NSObject.
+  // assume that base class ultimately inherits NSObject.
   if (C->getAttrs().hasAttribute<SwiftNativeObjCRuntimeBaseAttr>())
     return IGM.getObjCRuntimeBaseClass(
              IGM.Context.getSwiftId(KnownFoundationEntity::NSObject),
