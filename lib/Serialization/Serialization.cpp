@@ -2855,7 +2855,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         access <= swift::AccessLevel::FilePrivate &&
         !value->getDeclContext()->isLocalContext();
 
-    // Emit the the filename for private mapping for private decls and
+    // Emit the filename for private mapping for private decls and
     // decls with private accessors if compiled with -enable-private-imports.
     bool shouldEmitFilenameForPrivate =
         S.M->arePrivateImportsEnabled() &&
