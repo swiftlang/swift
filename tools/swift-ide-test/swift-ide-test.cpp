@@ -499,7 +499,7 @@ static llvm::cl::opt<bool> CodeCompletionAddCallWithNoDefaultArgs(
 
 static llvm::cl::list<std::string>
 ConformingMethodListExpectedTypes("conforming-methods-expected-types",
-    llvm::cl::desc("Set expected types for comforming method list"),
+    llvm::cl::desc("Set expected types for conforming method list"),
     llvm::cl::cat(Category));
 
 // '-syntax-coloring' options.
