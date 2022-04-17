@@ -3485,7 +3485,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
             if (auto anchor = locator.getLocatorParts(path)) {
               // Let's drop `optional` or `generic argument` bits from
               // locator because that helps to diagnose reference equality
-              // operaators ("===" and "!==") since there is always a
+              // operators ("===" and "!==") since there is always a
               // `value-to-optional` or `optional-to-optional` conversion
               // associated with them (expected argument is `AnyObject?`).
               if (!path.empty() &&
