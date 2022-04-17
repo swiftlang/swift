@@ -134,7 +134,7 @@ void ContextInfoCallbacks::getImplicitMembers(
     Type T;
     SmallVectorImpl<ValueDecl *> &Result;
 
-    bool canBeImplictMember(ValueDecl *VD) {
+    bool canBeImplicitMember(ValueDecl *VD) {
       if (VD->isOperator())
         return false;
 
@@ -162,7 +162,7 @@ void ContextInfoCallbacks::getImplicitMembers(
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                    DynamicLookupInfo) override {
-      if (canBeImplictMember(VD) && !VD->shouldHideFromEditor())
+      if (canBeImplicitMember(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }
 
