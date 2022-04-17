@@ -527,7 +527,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -561,6 +561,9 @@ protected:
 
     /// Whether we have a lazy-loaded list of associated types.
     HasLazyAssociatedTypes : 1,
+
+    /// Whether we have a lazy-loaded list of primary associated types.
+    HasLazyPrimaryAssociatedTypes : 1,
 
     : NumPadBits,
 
@@ -4450,6 +4453,10 @@ class ProtocolDecl final : public NominalTypeDecl {
     return Bits.ProtocolDecl.HasLazyRequirementSignature;
   }
 
+  bool hasLazyPrimaryAssociatedTypes() const {
+    return Bits.ProtocolDecl.HasLazyPrimaryAssociatedTypes;
+  }
+
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class StructuralRequirementsRequest;
@@ -4462,6 +4469,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ExistentialConformsToSelfRequest;
   friend class ExistentialRequiresAnyRequest;
   friend class InheritedProtocolsRequest;
+  friend class PrimaryAssociatedTypesRequest;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
@@ -4685,6 +4693,9 @@ public:
 
   void setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
                                     uint64_t associatedTypesData);
+
+  void setLazyPrimaryAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
+                                           uint64_t associatedTypesData);
 
 public:
   // Implement isa/cast/dyncast/etc.
