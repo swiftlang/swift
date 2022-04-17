@@ -2249,7 +2249,7 @@ class ValueDecl : public Decl {
     unsigned isFinalComputed : 1;
 
     /// Whether this declaration is 'final'. A final class can't be subclassed,
-    /// a final class member can't be overriden.
+    /// a final class member can't be overridden.
     unsigned isFinal : 1;
 
     /// Whether the "isIUO" bit" has been computed yet.

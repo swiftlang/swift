@@ -912,7 +912,7 @@ static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
 }
 
 /// If the declaration is an @objc protocol defined in Swift and the
-/// Objective-C name has been overrridden from the default, return the
+/// Objective-C name has been overridden from the default, return the
 /// specified name.
 ///
 /// \param useObjCProtocolNames When false, always returns \c None.
