@@ -1949,9 +1949,9 @@ public:
           return true;
         if (t.getASTType() == t.getASTContext().TheNativeObjectType)
           return true;
-        if (auto clas = t.getClassOrBoundGenericClass())
+        if (auto clazz = t.getClassOrBoundGenericClass())
           // Must be a class defined in Swift.
-          return clas->hasKnownSwiftImplementation();
+          return clazz->hasKnownSwiftImplementation();
         return false;
       };
       
