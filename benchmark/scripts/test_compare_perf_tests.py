@@ -517,7 +517,7 @@ class OldAndNewLog(unittest.TestCase):
 
 class TestLogParser(unittest.TestCase):
     def test_parse_results_csv(self):
-        """Ignores uknown lines, extracts data from supported formats."""
+        """Ignores unknown lines, extracts data from supported formats."""
         log = """#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
 7,Array.append.Array.Int?,20,10,10,10,0,10
 21,Bridging.NSArray.as!.Array.NSString,20,11,11,11,0,11
