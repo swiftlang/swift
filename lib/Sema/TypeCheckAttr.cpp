@@ -2559,7 +2559,7 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
   }
 }
 
-/// Lookup the replaced decl in the replacments scope.
+/// Lookup the replaced decl in the replacements scope.
 static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                const DeclAttribute  *attr,
                                const ValueDecl *replacement,
