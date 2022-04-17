@@ -407,7 +407,7 @@ func a() {
 }
 
 
-// Array/Dictionay/Tuple/Closure within arg list shouldn't cause their solo
+// Array/Dictionary/Tuple/Closure within arg list shouldn't cause their solo
 // closing tokens to indent.
 //
 foo(a: [
