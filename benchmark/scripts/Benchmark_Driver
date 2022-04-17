@@ -544,7 +544,7 @@ class BenchmarkDoctor(object):
             caveat = "" if setup == 0 else " (excluding the setup overhead)"
             log("'%s' execution took at least %d μs%s.", name, runtime, caveat)
 
-            def factor(base):  # suitable divisior that's integer power of base
+            def factor(base):  # suitable divisor that's integer power of base
                 return int(
                     pow(base, math.ceil(math.log(runtime / float(threshold), base)))
                 )
