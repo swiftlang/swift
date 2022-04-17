@@ -3408,7 +3408,7 @@ bool ValueDecl::shouldHideFromEditor() const {
     bool bypassSwiftPrivate = false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(this)) {
       if (AFD->getForeignAsyncConvention().hasValue()) {
-        // For imported 'async' declartions, visibility can be controlled by
+        // For imported 'async' declarations, visibility can be controlled by
         // 'swift_async(...)' attribute.
         if (auto *asyncAttr = ClangD->getAttr<clang::SwiftAsyncAttr>()) {
           bypassSwiftPrivate = true;
