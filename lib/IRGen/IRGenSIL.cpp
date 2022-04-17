@@ -5308,7 +5308,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     return;
 
   VarDecl *Decl = i->getDecl();
-  // Describe the underlying alloca. This way an llvm.dbg.declare instrinsic
+  // Describe the underlying alloca. This way an llvm.dbg.declare intrinsic
   // is used, which is valid for the entire lifetime of the alloca.
   if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr)) {
     auto *Op0 = BitCast->getOperand(0);
