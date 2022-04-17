@@ -76,7 +76,7 @@ class AtomicWaitQueue {
   Mutex WaitQueueLock;
 
   /// Add a reference to this queue.  Must be called while holding the
-  /// globaal lock.
+  /// global lock.
   void retain_locked() {
     referenceCount++;
   }
