@@ -544,7 +544,7 @@ public:
   /// \c tryBindExtension needs to get the extended nominal, and the DeclContext
   /// is the parent of the \c ExtensionDecl. If the \c SourceRange of an \c
   /// ExtensionScope were to start where the \c ExtensionDecl says, the lookup
-  /// source locaiton would fall within the \c ExtensionScope. This inclusion
+  /// source location would fall within the \c ExtensionScope. This inclusion
   /// would cause the lazy \c ExtensionScope to be expanded which would ask for
   /// its generic parameters in order to create those sub-scopes. That request
   /// would cause a cycle because it would ask for the extended nominal. So,
