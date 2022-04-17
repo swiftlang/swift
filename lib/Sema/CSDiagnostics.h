@@ -183,7 +183,7 @@ protected:
     return S.getConstraintLocator(anchor, {element});
   }
 
-  /// Retrive the constraint locator for the given anchor and
+  /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued and automatically calculate the summary flags
   ConstraintLocator *getConstraintLocator(
       ASTNode anchor,
@@ -592,7 +592,7 @@ private:
   static Diag<StringRef> findDeclDiagnostic(ASTContext &ctx,
                                             const Expr *destExpr);
 
-  /// Retrive an member reference associated with given member
+  /// Retrieve an member reference associated with given member
   /// looking through dynamic member lookup on the way.
   Optional<OverloadChoice> getMemberRef(ConstraintLocator *locator) const;
 };
