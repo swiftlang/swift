@@ -5285,7 +5285,7 @@ struct ClassifiedBlocks {
   ClassifiedBlock ErrorBlock;
 };
 
-/// Classifer of callback closure statements that that have either multiple
+/// Classifier of callback closure statements that that have either multiple
 /// non-Result parameters or a single Result parameter and return Void.
 ///
 /// It performs a (possibly incorrect) best effort and may give up in certain
