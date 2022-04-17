@@ -540,7 +540,7 @@ func sr10988() {
     func test() -> some Numeric {
       // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
       let x = 0
-      x // expected-note {{did you mean to return the last expression?}}
+      x // expected-note {{did you mean to return the last expression?}} {{7-7=return }}
       // expected-warning@-1 {{expression of type 'Int' is unused}}
     }
   }

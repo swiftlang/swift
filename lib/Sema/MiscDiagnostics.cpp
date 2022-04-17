@@ -2645,8 +2645,10 @@ public:
     // If there are no candidates, then the body has no return statements, and
     // we have nothing to infer the underlying type from.
     if (Candidates.empty()) {
-      // We try to find valid candidates for return values to see if we can offer
-      // a fixit before presenting the default diagnosis.
+      // We try to find if the last element of the `Body` multi element
+      // `BraceStmt` is an expression that produces a value that satisfies all
+      // the opaque type requirements and if that is the case, it means we can
+      // suggest a fix-it note to add an explicit `return`.
       if (Body->getNumElements() > 1) {
         auto element = Body->getLastElement();
         // Let's see if the last statement would make for a valid return value.
@@ -2655,14 +2657,12 @@ public:
 
           for (auto requirement :
                OpaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements()) {
-            bool unwrappedIUO = true;
             auto requirementFulfilled =
                 TypeChecker::typesSatisfyConstraint(expr->getType()->getRValueType(),
                                                     requirement.getSecondType(),
-                                                    false,
+                                                    /*openArchetypes=*/ false,
                                                     ConstraintKind::ConformsTo,
-                                                    OpaqueDecl->getDeclContext(),
-                                                    &unwrappedIUO);
+                                                    OpaqueDecl->getDeclContext());
             if (!requirementFulfilled) {
               conforms = false;
               break;
