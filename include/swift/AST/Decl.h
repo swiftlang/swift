@@ -4342,7 +4342,7 @@ public:
     return !hasClangNode();
   }
 
-  /// Used to determine if this class decl is a foriegn reference type. I.e., a
+  /// Used to determine if this class decl is a foreign reference type. I.e., a
   /// non-reference-counted swift reference type that was imported from a C++
   /// record.
   bool isForeignReferenceType() const;
