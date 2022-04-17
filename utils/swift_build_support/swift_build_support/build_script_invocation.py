@@ -563,7 +563,7 @@ class BuildScriptInvocation(object):
         # Otherwise, we build an "early" swift-driver using the host
         # toolchain, which the later-built compiler will forward
         # `swiftc` invocations to. That is, if we find a Swift compiler
-        # in the host toolchain. If the host toolchain is not equpipped with
+        # in the host toolchain. If the host toolchain is not equipped with
         # a Swift compiler, a warning is emitted. In the future, it may become
         # mandatory that the host toolchain come with its own `swiftc`.
         builder.add_product(products.EarlySwiftDriver,
