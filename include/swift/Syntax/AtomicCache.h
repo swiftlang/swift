@@ -25,7 +25,7 @@ namespace swift {
 template <typename T>
 class AtomicCache {
   // Whatever type is created through this cache must be pointer-sized,
-  // othwerise, we can't pretend it's a uintptr_t and use its
+  // otherwise, we can't pretend it's a uintptr_t and use its
   // compare_exchange_strong.
   static_assert(sizeof(uintptr_t) == sizeof(RC<T>),
                 "RC<T> must be pointer sized!");
