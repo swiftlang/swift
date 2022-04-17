@@ -1300,7 +1300,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (Params.size() <= Idx)
       return;
 
-    // Get the internal name of the changed paramter.
+    // Get the internal name of the changed parameter.
     auto VariableName = Params[Idx]->getParameterName().str();
 
     // Insert the helper function to convert the type back to raw types.
