@@ -415,7 +415,7 @@ struct Runner {
                     await innerTaskHandle.value
                     debugLog("==> After")
                 }
-                // Accessis over. We shouldn't crash here.
+                // Access is over. We shouldn't crash here.
                 withExclusiveAccess(to: &global1) { _ in
                     debugLog("==> No crash!")
                 }
