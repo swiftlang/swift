@@ -1976,7 +1976,7 @@ static NodePointer getParameterList(NodePointer funcType) {
       funcType->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/1);
   assert(parameterContainer->getNumChildren() > 0);
 
-  // This is a type that convers entire parameter list.
+  // This is a type that covers entire parameter list.
   auto parameterList = parameterContainer->getFirstChild();
   assert(parameterList->getKind() == Node::Kind::Type);
 
