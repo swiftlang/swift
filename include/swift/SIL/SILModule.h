@@ -170,7 +170,7 @@ public:
     /// Link functions with shared linkage. Used by the mandatory pipeline.
     LinkNormal,
 
-    /// Link all functions. Used by the performance pipeine.
+    /// Link all functions. Used by the performance pipeline.
     LinkAll
   };
 
