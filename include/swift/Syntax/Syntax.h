@@ -23,7 +23,7 @@
 // SyntaxDataRef provides a *view* into the SyntaxDataRef and the view provides
 // all convenience APIs. The advantage of this is that the underlying SyntaxData
 // can be stack-allocated and does not need to be copied when the the SyntaxRef
-// is being passsed around or when the SyntaxRef is being casted.
+// is being passed around or when the SyntaxRef is being casted.
 //
 // Syntax:
 // The syntax nodes are designed for memory safety. Syntax nodes always retain
