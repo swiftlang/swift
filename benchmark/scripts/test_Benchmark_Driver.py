@@ -999,7 +999,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
             doctor.analyze(
                 {
                     # The threshold of 15 pages was estimated from previous
-                    # measurements. The normal range should be probably aproximated
+                    # measurements. The normal range should be probably approximate
                     # by a function instead of a simple constant.
                     # TODO: re-evaluate normal range from whole SBS
                     "name": "ConstantMemory",
