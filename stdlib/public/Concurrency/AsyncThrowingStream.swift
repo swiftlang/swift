@@ -283,7 +283,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///   elements to the stream and terminate the stream when finished.
   ///
   /// The `AsyncStream.Continuation` received by the `build` closure is
-  /// appopriate for use in concurrent contexts. It is thread safe to send and
+  /// appropriate for use in concurrent contexts. It is thread safe to send and
   /// finish; all calls are to the continuation are serialized. However, calling
   /// this from multiple concurrent contexts could result in out-of-order
   /// delivery.
