@@ -3370,7 +3370,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     }
   }
 
-  // For source compatibilty, allow duplicate internal parameter names
+  // For source compatibility, allow duplicate internal parameter names
   // on protocol requirements.
   //
   // FIXME: Consider turning this into a warning or error if we do

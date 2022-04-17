@@ -2086,7 +2086,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
         auto indexType = getType(unaryArg);
 
         // In Swift versions lower than 5, this check will fail as read only
-        // key paths can masquerade as writable for compatibilty reasons.
+        // key paths can masquerade as writable for compatibility reasons.
         // This is fine as in this case we just fall back on old diagnostics.
         if (indexType->isKeyPath() || indexType->isPartialKeyPath()) {
           return {expr, member};
