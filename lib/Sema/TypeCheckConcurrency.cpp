@@ -285,7 +285,7 @@ GlobalActorAttributeRequest::evaluate(
     dc = decl->getDeclContext();
     declAttrs = &decl->getAttrs();
     // HACK: `getLoc`, when querying the attr from  a serialized decl,
-    // dependning on deserialization order, may launch into arbitrary
+    // depending on deserialization order, may launch into arbitrary
     // type-checking when querying interface types of such decls. Which,
     // in turn, may do things like query (to print) USRs. This ends up being
     // prone to request evaluator cycles.
