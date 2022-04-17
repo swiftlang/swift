@@ -1949,7 +1949,7 @@ private:
 
 } // end namespace detail
 
-/// Given an input range, returns a new range whose values are are pair (A,B)
+/// Given an input range, returns a new range whose values are pair (A,B)
 /// such that A is the 0-based index of the item in the sequence, and B is
 /// the value from the original sequence.  Example:
 ///
