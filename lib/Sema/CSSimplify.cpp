@@ -5127,7 +5127,7 @@ bool ConstraintSystem::repairFailures(
       if (hasFixFor(calleeLocator, FixKind::AddQualifierToAccessTopLevelName)) {
         if (auto overload = findSelectedOverloadFor(calleeLocator)) {
           if (auto choice = overload->choice.getDeclOrNull()) {
-            // If this is an argument of a symetric function/operator let's
+            // If this is an argument of a symmetric function/operator let's
             // not fix any position rather than first because we'd just end
             // up with ambiguity instead of reporting an actual problem with
             // mismatched type since each argument can have district bindings.
