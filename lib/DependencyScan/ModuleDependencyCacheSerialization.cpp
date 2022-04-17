@@ -589,7 +589,7 @@ using ModuleIdentifierArrayKey =
 template <>
 struct llvm::DenseMapInfo<ModuleIdentifierArrayKind> {
   using UnderlyingType = std::underlying_type<ModuleIdentifierArrayKind>::type;
-  using UnerlyingInfo = DenseMapInfo<UnderlyingType>;
+  using UnderlyingInfo = DenseMapInfo<UnderlyingType>;
 
   static inline ModuleIdentifierArrayKind getEmptyKey() {
     return ModuleIdentifierArrayKind::Empty;
@@ -599,7 +599,7 @@ struct llvm::DenseMapInfo<ModuleIdentifierArrayKind> {
   }
   static unsigned getHashValue(const ModuleIdentifierArrayKind &arrKind) {
     auto underlyingValue = static_cast<UnderlyingType>(arrKind);
-    return UnerlyingInfo::getHashValue(underlyingValue);
+    return UnderlyingInfo::getHashValue(underlyingValue);
   }
   static bool isEqual(const ModuleIdentifierArrayKind &LHS,
                       const ModuleIdentifierArrayKind &RHS) {
