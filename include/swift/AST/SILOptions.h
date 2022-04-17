@@ -223,7 +223,7 @@ public:
   /// Emit checks to trap at run time when the law of exclusivity is violated.
   bool EnforceExclusivityDynamic = true;
 
-  /// Emit extra exclusvity markers for memory access and verify coverage.
+  /// Emit extra exclusivity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
 
   /// When building the stdlib with opts should we lower ownership after
