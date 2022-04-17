@@ -67,7 +67,7 @@ struct FixitFilter {
     // due to the extension rename not having been applied. The below diag(s)
     // can provide undesireable fixits that rename references of these
     // no-longer-visible members to similar still-visible ones.
-    // Note: missing_argument_lables and extra_argument_labels are filtered out
+    // Note: missing_argument_labels and extra_argument_labels are filtered out
     // elsewhere
     if (Info.ID == diag::wrong_argument_labels.ID)
       return false;
