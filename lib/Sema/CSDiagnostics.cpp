@@ -1056,7 +1056,7 @@ bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
       if (paramInterfaceTy->isTypeParameter() &&
           attributeKind == AttributeKind::Escaping) {
         auto diagnoseGenericParamFailure = [&](GenericTypeParamDecl *decl) {
-          emitDiagnostic(diag::converting_noespace_param_to_generic_type,
+          emitDiagnostic(diag::converting_noescape_param_to_generic_type,
                          PD->getName(), paramInterfaceTy);
 
           auto declLoc = decl->getLoc();
