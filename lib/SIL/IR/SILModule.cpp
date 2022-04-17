@@ -178,7 +178,7 @@ void SILModule::checkForLeaks() const {
                        
   if (numAllocated != instsInModule) {
     llvm::errs() << "Leaking instructions!\n";
-    llvm::errs() << "Alloated instructions: " << numAllocated << '\n';
+    llvm::errs() << "Allocated instructions: " << numAllocated << '\n';
     llvm::errs() << "Instructions in module: " << instsInModule << '\n';
     llvm_unreachable("leaking instructions");
   }
