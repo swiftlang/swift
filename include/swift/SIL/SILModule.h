@@ -274,7 +274,7 @@ private:
   /// Declarations which are externally visible.
   ///
   /// These are method declarations which are referenced from inlinable
-  /// functions due to cross-module-optimzation. Those declarations don't have
+  /// functions due to cross-module-optimization. Those declarations don't have
   /// any attributes or linkage which mark them as externally visible by
   /// default.
   /// Currently this table is not serialized.
