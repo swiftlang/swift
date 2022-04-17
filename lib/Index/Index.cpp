@@ -740,7 +740,7 @@ private:
   /// Extensions redeclare all generic parameters of their extended type to add
   /// their additional restrictions. There are two issues with this model for
   /// indexing:
-  ///  - The generic paramter declarations of the extension are implicit so we
+  ///  - The generic parameter declarations of the extension are implicit so we
   ///    wouldn't report them in the index. Any usage of the generic param in
   ///    the extension references this implicit declaration so we don't include
   ///    it in the index either.
@@ -749,7 +749,7 @@ private:
   ///    declaration of the param in the extended type.
   ///
   /// To fix these issues, we replace the reference to the implicit generic
-  /// parameter defined in the extension by a reference to the generic paramter
+  /// parameter defined in the extension by a reference to the generic parameter
   /// defined in the extended type.
   ///
   /// \returns the canonicalized replaced generic param decl if it can be found
@@ -759,7 +759,7 @@ private:
     auto Extension = dyn_cast_or_null<ExtensionDecl>(
         GenParam->getDeclContext()->getAsDecl());
     if (!Extension) {
-      // We are not referencing a generic paramter defined in an extension.
+      // We are not referencing a generic parameter defined in an extension.
       // Nothing to do.
       return GenParam;
     }
