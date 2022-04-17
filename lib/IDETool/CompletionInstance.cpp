@@ -270,7 +270,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
   switch (newInfo.Kind) {
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     // If the interface has changed, AST must be refreshed.
-    // See if the inteface of the function and types visible from a function
+    // See if the interface of the function and types visible from a function
     // body has changed since the last completion. If they haven't changed,
     // completion can reuse the existing AST of the source file.
     // \c getInterfaceHash() is not enough because it doesn't take the interface
