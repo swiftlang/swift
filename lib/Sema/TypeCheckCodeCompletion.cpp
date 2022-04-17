@@ -593,7 +593,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     return false;
 
   // Interpolation components are type-checked separately.
-  if (contextAnalyzer.locatedInStringIterpolation())
+  if (contextAnalyzer.locatedInStringInterpolation())
     return false;
 
   // FIXME: There is currently no way to distinguish between

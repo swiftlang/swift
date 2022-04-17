@@ -74,7 +74,7 @@ public:
     return hasContext(ContextKind::MultiStmtClosure);
   }
 
-  bool locatedInStringIterpolation() const {
+  bool locatedInStringInterpolation() const {
     return hasContext(ContextKind::StringInterpolation);
   }
 
