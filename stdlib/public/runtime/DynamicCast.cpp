@@ -673,7 +673,7 @@ bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
 #if SWIFT_OBJC_INTEROP
 // Helper to memoize bridging conformance data for a particular
 // Swift struct type.  This is used to speed up the most common
-// ObjC->Swift bridging conversions by eliminating repeeated
+// ObjC->Swift bridging conversions by eliminating repeated
 // protocol conformance lookups.
 
 // Currently used only for String, which may be the only
