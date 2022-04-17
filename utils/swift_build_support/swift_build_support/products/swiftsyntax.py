@@ -101,7 +101,7 @@ class SwiftSyntax(product.Product):
         return self.args.install_swiftsyntax
 
     def install(self, target_name):
-        # SwiftSyntax doesn't produce any products thate should be installed
+        # SwiftSyntax doesn't produce any products that should be installed
         # into the toolchein. All tools using it link against SwiftSyntax
         # statically.
         pass
