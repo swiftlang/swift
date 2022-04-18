@@ -2279,7 +2279,7 @@ struct DefaultAllocatorConventions : DefaultConventions {
   }
 };
 
-/// The default conventions for Swift setter acccessors.
+/// The default conventions for Swift setter accessories.
 ///
 /// These take self at +0, but all other parameters at +1. This is because we
 /// assume that setter parameters are likely to be values to be forwarded into
