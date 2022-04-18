@@ -2174,7 +2174,7 @@ class GenericParameterReferenceInfo final {
   using OptionalTypePosition = OptionalEnum<decltype(TypePosition::Covariant)>;
 
 public:
-  /// Whether the uncurried interface type of the declaration, stipped of any
+  /// Whether the uncurried interface type of the declaration, stripped of any
   /// optionality, is a direct reference to the generic parameter at hand. For
   /// example, "func foo(x: Int) -> () -> Self?" has a covariant 'Self' result.
   bool hasCovariantSelfResult;
@@ -2699,7 +2699,7 @@ public:
   /// \param treatNonResultCovariantSelfAsInvariant When set, covariant 'Self'
   /// references that are not in covariant result type position are considered
   /// invariant. This position is the uncurried interface type of a declaration,
-  /// stipped of any optionality. For example, this is true for 'Self' in
+  /// stripped of any optionality. For example, this is true for 'Self' in
   /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
