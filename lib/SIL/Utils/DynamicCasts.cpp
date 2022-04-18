@@ -279,7 +279,7 @@ static CanType getHashableExistentialType(ModuleDecl *M) {
 //
 //          let c = b as! C // releases __SwiftValue
 //
-// After unwrapping Optional, the type may fall into one one of
+// After unwrapping Optional, the type may fall into one of
 // the following categories that are relevant for cast ownership:
 //
 // Class-bound types (hasReferenceSemantics() && !isPotentiallyAnyObject())
