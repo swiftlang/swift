@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck %s -enable-library-evolution -emit-module-interface-path %t/Module.swiftinterface -experimental-skip-non-inlinable-function-bodies
-// RUN: %FileCheck %s --check-prefixes CHECK < %t/Module.swiftinterface
+// RUN: %target-swift-emit-module-interface(%t/Module.swiftinterface) %s
+// RUN: %target-swift-typecheck-module-from-interface(%t/Module.swiftinterface)
+// RUN: %FileCheck %s < %t/Module.swiftinterface
 
 // REQUIRES: OS=macosx
 

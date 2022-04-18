@@ -4,11 +4,11 @@
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule -emit-module-interface-path %t/Test.swiftinterface -module-name Test -enable-experimental-concurrency -I %t %s
 // RUN: %FileCheck %s < %t/Test.swiftinterface
 // RUN: %FileCheck %s -check-prefix SYNTHESIZED < %t/Test.swiftinterface
-// RUN: %target-swift-frontend -typecheck-module-from-interface -module-name Test %t/Test.swiftinterface -I %t 
+// RUN: %target-swift-typecheck-module-from-interface(%t/Test.swiftinterface) -module-name Test -I %t
 
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-module-interface-path %t/TestFromModule.swiftinterface -module-name Test -enable-experimental-concurrency -I %t 
 // RUN: %FileCheck %s < %t/TestFromModule.swiftinterface
-// RUN: %target-swift-frontend -typecheck-module-from-interface -module-name Test %t/TestFromModule.swiftinterface -I %t 
+// RUN: %target-swift-typecheck-module-from-interface(%t/TestFromModule.swiftinterface) -module-name Test -I %t
 
 // REQUIRES: concurrency
 import Preconcurrency

@@ -2,7 +2,8 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/Module.swiftinterface -module-name Module -enable-library-evolution
+// RUN: %target-swift-emit-module-interface(%t/Module.swiftinterface) %S/non-public-designated-inits.swift -module-name Module
+// RUN: %target-swift-typecheck-module-from-interface(%t/Module.swiftinterface) -module-name Module
 // RUN: %FileCheck %s < %t/Module.swiftinterface
 
 // CHECK: @_hasMissingDesignatedInitializers open class A {

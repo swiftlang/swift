@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -emit-module-interface-path - -sdk %clang-importer-sdk -enable-library-evolution %s -experimental-print-full-convention -use-clang-function-types | %FileCheck %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -sdk %clang-importer-sdk -experimental-print-full-convention -use-clang-function-types
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -sdk %clang-importer-sdk
+// RUN: %FileCheck %s < %t.swiftinterface
 
 import ctypes
 
