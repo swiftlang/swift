@@ -925,7 +925,7 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
 ///   -(void)performWithOptions:(NSDictionary *) opts;
 ///
 /// This doesn't match the condition because the base name of the function in
-/// Swift is 'peform':
+/// Swift is 'perform':
 ///
 ///   func perform(options opts: [AnyHashable:Any] = [:])
 ///
