@@ -2646,7 +2646,10 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
   auto fromPrivateFrameworks = [&](StringRef modulePath) -> bool {
     if (!ctx.LangOpts.Target.isOSDarwin()) return false;
 
-    return hasSDKPrefix(modulePath, "System", "Library", "PrivateFrameworks");
+    return hasSDKPrefix(modulePath, "AppleInternal", "Library", "Frameworks") ||
+           hasSDKPrefix(modulePath, "System", "Library", "PrivateFrameworks") ||
+           hasSDKPrefix(modulePath, "System", "iOSSupport", "System", "Library", "PrivateFrameworks") ||
+           hasSDKPrefix(modulePath, "usr", "local", "include");
   };
 
   if (module->isNonSwiftModule()) {
@@ -2654,8 +2657,7 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
       // Imported clangmodules are SPI if they are defined by a private
       // modulemap or from the PrivateFrameworks folder in the SDK.
       bool moduleIsSPI = underlying->ModuleMapIsPrivate ||
-                         (underlying->isPartOfFramework() &&
-                          fromPrivateFrameworks(underlying->PresumedModuleMapFile));
+                         fromPrivateFrameworks(underlying->PresumedModuleMapFile);
       return moduleIsSPI ? LibraryLevel::SPI : LibraryLevel::API;
     }
     return LibraryLevel::Other;

@@ -40,6 +40,7 @@ import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported
 import PublicClang
 import PublicClang_Private // expected-error{{private module 'PublicClang_Private' is imported publicly from the public module 'MainLib'}}
 import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'MainLib'}}
+import LocalClang // expected-error{{private module 'LocalClang' is imported publicly from the public module 'MainLib'}}
 @_exported import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}
 
 /// Expect no errors with implementation-only imports.
@@ -51,6 +52,7 @@ import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' i
 @_implementationOnly import PrivateSwift
 @_implementationOnly import PublicClang_Private
 @_implementationOnly import FullyPrivateClang
+@_implementationOnly import LocalClang
 
 #endif
 
