@@ -1148,11 +1148,21 @@ private:
     }
 
     /// Extract conforming type's name from a Conformance Descriptor
-    llvm::Optional<std::string> getConformingTypeName(
+    /// Returns a pair of (mangledTypeName, fullyQualifiedTypeName)
+    llvm::Optional<std::pair<std::string, std::string>> getConformingTypeName(
         const uintptr_t conformanceDescriptorAddress,
         const ExternalProtocolConformanceDescriptor<
             ObjCInteropKind, PointerSize> &conformanceDescriptor) {
       std::string typeName;
+      std::string mangledTypeName = "";
+
+      // If this is a conformance added to an ObjC class, detect that here and return class name
+      if (conformanceDescriptor.getTypeKind() == TypeReferenceKind::DirectObjCClassName) {
+        auto className = conformanceDescriptor.getDirectObjCClassName();
+        typeName = MANGLING_MODULE_OBJC.str() + std::string(".") + className;
+        return std::make_pair(mangledTypeName, typeName);
+      }
+
       // Compute the address of the type descriptor as follows:
       //    - Compute the address of the TypeRef field in the protocol
       //    descriptor
@@ -1178,6 +1188,21 @@ private:
       auto contextTypeDescriptorAddress = detail::applyRelativeOffset(
           (const char *)contextDescriptorFieldAddress,
           (int32_t)*contextDescriptorOffset);
+
+      // Instead of a type descriptor this may just be a symbol reference, check that first
+      if (auto symbol = OpaquePointerReader(remote::RemoteAddress(contextTypeDescriptorAddress),
+                                            PointerSize)) {
+        if (!symbol->getSymbol().empty()) {
+          mangledTypeName = symbol->getSymbol().str();
+          Demangle::Context Ctx;
+          auto demangledRoot =
+              Ctx.demangleSymbolAsNode(mangledTypeName);
+          assert(demangledRoot->getKind() == Node::Kind::Global);
+          typeName =
+              nodeToString(demangledRoot->getChild(0)->getChild(0));
+          return std::make_pair(mangledTypeName, typeName);
+        }
+      }
 
       auto contextTypeDescriptorBytes = OpaqueByteReader(
           remote::RemoteAddress(contextTypeDescriptorAddress),
@@ -1213,7 +1238,7 @@ private:
         typeName = optionalParentName.getValue() + "." + typeName;
       }
 
-      return typeName;
+      return std::make_pair(mangledTypeName, typeName);
     }
 
     /// Extract protocol name from a Conformance Descriptor
@@ -1317,9 +1342,9 @@ private:
               (const ExternalProtocolConformanceDescriptor<
                   ObjCInteropKind, PointerSize> *)descriptorBytes.get();
 
-      auto optionalConformingTypeName = getConformingTypeName(
+      auto optionalConformingTypeNamePair = getConformingTypeName(
           conformanceDescriptorAddress, *conformanceDescriptorPtr);
-      if (!optionalConformingTypeName.hasValue())
+      if (!optionalConformingTypeNamePair.hasValue())
         return llvm::None;
 
       auto optionalConformanceProtocol = getConformanceProtocolName(
@@ -1328,15 +1353,18 @@ private:
         return llvm::None;
 
       std::string mangledTypeName;
-      auto it =
-          typeNameToManglingMap.find(optionalConformingTypeName.getValue());
-      if (it != typeNameToManglingMap.end()) {
-        mangledTypeName = it->second;
+      if (optionalConformingTypeNamePair.getValue().first.empty()) {
+        auto it = typeNameToManglingMap.find(optionalConformingTypeNamePair.getValue().second);
+        if (it != typeNameToManglingMap.end()) {
+          mangledTypeName = it->second;
+        } else {
+          mangledTypeName = "";
+        }
       } else {
-        mangledTypeName = "";
+        mangledTypeName = optionalConformingTypeNamePair.getValue().first;
       }
 
-      return ProtocolConformanceInfo{optionalConformingTypeName.getValue(),
+      return ProtocolConformanceInfo{optionalConformingTypeNamePair.getValue().second,
                                      optionalConformanceProtocol.getValue(),
                                      mangledTypeName};
     }
