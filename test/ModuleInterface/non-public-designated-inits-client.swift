@@ -2,7 +2,8 @@
 // init cannot be called.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck %S/non-public-designated-inits.swift -emit-module-interface-path %t/Module.swiftinterface -module-name Module -enable-library-evolution
+// RUN: %target-swift-emit-module-interface(%t/Module.swiftinterface) %S/non-public-designated-inits.swift -module-name Module
+// RUN: %target-swift-typecheck-module-from-interface(%t/Module.swiftinterface) -module-name Module
 // RUN: %target-swift-frontend -typecheck -verify %s -I %t
 
 // Make sure the same error is emitted when importing a .swiftmodule

@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -enable-library-evolution -target %target-cpu-apple-macosx12.0 -emit-module-interface-path %t/Library.swiftinterface -module-name Library %s
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -target %target-cpu-apple-macosx12.0 -module-name Library
+// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
@@ -22,5 +23,6 @@ public struct Y { }
 // CHECK: @available(*, unavailable)
 // CHECK-NEXT: extension Library.Y{{( )?}}: @unchecked Swift.Sendable {
 
-// RUN: %target-swift-frontend -typecheck -enable-library-evolution -target %target-cpu-apple-macosx12.0 -emit-module-interface-path %t/Library.swiftinterface -DLIBRARY -module-name Library %s -module-interface-preserve-types-as-written
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -target %target-cpu-apple-macosx12.0 -DLIBRARY -module-name Library -module-interface-preserve-types-as-written
+// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %FileCheck %s <%t/Library.swiftinterface

@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -enable-library-evolution  -disable-availability-checking -emit-module-interface-path %t/Library.swiftinterface -module-name Library %s
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -disable-availability-checking -module-name Library
+// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -disable-availability-checking -module-name Library
 // RUN: %FileCheck --check-prefix CHECK-EXTENSION %s <%t/Library.swiftinterface
 // RUN: %FileCheck --check-prefix CHECK %s <%t/Library.swiftinterface
 // REQUIRES: concurrency
