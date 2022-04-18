@@ -583,7 +583,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   if (SubExpr.isNull())
     return Status;
 
-  // We are sure we can create a prefix prefix operator expr now.
+  // We are sure we can create a prefix operator expr now.
   UnaryContext.setCreateSyntax(SyntaxKind::PrefixOperatorExpr);
 
   // Check if we have a unary '-' with number literal sub-expression, for
