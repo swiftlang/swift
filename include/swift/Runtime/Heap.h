@@ -29,7 +29,7 @@
 namespace swift {
 namespace {
 // This is C++17 and newer, so we simply re-define it.  Since the codebase is
-// C++14, asume that DR1558 is accounted for and that unused parameters in alias
+// C++14, assume that DR1558 is accounted for and that unused parameters in alias
 // templates are guaranteed to ensure SFINAE and are not ignored.
 template <typename ...>
 using void_t = void;
