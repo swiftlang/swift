@@ -1171,10 +1171,10 @@ llvm::SmallPtrSet<ProtocolDecl *, 2>
 swift::extractDistributedSerializationRequirements(
     ASTContext &C, ArrayRef<Requirement> allRequirements) {
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
-  auto systemProto = C.getDistributedActorSystemDecl();
-  auto serializationReqAssocType =
-      systemProto->getAssociatedType(C.Id_SerializationRequirement);
-  auto systemSerializationReqTy = serializationReqAssocType->getInterfaceType();
+  auto DA = C.getDistributedActorDecl();
+  auto daSerializationReqAssocType =
+      DA->getAssociatedType(C.Id_SerializationRequirement);
+  auto daSystemSerializationReqTy = daSerializationReqAssocType->getInterfaceType();
 
   for (auto req : allRequirements) {
     if (req.getSecondType()->isAny()) {
@@ -1188,7 +1188,7 @@ swift::extractDistributedSerializationRequirements(
       auto dependentTy =
           dependentMemberType->getAssocType()->getInterfaceType();
 
-      if (dependentTy->isEqual(systemSerializationReqTy)) {
+      if (dependentTy->isEqual(daSystemSerializationReqTy)) {
         auto requirementProto = req.getSecondType();
         if (auto proto = dyn_cast_or_null<ProtocolDecl>(
                 requirementProto->getAnyNominal())) {
