@@ -1562,6 +1562,10 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     // In our recursive parse, remember that we're in a matching pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, IVOLP_InMatchingPattern);
+
+    // Reset async attribute in parser context.
+    llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
   } else if (Tok.is(tok::kw_case)) {
     ConditionCtxt.setCreateSyntax(SyntaxKind::Unknown);
@@ -1580,7 +1584,10 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     // In our recursive parse, remember that we're in a var/let pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, wasLet ? IVOLP_InLet : IVOLP_InVar);
-    
+
+    // Reset async attribute in parser context.
+    llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
     
     if (ThePattern.isNonNull()) {
@@ -2234,6 +2241,10 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   if (consumeIf(tok::kw_case)) {
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
+
+    // Reset async attribute in parser context.
+    llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
     pattern = parseMatchingPattern(/*isExprBasic*/true);
     pattern = parseOptionalPatternTypeAnnotation(pattern);
   } else if (!IsCStyleFor || Tok.is(tok::kw_var)) {

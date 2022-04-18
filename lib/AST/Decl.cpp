@@ -1745,6 +1745,18 @@ bool PatternBindingDecl::isAsyncLet() const {
   if (auto var = getAnchoringVarDecl(0))
     return var->isAsyncLet();
 
+  // Check for "async let _: <Type> = <expression>" pattern.
+  auto *pattern = getPatternList()[0].getPattern();
+  if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
+    auto *anyPattern = dyn_cast<AnyPattern>(typedPattern->getSubPattern());
+    return anyPattern && anyPattern->isAsyncLet();
+  }
+
+  // Check for "async let _ = <expression>" pattern.
+  if (auto *anyPattern = dyn_cast<AnyPattern>(pattern)) {
+    return anyPattern->isAsyncLet();
+  }
+
   return false;
 }
 
