@@ -1,12 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -emit-cxx-header-path %t/empty.h
+// RUN: %target-swift-frontend %s -typecheck -clang-header-expose-public-decls -emit-clang-header-path %t/empty.h
 // RUN: %FileCheck %s < %t/empty.h
-
-// RUN: %check-cxx-header-in-clang -std=c++14 %t/empty.h
-// RUN: %check-cxx-header-in-clang -std=c++17 %t/empty.h
-
-// CHECK-NOT: @import Swift;
-// CHECK-NOT: IBSegueAction
 
 // CHECK-LABEL: #ifndef EMPTY_SWIFT_H
 // CHECK-NEXT:  #define EMPTY_SWIFT_H
@@ -27,9 +21,18 @@
 // CHECK-NEXT: # define __has_warning(x) 0
 // CHECK-NEXT: #endif
 
-// CHECK-LABEL: #include <cstdint>
-// CHECK: #include <cstddef>
-// CHECK: #include <cstdbool>
+// CHECK-LABEL: #if defined(__OBJC__)
+// CHECK-NEXT:  #include <Foundation/Foundation.h>
+// CHECK-NEXT:  #endif
+// CHECK-NEXT:  #if defined(__cplusplus)
+// CHECK-NEXT:  #include <cstdint>
+// CHECK-NEXT:  #include <cstddef>
+// CHECK-NEXT:  #include <cstdbool>
+// CHECK-NEXT:  #else
+// CHECK-NEXT:  #include <stdint.h>
+// CHECK-NEXT:  #include <stddef.h>
+// CHECK-NEXT:  #include <stdbool.h>
+// CHECK-NEXT:  #endif
 
 // CHECK-LABEL: !defined(SWIFT_TYPEDEFS)
 // CHECK-NEXT:  # define SWIFT_TYPEDEFS 1
@@ -54,7 +57,19 @@
 // CHECK: # define SWIFT_EXTENSION(M)
 // CHECK: # define OBJC_DESIGNATED_INITIALIZER
 
-// CHECK-LABEL: namespace empty {
-// CHECK: } // namespace empty
+// CHECK-LABEL: #if defined(__OBJC__)
+// CHECK-NEXT:  #if !defined(IBSegueAction)
+// CHECK-NEXT:  # define IBSegueAction
+// CHECK-NEXT:  #endif
+
+// CHECK-LABEL: #if defined(__OBJC__)
+// CHECK-NEXT:  #if __has_feature(modules)
+
+// CHECK-LABEL: #if defined(__OBJC__)
+// CHECK-NEXT:  #endif
+// CHECK-NEXT:  #if defined(__cplusplus)
+// CHECK-NEXT:  namespace empty {
+// CHECK:       } // namespace empty
+// CHECK:       #endif
 
 // CHECK-NOT: @

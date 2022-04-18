@@ -35,7 +35,7 @@ public protocol AnyActor: AnyObject, Sendable {}
 /// The `Actor` protocol generalizes over all `actor` types. Actor types
 /// implicitly conform to this protocol.
 @available(SwiftStdlib 5.1, *)
-public protocol Actor: AnyActor, Sendable {
+public protocol Actor: AnyActor {
 
   /// Retrieve the executor for this actor as an optimized, unowned
   /// reference.

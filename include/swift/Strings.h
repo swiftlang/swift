@@ -25,7 +25,7 @@ constexpr static const StringLiteral SWIFT_ONONE_SUPPORT = "SwiftOnoneSupport";
 /// The name of the Concurrency module, which supports that extension.
 constexpr static const StringLiteral SWIFT_CONCURRENCY_NAME = "_Concurrency";
 /// The name of the Distributed module, which supports that extension.
-constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "_Distributed";
+constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "Distributed";
 /// The name of the StringProcessing module, which supports that extension.
 constexpr static const StringLiteral SWIFT_STRING_PROCESSING_NAME = "_StringProcessing";
 /// The name of the SwiftShims module, which contains private stdlib decls.

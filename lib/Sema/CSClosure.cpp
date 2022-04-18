@@ -363,7 +363,7 @@ private:
     // Generate constraints to initialize the pattern.
     auto initType =
         cs.generateConstraints(pattern, contextualLocator,
-                               /*shouldBindPatternOneWay=*/true,
+                               /*shouldBindPatternOneWay=*/false,
                                /*patternBinding=*/nullptr, /*patternIndex=*/0);
 
     if (!initType) {
@@ -434,7 +434,7 @@ private:
     {
       auto target = SolutionApplicationTarget::forForEachStmt(
           forEachStmt, sequenceProto, closure,
-          /*bindTypeVarsOneWay=*/true,
+          /*bindTypeVarsOneWay=*/false,
           /*contextualPurpose=*/CTP_ForEachSequence);
 
       auto &targetInfo = target.getForEachStmtInfo();
@@ -451,9 +451,9 @@ private:
   }
 
   void visitCaseItemPattern(Pattern *pattern, ContextualTypeInfo context) {
-    Type patternType =
-        cs.generateConstraints(pattern, locator, /*bindPatternVarsOneWay=*/true,
-                               /*patternBinding=*/nullptr, /*patternIndex=*/0);
+    Type patternType = cs.generateConstraints(
+        pattern, locator, /*bindPatternVarsOneWay=*/false,
+        /*patternBinding=*/nullptr, /*patternIndex=*/0);
 
     if (!patternType) {
       hadError = true;
@@ -483,12 +483,115 @@ private:
     });
   }
 
+  void visitPatternBinding(PatternBindingDecl *patternBinding,
+                           SmallVectorImpl<ElementInfo> &patterns) {
+    auto *baseLoc = cs.getConstraintLocator(
+        locator, LocatorPathElt::ClosureBodyElement(patternBinding));
+
+    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      auto *pattern = TypeChecker::resolvePattern(
+          patternBinding->getPattern(index), patternBinding->getDeclContext(),
+          /*isStmtCondition=*/true);
+
+      if (!pattern) {
+        hadError = true;
+        return;
+      }
+
+      // Reset binding to point to the resolved pattern. This is required
+      // before calling `forPatternBindingDecl`.
+      patternBinding->setPattern(index, pattern,
+                                 patternBinding->getInitContext(index));
+
+      patterns.push_back(makeElement(
+          patternBinding,
+          cs.getConstraintLocator(
+              baseLoc, LocatorPathElt::PatternBindingElement(index))));
+    }
+  }
+
+  Optional<SolutionApplicationTarget>
+  getTargetForPattern(PatternBindingDecl *patternBinding, unsigned index,
+                      Type patternType) {
+    auto hasPropertyWrapper = [&](Pattern *pattern) -> bool {
+      if (auto *singleVar = pattern->getSingleVar())
+        return singleVar->hasAttachedPropertyWrapper();
+      return false;
+    };
+
+    auto *pattern = patternBinding->getPattern(index);
+    auto *init = patternBinding->getInit(index);
+
+    if (!init && patternBinding->isDefaultInitializable(index) &&
+        pattern->hasStorage()) {
+      init = TypeChecker::buildDefaultInitializer(patternType);
+    }
+
+    if (init) {
+      return SolutionApplicationTarget::forInitialization(
+          init, patternBinding->getDeclContext(), patternType, patternBinding,
+          index,
+          /*bindPatternVarsOneWay=*/false);
+    }
+
+    // If there was no initializer, there could be one from a property
+    // wrapper which has to be pre-checked before use. This is not a
+    // problem in top-level code because pattern bindings go through
+    // `typeCheckExpression` which does pre-check automatically and
+    // result builders do not allow declaring local wrapped variables.
+    if (hasPropertyWrapper(pattern)) {
+      auto target = SolutionApplicationTarget::forInitialization(
+          init, patternBinding->getDeclContext(), patternType, patternBinding,
+          index,
+          /*bindPatternVarsOneWay=*/false);
+
+      if (ConstraintSystem::preCheckTarget(
+              target, /*replaceInvalidRefsWithErrors=*/true,
+              /*LeaveCLosureBodyUnchecked=*/false))
+        return None;
+
+      return target;
+    }
+
+    return SolutionApplicationTarget::forUninitializedVar(patternBinding, index,
+                                                          patternType);
+  }
+
+  void visitPatternBindingElement(PatternBindingDecl *patternBinding) {
+    assert(locator->isLastElement<LocatorPathElt::PatternBindingElement>());
+
+    auto index =
+        locator->castLastElementTo<LocatorPathElt::PatternBindingElement>()
+            .getIndex();
+
+    auto contextualPattern =
+        ContextualPattern::forPatternBindingDecl(patternBinding, index);
+    Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+
+    // Fail early if pattern couldn't be type-checked.
+    if (!patternType || patternType->hasError()) {
+      hadError = true;
+      return;
+    }
+
+    auto target = getTargetForPattern(patternBinding, index, patternType);
+    if (!target ||
+        cs.generateConstraints(*target, FreeTypeVariableBinding::Disallow)) {
+      hadError = true;
+      return;
+    }
+
+    // Keep track of this binding entry.
+    cs.setSolutionApplicationTarget({patternBinding, index}, *target);
+  }
+
   void visitDecl(Decl *decl) {
     if (isSupportedMultiStatementClosure()) {
       if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-        SolutionApplicationTarget target(patternBinding);
-        if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
-          hadError = true;
+        if (locator->isLastElement<LocatorPathElt::PatternBindingElement>())
+          visitPatternBindingElement(patternBinding);
+        else
+          llvm_unreachable("cannot visit pattern binding directly");
         return;
       }
     }
@@ -788,6 +891,13 @@ private:
             element.is<Expr *>() &&
             (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
 
+        if (auto *decl = element.dyn_cast<Decl *>()) {
+          if (auto *PDB = dyn_cast<PatternBindingDecl>(decl)) {
+            visitPatternBinding(PDB, elements);
+            continue;
+          }
+        }
+
         elements.push_back(makeElement(
             element,
             cs.getConstraintLocator(
@@ -819,7 +929,9 @@ private:
 
     // Single-expression closures are effectively a `return` statement,
     // so let's give them a special locator as to indicate that.
-    if (closure->hasSingleExpressionBody()) {
+    // Return statements might not have a result if we have a closure whose
+    // implicit returned value is coerced to Void.
+    if (closure->hasSingleExpressionBody() && returnStmt->hasResult()) {
       auto *expr = returnStmt->getResult();
       assert(expr && "single expression closure without expression?");
 
@@ -927,6 +1039,12 @@ bool ConstraintSystem::isInResultBuilderContext(ClosureExpr *closure) const {
   if (!closure->hasSingleExpressionBody()) {
     auto *DC = closure->getParent();
     do {
+      // Result builder is applied to a function/getter body.
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+        if (resultBuilderTransformed.count(AFD))
+          return true;
+      }
+
       if (auto *parentClosure = dyn_cast<ClosureExpr>(DC)) {
         if (resultBuilderTransformed.count(parentClosure))
           return true;
@@ -1271,7 +1389,8 @@ private:
     for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
       assert(expected->hasName());
       auto prev = expected->getParentVarDecl();
-      auto type = solution.resolveInterfaceType(solution.getType(prev));
+      auto type = solution.resolveInterfaceType(
+          solution.getType(prev)->mapTypeOutOfContext());
       expected->setInterfaceType(type);
     }
 
@@ -1599,6 +1718,17 @@ void ConjunctionElement::findReferencedVariables(
   auto *locator = Element->getLocator();
 
   TypeVariableRefFinder refFinder(cs, locator->getAnchor(), typeVars);
+
+  if (auto *patternBinding =
+          dyn_cast_or_null<PatternBindingDecl>(element.dyn_cast<Decl *>())) {
+    if (auto patternBindingElt =
+            locator
+                ->getLastElementAs<LocatorPathElt::PatternBindingElement>()) {
+      if (auto *init = patternBinding->getInit(patternBindingElt->getIndex()))
+        init->walk(refFinder);
+      return;
+    }
+  }
 
   if (element.is<Decl *>() || element.is<StmtConditionElement *>() ||
       element.is<Expr *>() || element.isStmt(StmtKind::Return))

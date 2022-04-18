@@ -19,6 +19,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/Basic/LangOptions.h"
 #include "llvm/ADT/None.h"
 
 namespace swift {
@@ -277,17 +278,21 @@ public:
   }
 
   /// Whether parameterized protocol types are supported in this context.
-  bool isParameterizedProtocolSupported() const {
+  ///
+  /// FIXME: Remove LangOptions parameter once EnableParameterizedExistentialTypes
+  /// staging flag is gone.
+  bool isParameterizedProtocolSupported(const LangOptions &opts) const {
     switch (context) {
     case Context::Inherited:
     case Context::ExtensionBinding:
     case Context::GenericRequirement:
       return true;
+    case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
+      return opts.EnableParameterizedExistentialTypes;
     case Context::None:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
-    case Context::MetatypeBase:
-    case Context::ExistentialConstraint:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:

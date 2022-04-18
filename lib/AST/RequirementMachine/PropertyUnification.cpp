@@ -10,10 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This implements the PropertyBag::addProperty() method, which merges layout,
-// superclass and concrete type requirements. This merging can create new rules;
-// property map construction is iterated with the Knuth-Bendix completion
-// procedure until fixed point.
+// This file is the core of the property map construction algorithm.
+//
+// The primary entry point is the PropertyBag::addProperty() method, which
+// unifies multiple layout, superclass and concrete type requirements on a
+// single term.
+//
+// This unification can add new rewrite rules, as well as record rewrite loops
+// relating existing rules together. Property map construction is iterated with
+// the Knuth-Bendix completion procedure until fixed point.
 //
 //===----------------------------------------------------------------------===//
 
@@ -114,9 +119,37 @@ static void recordRelation(Term key,
   (void) system.addRule(lhs, rhs, &path);
 }
 
+/// Given two property rules that conflict because no concrete type
+/// can satisfy both, mark one or both rules conflicting.
+///
+/// The right hand side of one rule must be a suffix of the other
+/// (in which case the longer of the two rules is conflicting) or
+/// the right hand sides are equal (in which case both will be
+/// conflicting).
 void RewriteSystem::recordConflict(unsigned existingRuleID,
                                    unsigned newRuleID) {
   ConflictingRules.emplace_back(existingRuleID, newRuleID);
+
+  auto &existingRule = getRule(existingRuleID);
+  auto &newRule = getRule(newRuleID);
+
+  if (Debug.contains(DebugFlags::ConflictingRules)) {
+    llvm::dbgs() << "Conflicting rules:\n";
+    llvm::dbgs() << "- " << existingRule << "\n";
+    llvm::dbgs() << "- " << newRule << "\n";
+  }
+
+  // The identity conformance rule ([P].[P] => [P]) will conflict with
+  // a concrete type requirement in an invalid protocol declaration
+  // where 'Self' is constrained to a type that does not conform to
+  // the protocol. This rule is permanent, so don't mark it as
+  // conflicting in this case.
+  if (!existingRule.isIdentityConformanceRule() &&
+      existingRule.getRHS().size() >= newRule.getRHS().size())
+    existingRule.markConflicting();
+  if (!newRule.isIdentityConformanceRule() &&
+      newRule.getRHS().size() >= existingRule.getRHS().size())
+    newRule.markConflicting();
 }
 
 void PropertyMap::addConformanceProperty(
@@ -228,7 +261,6 @@ void PropertyMap::recordSuperclassRelation(Term key,
 void PropertyMap::addSuperclassProperty(
     Term key, Symbol property, unsigned ruleID) {
   auto *props = getOrCreateProperties(key);
-  auto &newRule = System.getRule(ruleID);
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   const auto *superclassDecl = property.getConcreteType()
@@ -345,8 +377,11 @@ void PropertyMap::addSuperclassProperty(
                    << props->SuperclassDecl->getName() << "\n";
     }
 
-    // FIXME: Record the conflict better
-    newRule.markConflicting();
+    auto &req = props->Superclasses[props->SuperclassDecl];
+    for (const auto &pair : req.SuperclassRules) {
+      if (checkRulePairOnce(pair.second, ruleID))
+        System.recordConflict(pair.second, ruleID);
+    }
   }
 }
 
@@ -623,6 +658,17 @@ void PropertyMap::addProperty(
 ///
 /// - concrete vs superclass
 /// - concrete vs layout
+///
+/// Note that we allow a subclass existential 'any C & P' to satisfy a
+/// superclass requirement 'C' as long as 'P' is an @objc protocol.
+///
+/// This is not fully sound because 'any C & P' is not substitutable for
+/// 'C' if the code calls static method or required initializers on 'C',
+/// but existing code out there relies on this working.
+///
+/// A more refined check would ensure that 'C' had no required initializers
+/// and that 'P' was self-conforming; or we could ban this entirely in a
+/// future -swift-version mode.
 void PropertyMap::checkConcreteTypeRequirements() {
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
@@ -631,51 +677,61 @@ void PropertyMap::checkConcreteTypeRequirements() {
       auto concreteType = pair.first;
       unsigned concreteTypeRule = pair.second;
 
-      // A rule (T.[concrete: C] => T) where C is a class type induces a rule
-      // (T.[superclass: C] => T).
-      if (concreteType.getConcreteType()->getClassOrBoundGenericClass()) {
-        auto superclassSymbol = Symbol::forSuperclass(
-            concreteType.getConcreteType(),
-            concreteType.getSubstitutions(),
-            Context);
-
-        recordRelation(props->getKey(), concreteTypeRule,
-                       superclassSymbol, System, debug);
-
       // If the concrete type is not a class and we have a superclass
       // requirement, we have a conflict.
-      } else if (props->hasSuperclassBound()) {
+      if (!concreteType.getConcreteType()->getClassOrBoundGenericClass() &&
+          !(concreteType.getConcreteType()->isObjCExistentialType() &&
+            concreteType.getConcreteType()->getSuperclass()) &&
+          props->hasSuperclassBound()) {
         const auto &req = props->getSuperclassRequirement();
         for (auto pair : req.SuperclassRules) {
-          System.recordConflict(concreteTypeRule, pair.second);
+          if (checkRulePairOnce(concreteTypeRule, pair.second))
+            System.recordConflict(concreteTypeRule, pair.second);
         }
       }
 
-      // A rule (T.[concrete: C] => T) where C is a class type induces a rule
-      // (T.[layout: L] => T), where L is either AnyObject or _NativeObject.
-      if (concreteType.getConcreteType()->satisfiesClassConstraint()) {
-        Type superclassType = concreteType.getConcreteType();
-        if (!superclassType->getClassOrBoundGenericClass())
-          superclassType = superclassType->getSuperclass();
-
-        auto layoutConstraint = LayoutConstraintKind::Class;
-        if (superclassType)
-          if (auto *classDecl = superclassType->getClassOrBoundGenericClass())
-            layoutConstraint = classDecl->getLayoutConstraintKind();
-
-        auto layout =
-            LayoutConstraint::getLayoutConstraint(
-              layoutConstraint, Context.getASTContext());
-        auto layoutSymbol = Symbol::forLayout(layout, Context);
-
-        recordRelation(props->getKey(), concreteTypeRule,
-                       layoutSymbol, System, debug);
-
       // If the concrete type does not satisfy a class layout constraint and
       // we have such a layout requirement, we have a conflict.
-      } else if (props->LayoutRule &&
-                 props->Layout->isClass()) {
-        System.recordConflict(concreteTypeRule, *props->LayoutRule);
+      if (!concreteType.getConcreteType()->satisfiesClassConstraint() &&
+          props->LayoutRule &&
+          props->Layout->isClass()) {
+        if (checkRulePairOnce(concreteTypeRule, *props->LayoutRule))
+          System.recordConflict(concreteTypeRule, *props->LayoutRule);
+      }
+
+      if (checkRuleOnce(concreteTypeRule)) {
+        if (concreteType.getConcreteType()->satisfiesClassConstraint()) {
+          Type superclassType = concreteType.getConcreteType();
+          if (!superclassType->getClassOrBoundGenericClass())
+            superclassType = superclassType->getSuperclass();
+
+          if (superclassType) {
+            // A rule (T.[concrete: C] => T) where C is a class type induces a rule
+            // (T.[superclass: C] => T).
+            auto superclassSymbol = Symbol::forSuperclass(
+                superclassType->getCanonicalType(),
+                concreteType.getSubstitutions(),
+                Context);
+
+            recordRelation(props->getKey(), concreteTypeRule,
+                           superclassSymbol, System, debug);
+          }
+
+          // A rule (T.[concrete: C] => T) where C is a class type induces a rule
+          // (T.[layout: L] => T), where L is either AnyObject or _NativeObject.
+          auto layoutConstraint = LayoutConstraintKind::Class;
+          if (superclassType)
+            if (auto *classDecl = superclassType->getClassOrBoundGenericClass())
+              layoutConstraint = classDecl->getLayoutConstraintKind();
+
+          auto layout =
+              LayoutConstraint::getLayoutConstraint(
+                layoutConstraint, Context.getASTContext());
+          auto layoutSymbol = Symbol::forLayout(layout, Context);
+
+          recordRelation(props->getKey(), concreteTypeRule,
+                         layoutSymbol, System, debug);
+        }
       }
     }
   }

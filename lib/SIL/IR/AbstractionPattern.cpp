@@ -1464,9 +1464,10 @@ public:
     if (auto gp = handleTypeParameterInAbstractionPattern(pattern, t))
       return gp;
     
-    assert(!pattern.getType()->hasTypeParameter()
+    assert(pattern.getType()->isExistentialType() ||
+           (!pattern.getType()->hasTypeParameter()
            && !pattern.getType()->hasArchetype()
-           && !pattern.getType()->hasOpaqueArchetype());
+           && !pattern.getType()->hasOpaqueArchetype()));
     return pattern.getType();
   }
   

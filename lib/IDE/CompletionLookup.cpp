@@ -34,52 +34,6 @@ static bool SwiftKeyPathFilter(ValueDecl *decl, DeclVisibilityKind) {
   }
 }
 
-/// Returns \c true if \p DC can handles async call.
-static bool canDeclContextHandleAsync(const DeclContext *DC) {
-  if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
-    return func->isAsyncContext();
-
-  if (auto *closure = dyn_cast<ClosureExpr>(DC)) {
-    // See if the closure has 'async' function type.
-    if (auto closureType = closure->getType())
-      if (auto fnType = closureType->getAs<AnyFunctionType>())
-        if (fnType->isAsync())
-          return true;
-
-    // If the closure doesn't contain any async call in the body, closure itself
-    // doesn't have 'async' type even if 'async' closure is expected.
-    //   func foo(fn: () async -> Void)
-    //   foo { <HERE> }
-    // In this case, the closure is wrapped with a 'FunctionConversionExpr'
-    // which has 'async' function type.
-    struct AsyncClosureChecker : public ASTWalker {
-      const ClosureExpr *Target;
-      bool Result = false;
-
-      AsyncClosureChecker(const ClosureExpr *Target) : Target(Target) {}
-
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-        if (E == Target)
-          return {false, E};
-
-        if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
-          if (conversionExpr->getSubExpr() == Target) {
-            if (conversionExpr->getType()->is<AnyFunctionType>() &&
-                conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
-              Result = true;
-            return {false, E};
-          }
-        }
-        return {true, E};
-      }
-    } checker(closure);
-    closure->getParent()->walkContext(checker);
-    return checker.Result;
-  }
-
-  return false;
-}
-
 static bool isTopLevelSubcontext(const DeclContext *DC) {
   for (; DC && DC->isLocalContext(); DC = DC->getParent()) {
     switch (DC->getContextKind()) {
@@ -165,11 +119,13 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
 }
 } // end anonymous namespace
 
-bool swift::ide::DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind) {
+bool swift::ide::DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind,
+                               DynamicLookupInfo dynamicLookupInfo) {
   return true;
 }
 
-bool swift::ide::KeyPathFilter(ValueDecl *decl, DeclVisibilityKind) {
+bool swift::ide::KeyPathFilter(ValueDecl *decl, DeclVisibilityKind,
+                               DynamicLookupInfo dynamicLookupInfo) {
   return isa<TypeDecl>(decl) ||
          (isa<VarDecl>(decl) && decl->getDeclContext()->isTypeContext());
 }
@@ -205,6 +161,52 @@ bool swift::ide::isCompletionDeclContextLocalContext(DeclContext *DC) {
   if (isCodeCompletionAtTopLevel(DC))
     return false;
   return true;
+}
+
+/// Returns \c true if \p DC can handles async call.
+bool swift::ide::canDeclContextHandleAsync(const DeclContext *DC) {
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
+    return func->isAsyncContext();
+
+  if (auto *closure = dyn_cast<ClosureExpr>(DC)) {
+    // See if the closure has 'async' function type.
+    if (auto closureType = closure->getType())
+      if (auto fnType = closureType->getAs<AnyFunctionType>())
+        if (fnType->isAsync())
+          return true;
+
+    // If the closure doesn't contain any async call in the body, closure itself
+    // doesn't have 'async' type even if 'async' closure is expected.
+    //   func foo(fn: () async -> Void)
+    //   foo { <HERE> }
+    // In this case, the closure is wrapped with a 'FunctionConversionExpr'
+    // which has 'async' function type.
+    struct AsyncClosureChecker : public ASTWalker {
+      const ClosureExpr *Target;
+      bool Result = false;
+
+      AsyncClosureChecker(const ClosureExpr *Target) : Target(Target) {}
+
+      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+        if (E == Target)
+          return {false, E};
+
+        if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
+          if (conversionExpr->getSubExpr() == Target) {
+            if (conversionExpr->getType()->is<AnyFunctionType>() &&
+                conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
+              Result = true;
+            return {false, E};
+          }
+        }
+        return {true, E};
+      }
+    } checker(closure);
+    closure->getParent()->walkContext(checker);
+    return checker.Result;
+  }
+
+  return false;
 }
 
 /// Return \c true if the completion happens at top-level of a library file.
@@ -804,8 +806,13 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   assert(!Name.empty() && "name should not be empty");
 
   Type VarType;
-  if (VD->hasInterfaceType())
+  auto SolutionSpecificType = SolutionSpecificVarTypes.find(VD);
+  if (SolutionSpecificType != SolutionSpecificVarTypes.end()) {
+    assert(!VarType && "Type recorded in the AST and is also solution-specific?");
+    VarType = SolutionSpecificType->second;
+  } else if (VD->hasInterfaceType()) {
     VarType = getTypeOfMember(VD, dynamicLookupInfo);
+  }
 
   Optional<ContextualNotRecommendedReason> NotRecommended;
   // "not recommended" in its own getter.
@@ -866,6 +873,71 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
     Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
 }
 
+/// Return whether \p param has a non-desirable default value for code
+/// completion.
+///
+/// 'ClangImporter::Implementation::inferDefaultArgument()' automatically adds
+/// default values for some parameters;
+///   * NS_OPTIONS enum type with the name '...Options'.
+///   * NSDictionary and labeled 'options', 'attributes', or 'userInfo'.
+///
+/// But sometimes, this behavior isn't really desirable. This function add a
+/// heuristic where if a parameter matches all the following condition, we
+/// consider the imported default value is _not_ desirable:
+///   * it is the first parameter,
+///   * it doesn't have an argument label, and
+///   * the imported function base name ends with those words
+/// For example, ClangImporter imports:
+///
+///   -(void)addAttributes:(NSDictionary *)attrs, options:(NSDictionary *)opts;
+///
+/// as:
+///
+///   func addAttributes(_ attrs: [AnyHashable:Any] = [:],
+///                      options opts: [AnyHashable:Any] = [:])
+///
+/// In this case, we don't want 'attrs' defaulted because the function name have
+/// 'Attribute' in its name so calling 'value.addAttribute()' doesn't make
+/// sense, but we _do_ want to keep 'opts' defaulted.
+///
+/// Note that:
+///
+///   -(void)performWithOptions:(NSDictionary *) opts;
+///
+/// This doesn't match the condition because the base name of the function in
+/// Swift is 'peform':
+///
+///   func perform(options opts: [AnyHashable:Any] = [:])
+///
+bool isNonDesirableImportedDefaultArg(const ParamDecl *param) {
+  auto kind = param->getDefaultArgumentKind();
+  if (kind != DefaultArgumentKind::EmptyArray &&
+      kind != DefaultArgumentKind::EmptyDictionary)
+    return false;
+
+  if (!param->getArgumentName().empty())
+    return false;
+
+  auto *func = dyn_cast<FuncDecl>(param->getDeclContext());
+  if (!func->hasClangNode())
+    return false;
+  if (func->getParameters()->front() != param)
+    return false;
+  if (func->getBaseName().isSpecial())
+    return false;
+
+  auto baseName = func->getBaseName().getIdentifier().str();
+  switch (kind) {
+  case DefaultArgumentKind::EmptyArray:
+    return (baseName.endswith("Options"));
+  case DefaultArgumentKind::EmptyDictionary:
+    return (baseName.endswith("Options") || baseName.endswith("Attributes") ||
+            baseName.endswith("UserInfo"));
+  default:
+    llvm_unreachable("unhandled DefaultArgumentKind");
+  }
+}
+
 bool CompletionLookup::hasInterestingDefaultValue(const ParamDecl *param) {
   if (!param)
     return false;
@@ -873,10 +945,14 @@ bool CompletionLookup::hasInterestingDefaultValue(const ParamDecl *param) {
   switch (param->getDefaultArgumentKind()) {
   case DefaultArgumentKind::Normal:
   case DefaultArgumentKind::NilLiteral:
-  case DefaultArgumentKind::EmptyArray:
-  case DefaultArgumentKind::EmptyDictionary:
   case DefaultArgumentKind::StoredProperty:
   case DefaultArgumentKind::Inherited:
+    return true;
+
+  case DefaultArgumentKind::EmptyArray:
+  case DefaultArgumentKind::EmptyDictionary:
+    if (isNonDesirableImportedDefaultArg(param))
+      return false;
     return true;
 
   case DefaultArgumentKind::None:
@@ -887,7 +963,7 @@ bool CompletionLookup::hasInterestingDefaultValue(const ParamDecl *param) {
   }
 }
 
-bool CompletionLookup::addItemWithoutDefaultArgs(
+bool CompletionLookup::shouldAddItemWithoutDefaultArgs(
     const AbstractFunctionDecl *func) {
   if (!func || !Sink.addCallWithNoDefaultArgs)
     return false;
@@ -917,7 +993,8 @@ bool CompletionLookup::addCallArgumentPatterns(
     bool hasDefault = false;
     if (!declParams.empty()) {
       const ParamDecl *PD = declParams[i];
-      hasDefault = PD->isDefaultArgument();
+      hasDefault =
+          PD->isDefaultArgument() && !isNonDesirableImportedDefaultArg(PD);
       // Skip default arguments if we're either not including them or they
       // aren't interesting
       if (hasDefault &&
@@ -972,13 +1049,14 @@ void CompletionLookup::addEffectsSpecifiers(
   assert(AFT != nullptr);
 
   // 'async'.
-  if (forceAsync || (AFD && AFD->hasAsync()) || AFT->isAsync())
+  if (forceAsync || (AFD && AFD->hasAsync()) ||
+      (AFT->hasExtInfo() && AFT->isAsync()))
     Builder.addAnnotatedAsync();
 
   // 'throws' or 'rethrows'.
   if (AFD && AFD->getAttrs().hasAttribute<RethrowsAttr>())
     Builder.addAnnotatedRethrows();
-  else if (AFT->isThrowing())
+  else if (AFT->hasExtInfo() && AFT->isThrowing())
     Builder.addAnnotatedThrows();
 }
 
@@ -1141,7 +1219,8 @@ void CompletionLookup::addFunctionCallPattern(
     else
       addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
-    if (!isForCaching() && AFT->isAsync() && !CanCurrDeclContextHandleAsync) {
+    if (!isForCaching() && AFT->hasExtInfo() && AFT->isAsync() &&
+        !CanCurrDeclContextHandleAsync) {
       Builder.setContextualNotRecommended(
           ContextualNotRecommendedReason::InvalidAsyncContext);
     }
@@ -1180,7 +1259,7 @@ void CompletionLookup::addFunctionCallPattern(
     if (isImplicitlyCurriedInstanceMethod) {
       addPattern({AFD->getImplicitSelfDecl()}, /*includeDefaultArgs=*/true);
     } else {
-      if (addItemWithoutDefaultArgs(AFD))
+      if (shouldAddItemWithoutDefaultArgs(AFD))
         addPattern(AFD->getParameters()->getArray(),
                    /*includeDefaultArgs=*/false);
       addPattern(AFD->getParameters()->getArray(),
@@ -1376,7 +1455,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     if (trivialTrailingClosure)
       addMethodImpl(/*includeDefaultArgs=*/false,
                     /*trivialTrailingClosure=*/true);
-    if (addItemWithoutDefaultArgs(FD))
+    if (shouldAddItemWithoutDefaultArgs(FD))
       addMethodImpl(/*includeDefaultArgs=*/false);
     addMethodImpl(/*includeDefaultArgs=*/true);
   }
@@ -1466,7 +1545,7 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
     }
   };
 
-  if (ConstructorType && addItemWithoutDefaultArgs(CD))
+  if (ConstructorType && shouldAddItemWithoutDefaultArgs(CD))
     addConstructorImpl(/*includeDefaultArgs=*/false);
   addConstructorImpl();
 }
@@ -1792,7 +1871,7 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
   if (D->shouldHideFromEditor())
     return;
 
-  if (IsKeyPathExpr && !KeyPathFilter(D, Reason))
+  if (IsKeyPathExpr && !KeyPathFilter(D, Reason, dynamicLookupInfo))
     return;
 
   if (IsSwiftKeyPathExpr && !SwiftKeyPathFilter(D, Reason))
@@ -2634,22 +2713,6 @@ void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
       RequestedResultsTy::toplevelResults().withModuleQualifier(
           ModuleQualifier));
 
-  // Manually add any expected nominal types from imported modules so that
-  // they get their expected type relation. Don't include protocols, since
-  // they can't be initialized from the type name.
-  // FIXME: this does not include types that conform to an expected protocol.
-  // FIXME: this creates duplicate results.
-  for (auto T : expectedTypeContext.getPossibleTypes()) {
-    if (auto NT = T->getAs<NominalType>()) {
-      if (auto NTD = NT->getDecl()) {
-        if (!isa<ProtocolDecl>(NTD) && NTD->getModuleContext() != CurrModule) {
-          addNominalTypeRef(NT->getDecl(),
-                            DeclVisibilityKind::VisibleAtTopLevel, {});
-        }
-      }
-    }
-  }
-
   if (CompletionContext) {
     // FIXME: this is an awful simplification that says all and only enums can
     // use implicit member syntax (leading dot). Computing the accurate answer
@@ -2690,6 +2753,8 @@ void CompletionLookup::getUnresolvedMemberCompletions(Type T) {
   if (!T->mayHaveMembers())
     return;
 
+  NeedLeadingDot = !HaveDot;
+
   if (auto objT = T->getOptionalObjectType()) {
     // Add 'nil' keyword with erasing '.' instruction.
     unsigned bytesToErase = 0;
@@ -2704,7 +2769,8 @@ void CompletionLookup::getUnresolvedMemberCompletions(Type T) {
   // type and has the same type (or if the member is a function, then the
   // same result type) as the contextual type.
   FilteredDeclConsumer consumer(*this,
-                                [=](ValueDecl *VD, DeclVisibilityKind Reason) {
+                                [=](ValueDecl *VD, DeclVisibilityKind Reason,
+                                    DynamicLookupInfo dynamicLookupInfo) {
                                   // In optional context, ignore
                                   // '.init(<some>)', 'init(nilLiteral:)',
                                   return !isInitializerOnOptional(T, VD);
@@ -2852,7 +2918,6 @@ void CompletionLookup::getGenericRequirementCompletions(
 
 bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                              bool IsConcurrencyEnabled,
-                                             bool IsDistributedEnabled,
                                              Optional<DeclKind> DK) {
   if (DeclAttribute::isUserInaccessible(DAK))
     return false;
@@ -2863,8 +2928,6 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
   if (!IsInSil && DeclAttribute::isSilOnly(DAK))
     return false;
   if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
-    return false;
-  if (!IsDistributedEnabled && DeclAttribute::isDistributedOnly(DAK))
     return false;
   if (!DK.hasValue())
     return true;
@@ -2885,11 +2948,10 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
     }
   }
   bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
-  bool IsDistributedEnabled = Ctx.LangOpts.EnableExperimentalDistributed;
   std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
   if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled,         \
-                            IsDistributedEnabled, DK))                         \
+                            DK))                         \
     addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/Attr.def"
 }
@@ -3130,4 +3192,33 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
                                         SemanticContextKind::Local);
     Builder.addTextChunk(name.str());
   }
+}
+
+void CompletionLookup::getOptionalBindingCompletions(SourceLoc Loc) {
+  ExprType = Type();
+  Kind = LookupKind::ValueInDeclContext;
+  NeedLeadingDot = false;
+
+  AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext, *this);
+
+  // Suggest only 'Optional' type var decls (incl. parameters)
+  FilteredDeclConsumer FilteringConsumer(
+      AccessFilteringConsumer,
+      [&](ValueDecl *VD, DeclVisibilityKind Reason,
+          DynamicLookupInfo dynamicLookupInfo) -> bool {
+        auto *VarD = dyn_cast<VarDecl>(VD);
+        if (!VarD)
+          return false;
+
+        auto Ty = getTypeOfMember(VD, dynamicLookupInfo);
+        return Ty->isOptional();
+      });
+
+  // FIXME: Currently, it doesn't include top level decls for performance
+  // reason. Enabling 'IncludeTopLevel' pulls everything including imported
+  // modules. For suggesting top level results, we need a way to filter cached
+  // results.
+
+  lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
+                     /*IncludeTopLevel=*/false, Loc);
 }

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library -Xfrontend -enable-copy-propagation -Xllvm -enable-destroy-hoisting=false) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library -Xfrontend -enable-copy-propagation) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

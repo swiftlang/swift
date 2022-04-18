@@ -91,8 +91,8 @@ class SILModule::SerializationCallback final
 
 SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
                      Lowering::TypeConverter &TC, const SILOptions &Options)
-    : Stage(SILStage::Raw), indexTrieRoot(new IndexTrieNode()),
-      Options(Options), serialized(false),
+    : Stage(SILStage::Raw), loweredAddresses(!Options.EnableSILOpaqueValues),
+      indexTrieRoot(new IndexTrieNode()), Options(Options), serialized(false),
       regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
       prespecializedFunctionDeclsImported(false), SerializeSILAction(),

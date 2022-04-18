@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements diagnostics for @inlinable.
+// This file implements diagnostics for fragile functions, like those with
+// @inlinable, @_alwaysEmitIntoClient, or @_backDeploy.
 //
 //===----------------------------------------------------------------------===//
 
@@ -91,12 +92,9 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::resilience_decl_unavailable_warn;
 
-  Context.Diags.diagnose(
-           loc, diagID,
-           D->getDescriptiveKind(), diagName,
-           D->getFormalAccessScope().accessLevelForDiagnostics(),
-           static_cast<unsigned>(fragileKind.kind),
-           isAccessor);
+  Context.Diags.diagnose(loc, diagID, D->getDescriptiveKind(), diagName,
+                         D->getFormalAccessScope().accessLevelForDiagnostics(),
+                         fragileKind.getSelector(), isAccessor);
 
   if (fragileKind.allowUsableFromInline) {
     Context.Diags.diagnose(D, diag::resilience_decl_declared_here,
@@ -150,8 +148,7 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
   } else {
     ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module,
                        D->getDescriptiveKind(), D->getName(),
-                       static_cast<unsigned>(fragileKind.kind),
-                       definingModule->getName(),
+                       fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind));
   }
   return true;

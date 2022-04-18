@@ -150,8 +150,9 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          IsDynamicallyReplaceable_t isDynamic,
                          IsExactSelfClass_t isExactSelfClass,
                          IsDistributed_t isDistributed)
-    : SwiftObjectHeader(functionMetatype),
-      Module(Module), Availability(AvailabilityContext::alwaysAvailable())  {
+    : SwiftObjectHeader(functionMetatype), Module(Module),
+      index(Module.getNewFunctionIndex()),
+      Availability(AvailabilityContext::alwaysAvailable()) {
   init(Linkage, Name, LoweredType, genericEnv, Loc, isBareSILFunction, isTrans,
        isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy,
        E, DebugScope, isDynamic, isExactSelfClass, isDistributed);
@@ -599,9 +600,6 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
       return (Succ == DMBI->getHasMethodBB()) ? "T" : "F";
 
     if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(Term))
-      return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
-
-    if (auto *CCBI = dyn_cast<CheckedCastValueBranchInst>(Term))
       return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
 
     if (auto *CCBI = dyn_cast<CheckedCastAddrBranchInst>(Term))

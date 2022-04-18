@@ -1112,39 +1112,31 @@ public:
 /// initializes the kind field on our object is run before our constructor runs.
 class OwnershipForwardingMixin {
   ValueOwnershipKind ownershipKind;
-  bool directlyForwards;
+  bool preservesOwnershipFlag;
 
 protected:
   OwnershipForwardingMixin(SILInstructionKind kind,
                            ValueOwnershipKind ownershipKind,
-                           bool isDirectlyForwarding = true)
-      : ownershipKind(ownershipKind), directlyForwards(isDirectlyForwarding) {
+                           bool preservesOwnership = true)
+      : ownershipKind(ownershipKind),
+        preservesOwnershipFlag(preservesOwnership) {
     assert(isa(kind) && "Invalid subclass?!");
     assert(ownershipKind && "invalid forwarding ownership");
-    assert((directlyForwards || ownershipKind != OwnershipKind::Guaranteed) &&
+    assert((preservesOwnershipFlag
+            || ownershipKind != OwnershipKind::Guaranteed) &&
            "Non directly forwarding instructions can not forward guaranteed "
            "ownership");
   }
 
 public:
-  /// If an instruction is directly forwarding, then any operand op whose
-  /// ownership it forwards into a result r must have the property that op and r
-  /// are "rc identical". This means that they are representing the same set of
-  /// underlying lifetimes (plural b/c of aggregates).
+  /// A forwarding instruction preserved ownership if it has a
+  /// dynamically non-trivial result in which all references are forwarded from
+  /// the operand.
   ///
-  /// An instruction that is not directly forwarding, can not have guaranteed
-  /// ownership since without direct forwarding, there isn't necessarily any
-  /// connection in between the operand's lifetime and the value's lifetime.
-  ///
-  /// An example of this is checked_cast_br where when performing the following:
-  ///
-  ///   __SwiftValue(AnyHashable(Klass())) to OtherKlass()
-  ///
-  /// we will look through the __SwiftValue(AnyHashable(X)) any just cast Klass
-  /// to OtherKlass. This means that the result argument would no longer be
-  /// rc-identical to the operand and default case and thus we can not propagate
-  /// forward any form of guaranteed ownership.
-  bool isDirectlyForwarding() const { return directlyForwards; }
+  /// A cast can only forward guaranteed values if it preserves ownership. Such
+  /// casts cannot release any references within their operand's value and
+  /// cannot retain any references owned by their result.
+  bool preservesOwnership() const { return preservesOwnershipFlag; }
 
   /// Forwarding ownership is determined by the forwarding instruction's
   /// constant ownership attribute. If forwarding ownership is owned, then the
@@ -1160,7 +1152,7 @@ public:
     return ownershipKind;
   }
   void setForwardingOwnershipKind(ValueOwnershipKind newKind) {
-    assert((isDirectlyForwarding() || newKind != OwnershipKind::Guaranteed) &&
+    assert((preservesOwnership() || newKind != OwnershipKind::Guaranteed) &&
            "Non directly forwarding instructions can not forward guaranteed "
            "ownership");
     ownershipKind = newKind;
@@ -5241,39 +5233,6 @@ public:
   void setLifetimeGuaranteed() { lifetimeGuaranteed = true; }
 };
 
-/// ThinFunctionToPointerInst - Convert a thin function pointer to a
-/// Builtin.RawPointer.
-class ThinFunctionToPointerInst
-  : public UnaryInstructionBase<SILInstructionKind::ThinFunctionToPointerInst,
-                                ConversionInst>
-{
-  friend SILBuilder;
-
-  ThinFunctionToPointerInst(SILDebugLocation DebugLoc, SILValue operand,
-                            SILType ty)
-      : UnaryInstructionBase(DebugLoc, operand, ty) {}
-};
-
-/// PointerToThinFunctionInst - Convert a Builtin.RawPointer to a thin
-/// function pointer.
-class PointerToThinFunctionInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-          SILInstructionKind::PointerToThinFunctionInst,
-          PointerToThinFunctionInst,
-          ConversionInst> {
-  friend SILBuilder;
-
-  PointerToThinFunctionInst(SILDebugLocation DebugLoc, SILValue operand,
-                            ArrayRef<SILValue> TypeDependentOperands,
-                            SILType ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, operand, TypeDependentOperands, ty) {}
-
-  static PointerToThinFunctionInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F);
-};
-
 /// UpcastInst - Perform a conversion of a class instance to a supertype.
 class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
                              SILInstructionKind::UpcastInst, UpcastInst,
@@ -5662,39 +5621,6 @@ public:
 
   CanType getTargetFormalType() const { return DestFormalTy; }
   SILType getTargetLoweredType() const { return getType(); }
-};
-
-/// Perform an unconditional checked cast that aborts if the cast fails.
-/// The result of the checked cast is left in the destination.
-class UnconditionalCheckedCastValueInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-          SILInstructionKind::UnconditionalCheckedCastValueInst,
-          UnconditionalCheckedCastValueInst, ConversionInst> {
-  CanType SourceFormalTy;
-  CanType DestFormalTy;
-  friend SILBuilder;
-
-  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc,
-                                    SILValue Operand, CanType SourceFormalTy,
-                                    ArrayRef<SILValue> TypeDependentOperands,
-                                    SILType DestLoweredTy, CanType DestFormalTy)
-      : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands,
-            DestLoweredTy),
-        SourceFormalTy(SourceFormalTy),
-        DestFormalTy(DestFormalTy) {}
-
-  static UnconditionalCheckedCastValueInst *
-  create(SILDebugLocation DebugLoc,
-         SILValue Operand, CanType SourceFormalTy,
-         SILType DestLoweredTy, CanType DestFormalTy, SILFunction &F);
-
-public:
-  SILType getSourceLoweredType() const { return getOperand()->getType(); }
-  CanType getSourceFormalType() const { return SourceFormalTy; }
-
-  SILType getTargetLoweredType() const { return getType(); }
-  CanType getTargetFormalType() const { return DestFormalTy; }
 };
 
 /// StructInst - Represents a constructed loadable struct.
@@ -8132,7 +8058,6 @@ public:
     case TermKind::SwitchEnumAddrInst:
     case TermKind::DynamicMethodBranchInst:
     case TermKind::CheckedCastAddrBranchInst:
-    case TermKind::CheckedCastValueBranchInst:
     case TermKind::AwaitAsyncContinuationInst:
       return false;
     case TermKind::SwitchEnumInst:
@@ -8150,9 +8075,9 @@ protected:
   OwnershipForwardingTermInst(SILInstructionKind kind,
                               SILDebugLocation debugLoc,
                               ValueOwnershipKind ownershipKind,
-                              bool isDirectlyForwarding = true)
+                              bool preservesOwnership = true)
       : TermInst(kind, debugLoc),
-        OwnershipForwardingMixin(kind, ownershipKind, isDirectlyForwarding) {
+        OwnershipForwardingMixin(kind, ownershipKind, preservesOwnership) {
     assert(classof(kind));
   }
 
@@ -8451,16 +8376,6 @@ public:
 private:
   std::array<SILSuccessor, 2> DestBBs;
 
-  /// The number of arguments for the True branch.
-  unsigned getNumTrueArgs() const {
-    return SILNode::Bits.CondBranchInst.NumTrueArgs;
-  }
-  /// The number of arguments for the False branch.
-  unsigned getNumFalseArgs() const {
-    return getAllOperands().size() - NumFixedOpers -
-        SILNode::Bits.CondBranchInst.NumTrueArgs;
-  }
-
   CondBranchInst(SILDebugLocation DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
                  ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse,
@@ -8504,6 +8419,16 @@ public:
   ProfileCounter getTrueBBCount() const { return DestBBs[0].getCount(); }
   /// The number of times the False branch was executed.
   ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
+
+  /// The number of arguments for the True branch.
+  unsigned getNumTrueArgs() const {
+    return SILNode::Bits.CondBranchInst.NumTrueArgs;
+  }
+  /// The number of arguments for the False branch.
+  unsigned getNumFalseArgs() const {
+    return getAllOperands().size() - NumFixedOpers -
+        SILNode::Bits.CondBranchInst.NumTrueArgs;
+  }
 
   /// Get the arguments to the true BB.
   OperandValueArrayRef getTrueArgs() const {
@@ -9129,16 +9054,12 @@ class CheckedCastBranchInst final
                         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
                         ProfileCounter Target1Count,
                         ProfileCounter Target2Count,
-                        ValueOwnershipKind forwardingOwnershipKind)
+                        ValueOwnershipKind forwardingOwnershipKind,
+                        bool preservesOwnership)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, SuccessBB, FailureBB,
             Target1Count, Target2Count, forwardingOwnershipKind,
-            // We are always directly forwarding unless we are casting an
-            // AnyObject. This is b/c an AnyObject could contain a boxed
-            // AnyObject(Class()) that we unwrap as part of the cast. In such a
-            // case, we would return a different value and potentially end the
-            // lifetime of the operand value.
-            !Operand->getType().isAnyObject()),
+            preservesOwnership),
         DestLoweredTy(DestLoweredTy), DestFormalTy(DestFormalTy),
         IsExact(IsExact) {}
 
@@ -9154,45 +9075,6 @@ public:
 
   SILType getSourceLoweredType() const { return getOperand()->getType(); }
   CanType getSourceFormalType() const { return getSourceLoweredType().getASTType(); }
-
-  SILType getTargetLoweredType() const { return DestLoweredTy; }
-  CanType getTargetFormalType() const { return DestFormalTy; }
-};
-
-/// Perform a checked cast operation and branch on whether the cast succeeds.
-/// The success branch destination block receives the cast result as a BB
-/// argument.
-class CheckedCastValueBranchInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-          SILInstructionKind::CheckedCastValueBranchInst,
-          CheckedCastValueBranchInst, CastBranchInstBase<TermInst>> {
-  friend SILBuilder;
-
-  CanType SourceFormalTy;
-  SILType DestLoweredTy;
-  CanType DestFormalTy;
-
-  CheckedCastValueBranchInst(SILDebugLocation DebugLoc, SILValue Operand,
-                             CanType SourceFormalTy,
-                             ArrayRef<SILValue> TypeDependentOperands,
-                             SILType DestLoweredTy, CanType DestFormalTy,
-                             SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB)
-      : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, SuccessBB, FailureBB,
-            ProfileCounter(), ProfileCounter()),
-        SourceFormalTy(SourceFormalTy), DestLoweredTy(DestLoweredTy),
-        DestFormalTy(DestFormalTy) {}
-
-  static CheckedCastValueBranchInst *
-  create(SILDebugLocation DebugLoc,
-         SILValue Operand, CanType SourceFormalTy,
-         SILType DestLoweredTy, CanType DestFormalTy,
-         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
-         SILFunction &F);
-
-public:
-  SILType getSourceLoweredType() const { return getOperand()->getType(); }
-  CanType getSourceFormalType() const { return SourceFormalTy; }
 
   SILType getTargetLoweredType() const { return DestLoweredTy; }
   CanType getTargetFormalType() const { return DestFormalTy; }
@@ -9861,6 +9743,19 @@ public:
 
 private:
   void createNode(const SILInstruction &);
+};
+
+template <>
+struct DenseMapInfo<swift::SILDebugVariable> {
+  using KeyTy = swift::SILDebugVariable;
+  static inline KeyTy getEmptyKey() {
+    return KeyTy(KeyTy::IsDenseMapSingleton::IsEmpty);
+  }
+  static inline KeyTy getTombstoneKey() {
+    return KeyTy(KeyTy::IsDenseMapSingleton::IsTombstone);
+  }
+  static unsigned getHashValue(const KeyTy &Val) { return hash_value(Val); }
+  static bool isEqual(const KeyTy &LHS, const KeyTy &RHS) { return LHS == RHS; }
 };
 
 } // end llvm namespace

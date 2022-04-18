@@ -73,6 +73,10 @@ class BuilderClosureVisitor
   Identifier buildOptionalId;
   llvm::SmallDenseMap<DeclName, bool> supportedOps;
 
+  /// The variable used as a base for all `build*` operations added
+  /// by this transform.
+  VarDecl *builderVar = nullptr;
+
   SkipUnhandledConstructInResultBuilder::UnhandledNode unhandledNode;
 
   /// Whether an error occurred during application of the builder closure,
@@ -94,32 +98,6 @@ class BuilderClosureVisitor
     if (!cs)
       return nullptr;
 
-    // FIXME: Setting a base on this expression is necessary in order
-    // to get diagnostics if something about this builder call fails,
-    // e.g. if there isn't a matching overload for `buildBlock`.
-    TypeExpr *typeExpr;
-    auto simplifiedTy = cs->simplifyType(builderType);
-    if (!simplifiedTy->hasTypeVariable()) {
-      typeExpr = TypeExpr::createImplicitHack(loc, simplifiedTy, ctx);
-    } else if (auto *decl = simplifiedTy->getAnyGeneric()) {
-      // HACK: If there's not enough information to completely resolve the
-      // builder type, but we have the base available to us, form an *explicit*
-      // TypeExpr pointing at it. We cannot form an implicit base without
-      // a fully-resolved concrete type. Really, whatever we put here has no
-      // bearing on the generated solution because we're going to use this node
-      // to stash the builder type and hand it back to the ambient
-      // constraint system.
-      typeExpr = TypeExpr::createForDecl(DeclNameLoc(loc), decl, dc);
-    } else {
-      // HACK: If there's not enough information in the constraint system,
-      // create a garbage base type to force it to diagnose
-      // this as an ambiguous expression.
-      // FIXME: We can also construct an UnresolvedMemberExpr here instead of
-      // an UnresolvedDotExpr and get a slightly better diagnostic.
-      typeExpr = TypeExpr::createImplicitHack(loc, ErrorType::get(ctx), ctx);
-    }
-    cs->setType(typeExpr, MetatypeType::get(builderType));
-
     SmallVector<Argument, 4> args;
     for (auto i : indices(argExprs)) {
       auto *expr = argExprs[i];
@@ -128,8 +106,11 @@ class BuilderClosureVisitor
       args.emplace_back(labelLoc, label, expr);
     }
 
+    auto *baseExpr = new (ctx) DeclRefExpr({builderVar}, DeclNameLoc(loc),
+                                           /*isImplicit=*/true);
+
     auto memberRef = new (ctx) UnresolvedDotExpr(
-        typeExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
+        baseExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
         /*implicit=*/true);
     memberRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
@@ -223,6 +204,16 @@ public:
       buildOptionalId = ctx.Id_buildOptional;
     else
       buildOptionalId = ctx.Id_buildIf;
+
+    // If we are about to generate constraints, let's establish builder
+    // variable for the base of `build*` calls.
+    if (cs) {
+      builderVar = new (ctx) VarDecl(
+          /*isStatic=*/false, VarDecl::Introducer::Let,
+          /*nameLoc=*/SourceLoc(), ctx.Id_builderSelf, dc);
+      builderVar->setImplicit();
+      cs->setType(builderVar, MetatypeType::get(cs->simplifyType(builderType)));
+    }
   }
 
   /// Apply the builder transform to the given statement.
@@ -374,8 +365,7 @@ protected:
     // If the builder supports `buildPartialBlock(first:)` and
     // `buildPartialBlock(accumulated:next:)`, use this to combine
     // subexpressions pairwise.
-    if (ctx.LangOpts.EnableExperimentalPairwiseBuildBlock &&
-        !expressions.empty() &&
+    if (!expressions.empty() &&
         builderSupports(ctx.Id_buildPartialBlock, {ctx.Id_first},
                         /*checkAvailability*/ true) &&
         builderSupports(ctx.Id_buildPartialBlock,
@@ -398,31 +388,10 @@ protected:
                                  {ctx.Id_accumulated, ctx.Id_next});
       }
     }
-    // TODO: Remove support for the old method name,
-    // `buildBlock(combining:into:)`.
-    else if (ctx.LangOpts.EnableExperimentalPairwiseBuildBlock &&
-             !expressions.empty() &&
-             builderSupports(ctx.Id_buildBlock,
-                             {ctx.Id_combining, ctx.Id_into})) {
-      // NOTE: The current implementation uses one-way constraints in between
-      // subexpressions. It's functionally equivalent to the following:
-      //   let v0 = Builder.buildBlock(arg_0)
-      //   let v1 = Builder.buildBlock(combining: arg_1, into: v0)
-      //   ...
-      //   return Builder.buildBlock(combining: arg_n, into: ...)
-      call = buildCallIfWanted(braceStmt->getStartLoc(), ctx.Id_buildBlock,
-                               {expressions.front()}, /*argLabels=*/{});
-      for (auto *expr : llvm::drop_begin(expressions)) {
-        call = buildCallIfWanted(braceStmt->getStartLoc(), ctx.Id_buildBlock,
-                                 {expr, new (ctx) OneWayExpr(call)},
-                                 {ctx.Id_combining, ctx.Id_into});
-      }
-    }
     // If `buildBlock` does not exist at this point, it could be the case that
     // `buildPartialBlock` did not have the sufficient availability for this
     // call site.  Diagnose it.
-    else if (ctx.LangOpts.EnableExperimentalPairwiseBuildBlock &&
-             !builderSupports(ctx.Id_buildBlock)) {
+    else if (!builderSupports(ctx.Id_buildBlock)) {
       ctx.Diags.diagnose(
           braceStmt->getStartLoc(),
           diag::result_builder_missing_available_buildpartialblock,
@@ -1516,7 +1485,8 @@ public:
     for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
       assert(expected->hasName());
       auto prev = expected->getParentVarDecl();
-      auto type = solution.resolveInterfaceType(solution.getType(prev));
+      auto type = solution.resolveInterfaceType(
+          solution.getType(prev)->mapTypeOutOfContext());
       expected->setInterfaceType(type);
     }
 
@@ -1735,8 +1705,22 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   }
 
   // Solve the constraint system.
+  if (cs.getASTContext().CompletionCallback) {
+    SmallVector<Solution, 4> solutions;
+    cs.solveForCodeCompletion(solutions);
+
+    CompletionContextFinder analyzer(func, func->getDeclContext());
+    filterSolutionsForCodeCompletion(solutions, analyzer);
+    for (const auto &solution : solutions) {
+      cs.getASTContext().CompletionCallback->sawSolution(solution);
+    }
+    return nullptr;
+  }
+
   SmallVector<Solution, 4> solutions;
-  if (cs.solve(solutions) || solutions.size() != 1) {
+  bool solvingFailed = cs.solve(solutions);
+
+  if (solvingFailed || solutions.size() != 1) {
     // Try to fix the system or provide a decent diagnostic.
     auto salvagedResult = cs.salvage();
     switch (salvagedResult.getKind()) {
@@ -1863,6 +1847,13 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     if (auto unhandledNode = visitor.check(fn.getBody())) {
       // If we aren't supposed to attempt fixes, fail.
       if (!shouldAttemptFixes()) {
+        return getTypeMatchFailure(locator);
+      }
+
+      // If we're solving for code completion and the body contains the code
+      // completion location, skipping it won't get us to a useful solution so
+      // just bail.
+      if (isForCodeCompletion() && containsCodeCompletionLoc(fn.getBody())) {
         return getTypeMatchFailure(locator);
       }
 

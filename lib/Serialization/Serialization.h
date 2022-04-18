@@ -518,10 +518,13 @@ public:
   /// may not be exactly the same as the name of the module containing DC;
   /// instead, it will match the containing file's "exported module name".
   ///
+  /// \param ignoreExport When true, register the real module name,
+  /// ignoring exported_as definitions.
   /// \returns The ID for the identifier for the module's name, or one of the
   /// special module codes defined above.
   /// \see FileUnit::getExportedModuleName
-  IdentifierID addContainingModuleRef(const DeclContext *DC);
+  IdentifierID addContainingModuleRef(const DeclContext *DC,
+                                      bool ignoreExport);
 
   /// Records the module \m.
   IdentifierID addModuleRef(const ModuleDecl *m);
@@ -540,6 +543,9 @@ public:
 
   /// Writes a protocol's associated type table.
   void writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes);
+
+  /// Writes a protocol's primary associated type table.
+  void writePrimaryAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes);
 
   bool allowCompilerErrors() const;
 };

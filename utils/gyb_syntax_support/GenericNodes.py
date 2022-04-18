@@ -101,4 +101,13 @@ GENERIC_NODES = [
              Child('Colon', kind='ColonToken'),
              Child('RightTypeIdentifier', kind='Type'),
          ]),
+
+    # primary-associated-type-clause -> '<' primary-associated-type-list '>'
+    Node('PrimaryAssociatedTypeClause', kind='Syntax',
+         children=[
+             Child('LeftAngleBracket', kind='LeftAngleToken'),
+             Child('PrimaryAssociatedTypeList', kind='PrimaryAssociatedTypeList',
+                   collection_element_name='PrimaryAssociatedType'),
+             Child('RightAngleBracket', kind='RightAngleToken'),
+         ]),
 ]

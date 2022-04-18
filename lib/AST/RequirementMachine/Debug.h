@@ -64,7 +64,17 @@ enum class DebugFlags : unsigned {
   RedundantRulesDetail = (1<<13),
 
   /// Print debug output from the concrete contraction pre-processing pass.
-  ConcreteContraction = (1<<14)
+  ConcreteContraction = (1<<14),
+
+  /// Print debug output from propagating explicit requirement
+  /// IDs from redundant rules.
+  PropagateRequirementIDs = (1<<15),
+
+  /// Print a trace of requirement machines constructed and how long each took.
+  Timers = (1<<16),
+
+  /// Print conflicting rules.
+  ConflictingRules = (1<<17),
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

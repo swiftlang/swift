@@ -2071,7 +2071,8 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   llvm::DenseMap<Expr *, Expr *> parentMap;
 
   static bool isEffectAnchor(Expr *e) {
-    return isa<AbstractClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) || isa<AssignExpr>(e);
+    return isa<AbstractClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) ||
+           isa<AssignExpr>(e);
   }
 
   static bool isAnchorTooEarly(Expr *e) {
@@ -2091,24 +2092,13 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     if (parent && !isAnchorTooEarly(parent)) {
       return parent;
     }
-
     if (isInterpolatedString) {
-      // TODO: I'm being gentle with the casts to avoid breaking things
-      //       If we see incorrect fix-it locations in string interpolations
-      //       we need to change how this behaves
-      //       Assert builds will crash giving us a bug to fix, non-asserts will
-      //       quietly "just work".
       assert(parent == nullptr && "Expected to be at top of expression");
-      assert(isa<CallExpr>(lastParent) &&
-             "Expected top of string interpolation to be CalExpr");
-      assert(cast<CallExpr>(lastParent)->getArgs()->isUnlabeledUnary() &&
-             "Expected unary arg in string interpolation call");
-      if (auto *callExpr = dyn_cast<CallExpr>(lastParent)) {
-        if (auto *unaryArg = callExpr->getArgs()->getUnlabeledUnaryExpr())
+      if (ArgumentList *args = lastParent->getArgs()) {
+        if (Expr *unaryArg = args->getUnlabeledUnaryExpr())
           return unaryArg;
       }
     }
-
     return lastParent;
   }
 

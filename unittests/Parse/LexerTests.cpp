@@ -804,6 +804,9 @@ TEST_F(LexerTest, DiagnoseEmbeddedNul) {
           LexerMode::Swift, HashbangMode::Disallowed,
           CommentRetentionMode::None, TriviaRetentionMode::WithTrivia);
 
+  Token Tok;
+  L.lex(Tok);
+
   ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
                              "1, 2: nul character embedded in middle of file"));
   ASSERT_TRUE(containsPrefix(DiagConsumer.messages,

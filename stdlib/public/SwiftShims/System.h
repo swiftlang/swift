@@ -152,10 +152,19 @@
 /// Darwin reserves the low 4GB of address space.
 #define SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER 0x100000000ULL
 
+// Android AArch64 reserves the top byte for pointer tagging since Android 11,
+// so shift the spare bits tag to the second byte and zero the ObjC tag.
+#define SWIFT_ABI_ANDROID_ARM64_SWIFT_SPARE_BITS_MASK 0x00F0000000000007ULL
+#define SWIFT_ABI_ANDROID_ARM64_OBJC_RESERVED_BITS_MASK 0x0000000000000000ULL
+
+#if defined(__ANDROID__) && defined(__aarch64__)
+#define SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK SWIFT_ABI_ANDROID_ARM64_SWIFT_SPARE_BITS_MASK
+#else
 // TBI guarantees the top byte of pointers is unused, but ARMv8.5-A
 // claims the bottom four bits of that for memory tagging.
 // Heap objects are eight-byte aligned.
 #define SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK 0xF000000000000007ULL
+#endif
 
 // Objective-C reserves just the high bit for tagged pointers.
 #define SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK 0x8000000000000000ULL

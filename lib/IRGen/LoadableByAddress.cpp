@@ -2782,9 +2782,6 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   IRGenModule *currIRMod =
       getIRGenModule()->IRGen.getGenModule(convInstr->getFunction());
   SILType currSILType = convInstr->getType();
-  if (auto *thinToPointer = dyn_cast<ThinFunctionToPointerInst>(convInstr)) {
-    currSILType = thinToPointer->getOperand()->getType();
-  }
   auto currSILFunctionType = currSILType.castTo<SILFunctionType>();
   GenericEnvironment *genEnv =
     getSubstGenericEnvironment(convInstr->getFunction());
@@ -2810,14 +2807,6 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   case SILInstructionKind::ThinToThickFunctionInst: {
     auto instr = cast<ThinToThickFunctionInst>(convInstr);
     newInstr = convBuilder.createThinToThickFunction(
-        instr->getLoc(), instr->getOperand(), newType);
-    break;
-  }
-  case SILInstructionKind::ThinFunctionToPointerInst: {
-    auto instr = cast<ThinFunctionToPointerInst>(convInstr);
-    newType =
-        MapperCache.getNewSILType(genEnv, instr->getType(), *getIRGenModule());
-    newInstr = convBuilder.createThinFunctionToPointer(
         instr->getLoc(), instr->getOperand(), newType);
     break;
   }
@@ -2956,7 +2945,6 @@ void LoadableByAddress::run() {
               case SILInstructionKind::ConvertFunctionInst:
               case SILInstructionKind::ConvertEscapeToNoEscapeInst:
               case SILInstructionKind::MarkDependenceInst:
-              case SILInstructionKind::ThinFunctionToPointerInst:
               case SILInstructionKind::ThinToThickFunctionInst:
               case SILInstructionKind::DifferentiableFunctionInst:
               case SILInstructionKind::LinearFunctionInst:

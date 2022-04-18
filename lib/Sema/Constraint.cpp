@@ -388,8 +388,21 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   }
 
   if (Kind == ConstraintKind::ClosureBodyElement) {
-    Out << "closure body element ";
-    getClosureElement().dump(Out);
+    auto *locator = getLocator();
+    auto element = getClosureElement();
+
+    if (auto patternBindingElt =
+            locator
+                ->getLastElementAs<LocatorPathElt::PatternBindingElement>()) {
+      auto *patternBinding = cast<PatternBindingDecl>(element.get<Decl *>());
+      Out << "pattern binding element @ ";
+      Out << patternBindingElt->getIndex() << " : ";
+      patternBinding->getPattern(patternBindingElt->getIndex())->dump(Out);
+    } else {
+      Out << "closure body element ";
+      getClosureElement().dump(Out);
+    }
+
     return;
   }
 

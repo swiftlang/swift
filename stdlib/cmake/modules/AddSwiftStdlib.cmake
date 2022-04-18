@@ -302,6 +302,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
   endif()
 
+  if(SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER)
+    list(APPEND result "-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER=1")
+  endif()
+
   if(SWIFT_STDLIB_STABLE_ABI)
     list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=1")
   else()
@@ -373,9 +377,13 @@ function(_add_target_variant_c_compile_flags)
   if(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING)
     list(APPEND result "-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING")
   endif()
-  
+
   if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
     list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_UNICODE_DATA")
+  endif()
+
+  if(SWIFT_STDLIB_CONCURRENCY_TRACING)
+    list(APPEND result "-DSWIFT_STDLIB_CONCURRENCY_TRACING")
   endif()
 
   list(APPEND result ${SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS})
@@ -847,6 +855,9 @@ function(add_swift_target_library_single target name)
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}") 
   endforeach()
 
+  # Enable -target-min-inlining-version
+  list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-target-min-inlining-version" "-Xfrontend" "min")
+
   # Don't install the Swift module content for back-deployment libraries.
   if (SWIFTLIB_SINGLE_BACK_DEPLOYMENT_LIBRARY)
     set(install_in_component "never_install")
@@ -1207,7 +1218,7 @@ function(add_swift_target_library_single target name)
 
   set(library_search_subdir "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
   set(library_search_directories
-      "${lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}"
+      "${lib_dir}/${output_sub_dir}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
 
@@ -1743,7 +1754,7 @@ function(add_swift_target_library name)
   # Turn off implicit import of _Concurrency when building libraries
   list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-concurrency-module-import")
 
-  # Turn off implicit import of _Distributed when building libraries
+  # Turn off implicit import of Distributed when building libraries
   if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS
                       "-Xfrontend;-disable-implicit-distributed-module-import")

@@ -123,7 +123,7 @@ collectExistentialConformances(ModuleDecl *M, CanType openedType,
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
-    auto conformance = M->lookupConformance(openedType, proto->getDecl());
+    auto conformance = M->lookupConformance(openedType, proto);
     assert(conformance);
     conformances.push_back(conformance);
   }

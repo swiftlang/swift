@@ -7,6 +7,8 @@ sil_stage canonical
 
 import Builtin
 
+typealias AnyObject = Builtin.AnyObject
+
 class X {
 }
 
@@ -50,6 +52,24 @@ case remove(offset: Int, element: X)
 
 struct Int {
     @_hasStorage var _value : Builtin.Int64
+}
+
+struct I {
+  var value: Builtin.Int64
+}
+
+typealias TXXI = (X, X, I)
+
+struct SXXI {
+  var x_1: X
+  var x_2: X
+  var i: I
+}
+
+struct STXXITXXII {
+  var txxi_1: TXXI
+  var txxi_2: TXXI
+  var i: I
 }
 
 sil @unknown : $@convention(thin) () -> ()
@@ -330,12 +350,12 @@ exit:
 
 // Hoist a destroy_addr of an @in argument over a load from an alloc_stack.
 //
-// CHECK-LABEL: sil [ossa] @test_hoist_over_load_from_stack : {{.*}} {
+// CHECK-LABEL: sil [ossa] @hoist_over_load_from_stack : {{.*}} {
 // CHECK:         apply
 // CHECK:         destroy_addr
 // CHECK:         load [take]
-// CHECK-LABEL: } // end sil function 'test_hoist_over_load_from_stack'
-sil [ossa] @test_hoist_over_load_from_stack : $@convention(thin) (@in X) -> @owned X {
+// CHECK-LABEL: } // end sil function 'hoist_over_load_from_stack'
+sil [ossa] @hoist_over_load_from_stack : $@convention(thin) (@in X) -> @owned X {
 entry(%in_addr : $*X):
   %stack_addr = alloc_stack $X
   copy_addr %in_addr to [initialization] %stack_addr : $*X
@@ -363,6 +383,44 @@ entry(%addr : $*X, %instance : @owned $X):
   %retval = tuple ()
   store %instance to [assign] %addr : $*X
   return %retval : $()
+}
+
+// Hoist up to a (transitive) use of an address_to_pointer instruction.  In
+// particular, do _some_ hoisting despite the fact that such an instruction is
+// a use.
+//
+// CHECK-LABEL: sil [ossa] @hoist_upto_address_to_pointer_use : {{.*}} {
+// CHECK:         address_to_pointer
+// CHECK:         pointer_to_address
+// CHECK:         load [copy]
+// CHECK:         destroy_addr
+// CHECK:         tuple
+// CHECK-LABEL: } // end sil function 'hoist_upto_address_to_pointer_use'
+sil [ossa] @hoist_upto_address_to_pointer_use : $@convention(thin) (@in X) -> (@owned X) {
+entry(%instance : $*X):
+  %pointer = address_to_pointer %instance : $*X to $Builtin.RawPointer
+  %addr = pointer_to_address %pointer : $Builtin.RawPointer to $*X
+  %value = load [copy] %addr : $*X
+  %retval = tuple ()
+  destroy_addr %instance : $*X
+  return %value : $X
+}
+
+// Hoist even if the pointerified address gets used.
+//
+// CHECK-LABEL: sil [ossa] @hoist_despite_use_of_pointer : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK-NEXT:    destroy_addr [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_despite_use_of_pointer'
+sil [ossa] @hoist_despite_use_of_pointer : $@convention(thin) (@inout X) -> () {
+entry(%instance : $*X):
+   %addr_for_pointer = alloc_stack $Builtin.RawPointer
+   %pointer = address_to_pointer %instance : $*X to $Builtin.RawPointer
+   store %pointer to [trivial] %addr_for_pointer : $*Builtin.RawPointer
+   %retval = tuple ()
+   destroy_addr %instance : $*X
+   dealloc_stack %addr_for_pointer : $*Builtin.RawPointer
+   return %retval : $()
 }
 
 // Fold destroy_addr and a load [copy] into a load [take] even when that
@@ -406,12 +464,12 @@ entry(%instance : @owned $S):
   return %value : $S
 }
 
-// Don't fold with a copy_addr of a struct_element_addr.
+// Fold with a copy_addr of a struct_element_addr.
 //
-// CHECK-LABEL: sil [ossa] @nofold_scoped_copy_addr_projection : {{.*}} {
-// CHECK:         load [copy]
-// CHECK-LABEL: // end sil function 'nofold_scoped_copy_addr_projection'
-sil [ossa] @nofold_scoped_copy_addr_projection : $@convention(thin) (@owned S) -> (@owned S) {
+// CHECK-LABEL: sil [ossa] @fold_scoped_copy_addr_projection : {{.*}} {
+// CHECK:         load [take]
+// CHECK-LABEL: // end sil function 'fold_scoped_copy_addr_projection'
+sil [ossa] @fold_scoped_copy_addr_projection : $@convention(thin) (@owned S) -> (@owned S) {
 entry(%instance : @owned $S):
   %addr = alloc_stack $S
   %store_scope = begin_access [modify] [static] %addr : $*S
@@ -427,12 +485,12 @@ entry(%instance : @owned $S):
   return %value : $S
 }
 
-// Don't fold destroy of outer scope with struct_element_addr of inner scope.
+// Fold destroy of outer scope with struct_element_addr of inner scope.
 //
-// CHECK-LABEL: sil [ossa] @nofold_with_copy_addr_projection : {{.*}} {
-// CHECK:         copy_addr {{%[^,]+}}
-// CHECK-LABEL: // end sil function 'nofold_with_copy_addr_projection'
-sil [ossa] @nofold_with_copy_addr_projection : $@convention(thin) (@owned S) -> (@owned S) {
+// CHECK-LABEL: sil [ossa] @fold_with_copy_addr_projection : {{.*}} {
+// CHECK:         copy_addr [take] {{%[^,]+}}
+// CHECK-LABEL: // end sil function 'fold_with_copy_addr_projection'
+sil [ossa] @fold_with_copy_addr_projection : $@convention(thin) (@owned S) -> (@owned S) {
 entry(%instance : @owned $S):
   %addr = alloc_stack $S
   %addr_2 = alloc_stack $S
@@ -454,7 +512,7 @@ entry(%instance : @owned $S):
   return %value : $S
 }
 
-// Don't fold destroy of outer scope with struct_element_addr of inner scope.
+// Fold destroy of outer scope with struct_element_addr of inner scope.
 //
 // CHECK-LABEL: sil [ossa] @fold_scoped_destroy_with_scoped_copy_addr : {{.*}} {
 // CHECK:         copy_addr [take] {{%[^,]+}}
@@ -536,4 +594,244 @@ entry(%instance : @owned $X):
   dealloc_stack %addr_inner : $*X
   dealloc_stack %addr_outer : $*X
   return %value : $X
+}
+
+// Fold with loads of immediate leaves of a tuple.
+//
+// CHECK-LABEL: sil [ossa] @fold_tuple_field_loads : {{.*}} {
+// CHECK:         load [take]
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'fold_tuple_field_loads'
+sil [ossa] @fold_tuple_field_loads : $@convention(thin) (@owned (X, X, I)) -> @owned (X, X) {
+entry(%instance : @owned $(X, X, I)):
+  %addr = alloc_stack $(X, X, I)
+  store %instance to [init] %addr : $*(X, X, I)
+  %first_addr = tuple_element_addr %addr : $*(X, X, I), 0
+  %second_addr = tuple_element_addr %addr : $*(X, X, I), 1
+  %first = load [copy] %first_addr : $*X
+  %second = load [copy] %second_addr : $*X
+  destroy_addr %addr : $*(X, X, I)
+  dealloc_stack %addr : $*(X, X, I)
+  %retval = tuple (%first : $X, %second : $X)
+  return %retval : $(X, X)
+}
+
+// Fold with copy_addrs of immediate leaves of a struct.
+//
+// CHECK-LABEL: sil [ossa] @fold_struct_field_copy_addrs : $@convention(thin) (@owned SXXI) -> () {
+// CHECK:         copy_addr [take]
+// CHECK:         copy_addr [take]
+// CHECK-LABEL: } // end sil function 'fold_struct_field_copy_addrs'
+sil [ossa] @fold_struct_field_copy_addrs : $@convention(thin) (@owned SXXI) -> () {
+entry(%instance : @owned $SXXI):
+    %addr = alloc_stack $SXXI
+    %x_1_alone = alloc_stack $X
+    %x_2_alone = alloc_stack $X
+    store %instance to [init] %addr : $*SXXI
+    %x_1_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_1
+    %x_2_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_2
+    copy_addr %x_1_addr to [initialization] %x_1_alone : $*X
+    copy_addr %x_2_addr to [initialization] %x_2_alone : $*X
+    destroy_addr %addr : $*SXXI
+    %barrier = function_ref @unknown : $@convention(thin) () -> ()
+    apply %barrier() : $@convention(thin) () -> ()
+
+    destroy_addr %x_1_alone : $*X
+    destroy_addr %x_2_alone : $*X
+    dealloc_stack %x_2_alone : $*X
+    dealloc_stack %x_1_alone : $*X
+    dealloc_stack %addr : $*SXXI
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Fold with a mix of both copy_addrs and load [copy]s which are dealing
+// exclusively non-trivial leaves.
+//
+// CHECK-LABEL: sil [ossa] @fold_struct_enclosing_tuples_leaf_fields_mixed_insts : {{.*}} {
+// CHECK:         copy_addr [take]
+// CHECK:         load [take]
+// CHECK:         copy_addr [take]
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'fold_struct_enclosing_tuples_leaf_fields_mixed_insts'
+sil [ossa] @fold_struct_enclosing_tuples_leaf_fields_mixed_insts : $@convention(thin) (@owned STXXITXXII) -> @owned (X, X) {
+entry(%instance : @owned $STXXITXXII):
+    %addr = alloc_stack $STXXITXXII
+    %txxi_1_alone = alloc_stack $X
+    %txxi_2_alone = alloc_stack $X
+    store %instance to [init] %addr : $*STXXITXXII
+    %txxi_1_addr = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.txxi_1
+    %txxi_2_addr = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.txxi_2
+    %txxi_1_x_0_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 0
+    %txxi_1_x_1_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 1
+    %txxi_2_x_0_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 0
+    %txxi_2_x_1_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 1
+
+    copy_addr %txxi_1_x_0_addr to [initialization] %txxi_1_alone : $*X
+    %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
+    copy_addr %txxi_2_x_0_addr to [initialization] %txxi_2_alone : $*X
+    %x2x1 = load [copy] %txxi_2_x_1_addr : $*X
+    destroy_addr %addr : $*STXXITXXII
+    %barrier = function_ref @unknown : $@convention(thin) () -> ()
+    apply %barrier() : $@convention(thin) () -> ()
+
+    destroy_addr %txxi_1_alone : $*X
+    destroy_addr %txxi_2_alone : $*X
+    dealloc_stack %txxi_2_alone : $*X
+    dealloc_stack %txxi_1_alone : $*X
+    dealloc_stack %addr : $*STXXITXXII
+    %retval = tuple (%x1x1 : $X, %x2x1 : $X)
+    return %retval : $(X, X)
+}
+
+// Fold with a mix of both copy_addrs and load [copy]s which are dealing with
+// a mix of both leaves and intermediate nodes.
+//
+// CHECK-LABEL: sil [ossa] @fold_struct_enclosing_tuples_mixed_fields_mixed_insts : {{.*}} {
+// CHECK:         copy_addr [take]
+// CHECK:         load [take]
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'fold_struct_enclosing_tuples_mixed_fields_mixed_insts'
+sil [ossa] @fold_struct_enclosing_tuples_mixed_fields_mixed_insts : $@convention(thin) (@owned STXXITXXII) -> @owned (X, (X, X, I)) {
+entry(%instance : @owned $STXXITXXII):
+    %addr = alloc_stack $STXXITXXII
+    %txxi_1_alone = alloc_stack $X
+    store %instance to [init] %addr : $*STXXITXXII
+    %txxi_1_addr = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.txxi_1
+    %txxi_2_addr = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.txxi_2
+    %txxi_1_x_0_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 0
+    %txxi_1_x_1_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 1
+
+    copy_addr %txxi_1_x_0_addr to [initialization] %txxi_1_alone : $*X
+    %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
+    %txxi2 = load [copy] %txxi_2_addr : $*(X, X, I)
+    destroy_addr %addr : $*STXXITXXII
+
+    %barrier = function_ref @unknown : $@convention(thin) () -> ()
+    apply %barrier() : $@convention(thin) () -> ()
+    destroy_addr %txxi_1_alone : $*X
+    dealloc_stack %txxi_1_alone : $*X
+    dealloc_stack %addr : $*STXXITXXII
+    %retval = tuple (%x1x1 : $X, %txxi2 : $(X, X, I))
+    return %retval : $(X, (X, X, I))
+}
+
+// When walking backwards from the hoisting point, if we encounter multiple
+// loads of the same nontrivial leaf/leaves BEFORE encountering all nontrivial
+// leaves, we can't fold.
+//
+// TODO: Allow folding with the last of them if possible.
+// CHECK-LABEL: sil [ossa] @nofold_multiple_nontrivial_leaf_loads : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $SXXI):
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack
+// CHECK:         load [copy]
+// CHECK:         load [copy]
+// CHECK:         load [copy]
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK-LABEL: } // end sil function 'nofold_multiple_nontrivial_leaf_loads'
+sil [ossa] @nofold_multiple_nontrivial_leaf_loads : $@convention(thin) (@owned SXXI) -> @owned (X, X, X) {
+entry(%instance : @owned $SXXI):
+    %addr = alloc_stack $SXXI
+    store %instance to [init] %addr : $*SXXI
+
+    %x_1_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_1
+    %x_2_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_2
+
+    %x_1 = load [copy] %x_1_addr : $*X
+    %x_2_1 = load [copy] %x_2_addr : $*X
+    %x_2_2 = load [copy] %x_2_addr : $*X
+    destroy_addr %addr : $*SXXI
+
+    dealloc_stack %addr : $*SXXI
+    %retval = tuple (%x_1 : $X, %x_2_1 : $X, %x_2_2 : $X)
+    return %retval : $(X, X, X)
+}
+
+// When walking backwards from the hoisting point, fold even if we encounter
+// multiple loads of the same TRIVIAL leaf/leaves BEFORE encountering all
+// nontrivial leaves.  Contrast to nofold_multiple_nontrivial_leaf_loads.
+//
+// CHECK-LABEL: sil [ossa] @nofold_multiple_trivial_leaf_loads : {{.*}} {
+// CHECK:         load [copy]
+// CHECK:         load [copy]
+// CHECK:         load [trivial]
+// CHECK:         load [trivial]
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nofold_multiple_trivial_leaf_loads'
+sil [ossa] @nofold_multiple_trivial_leaf_loads : $@convention(thin) (@owned SXXI) -> @owned (I, I, X, X) {
+entry(%instance : @owned $SXXI):
+    %addr = alloc_stack $SXXI
+    store %instance to [init] %addr : $*SXXI
+
+    %x_1_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_1
+    %x_2_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_2
+    %i_addr = struct_element_addr %addr : $*SXXI, #SXXI.i
+
+    %x_1 = load [copy] %x_1_addr : $*X
+    %x_2 = load [copy] %x_2_addr : $*X
+    %i_1 = load [trivial] %i_addr : $*I
+    %i_2 = load [trivial] %i_addr : $*I
+    destroy_addr %addr : $*SXXI
+
+    dealloc_stack %addr : $*SXXI
+    %retval = tuple (%i_1 : $I, %i_2 : $I, %x_1 : $X, %x_2 : $X)
+    return %retval : $(I, I, X, X)
+}
+
+// CHECK-LABEL: sil [ossa] @nofold_over_trivial_load_into_tuple_load_copy : {{.*}} {
+// CHECK:         load [copy]
+// CHECK:         load [trivial]
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nofold_over_trivial_load_into_tuple_load_copy'
+sil [ossa] @nofold_over_trivial_load_into_tuple_load_copy : $@convention(thin) (@owned (X, I)) -> @owned ((X, I), I) {
+entry(%instance : @owned $(X, I)):
+    %addr = alloc_stack $(X, I)
+    store %instance to [init] %addr : $*(X, I)
+
+    %i_addr = tuple_element_addr %addr : $*(X, I), 1
+
+    %copy = load [copy] %addr : $*(X, I)
+    %i_2 = load [trivial] %i_addr : $*I
+    destroy_addr %addr : $*(X, I)
+
+    dealloc_stack %addr : $*(X, I)
+    %retval = tuple (%copy : $(X, I), %i_2 : $I)
+    return %retval : $((X, I), I)
+}
+
+// Don't fold a destroy_addr of underlying storage into the copy_addr of a
+// bitcast of that address.
+//
+// CHECK-LABEL: sil [ossa] @nofold_destroy_addr_original_into_copy_addr_cast : {{.*}} {
+// CHECK:         copy_addr {{%[^,]+}}
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nofold_destroy_addr_original_into_copy_addr_cast'
+sil [ossa] @nofold_destroy_addr_original_into_copy_addr_cast : $@convention(thin) <T> (@owned AnyObject) -> @out T {
+entry(%out : $*T, %instance : @owned $AnyObject):
+    %addr = alloc_stack $AnyObject
+    store %instance to [init] %addr : $*AnyObject
+    %cast_addr = unchecked_addr_cast %addr : $*AnyObject to $*T
+    copy_addr %cast_addr to [initialization] %out : $*T
+    destroy_addr %addr : $*AnyObject
+    dealloc_stack %addr : $*AnyObject
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Don't fold a destroy_addr of underlying storage into the load [copy] of a 
+// bitcast of that address.
+//
+// CHECK-LABEL: sil [ossa] @nofold_destroy_addr_original_into_load_cast : {{.*}} {
+// CHECK:         load [copy]
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nofold_destroy_addr_original_into_load_cast'
+sil [ossa] @nofold_destroy_addr_original_into_load_cast : $@convention(thin) (@owned AnyObject) -> @owned X {
+entry(%instance : @owned $AnyObject):
+    %addr = alloc_stack $AnyObject
+    store %instance to [init] %addr : $*AnyObject
+    %cast_addr = unchecked_addr_cast %addr : $*AnyObject to $*X
+    %cast = load [copy] %cast_addr : $*X
+    destroy_addr %addr : $*AnyObject
+    dealloc_stack %addr : $*AnyObject
+    return %cast : $X
 }

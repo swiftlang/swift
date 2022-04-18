@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
-var t1a: (Int...) = (1) // expected-error{{cannot create expansion with non-variadic type 'Int'}}
-// expected-error@-1 {{cannot convert value of type 'Int' to specified type '(Int...)'}}
+var t1a: (Int...) = (1)
+// expected-error@-1 {{cannot create a variadic tuple}}
 var t2d: (Double = 0.0) = 1 // expected-error {{default argument not permitted in a tuple type}} {{18-23=}}
 
 func f1(_ a: Int...) { for _ in a {} }

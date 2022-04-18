@@ -443,7 +443,7 @@ FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
       clearNodeFactory();
       if (optionalMangledTypeName.hasValue()) {
         auto mangledTypeName =
-            optionalMangledTypeName.getValue().insert(0, "$s");
+          optionalMangledTypeName.getValue();
         if (forMangledTypeName.hasValue()) {
           if (mangledTypeName != forMangledTypeName.getValue())
             continue;
@@ -461,8 +461,7 @@ FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
             auto optionalMangledfieldTypeName =
                 normalizeReflectionName(fieldTypeRef);
             if (optionalMangledfieldTypeName.hasValue()) {
-              mangledFieldTypeName =
-                  "$s" + optionalMangledfieldTypeName.getValue();
+              mangledFieldTypeName = optionalMangledfieldTypeName.getValue();
             }
             auto fieldTypeDemangleTree = demangleTypeRef(fieldTypeRef);
             auto fieldTypeName = nodeToString(fieldTypeDemangleTree);
@@ -518,7 +517,7 @@ AssociatedTypeCollectionResult TypeRefBuilder::collectAssociatedTypes(
       clearNodeFactory();
       if (optionalMangledTypeName.hasValue()) {
         auto mangledTypeName =
-            optionalMangledTypeName.getValue().insert(0, "$s");
+            optionalMangledTypeName.getValue();
         if (forMangledTypeName.hasValue()) {
           if (mangledTypeName != forMangledTypeName.getValue())
             continue;
@@ -538,8 +537,7 @@ AssociatedTypeCollectionResult TypeRefBuilder::collectAssociatedTypes(
           auto optionalMangledSubstitutedTypeName =
               normalizeReflectionName(substitutedTypeRef);
           if (optionalMangledSubstitutedTypeName.hasValue()) {
-            mangledSubstitutedTypeName =
-                "$s" + optionalMangledSubstitutedTypeName.getValue();
+            mangledSubstitutedTypeName = optionalMangledSubstitutedTypeName.getValue();
           }
           auto substitutedDemangleTree = demangleTypeRef(substitutedTypeRef);
           auto substitutedTypeName = nodeToString(substitutedDemangleTree);

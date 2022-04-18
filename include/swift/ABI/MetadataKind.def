@@ -74,6 +74,9 @@ METADATAKIND(ObjCClassWrapper, 5 | MetadataKindIsRuntimePrivate | MetadataKindIs
 /// An existential metatype.
 METADATAKIND(ExistentialMetatype, 6 | MetadataKindIsRuntimePrivate | MetadataKindIsNonHeap)
 
+/// An extended existential type.
+METADATAKIND(ExtendedExistential, 7 | MetadataKindIsRuntimePrivate | MetadataKindIsNonHeap)
+
 /// A heap-allocated local variable using statically-generated metadata.
 METADATAKIND(HeapLocalVariable, 0 | MetadataKindIsNonType)
 

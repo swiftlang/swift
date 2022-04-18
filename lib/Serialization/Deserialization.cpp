@@ -991,70 +991,84 @@ void ModuleFile::readAssociatedTypes(
   }
 }
 
+void ModuleFile::readPrimaryAssociatedTypes(
+                   SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
+                   llvm::BitstreamCursor &Cursor) {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(Cursor);
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  while (true) {
+    lastRecordOffset.reset();
+
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = fatalIfUnexpected(
+        Cursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != PRIMARY_ASSOCIATED_TYPE)
+      break;
+
+    DeclID declID;
+    PrimaryAssociatedTypeLayout::readRecord(scratch, declID);
+
+    assocTypes.push_back(cast<AssociatedTypeDecl>(getDecl(declID)));
+  }
+}
+
+static llvm::Error skipRecords(llvm::BitstreamCursor &Cursor, unsigned kind) {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(Cursor);
+
+  while (true) {
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        Cursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry)
+      return maybeEntry.takeError();
+    llvm::BitstreamEntry entry = maybeEntry.get();
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    Expected<unsigned> maybeRecordID = Cursor.skipRecord(entry.ID);
+    if (!maybeRecordID)
+      return maybeRecordID.takeError();
+    if (maybeRecordID.get() != kind)
+      return llvm::Error::success();
+
+    lastRecordOffset.reset();
+  }
+
+  return llvm::Error::success();
+}
+
 /// Advances past any records that might be part of a protocol requirement
 /// signature, which consists of generic requirements together with protocol
 /// typealias records.
 static llvm::Error skipRequirementSignature(llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
 
-  BCOffsetRAII lastRecordOffset(Cursor);
-
-  while (true) {
-    Expected<llvm::BitstreamEntry> maybeEntry =
-        Cursor.advance(AF_DontPopBlockAtEnd);
-    if (!maybeEntry)
-      return maybeEntry.takeError();
-    llvm::BitstreamEntry entry = maybeEntry.get();
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
-
-    Expected<unsigned> maybeRecordID = Cursor.skipRecord(entry.ID);
-    if (!maybeRecordID)
-      return maybeRecordID.takeError();
-    switch (maybeRecordID.get()) {
-    case REQUIREMENT_SIGNATURE:
-      break;
-
-    default:
-      // This record is not a generic requirement.
-      return llvm::Error::success();
-    }
-
-    lastRecordOffset.reset();
-  }
-  return llvm::Error::success();
+  return skipRecords(Cursor, REQUIREMENT_SIGNATURE);
 }
 
 /// Advances past any lazy associated type member records.
 static llvm::Error skipAssociatedTypeMembers(llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
 
-  BCOffsetRAII lastRecordOffset(Cursor);
+  return skipRecords(Cursor, ASSOCIATED_TYPE);
+}
 
-  while (true) {
-    Expected<llvm::BitstreamEntry> maybeEntry =
-        Cursor.advance(AF_DontPopBlockAtEnd);
-    if (!maybeEntry)
-      return maybeEntry.takeError();
-    llvm::BitstreamEntry entry = maybeEntry.get();
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
+/// Advances past any lazy primary associated type member records.
+static llvm::Error skipPrimaryAssociatedTypeMembers(
+    llvm::BitstreamCursor &Cursor) {
+  using namespace decls_block;
 
-    Expected<unsigned> maybeRecordID = Cursor.skipRecord(entry.ID);
-    if (!maybeRecordID)
-      return maybeRecordID.takeError();
-    switch (maybeRecordID.get()) {
-    case ASSOCIATED_TYPE:
-      break;
-
-    default:
-      // This record is not an associated type.
-      return llvm::Error::success();
-    }
-
-    lastRecordOffset.reset();
-  }
-  return llvm::Error::success();
+  return skipRecords(Cursor, PRIMARY_ASSOCIATED_TYPE);
 }
 
 GenericSignature ModuleFile::getGenericSignature(
@@ -1891,7 +1905,7 @@ giveUpFastPath:
       XRefExtensionPathPieceLayout::readRecord(scratch, ownerID, rawGenericSig);
       M = getModule(ownerID);
       if (!M) {
-        return llvm::make_error<XRefError>("module is not loaded",
+        return llvm::make_error<XRefError>("module with extension is not loaded",
                                            pathTrace, getIdentifier(ownerID));
       }
       pathTrace.addExtension(M);
@@ -2777,13 +2791,11 @@ public:
     TypeID defaultDefinitionID;
     bool isImplicit;
     ArrayRef<uint64_t> rawOverriddenIDs;
-    bool isPrimary;
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
                                                       defaultDefinitionID,
                                                       isImplicit,
-                                                      isPrimary,
                                                       rawOverriddenIDs);
 
     auto DC = MF.getDeclContext(contextID);
@@ -2817,9 +2829,6 @@ public:
       }
     }
     assocType->setOverriddenDecls(overriddenAssocTypes);
-
-    if (isPrimary)
-      assocType->setPrimary();
 
     return assocType;
   }
@@ -3522,7 +3531,50 @@ public:
                                        StringRef blobData) {
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
   }
-      
+
+  void deserializeConditionalSubstitutions(
+      SmallVectorImpl<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+          &limitedAvailability) {
+    SmallVector<uint64_t, 4> scratch;
+    StringRef blobData;
+
+    while (true) {
+      llvm::BitstreamEntry entry =
+          MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        break;
+
+      scratch.clear();
+      unsigned recordID = MF.fatalIfUnexpected(
+          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+      if (recordID != decls_block::CONDITIONAL_SUBSTITUTION)
+        break;
+
+      ArrayRef<uint64_t> rawConditions;
+      SubstitutionMapID substitutionMapRef;
+
+      decls_block::ConditionalSubstitutionLayout::readRecord(
+          scratch, substitutionMapRef, rawConditions);
+
+      SmallVector<VersionRange, 4> conditions;
+      llvm::transform(rawConditions, std::back_inserter(conditions),
+                      [&](uint64_t id) {
+                        llvm::VersionTuple lowerEndpoint;
+                        if (lowerEndpoint.tryParse(MF.getIdentifier(id).str()))
+                          MF.fatal();
+                        return VersionRange::allGTE(lowerEndpoint);
+                      });
+
+      auto subMapOrError = MF.getSubstitutionMapChecked(substitutionMapRef);
+      if (!subMapOrError)
+        MF.fatal();
+
+      limitedAvailability.push_back(
+          OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+              ctx, conditions, subMapOrError.get()));
+    }
+  }
+
   Expected<Decl *> deserializeOpaqueType(ArrayRef<uint64_t> scratch,
                                          StringRef blobData) {
     DeclID namingDeclID;
@@ -3567,11 +3619,30 @@ public:
     auto genericSig = MF.getGenericSignature(genericSigID);
     if (genericSig)
       opaqueDecl->setGenericSignature(genericSig);
+    else
+      opaqueDecl->setGenericSignature(GenericSignature());
     if (underlyingTypeSubsID) {
       auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError)
         return subMapOrError.takeError();
-      opaqueDecl->setUnderlyingTypeSubstitutions(subMapOrError.get());
+
+      // Check whether there are any conditionally available substitutions.
+      // If there are, it means that "unique" we just read is a universally
+      // available substitution.
+      SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+          limitedAvailability;
+
+      deserializeConditionalSubstitutions(limitedAvailability);
+
+      if (limitedAvailability.empty()) {
+        opaqueDecl->setUniqueUnderlyingTypeSubstitutions(subMapOrError.get());
+      } else {
+        limitedAvailability.push_back(
+            OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+                ctx, VersionRange::empty(), subMapOrError.get()));
+
+        opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
+      }
     }
     return opaqueDecl;
   }
@@ -3664,8 +3735,10 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto proto = MF.createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(), name,
-                                             None, /*TrailingWhere=*/nullptr);
+    auto proto = MF.createDecl<ProtocolDecl>(
+        DC, SourceLoc(), SourceLoc(), name,
+        ArrayRef<PrimaryAssociatedTypeName>(), None,
+        /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
@@ -3690,14 +3763,19 @@ public:
       proto->setImplicit();
     proto->setIsObjC(isObjC);
 
-    proto->setLazyRequirementSignature(&MF,
-                                       MF.DeclTypeCursor.GetCurrentBitNo());
+    proto->setLazyRequirementSignature(
+        &MF, MF.DeclTypeCursor.GetCurrentBitNo());
     if (llvm::Error Err = skipRequirementSignature(MF.DeclTypeCursor))
       MF.fatal(std::move(Err));
 
-    proto->setLazyAssociatedTypeMembers(&MF,
-                                        MF.DeclTypeCursor.GetCurrentBitNo());
+    proto->setLazyAssociatedTypeMembers(
+        &MF, MF.DeclTypeCursor.GetCurrentBitNo());
     if (llvm::Error Err = skipAssociatedTypeMembers(MF.DeclTypeCursor))
+      MF.fatal(std::move(Err));
+
+    proto->setLazyPrimaryAssociatedTypeMembers(
+        &MF, MF.DeclTypeCursor.GetCurrentBitNo());
+    if (llvm::Error Err = skipPrimaryAssociatedTypeMembers(MF.DeclTypeCursor))
       MF.fatal(std::move(Err));
 
     proto->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
@@ -4361,6 +4439,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   bool isImplicit;
   bool isUnavailable;
   bool isDeprecated;
+  bool isNoAsync;
   bool isPackageDescriptionVersionSpecific;
   bool isSPI;
   DEF_VER_TUPLE_PIECES(Introduced);
@@ -4371,7 +4450,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
 
   // Decode the record, pulling the version tuple information.
   serialization::decls_block::AvailableDeclAttrLayout::readRecord(
-      scratch, isImplicit, isUnavailable, isDeprecated,
+      scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync,
       isPackageDescriptionVersionSpecific, isSPI, LIST_VER_TUPLE_PIECES(Introduced),
       LIST_VER_TUPLE_PIECES(Deprecated), LIST_VER_TUPLE_PIECES(Obsoleted),
       platform, renameDeclID, messageSize, renameSize);
@@ -4394,6 +4473,8 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
   else if (isDeprecated)
     platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
+  else if (isNoAsync)
+    platformAgnostic = PlatformAgnosticAvailabilityKind::NoAsync;
   else if (((PlatformKind)platform) == PlatformKind::none &&
            (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()))
     platformAgnostic =
@@ -6923,6 +7004,14 @@ void ModuleFile::loadAssociatedTypes(const ProtocolDecl *decl,
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
   readAssociatedTypes(assocTypes, DeclTypeCursor);
+}
+
+void ModuleFile::loadPrimaryAssociatedTypes(const ProtocolDecl *decl,
+                                            uint64_t contextData,
+                           SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) {
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
+  readPrimaryAssociatedTypes(assocTypes, DeclTypeCursor);
 }
 
 static Optional<ForeignErrorConvention::Kind>

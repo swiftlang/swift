@@ -62,6 +62,10 @@ inline SILBasicBlock *castToBasicBlock(BridgedBasicBlock block) {
   return static_cast<SILBasicBlock *>(block.obj);
 }
 
+template <class A = SILArgument> A *castToArgument(BridgedArgument argument) {
+  return cast<A>(static_cast<SILArgument *>(argument.obj));
+}
+
 inline SILFunction *castToFunction(BridgedFunction function) {
   return static_cast<SILFunction *>(function.obj);
 }

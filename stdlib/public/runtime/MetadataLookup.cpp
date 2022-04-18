@@ -38,6 +38,7 @@
 #include <functional>
 #include <vector>
 #include <list>
+#include <new>
 
 using namespace swift;
 using namespace Demangle;
@@ -76,7 +77,16 @@ static uintptr_t resolveSymbolicReferenceOffset(SymbolicReferenceKind kind,
                                                 Directness isIndirect,
                                                 int32_t offset,
                                                 const void *base) {
-  auto ptr = detail::applyRelativeOffset(base, offset);
+  uintptr_t ptr;
+  // Function references may be resolved differently than other data references.
+  switch (kind) {
+  case SymbolicReferenceKind::AccessorFunctionReference:
+    ptr = (uintptr_t)TargetCompactFunctionPointer<InProcess, void>::resolve(base, offset);
+    break;
+  default:
+    ptr = detail::applyRelativeOffset(base, offset);
+    break;
+  }
 
   // Indirect references may be authenticated in a way appropriate for the
   // referent.
@@ -765,7 +775,7 @@ _findContextDescriptor(Demangle::NodePointer node,
                                                     *entry,
                                                 bool created) {
       if (created)
-        new (entry) NominalTypeDescriptorCacheEntry{mangledName, foundContext};
+        ::new (entry) NominalTypeDescriptorCacheEntry{mangledName, foundContext};
       return true;
     });
 
@@ -922,7 +932,7 @@ _findProtocolDescriptor(NodePointer node,
                                                      *entry,
                                                  bool created) {
       if (created)
-        new (entry) ProtocolDescriptorCacheEntry{mangledName, foundProtocol};
+        ::new (entry) ProtocolDescriptorCacheEntry{mangledName, foundProtocol};
       return true;
     });
   }
@@ -1505,6 +1515,13 @@ public:
 
     return swift_getExistentialTypeMetadata(classConstraint, superclass,
                                             protocols.size(), protocols.data());
+  }
+
+  TypeLookupErrorOr<BuiltType>
+  createParameterizedProtocolType(BuiltType base,
+                                  llvm::ArrayRef<BuiltType> args) const {
+    // FIXME: Runtime plumbing.
+    return BuiltType();
   }
 
   TypeLookupErrorOr<BuiltType> createDynamicSelfType(BuiltType selfType) const {
@@ -2593,10 +2610,10 @@ void DynamicReplacementDescriptor::enableReplacement() const {
 
   // Link the replacement entry.
   chainRoot->next = chainEntry.get();
-  // chainRoot->implementationFunction = replacementFunction.get();
+  // chainRoot->implementationFunction = getReplacementFunction();
   swift_ptrauth_init_code_or_data(
       reinterpret_cast<void **>(&chainRoot->implementationFunction),
-      reinterpret_cast<void *>(replacementFunction.get()),
+      reinterpret_cast<void *>(getReplacementFunction()),
       replacedFunctionKey->getExtraDiscriminator(),
       !replacedFunctionKey->isAsync());
 }

@@ -1,9 +1,5 @@
-// FIXME: Once the Requirement Machine can emit diagnostics, run this test with
-// it enabled unconditionally.
-
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=off
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on > %t.dump 2>&1
-// RUN: %FileCheck %s < %t.dump
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify > %t.dump 2>&1
 
 
 func sameType<T>(_: T.Type, _: T.Type) {}
@@ -107,7 +103,7 @@ protocol P7 {
 }
 
 // CHECK-LABEL: .P7a@
-// CHECK: Requirement signature: <Self where Self : P7>
+// CHECK: Requirement signature: <Self where Self : P7, Self.[P7a]A == Int>
 protocol P7a : P7 {
   associatedtype A   // expected-warning{{associated type 'A' is redundant with type 'A' declared in inherited protocol 'P7'}}
 }

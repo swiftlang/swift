@@ -45,14 +45,6 @@ func test(_ i: Int) {
   // CHECK: SWIFT_NAME(MutuallyCircularNameA.Inner) @interface MutuallyCircularNameB : NSObject @end
   // CHECK-NOT: {{warning|note}}:
   // CHECK: note: please report this issue to the owners of 'ObjCIRExtras'
-  // CHECK-NOT: warning:
-
-  // CHECK: warning: cycle detected while resolving 'MutuallyCircularNameA' in swift_name attribute for 'MutuallyCircularNameB'
-  // CHECK: SWIFT_NAME(MutuallyCircularNameA.Inner) @interface MutuallyCircularNameB : NSObject @end
   // CHECK-NOT: {{warning|note}}:
-  // CHECK: note: while resolving 'MutuallyCircularNameB' in swift_name attribute for 'MutuallyCircularNameA'
   // CHECK: SWIFT_NAME(MutuallyCircularNameB.Inner) @interface MutuallyCircularNameA : NSObject @end
-  // CHECK-NOT: {{warning|note}}:
-  // CHECK: note: please report this issue to the owners of 'ObjCIRExtras'
-  // CHECK-NOT: warning:
 }

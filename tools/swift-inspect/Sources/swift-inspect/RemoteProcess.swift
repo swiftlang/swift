@@ -19,8 +19,6 @@ internal protocol RemoteProcess: AnyObject {
   var process: ProcessHandle { get }
   var context: SwiftReflectionContextRef! { get }
 
-  init?(processId: ProcessIdentifier)
-
   typealias QueryDataLayoutFunction =
       @convention(c) (UnsafeMutableRawPointer?, DataLayoutQueryType,
                       UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> CInt

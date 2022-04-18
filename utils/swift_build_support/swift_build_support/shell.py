@@ -13,8 +13,6 @@ Centralized command line and file system interface for the build script.
 """
 # ----------------------------------------------------------------------------
 
-from __future__ import print_function
-
 import os
 import pipes
 import platform
@@ -211,7 +209,7 @@ def run(*args, **kwargs):
     repo_path = os.getcwd()
     echo_output = kwargs.pop('echo', False)
     dry_run = kwargs.pop('dry_run', False)
-    env = kwargs.pop('env', None)
+    env = kwargs.get('env', None)
     prefix = kwargs.pop('prefix', '')
     if dry_run:
         _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))

@@ -31,6 +31,16 @@ class DeclContext;
 class FuncDecl;
 class NominalTypeDecl;
 
+/// Determine the concrete type of 'ActorSystem' as seen from the member.
+/// E.g. when in a protocol, and trying to determine what the actor system was
+/// constrained to.
+///
+/// \param member the member from which context the lookup should be performed,
+///        e.g. a function or computed property.
+/// \return the concrete type of the ActorSystem to be used by this member,
+///         or null if no concrete actor system was found.
+Type getConcreteReplacementForProtocolActorSystemType(ValueDecl *member);
+
 /// Determine the `ActorSystem` type for the given actor.
 Type getDistributedActorSystemType(NominalTypeDecl *actor);
 
@@ -43,14 +53,16 @@ Type getDistributedActorIDType(NominalTypeDecl *actor);
 Type getDistributedSerializationRequirementType(
     NominalTypeDecl *nominal, ProtocolDecl *protocol);
 
-///// Determine the serialization requirement for the given actor, actor system
-///// or other type that has the SerializationRequirement associated type.
-//Type getDistributedSerializationRequirementType(
-//    NominalTypeDecl *nominal, ProtocolDecl *protocol);
+/// Get the specific 'InvocationEncoder' type of a specific distributed actor
+/// system.
+Type getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *system);
 
-Type getDistributedActorSystemActorIDRequirementType(
-    NominalTypeDecl *system);
+/// Get the specific 'ResultHandler' type of a specific distributed actor
+/// system.
+Type getDistributedActorSystemResultHandlerType(NominalTypeDecl *system);
 
+/// Get the 'ActorID' type of a specific distributed actor system.
+Type getDistributedActorSystemActorIDType(NominalTypeDecl *system);
 
 /// Get the specific protocols that the `SerializationRequirement` specifies,
 /// and all parameters / return types of distributed targets must conform to.
@@ -98,6 +110,7 @@ getDistributedSerializationRequirements(
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 extractDistributedSerializationRequirements(
     ASTContext &C, ArrayRef<Requirement> allRequirements);
+
 }
 
 #endif /* SWIFT_DECL_TYPECHECKDISTRIBUTED_H */

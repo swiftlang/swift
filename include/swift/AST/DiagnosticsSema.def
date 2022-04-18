@@ -1603,10 +1603,11 @@ NOTE(option_set_empty_set_init,none,
      "use [] to silence this warning", ())
 
 ERROR(originally_definedin_topleve_decl,none,
-      "@%0 is only applicable to top-level decl", (StringRef))
+      "'%0' is only applicable to top-level decl", (DeclAttribute))
 
 ERROR(originally_definedin_must_not_before_available_version,none,
-      "symbols are moved to the current module before they were available in the OSs", (StringRef))
+      "symbols are moved to the current module before they were available in "
+      "the OSs", ())
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -1935,8 +1936,8 @@ WARNING(type_does_not_conform_swiftui_warning,none,
 
 ERROR(non_final_class_cannot_conform_to_self_same_type,none,
       "non-final class %0 cannot safely conform to protocol %1, "
-      "which requires that 'Self' is exactly equal to %2",
-      (Type, Type, Type))
+      "which requires that %2 %select{is exactly equal to|inherit from}3 %4",
+      (Type, Type, Type, unsigned, Type))
 
 ERROR(cannot_use_nil_with_this_type,none,
       "'nil' cannot be used in context expecting type %0", (Type))
@@ -2154,6 +2155,13 @@ ERROR(witness_not_accessible_proto,none,
       "requirement in %select{private|fileprivate|internal|public|%error}4 protocol "
       "%5",
       (RequirementKind, DeclName, bool, AccessLevel, AccessLevel, Identifier))
+ERROR(witness_not_as_sendable,none,
+      "sendability of function types in %0 %1 does not match requirement in "
+      "protocol %2",
+      (DescriptiveDeclKind, DeclName, Identifier))
+NOTE(less_sendable_reqt_here,none,
+     "expected sendability to match requirement here",
+     ())
 ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
@@ -2302,6 +2310,9 @@ NOTE(ambiguous_witnesses_type,none,
      "multiple matching types named %0", (Identifier))
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
+NOTE(protocol_witness_non_sendable,none,
+     "candidate matches except for closure sendability%0%select{; this will be "
+     "an error in Swift 6|}1", (StringRef, bool))
 NOTE(protocol_witness_renamed,none,
      "rename to %0 to satisfy this requirement%1", (DeclName, StringRef))
 NOTE(protocol_witness_kind_conflict,none,
@@ -2490,6 +2501,9 @@ ERROR(recursive_superclass_constraint,none,
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
+ERROR(same_type_does_not_inherit,none,
+      "same-type constraint type %0 does not inherit from required superclass %1",
+      (Type, Type))
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
@@ -2505,6 +2519,9 @@ WARNING(missing_protocol_refinement, none,
 ERROR(same_type_conflict,none,
       "%select{generic parameter |protocol |}0%1 cannot be equal to both "
       "%2 and %3", (unsigned, Type, Type, Type))
+ERROR(requirement_conflict,none,
+      "no type for %0 can satisfy both %1",
+      (Type, StringRef))
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(same_type_redundancy_here,none,
@@ -2595,6 +2612,9 @@ WARNING(generic_param_usable_from_inline_warn,none,
 ERROR(override_multiple_decls_base,none,
       "declaration %0 cannot override more than one superclass declaration",
       (DeclName))
+ERROR(override_sendability_mismatch,none,
+      "declaration %0 has a type with different sendability from any potential "
+      "overrides", (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument labels from any potential "
       "overrides", (DeclName))
@@ -3203,6 +3223,17 @@ ERROR(escaping_non_function_parameter,none,
 ERROR(escaping_optional_type_argument, none,
       "closure is already escaping in optional type argument", ())
 
+// @_compilerInitialized attribute
+ERROR(incompatible_compilerinitialized_var,none,
+      "'@_compilerInitialized' attribute only applies to "
+      "let-bound stored properties without a default value", ())
+ERROR(protocol_compilerinitialized,none,
+      "'@_compilerInitialized' is not currently supported in protocols", ())
+ERROR(optional_compilerinitialized,none,
+      "'@_compilerInitialized' cannot be applied to an Optional let", ())
+ERROR(instancemember_compilerinitialized,none,
+      "'@_compilerInitialized' can only be applied to a non-static class or actor member", ())
+
 // @_nonEphemeral attribute
 ERROR(non_ephemeral_non_pointer_type,none,
       "@_nonEphemeral attribute only applies to pointer types", ())
@@ -3752,14 +3783,19 @@ ERROR(not_a_generic_definition,none,
       "cannot specialize a non-generic definition", ())
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
+ERROR(protocol_declares_unknown_primary_assoc_type,none,
+      "an associated type named %0 must be declared in the protocol %1 or a protocol it inherits",
+      (Identifier, Type))
+ERROR(protocol_declares_duplicate_primary_assoc_type,none,
+      "duplicate primary associated type name %0", (Identifier))
 ERROR(parameterized_protocol_not_supported,none,
-      "protocol type with generic arguments can only be used as a generic constraint", ())
+      "protocol type with type arguments can only be used as a generic constraint", ())
 ERROR(protocol_does_not_have_primary_assoc_type,none,
       "cannot specialize protocol type %0", (Type))
-ERROR(parameterized_protocol_too_many_type_arguments,none,
-      "protocol type %0 can specialized with too many type parameters "
-      "(got %1, but expected at most %2)",
-      (Type, unsigned, unsigned))
+ERROR(parameterized_protocol_type_argument_count_mismatch,none,
+      "protocol type %0 specialized with %select{too many|too few}3 type arguments "
+      "(got %1, but expected %2)",
+      (Type, unsigned, unsigned, unsigned))
 ERROR(cannot_specialize_self,none,
       "cannot specialize 'Self'", ())
 NOTE(specialize_explicit_type_instead,none,
@@ -4434,14 +4470,11 @@ NOTE(note_add_nonisolated_to_decl,none,
      (DeclName, DescriptiveDeclKind))
 NOTE(note_add_async_and_throws_to_decl,none,
      "mark the protocol requirement %0 '%select{|async|throws|async throws}1' "
-     "in order witness it with 'distributed' function declared in distributed actor %2",
-     (DeclName, unsigned, DeclName))
+     "to allow actor-isolated conformances",
+     (DeclName, unsigned))
 NOTE(note_add_distributed_to_decl,none,
-     "add 'distributed' to %0 to make this %1 witness the protocol requirement",
+     "add 'distributed' to %0 to make this %1 satisfy the protocol requirement",
      (DeclName, DescriptiveDeclKind))
-NOTE(note_distributed_requirement_defined_here,none,
-     "distributed instance method requirement %0 declared here",
-     (DeclName))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
      (StringRef, DescriptiveDeclKind, DeclName, Type))
@@ -4495,8 +4528,19 @@ ERROR(actor_inheritance,none,
 ERROR(actor_protocol_illegal_inheritance,none,
       "non-actor type %0 cannot conform to the 'Actor' protocol",
       (DeclName))
+ERROR(distributed_actor_conformance_missing_system_type,none,
+      "distributed actor %0 does not declare ActorSystem it can be used with.",
+      (DeclName))
+NOTE(note_distributed_actor_system_can_be_defined_using_defaultdistributedactorsystem,none,
+     "you can provide a module-wide default actor system by declaring:\n"
+     "typealias DefaultDistributedActorSystem = <#ConcreteActorSystem#>\n",
+     ())
 ERROR(distributed_actor_protocol_illegal_inheritance,none,
       "non-distributed actor type %0 cannot conform to the 'DistributedActor' protocol",
+      (DeclName))
+ERROR(actor_cannot_inherit_distributed_actor_protocol,none,
+      "actor type %0 cannot conform to the 'DistributedActor' protocol. "
+      "Isolation rules of these actor types are not interchangeable.",
       (DeclName))
 ERROR(broken_distributed_actor_requirement,none,
       "DistributedActor protocol is broken: unexpected requirement", ())
@@ -4510,24 +4554,23 @@ NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
       "explicitly defined", ())
-ERROR(actor_isolated_from_decl,none,
-      "actor-isolated %0 %1 can not be referenced from a non-isolated "
-      "%select{deinit|autoclosure|closure}2",
-      (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_non_self_reference,none,
-        "actor-isolated %0 %1 can not be "
+        "%5 %0 %1 can not be "
         "%select{referenced|mutated|used 'inout'}2 "
-        "%select{on a non-isolated actor instance|"
+        "%select{from outside the actor|on a different actor instance|"
+        "on a non-isolated actor instance|"
         "from a Sendable function|from a Sendable closure|"
         "from an 'async let' initializer|from global actor %4|"
-        "from the main actor|from a non-isolated context}3",
-        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
+        "from the main actor|from a non-isolated context|"
+        "from a non-isolated autoclosure}3",
+        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type,
+         ActorIsolation))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %0 %1 can not be accessed from a "
       "non-isolated context",
       (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
-      "'_Distributed' module not imported, required for 'distributed actor'",
+      "'Distributed' module not imported, required for 'distributed actor'",
       ())
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"
@@ -4536,22 +4579,6 @@ ERROR(actor_isolated_inout_state,none,
 ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
-ERROR(global_actor_from_instance_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from actor %3 %select{|in a synchronous context}5",
-      (DescriptiveDeclKind, DeclName, Type, DeclName, unsigned, bool))
-ERROR(global_actor_from_other_global_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from different global actor %3 %select{|in a synchronous context}5",
-      (DescriptiveDeclKind, DeclName, Type, Type, unsigned, bool))
-ERROR(global_actor_from_nonactor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from %select{this|a non-isolated}3%select{| synchronous}5 context",
-      (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
-ERROR(global_actor_from_initializing_expr,none,
-      "expression requiring global actor %0 cannot appear in "
-        "default-value expression of %1 %2",
-      (Type, DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_call,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))
@@ -4577,6 +4604,10 @@ ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %1 %2 in "
       "concurrently-executing code",
       (bool, DescriptiveDeclKind, DeclName))
+ERROR(concurrent_access_of_inout_param,none,
+      "mutable capture of 'inout' parameter %0 is not allowed in "
+      "concurrently-executing code",
+      (DeclName))
 ERROR(non_sendable_capture,none,
       "capture of %1 with non-sendable type %0 in a `@Sendable` closure",
       (Type, DeclName))
@@ -4595,12 +4626,18 @@ NOTE(note_distributed_actor_isolated_method,none,
 ERROR(distributed_actor_isolated_method,none,
       "only 'distributed' instance methods can be called on a potentially remote distributed actor",
       ())
+ERROR(distributed_local_cannot_be_used,none,
+      "'local' cannot be used in user-defined code currently",
+      ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
       (StringRef, Type, DescriptiveDeclKind, StringRef))
 ERROR(distributed_actor_target_result_not_codable,none,
       "result type %0 of %1 %2 does not conform to serialization requirement '%3'",
       (Type, DescriptiveDeclKind, Identifier, StringRef))
+ERROR(distributed_actor_system_serialization_req_must_be_protocol,none,
+      "'SerializationRequirement' type witness %0 must be a protocol type",
+      (Type))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
       "distributed instance method's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))
@@ -4638,19 +4675,9 @@ WARNING(shared_mutable_state_access,none,
         "reference to %0 %1 is not concurrency-safe because it involves "
         "shared mutable state", (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_witness,none,
-     "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
-     (DescriptiveDeclKind, DeclName))
-ERROR(distributed_actor_isolated_witness,none,
-     "distributed actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
-     (DescriptiveDeclKind, DeclName))
-ERROR(global_actor_isolated_witness,none,
-      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
-      "requirement from protocol %3",
-      (DescriptiveDeclKind, DeclName, Type, Identifier))
-ERROR(global_actor_isolated_requirement_witness_conflict,none,
-      "%0 %1 isolated to global actor %2 can not satisfy corresponding "
-      "requirement from protocol %3 isolated to global actor %4",
-      (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
+     "%select{|distributed }0%1 %2 %3 cannot be used to satisfy %4 protocol "
+     "requirement",
+     (bool, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       "actor %0 cannot conform to global actor isolated protocol %1",
       (Type, Type))
@@ -4726,9 +4753,12 @@ ERROR(unchecked_not_existential,none,
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))
+ERROR(incorrect_optional_any,none,
+      "optional 'any' type must be written %0",
+      (Type))
 ERROR(existential_requires_any,none,
-      "%select{protocol |}1%0 as a type must be explicitly marked as 'any'",
-      (Type, bool))
+      "use of %select{protocol |}2%0 as a type must be written %1",
+      (Type, Type, bool))
 
 ERROR(nonisolated_let,none,
       "'nonisolated' is meaningless on 'let' declarations because "
@@ -4775,14 +4805,6 @@ ERROR(distributed_actor_func_static,none,
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
       "'distributed' method can only be declared within 'distributed actor'",
       ())
-ERROR(distributed_actor_designated_ctor_must_have_one_distributedactorsystem_param,none,
-      "designated distributed actor initializer %0 must accept exactly one "
-      "DistributedActorSystem parameter, found %1",
-      (DeclName, int))
-ERROR(distributed_actor_designated_ctor_missing_transport_param,none,
-      "designated distributed actor initializer %0 is missing required "
-      "DistributedActorSystem parameter",
-      (DeclName))
 ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",
@@ -4842,8 +4864,8 @@ ERROR(async_named_decl_must_be_available_from_async,none,
         "asynchronous %0 %1 must be available from asynchronous contexts",
         (DescriptiveDeclKind, DeclName))
 ERROR(async_unavailable_decl,none,
-      "%0 %1 is unavailable from asynchronous contexts%select{|; %3}2",
-      (DescriptiveDeclKind, DeclBaseName, bool, StringRef))
+      "%0 %1 is unavailable from asynchronous contexts%select{|; %2}2",
+      (DescriptiveDeclKind, DeclBaseName, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: String Processing
@@ -5621,10 +5643,6 @@ WARNING(public_decl_needs_availability, none,
         "public declarations should have an availability attribute when building "
         "with -require-explicit-availability", ())
 
-ERROR(availability_macro_in_inlinable, none,
-      "availability macro cannot be used in inlinable %0",
-      (DescriptiveDeclKind))
-
 ERROR(attr_requires_decl_availability_for_platform,none,
       "'%0' requires that %1 have explicit availability for %2",
       (DeclAttribute, DeclName, StringRef))
@@ -5721,7 +5739,8 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "an '@inlinable' function|" \
   "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
-  "a property initializer in a '@frozen' type}"
+  "a property initializer in a '@frozen' type|" \
+  "a '@_backDeploy' function'}"
 
 #define DECL_OR_ACCESSOR "%select{%0|%0 for}"
 
@@ -5745,6 +5764,10 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "it is an SPI imported from %3|"
       "it is SPI}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
+
+ERROR(availability_macro_in_inlinable, none,
+      "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
+      (unsigned))
 
 #undef FRAGILE_FUNC_KIND
 
@@ -6111,9 +6134,6 @@ WARNING(result_builder_missing_limited_availability, none,
         "result builder %0 does not implement 'buildLimitedAvailability'; "
         "this code may crash on earlier versions of the OS",
         (Type))
-ERROR(result_builder_static_buildblock, none,
-      "result builder must provide at least one static 'buildBlock' "
-      "method", ())
 ERROR(result_builder_static_buildblock_or_buildpartialblock, none,
       "result builder must provide at least one static 'buildBlock' "
       "method, or both 'buildPartialBlock(first:)' and "

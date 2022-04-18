@@ -15,7 +15,7 @@
 
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 
 namespace swift {
 namespace ide {
@@ -31,21 +31,28 @@ class DotExprTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     bool ExpectsNonVoid;
     bool BaseIsStaticMetaType;
     bool IsImplicitSingleExpressionReturn;
+
+    /// Whether the surrounding context is async and thus calling async
+    /// functions is supported.
+    bool IsInAsyncContext;
   };
 
   CodeCompletionExpr *CompletionExpr;
+  DeclContext *DC;
+
   SmallVector<Result, 4> Results;
   llvm::DenseMap<std::pair<Type, Decl *>, size_t> BaseToSolutionIdx;
 
+  void sawSolutionImpl(const constraints::Solution &solution) override;
+
 public:
-  DotExprTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr)
-      : CompletionExpr(CompletionExpr) {}
+  DotExprTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
+                                     DeclContext *DC)
+      : CompletionExpr(CompletionExpr), DC(DC) {}
 
   /// Typecheck the code completion expression in isolation, calling
   /// \c sawSolution for each solution formed.
   void fallbackTypeCheck(DeclContext *DC) override;
-
-  void sawSolution(const constraints::Solution &solution) override;
 
   void deliverResults(Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc,
                       bool IsInSelector, CodeCompletionContext &CompletionCtx,

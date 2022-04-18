@@ -350,7 +350,7 @@ static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
   (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
 }
 
-// TODO: same ugly hack as Codable does...
+// TODO(distributed): same ugly hack as Codable does...
 static void installDistributedActorIfNecessary(NominalTypeDecl *NTD) {
   auto req =
     ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveDistributedActor};
@@ -1039,7 +1039,10 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   auto *initExpr = param->getStructuralDefaultExpr();
   assert(initExpr);
 
-  if (paramTy->hasError())
+  // If the param has an error type, there's no point type checking the default
+  // expression, unless we are type checking for code completion, in which case
+  // the default expression might contain the code completion token.
+  if (paramTy->hasError() && !ctx.CompletionCallback)
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
 
   auto *dc = param->getDefaultArgumentInitContext();
@@ -1062,8 +1065,10 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
 
 Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
                                           ParamDecl *param) const {
-  if (auto expr = param->getTypeCheckedDefaultExpr())
-    return expr->getType();
+  if (auto *expr = param->getTypeCheckedDefaultExpr()) {
+    // If the request failed, let's not propagate ErrorType up.
+    return isa<ErrorExpr>(expr) ? Type() : expr->getType();
+  }
   return Type();
 }
 
@@ -1692,6 +1697,39 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
   }
 }
 
+/// Make sure that every protocol conformance requirement on 'Self' is
+/// directly stated in the protocol's inheritance clause.
+///
+/// This disallows protocol declarations where a conformance requirement on
+/// 'Self' is implied by some other requirement, such as this:
+///
+///    protocol Other { ... }
+///    protocol Foo { associatedtype A : Other }
+///    protocol Bar {
+///      associatedtype A : Foo where Self == A.A
+///    }
+///
+/// Since name lookup is upstream of generic signature computation, we
+/// want 'Other' to appear in the inheritance clause of 'Bar', so that
+/// name lookup on Bar can find members of Other.
+static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
+  auto requiredProtos = proto->getGenericSignature()->getRequiredProtocols(
+      proto->getSelfInterfaceType());
+
+  for (auto *otherProto : requiredProtos) {
+    // Every protocol 'P' has an implied requirement 'Self : P'; skip it.
+    if (otherProto == proto)
+      continue;
+
+    // GenericSignature::getRequiredProtocols() canonicalizes the protocol
+    // list by dropping protocols that are inherited by other protocols in
+    // the list. Any protocols that remain in the list other than 'proto'
+    // itself are implied by a conformance requirement on 'Self', but are
+    // not (transitively) inherited by 'proto'.
+    proto->diagnose(diag::missing_protocol_refinement, proto, otherProto);
+  }
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2268,7 +2306,7 @@ public:
     auto kind = DC->getFragileFunctionKind();
     if (kind.kind != FragileFunctionKind::None) {
       NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getName(),
-                    static_cast<unsigned>(kind.kind));
+                    kind.getSelector());
     }
 
     // We don't support protocols outside the top level of a file.
@@ -2499,7 +2537,7 @@ public:
     }
 
     if (CD->isDistributedActor()) {
-      TypeChecker::checkDistributedActor(CD);
+      TypeChecker::checkDistributedActor(SF, CD);
     }
 
     // Force lowering of stored properties.
@@ -2645,15 +2683,19 @@ public:
     checkUnsupportedNestedType(PD);
 
     // Check for circular inheritance within the protocol.
-    (void)PD->hasCircularInheritedProtocols();
+    (void) PD->hasCircularInheritedProtocols();
 
     TypeChecker::checkDeclAttributes(PD);
+
+    // Check that all named primary associated types are valid.
+    if (!PD->getPrimaryAssociatedTypeNames().empty())
+      (void) PD->getPrimaryAssociatedTypes();
 
     // Explicity compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
     // a member referenecs another declaration whose generic signature
     // has a conformance requirement to this protocol.
-    auto reqSig = PD->getRequirementSignature().getRequirements();
+    auto reqSig = PD->getRequirementSignature();
 
     // Check the members.
     for (auto Member : PD->getMembers())
@@ -2663,14 +2705,20 @@ public:
 
     checkInheritanceClause(PD);
 
+    if (PD->getASTContext().LangOpts.RequirementMachineProtocolSignatures
+        == RequirementMachineMode::Enabled) {
+      checkProtocolRefinementRequirements(PD);
+    }
+
     TypeChecker::checkDeclCircularity(PD);
     if (PD->isResilient())
       if (!SF || SF->Kind != SourceFileKind::Interface)
         TypeChecker::inferDefaultWitnesses(PD);
 
     if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
-      auto requirementsSig =
-        GenericSignature::get({PD->getProtocolSelfType()}, reqSig);
+      auto sig =
+        GenericSignature::get({PD->getProtocolSelfType()},
+                              reqSig.getRequirements());
 
       llvm::errs() << "\n";
       llvm::errs() << "Protocol requirement signature:\n";
@@ -2679,25 +2727,33 @@ public:
       llvm::errs() << "Requirement signature: ";
       PrintOptions Opts;
       Opts.ProtocolQualifiedDependentMemberTypes = true;
-      requirementsSig->print(llvm::errs(), Opts);
+      sig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
 
       llvm::errs() << "Canonical requirement signature: ";
-      auto canRequirementSig =
-        CanGenericSignature::getCanonical(requirementsSig.getGenericParams(),
-                                          requirementsSig.getRequirements());
-      canRequirementSig->print(llvm::errs(), Opts);
+      auto canSig =
+        CanGenericSignature::getCanonical(sig.getGenericParams(),
+                                          sig.getRequirements());
+      canSig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
 
-
-#ifndef NDEBUG
-    // In asserts builds, also verify some invariants of the requirement
-    // signature.
-    PD->getGenericSignature().verify(reqSig);
-#endif
-
-    (void) reqSig;
+    if (!reqSig.getErrors()) {
+      if (getASTContext().LangOpts.RequirementMachineProtocolSignatures ==
+          RequirementMachineMode::Disabled) {
+    #ifndef NDEBUG
+        // The GenericSignatureBuilder outputs incorrectly-minimized signatures
+        // sometimes, so only check invariants in asserts builds.
+        PD->getGenericSignature().verify(reqSig.getRequirements());
+    #endif
+      } else {
+        // When using the Requirement Machine, always verify signatures.
+        // An incorrect signature indicates a serious problem which can cause
+        // miscompiles or inadvertent ABI dependencies on compiler bugs, so
+        // we really want to avoid letting one slip by.
+        PD->getGenericSignature().verify(reqSig.getRequirements());
+      }
+    }
 
     checkExplicitAvailability(PD);
   }
@@ -3051,7 +3107,7 @@ public:
     checkExplicitAvailability(ED);
 
     if (nominal->isDistributedActor())
-      TypeChecker::checkDistributedActor(dyn_cast<ClassDecl>(nominal));
+      TypeChecker::checkDistributedActor(SF, nominal);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

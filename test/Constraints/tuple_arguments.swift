@@ -1407,9 +1407,17 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
   }
 
   f2.forEach { block in
-  // expected-note@-1 2{{'block' declared here}}
+  // expected-note@-1 {{'block' declared here}}
     block(p) // expected-error {{parameter 'block' expects 2 separate arguments}}
+  }
+
+  f2.forEach { block in
+  // expected-note@-1 {{'block' declared here}}
     block((c, c)) // expected-error {{parameter 'block' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{11-12=}} {{16-17=}}
+    block(c, c)
+  }
+
+  f2.forEach { block in
     block(c, c)
   }
 
@@ -1417,13 +1425,21 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
   // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> Void' to expected argument type '(@escaping (Bool, Bool) -> ()) throws -> Void'}}
     block(p)
     block((c, c))
+    block(c, c) // expected-error {{parameter 'block' expects a single parameter of type '(Bool, Bool)'}}
+  }
+
+  f2.forEach { (block: (Bool, Bool) -> ()) in
+  // expected-note@-1 {{'block' declared here}}
+    block(p) // expected-error {{parameter 'block' expects 2 separate arguments}}
+  }
+
+  f2.forEach { (block: (Bool, Bool) -> ()) in
+    // expected-note@-1 {{'block' declared here}}
+    block((c, c)) // expected-error {{parameter 'block' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{11-12=}} {{16-17=}}
     block(c, c)
   }
 
   f2.forEach { (block: (Bool, Bool) -> ()) in
-  // expected-note@-1 2{{'block' declared here}}
-    block(p) // expected-error {{parameter 'block' expects 2 separate arguments}}
-    block((c, c)) // expected-error {{parameter 'block' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{11-12=}} {{16-17=}}
     block(c, c)
   }
 }

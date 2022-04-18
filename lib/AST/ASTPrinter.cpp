@@ -46,6 +46,7 @@
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
@@ -300,31 +301,6 @@ Type TypeTransformContext::getBaseType() const {
 
 bool TypeTransformContext::isPrintingSynthesizedExtension() const {
   return !Decl.isNull();
-}
-
-std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
-  llvm::SmallString<256> Builder;
-  Builder.reserve(Text.size());
-  const llvm::UTF8* Data = reinterpret_cast<const llvm::UTF8*>(Text.begin());
-  const llvm::UTF8* End = reinterpret_cast<const llvm::UTF8*>(Text.end());
-  StringRef Replacement = u8"\ufffd";
-  while (Data < End) {
-    auto Step = llvm::getNumBytesForUTF8(*Data);
-    if (Data + Step > End) {
-      Builder.append(Replacement);
-      break;
-    }
-
-    if (llvm::isLegalUTF8Sequence(Data, Data + Step)) {
-      Builder.append(Data, Data + Step);
-    } else {
-
-      // If malformed, add replacement characters.
-      Builder.append(Replacement);
-    }
-    Data += Step;
-  }
-  return std::string(Builder.str());
 }
 
 void ASTPrinter::anchor() {}
@@ -633,9 +609,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
     bool FirstLine = true;
     for (auto Line : Lines) {
       if (FirstLine)
-        Printer << sanitizeClangDocCommentStyle(ASTPrinter::sanitizeUtf8(Line));
+        Printer << sanitizeClangDocCommentStyle(unicode::sanitizeUTF8(Line));
       else
-        Printer << ASTPrinter::sanitizeUtf8(Line);
+        Printer << unicode::sanitizeUTF8(Line);
       Printer.printNewline();
       FirstLine = false;
     }
@@ -1381,8 +1357,7 @@ struct RequirementPrintLocation {
 /// function does: asking "where should this requirement be printed?" and then
 /// callers check if the location is the ATD.
 static RequirementPrintLocation
-bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req,
-                             PrintOptions opts, bool inheritanceClause) {
+bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
   auto protoSelf = proto->getProtocolSelfType();
   // Returns the most relevant decl within proto connected to outerType (or null
   // if one doesn't exist), and whether the type is an "direct use",
@@ -1414,16 +1389,6 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req,
     // If we didn't find anything, relevantDecl and foundType will be null, as
     // desired.
     auto directUse = foundType && outerType->isEqual(foundType);
-
-    // Prefer to attach requirements to associated type declarations,
-    // unless the associated type is a primary associated type and
-    // we're printing primary associated types using the new syntax.
-    if (!directUse &&
-        relevantDecl &&
-        opts.PrintPrimaryAssociatedTypes &&
-        isa<AssociatedTypeDecl>(relevantDecl) &&
-        cast<AssociatedTypeDecl>(relevantDecl)->isPrimary())
-      relevantDecl = proto;
 
     return std::make_pair(relevantDecl, directUse);
   };
@@ -1495,8 +1460,7 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
           return false;
         }
 
-        auto location = bestRequirementPrintLocation(proto, req, Options,
-                                                     /*inheritanceClause=*/true);
+        auto location = bestRequirementPrintLocation(proto, req);
         return location.AttachedTo == attachingTo && !location.InWhereClause;
       });
 }
@@ -1511,8 +1475,7 @@ void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                             proto->getRequirementSignature().getRequirements()),
       flags,
       [&](const Requirement &req) {
-        auto location = bestRequirementPrintLocation(proto, req, Options,
-                                                     /*inheritanceClause=*/false);
+        auto location = bestRequirementPrintLocation(proto, req);
         return location.AttachedTo == attachingTo && location.InWhereClause;
       });
 }
@@ -2348,7 +2311,8 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
                             bool openBracket, bool closeBracket) {
   if (openBracket) {
     Printer << " {";
-    Printer.printNewline();
+    if (!Options.PrintEmptyMembersOnSameLine || !members.empty())
+      Printer.printNewline();
   }
   {
     IndentRAII indentMore(*this);
@@ -2601,12 +2565,12 @@ void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
     //   protocol Foo {}
     //   extension Foo where <requirments from ExtDecl> { ... }
     //   struct Bar {}
-    //   extension Bar: Foo where <requirments from TransformContext> { ... }
+    //   extension Bar: Foo where <requirements from TransformContext> { ... }
     //
     // should produce a synthesized extension of Bar with both sets of
-    // requirments:
+    // requirements:
     //
-    //   extension Bar where <requirments from ExtDecl+TransformContext { ... }
+    //   extension Bar where <requirements from ExtDecl+TransformContext> { ... }
     //
     if (!printCombinedRequirementsIfNeeded())
       printDeclGenericRequirements(ExtDecl);
@@ -2781,8 +2745,8 @@ static bool usesFeatureRethrowsProtocol(
       if (auto inheritedType = inheritedEntry.getType()) {
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
-          for (ProtocolType *protoTy : layout.getProtocols()) {
-            if (usesFeatureRethrowsProtocol(protoTy->getDecl(), checked))
+          for (ProtocolDecl *proto : layout.getProtocols()) {
+            if (usesFeatureRethrowsProtocol(proto, checked))
               return true;
           }
         }
@@ -2985,7 +2949,7 @@ static void suppressingFeatureUnsafeInheritExecutor(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
-static bool usesFeaturePrimaryAssociatedTypes(Decl *decl) {
+static bool usesFeaturePrimaryAssociatedTypes2(Decl *decl) {
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
     if (protoDecl->getPrimaryAssociatedTypes().size() > 0)
       return true;
@@ -2994,7 +2958,7 @@ static bool usesFeaturePrimaryAssociatedTypes(Decl *decl) {
   return false;
 }
 
-static void suppressingFeaturePrimaryAssociatedTypes(PrintOptions &options,
+static void suppressingFeaturePrimaryAssociatedTypes2(PrintOptions &options,
                                          llvm::function_ref<void()> action) {
   bool originalPrintPrimaryAssociatedTypes = options.PrintPrimaryAssociatedTypes;
   options.PrintPrimaryAssociatedTypes = false;
@@ -3013,6 +2977,18 @@ suppressingFeatureUnavailableFromAsync(PrintOptions &options,
   options.ExcludeAttrList.push_back(DAK_UnavailableFromAsync);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
+static bool usesFeatureNoAsyncAvailability(Decl *decl) {
+   return decl->getAttrs().getNoAsync(decl->getASTContext()) != nullptr;
+}
+
+static void
+suppressingFeatureNoAsyncAvailability(PrintOptions &options,
+                                      llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<PrintOptions> orignalOptions(options);
+  options.SuppressNoAsyncAvailabilityAttr = true;
+  action();
 }
 
 /// Suppress the printing of a particular feature.
@@ -3129,13 +3105,12 @@ static FeatureSet getUniqueFeaturesUsed(Decl *decl) {
   return features;
 }
 
-static void printCompatibilityCheckIf(ASTPrinter &printer,
-                                      bool isElsif,
+static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
                                       bool includeCompilerCheck,
                                       const BasicFeatureSet &features) {
   assert(!features.empty());
 
-  printer << (isElsif ? "#elsif " : "#if ");
+  printer << (isElseIf ? "#elseif " : "#if ");
   if (includeCompilerCheck)
     printer << "compiler(>=5.3) && ";
 
@@ -3151,7 +3126,7 @@ static void printCompatibilityCheckIf(ASTPrinter &printer,
   printer.printNewline();
 }
 
-/// Generate a #if ... #elsif ... #endif chain for the given
+/// Generate a #if ... #elseif ... #endif chain for the given
 /// suppressible feature checks.
 static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
                                                PrintOptions &options,
@@ -3172,18 +3147,17 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
     return;
   }
 
-  // Otherwise, enter a `#if` or `#elsif` for the next feature.
+  // Otherwise, enter a `#if` or `#elseif` for the next feature.
   Feature feature = generator.next();
-  printCompatibilityCheckIf(printer, /*elsif*/ !firstInChain,
-                            includeCompilerCheck,
-                            {feature});
+  printCompatibilityCheckIf(printer, /*elseif*/ !firstInChain,
+                            includeCompilerCheck, {feature});
 
   // Print the body.
   printBody();
   printer.printNewline();
 
   // Start suppressing the feature and recurse to either generate
-  // more `#elsif` clauses or finish off with `#endif`.
+  // more `#elseif` clauses or finish off with `#endif`.
   suppressingFeature(options, feature, [&] {
     printWithSuppressibleFeatureChecks(printer, options, /*first*/ false,
                                        includeCompilerCheck, generator,
@@ -3196,20 +3170,20 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
 ///
 /// In the most general form, with both required features and multiple
 /// suppressible features in play, the generated code pattern looks like
-/// the following (assuming that feaature $bar implies feature $baz):
+/// the following (assuming that feature $bar implies feature $baz):
 ///
 /// ```
 ///   #if compiler(>=5.3) && $foo
 ///   #if $bar
 ///   @foo @bar @baz func @test() {}
-///   #elsif $baz
+///   #elseif $baz
 ///   @foo @baz func @test() {}
 ///   #else
 ///   @foo func @test() {}
 ///   #endif
 ///   #endif
 /// ```
-bool swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
+void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
                                                 PrintOptions &options,
                                                 Decl *decl,
                                  llvm::function_ref<void()> printBody) {
@@ -3217,20 +3191,20 @@ bool swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
   // it should go around the whole decl.
   if (isa<AccessorDecl>(decl)) {
     printBody();
-    return false;
+    return;
   }
 
   FeatureSet features = getUniqueFeaturesUsed(decl);
   if (features.empty()) {
     printBody();
-    return false;
+    return;
   }
 
   // Enter a `#if` for the required features, if any.
   bool hasRequiredFeatures = features.hasAnyRequired();
   if (hasRequiredFeatures) {
     printCompatibilityCheckIf(printer,
-                              /*elsif*/ false,
+                              /*elseif*/ false,
                               /*compiler check*/ true,
                               features.requiredFeatures());
   }
@@ -3253,8 +3227,6 @@ bool swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
     printer.printNewline();
     printer << "#endif";
   }
-
-  return true;
 }
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
@@ -3545,14 +3517,6 @@ void PrintAST::printPrimaryAssociatedTypes(ProtocolDecl *decl) {
                                       assocType);
         Printer.printName(assocType->getName(),
                           PrintNameContext::GenericParameter);
-
-        printInheritedFromRequirementSignature(decl, assocType);
-
-        if (assocType->hasDefaultDefinitionType()) {
-          Printer << " = ";
-          assocType->getDefaultDefinitionType().print(Printer, Options);
-        }
-
         Printer.printStructurePost(PrintStructureKind::GenericParameter,
                                    assocType);
       },
@@ -4917,20 +4881,22 @@ void PrintAST::visitRepeatWhileStmt(RepeatWhileStmt *stmt) {
   visit(stmt->getCond());
 }
 
-void PrintAST::printStmtCondition(StmtCondition stmt) {
-  for (auto elt : stmt) {
-    if (auto pattern = elt.getPatternOrNull()) {
-      printPattern(pattern);
-      auto initializer = elt.getInitializer();
-      if (initializer) {
-        Printer << " = ";
-        visit(initializer);
-      }
-    }
-    else if (auto boolean = elt.getBooleanOrNull()) {
-      visit(boolean);
-    }
-  }
+void PrintAST::printStmtCondition(StmtCondition condition) {
+  interleave(
+      condition,
+      [&](StmtConditionElement &elt) {
+        if (auto pattern = elt.getPatternOrNull()) {
+          printPattern(pattern);
+          auto initializer = elt.getInitializer();
+          if (initializer) {
+            Printer << " = ";
+            visit(initializer);
+          }
+        } else if (auto boolean = elt.getBooleanOrNull()) {
+          visit(boolean);
+        }
+      },
+      [&] { Printer << ", "; });
 }
 
 void PrintAST::visitDoStmt(DoStmt *stmt) {
@@ -5076,14 +5042,6 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
 
   if (isa<IfConfigDecl>(this)) {
     return PO.PrintIfConfig;
-  }
-
-  if (auto *ATD = dyn_cast<AssociatedTypeDecl>(this)) {
-    // If PO.PrintPrimaryAssociatedTypes is on, primary associated
-    // types are printed as part of the protocol declaration itself,
-    // so skip them here.
-    if (ATD->isPrimary() && PO.PrintPrimaryAssociatedTypes)
-      return false;
   }
 
   // Print everything else.
@@ -6194,8 +6152,14 @@ public:
   }
 
   void visitVariadicSequenceType(VariadicSequenceType *T) {
-    visit(T->getBaseType());
-    Printer << "...";
+    if (Options.PrintForSIL) {
+      Printer << "[";
+      visit(T->getBaseType());
+      Printer << "]";
+    } else {
+      visit(T->getBaseType());
+      Printer << "...";
+    }
   }
 
   void visitProtocolType(ProtocolType *T) {

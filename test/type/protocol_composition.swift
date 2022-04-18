@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: %target-typecheck-verify-swift -swift-version 4 -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
 
 func canonical_empty_protocol() -> Any {
   return 1

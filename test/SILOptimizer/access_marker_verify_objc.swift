@@ -12,8 +12,8 @@ import Foundation
 // --- initializer `let` of CFString.
 // The verifier should ignore this.
 
-// CHECK_LABEL: sil private @{{.*}}WZ : $@convention(c) () -> () {
-// CHECK: bb0:
+// CHECK_LABEL: sil private @{{.*}}WZ : $@convention(c) (Builtin.RawPointer) -> () {
+// CHECK: bb0(%0 : $Builtin.RawPointer):
 // CHECK:   alloc_global @$s25access_marker_verify_objc12testCFStringC8cfStringSo0F3RefavpZ
 // CHECK:   [[GA:%.*]] = global_addr @$s25access_marker_verify_objc12testCFStringC8cfStringSo0F3RefavpZ : $*CFString
 // CHECK-NOT: begin_access

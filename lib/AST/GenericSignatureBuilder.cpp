@@ -4471,7 +4471,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         // getLookupConformanceFns used in here don't use that parameter anyway.
         auto dependentType = CanType();
         auto conformance =
-            getLookupConformanceFn()(dependentType, subjectType, proto->getDecl());
+            getLookupConformanceFn()(dependentType, subjectType, proto);
 
         // FIXME: diagnose if there's no conformance.
         if (conformance) {
@@ -4551,8 +4551,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         anyErrors = true;
     }
 
-    for (auto *proto : layout.getProtocols()) {
-      auto *protoDecl = proto->getDecl();
+    for (auto *protoDecl : layout.getProtocols()) {
       if (isErrorResult(addConformanceRequirement(resolvedSubject, protoDecl,
                                                   source)))
         anyErrors = true;
@@ -8224,6 +8223,81 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   return sig;
 }
 
+GenericSignatureWithError
+AbstractGenericSignatureRequest::evaluate(
+         Evaluator &evaluator,
+         const GenericSignatureImpl *baseSignatureImpl,
+         SmallVector<GenericTypeParamType *, 2> addedParameters,
+         SmallVector<Requirement, 2> addedRequirements) const {
+  GenericSignature baseSignature = GenericSignature{baseSignatureImpl};
+  // If nothing is added to the base signature, just return the base
+  // signature.
+  if (addedParameters.empty() && addedRequirements.empty())
+    return GenericSignatureWithError(baseSignature, GenericSignatureErrors());
+
+  ASTContext &ctx = addedParameters.empty()
+      ? addedRequirements.front().getFirstType()->getASTContext()
+      : addedParameters.front()->getASTContext();
+
+  auto buildViaGSB = [&]() {
+    return evaluateOrDefault(
+        ctx.evaluator,
+        AbstractGenericSignatureRequestGSB{
+          baseSignatureImpl,
+          std::move(addedParameters),
+          std::move(addedRequirements)},
+        GenericSignatureWithError());
+  };
+
+  auto buildViaRQM = [&]() {
+    return evaluateOrDefault(
+        ctx.evaluator,
+        AbstractGenericSignatureRequestRQM{
+          baseSignatureImpl,
+          std::move(addedParameters),
+          std::move(addedRequirements)},
+        GenericSignatureWithError());
+  };
+
+  switch (ctx.LangOpts.RequirementMachineAbstractSignatures) {
+  case RequirementMachineMode::Disabled:
+    return buildViaGSB();
+
+  case RequirementMachineMode::Enabled:
+    return buildViaRQM();
+
+  case RequirementMachineMode::Verify:
+  case RequirementMachineMode::Check: {
+    auto rqmResult = buildViaRQM();
+    auto gsbResult = buildViaGSB();
+
+    if (!rqmResult.getPointer() && !gsbResult.getPointer())
+      return rqmResult;
+
+    if (!rqmResult.getInt().contains(GenericSignatureErrorFlags::HasInvalidRequirements) &&
+        !rqmResult.getInt().contains(GenericSignatureErrorFlags::CompletionFailed) &&
+        !rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
+      PrintOptions opts;
+      opts.ProtocolQualifiedDependentMemberTypes = true;
+
+      llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
+      llvm::errs() << "RequirementMachine says:      ";
+      rqmResult.getPointer()->print(llvm::errs(), opts);
+      llvm::errs() << "\n";
+      llvm::errs() << "GenericSignatureBuilder says: ";
+      gsbResult.getPointer()->print(llvm::errs(), opts);
+      llvm::errs() << "\n";
+
+      if (ctx.LangOpts.RequirementMachineAbstractSignatures
+          == RequirementMachineMode::Verify)
+        abort();
+    }
+
+    return rqmResult;
+  }
+  }
+}
+
 /// Check whether the inputs to the \c AbstractGenericSignatureRequest are
 /// all canonical.
 static bool isCanonicalRequest(GenericSignature baseSignature,
@@ -8246,7 +8320,7 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
 }
 
 GenericSignatureWithError
-AbstractGenericSignatureRequest::evaluate(
+AbstractGenericSignatureRequestGSB::evaluate(
          Evaluator &evaluator,
          const GenericSignatureImpl *baseSignatureImpl,
          SmallVector<GenericTypeParamType *, 2> addedParameters,
@@ -8255,7 +8329,7 @@ AbstractGenericSignatureRequest::evaluate(
   // If nothing is added to the base signature, just return the base
   // signature.
   if (addedParameters.empty() && addedRequirements.empty())
-    return GenericSignatureWithError(baseSignature, /*hadError=*/false);
+    return GenericSignatureWithError(baseSignature, GenericSignatureErrors());
 
   ASTContext &ctx = addedParameters.empty()
       ? addedRequirements.front().getFirstType()->getASTContext()
@@ -8270,7 +8344,7 @@ AbstractGenericSignatureRequest::evaluate(
 
     auto result = GenericSignature::get(addedParameters,
                                         baseSignature.getRequirements());
-    return GenericSignatureWithError(result, /*hadError=*/false);
+    return GenericSignatureWithError(result, GenericSignatureErrors());
   }
 
   // If the request is non-canonical, we won't need to build our own
@@ -8295,7 +8369,7 @@ AbstractGenericSignatureRequest::evaluate(
     // Build the canonical signature.
     auto canSignatureResult = evaluateOrDefault(
         ctx.evaluator,
-        AbstractGenericSignatureRequest{
+        AbstractGenericSignatureRequestGSB{
           canBaseSignature.getPointer(), std::move(canAddedParameters),
           std::move(canAddedRequirements)},
         GenericSignatureWithError());
@@ -8336,72 +8410,26 @@ AbstractGenericSignatureRequest::evaluate(
         canSignatureResult.getInt());
   }
 
-  auto buildViaGSB = [&]() {
-    // Create a generic signature that will form the signature.
-    GenericSignatureBuilder builder(ctx);
-    if (baseSignature)
-      builder.addGenericSignature(baseSignature);
+  // Create a generic signature that will form the signature.
+  GenericSignatureBuilder builder(ctx);
+  if (baseSignature)
+    builder.addGenericSignature(baseSignature);
 
-    auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+  auto source =
+    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
 
-    for (auto param : addedParameters)
-      builder.addGenericParameter(param);
+  for (auto param : addedParameters)
+    builder.addGenericParameter(param);
 
-    for (const auto &req : addedRequirements)
-      builder.addRequirement(req, source, nullptr);
+  for (const auto &req : addedRequirements)
+    builder.addRequirement(req, source, nullptr);
 
-    bool hadError = builder.hadAnyError();
-    auto result = std::move(builder).computeGenericSignature(
-        /*allowConcreteGenericParams=*/true);
-    return GenericSignatureWithError(result, hadError);
-  };
-
-  auto buildViaRQM = [&]() {
-    return evaluateOrDefault(
-        ctx.evaluator,
-        AbstractGenericSignatureRequestRQM{
-          baseSignature.getPointer(),
-          std::move(addedParameters),
-          std::move(addedRequirements)},
-        GenericSignatureWithError());
-  };
-
-  switch (ctx.LangOpts.RequirementMachineAbstractSignatures) {
-  case RequirementMachineMode::Disabled:
-    return buildViaGSB();
-
-  case RequirementMachineMode::Enabled:
-    return buildViaRQM();
-
-  case RequirementMachineMode::Verify:
-  case RequirementMachineMode::Check: {
-    auto rqmResult = buildViaRQM();
-    auto gsbResult = buildViaGSB();
-
-    if (!rqmResult.getPointer() && !gsbResult.getPointer())
-      return rqmResult;
-
-    if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
-      PrintOptions opts;
-      opts.ProtocolQualifiedDependentMemberTypes = true;
-
-      llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
-      llvm::errs() << "RequirementMachine says:      ";
-      rqmResult.getPointer()->print(llvm::errs(), opts);
-      llvm::errs() << "\n";
-      llvm::errs() << "GenericSignatureBuilder says: ";
-      gsbResult.getPointer()->print(llvm::errs(), opts);
-      llvm::errs() << "\n";
-
-      if (ctx.LangOpts.RequirementMachineAbstractSignatures
-          == RequirementMachineMode::Verify)
-        abort();
-    }
-
-    return rqmResult;
-  }
-  }
+  GenericSignatureErrors errorFlags;
+  if (builder.hadAnyError())
+    errorFlags |= GenericSignatureErrorFlags::HasInvalidRequirements;
+  auto result = std::move(builder).computeGenericSignature(
+      /*allowConcreteGenericParams=*/true);
+  return GenericSignatureWithError(result, errorFlags);
 }
 
 GenericSignatureWithError
@@ -8414,130 +8442,27 @@ InferredGenericSignatureRequest::evaluate(
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,
         bool allowConcreteGenericParams) const {
-  auto buildViaGSB = [&]() {
-    GenericSignatureBuilder builder(parentModule->getASTContext());
-        
-    // If there is a parent context, add the generic parameters and requirements
-    // from that context.
-    builder.addGenericSignature(parentSig);
-
-    DeclContext *lookupDC = nullptr;
-
-    const auto visitRequirement = [&](const Requirement &req,
-                                      RequirementRepr *reqRepr) {
-      const auto source = FloatingRequirementSource::forExplicit(
-        reqRepr->getSeparatorLoc());
-
-      // If we're extending a protocol and adding a redundant requirement,
-      // for example, `extension Foo where Self: Foo`, then emit a
-      // diagnostic.
-
-      if (auto decl = lookupDC->getAsDecl()) {
-        if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
-          auto extType = extDecl->getDeclaredInterfaceType();
-          auto extSelfType = extDecl->getSelfInterfaceType();
-          auto reqLHSType = req.getFirstType();
-          auto reqRHSType = req.getSecondType();
-
-          if (extType->isExistentialType() &&
-              reqLHSType->isEqual(extSelfType) &&
-              reqRHSType->isEqual(extType)) {
-
-            auto &ctx = extDecl->getASTContext();
-            ctx.Diags.diagnose(extDecl->getLoc(),
-                               diag::protocol_extension_redundant_requirement,
-                               extType->getString(),
-                               extSelfType->getString(),
-                               reqRHSType->getString());
-          }
-        }
-      }
-
-      builder.addRequirement(req, reqRepr, source,
-                             lookupDC->getParentModule());
-      return false;
-    };
-
-    if (genericParams) {
-      // Extensions never have a parent signature.
-      if (genericParams->getOuterParameters())
-        assert(parentSig == nullptr);
-
-      // Type check the generic parameters, treating all generic type
-      // parameters as dependent, unresolved.
-      SmallVector<GenericParamList *, 2> gpLists;
-      for (auto *outerParams = genericParams;
-           outerParams != nullptr;
-           outerParams = outerParams->getOuterParameters()) {
-        gpLists.push_back(outerParams);
-      }
-
-      // The generic parameter lists MUST appear from innermost to outermost.
-      // We walk them backwards to order outer requirements before
-      // inner requirements.
-      for (auto &genericParams : llvm::reverse(gpLists)) {
-        assert(genericParams->size() > 0 &&
-               "Parsed an empty generic parameter list?");
-
-        // First, add the generic parameters to the generic signature builder.
-        // Do this before checking the inheritance clause, since it may
-        // itself be dependent on one of these parameters.
-        for (const auto param : *genericParams)
-          builder.addGenericParameter(param);
-
-        // Add the requirements for each of the generic parameters to the builder.
-        // Now, check the inheritance clauses of each parameter.
-        for (const auto param : *genericParams)
-          builder.addGenericParameterRequirements(param);
-
-        // Determine where and how to perform name lookup.
-        lookupDC = genericParams->begin()[0]->getDeclContext();
-
-        // Add the requirements clause to the builder.
-        WhereClauseOwner(lookupDC, genericParams)
-          .visitRequirements(TypeResolutionStage::Structural,
-                             visitRequirement);
-      }
-    }
-
-    if (whereClause) {
-      lookupDC = whereClause.dc;
-      std::move(whereClause).visitRequirements(
-          TypeResolutionStage::Structural, visitRequirement);
-    }
-        
-    /// Perform any remaining requirement inference.
-    for (auto sourcePair : inferenceSources) {
-      auto *typeRepr = sourcePair.getTypeRepr();
-      auto source =
-        FloatingRequirementSource::forInferred(
-          typeRepr ? typeRepr->getStartLoc() : SourceLoc());
-
-      builder.inferRequirements(*parentModule,
-                                sourcePair.getType(),
-                                source);
-    }
-    
-    // Finish by adding any remaining requirements.
-    auto source =
-      FloatingRequirementSource::forInferred(SourceLoc());
-        
-    for (const auto &req : addedRequirements)
-      builder.addRequirement(req, source, parentModule);
-
-    bool hadError = builder.hadAnyError();
-    auto result = std::move(builder).computeGenericSignature(
-        allowConcreteGenericParams);
-    return GenericSignatureWithError(result, hadError);
-  };
 
   auto &ctx = parentModule->getASTContext();
+
+  auto buildViaGSB = [&]() {
+    return evaluateOrDefault(
+        ctx.evaluator,
+        InferredGenericSignatureRequestGSB{
+          parentModule,
+          parentSig,
+          genericParams,
+          whereClause,
+          addedRequirements,
+          inferenceSources,
+          allowConcreteGenericParams},
+        GenericSignatureWithError());
+  };
 
   auto buildViaRQM = [&]() {
     return evaluateOrDefault(
         ctx.evaluator,
         InferredGenericSignatureRequestRQM{
-          parentModule,
           parentSig,
           genericParams,
           whereClause,
@@ -8562,7 +8487,9 @@ InferredGenericSignatureRequest::evaluate(
     if (!rqmResult.getPointer() && !gsbResult.getPointer())
       return rqmResult;
 
-    if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
+    if (!rqmResult.getInt().contains(GenericSignatureErrorFlags::HasInvalidRequirements) &&
+        !rqmResult.getInt().contains(GenericSignatureErrorFlags::CompletionFailed) &&
+        !rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
       PrintOptions opts;
       opts.ProtocolQualifiedDependentMemberTypes = true;
 
@@ -8584,55 +8511,144 @@ InferredGenericSignatureRequest::evaluate(
   }
 }
 
+GenericSignatureWithError
+InferredGenericSignatureRequestGSB::evaluate(
+        Evaluator &evaluator,
+        ModuleDecl *parentModule,
+        const GenericSignatureImpl *parentSig,
+        GenericParamList *genericParams,
+        WhereClauseOwner whereClause,
+        SmallVector<Requirement, 2> addedRequirements,
+        SmallVector<TypeLoc, 2> inferenceSources,
+        bool allowConcreteGenericParams) const {
+  GenericSignatureBuilder builder(parentModule->getASTContext());
+      
+  // If there is a parent context, add the generic parameters and requirements
+  // from that context.
+  builder.addGenericSignature(parentSig);
+
+  DeclContext *lookupDC = nullptr;
+
+  const auto visitRequirement = [&](const Requirement &req,
+                                    RequirementRepr *reqRepr) {
+    const auto source = FloatingRequirementSource::forExplicit(
+      reqRepr->getSeparatorLoc());
+
+    // If we're extending a protocol and adding a redundant requirement,
+    // for example, `extension Foo where Self: Foo`, then emit a
+    // diagnostic.
+
+    if (auto decl = lookupDC->getAsDecl()) {
+      if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
+        auto extType = extDecl->getDeclaredInterfaceType();
+        auto extSelfType = extDecl->getSelfInterfaceType();
+        auto reqLHSType = req.getFirstType();
+        auto reqRHSType = req.getSecondType();
+
+        if (extType->isExistentialType() &&
+            reqLHSType->isEqual(extSelfType) &&
+            reqRHSType->isEqual(extType)) {
+
+          auto &ctx = extDecl->getASTContext();
+          ctx.Diags.diagnose(extDecl->getLoc(),
+                             diag::protocol_extension_redundant_requirement,
+                             extType->getString(),
+                             extSelfType->getString(),
+                             reqRHSType->getString());
+        }
+      }
+    }
+
+    builder.addRequirement(req, reqRepr, source,
+                           lookupDC->getParentModule());
+    return false;
+  };
+
+  if (genericParams) {
+    // Extensions never have a parent signature.
+    if (genericParams->getOuterParameters())
+      assert(parentSig == nullptr);
+
+    // Type check the generic parameters, treating all generic type
+    // parameters as dependent, unresolved.
+    SmallVector<GenericParamList *, 2> gpLists;
+    for (auto *outerParams = genericParams;
+         outerParams != nullptr;
+         outerParams = outerParams->getOuterParameters()) {
+      gpLists.push_back(outerParams);
+    }
+
+    // The generic parameter lists MUST appear from innermost to outermost.
+    // We walk them backwards to order outer requirements before
+    // inner requirements.
+    for (auto &genericParams : llvm::reverse(gpLists)) {
+      assert(genericParams->size() > 0 &&
+             "Parsed an empty generic parameter list?");
+
+      // First, add the generic parameters to the generic signature builder.
+      // Do this before checking the inheritance clause, since it may
+      // itself be dependent on one of these parameters.
+      for (const auto param : *genericParams)
+        builder.addGenericParameter(param);
+
+      // Add the requirements for each of the generic parameters to the builder.
+      // Now, check the inheritance clauses of each parameter.
+      for (const auto param : *genericParams)
+        builder.addGenericParameterRequirements(param);
+
+      // Determine where and how to perform name lookup.
+      lookupDC = genericParams->begin()[0]->getDeclContext();
+
+      // Add the requirements clause to the builder.
+      WhereClauseOwner(lookupDC, genericParams)
+        .visitRequirements(TypeResolutionStage::Structural,
+                           visitRequirement);
+    }
+  }
+
+  if (whereClause) {
+    lookupDC = whereClause.dc;
+    std::move(whereClause).visitRequirements(
+        TypeResolutionStage::Structural, visitRequirement);
+  }
+      
+  /// Perform any remaining requirement inference.
+  for (auto sourcePair : inferenceSources) {
+    auto *typeRepr = sourcePair.getTypeRepr();
+    auto source =
+      FloatingRequirementSource::forInferred(
+        typeRepr ? typeRepr->getStartLoc() : SourceLoc());
+
+    builder.inferRequirements(*parentModule,
+                              sourcePair.getType(),
+                              source);
+  }
+  
+  // Finish by adding any remaining requirements.
+  auto source =
+    FloatingRequirementSource::forInferred(SourceLoc());
+      
+  for (const auto &req : addedRequirements)
+    builder.addRequirement(req, source, parentModule);
+
+  GenericSignatureErrors errorFlags;
+  if (builder.hadAnyError())
+    errorFlags |= GenericSignatureErrorFlags::HasInvalidRequirements;
+  auto result = std::move(builder).computeGenericSignature(
+      allowConcreteGenericParams);
+  return GenericSignatureWithError(result, errorFlags);
+}
+
 RequirementSignature
 RequirementSignatureRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *proto) const {
   ASTContext &ctx = proto->getASTContext();
 
-  // First check if we have a deserializable requirement signature.
-  if (proto->hasLazyRequirementSignature()) {
-    ++NumLazyRequirementSignaturesLoaded;
-    // FIXME: (transitional) increment the redundant "always-on" counter.
-    if (ctx.Stats)
-      ++ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded;
-
-    auto contextData = static_cast<LazyProtocolData *>(
-        ctx.getOrCreateLazyContextData(proto, nullptr));
-
-    SmallVector<Requirement, 2> requirements;
-    SmallVector<ProtocolTypeAlias, 2> typeAliases;
-    contextData->loader->loadRequirementSignature(
-        proto, contextData->requirementSignatureData,
-        requirements, typeAliases);
-    return RequirementSignature(ctx.AllocateCopy(requirements),
-                                ctx.AllocateCopy(typeAliases));
-  }
-
   auto buildViaGSB = [&]() {
-    GenericSignatureBuilder builder(proto->getASTContext(),
-                                    /*requirementSignature=*/true);
-
-    // Add all of the generic parameters.
-    for (auto gp : *proto->getGenericParams())
-      builder.addGenericParameter(gp);
-
-    // Add the conformance of 'self' to the protocol.
-    auto selfType =
-      proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-    auto requirement =
-      Requirement(RequirementKind::Conformance, selfType,
-                  proto->getDeclaredInterfaceType());
-
-    builder.addRequirement(
-            requirement,
-            GenericSignatureBuilder::RequirementSource::forRequirementSignature(
-                                                        builder, selfType, proto),
-            nullptr);
-
-    auto reqSignature = std::move(builder).computeGenericSignature(
-                          /*allowConcreteGenericParams=*/false,
-                          /*requirementSignatureSelfProto=*/proto);
-    return RequirementSignature(reqSignature.getRequirements(), None);
+    return evaluateOrDefault(
+        ctx.evaluator,
+        RequirementSignatureRequestGSB{const_cast<ProtocolDecl *>(proto)},
+        RequirementSignature());
   };
 
   auto buildViaRQM = [&]() {
@@ -8644,23 +8660,35 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 
   auto compare = [&](ArrayRef<Requirement> rqmResult,
                      ArrayRef<Requirement> gsbResult) {
-    if (proto->getParentModule()->isStdlibModule() &&
-        (proto->getName().is("Collection") ||
-         proto->getName().is("StringProtocol"))) {
-      if (rqmResult.size() > gsbResult.size())
-        return false;
-    } else {
-      if (rqmResult.size() != gsbResult.size())
-        return false;
+    if (rqmResult.size() > gsbResult.size())
+      return false;
+
+    SmallVector<Requirement, 2> rqmNonSameType;
+    SmallVector<Requirement, 2> gsbNonSameType;
+
+    for (auto req : rqmResult) {
+      if (req.getKind() != RequirementKind::SameType)
+        rqmNonSameType.push_back(req);
     }
 
-    return std::equal(rqmResult.begin(),
-                      rqmResult.end(),
-                      gsbResult.begin(),
-                      [](const Requirement &lhs,
-                         const Requirement &rhs) {
-                        return lhs.getCanonical() == rhs.getCanonical();
-                      });
+    for (auto req : gsbResult) {
+      if (req.getKind() != RequirementKind::SameType)
+        gsbNonSameType.push_back(req);
+    }
+
+    if (rqmNonSameType.size() != gsbNonSameType.size())
+      return false;
+    
+    if (!std::equal(rqmNonSameType.begin(),
+                    rqmNonSameType.end(),
+                    gsbNonSameType.begin(),
+                    [](const Requirement &lhs,
+                       const Requirement &rhs) {
+                      return lhs.getCanonical() == rhs.getCanonical();
+                    }))
+      return false;
+
+    return true;
   };
 
   switch (ctx.LangOpts.RequirementMachineProtocolSignatures) {
@@ -8675,7 +8703,10 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
-    if (!compare(rqmResult.getRequirements(), gsbResult.getRequirements())) {
+    if (!rqmResult.getErrors().contains(GenericSignatureErrorFlags::HasInvalidRequirements) &&
+        !rqmResult.getErrors().contains(GenericSignatureErrorFlags::CompletionFailed) &&
+        !compare(rqmResult.getRequirements(),
+                 gsbResult.getRequirements())) {
       PrintOptions opts;
       opts.ProtocolQualifiedDependentMemberTypes = true;
 
@@ -8704,4 +8735,54 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     return rqmResult;
   }
   }
+}
+
+RequirementSignature
+RequirementSignatureRequestGSB::evaluate(Evaluator &evaluator,
+                                         ProtocolDecl *proto) const {
+  ASTContext &ctx = proto->getASTContext();
+
+  // First check if we have a deserializable requirement signature.
+  if (proto->hasLazyRequirementSignature()) {
+    ++NumLazyRequirementSignaturesLoaded;
+    // FIXME: (transitional) increment the redundant "always-on" counter.
+    if (ctx.Stats)
+      ++ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded;
+
+    auto contextData = static_cast<LazyProtocolData *>(
+        ctx.getOrCreateLazyContextData(proto, nullptr));
+
+    SmallVector<Requirement, 2> requirements;
+    SmallVector<ProtocolTypeAlias, 2> typeAliases;
+    contextData->loader->loadRequirementSignature(
+        proto, contextData->requirementSignatureData,
+        requirements, typeAliases);
+    return RequirementSignature(ctx.AllocateCopy(requirements),
+                                ctx.AllocateCopy(typeAliases));
+  }
+
+  GenericSignatureBuilder builder(proto->getASTContext(),
+                                  /*requirementSignature=*/true);
+
+  // Add all of the generic parameters.
+  for (auto gp : *proto->getGenericParams())
+    builder.addGenericParameter(gp);
+
+  // Add the conformance of 'self' to the protocol.
+  auto selfType =
+    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+  auto requirement =
+    Requirement(RequirementKind::Conformance, selfType,
+                proto->getDeclaredInterfaceType());
+
+  builder.addRequirement(
+          requirement,
+          GenericSignatureBuilder::RequirementSource::forRequirementSignature(
+                                                      builder, selfType, proto),
+          nullptr);
+
+  auto reqSignature = std::move(builder).computeGenericSignature(
+                        /*allowConcreteGenericParams=*/false,
+                        /*requirementSignatureSelfProto=*/proto);
+  return RequirementSignature(reqSignature.getRequirements(), None);
 }

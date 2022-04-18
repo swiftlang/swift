@@ -1469,6 +1469,25 @@ public:
       verifyCheckedBase(E);
     }
 
+    bool shouldVerify(ErasureExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      for (auto &elt : expr->getArgumentConversions()) {
+        assert(!OpaqueValues.count(elt.OrigValue));
+        OpaqueValues[elt.OrigValue] = 0;
+      }
+
+      return true;
+    }
+
+    void cleanup(ErasureExpr *expr) {
+      for (auto &elt : expr->getArgumentConversions()) {
+        assert(OpaqueValues.count(elt.OrigValue));
+        OpaqueValues.erase(elt.OrigValue);
+      }
+    }
+
     void verifyChecked(ErasureExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ErasureExpr", E);
 

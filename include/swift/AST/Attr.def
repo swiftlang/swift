@@ -57,6 +57,7 @@ TYPE_ATTR(async)
 TYPE_ATTR(Sendable)
 TYPE_ATTR(unchecked)
 TYPE_ATTR(_typeSequence)
+TYPE_ATTR(_local)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -264,6 +265,10 @@ SIMPLE_DECL_ATTR(objcMembers, ObjCMembers,
   OnClass |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   34)
+CONTEXTUAL_SIMPLE_DECL_ATTR(_compilerInitialized, CompilerInitialized,
+  OnVar |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  35)
 CONTEXTUAL_SIMPLE_DECL_ATTR(__consuming, Consuming,
   OnFunc | OnAccessor |
   DeclModifier |
@@ -656,7 +661,6 @@ SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   DeclModifier | OnClass | OnFunc | OnVar |
-  DistributedOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   118)
@@ -719,6 +723,12 @@ DECL_ATTR(_backDeploy, BackDeploy,
   AllowMultipleAttributes | LongAttribute | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
   129)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
+  DeclModifier | OnFunc | OnParam | OnVar |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  130)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.

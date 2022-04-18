@@ -225,7 +225,7 @@ public:
 
   virtual void completePlatformCondition() {};
 
-  virtual void completeAfterIfStmt(bool hasElse) {};
+  virtual void completeAfterIfStmtElse() {};
 
   virtual void completeGenericRequirement() {};
 
@@ -235,6 +235,8 @@ public:
   void completeForEachPatternBeginning(bool hasTry, bool hasAwait) {};
 
   virtual void completeTypeAttrBeginning() {};
+
+  virtual void completeOptionalBinding(){};
 
   /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

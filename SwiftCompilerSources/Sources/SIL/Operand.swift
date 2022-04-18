@@ -21,19 +21,7 @@ public struct Operand : CustomStringConvertible, CustomReflectable {
   }
 
   public var value: Value {
-    let v = Operand_getValue(bridged).getAs(AnyObject.self)
-    switch v {
-      case let inst as SingleValueInstruction:
-        return inst
-      case let arg as Argument:
-        return arg
-      case let mvr as MultipleValueInstructionResult:
-        return mvr
-      case let undef as Undef:
-        return undef
-      default:
-        fatalError("unknown Value type")
-    }
+    Operand_getValue(bridged).value
   }
 
   public static func ==(lhs: Operand, rhs: Operand) -> Bool {

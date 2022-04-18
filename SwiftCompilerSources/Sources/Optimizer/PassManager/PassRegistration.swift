@@ -13,8 +13,8 @@
 import SIL
 import OptimizerBridging
 
-#if canImport(ExperimentalRegex)
-import ExperimentalRegex
+#if canImport(_CompilerRegexParser)
+import _CompilerRegexParser
 #endif
 
 @_cdecl("initializeSwiftModules")
@@ -22,7 +22,7 @@ public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftPasses()
 
-  #if canImport(ExperimentalRegex)
+  #if canImport(_CompilerRegexParser)
   registerRegexParser()
   #endif
 }
@@ -51,6 +51,7 @@ private func registerSwiftPasses() {
   registerPass(simplifyStrongRetainPass, { simplifyStrongRetainPass.run($0) })
   registerPass(simplifyStrongReleasePass, { simplifyStrongReleasePass.run($0) })
   registerPass(assumeSingleThreadedPass, { assumeSingleThreadedPass.run($0) })
+  registerPass(rangeDumper, { rangeDumper.run($0) })
   registerPass(runUnitTests, { runUnitTests.run($0) })
   registerPass(releaseDevirtualizerPass, { releaseDevirtualizerPass.run($0) })
 }

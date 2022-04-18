@@ -70,6 +70,8 @@ public:
 
   remote::RemoteAbsolutePointer resolvePointer(uint64_t Addr,
                                                uint64_t pointerValue) const;
+
+  remote::RemoteAbsolutePointer getDynamicSymbol(uint64_t Addr) const;
 };
 
 /// MemoryReader that reads from the on-disk representation of an executable
@@ -118,6 +120,9 @@ public:
 
   remote::RemoteAbsolutePointer resolvePointer(reflection::RemoteAddress Addr,
                                                uint64_t pointerValue) override;
+
+  remote::RemoteAbsolutePointer
+  getDynamicSymbol(reflection::RemoteAddress Addr) override;
 };
 
 using ReflectionContextOwner = std::unique_ptr<void, void (*)(void *)>;

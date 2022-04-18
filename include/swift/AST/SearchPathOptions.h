@@ -16,7 +16,9 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/PathRemapper.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
 #include <string>
@@ -356,6 +358,14 @@ public:
                                   llvm::vfs::FileSystem *FS, bool IsOSDarwin) {
     return Lookup.searchPathsContainingFile(this, Filenames, FS, IsOSDarwin);
   }
+
+  /// Creates a filesystem taking into account any overlays specified in
+  /// \c VFSOverlayFiles. Returns \p BaseFS if there were no overlays and
+  /// \c FileError(s) if any error occurred while attempting to parse the
+  /// overlay files.
+  llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+  makeOverlayFileSystem(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) const;
 
 private:
   static StringRef

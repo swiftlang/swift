@@ -109,6 +109,7 @@ class CompletionInstance {
   bool performCachedOperationIfPossible(
       llvm::hash_code ArgsHash,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      const SearchPathOptions &SearchPathOpts,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,

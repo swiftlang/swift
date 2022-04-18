@@ -25,6 +25,11 @@ SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequestRQM,
                                          SmallVector<GenericTypeParamType *, 2>,
                                          SmallVector<Requirement, 2>),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequestGSB,
+              GenericSignatureWithError (const GenericSignatureImpl *,
+                                         SmallVector<GenericTypeParamType *, 2>,
+                                         SmallVector<Requirement, 2>),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ApplyAccessNoteRequest,
               evaluator::SideEffect(ValueDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AttachedResultBuilderRequest,
@@ -105,8 +110,14 @@ SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(NominalTypeDecl *),
 SWIFT_REQUEST(TypeChecker, IsDefaultActorRequest,
               bool(ClassDecl *, ModuleDecl *, ResilienceExpansion),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckDistributedFunctionRequest,
+              bool(AbstractFunctionDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDistributedActorRequest, bool(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetDistributedActorImplicitCodableRequest,
+               NormalProtocolConformance *(NominalTypeDecl *, KnownProtocolKind),
+               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorSystemRemoteCallFunctionRequest,
               AbstractFunctionDecl *(NominalTypeDecl *, bool),
               Cached, NoLocationInfo)
@@ -125,6 +136,9 @@ SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationDecoderDecodeNextArgume
 SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest,
               AbstractFunctionDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetDistributedThunkRequest,
+              FuncDecl *(AbstractFunctionDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorIDPropertyRequest,
               VarDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
@@ -132,6 +146,9 @@ SWIFT_REQUEST(TypeChecker, GetDistributedActorSystemPropertyRequest,
               VarDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedRemoteCallTargetInitFunctionRequest,
+              ConstructorDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetDistributedRemoteCallArgumentInitFunctionRequest,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorInvocationDecoderRequest,
@@ -179,6 +196,14 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                          SmallVector<TypeLoc, 2>, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequestRQM,
+              GenericSignatureWithError (ModuleDecl *,
+                                         const GenericSignatureImpl *,
+                                         GenericParamList *,
+                                         WhereClauseOwner,
+                                         SmallVector<Requirement, 2>,
+                                         SmallVector<TypeLoc, 2>, bool),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequestGSB,
               GenericSignatureWithError (ModuleDecl *,
                                          const GenericSignatureImpl *,
                                          GenericParamList *,
@@ -280,6 +305,9 @@ SWIFT_REQUEST(TypeChecker, ProtocolDependenciesRequest,
               ArrayRef<ProtocolDecl *>(ProtocolDecl *), Cached,
               HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, RequirementSignatureRequestRQM,
+              RequirementSignature(ProtocolDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, RequirementSignatureRequestGSB,
               RequirementSignature(ProtocolDecl *), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RequirementSignatureRequest,

@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 // TODO(distributed): rdar://82419661 remove -verify-ignore-unknown here, no warnings should be emitted for our
 //  generated code but right now a few are, because of Sendability checks -- need to track it down more.
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 @available(SwiftStdlib 5.5, *)
@@ -45,7 +45,7 @@ distributed actor DistributedActor_1 {
   distributed static func distributedStatic() {} // expected-error{{'distributed' method cannot be 'static'}}
   distributed class func distributedClass() {}
   // expected-error@-1{{class methods are only allowed within classes; use 'static' to declare a static method}}
-  // expected-error@-2{{'distributed' method cannot be 'static'}} // TODO(distributed): should call out 'class' instead?
+  // expected-error@-2{{'distributed' method cannot be 'static'}}
 
   func hello() {} // expected-note{{distributed actor-isolated instance method 'hello()' declared here}}
   func helloAsync() async {} // expected-note{{distributed actor-isolated instance method 'helloAsync()' declared here}}

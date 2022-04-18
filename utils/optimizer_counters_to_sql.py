@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # optimizer_counters_to_sql.py - Store CSV counters into SQLite  -*- python -*-
 #
 # This source file is part of the Swift.org open source project

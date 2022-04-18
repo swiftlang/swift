@@ -51,6 +51,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
@@ -703,9 +704,54 @@ PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *decl) const {
   SmallVector<AssociatedTypeDecl *, 2> assocTypes;
 
-  for (auto *assocType : decl->getAssociatedTypeMembers()) {
-    if (assocType->isPrimary())
-      assocTypes.push_back(assocType);
+  if (decl->hasLazyPrimaryAssociatedTypes()) {
+    auto &ctx = decl->getASTContext();
+    auto contextData = static_cast<LazyProtocolData *>(
+        ctx.getOrCreateLazyContextData(decl, nullptr));
+
+    contextData->loader->loadPrimaryAssociatedTypes(
+        decl, contextData->primaryAssociatedTypesData, assocTypes);
+
+    return decl->getASTContext().AllocateCopy(assocTypes);
+  }
+
+  llvm::SmallDenseSet<Identifier, 2> assocTypeNames;
+
+  for (auto pair : decl->getPrimaryAssociatedTypeNames()) {
+    if (!assocTypeNames.insert(pair.first).second) {
+      auto &ctx = decl->getASTContext();
+      ctx.Diags.diagnose(pair.second,
+                         diag::protocol_declares_duplicate_primary_assoc_type,
+                         pair.first);
+      continue;
+    }
+
+    SmallVector<ValueDecl *, 2> result;
+
+    decl->lookupQualified(ArrayRef<NominalTypeDecl *>(decl),
+                          DeclNameRef(pair.first),
+                          NL_QualifiedDefault | NL_OnlyTypes,
+                          result);
+
+    AssociatedTypeDecl *bestAssocType = nullptr;
+    for (auto *decl : result) {
+      if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+        if (bestAssocType == nullptr ||
+            TypeDecl::compare(assocType, bestAssocType) < 0) {
+          bestAssocType = assocType;
+        }
+      }
+    }
+
+    if (bestAssocType == nullptr) {
+      auto &ctx = decl->getASTContext();
+      ctx.Diags.diagnose(pair.second,
+                         diag::protocol_declares_unknown_primary_assoc_type,
+                         pair.first, decl->getDeclaredInterfaceType());
+      continue;
+    }
+
+    assocTypes.push_back(bestAssocType);
   }
 
   return decl->getASTContext().AllocateCopy(assocTypes);

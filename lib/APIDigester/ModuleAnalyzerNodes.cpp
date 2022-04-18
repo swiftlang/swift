@@ -2265,7 +2265,7 @@ class ConstExtractor: public ASTWalker {
   void record(Expr *E, Expr *ValueProvider, StringRef ReferecedD = "") {
     std::string content;
     llvm::raw_string_ostream os(content);
-    ValueProvider->printConstExprValue(&os);
+    ValueProvider->printConstExprValue(&os, nullptr);
     assert(!content.empty());
     auto buffered = SCtx.buffer(content);
     switch(ValueProvider->getKind()) {

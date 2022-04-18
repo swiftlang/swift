@@ -1212,8 +1212,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     if (auto tryExpr = dyn_cast<TryExpr>(init))
       init = tryExpr->getSubExpr();
     init = cast<CallExpr>(init)->getFn();
-    assert(isa<AutoClosureExpr>(init) &&
-           "Could not find async let autoclosure");
+    auto initClosure = cast<AutoClosureExpr>(init);
     bool isThrowing = init->getType()->castTo<AnyFunctionType>()->isThrowing();
 
     // Allocate space to receive the child task's result.
@@ -1240,8 +1239,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
       alet = emitAsyncLetStart(
           loc,
           options.forward(*this), // options is B.createManagedOptionalNone
-          init->getType(),
-          emitRValue(init).getScalarValue(),
+          initClosure,
           resultBufPtr
         ).forward(*this);
     }

@@ -191,4 +191,4 @@ extension Result: Equatable where Success: Equatable, Failure: Equatable { }
 
 extension Result: Hashable where Success: Hashable, Failure: Hashable { }
 
-extension Result: Sendable where Success: Sendable, Failure: Sendable { }
+extension Result: Sendable where Success: Sendable { }

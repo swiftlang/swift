@@ -2086,7 +2086,7 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
       llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(
           getAFPPtr()->getType()->getScalarType()->getPointerElementType(),
           getAFPPtr(), 0);
-      fn = IGF.emitLoadOfRelativePointer(
+      fn = IGF.emitLoadOfCompactFunctionPointer(
           Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
           /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
     }
@@ -3897,20 +3897,58 @@ emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
   IGF.setEarliestInsertionPoint(pt);
 }
 
+void IRGenModule::addAsyncCoroIDMapping(llvm::GlobalVariable *asyncFunctionPointer,
+                                        llvm::CallInst *coro_id_builtin) {
+  AsyncCoroIDsForPadding[asyncFunctionPointer] = coro_id_builtin;
+}
+
+llvm::CallInst *
+IRGenModule::getAsyncCoroIDMapping(llvm::GlobalVariable *asyncFunctionPointer) {
+  auto found = AsyncCoroIDsForPadding.find(asyncFunctionPointer);
+  if (found == AsyncCoroIDsForPadding.end())
+    return nullptr;
+  return found->second;
+}
+
+void IRGenModule::markAsyncFunctionPointerForPadding(
+                                   llvm::GlobalVariable *asyncFunctionPointer) {
+  AsyncCoroIDsForPadding[asyncFunctionPointer] = nullptr;
+}
+
+bool IRGenModule::isAsyncFunctionPointerMarkedForPadding(
+                                   llvm::GlobalVariable *asyncFunctionPointer) {
+  auto found = AsyncCoroIDsForPadding.find(asyncFunctionPointer);
+  if (found == AsyncCoroIDsForPadding.end())
+    return false;
+  return found->second == nullptr;
+}
+
 void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
                                    const AsyncContextLayout &layout,
                                    LinkEntity asyncFunction,
                                    unsigned asyncContextIndex) {
   auto &IGM = IGF.IGM;
   auto size = layout.getSize();
+  auto asyncFuncPointerVar = cast<llvm::GlobalVariable>(IGM.getAddrOfAsyncFunctionPointer(asyncFunction));
+  bool isPadded = IGM
+    .isAsyncFunctionPointerMarkedForPadding(asyncFuncPointerVar);
   auto asyncFuncPointer = IGF.Builder.CreateBitOrPointerCast(
-      IGM.getAddrOfAsyncFunctionPointer(asyncFunction), IGM.Int8PtrTy);
+                                           asyncFuncPointerVar, IGM.Int8PtrTy);
+  
+  if (isPadded) {
+    size = std::max(layout.getSize(),
+                    NumWords_AsyncLet * IGM.getPointerSize());
+  }
+  
   auto *id = IGF.Builder.CreateIntrinsicCall(
       llvm::Intrinsic::coro_id_async,
       {llvm::ConstantInt::get(IGM.Int32Ty, size.getValue()),
        llvm::ConstantInt::get(IGM.Int32Ty, 16),
        llvm::ConstantInt::get(IGM.Int32Ty, asyncContextIndex),
        asyncFuncPointer});
+  
+  IGM.addAsyncCoroIDMapping(asyncFuncPointerVar, id);
+
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
   // This serves as a handle that we can pass around to other intrinsics.
   auto hdl = IGF.Builder.CreateIntrinsicCall(
@@ -4952,7 +4990,7 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
     auto *addrPtr = IGF.Builder.CreateStructGEP(
         descriptorPtr->getType()->getScalarType()->getPointerElementType(),
         descriptorPtr, 0);
-    auto *result = IGF.emitLoadOfRelativePointer(
+    auto *result = IGF.emitLoadOfCompactFunctionPointer(
         Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
         /*expectedType*/ getFunctionType()->getPointerTo());
     if (auto codeAuthInfo = AuthInfo.getCorrespondingCodeAuthInfo()) {

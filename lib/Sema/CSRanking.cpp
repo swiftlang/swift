@@ -1322,13 +1322,16 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // The systems are not considered equivalent.
     identical = false;
 
-    // A concrete type is better than an archetype.
+    // Archetypes are worse than concrete types (i.e. non-placeholder and
+    // non-archetype)
     // FIXME: Total hack.
-    if (type1->is<ArchetypeType>() != type2->is<ArchetypeType>()) {
-      if (type1->is<ArchetypeType>())
-        ++score2;
-      else
-        ++score1;
+    if (type1->is<ArchetypeType>() && !type2->is<ArchetypeType>() &&
+        !type2->is<PlaceholderType>()) {
+      ++score2;
+      continue;
+    } else if (type2->is<ArchetypeType>() && !type1->is<ArchetypeType>() &&
+               !type1->is<PlaceholderType>()) {
+      ++score1;
       continue;
     }
 

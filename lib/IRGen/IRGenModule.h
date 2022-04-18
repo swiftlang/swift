@@ -328,10 +328,10 @@ private:
 
   /// The queue of IRGenModules for multi-threaded compilation.
   SmallVector<IRGenModule *, 8> Queue;
-
+  
   std::atomic<int> QueueIndex;
   
-  friend class CurrentIGMPtr;  
+  friend class CurrentIGMPtr;
 public:
   explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
 
@@ -893,6 +893,18 @@ public:
   std::string GetObjCSectionName(StringRef Section, StringRef MachOAttributes);
   void SetCStringLiteralSection(llvm::GlobalVariable *GV, ObjCLabelType Type);
 
+  void addAsyncCoroIDMapping(llvm::GlobalVariable *asyncFunctionPointer,
+                             llvm::CallInst *coro_id_builtin);
+  
+  llvm::CallInst *getAsyncCoroIDMapping(
+                                    llvm::GlobalVariable *asyncFunctionPointer);
+  
+  void markAsyncFunctionPointerForPadding(
+                                    llvm::GlobalVariable *asyncFunctionPointer);
+  
+  bool isAsyncFunctionPointerMarkedForPadding(
+                                    llvm::GlobalVariable *asyncFunctionPointer);
+  
 private:
   Size PtrSize;
   Size AtomicBoolSize;
@@ -907,7 +919,18 @@ private:
   llvm::PointerType *EnumValueWitnessTablePtrTy = nullptr;
 
   llvm::DenseMap<llvm::Type *, SpareBitVector> SpareBitsForTypes;
-  
+
+  // Mapping of AsyncFunctionPointer records to their corresponding
+  // `@llvm.coro.id.async` intrinsic tag in the function implementation.
+  // This is used for a runtime bug workaround where we need to pad the initial
+  // context size for tasks used as `async let` entry points.
+  //
+  // An entry in the map may have a null value, to indicate that a not-yet-
+  // emitted async function pointer should get the padding applied when it is
+  // emitted.
+  llvm::DenseMap<llvm::GlobalVariable*, llvm::CallInst*> AsyncCoroIDsForPadding;
+
+
 //--- Types -----------------------------------------------------------------
 public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D, ProtocolInfoKind kind);
@@ -973,8 +996,10 @@ public:
   substOpaqueTypesWithUnderlyingTypes(CanType type,
                                       ProtocolConformanceRef conformance);
 
-  bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
-  bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion);
+  bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion,
+                   ClassDecl *asViewedFromRootClass = nullptr);
+  bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion,
+                            ClassDecl *asViewedFromRootClass = nullptr);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
@@ -1036,6 +1061,10 @@ public:
   ConstantReference getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto);
 
   ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
+
+  llvm::Constant *getOrCreateLazyGlobalVariable(LinkEntity entity,
+      llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> build,
+      llvm::function_ref<void(llvm::GlobalVariable *)> finish);
 
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);

@@ -380,22 +380,6 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     return;
   }
 
-  case TermKind::CheckedCastValueBranchInst: {
-    auto cbi = cast<CheckedCastValueBranchInst>(t);
-    assert(oldDest == cbi->getSuccessBB()
-           || oldDest == cbi->getFailureBB() && "Invalid edge index");
-    auto successBB =
-        oldDest == cbi->getSuccessBB() ? newDest : cbi->getSuccessBB();
-    auto failureBB =
-        oldDest == cbi->getFailureBB() ? newDest : cbi->getFailureBB();
-    builder.createCheckedCastValueBranch(
-        cbi->getLoc(), cbi->getOperand(), cbi->getSourceFormalType(),
-        cbi->getTargetLoweredType(), cbi->getTargetFormalType(),
-        successBB, failureBB);
-    cbi->eraseFromParent();
-    return;
-  }
-
   case TermKind::CheckedCastAddrBranchInst: {
     auto cbi = cast<CheckedCastAddrBranchInst>(t);
     assert(oldDest == cbi->getSuccessBB()
@@ -738,7 +722,6 @@ static bool isSafeNonExitTerminator(TermInst *ti) {
   case TermKind::SwitchEnumAddrInst:
   case TermKind::DynamicMethodBranchInst:
   case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
     return true;
   case TermKind::UnreachableInst:

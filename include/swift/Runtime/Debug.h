@@ -82,7 +82,13 @@ static inline void crash(const char *message) {
   swift_unreachable("Expected compiler to crash.");
 }
 
-// swift::fatalError() halts with a crash log message, 
+// swift::fatalErrorv() halts with a crash log message,
+// but makes no attempt to preserve register state.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+SWIFT_VFORMAT(2)
+extern void fatalErrorv(uint32_t flags, const char *format, va_list args);
+
+// swift::fatalError() halts with a crash log message,
 // but makes no attempt to preserve register state.
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 SWIFT_FORMAT(2, 3)

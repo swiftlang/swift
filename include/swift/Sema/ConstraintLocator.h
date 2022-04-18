@@ -1058,6 +1058,19 @@ public:
   }
 };
 
+class LocatorPathElt::PatternBindingElement final
+    : public StoredIntegerElement<1> {
+public:
+  PatternBindingElement(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::PatternBindingElement, index) {}
+
+  unsigned getIndex() const { return getValue(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PatternBindingElement;
+  }
+};
+
 namespace details {
   template <typename CustomPathElement>
   class PathElement {

@@ -17,7 +17,6 @@
 // RUN: %line-directive %t/NumericParsing.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 %{
-from __future__ import division
 from SwiftIntTypes import all_integer_types
 
 word_bits = int(CMAKE_SIZEOF_VOID_P)

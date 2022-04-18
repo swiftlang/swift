@@ -89,6 +89,7 @@
 
 #define DEBUG_TYPE "ssa-destroy-hoisting"
 
+#include "swift/AST/Type.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
@@ -173,13 +174,11 @@ protected:
 
   bool visitUnknownUse(Operand *use) override {
     auto *user = use->getUser();
-    // Recognize any leaf users not already recognized by UniqueAddressUses.
-    //
-    // Destroy hoisting considers address_to_pointer to be a leaf use because
-    // any potential pointer access is already considered to be a
-    // deinitializtion barrier.
-    if (isa<PointerToAddressInst>(user)) {
-      storageUsers.insert(use->getUser());
+    if (isa<BuiltinRawPointerType>(use->get()->getType().getASTType())) {
+      // Destroy hoisting considers address_to_pointer to be a leaf use because
+      // any potential pointer access is already considered to be a
+      // deinitializtion barrier.  Consequently, any instruction that uses a
+      // value produced by address_to_pointer isn't regarded as a storage use.
       return true;
     }
     LLVM_DEBUG(llvm::dbgs() << "Unknown user " << *user);
@@ -211,7 +210,7 @@ public:
   // sure not to hoist a destroy_addr into an access scope and by doing so cause
   // a deinit which had previously executed outside an access scope to start
   // executing within it--that could violate exclusivity.
-  llvm::SmallPtrSet<BeginAccessInst *, 8> barrierAccessScopes;
+  SmallPtrSet<BeginAccessInst *, 8> barrierAccessScopes;
 
   explicit DeinitBarriers(bool ignoreDeinitBarriers,
                           const KnownStorageUses &knownUses,
@@ -498,6 +497,9 @@ bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
 /// object.
 class HoistDestroys {
   SILValue storageRoot;
+  SILFunction *function;
+  SILModule &module;
+  TypeExpansionContext typeExpansionContext;
   bool ignoreDeinitBarriers;
   SmallPtrSetImpl<SILInstruction *> &remainingDestroyAddrs;
   InstructionDeleter &deleter;
@@ -511,7 +513,9 @@ public:
   HoistDestroys(SILValue storageRoot, bool ignoreDeinitBarriers,
                 SmallPtrSetImpl<SILInstruction *> &remainingDestroyAddrs,
                 InstructionDeleter &deleter)
-      : storageRoot(storageRoot), ignoreDeinitBarriers(ignoreDeinitBarriers),
+      : storageRoot(storageRoot), function(storageRoot->getFunction()),
+        module(function->getModule()), typeExpansionContext(*function),
+        ignoreDeinitBarriers(ignoreDeinitBarriers),
         remainingDestroyAddrs(remainingDestroyAddrs), deleter(deleter),
         destroyMergeBlocks(getFunction()) {}
 
@@ -520,10 +524,19 @@ public:
 protected:
   SILFunction *getFunction() const { return storageRoot->getFunction(); }
 
-  bool foldBarrier(SILInstruction *barrier, SILValue accessScope);
-
-  bool foldBarrier(SILInstruction *barrier, const KnownStorageUses &knownUses,
+  bool foldBarrier(SILInstruction *barrier, const AccessStorage &storage,
                    const DeinitBarriers &deinitBarriers);
+
+  bool foldBarrier(SILInstruction *barrier, const AccessStorage &storage,
+                   const KnownStorageUses &knownUses,
+                   const DeinitBarriers &deinitBarriers);
+
+  bool checkFoldingBarrier(SILInstruction *instruction,
+                           SmallVectorImpl<LoadInst *> &loads,
+                           SmallVectorImpl<CopyAddrInst *> &copies,
+                           SmallPtrSetImpl<AccessPath::PathNode> &leaves,
+                           const AccessStorage &storage,
+                           const DeinitBarriers &deinitBarriers);
 
   void insertDestroy(SILInstruction *barrier, SILInstruction *insertBefore,
                      const KnownStorageUses &knownUses);
@@ -533,7 +546,8 @@ protected:
 
   void createSuccessorDestroys(SILBasicBlock *barrierBlock);
 
-  bool rewriteDestroys(const KnownStorageUses &knownUses,
+  bool rewriteDestroys(const AccessStorage &storage,
+                       const KnownStorageUses &knownUses,
                        const DeinitBarriers &deinitBarriers);
 
   void mergeDestroys(SILBasicBlock *mergeBlock);
@@ -555,16 +569,17 @@ bool HoistDestroys::perform() {
   deinitBarriers.compute();
 
   // No SIL changes happen before rewriting.
-  return rewriteDestroys(knownUses, deinitBarriers);
+  return rewriteDestroys(storage, knownUses, deinitBarriers);
 }
 
-bool HoistDestroys::rewriteDestroys(const KnownStorageUses &knownUses,
+bool HoistDestroys::rewriteDestroys(const AccessStorage &storage,
+                                    const KnownStorageUses &knownUses,
                                     const DeinitBarriers &deinitBarriers) {
   // Place a new destroy after each barrier instruction.
   for (SILInstruction *barrier : deinitBarriers.barriers) {
     auto *barrierBlock = barrier->getParent();
     if (barrier != barrierBlock->getTerminator()) {
-      if (!foldBarrier(barrier, knownUses, deinitBarriers))
+      if (!foldBarrier(barrier, storage, knownUses, deinitBarriers))
         insertDestroy(barrier, barrier->getNextInstruction(), knownUses);
       continue;
     }
@@ -612,30 +627,234 @@ bool HoistDestroys::rewriteDestroys(const KnownStorageUses &knownUses,
   return deleter.hadCallbackInvocation();
 }
 
-bool HoistDestroys::foldBarrier(SILInstruction *barrier, SILValue storageRoot) {
-  if (auto *load = dyn_cast<LoadInst>(barrier)) {
-    if (stripAccessMarkers(load->getOperand()) ==
-        stripAccessMarkers(storageRoot)) {
-      if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
-        load->setOwnershipQualifier(LoadOwnershipQualifier::Take);
+/// Try to fold the destroy_addr with the specified barrier, or a backwards
+/// sequence of instructions that it begins.
+///
+/// Do the following kinds of folds:
+///
+/// - loads:
+///   given: load [copy] %addr
+///          destroy_addr %addr
+///   yield: load [take]
+/// - copy_addrs:
+///   given: copy_addr %addr to ...
+///          destroy_addr %addr
+///   yield: copy_addr [take] %addr
+///
+/// Additionally, generalize this to subobjects.  If there is a sequence of
+/// copy_addrs and loads that covers all the subobjects of %addr.  Given
+/// projections %subobject_1 and %subobject_2 out of %addr which fully cover all
+/// the non-trivial fields of the recursive type-tree of %addr, fold
+///
+///     load [copy] %subobject_1
+///     copy_addr %subobject_2 to ...
+///     destroy_addr %addr
+///
+/// into
+///
+///     load [take] %subobject_1
+///     copy_addr [take] %subobject_2 to ...
+///
+/// so long as all the loads and copy_addrs occur within the same block.
+bool HoistDestroys::foldBarrier(SILInstruction *barrier,
+                                const AccessStorage &storage,
+                                const DeinitBarriers &deinitBarriers) {
+
+  // The load [copy]s which will be folded into load [take]s if folding is
+  // possible.
+  llvm::SmallVector<LoadInst *, 4> loads;
+  // The copy_addrs which will be folded into copy_addr [take]s if folding is
+  // possible.
+  llvm::SmallVector<CopyAddrInst *, 4> copies;
+
+  // The non-trivial storage leaves of the root storage all of which must be
+  // destroyed exactly once in the sequence of instructions prior to the
+  // destroy_addr in order for folding to occur.
+  llvm::SmallPtrSet<AccessPath::PathNode, 16> leaves;
+
+  visitProductLeafAccessPathNodes(storageRoot, typeExpansionContext, module,
+                                  [&](AccessPath::PathNode node, SILType ty) {
+                                    if (ty.isTrivial(*function))
+                                      return;
+                                    leaves.insert(node);
+                                  });
+
+  for (auto *instruction = barrier; instruction != nullptr;
+       instruction = instruction->getPreviousInstruction()) {
+    if (checkFoldingBarrier(instruction, loads, copies, leaves, storage,
+                            deinitBarriers))
+      return false;
+
+    // If we have load [copy]s or copy_addrs of projections out of the root
+    // storage that cover all non-trivial product leaves, then we can fold!
+    //
+    // Stop looking for instructions to fold.
+    if (leaves.empty())
+      break;
+  }
+
+  if (!leaves.empty())
+    return false;
+
+  for (auto *load : loads) {
+    assert(load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy);
+    load->setOwnershipQualifier(LoadOwnershipQualifier::Take);
+  }
+  for (auto *copy : copies) {
+    assert(!copy->isTakeOfSrc());
+    copy->setIsTakeOfSrc(IsTake);
+  }
+
+  return true;
+}
+
+/// Whether the specified instruction is a barrier to folding.
+///
+/// TODO: This is a bit more conservative that it needs to be in a couple of
+/// ways:
+///
+/// (1) even if we've already seen a leaf, we could still fold, in certain
+/// cases, we should be able to fold anyway.  For example, given projections
+/// %p1 and %p2 of some root storage %a, in the following scenario:
+///
+///    %p1 = <PROJECT> %a
+///    %p2 = <PROJECT> %a
+///    %v1 = load [copy] %p1
+///    %v2_1 = load [copy] %p2
+///    %v2_1 = load [copy] %p2
+///    destroy_addr %a
+///
+/// we could fold destroy_addr %a into the first load [copy] %p2 and the
+/// load [copy] %p1:
+///
+///     %v1 = load [take] %p1
+///     %v2_1 = load [copy] %p2
+///     %v2_2 = load [take] %p1
+///
+/// And indeed we can do that for loads from a subprojection %p2_sub of
+/// %p2; the following
+///
+///     %v1 = load [copy] %p1
+///     %v2_sub = load [copy] %p2_sub
+///     %v2 = load [copy] %p2
+///
+/// could be folded to
+///
+///     %v1 = load [take] %p1
+///     %v2_sub = load [copy] %p2_sub
+///     %v2 = load [take] %p2
+///
+/// (2) We should be able to continue folding over a load [trivial] so long as
+/// the instructions that we're folding with don't destroy an aggregate that
+/// contains the projection which is the target of the load [trivial].  For
+/// example, given
+///
+///     %addr = alloc_stack %(X, I)
+///     %x_addr = tuple_element_addr %addr : $*(X, I), 0
+///     %i_addr = tuple_element_addr %addr : $*(X, I), 1
+///     %x = load [copy] %x_addr : $*X
+///     %i = load [trivial] %i_addr : $*I
+///     destroy_addr %addr
+///
+/// we should be able to fold the destroy_addr of the tuple with the load [copy]
+/// and ignore the load [trivial].
+///
+/// Doing this is complicated by the fact that we can't ignore the load
+/// [trivial] if the load [copy] is of the whole tuple.  If we have instead
+///
+///     %addr = alloc_stack %(X, I)
+///     %x_addr = tuple_element_addr %addr : $*(X, I), 0
+///     %i_addr = tuple_element_addr %addr : $*(X, I), 1
+///     %x = load [copy] %addr : $*(X, I)
+///     %i = load [trivial] %i_addr : $*I
+///     destroy_addr %addr
+///
+/// then we cannot fold.  If we did, we would end up with invalid SIL:
+///
+///     %x = load [take] %addr
+///     %i = load [trivial] %i_addr
+bool HoistDestroys::checkFoldingBarrier(
+    SILInstruction *instruction, SmallVectorImpl<LoadInst *> &loads,
+    SmallVectorImpl<CopyAddrInst *> &copies,
+    SmallPtrSetImpl<AccessPath::PathNode> &leaves, const AccessStorage &storage,
+    const DeinitBarriers &deinitBarriers) {
+  // The address of a projection out of the root storage which would be
+  // folded if folding is possible.
+  //
+  // If no such address is found, we need to check whether the instruction
+  // is a barrier.
+  SILValue address;
+  if (auto *load = dyn_cast<LoadInst>(instruction)) {
+    auto loadee = load->getOperand();
+    auto relativeAccessStorage = RelativeAccessStorageWithBase::compute(loadee);
+    if (relativeAccessStorage.getStorage().hasIdenticalStorage(storage)) {
+      // If the access path from the loaded address to its root storage involves
+      // a (layout non-equivalent) typecast--a load [take] of the casted address
+      // would not be equivalent to a load [copy] followed by a destroy_addr of
+      // the corresponding uncast projection--the truncated portion might have
+      // refcounted components.
+      if (relativeAccessStorage.cast == AccessStorageCast::Type)
         return true;
+      if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+        address = loadee;
+        loads.push_back(load);
       } else {
-        assert(load->getOperand()->getType().isTrivial(*load->getFunction()));
-        return false;
+        assert(loadee->getType().isTrivial(*load->getFunction()));
+        return true;
       }
     }
+  } else if (auto *copy = dyn_cast<CopyAddrInst>(instruction)) {
+    auto source = copy->getSrc();
+    auto relativeAccessStorage = RelativeAccessStorageWithBase::compute(source);
+    if (relativeAccessStorage.getStorage().hasIdenticalStorage(storage)) {
+      // If the access path from the copy_addr'd address to its root storage
+      // involves a (layout non-equivalent) typecast--a copy_addr [take] of the
+      // casted address would not be equivalent to a copy_addr followed by a
+      // destroy_addr of the corresponding uncast projection--the truncated
+      // portion might have refcounted components.
+      if (relativeAccessStorage.cast == AccessStorageCast::Type)
+        return true;
+      address = source;
+      copies.push_back(copy);
+    }
   }
-  if (auto *copy = dyn_cast<CopyAddrInst>(barrier)) {
-    if (stripAccessMarkers(copy->getSrc()) == stripAccessMarkers(storageRoot)) {
-      assert(!copy->isTakeOfSrc());
-      copy->setIsTakeOfSrc(IsTake);
+  if (address) {
+    // We found a relevant instruction that is operating on a projection out
+    // of the root storage which would be folded if folding were possible.
+    // Find its nontrivial product leaves and remove them from the set of
+    // leaves of the root storage which we're wating to see.
+    bool alreadySawLeaf = false;
+    visitProductLeafAccessPathNodes(address, typeExpansionContext, module,
+                                    [&](AccessPath::PathNode node, SILType ty) {
+                                      if (ty.isTrivial(*function))
+                                        return;
+                                      bool erased = leaves.erase(node);
+                                      alreadySawLeaf =
+                                          alreadySawLeaf || !erased;
+                                    });
+    if (alreadySawLeaf) {
+      // We saw this non-trivial product leaf already.  That means there are
+      // multiple load [copy]s or copy_addrs of at least one product leaf
+      // before (walking backwards from the hoisting point) there are
+      // instructions that load or copy from all the non-trivial leaves.
+      // Give up on folding.
       return true;
     }
+  } else if (deinitBarriers.isBarrier(instruction)) {
+    // We didn't find an instruction that was both
+    // - relevant (i.e. a copy_addr or a load [take])
+    // - operating on a projection of the root storage
+    // Additionally:
+    // - we can't ignore whether it's a barrier
+    // - and it IS a barrier.
+    // We can't fold.
+    return true;
   }
   return false;
 }
 
 bool HoistDestroys::foldBarrier(SILInstruction *barrier,
+                                const AccessStorage &storage,
                                 const KnownStorageUses &knownUses,
                                 const DeinitBarriers &deinitBarriers) {
   if (auto *eai = dyn_cast<EndAccessInst>(barrier)) {
@@ -647,13 +866,13 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier,
     while ((instruction = instruction->getPreviousInstruction())) {
       if (instruction == bai)
         return false;
-      if (foldBarrier(instruction, storageRoot))
+      if (foldBarrier(instruction, storage, deinitBarriers))
         return true;
       if (deinitBarriers.isBarrier(instruction))
         return false;
     }
   }
-  return foldBarrier(barrier, storageRoot);
+  return foldBarrier(barrier, storage, deinitBarriers);
 }
 
 // \p barrier may be null if the destroy is at function entry.
@@ -730,6 +949,12 @@ bool hoistDestroys(SILValue root, bool ignoreDeinitBarriers,
 
   // The algorithm assumes no critical edges.
   assert(function->hasOwnership() && "requires OSSA");
+
+  // If lexical lifetimes aren't enabled, then deinit barriers aren't respected.
+  auto &module = function->getModule();
+  auto enableLexicalLifetimes =
+      module.getASTContext().SILOpts.supportsLexicalLifetimes(module);
+  ignoreDeinitBarriers = ignoreDeinitBarriers || !enableLexicalLifetimes;
 
   return HoistDestroys(root, ignoreDeinitBarriers, remainingDestroyAddrs,
                        deleter)
@@ -844,8 +1069,7 @@ void SSADestroyHoisting::run() {
   // We assume that the function is in reverse post order so visiting the
   // blocks and pushing begin_access as we see them and then popping them off
   // the end will result in hoisting inner begin_access' destroy_addrs first.
-  while (!bais.empty()) {
-    auto *bai = bais.pop_back_val();
+  for (auto *bai : llvm::reverse(bais)) {
     changed |= hoistDestroys(bai, /*ignoreDeinitBarriers=*/true,
                              remainingDestroyAddrs, deleter);
   }

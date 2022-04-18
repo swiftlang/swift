@@ -248,6 +248,16 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define SWIFT_VFORMAT(fmt)
 #endif
 
+/// Should we use absolute function pointers instead of relative ones?
+/// WebAssembly target uses it by default.
+#ifndef SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
+# if defined(__wasm__)
+#  define SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER 1
+# else
+#  define SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER 0
+# endif
+#endif
+
 // Pointer authentication.
 #if __has_feature(ptrauth_calls)
 #define SWIFT_PTRAUTH 1
@@ -292,9 +302,15 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_dispatch_invoke_function                               \
   __ptrauth(ptrauth_key_process_independent_code, 1,                           \
             SpecialPointerAuthDiscriminators::DispatchInvokeFunction)
+#define __ptrauth_swift_accessible_function_record                             \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::AccessibleFunctionRecord)
 #define __ptrauth_swift_objc_superclass                                        \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             swift::SpecialPointerAuthDiscriminators::ObjCSuperclass)
+#define __ptrauth_swift_nonunique_extended_existential_type_shape                        \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape)
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer)         \
   ptrauth_auth_and_resign(__fn, ptrauth_key_function_pointer, 0,               \
                           ptrauth_key_process_independent_code,                \
@@ -321,12 +337,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_cancellation_notification_function
 #define __ptrauth_swift_escalation_notification_function
 #define __ptrauth_swift_dispatch_invoke_function
+#define __ptrauth_swift_accessible_function_record
 #define __ptrauth_swift_objc_superclass
 #define __ptrauth_swift_runtime_function_entry
 #define __ptrauth_swift_runtime_function_entry_with_key(__key)
 #define __ptrauth_swift_runtime_function_entry_strip(__fn) (__fn)
 #define __ptrauth_swift_heap_object_destructor
 #define __ptrauth_swift_type_descriptor
+#define __ptrauth_swift_nonunique_extended_existential_type_shape
 #define __ptrauth_swift_dynamic_replacement_key
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer) (__fn)
 #define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer) (__fn)

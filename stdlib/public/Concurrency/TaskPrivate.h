@@ -26,8 +26,10 @@
 #include "swift/Runtime/DispatchShims.h"
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/Exclusivity.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include <atomic>
+#include <new>
 
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
@@ -295,6 +297,10 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
 #endif
   };
 
+  // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
+  // ActiveTaskStatusWithoutEscalation in
+  // include/swift/Reflection/RuntimeInternals.h. Any changes to the layout here
+  // must also be made there.
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;
   dispatch_lock_t ExecutionLock;
@@ -507,7 +513,9 @@ public:
   }
 
   void traceStatusChanged(AsyncTask *task) {
-    concurrency::trace::task_status_changed(task, Flags);
+    concurrency::trace::task_status_changed(
+        task, static_cast<uint8_t>(getStoredPriority()), isCancelled(),
+        isStoredPriorityEscalated(), isRunning(), isEnqueued());
   }
 };
 
@@ -518,6 +526,12 @@ public:
 #endif
 static_assert(sizeof(ActiveTaskStatus) == ACTIVE_TASK_STATUS_SIZE,
   "ActiveTaskStatus is of incorrect size");
+#if !defined(_WIN64)
+static_assert(sizeof(swift::atomic<ActiveTaskStatus>) == sizeof(std::atomic<ActiveTaskStatus>),
+              "swift::atomic pads std::atomic, memory aliasing invariants violated");
+#endif
+static_assert(sizeof(swift::atomic<ActiveTaskStatus>) == sizeof(ActiveTaskStatus),
+              "swift::atomic pads ActiveTaskStatus, memory aliasing invariants violated");
 
 /// The size of an allocator slab. We want the full allocation to fit into a
 /// 1024-byte malloc quantum. We subtract off the slab header size, plus a
@@ -539,7 +553,7 @@ struct AsyncTask::PrivateStorage {
 
   /// Storage for the ActiveTaskStatus. See doc for ActiveTaskStatus for size
   /// and alignment requirements.
-  alignas(2 * sizeof(void *)) char StatusStorage[sizeof(ActiveTaskStatus)];
+  alignas(alignof(ActiveTaskStatus)) char StatusStorage[sizeof(ActiveTaskStatus)];
 
   /// The allocator for the task stack.
   /// Currently 2 words + 8 bytes.
@@ -642,11 +656,11 @@ AsyncTask::OpaquePrivateStorage::get() const {
   return reinterpret_cast<const PrivateStorage &>(*this);
 }
 inline void AsyncTask::OpaquePrivateStorage::initialize(JobPriority basePri) {
-  new (this) PrivateStorage(basePri);
+  ::new (this) PrivateStorage(basePri);
 }
 inline void AsyncTask::OpaquePrivateStorage::initializeWithSlab(
     JobPriority basePri, void *slab, size_t slabCapacity) {
-  new (this) PrivateStorage(basePri, slab, slabCapacity);
+  ::new (this) PrivateStorage(basePri, slab, slabCapacity);
 }
 inline void AsyncTask::OpaquePrivateStorage::complete(AsyncTask *task) {
   get().complete(task);
@@ -771,7 +785,10 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
 
   // Set up task for enqueue to next location by setting the Job priority field
   Flags.setPriority(newStatus.getStoredPriority());
-  concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
+  concurrency::trace::task_flags_changed(
+      this, static_cast<uint8_t>(Flags.getPriority()), Flags.task_isChildTask(),
+      Flags.task_isFuture(), Flags.task_isGroupChildTask(),
+      Flags.task_isAsyncLetTask());
 
   swift_task_enqueue(this, newExecutor);
 }

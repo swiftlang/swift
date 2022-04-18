@@ -682,7 +682,6 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
   case CodeCompletionResultKind::Declaration:
     switch (completion->getExpectedTypeRelation()) {
     case swift::ide::CodeCompletionResultTypeRelation::Convertible:
-    case swift::ide::CodeCompletionResultTypeRelation::Identical:
       return ResultBucket::NormalTypeMatch;
     case swift::ide::CodeCompletionResultTypeRelation::NotApplicable:
     case swift::ide::CodeCompletionResultTypeRelation::Unknown:

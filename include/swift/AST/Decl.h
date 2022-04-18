@@ -19,6 +19,7 @@
 
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -505,11 +506,6 @@ protected:
     IsOpaqueType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AssociatedTypeDecl, AbstractTypeParamDecl, 1,
-    /// Whether this is a primary associated type.
-    IsPrimary : 1
-  );
-
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
@@ -531,7 +527,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -565,6 +561,9 @@ protected:
 
     /// Whether we have a lazy-loaded list of associated types.
     HasLazyAssociatedTypes : 1,
+
+    /// Whether we have a lazy-loaded list of primary associated types.
+    HasLazyPrimaryAssociatedTypes : 1,
 
     : NumPadBits,
 
@@ -2175,6 +2174,9 @@ class GenericParameterReferenceInfo final {
   using OptionalTypePosition = OptionalEnum<decltype(TypePosition::Covariant)>;
 
 public:
+  /// Whether the uncurried interface type of the declaration, stipped of any
+  /// optionality, is a direct reference to the generic parameter at hand. For
+  /// example, "func foo(x: Int) -> () -> Self?" has a covariant 'Self' result.
   bool hasCovariantSelfResult;
 
   OptionalTypePosition selfRef;
@@ -2183,6 +2185,12 @@ public:
   /// A reference to 'Self'.
   static GenericParameterReferenceInfo forSelfRef(TypePosition position) {
     return GenericParameterReferenceInfo(false, position, llvm::None);
+  }
+
+  /// A reference to the generic parameter in covariant result position.
+  static GenericParameterReferenceInfo forCovariantResult() {
+    return GenericParameterReferenceInfo(true, TypePosition::Covariant,
+                                         llvm::None);
   }
 
   /// A reference to 'Self' through an associated type.
@@ -2685,13 +2693,14 @@ public:
   /// that this declaration dynamically replaces.
   ValueDecl *getDynamicallyReplacedDecl() const;
 
-  /// Report 'Self' references within the type of this declaration as a
-  /// member of the given existential base type.
+  /// Find references to 'Self' in the type signature of this declaration in the
+  /// context of the given existential base type.
   ///
-  /// \param treatNonResultCovariantSelfAsInvariant If true, 'Self' or 'Self?'
-  /// is considered covariant only when it appears as the immediate type of a
-  /// property, or the uncurried result type of a method/subscript, e.g.
-  /// '() -> () -> Self'.
+  /// \param treatNonResultCovariantSelfAsInvariant When set, covariant 'Self'
+  /// references that are not in covariant result type position are considered
+  /// invariant. This position is the uncurried interface type of a declaration,
+  /// stipped of any optionality. For example, this is true for 'Self' in
+  /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
 };
@@ -2786,6 +2795,12 @@ class OpaqueTypeDecl final :
     private llvm::TrailingObjects<OpaqueTypeDecl, OpaqueReturnTypeRepr *> {
   friend TrailingObjects;
 
+public:
+  /// A set of substitutions that represents a possible underlying type iff
+  /// associated set of availability conditions is met.
+  class ConditionallyAvailableSubstitutions;
+
+private:
   /// The original declaration that "names" the opaque type. Although a specific
   /// opaque type cannot be explicitly named, oapque types can propagate
   /// arbitrarily through expressions, so we need to know *which* opaque type is
@@ -2805,8 +2820,17 @@ class OpaqueTypeDecl final :
   /// expressed as a SubstitutionMap for the opaque interface generic signature.
   /// This maps types in the interface generic signature to the outer generic
   /// signature of the original declaration.
-  Optional<SubstitutionMap> UnderlyingTypeSubstitutions;
-  
+  Optional<SubstitutionMap> UniqueUnderlyingType;
+
+  /// A set of substitutions which are used based on the availability
+  /// checks performed at runtime. This set of only populated if there
+  /// is no single unique underlying type for this opaque type declaration.
+  ///
+  /// It always contains one or more conditionally available substitutions
+  /// followed by a universally available type used as a fallback.
+  Optional<MutableArrayRef<ConditionallyAvailableSubstitutions *>>
+      ConditionallyAvailableTypes = None;
+
   mutable Identifier OpaqueReturnTypeIdentifier;
 
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
@@ -2882,16 +2906,29 @@ public:
   }
 
   /// The substitutions that map the generic parameters of the opaque type to
-  /// their underlying types, when that information is known.
-  Optional<SubstitutionMap> getUnderlyingTypeSubstitutions() const {
-    return UnderlyingTypeSubstitutions;
+  /// the unique underlying types, when that information is known.
+  Optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const {
+    return UniqueUnderlyingType;
   }
   
-  void setUnderlyingTypeSubstitutions(SubstitutionMap subs) {
-    assert(!UnderlyingTypeSubstitutions.hasValue() && "resetting underlying type?!");
-    UnderlyingTypeSubstitutions = subs;
+  void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
+    assert(!UniqueUnderlyingType.hasValue() && "resetting underlying type?!");
+    UniqueUnderlyingType = subs;
   }
-  
+
+  bool hasConditionallyAvailableSubstitutions() const {
+    return ConditionallyAvailableTypes.hasValue();
+  }
+
+  ArrayRef<ConditionallyAvailableSubstitutions *>
+  getConditionallyAvailableSubstitutions() const {
+    assert(ConditionallyAvailableTypes);
+    return ConditionallyAvailableTypes.getValue();
+  }
+
+  void setConditionallyAvailableSubstitutions(
+      ArrayRef<ConditionallyAvailableSubstitutions *> substitutions);
+
   // Opaque type decls are currently always implicit
   SourceRange getSourceRange() const { return SourceRange(); }
   
@@ -2910,6 +2947,40 @@ public:
       return classof(D);
     return false;
   }
+
+  class ConditionallyAvailableSubstitutions final
+      : private llvm::TrailingObjects<ConditionallyAvailableSubstitutions,
+                                      VersionRange> {
+    friend TrailingObjects;
+
+    unsigned NumAvailabilityConditions;
+
+    SubstitutionMap Substitutions;
+
+    /// A type with limited availability described by the provided set
+    /// of availability conditions (with `and` relationship).
+    ConditionallyAvailableSubstitutions(
+        ArrayRef<VersionRange> availabilityContext,
+        SubstitutionMap substitutions)
+        : NumAvailabilityConditions(availabilityContext.size()),
+          Substitutions(substitutions) {
+      assert(!availabilityContext.empty());
+      std::uninitialized_copy(availabilityContext.begin(),
+                              availabilityContext.end(),
+                              getTrailingObjects<VersionRange>());
+    }
+
+  public:
+    ArrayRef<VersionRange> getAvailability() const {
+      return {getTrailingObjects<VersionRange>(), NumAvailabilityConditions};
+    }
+
+    SubstitutionMap getSubstitutions() const { return Substitutions; }
+
+    static ConditionallyAvailableSubstitutions *
+    get(ASTContext &ctx, ArrayRef<VersionRange> availabilityContext,
+        SubstitutionMap substitutions);
+  };
 };
 
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
@@ -3213,14 +3284,6 @@ public:
                      LazyMemberLoader *definitionResolver,
                      uint64_t resolverData);
 
-  bool isPrimary() const {
-    return Bits.AssociatedTypeDecl.IsPrimary;
-  }
-
-  void setPrimary() {
-    Bits.AssociatedTypeDecl.IsPrimary = true;
-  }
-
   /// Get the protocol in which this associated type is declared.
   ProtocolDecl *getProtocol() const {
     return cast<ProtocolDecl>(getDeclContext());
@@ -3277,6 +3340,7 @@ public:
 };
 
 class MemberLookupTable;
+class ObjCMethodLookupTable;
 class ConformanceLookupTable;
   
 // Kinds of pointer types.
@@ -3381,6 +3445,12 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   ArrayRef<ValueDecl *>
     getSatisfiedProtocolRequirementsForMember(const ValueDecl *Member,
                                               bool Sorted) const;
+
+  ObjCMethodLookupTable *ObjCMethodLookup = nullptr;
+
+  /// Create the Objective-C method lookup table, or return \c false if this
+  /// kind of type cannot have Objective-C methods.
+  bool createObjCMethodLookup();
 
   friend class ASTContext;
   friend class MemberLookupTable;
@@ -3493,8 +3563,11 @@ public:
   /// Find, or potentially synthesize, the implicit 'id' property of this actor.
   VarDecl *getDistributedActorIDProperty() const;
 
-  /// Find the 'RemoteCallTarget.init(_mangledName:)' initializer function
+  /// Find the 'RemoteCallTarget.init(_:)' initializer function.
   ConstructorDecl* getDistributedRemoteCallTargetInitFunction() const;
+
+  /// Find the 'RemoteCallArgument(label:name:value:)' initializer function.
+  ConstructorDecl* getDistributedRemoteCallArgumentInitFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -3530,6 +3603,24 @@ public:
                                    bool synthesized = false);
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
+
+  /// Look in this type and its extensions (but not any of its protocols or
+  /// superclasses) for declarations with a given Objective-C selector.
+  ///
+  /// Note that this can find methods, initializers, deinitializers,
+  /// getters, and setters.
+  ///
+  /// \param selector The Objective-C selector of the method we're
+  /// looking for.
+  ///
+  /// \param isInstance Whether we are looking for an instance method
+  /// (vs. a class method).
+  TinyPtrVector<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
+                                                     bool isInstance);
+
+  /// Record the presence of an @objc method with the given selector. No-op if
+  /// the type is of a kind which cannot contain @objc methods.
+  void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
 
   /// Is this the decl for Optional<T>?
   bool isOptionalDecl() const;
@@ -3954,13 +4045,7 @@ using AncestryOptions = OptionSet<AncestryFlags>;
 /// The type of the decl itself is a MetatypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
 class ClassDecl final : public NominalTypeDecl {
-  class ObjCMethodLookupTable;
-
   SourceLoc ClassLoc;
-  ObjCMethodLookupTable *ObjCMethodLookup = nullptr;
-
-  /// Create the Objective-C member lookup table.
-  void createObjCMethodLookup();
 
   struct {
     /// The superclass decl and a bit to indicate whether the
@@ -4225,25 +4310,6 @@ public:
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
 
-  using NominalTypeDecl::lookupDirect;
-
-  /// Look in this class and its extensions (but not any of its protocols or
-  /// superclasses) for declarations with a given Objective-C selector.
-  ///
-  /// Note that this can find methods, initializers, deinitializers,
-  /// getters, and setters.
-  ///
-  /// \param selector The Objective-C selector of the method we're
-  /// looking for.
-  ///
-  /// \param isInstance Whether we are looking for an instance method
-  /// (vs. a class method).
-  TinyPtrVector<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
-                                                     bool isInstance);
-
-  /// Record the presence of an @objc method with the given selector.
-  void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Class;
@@ -4296,9 +4362,13 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
+  Identifiable,
   Actor,
   DistributedActor,
+  DistributedActorSystem,
 };
+
+using PrimaryAssociatedTypeName = std::pair<Identifier, SourceLoc>;
 
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
@@ -4316,6 +4386,7 @@ enum class KnownDerivableProtocolKind : uint8_t {
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
+  ArrayRef<PrimaryAssociatedTypeName> PrimaryAssociatedTypeNames;
   ArrayRef<ProtocolDecl *> InheritedProtocols;
   ArrayRef<AssociatedTypeDecl *> AssociatedTypes;
 
@@ -4382,6 +4453,10 @@ class ProtocolDecl final : public NominalTypeDecl {
     return Bits.ProtocolDecl.HasLazyRequirementSignature;
   }
 
+  bool hasLazyPrimaryAssociatedTypes() const {
+    return Bits.ProtocolDecl.HasLazyPrimaryAssociatedTypes;
+  }
+
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class StructuralRequirementsRequest;
@@ -4389,14 +4464,18 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ProtocolDependenciesRequest;
   friend class RequirementSignatureRequest;
   friend class RequirementSignatureRequestRQM;
+  friend class RequirementSignatureRequestGSB;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
   friend class ExistentialRequiresAnyRequest;
   friend class InheritedProtocolsRequest;
+  friend class PrimaryAssociatedTypesRequest;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
-               Identifier Name, ArrayRef<InheritedEntry> Inherited,
+               Identifier Name,
+               ArrayRef<PrimaryAssociatedTypeName> PrimaryAssociatedTypeNames,
+               ArrayRef<InheritedEntry> Inherited,
                TrailingWhereClause *TrailingWhere);
 
   using Decl::getASTContext;
@@ -4421,6 +4500,13 @@ public:
   /// saves loading the set of members in cases where there's no possibility of
   /// a protocol having nested types (ObjC protocols).
   ArrayRef<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
+
+  /// Returns the list of primary associated type names. These are the associated
+  /// types that is parametrized with same-type requirements in a
+  /// parametrized protocol type of the form SomeProtocol<Arg1, Arg2...>.
+  ArrayRef<PrimaryAssociatedTypeName> getPrimaryAssociatedTypeNames() const {
+    return PrimaryAssociatedTypeNames;
+  }
 
   /// Returns the list of primary associated types. These are the associated
   /// types that is parametrized with same-type requirements in a
@@ -4489,10 +4575,6 @@ public:
   /// Determine whether this is a "marker" protocol, meaning that is indicates
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
-
-  /// Is a protocol that can only be conformed by distributed actors.
-  /// Such protocols are allowed to contain distributed functions.
-  bool inheritsFromDistributedActor() const;
 
 private:
   void computeKnownProtocolKind() const;
@@ -4611,6 +4693,9 @@ public:
 
   void setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
                                     uint64_t associatedTypesData);
+
+  void setLazyPrimaryAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
+                                           uint64_t associatedTypesData);
 
 public:
   // Implement isa/cast/dyncast/etc.
@@ -5063,6 +5148,13 @@ protected:
           SourceLoc nameLoc, Identifier name, DeclContext *dc,
           StorageIsMutable_t supportsMutation);
 
+protected:
+  // Only \c ParamDecl::setSpecifier is allowed to flip this - and it's also
+  // on the way out of that business.
+  void setIntroducer(Introducer value) {
+    Bits.VarDecl.Introducer = uint8_t(value);
+  }
+
 public:
   VarDecl(bool isStatic, Introducer introducer,
           SourceLoc nameLoc, Identifier name, DeclContext *dc)
@@ -5244,9 +5336,8 @@ public:
   
   /// Is this an immutable 'let' property?
   ///
-  /// If this is a ParamDecl, isLet() is true iff
-  /// getSpecifier() == Specifier::Default.
-  bool isLet() const { return getIntroducer() == Introducer::Let; }
+  /// For \c ParamDecl instances, using \c isImmutable is preferred.
+  bool isLet() const;
 
   /// Is this an "async let" property?
   bool isAsyncLet() const;
@@ -5254,16 +5345,16 @@ public:
   /// Does this have a 'distributed' modifier?
   bool isDistributed() const;
 
+  /// Is this var known to be a "local" distributed actor,
+  /// if so the implicit throwing ans some isolation checks can be skipped.
+  bool isKnownToBeLocal() const;
+
   /// Is this a stored property that will _not_ trigger any user-defined code
   /// upon any kind of access?
   bool isOrdinaryStoredProperty() const;
 
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
-  }
-
-  void setIntroducer(Introducer value) {
-    Bits.VarDecl.Introducer = uint8_t(value);
   }
 
   CaptureListExpr *getParentCaptureList() const {
@@ -5585,6 +5676,19 @@ public:
 
   /// Create a an identical copy of this ParamDecl.
   static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
+
+  static ParamDecl *
+  createImplicit(ASTContext &Context, SourceLoc specifierLoc,
+                 SourceLoc argumentNameLoc, Identifier argumentName,
+                 SourceLoc parameterNameLoc, Identifier parameterName,
+                 Type interfaceType, DeclContext *Parent,
+                 ParamSpecifier specifier = ParamSpecifier::Default);
+
+  static ParamDecl *
+  createImplicit(ASTContext &Context, Identifier argumentName,
+                 Identifier parameterName, Type interfaceType,
+                 DeclContext *Parent,
+                 ParamSpecifier specifier = ParamSpecifier::Default);
 
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
@@ -6308,7 +6412,15 @@ public:
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
 
-  /// Returns 'true' if the function has the @c @_backDeploy attribute.
+  /// For a 'distributed' target (func or computed property),
+  /// get the 'thunk' responsible for performing the 'remoteCall'.
+  ///
+  /// \return the synthesized thunk, or null if the base of the call has
+  ///         diagnosed errors during type checking.
+  FuncDecl *getDistributedThunk() const;
+  
+  /// Returns 'true' if the function has (or inherits) the @c @_backDeploy
+  /// attribute.
   bool isBackDeployed() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
@@ -6433,6 +6545,10 @@ public:
     return getBodyKind() == BodyKind::TypeChecked;
   }
 
+  bool isBodySILSynthesize() const {
+    return getBodyKind() == BodyKind::SILSynthesize;
+  }
+
   bool isBodySkipped() const {
     return getBodyKind() == BodyKind::Skipped;
   }
@@ -6446,14 +6562,24 @@ public:
   /// initialization factory. Such functions do not have a body that is
   /// representable in the AST, so it must be synthesized during SILGen.
   bool isDistributedActorFactory() const {
-    return getBodyKind() == BodyKind::SILSynthesize
-    && getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
+    return getBodyKind() == BodyKind::SILSynthesize &&
+           getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
   }
 
   /// Determines whether this function is a 'remoteCall' function,
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedActorSystem' protocol.
   bool isDistributedActorSystemRemoteCall(bool isVoidReturn) const;
+
+  /// Determines whether this function is a 'makeInvocationEncoder' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedActorSystem' protocol.
+  bool isDistributedActorSystemMakeInvocationEncoder() const;
+
+  /// Determines if this function is a 'recordGenericSubstitution' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordGenericSubstitution() const;
 
   /// Determines if this function is a 'recordArgument' function,
   /// which is used as ad-hoc protocol requirement by the
@@ -7843,8 +7969,11 @@ public:
   }
 };
 
-/// Find references to the given generic paramaeter in the generic signature
-/// and the type of the given value.
+/// Find references to the given generic paramater in the type signature of the
+/// given declaration using the given generic signature.
+///
+/// \param skipParamIndex If the value is a function or subscript declaration,
+/// specifies the index of the parameter that shall be skipped.
 GenericParameterReferenceInfo findGenericParameterReferences(
     const ValueDecl *value,
     CanGenericSignature sig, GenericTypeParamType *genericParam,
@@ -8016,9 +8145,13 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   return result;
 }
 
-/// Retrieve the parameter list for a given declaration, or nullputr if there
+/// Retrieve the parameter list for a given declaration, or nullptr if there
 /// is none.
 ParameterList *getParameterList(ValueDecl *source);
+
+/// Retrieve the parameter list for a given declaration context, or nullptr if
+/// there is none.
+ParameterList *getParameterList(DeclContext *source);
 
 /// Retrieve parameter declaration from the given source at given index, or
 /// nullptr if the source does not have a parameter list.

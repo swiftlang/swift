@@ -301,6 +301,9 @@ struct PrintOptions {
   /// Whether to print generic requirements in a where clause.
   bool PrintGenericRequirements = true;
 
+  /// Suppress emitting @available(*, noasync)
+  bool SuppressNoAsyncAvailabilityAttr = false;
+
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.
@@ -387,6 +390,12 @@ struct PrintOptions {
 
   /// Whether to use an empty line to separate two members in a single decl.
   bool EmptyLineBetweenMembers = false;
+
+  /// Whether to print empty members of a declaration on a single line, e.g.:
+  /// ```
+  /// extension Foo: Bar {}
+  /// ```
+  bool PrintEmptyMembersOnSameLine = false;
 
   /// Whether to print the extensions from conforming protocols.
   bool PrintExtensionFromConformingProtocols = false;

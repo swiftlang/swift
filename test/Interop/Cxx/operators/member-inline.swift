@@ -1,7 +1,7 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 
 // REQUIRES: executable_test
-// XFAIL: OS=linux-android
+// XFAIL: *
 
 import MemberInline
 import StdlibUnittest
@@ -29,6 +29,13 @@ OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
   expectEqual(42, resultNoArgs)
   expectEqual(65, resultOneArg)
   expectEqual(57, resultTwoArgs)
+}
+
+OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
+  var wrapper = LoadableBoolWrapper(value: true)
+
+  let resultExclaim = !wrapper
+  expectEqual(false, resultExclaim.value)
 }
 
 OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {

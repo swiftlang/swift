@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 678; // remove shared_external linkage
+const uint16_t SWIFTMODULE_VERSION_MINOR = 685; // Primary associated types
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1234,7 +1234,6 @@ namespace decls_block {
     DeclContextIDField,  // context decl
     TypeIDField,         // default definition
     BCFixed<1>,          // implicit flag
-    BCFixed<1>,          // is primary
     BCArray<DeclIDField> // overridden associated types
   >;
 
@@ -1414,7 +1413,13 @@ namespace decls_block {
     // - the foreign error convention, if any
     // - inlinable body text, if any
   >;
-  
+
+  using ConditionalSubstitutionLayout = BCRecordLayout<
+    CONDITIONAL_SUBSTITUTION,
+    SubstitutionMapIDField,
+    BCArray<IdentifierIDField> // N conditions where each is <major>.<minor>.<patch>
+  >;
+
   using OpaqueTypeLayout = BCRecordLayout<
     OPAQUE_TYPE_DECL,
     DeclContextIDField, // decl context
@@ -1425,6 +1430,7 @@ namespace decls_block {
     SubstitutionMapIDField, // optional substitution map for underlying type
     AccessLevelField // access level
     // trailed by generic parameters
+    // trailed by conditional substitutions
   >;
 
   // TODO: remove the unnecessary FuncDecl components here
@@ -1648,6 +1654,11 @@ namespace decls_block {
 
   using AssociatedTypeLayout = BCRecordLayout<
     ASSOCIATED_TYPE,
+    DeclIDField                  // associated type decl
+  >;
+
+  using PrimaryAssociatedTypeLayout = BCRecordLayout<
+    PRIMARY_ASSOCIATED_TYPE,
     DeclIDField                  // associated type decl
   >;
 
@@ -1916,6 +1927,7 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCFixed<1>, // is unconditionally unavailable?
     BCFixed<1>, // is unconditionally deprecated?
+    BCFixed<1>, // is unavailable from async?
     BCFixed<1>, // is this PackageDescription version-specific kind?
     BCFixed<1>, // is SPI?
     BC_AVAIL_TUPLE, // Introduced

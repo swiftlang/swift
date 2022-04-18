@@ -21,7 +21,7 @@
 #include "swift/Syntax/SyntaxKind.h"
 
 // Regex parser delivered via Swift modules.
-#include "swift/Parse/ExperimentalRegexBridging.h"
+#include "swift/Parse/RegexParserBridging.h"
 static RegexLiteralParsingFn regexLiteralParsingFn = nullptr;
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn) {
   regexLiteralParsingFn = fn;

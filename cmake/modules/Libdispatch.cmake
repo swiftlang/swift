@@ -89,6 +89,8 @@ foreach(sdk ${DISPATCH_SDKS})
                           ${SWIFT_LIBDISPATCH_COMPILER_TRIPLE_CMAKE_ARGS}
                           -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
                           -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                          -DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}
+                          -DCMAKE_SHARED_LINKER_FLAGS=${CMAKE_SHARED_LINKER_FLAGS}
                           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
                           -DCMAKE_INSTALL_LIBDIR=lib
                           -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>

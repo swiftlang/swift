@@ -112,10 +112,6 @@ struct PassContext {
     PassContext_fixStackNesting(_bridged, function.bridged)
   }
 
-  func getDestructor(ofClass type: Type) -> Function? {
-    PassContext_getDestructor(_bridged, type.bridged).function
-  }
-
   func getContextSubstitutionMap(for type: Type) -> SubstitutionMap {
     SubstitutionMap(PassContext_getContextSubstitutionMap(_bridged, type.bridged))
   }

@@ -198,7 +198,8 @@ Expr *Expr::getSemanticsProvidingExpr() {
   return this;
 }
 
-bool Expr::printConstExprValue(llvm::raw_ostream *OS) const {
+bool Expr::printConstExprValue(llvm::raw_ostream *OS,
+                        llvm::function_ref<bool(Expr*)> additionalCheck) const {
   auto print = [&](StringRef text) {
     if (OS) {
       *OS << text;
@@ -242,7 +243,7 @@ bool Expr::printConstExprValue(llvm::raw_ostream *OS) const {
     for (unsigned N = CE->getNumElements(), I = 0; I != N; I ++) {
       auto Ele = CE->getElement(I);
       auto needComma = I + 1 != N;
-      if (!Ele->printConstExprValue(OS)) {
+      if (!Ele->printConstExprValue(OS, additionalCheck)) {
         return false;
       }
       if (needComma)
@@ -257,7 +258,7 @@ bool Expr::printConstExprValue(llvm::raw_ostream *OS) const {
     for (unsigned N = TE->getNumElements(), I = 0; I != N; I ++) {
       auto Ele = TE->getElement(I);
       auto needComma = I + 1 != N;
-      if (!Ele->printConstExprValue(OS)) {
+      if (!Ele->printConstExprValue(OS, additionalCheck)) {
         return false;
       }
       if (needComma)
@@ -267,12 +268,13 @@ bool Expr::printConstExprValue(llvm::raw_ostream *OS) const {
     return true;
   }
   default:
-    return false;
+    return additionalCheck && additionalCheck(const_cast<Expr*>(this));
   }
 }
 
-bool Expr::isSemanticallyConstExpr() const {
-  return printConstExprValue(nullptr);
+bool Expr::isSemanticallyConstExpr(
+    llvm::function_ref<bool(Expr*)> additionalCheck) const {
+  return printConstExprValue(nullptr, additionalCheck);
 }
 
 Expr *Expr::getValueProvidingExpr() {
@@ -1178,14 +1180,16 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   assert(elements.size() & 1 && "even number of elements in sequence");
   size_t bytes = totalSizeToAlloc<Expr *>(elements.size());
   void *Buffer = ctx.Allocate(bytes, alignof(SequenceExpr));
-  return ::new(Buffer) SequenceExpr(elements);
+  return ::new (Buffer) SequenceExpr(elements);
 }
 
 ErasureExpr *ErasureExpr::create(ASTContext &ctx, Expr *subExpr, Type type,
-                                 ArrayRef<ProtocolConformanceRef> conformances){
-  auto size = totalSizeToAlloc<ProtocolConformanceRef>(conformances.size());
+                                 ArrayRef<ProtocolConformanceRef> conformances,
+                                 ArrayRef<ConversionPair> argConversions) {
+  auto size = totalSizeToAlloc<ProtocolConformanceRef, ConversionPair>(conformances.size(),
+                                                                       argConversions.size());
   auto mem = ctx.Allocate(size, alignof(ErasureExpr));
-  return ::new(mem) ErasureExpr(subExpr, type, conformances);
+  return ::new (mem) ErasureExpr(subExpr, type, conformances, argConversions);
 }
 
 UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
@@ -1194,8 +1198,8 @@ UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
                                              SourceLoc RAngleLoc) {
   auto size = totalSizeToAlloc<TypeRepr *>(UnresolvedParams.size());
   auto mem = ctx.Allocate(size, alignof(UnresolvedSpecializeExpr));
-  return ::new(mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
-                                             UnresolvedParams, RAngleLoc);
+  return ::new (mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
+                                              UnresolvedParams, RAngleLoc);
 }
 
 CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {

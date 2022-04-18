@@ -295,7 +295,9 @@ enum class TypeMatchFlags {
   /// to be non-escaping, but Swift currently does not.
   IgnoreNonEscapingForOptionalFunctionParam = 1 << 4,
   /// Allow compatible opaque archetypes.
-  AllowCompatibleOpaqueTypeArchetypes = 1 << 5
+  AllowCompatibleOpaqueTypeArchetypes = 1 << 5,
+  /// Ignore the @Sendable attributes on functions when matching types.
+  IgnoreFunctionSendability = 1 << 6,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
@@ -689,7 +691,7 @@ public:
   bool canDynamicallyBeOptionalType(bool includeExistential);
 
   /// Determine whether this type contains a type parameter somewhere in it.
-  bool hasTypeParameter() {
+  bool hasTypeParameter() const {
     return getRecursiveProperties().hasTypeParameter();
   }
 
@@ -772,6 +774,10 @@ public:
 
   /// Determines whether this type is an actor type.
   bool isActorType();
+
+  /// Determines whether this type conforms or inherits (if it's a protocol
+  /// type) from `DistributedActor`.
+  bool isDistributedActor();
 
   /// Determines the element type of a known
   /// [Autoreleasing]Unsafe[Mutable][Raw]Pointer variant, or returns null if the
@@ -1241,6 +1247,10 @@ public:
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
+
+  /// Return true if this type is potentially an AnyObject existential after
+  /// substitution.
+  bool isPotentiallyAnyObject();
 
   /// Whether this is an existential composition containing
   /// Error.
@@ -2084,7 +2094,7 @@ public:
     return value.toRaw() != other.value.toRaw();
   }
 
-  uint8_t toRaw() const { return value.toRaw(); }
+  uint16_t toRaw() const { return value.toRaw(); }
 };
 
 class YieldTypeFlags {
@@ -2762,6 +2772,7 @@ BEGIN_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
                                         MetatypeRepresentation repr) {
     return CanExistentialMetatypeType(ExistentialMetatypeType::get(type, repr));
   }
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getExistentialInstanceType)
 END_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
   
 /// ModuleType - This is the type given to a module value, e.g. the "Builtin" in
@@ -5248,6 +5259,9 @@ private:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
+  CanTypeArrayRef getMembers() const {
+    return CanTypeArrayRef(getPointer()->getMembers());
+  }
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
 /// ParameterizedProtocolType - A type that constrains one or more primary
@@ -5285,9 +5299,17 @@ public:
     return Base;
   }
 
+  ProtocolDecl *getProtocol() const {
+    return Base->getDecl();
+  }
+
   ArrayRef<Type> getArgs() const {
     return {getTrailingObjects<Type>(),
             Bits.ParameterizedProtocolType.ArgCount};
+  }
+
+  bool requiresClass() const {
+    return getBaseType()->requiresClass();
   }
 
   void getRequirements(Type baseType, SmallVectorImpl<Requirement> &reqs) const;
@@ -5311,11 +5333,35 @@ private:
                             RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)
+  CanProtocolType getBaseType() const {
+    return CanProtocolType(getPointer()->getBaseType());
+  }
   CanTypeArrayRef getArgs() const {
     return CanTypeArrayRef(getPointer()->getArgs());
   }
 END_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
+
+/// The generalized shape of an existential type.
+struct ExistentialTypeGeneralization {
+  /// The generalized existential type.  May refer to type parameters
+  /// from the generalization signature.
+  Type Shape;
+
+  /// The generalization signature and substitutions.
+  SubstitutionMap Generalization;
+
+  /// Retrieve the generalization for the given existential type.
+  ///
+  /// Substituting the generalization substitutions into the shape
+  /// should produce the original existential type.
+  ///
+  /// If there is a generic type substitution which can turn existential
+  /// type A into existential type B, then:
+  /// - the generalized shape types of A and B must be equal and
+  /// - the generic signatures of the generalization substitutions of
+  ///   A and B must be equal.
+  static ExistentialTypeGeneralization get(Type existentialType);
+};
 
 /// An existential type, spelled with \c any .
 ///
@@ -5341,6 +5387,9 @@ public:
 
     if (auto composition = ConstraintType->getAs<ProtocolCompositionType>())
       return composition->requiresClass();
+
+    if (auto paramProtocol = ConstraintType->getAs<ParameterizedProtocolType>())
+      return paramProtocol->requiresClass();
 
     return false;
   }
@@ -6417,9 +6466,10 @@ inline bool TypeBase::isAnyExistentialType() {
 }
 
 inline bool CanType::isExistentialTypeImpl(CanType type) {
-  return (isa<ProtocolType>(type) ||
-          isa<ProtocolCompositionType>(type) ||
-          isa<ExistentialType>(type));
+  return isa<ProtocolType>(type) ||
+         isa<ProtocolCompositionType>(type) ||
+         isa<ExistentialType>(type) ||
+         isa<ParameterizedProtocolType>(type);
 }
 
 inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
@@ -6515,6 +6565,8 @@ inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
     return Ty->getDecl();
   if (auto Ty = dyn_cast<ExistentialType>(*this))
     return Ty->getConstraintType()->getNominalOrBoundGenericNominal();
+  if (auto Ty = dyn_cast<ParameterizedProtocolType>(*this))
+    return Ty->getBaseType()->getNominalOrBoundGenericNominal();
   return nullptr;
 }
 
@@ -6525,7 +6577,8 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 inline Type TypeBase::getNominalParent() {
   if (auto existential = getAs<ExistentialType>())
     return existential->getConstraintType()->getNominalParent();
-
+  if (auto ppt = getAs<ParameterizedProtocolType>())
+    return ppt->getBaseType()->getNominalParent();
   return castTo<AnyGenericType>()->getParent();
 }
 

@@ -11,7 +11,12 @@
 #===----------------------------------------------------------------------===#
 
 if(NOT swift_concurrency_extra_sources)
-  set(swift_concurrency_extra_sources)
+  set(swift_concurrency_extra_sources
+    Clock.cpp
+    Clock.swift
+    ContinuousClock.swift
+    SuspendingClock.swift
+    TaskSleepDuration.swift)
 endif()
 
 if(NOT swift_concurrency_install_component)
@@ -113,10 +118,6 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncThrowingStream.swift
   AsyncStream.cpp
   Deque.swift
-  Clock.cpp
-  Clock.swift
-  ContinuousClock.swift
-  SuspendingClock.swift
   ${swift_concurrency_extra_sources}
   linker-support/magic-symbols-for-install-name.c
 

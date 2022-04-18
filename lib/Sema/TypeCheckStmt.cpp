@@ -429,8 +429,8 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
     // Reject inlinable code using availability macros.
     PoundAvailableInfo *info = elt.getAvailability();
     if (auto *decl = dc->getAsDecl()) {
-      if (decl->getAttrs().hasAttribute<InlinableAttr>() ||
-          decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      auto fragileKind = dc->getFragileFunctionKind();
+      if (fragileKind.kind != FragileFunctionKind::None)
         for (auto queries : info->getQueries())
           if (auto availSpec =
                   dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
@@ -438,7 +438,7 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
               Context.Diags.diagnose(
                   availSpec->getMacroLoc(),
                   swift::diag::availability_macro_in_inlinable,
-                  decl->getDescriptiveKind());
+                  fragileKind.getSelector());
               break;
             }
     }
@@ -1754,8 +1754,7 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
     auto kind = ctor->getFragileFunctionKind();
     if (kind.kind != FragileFunctionKind::None) {
       ctor->diagnose(diag::class_designated_init_inlinable_resilient,
-                     classDecl->getDeclaredInterfaceType(),
-                     static_cast<unsigned>(kind.kind));
+                     classDecl->getDeclaredInterfaceType(), kind.getSelector());
     }
   }
 
@@ -1800,6 +1799,36 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   auto &ctx = DC->getASTContext();
   assert(DiagnosticSuppression::isEnabled(ctx.Diags) &&
          "Diagnosing and Single ASTNode type checknig don't mix");
+
+  // Initializers aren't walked by ASTWalker and thus we don't find the context
+  // to type check using ASTNodeFinder. Also, initializers aren't representable
+  // by ASTNodes that can be type checked using typeCheckASTNode.
+  // Handle them specifically here.
+  if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
+    if (auto *PBD = patternInit->getBinding()) {
+      auto i = patternInit->getBindingIndex();
+      PBD->getPattern(i)->forEachVariable(
+          [](VarDecl *VD) { (void)VD->getInterfaceType(); });
+      if (PBD->getInit(i)) {
+        if (!PBD->isInitializerChecked(i)) {
+          typeCheckPatternBinding(PBD, i,
+                                  /*LeaveClosureBodyUnchecked=*/true);
+          return false;
+        }
+      }
+    }
+  } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
+      auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
+      (void)Param->getTypeCheckedDefaultExpr();
+      return false;
+    }
+    if (auto *SD = dyn_cast<SubscriptDecl>(defaultArg->getParent())) {
+      auto *Param = SD->getIndices()->get(defaultArg->getIndex());
+      (void)Param->getTypeCheckedDefaultExpr();
+      return false;
+    }
+  }
 
   // Find innermost ASTNode at Loc from DC. Results the reference to the found
   // ASTNode and the decl context of it.

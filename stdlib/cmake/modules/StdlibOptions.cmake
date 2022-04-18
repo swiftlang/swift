@@ -73,6 +73,10 @@ option(SWIFT_STDLIB_STABLE_ABI
        "Should stdlib be built with stable ABI (library evolution, resilience)."
        "${SWIFT_STDLIB_STABLE_ABI_default}")
 
+option(SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER
+       "Force compact function pointer to always be absolute mainly for WebAssembly"
+       FALSE)
+
 option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        "${SWIFT_STDLIB_STABLE_ABI}")
@@ -183,3 +187,14 @@ option(SWIFT_FREESTANDING_FLAVOR
 set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
     must specify the form of LTO by setting this to one of: 'full', 'thin'. This
     option only affects the standard library and runtime, not tools.")
+
+if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_STDLIB_CONCURRENCY_TRACING_default TRUE)
+else()
+  set(SWIFT_STDLIB_CONCURRENCY_TRACING_default FALSE)
+endif()
+
+option(SWIFT_STDLIB_CONCURRENCY_TRACING
+  "Enable concurrency tracing in the runtime; assumes the presence of os_log(3)
+   and the os_signpost(3) API."
+  "${SWIFT_STDLIB_CONCURRENCY_TRACING_default}")

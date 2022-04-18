@@ -229,11 +229,14 @@ namespace {
         auto superclassDecl = superclassType.getClassOrBoundGenericClass();
         assert(superclassType && superclassDecl);
 
-        if (IGM.hasResilientMetadata(superclassDecl, ResilienceExpansion::Maximal))
+        if (IGM.hasResilientMetadata(superclassDecl,
+                                     ResilienceExpansion::Maximal,
+                                     rootClass))
           Options |= ClassMetadataFlags::ClassHasResilientAncestry;
 
         // If the superclass has resilient storage, don't walk its fields.
-        if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+        if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal,
+                            rootClass)) {
           Options |= ClassMetadataFlags::ClassHasResilientMembers;
 
           // If the superclass is generic, we have to assume that its layout
@@ -263,10 +266,11 @@ namespace {
       if (classHasIncompleteLayout(IGM, theClass))
         Options |= ClassMetadataFlags::ClassHasMissingMembers;
 
-      if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal))
+      if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal,
+                                   rootClass))
         Options |= ClassMetadataFlags::ClassHasResilientAncestry;
 
-      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal)) {
+      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal, rootClass)) {
         Options |= ClassMetadataFlags::ClassHasResilientMembers;
         return;
       }

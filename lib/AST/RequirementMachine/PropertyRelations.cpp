@@ -9,7 +9,21 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
+//
+// Utility functions used during property map construction to record rewrite
+// loops that describe certain special identities between rewrite rules that
+// are discovered by the property map.
+//
+// For example, a superclass requirement implies an AnyObject layout
+// requirement in the Swift language; if both are specified in some set of
+// user-written requirements, the latter requirement is redundant and should
+// be dropped from the minimal generic signature.
+//
+// This is described by recording a rewrite loop connecting the superclass rule
+// and the AnyObject layout rule via a special rewrite step known as a
+// "relation".
+//
+//===----------------------------------------------------------------------===//
 #include "swift/AST/Type.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>

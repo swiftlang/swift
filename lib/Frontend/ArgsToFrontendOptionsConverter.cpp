@@ -274,6 +274,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
+  Opts.ExposePublicDeclsInClangHeader =
+      Args.hasArg(OPT_clang_header_expose_public_decls);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
@@ -625,13 +627,8 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     return true;
   }
   if (!FrontendOptions::canActionEmitClangHeader(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+      Opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
-    return true;
-  }
-  if (!FrontendOptions::canActionEmitClangHeader(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasCxxHeaderOutputPath()) {
-    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_cxx_header);
     return true;
   }
   if (!FrontendOptions::canActionEmitLoadedModuleTrace(Opts.RequestedAction) &&

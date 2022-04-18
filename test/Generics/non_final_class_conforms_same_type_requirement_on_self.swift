@@ -14,7 +14,7 @@ public protocol Q {
 // exactly equal C; since C is not final, this means the conformance
 // is not covariant.
 public class C : P {
-// expected-warning@-1 {{non-final class 'C' cannot safely conform to protocol 'P', which requires that 'Self' is exactly equal to 'Self.A.B'; this is an error in Swift 6}}
+// expected-warning@-1 {{non-final class 'C' cannot safely conform to protocol 'P', which requires that 'Self.A.B' is exactly equal to 'Self'; this is an error in Swift 6}}
   public typealias A = D
 }
 
@@ -42,6 +42,37 @@ public class FinalD : Q {
 
 // CHECK-LABEL: Generic signature: <T where T : C>
 public func takesBoth1<T>(_: T) where T : P, T : C {}
+// expected-warning@-1 {{redundant conformance constraint 'C' : 'P'}}
 
 // CHECK-LABEL: Generic signature: <U where U : C>
 public func takesBoth2<U>(_: U) where U : C, U : P {}
+// expected-warning@-1 {{redundant conformance constraint 'C' : 'P'}}
+
+// 'Self' can also occur inside of a concrete type or superclass requirement.
+public class G<T> {}
+
+public protocol ConcreteExampleP {
+  associatedtype A : Q where A.B == G<Self>
+}
+
+public class ConcreteExampleC : ConcreteExampleP {
+// expected-warning@-1 {{non-final class 'ConcreteExampleC' cannot safely conform to protocol 'ConcreteExampleP', which requires that 'Self.A.B' is exactly equal to 'G<Self>'; this is an error in Swift 6}}
+  public typealias A = ConcreteExampleD
+}
+
+public class ConcreteExampleD : Q {
+  public typealias B = G<ConcreteExampleC>
+}
+
+public protocol SuperclassExampleP {
+  associatedtype A : Q where A.B : G<Self>
+}
+
+public class SuperclassExampleC : SuperclassExampleP {
+// expected-warning@-1 {{non-final class 'SuperclassExampleC' cannot safely conform to protocol 'SuperclassExampleP', which requires that 'Self.A.B' inherit from 'G<Self>'; this is an error in Swift 6}}
+  public typealias A = SuperclassExampleD
+}
+
+public class SuperclassExampleD : Q {
+  public typealias B = G<SuperclassExampleC>
+}

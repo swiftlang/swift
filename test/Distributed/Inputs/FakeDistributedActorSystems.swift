@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import _Distributed
+import Distributed
 
 // ==== Fake Address -----------------------------------------------------------
 
@@ -41,6 +41,7 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
   public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias InvocationEncoder = FakeInvocationEncoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeRoundtripResultHandler
 
   // just so that the struct does not become "trivial"
   let someValue: String = ""
@@ -87,7 +88,7 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   public func remoteCallVoid<Act, Err>(
@@ -99,7 +100,7 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
     where Act: DistributedActor,
           Act.ID == ActorID,
           Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
   public nonisolated var description: Swift.String {
@@ -115,6 +116,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
   public typealias InvocationEncoder = FakeInvocationEncoder
   public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeRoundtripResultHandler
 
   var activeActors: [ActorID: any DistributedActor] = [:]
 
@@ -184,7 +186,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
       try await executeDistributedTarget(
         on: active,
-        mangledTargetName: target.mangledName,
+        target: target,
         invocationDecoder: &decoder,
         handler: resultHandler
       )
@@ -234,7 +236,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
       try await executeDistributedTarget(
         on: active,
-        mangledTargetName: target.mangledName,
+        target: target,
         invocationDecoder: &decoder,
         handler: resultHandler
       )
@@ -267,18 +269,22 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
     genericSubs.append(type)
   }
 
-  public mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
-    print(" > encode argument: \(argument)")
-    arguments.append(argument)
+  public mutating func recordArgument<Value: SerializationRequirement>(
+    _ argument: RemoteCallArgument<Value>) throws {
+    print(" > encode argument name:\(argument.label ?? "_"), value: \(argument.value)")
+    arguments.append(argument.value)
   }
+
   public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
     print(" > encode error type: \(String(reflecting: type))")
     self.errorType = type
   }
+
   public mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {
     print(" > encode return type: \(String(reflecting: type))")
     self.returnType = type
   }
+
   public mutating func doneRecording() throws {
     print(" > done recording")
   }
@@ -358,13 +364,13 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
     self.storeError = storeError
   }
 
-  public func onReturn<Res>(value: Res) async throws {
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
     print(" << onReturn: \(value)")
     storeReturn(value)
   }
 
   public func onReturnVoid() async throws {
-    print(" << onReturnVoid:()")
+    print(" << onReturnVoid: ()")
     storeReturn(())
   }
 

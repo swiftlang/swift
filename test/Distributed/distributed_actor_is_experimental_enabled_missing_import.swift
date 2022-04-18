@@ -1,11 +1,11 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-distributed
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 actor SomeActor {}
 
 distributed actor DA {}
-// expected-error@-1{{'_Distributed' module not imported, required for 'distributed actor'}}
+// expected-error@-1{{'Distributed' module not imported, required for 'distributed actor'}}
 
 distributed actor class DAC {}
 // expected-error@-1{{distributed' can only be applied to 'actor' definitions, and distributed actor-isolated async functions}}
@@ -18,18 +18,18 @@ actor A {
 }
 
 actor B {
-  distributed var neverOk: String { // expected-error{{'_Distributed' module not imported, required for 'distributed actor'}}
+  distributed var neverOk: String { // expected-error{{'Distributed' module not imported, required for 'distributed actor'}}
     ""
   }
 }
 
 distributed actor DA2 {
-  // expected-error@-1{{'_Distributed' module not imported, required for 'distributed actor'}}
+  // expected-error@-1{{'Distributed' module not imported, required for 'distributed actor'}}
   func normal() async {}
   distributed func dist() {}
   distributed func distAsync() async {}
 
-  distributed var neverOk: String { // expected-error{{'_Distributed' module not imported, required for 'distributed actor'}}
+  distributed var neverOk: String { // expected-error{{'Distributed' module not imported, required for 'distributed actor'}}
     ""
   }
 }

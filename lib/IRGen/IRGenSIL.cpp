@@ -1311,8 +1311,6 @@ public:
   
   void visitConvertFunctionInst(ConvertFunctionInst *i);
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *i);
-  void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *i);
-  void visitPointerToThinFunctionInst(PointerToThinFunctionInst *i);
   void visitUpcastInst(UpcastInst *i);
   void visitAddressToPointerInst(AddressToPointerInst *i);
   void visitPointerToAddressInst(PointerToAddressInst *i);
@@ -1331,8 +1329,6 @@ public:
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *i);
-  void
-  visitUnconditionalCheckedCastValueInst(UnconditionalCheckedCastValueInst *i);
   void visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *i);
   void visitObjCExistentialMetatypeToObjectInst(
                                         ObjCExistentialMetatypeToObjectInst *i);
@@ -1363,7 +1359,6 @@ public:
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *i);
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *i);
   void visitCheckedCastBranchInst(CheckedCastBranchInst *i);
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *i);
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
   
   void visitGetAsyncContinuationInst(GetAsyncContinuationInst *i);
@@ -2239,7 +2234,7 @@ void IRGenSILFunction::emitSILFunction() {
 
   // Emit distributed accessor, and mark the thunk as accessible
   // by name at runtime through it.
-  if (CurSILFn->isDistributed() && CurSILFn->isThunk()) {
+  if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
     IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
   }
@@ -5770,7 +5765,9 @@ void IRGenSILFunction::visitBeginUnpairedAccessInst(
     // in which case we should use the caller, which is generally ok because
     // materializeForSet can't usually be thunked.
     llvm::Value *pc;
-    if (hasBeenInlined(access)) {
+    // Wasm doesn't have returnaddress because it can't access call frame
+    // for security purposes
+    if (IGM.Triple.isWasm() || hasBeenInlined(access)) {
       pc = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     } else {
       auto retAddrFn =
@@ -5856,26 +5853,6 @@ void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     out.add(fn);
     out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
   }
-  setLoweredExplosion(i, out);
-}
-
-void IRGenSILFunction::visitThinFunctionToPointerInst(
-                                          swift::ThinFunctionToPointerInst *i) {
-  Explosion in = getLoweredExplosion(i->getOperand());
-  llvm::Value *fn = in.claimNext();
-  fn = Builder.CreateBitCast(fn, IGM.Int8PtrTy);
-  Explosion out;
-  out.add(fn);
-  setLoweredExplosion(i, out);
-}
-
-void IRGenSILFunction::visitPointerToThinFunctionInst(
-                                          swift::PointerToThinFunctionInst *i) {
-  Explosion in = getLoweredExplosion(i->getOperand());
-  llvm::Value *fn = in.claimNext();
-  fn = Builder.CreateBitCast(fn, IGM.FunctionPtrTy);
-  Explosion out;
-  out.add(fn);
   setLoweredExplosion(i, out);
 }
 
@@ -6370,16 +6347,6 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                   CheckedCastMode::Unconditional);
 }
 
-void IRGenSILFunction::visitUnconditionalCheckedCastValueInst(
-    swift::UnconditionalCheckedCastValueInst *i) {
-  llvm_unreachable("unsupported instruction during IRGen");
-}
-
-void IRGenSILFunction::visitCheckedCastValueBranchInst(
-    swift::CheckedCastValueBranchInst *i) {
-  llvm_unreachable("unsupported instruction during IRGen");
-}
-
 void IRGenSILFunction::visitCheckedCastBranchInst(
                                               swift::CheckedCastBranchInst *i) {
   FailableCastResult castResult;
@@ -6506,8 +6473,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
       emitInitOfGenericRequirementsBuffer(*this, requirements, argsBuf,
         [&](GenericRequirement reqt) -> llvm::Value * {
           return emitGenericRequirementFromSubstitutions(*this, sig,
-                                           *IGM.getSwiftModule(),
-                                           reqt, subs);
+                                                         reqt, subs);
         });
     }
     

@@ -22,10 +22,9 @@ struct G<T : P1 & P2> {}
 // Since G.T.T == G.T.T.T == G.T.T.T.T = ... = X<T.U>, we tie off the
 // recursion by introducing a same-type requirement G.T.T => G.T.
 
-// CHECK-LABEL: Adding generic signature <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> {
+// CHECK-LABEL: Requirement machine for fresh signature < T >
 // CHECK-LABEL: Rewrite system: {
 // CHECK: - [P1:T].T => [P1:T].[P1:T]
 // CHECK: - τ_0_0.[P1:T].[concrete: X<τ_0_0.[P2:U]>] => τ_0_0.[P1:T]
 // CHECK: - τ_0_0.[P1:T].[P1:T] => τ_0_0.[P1:T]
-// CHECK: }
 // CHECK: }

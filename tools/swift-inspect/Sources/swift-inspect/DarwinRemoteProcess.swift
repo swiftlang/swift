@@ -28,6 +28,8 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   private var swiftCore: CSTypeRef
   private let swiftConcurrency: CSTypeRef
 
+  private lazy var threadInfos = getThreadInfos()
+
   static var QueryDataLayout: QueryDataLayoutFunction {
     return { (context, type, _, output) in
       guard let output = output else { return 0 }
@@ -111,13 +113,24 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     }
   }
 
-  init?(processId: ProcessIdentifier) {
+  init?(processId: ProcessIdentifier, forkCorpse: Bool) {
     var task: task_t = task_t()
-    let result = task_for_pid(mach_task_self_, processId, &task)
-    guard result == KERN_SUCCESS else {
-      print("unable to get task for pid \(processId): \(String(cString: mach_error_string(result))) (0x\(String(result, radix: 16)))")
+    let taskResult = task_for_pid(mach_task_self_, processId, &task)
+    guard taskResult == KERN_SUCCESS else {
+      print("unable to get task for pid \(processId): \(String(cString: mach_error_string(taskResult))) \(hex: taskResult)")
       return nil
     }
+
+    if forkCorpse {
+      var corpse = task_t()
+      let corpseResult = task_generate_corpse(task, &corpse)
+      if corpseResult == KERN_SUCCESS {
+        task = corpse
+      } else {
+        print("unable to fork corpse for pid \(processId): \(String(cString: mach_error_string(corpseResult))) \(hex: corpseResult)")
+      }
+    }
+
     self.task = task
 
     self.symbolicator = CSSymbolicatorCreateWithTask(self.task)
@@ -178,59 +191,115 @@ internal final class DarwinRemoteProcess: RemoteProcess {
 }
 
 extension DarwinRemoteProcess {
-  internal var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
-    var threadList: UnsafeMutablePointer<thread_t>?
-    var threadCount: mach_msg_type_number_t = 0
+  private class PortList: Sequence {
+    let buffer: UnsafeBufferPointer<mach_port_t>
 
-    let result = task_threads(self.task, &threadList, &threadCount)
-    guard result == KERN_SUCCESS else {
-      print("unable to gather threads for process: \(String(cString: mach_error_string(result))) (0x\(String(result, radix: 16)))")
-      return []
+    init?(task: task_t) {
+      var threadList: UnsafeMutablePointer<mach_port_t>?
+      var threadCount: mach_msg_type_number_t = 0
+
+      let result = task_threads(task, &threadList, &threadCount)
+      guard result == KERN_SUCCESS else {
+        print("unable to gather threads for process: \(String(cString: mach_error_string(result))) (0x\(String(result, radix: 16)))")
+        return nil
+      }
+
+      buffer = UnsafeBufferPointer(start: threadList, count: Int(threadCount))
     }
 
-    defer {
+    deinit {
       // Deallocate the port rights for the threads.
-      for i in 0 ..< Int(threadCount) {
-        mach_port_deallocate(mach_task_self_, threadList![i])
+      for thread in self {
+        mach_port_deallocate(mach_task_self_, thread)
       }
 
       // Deallocate the thread list.
-      let pointer = vm_address_t(truncatingIfNeeded: Int(bitPattern: threadList))
-      let size = vm_size_t(MemoryLayout<thread_t>.size) * vm_size_t(threadCount)
+      let pointer = vm_address_t(truncatingIfNeeded: Int(bitPattern: buffer.baseAddress))
+      let size = vm_size_t(MemoryLayout<mach_port_t>.size) * vm_size_t(buffer.count)
 
       vm_deallocate(mach_task_self_, pointer, size)
     }
 
-    var results: [(threadID: UInt64, currentTask: swift_addr_t)] = []
-    for i in 0 ..< Int(threadCount) {
-      let THREAD_IDENTIFIER_INFO_COUNT =
-          MemoryLayout<thread_identifier_info_data_t>.size / MemoryLayout<natural_t>.size
-      var info = thread_identifier_info_data_t()
-      var infoCount = mach_msg_type_number_t(THREAD_IDENTIFIER_INFO_COUNT)
+    func makeIterator() -> UnsafeBufferPointer<thread_t>.Iterator {
+      return buffer.makeIterator()
+    }
+  }
 
-      withUnsafeMutablePointer(to: &info) {
-        $0.withMemoryRebound(to: integer_t.self, capacity: THREAD_IDENTIFIER_INFO_COUNT) {
-          let result =
-              thread_info(threadList![i], thread_flavor_t(THREAD_IDENTIFIER_INFO),
-                          $0, &infoCount)
-          guard result == KERN_SUCCESS else {
-            print("unable to get info for thread \(i): \(String(cString: mach_error_string(result))) (0x\(String(result, radix: 16)))")
-            return
-          }
-        }
+  private struct ThreadInfo {
+    var threadID: UInt64
+    var tlsStart: UInt64
+    var kernelObject: UInt32?
+  }
+
+  private func getThreadInfos() -> [ThreadInfo] {
+    guard let threads = PortList(task: self.task) else {
+      return []
+    }
+    return threads.compactMap {
+      guard let info = getThreadInfo(thread: $0) else {
+        return nil
       }
+      guard let kernelObj = getKernelObject(task: mach_task_self_, port: $0) else {
+        return nil
+      }
+      return ThreadInfo(threadID: info.thread_id,
+                        tlsStart: info.thread_handle,
+                        kernelObject: kernelObj)
+    }
+  }
 
-      let tlsStart = info.thread_handle
-      if tlsStart == 0 { continue }
+  private func getKernelObject(task: task_t, port: mach_port_t) -> UInt32? {
+    var object: UInt32 = 0
+    var type: UInt32 = 0
+    let result = mach_port_kernel_object(task, port, &type, &object)
+    guard result == KERN_SUCCESS else {
+      return nil
+    }
+    return object
+  }
+
+  private func getThreadInfo(thread: thread_t) -> thread_identifier_info_data_t? {
+    let THREAD_IDENTIFIER_INFO_COUNT =
+        MemoryLayout<thread_identifier_info_data_t>.size / MemoryLayout<natural_t>.size
+    var info = thread_identifier_info_data_t()
+    var infoCount = mach_msg_type_number_t(THREAD_IDENTIFIER_INFO_COUNT)
+    var result: kern_return_t = 0
+
+    withUnsafeMutablePointer(to: &info) {
+      $0.withMemoryRebound(to: integer_t.self, capacity: THREAD_IDENTIFIER_INFO_COUNT) {
+        result = thread_info(thread, thread_flavor_t(THREAD_IDENTIFIER_INFO),
+                        $0, &infoCount)
+      }
+    }
+    guard result == KERN_SUCCESS else {
+      print("unable to get info for thread port \(thread): \(String(cString: mach_error_string(result))) (0x\(String(result, radix: 16)))")
+      return nil
+    }
+    return info
+  }
+}
+
+extension DarwinRemoteProcess {
+  internal var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
+    return threadInfos.compactMap {
+      let tlsStart = $0.tlsStart
+      if tlsStart == 0 { return nil }
 
       let SWIFT_CONCURRENCY_TASK_KEY = 103
       let currentTaskPointer = tlsStart + UInt64(SWIFT_CONCURRENCY_TASK_KEY * MemoryLayout<UnsafeRawPointer>.size)
-      if let pointer = read(address: currentTaskPointer, size: MemoryLayout<UnsafeRawPointer>.size) {
-        let currentTask = pointer.load(as: UInt.self)
-        results.append((threadID: info.thread_id, currentTask: swift_addr_t(currentTask)))
+      guard let pointer = read(address: currentTaskPointer, size: MemoryLayout<UnsafeRawPointer>.size) else {
+        return nil
       }
+      let currentTask = pointer.load(as: UInt.self)
+      return (threadID: $0.threadID, currentTask: swift_addr_t(currentTask))
     }
-    return results
+  }
+
+  internal func getThreadID(remotePort: thread_t) -> UInt64? {
+    guard let remoteThreadObj = getKernelObject(task: self.task, port: remotePort) else {
+      return nil
+    }
+    return threadInfos.first{ $0.kernelObject == remoteThreadObj }?.threadID
   }
 }
 

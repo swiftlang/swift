@@ -559,6 +559,9 @@ void CopyPropagation::run() {
   while (!defWorklist.ownedValues.empty()) {
     SILValue def = defWorklist.ownedValues.pop_back_val();
     canonicalizer.canonicalizeValueLifetime(def);
+    // Copies of borrowed values may be dead.
+    if (auto *inst = def->getDefiningInstruction())
+      deleter.trackIfDead(inst);
   }
   // Recursively cleanup dead defs after removing uses.
   deleter.cleanupDeadInstructions();

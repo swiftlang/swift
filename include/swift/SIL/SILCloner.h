@@ -1435,26 +1435,6 @@ void SILCloner<ImplClass>::visitConvertEscapeToNoEscapeInst(
 }
 
 template<typename ImplClass>
-void SILCloner<ImplClass>::visitThinFunctionToPointerInst(
-                                           ThinFunctionToPointerInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createThinFunctionToPointer(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void SILCloner<ImplClass>::visitPointerToThinFunctionInst(
-                                           PointerToThinFunctionInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createPointerToThinFunction(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUpcastInst(UpcastInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -1704,24 +1684,6 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   recordClonedInstruction(Inst,
                           getBuilder().createUnconditionalCheckedCastAddr(
                               OpLoc, SrcValue, SrcType, DestValue, TargetType));
-}
-
-template <typename ImplClass>
-void SILCloner<ImplClass>::visitUnconditionalCheckedCastValueInst(
-    UnconditionalCheckedCastValueInst *Inst) {
-  SILLocation OpLoc = getOpLocation(Inst->getLoc());
-  SILValue OpValue = getOpValue(Inst->getOperand());
-  CanType SrcFormalType = getOpASTType(Inst->getSourceFormalType());
-  SILType OpLoweredType = getOpType(Inst->getTargetLoweredType());
-  CanType OpFormalType = getOpASTType(Inst->getTargetFormalType());
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst,
-      getBuilder().createUnconditionalCheckedCastValue(OpLoc,
-                                                       OpValue,
-                                                       SrcFormalType,
-                                                       OpLoweredType,
-                                                       OpFormalType));
 }
 
 template <typename ImplClass>
@@ -2735,22 +2697,6 @@ SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                 getOpType(Inst->getTargetLoweredType()),
                 getOpASTType(Inst->getTargetFormalType()), OpSuccBB, OpFailBB,
                 Inst->getForwardingOwnershipKind(), TrueCount, FalseCount));
-}
-
-template <typename ImplClass>
-void SILCloner<ImplClass>::visitCheckedCastValueBranchInst(
-    CheckedCastValueBranchInst *Inst) {
-  SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
-  SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createCheckedCastValueBranch(
-                getOpLocation(Inst->getLoc()),
-                getOpValue(Inst->getOperand()),
-                getOpASTType(Inst->getSourceFormalType()),
-                getOpType(Inst->getTargetLoweredType()),
-                getOpASTType(Inst->getTargetFormalType()),
-                OpSuccBB, OpFailBB));
 }
 
 template<typename ImplClass>

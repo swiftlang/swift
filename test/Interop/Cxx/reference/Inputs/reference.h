@@ -34,4 +34,7 @@ T &refToTemplate(T &t) { return t; }
 template<class T>
 const T &constRefToTemplate(const T &t) { return t; }
 
+template<class T>
+void refToDependentParam(ClassTemplate<T> &param) { }
+
 #endif // TEST_INTEROP_CXX_REFERENCE_INPUTS_REFERENCE_H

@@ -53,6 +53,13 @@ final public class Function : CustomStringConvertible, HasName {
   public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
   public var resultType: Type { SILFunction_getSILResultType(bridged).type }
 
+  public var returnInstruction: ReturnInst? {
+    for block in blocks.reversed() {
+      if let retInst = block.terminator as? ReturnInst { return retInst }
+    }
+    return nil
+  }
+
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized
   /// in a client module, which might be compiled with a different deployment target.

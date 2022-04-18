@@ -189,6 +189,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// The swift async context entry in the extended frame info.
   PointerAuthSchema AsyncContextExtendedFrameEntry;
+
+  /// Extended existential type shapes in flight.
+  PointerAuthSchema ExtendedExistentialTypeShape;
+
+  /// Non-unique extended existential type shapes in flight.
+  PointerAuthSchema NonUniqueExtendedExistentialTypeShape;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -320,6 +326,11 @@ public:
   unsigned LazyInitializeProtocolConformances : 1;
   unsigned IndirectAsyncFunctionPointer : 1;
 
+  /// Use absolute function references instead of relative ones.
+  /// Mainly used on WebAssembly, that doesn't support relative references
+  /// to code from data.
+  unsigned CompactAbsoluteFunctionPointer : 1;
+
   /// Normally if the -read-legacy-type-info flag is not specified, we look for
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
   /// Passing this flag completely disables this behavior.
@@ -441,7 +452,8 @@ public:
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false),
-        IndirectAsyncFunctionPointer(false), DisableLegacyTypeInfo(false),
+        IndirectAsyncFunctionPointer(false),
+        CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),

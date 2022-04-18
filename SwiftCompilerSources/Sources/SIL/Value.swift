@@ -27,8 +27,33 @@ extension Value {
   public var uses: UseList {
     UseList(SILValue_firstUse(bridged))
   }
+  
+  public var function: Function {
+    SILNode_getFunction(bridgedNode).function
+  }
 
   public var type: Type { SILValue_getType(bridged).type }
+
+  public var definingInstruction: Instruction? {
+    switch self {
+      case let inst as SingleValueInstruction:
+        return inst
+      case let mvi as MultipleValueInstructionResult:
+        return mvi.instruction
+      default:
+        return nil
+    }
+  }
+
+  public var definingBlock: BasicBlock? {
+    if let inst = definingInstruction {
+      return inst.block
+    }
+    if let arg = self as? Argument {
+      return arg.block
+    }
+    return nil
+  }
 
   public var hashable: HashableValue { ObjectIdentifier(self) }
 
@@ -55,6 +80,23 @@ public func !=(_ lhs: Value, _ rhs: Value) -> Bool {
 
 extension BridgedValue {
   public func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
+
+  public var value: Value {
+    // This is much faster than a conformance lookup with `as! Value`.
+    let v = getAs(AnyObject.self)
+    switch v {
+      case let inst as SingleValueInstruction:
+        return inst
+      case let arg as Argument:
+        return arg
+      case let mvr as MultipleValueInstructionResult:
+        return mvr
+      case let undef as Undef:
+        return undef
+      default:
+        fatalError("unknown Value type")
+    }
+  }
 }
 
 final class Undef : Value {

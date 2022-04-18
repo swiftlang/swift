@@ -667,7 +667,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (UDRE->isImplicit()) {
       return TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), D, LookupDC,
-          LookupDC->mapTypeIntoContext(D->getInterfaceType()));
+          // It might happen that LookupDC is null if this is checking
+          // synthesized code, in that case, don't map the type into context,
+          // but return as is -- the synthesis should ensure the type is correct.
+          LookupDC ? LookupDC->mapTypeIntoContext(D->getInterfaceType())
+                   : D->getInterfaceType());
     } else {
       return TypeExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
     }

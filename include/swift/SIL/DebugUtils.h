@@ -341,6 +341,39 @@ struct DebugVarCarryingInst {
     }
   }
 
+  /// Returns true if this DebugVarCarryingInst was moved.
+  bool getWasMoved() const {
+    switch (kind) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      return cast<DebugValueInst>(inst)->getWasMoved();
+    case Kind::AllocStack:
+      return cast<AllocStackInst>(inst)->getWasMoved();
+    case Kind::AllocBox:
+      llvm_unreachable("Not implemented");
+    }
+  }
+
+  /// If we are attempting to create a "debug_value" clone of this debug var
+  /// carrying inst, return the appropriate SILValue to use as the operand of
+  /// that debug value.
+  ///
+  /// For a debug_value, we just return the actual operand, otherwise we return
+  /// the pointer address.
+  SILValue getOperandForDebugValueClone() const {
+    switch (kind) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      return cast<DebugValueInst>(inst)->getOperand();
+    case Kind::AllocStack:
+      return cast<AllocStackInst>(inst);
+    case Kind::AllocBox:
+      llvm_unreachable("Not implemented");
+    }
+  }
+
   /// If \p value is an alloc_stack, alloc_box use that. Otherwise, see if \p
   /// value has a single debug user, return that. Otherwise return the invalid
   /// DebugVarCarryingInst.

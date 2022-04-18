@@ -183,13 +183,6 @@ public:
     SGM.useConformancesFromObjectiveCType(CCABI->getTargetFormalType());
   }
 
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CCVBI) {
-    SGM.useConformancesFromType(CCVBI->getSourceFormalType());
-    SGM.useConformancesFromType(CCVBI->getTargetFormalType());
-    SGM.useConformancesFromObjectiveCType(CCVBI->getSourceFormalType());
-    SGM.useConformancesFromObjectiveCType(CCVBI->getTargetFormalType());
-  }
-
   void visitCopyAddrInst(CopyAddrInst *CAI) {
     SGM.useConformancesFromType(CAI->getSrc()->getType().getASTType());
     SGM.useConformancesFromType(CAI->getDest()->getType().getASTType());

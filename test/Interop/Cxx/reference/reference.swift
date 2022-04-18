@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clangxx -c %S/Inputs/reference.cpp -I %S/Inputs -o %t/reference.o
-// RUN: %target-build-swift %s -I %S/Inputs -o %t/reference %t/reference.o -Xfrontend -enable-cxx-interop
+// RUN: %target-build-swift %s -I %S/Inputs -o %t/reference %t/reference.o -Xfrontend -enable-experimental-cxx-interop
 // RUN: %target-codesign %t/reference
 // RUN: %target-run %t/reference
 //
@@ -96,7 +96,7 @@ ReferenceTestSuite.test("reference to template") {
 }
 
 ReferenceTestSuite.test("const reference to template") {
-  var val: CInt = 53
+  let val: CInt = 53
   let ref = constRefToTemplate(val)
   expectEqual(53, ref.pointee)
 }

@@ -7,20 +7,15 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from __future__ import absolute_import, unicode_literals
-
 import functools
 import os
 import platform
 import sys
 import unittest
+from io import StringIO
 
 from build_swift import cache_utils
 from build_swift.versions import Version
-
-import six
-from six import StringIO
-
 
 __all__ = [
     'quiet_output',
@@ -161,7 +156,7 @@ def requires_python(version):
     greater or equal to the required version.
     """
 
-    if isinstance(version, six.string_types):
+    if isinstance(version, str):
         version = Version(version)
 
     if _PYTHON_VERSION >= version:

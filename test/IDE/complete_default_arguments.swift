@@ -165,5 +165,5 @@ func testDefaultArgInit3(_ x: Int = #^DEFAULT_ARG_INIT_3^#) { }
 // DEFAULT_ARG_INIT: End completions
 
 // DEFAULT_ARG_INIT_INTCONTEXT: Begin completions
-// DEFAULT_ARG_INIT_INTCONTEXT: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: globalVar[#Int#]{{; name=.+$}}
+// DEFAULT_ARG_INIT_INTCONTEXT: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: globalVar[#Int#]{{; name=.+$}}
 // DEFAULT_ARG_INIT_INTCONTEXT: End completions

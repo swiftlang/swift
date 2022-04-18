@@ -289,8 +289,6 @@ static bool isNonWritableMemoryAddress(SILValue V) {
   case ValueKind::ObjCSuperMethodInst:
   case ValueKind::StringLiteralInst:
   case ValueKind::ThinToThickFunctionInst:
-  case ValueKind::ThinFunctionToPointerInst:
-  case ValueKind::PointerToThinFunctionInst:
     // These instructions return pointers to memory which can't be a
     // destination of a store.
     return true;

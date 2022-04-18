@@ -5,9 +5,134 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0347][]:
+
+  It's now possible to use a default value expression with a generic parameter type
+  to default the argument and its type:
+
+  ```
+  func compute<C: Collection>(_ values: C = [0, 1, 2]) {
+    ...
+  }
+  ```
+
+  `compute` is now accepted by compiler and `[Int]` is going to be inferred
+  for `C` at call sites that do not provide the argument explicitly.
+
+* [SE-0326][]:
+
+  It's now possible to infer parameter and result types from the body of a multi-statement
+  closure. The distinction between single- and multi-statement closures has been removed.
+
+  Use of closures becomes less cumbersome by removing the need to constantly specify explicit
+  closure types which sometimes could be pretty large e.g. when there are multiple parameters
+  or a complex tuple result type.
+
+  For example:
+
+  ```swift
+  func map<T>(fn: (Int) -> T) -> T {
+    return fn(42)
+  }
+
+  func computeResult<U: BinaryInteger>(_: U) -> U { /* processing */ }
+
+  let _ = map {
+    if let $0 < 0 {
+       // do some processing
+    }
+
+    return computeResult($0)
+  }
+  ```
+
+  The result type of `map` can now be inferred from the body of the trailing closure
+  passed as an argument.
+
+* [SE-0345][]:
+
+  It is now possible to unwrap optional variables with a shorthand syntax that
+  shadows the existing declaration. For example, the following:
+  
+  ```swift
+  let foo: String? = "hello world"
+  
+  if let foo {
+    print(foo) // prints "hello world"
+  }
+  ```
+  
+  is equivalent to:
+  
+  ```swift
+  let foo: String? = "hello world"
+  
+  if let foo = foo {
+    print(foo) // prints "hello world"
+  }
+  ```
+
+* [SE-0340][]:
+
+  It is now possible to make declarations unavailable from use in asynchronous
+  contexts with the `@available(*, noasync)` attribute.
+
+  This is to protect the consumers of an API against undefined behavior that can
+  occur when the API uses thread-local storage, or encourages using thread-local
+  storage, across suspension points, or protect developers against holding locks
+  across suspension points which may lead to undefined behavior, priority
+  inversions, or deadlocks.
+
+* [SE-0343][]:
+
+  Top-level scripts support asynchronous calls.
+
+  Using an `await` by calling an asynchronous function or accessing an isolated
+  variable transitions the top-level to an asynchronous context. As an
+  asynchronous context, top-level variables are `@MainActor`-isolated and the
+  top-level is run on the `@MainActor`.
+
+  Note that the transition affects function overload resolution and starts an
+  implicit run loop to drive the concurrency machinery.
+
+  Unmodified scripts are not affected by this change unless `-warn-concurrency` is
+  passed to the compiler invocation. With `-warn-concurrency`, variables in the
+  top-level are isolated to the main actor and the top-level context is isolated
+  to the main actor, but is not an asynchronous context.
+
+* [SE-0336][]:
+
+  It is now possible to declare `distributed actor` and `distributed func`s inside of them.
+
+  Distributed actors provide stronger isolation guarantees than "local" actors, and enable additional checks to be made on return types and parameters of distributed methods, e.g. checking if they conform to `Codable`. Distributed methods can be called on "remote" references of distributed actors, turning those invocations into remote procedure calls, by means of pluggable and user extensible distributed actor system implementations. 
+  
+  Swift does not provide any specific distributed actor system by itself, however, packages in the ecosystem fulfil the role of providing those implementations.
+  
+  ```swift
+  distributed actor Greeter { 
+    var greetingsSent = 0
+    
+    distributed func greet(name: String) -> String {
+      greetingsSent += 1
+      return "Hello, \(name)!"
+    }
+  }
+  
+  func talkTo(greeter: Greeter) async throws {
+    // isolation of distributed actors is stronger, it is impossible to refer to
+    // any stored properties of distributed actors from outside of them:
+    greeter.greetingsSent // distributed actor-isolated property 'name' can not be accessed from a non-isolated context
+    
+    // remote calls are implicitly throwing and async, 
+    // to account for the potential networking involved:
+    let greeting = try await greeter.greet(name: "Alice")
+    print(greeting) // Hello, Alice!
+  }
+  ```
+
 * The compiler now emits a warning when a non-final class conforms to a protocol that imposes a same-type requirement between `Self` and an associated type. This is because such a requirement makes the conformance unsound for subclasses.
 
-For example, Swift 5.6 would allow the following code, which at runtime would construct an instanec of `C` and not `SubC` as expected:
+  For example, Swift 5.6 would allow the following code, which at runtime would construct an instance of `C` and not `SubC` as expected:
 
   ```swift
   protocol P {
@@ -49,7 +174,7 @@ For example, Swift 5.6 would allow the following code, which at runtime would co
 
 * [SE-0341][]:
 
-  Opaque types can now be used in the parameters of functions and subscripts, wher they provide a shorthand syntax for the introduction of a generic parameter. For example, the following:
+  Opaque types can now be used in the parameters of functions and subscripts, when they provide a shorthand syntax for the introduction of a generic parameter. For example, the following:
 
   ```swift
   func horizontal(_ v1: some View, _ v2: some View) -> some View {
@@ -110,29 +235,32 @@ For example, Swift 5.6 would allow the following code, which at runtime would co
     return [ 1: "One", 2: "Two" ]
   }
   ```
+
 Swift 5.6
 ---------
 
+### 2022-03-14 (Xcode 13.3)
+
 * [SE-0327][]:
 
-In Swift 5 mode, a warning is now emitted if the default-value expression of an
-instance-member property requires global-actor isolation. For example:
+  In Swift 5 mode, a warning is now emitted if the default-value expression of an
+  instance-member property requires global-actor isolation. For example:
 
-```swift
-@MainActor
-func partyGenerator() -> [PartyMember] { fatalError("todo") }
-
-class Party {
-  @MainActor var members: [PartyMember] = partyGenerator()
-  //                                      ^~~~~~~~~~~~~~~~
-  // warning: expression requiring global actor 'MainActor' cannot
-  //          appear in default-value expression of property 'members'
-}
-```
-
-Previously, the isolation granted by the type checker matched the isolation of
-the property itself, but at runtime that is not guaranteed. In Swift 6, 
-such default-value expressions will become an error if they require isolation.
+  ```swift
+  @MainActor
+  func partyGenerator() -> [PartyMember] { fatalError("todo") }
+  
+  class Party {
+    @MainActor var members: [PartyMember] = partyGenerator()
+    //                                      ^~~~~~~~~~~~~~~~
+    // warning: expression requiring global actor 'MainActor' cannot
+    //          appear in default-value expression of property 'members'
+  }
+  ```
+  
+  Previously, the isolation granted by the type checker matched the isolation of
+  the property itself, but at runtime that is not guaranteed. In Swift 6, 
+  such default-value expressions will become an error if they require isolation.
 
 * Actor isolation checking now understands that `defer` bodies share the isolation of their enclosing function.
 
@@ -340,8 +468,6 @@ such default-value expressions will become an error if they require isolation.
       // iOS 15 functionality 
   }
   ```
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.5
 ---------
@@ -761,8 +887,6 @@ Swift 5.5
   Asynchronous for loops use asynchronous sequences, defined by the protocol
   `AsyncSequence` and its corresponding `AsyncIterator`.
 
-**Add new entries to the top of this section, not here!**
-
 Swift 5.4
 ---------
 
@@ -928,8 +1052,6 @@ Swift 5.4
 
   let _: Foo? = .bar.anotherFoo.getFoo().optionalFoo?.optionalFoo![]
   ```
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.3
 ---------
@@ -9034,6 +9156,12 @@ Swift 1.0
 [SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
 [SE-0335]: <https://github.com/apple/swift-evolution/blob/main/proposals/0335-existential-any.md>
 [SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
+[SE-0336]: <https://github.com/apple/swift-evolution/blob/main/proposals/0336-distributed-actor-isolation.md>
+[SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
+[SE-0340]: <https://github.com/apple/swift-evolution/blob/main/proposals/0340-swift-noasync.md>
+[SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
+[SE-0326]: <https://github.com/apple/swift-evolution/blob/main/proposals/0326-extending-multi-statement-closure-inference.md>
+[SE-0347]: <https://github.com/apple/swift-evolution/blob/main/proposals/0347-type-inference-from-default-exprs.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

@@ -601,6 +601,13 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
       break;
     }
 
+    case Node::Kind::ParameterizedProtocol: {
+      Buffer << Separator;
+      Separator = '_';
+      RETURN_IF_ERROR(mangleChildNodes(node->getChild(1), depth + 1));
+      break;
+    }
+
     case Node::Kind::BoundGenericFunction: {
       fullSubstitutionMap = true;
 
@@ -1215,6 +1222,15 @@ ManglingError Remangler::mangleEnum(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleErrorType(Node *node, unsigned depth) {
   Buffer << "Xe";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleParameterizedProtocol(Node *node,
+                                                     unsigned int depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
+  char separator = 'y';
+  RETURN_IF_ERROR(mangleGenericArgs(node, separator, depth + 1));
+  Buffer << "XP";
   return ManglingError::Success;
 }
 
@@ -3421,6 +3437,76 @@ ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleUniquable(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
+  Buffer << "Mq";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
+                                                            unsigned depth) {
+  NodePointer reqSig, genSig, type, storage;
+  reqSig = node->getChild(0);
+  if (node->getNumChildren() == 3) {
+    genSig = nullptr;
+    type = node->getChild(1);
+    storage = node->getChild(2);
+  } else {
+    genSig = node->getChild(1);
+    type = node->getChild(2);
+    storage = node->getChild(3);
+  }
+
+  RETURN_IF_ERROR(mangle(reqSig, depth + 1));
+  if (genSig) {
+    RETURN_IF_ERROR(mangle(genSig, depth + 1));  
+  }
+
+  // Recognize the special case of a type expression that's just the
+  // unique requirement type parameter.
+  {
+    if (type->getKind() != Node::Kind::Type)
+      return MANGLING_ERROR(ManglingError::WrongNodeType, type);
+    auto typeNode = type->getChild(0);
+
+    if (typeNode->getKind() == Node::Kind::DependentGenericParamType) {
+      auto paramDepth = typeNode->getChild(0)->getIndex();
+      auto index = typeNode->getChild(1)->getIndex();
+      if (paramDepth == (genSig ? 1 : 0) && index == 0)
+        type = nullptr;
+    }
+  }
+  if (type)
+    RETURN_IF_ERROR(mangle(type, depth + 1));
+
+  if (genSig && type)
+    Buffer << "XH";
+  else if (type)
+    Buffer << "Xh";
+  else if (genSig)
+    Buffer << "XG";
+  else
+    Buffer << "Xg";
+
+  RETURN_IF_ERROR(mangle(storage, depth + 1));
+
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleExtendedExistentialValueStorage(Node *node,
+                                                           unsigned depth) {
+  if (node->getText() == "opaque")
+    Buffer << "o";
+  else if (node->getText() == "class")
+    Buffer << "c";
+  else if (node->getText() == "metatype")
+    Buffer << "m";
+  else
+    return MANGLING_ERROR(ManglingError::UnknownEncoding, node);
+
+  return ManglingError::Success;
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
@@ -3475,6 +3561,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericFunction:
+    case Node::Kind::ParameterizedProtocol:
       return true;
 
     case Node::Kind::Structure:
@@ -3575,6 +3662,12 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
       if (isSpecialized(nominalType))
         return getUnspecialized(nominalType, Factory);
       return nominalType;
+    }
+
+    case Node::Kind::ParameterizedProtocol: {
+      NodePointer unboundType = node->getChild(0);
+      DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
+      return unboundType;
     }
 
     case Node::Kind::BoundGenericFunction: {

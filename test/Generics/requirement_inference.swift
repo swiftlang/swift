@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump -requirement-machine-protocol-signatures=verify 2>&1
-// RUN: %FileCheck %s < %t.dump
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=off
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
 
 protocol P1 { 
   func p1()
@@ -203,7 +202,7 @@ struct X8 : P12 {
 
 struct X9<T: P12, U: P12> where T.B == U.B {
   // CHECK-LABEL: X9.upperSameTypeConstraint
-	// CHECK: Generic signature: <T, U, V where T == X8, U : P12, U.[P12]B == X8.B>
+	// CHECK: Generic signature: <T, U, V where T == X8, U : P12, U.[P12]B == X7>
   // CHECK: Canonical generic signature: <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 == X8, τ_0_1 : P12, τ_0_1.[P12]B == X7>
 	func upperSameTypeConstraint<V>(_: V) where T == X8 { }
 }
@@ -219,7 +218,7 @@ struct X10: P11, P12 {
 
 struct X11<T: P12, U: P12> where T.B == U.B.A {
 	// CHECK-LABEL: X11.upperSameTypeConstraint
-	// CHECK: Generic signature: <T, U, V where T : P12, U == X10, T.[P12]B == X10.A>
+	// CHECK: Generic signature: <T, U, V where T : P12, U == X10, T.[P12]B == X10>
 	// CHECK: Canonical generic signature: <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 : P12, τ_0_1 == X10, τ_0_0.[P12]B == X10>
 	func upperSameTypeConstraint<V>(_: V) where U == X10 { }
 }
@@ -270,7 +269,7 @@ struct X18: P18, P17 {
 }
 
 // CHECK-LABEL: .X19.foo@
-// CHECK: Generic signature: <T, U where T == X18.A>
+// CHECK: Generic signature: <T, U where T == X18>
 struct X19<T: P18> where T == T.A {
   func foo<U>(_: U) where T == X18 { }
 }

@@ -157,6 +157,7 @@ set(SWIFTLIB_ESSENTIAL
   StringProtocol.swift
   StringIndex.swift
   StringIndexConversions.swift
+  StringIndexValidation.swift
   StringInterpolation.swift
   StringLegacy.swift
   StringNormalization.swift
@@ -182,6 +183,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeParser.swift
   UnicodeScalarProperties.swift
   CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
+  UnicodeSPI.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift

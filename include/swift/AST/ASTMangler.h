@@ -186,6 +186,8 @@ public:
                                              Type GlobalActorBound,
                                              ModuleDecl *Module);
 
+  std::string mangleDistributedThunk(const FuncDecl *thunk);
+
   /// Mangle a completion handler block implementation function, used for importing ObjC
   /// APIs as async.
   ///

@@ -297,9 +297,10 @@ protected:
     IsNonAccessing : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32+20,
     : NumPadBits,
-    NumConformances : 32
+    NumConformances : 32,
+    NumArgumentConversions : 20
   );
 
   SWIFT_INLINE_BITFIELD_FULL(UnresolvedSpecializeExpr, Expr, 32,
@@ -312,7 +313,7 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1+1,
     ThrowsIsSet : 1,
     Throws : 1,
     ImplicitlyAsync : 1,
@@ -495,8 +496,8 @@ public:
     return getSemanticsProvidingExpr()->getKind() == ExprKind::InOut;
   }
 
-  bool printConstExprValue(llvm::raw_ostream *OS) const;
-  bool isSemanticallyConstExpr() const;
+  bool printConstExprValue(llvm::raw_ostream *OS, llvm::function_ref<bool(Expr*)> additionalCheck) const;
+  bool isSemanticallyConstExpr(llvm::function_ref<bool(Expr*)> additionalCheck = nullptr) const;
 
   /// Returns false if this expression needs to be wrapped in parens when
   /// used inside of a any postfix expression, true otherwise.
@@ -1907,6 +1908,11 @@ public:
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Try;
   }
+
+  static TryExpr *createImplicit(ASTContext &ctx, SourceLoc tryLoc, Expr *sub,
+                                 Type type = Type()) {
+    return new (ctx) TryExpr(tryLoc, sub, type, /*implicit=*/true);
+  }
 };
 
 /// ForceTryExpr - A 'try!' surrounding an expression, marking that
@@ -2065,7 +2071,11 @@ public:
             bool implicit = false)
     : IdentityExpr(ExprKind::Await, sub, type, implicit), AwaitLoc(awaitLoc) {
   }
-  
+
+  static AwaitExpr *createImplicit(ASTContext &ctx, SourceLoc awaitLoc, Expr *sub, Type type = Type()) {
+    return new (ctx) AwaitExpr(awaitLoc, sub, type, /*implicit=*/true);
+  }
+
   SourceLoc getLoc() const { return AwaitLoc; }
   
   SourceLoc getAwaitLoc() const { return AwaitLoc; }
@@ -3244,20 +3254,35 @@ public:
 /// "Appropriate kind" means e.g. a concrete/existential metatype if the
 /// result is an existential metatype.
 class ErasureExpr final : public ImplicitConversionExpr,
-    private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef> {
+    private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef,
+                                  CollectionUpcastConversionExpr::ConversionPair> {
   friend TrailingObjects;
+  using ConversionPair = CollectionUpcastConversionExpr::ConversionPair;
 
   ErasureExpr(Expr *subExpr, Type type,
-              ArrayRef<ProtocolConformanceRef> conformances)
+              ArrayRef<ProtocolConformanceRef> conformances,
+              ArrayRef<ConversionPair> argConversions)
     : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type) {
     Bits.ErasureExpr.NumConformances = conformances.size();
     std::uninitialized_copy(conformances.begin(), conformances.end(),
                             getTrailingObjects<ProtocolConformanceRef>());
+
+    Bits.ErasureExpr.NumArgumentConversions = argConversions.size();
+    std::uninitialized_copy(argConversions.begin(), argConversions.end(),
+                            getTrailingObjects<ConversionPair>());
   }
 
 public:
   static ErasureExpr *create(ASTContext &ctx, Expr *subExpr, Type type,
-                             ArrayRef<ProtocolConformanceRef> conformances);
+                             ArrayRef<ProtocolConformanceRef> conformances,
+                             ArrayRef<ConversionPair> argConversions);
+
+  size_t numTrailingObjects(OverloadToken<ProtocolConformanceRef>) const {
+    return Bits.ErasureExpr.NumConformances;
+  }
+  size_t numTrailingObjects(OverloadToken<ConversionPair>) const {
+    return Bits.ErasureExpr.NumArgumentConversions;
+  }
 
   /// Retrieve the mapping specifying how the type of the subexpression
   /// maps to the resulting existential type. If the resulting existential
@@ -3272,6 +3297,30 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return {getTrailingObjects<ProtocolConformanceRef>(),
             Bits.ErasureExpr.NumConformances };
+  }
+
+  /// Retrieve the conversion expressions mapping requirements from any
+  /// parameterized existentials involved in this erasure.
+  ///
+  /// If the destination type is not a parameterized protocol type,
+  /// this array will be empty
+  ArrayRef<ConversionPair> getArgumentConversions() const {
+    return {getTrailingObjects<ConversionPair>(),
+            Bits.ErasureExpr.NumArgumentConversions };
+  }
+
+  /// Retrieve the conversion expressions mapping requirements from any
+  /// parameterized existentials involved in this erasure.
+  ///
+  /// If the destination type is not a parameterized protocol type,
+  /// this array will be empty
+  MutableArrayRef<ConversionPair> getArgumentConversions() {
+    return {getTrailingObjects<ConversionPair>(),
+            Bits.ErasureExpr.NumArgumentConversions };
+  }
+
+  void setArgumentConversion(unsigned i, const ConversionPair &p) {
+    getArgumentConversions()[i] = p;
   }
 
   static bool classof(const Expr *E) {
@@ -4469,11 +4518,11 @@ public:
   }
 
   /// Is this application _implicitly_ required to be a throwing call?
-  /// This can happen if the function is actually a proxy function invocation,
-  /// which may throw, regardless of the target function throwing, e.g.
-  /// a distributed instance method call on a 'remote' actor, may throw due to network
-  /// issues reported by the transport, regardless if the actual target function
-  /// can throw.
+  /// This can happen if the function is actually a distributed thunk
+  /// invocation, which may throw, regardless of the target function throwing,
+  /// e.g. a distributed instance method call on a 'remote' actor, may throw due
+  /// to network issues reported by the transport, regardless if the actual
+  /// target function can throw.
   bool implicitlyThrows() const {
     return Bits.ApplyExpr.ImplicitlyThrows;
   }

@@ -29,6 +29,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
@@ -429,14 +430,10 @@ ClangImporter::~ClangImporter() {
 
 #pragma mark Module loading
 
-/// Finds the glibc.modulemap file relative to the provided resource dir.
-///
-/// Note that the module map used for Glibc depends on the target we're
-/// compiling for, and is not included in the resource directory with the other
-/// implicit module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
-static Optional<StringRef>
-getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
-                      SmallVectorImpl<char> &buffer) {
+static Optional<StringRef> getModuleMapFilePath(StringRef name,
+                                                SearchPathOptions &Opts,
+                                                llvm::Triple triple,
+                                                SmallVectorImpl<char> &buffer) {
   StringRef platform = swift::getPlatformNameForTriple(triple);
   StringRef arch = swift::getMajorArchitectureName(triple);
 
@@ -445,7 +442,7 @@ getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
     buffer.clear();
     buffer.append(SDKPath.begin(), SDKPath.end());
     llvm::sys::path::append(buffer, "usr", "lib", "swift");
-    llvm::sys::path::append(buffer, platform, arch, "glibc.modulemap");
+    llvm::sys::path::append(buffer, platform, arch, name);
 
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
@@ -458,7 +455,7 @@ getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
     buffer.clear();
     buffer.append(Opts.RuntimeResourcePath.begin(),
                   Opts.RuntimeResourcePath.end());
-    llvm::sys::path::append(buffer, platform, arch, "glibc.modulemap");
+    llvm::sys::path::append(buffer, platform, arch, name);
 
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
@@ -468,6 +465,23 @@ getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
   }
 
   return None;
+}
+
+/// Finds the glibc.modulemap file relative to the provided resource dir.
+///
+/// Note that the module map used for Glibc depends on the target we're
+/// compiling for, and is not included in the resource directory with the other
+/// implicit module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
+static Optional<StringRef>
+getGlibcModuleMapPath(SearchPathOptions &Opts, llvm::Triple triple,
+                      SmallVectorImpl<char> &buffer) {
+  return getModuleMapFilePath("glibc.modulemap", Opts, triple, buffer);
+}
+
+static Optional<StringRef>
+getLibStdCxxModuleMapPath(SearchPathOptions &opts, llvm::Triple triple,
+                          SmallVectorImpl<char> &buffer) {
+  return getModuleMapFilePath("libstdcxx.modulemap", opts, triple, buffer);
 }
 
 static bool clangSupportsPragmaAttributeWithSwiftAttr() {
@@ -678,6 +692,14 @@ importer::getNormalInvocationArguments(
       invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
     } else {
       // FIXME: Emit a warning of some kind.
+    }
+
+    if (EnableCXXInterop) {
+      if (auto path =
+              getLibStdCxxModuleMapPath(searchPathOpts, triple, buffer)) {
+        invocationArgStrs.push_back(
+            (Twine("-fmodule-map-file=") + *path).str());
+      }
     }
   }
 
@@ -3631,7 +3653,8 @@ std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash(Impl.Instance->getDiagnostics());
 }
 
-Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
+Optional<Decl *>
+ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
   return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion);
 }
 
@@ -5581,6 +5604,8 @@ static ValueDecl *generateThunkForExtraMetatypes(SubstitutionMap subst,
 ConcreteDeclRef
 ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
                                                     ValueDecl *decl) {
+  PrettyStackTraceDeclAndSubst trace("specializing", subst, decl);
+
   assert(isa<clang::FunctionTemplateDecl>(decl->getClangDecl()) &&
          "This API should only be used with function templates.");
 

@@ -778,4 +778,3 @@ public let utf16Tests = [
         [ 0xDC00, 0xD800, 0xD800, 0xDC00 ]),
   ],
 ]
-

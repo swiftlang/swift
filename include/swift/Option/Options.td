@@ -270,6 +270,10 @@ def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to persist automatically created precompiled bridging headers">;
 
+def async_main: Flag<["-"], "async-main">,
+    Flags<[FrontendOption]>,
+    HelpText<"Resolve main function as if it were called from an asynchronous context">;
+
 // FIXME: Unhide this once it doesn't depend on an output file map.
 def incremental : Flag<["-"], "incremental">,
   Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -532,13 +536,11 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
          SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
-def emit_cxx_header : Flag<["-"], "emit-cxx-header">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
-  HelpText<"Emit a C++ header file">;
-def emit_cxx_header_path : Separate<["-"], "emit-cxx-header-path">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput]>,
-  MetaVarName<"<path>">, HelpText<"Emit a C++ header file to <path>">;
+  HelpText<"Emit an Objective-C and C++ header file to <path>">,
+  Alias<emit_objc_header_path>;
 
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
@@ -605,10 +607,6 @@ def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
-
-def enable_experimental_cxx_interop :
-  Flag<["-"], "enable-experimental-cxx-interop">,
-  HelpText<"Allow importing C++ modules into Swift (experimental feature)">;
 
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
@@ -677,6 +675,10 @@ def disable_actor_data_race_checks :
   Flag<["-"], "disable-actor-data-race-checks">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Disable runtime checks for actor data races">;
+
+def enable_bare_slash_regex : Flag<["-"], "enable-bare-slash-regex">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Enable the use of forward slash regular-expression literal syntax">;
 
 def warn_implicit_overrides :
   Flag<["-"], "warn-implicit-overrides">,

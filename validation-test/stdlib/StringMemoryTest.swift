@@ -7,7 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// REQUIRES: rdar85913190
+// UNSUPPORTED: asan
 
 import Foundation
 

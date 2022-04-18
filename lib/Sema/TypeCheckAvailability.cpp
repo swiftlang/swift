@@ -2608,6 +2608,9 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   case PlatformAgnosticAvailabilityKind::Deprecated:
     llvm_unreachable("shouldn't see deprecations in explicit unavailability");
 
+  case PlatformAgnosticAvailabilityKind::NoAsync:
+    llvm_unreachable("shouldn't see noasync in explicit unavailability");
+
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::Unavailable:
     if (attr->Platform != PlatformKind::none) {
@@ -2771,6 +2774,9 @@ bool swift::diagnoseExplicitUnavailability(
   switch (Attr->getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::Deprecated:
     llvm_unreachable("shouldn't see deprecations in explicit unavailability");
+
+  case PlatformAgnosticAvailabilityKind::NoAsync:
+    llvm_unreachable("shouldn't see noasync with explicit unavailability");
 
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::Unavailable:
@@ -3296,16 +3302,32 @@ diagnoseDeclUnavailableFromAsync(const ValueDecl *D, SourceRange R,
   // If we are in a synchronous context, don't check it
   if (!Where.getDeclContext()->isAsyncContext())
     return false;
-  if (!D->getAttrs().hasAttribute<UnavailableFromAsyncAttr>())
-    return false;
 
   ASTContext &ctx = Where.getDeclContext()->getASTContext();
+  if (const AvailableAttr *attr = D->getAttrs().getNoAsync(ctx)) {
+    SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+    auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl,
+                                   D->getDescriptiveKind(), D->getBaseName(),
+                                   attr->Message);
+
+    if (!attr->Rename.empty()) {
+      fixItAvailableAttrRename(diag, R, D, attr, call);
+    }
+    return true;
+  }
+
+  const bool hasUnavailableAttr =
+      D->getAttrs().hasAttribute<UnavailableFromAsyncAttr>();
+
+  if (!hasUnavailableAttr)
+    return false;
+  // @available(noasync) spelling
   const UnavailableFromAsyncAttr *attr =
       D->getAttrs().getAttribute<UnavailableFromAsyncAttr>();
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;
   ctx.Diags
       .diagnose(diagLoc, diag::async_unavailable_decl, D->getDescriptiveKind(),
-                D->getBaseName(), attr->hasMessage(), attr->Message)
+                D->getBaseName(), attr->Message)
       .warnUntilSwiftVersion(6);
   D->diagnose(diag::decl_declared_here, D->getName());
   return true;

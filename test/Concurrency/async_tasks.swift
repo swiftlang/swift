@@ -128,3 +128,12 @@ func test_detached_throwing() async -> String {
     print("caught: \(error)")
   }
 }
+
+// ==== Detached Tasks with inout Params---------------------------------------
+@available(SwiftStdlib 5.1, *)
+func printOrderNumber(n: inout Int) async {
+  Task.detached {
+      n+=1 //expected-error {{mutable capture of 'inout' parameter 'n' is not allowed in concurrently-executing code}}
+      print(n) //expected-error {{mutable capture of 'inout' parameter 'n' is not allowed in concurrently-executing code}}
+  }
+}

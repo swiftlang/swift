@@ -2063,7 +2063,7 @@ void IRGenerator::emitEntryPointInfo() {
   auto &IGM = *getGenModule(entrypoint);
   ConstantInitBuilder builder(IGM);
   auto entrypointInfo = builder.beginStruct();
-  entrypointInfo.addRelativeAddress(
+  entrypointInfo.addCompactFunctionReference(
       IGM.getAddrOfSILFunction(entrypoint, NotForDefinition));
   auto var = entrypointInfo.finishAndCreateGlobal(
       "\x01l_entry_point", Alignment(4),
@@ -3357,6 +3357,20 @@ static llvm::Constant *getElementBitCast(llvm::Constant *ptr,
   }
 }
 
+llvm::Constant *
+IRGenModule::getOrCreateLazyGlobalVariable(LinkEntity entity,
+    llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> build,
+    llvm::function_ref<void(llvm::GlobalVariable *)> finish) {
+  auto defaultType = entity.getDefaultDeclarationType(*this);
+
+  LazyConstantInitializer lazyInitializer = {
+    defaultType, build, finish
+  };
+  return getAddrOfLLVMVariable(entity,
+                               ConstantInit::getLazy(&lazyInitializer),
+                               DebugTypeInfo(), defaultType);
+}
+
 /// Return a reference to an object that's suitable for being used for
 /// the given kind of reference.
 ///
@@ -3429,7 +3443,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
 
     // If we're looking to define something, we may need to replace a
     // forward declaration.
-    if (definitionType) {
+    if (!definition.isLazy() && definitionType) {
       assert(existing->isDeclaration() && "already defined");
       updateLinkageForDefinition(*this, existing, entity);
 
@@ -3461,6 +3475,21 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   if (auto existing = Module.getNamedGlobal(link.getName()))
     return getElementBitCast(existing, defaultType);
 
+  const LazyConstantInitializer *lazyInitializer = nullptr;
+  Optional<ConstantInitBuilder> lazyBuilder;
+  if (definition.isLazy()) {
+    lazyInitializer = definition.getLazy();
+    lazyBuilder.emplace(*this);
+
+    // Build the lazy initializer as a future.
+    auto future = lazyInitializer->Build(*lazyBuilder);
+
+    // Set the future as our definition and set its type as the
+    // definition type.
+    definitionType = future.getType();
+    definition = future;
+  }
+
   // If we're not defining the object now, forward declare it with the default
   // type.
   if (!definitionType) definitionType = defaultType;
@@ -3472,6 +3501,11 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   // Install the concrete definition if we have one.
   if (definition && definition.hasInit()) {
     definition.getInit().installInGlobal(var);
+  }
+
+  // Call the creation callback.
+  if (lazyInitializer) {
+    lazyInitializer->Create(var);
   }
 
   // If we have an existing entry, destroy it, replacing it with the
@@ -4172,7 +4206,10 @@ void IRGenModule::emitAccessibleFunctions() {
 
     GenericSignature signature;
     if (auto *env = func->getGenericEnvironment()) {
-      signature = env->getGenericSignature();
+      // Drop all of the marker protocols because they are effect-less
+      // at runtime.
+      signature = env->getGenericSignature().withoutMarkerProtocols();
+
       genericEnvironment =
           getAddrOfGenericEnvironment(signature.getCanonicalSignature());
     }
@@ -5331,6 +5368,22 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   return address;
 }
 
+/// Can not treat a treat the layout of a class as resilient if the current
+///    class is defined in an external module and
+///    not publically accessible (e.g private or internal).
+/// This would normally not happen except if we compile theClass's module with
+/// enable-testing.
+static bool shouldTreatClassAsFragileBecauseOfEnableTesting(ClassDecl *D,
+                                                            IRGenModule &IGM) {
+    if (!D)
+      return false;
+
+    return D->getModuleContext() != IGM.getSwiftModule() &&
+           !D->getFormalAccessScope(/*useDC=*/nullptr,
+                                  /*treatUsableFromInlineAsPublic=*/true)
+           .isPublic();
+}
+
 /// Do we have to use resilient access patterns when working with this
 /// declaration?
 ///
@@ -5340,13 +5393,21 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D,
-                              ResilienceExpansion expansion) {
+                              ResilienceExpansion expansion,
+                              ClassDecl *asViewedFromRootClass) {
+  assert(!asViewedFromRootClass || isa<ClassDecl>(D));
+
   if (D->getModuleContext()->getBypassResilience())
     return false;
   if (expansion == ResilienceExpansion::Maximal &&
       Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
   }
+
+  if (shouldTreatClassAsFragileBecauseOfEnableTesting(asViewedFromRootClass,
+                                                      *this))
+    return false;
+
   return D->isResilient(getSwiftModule(), expansion);
 }
 
@@ -5356,11 +5417,17 @@ bool IRGenModule::isResilient(NominalTypeDecl *D,
 /// For classes, this means that virtual method calls use dispatch thunks
 /// rather than accessing metadata members directly.
 bool IRGenModule::hasResilientMetadata(ClassDecl *D,
-                                       ResilienceExpansion expansion) {
+                                       ResilienceExpansion expansion,
+                                       ClassDecl *asViewedFromRootClass) {
   if (expansion == ResilienceExpansion::Maximal &&
       Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
   }
+
+  if (shouldTreatClassAsFragileBecauseOfEnableTesting(asViewedFromRootClass,
+                                                      *this))
+    return false;
+
   return D->hasResilientMetadata(getSwiftModule(), expansion);
 }
 

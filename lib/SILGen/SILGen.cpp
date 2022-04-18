@@ -846,8 +846,11 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     PrettyStackTraceSILFunction X("silgen emitDistributedThunk", f);
     f->setBare(IsBare);
     f->setThunk(IsThunk);
+    f->setIsDistributed();
 
-    SILGenFunction(*this, *f, dc).emitDistributedThunk(constant);
+    assert(constant.isDistributedThunk());
+    SILGenFunction(*this, *f, constant.getFuncDecl())
+        .emitFunction(constant.getFuncDecl());
 
     postEmitFunction(constant, f);
     return;
@@ -1396,9 +1399,10 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       emitNativeToForeignThunk(thunk);
   }
 
-  if (AFD->isDistributed()) {
-    auto thunk = SILDeclRef(AFD).asDistributed();
-    emitDistributedThunk(thunk);
+  if (auto thunkDecl = AFD->getDistributedThunk()) {
+    auto thunk = SILDeclRef(thunkDecl).asDistributed();
+    emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
+                           getFunction(thunk, ForDefinition));
   }
 
   if (AFD->isBackDeployed()) {
@@ -1646,9 +1650,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *onceBuiltin =
       cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("once")));
   auto blockParam = onceBuiltin->getParameters()->get(1);
-  auto *type = blockParam->getType()->castTo<FunctionType>();
-  Type initType = FunctionType::get({}, TupleType::getEmpty(C),
-                                    type->getExtInfo());
+  auto *initType = blockParam->getType()->castTo<FunctionType>();
   auto initSILType = cast<SILFunctionType>(
       Types.getLoweredRValueType(TypeExpansionContext::minimal(), initType));
 

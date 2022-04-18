@@ -357,7 +357,7 @@ func testMyEnumWithCaseLabels(_ a : MyEnumWithCaseLabels) {
 }
 
 
-func test_guard(_ x : Int, y : Int??, cond : Bool) {
+func test_guard(_ x : Int, y : Int??, z: Int?, cond : Bool) {
   
   // These are all ok.
   guard let a = y else {}
@@ -366,9 +366,9 @@ func test_guard(_ x : Int, y : Int??, cond : Bool) {
   guard case let c = x, cond else {}
   guard case let Optional.some(d) = y else {}
   guard x != 4, case _ = x else { }
-
-
-  guard let e, cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
+  guard let z, cond else {}
+  
+  
   guard case let f? : Int?, cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
 
   // FIXME: Bring back the tailored diagnostic
@@ -400,12 +400,19 @@ func test_is_as_patterns() {
 }
 
 // <rdar://problem/21387308> Fuzzing SourceKit: crash in Parser::parseStmtForEach(...)
-func matching_pattern_recursion() {
+func matching_pattern_recursion(zs: [Int]) { // expected-note {{'zs' declared here}}
   switch 42 {
   case {  // expected-error {{expression pattern of type '() -> ()' cannot match values of type 'Int'}}
       for i in zs {
       }
   }: break
+  }
+
+  switch 42 {
+  case {
+      for i in ws { // expected-error {{cannot find 'ws' in scope; did you mean 'zs'?}}
+      }
+    }: break
   }
 }
 

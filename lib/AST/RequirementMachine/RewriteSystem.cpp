@@ -12,261 +12,27 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/TypeWalker.h"
-#include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <vector>
+#include "PropertyMap.h"
 #include "RewriteContext.h"
+#include "RewriteLoop.h"
 #include "RewriteSystem.h"
+#include "Rule.h"
+#include "Trie.h"
 
 using namespace swift;
 using namespace rewriting;
-
-/// If this is a rule of the form T.[p] => T where [p] is a property symbol,
-/// returns the symbol. Otherwise, returns None.
-///
-/// Note that this is meant to be used with a simplified rewrite system,
-/// where the right hand sides of rules are canonical, since this also means
-/// that T is canonical.
-Optional<Symbol> Rule::isPropertyRule() const {
-  auto property = LHS.back();
-
-  if (!property.isProperty())
-    return None;
-
-  if (LHS.size() - 1 != RHS.size())
-    return None;
-
-  if (!std::equal(RHS.begin(), RHS.end(), LHS.begin()))
-    return None;
-
-  return property;
-}
-
-/// If this is a rule of the form T.[P] => T where [P] is a protocol symbol,
-/// return the protocol P, otherwise return nullptr.
-const ProtocolDecl *Rule::isProtocolConformanceRule() const {
-  if (auto property = isPropertyRule()) {
-    if (property->getKind() == Symbol::Kind::Protocol)
-      return property->getProtocol();
-  }
-
-  return nullptr;
-}
-
-/// If this is a rule of the form T.[concrete: C : P] => T where
-/// [concrete: C : P] is a concrete conformance symbol, return the protocol P,
-/// otherwise return nullptr.
-const ProtocolDecl *Rule::isAnyConformanceRule() const {
-  if (auto property = isPropertyRule()) {
-    switch (property->getKind()) {
-    case Symbol::Kind::ConcreteConformance:
-    case Symbol::Kind::Protocol:
-      return property->getProtocol();
-
-    case Symbol::Kind::Layout:
-    case Symbol::Kind::Superclass:
-    case Symbol::Kind::ConcreteType:
-      return nullptr;
-
-    case Symbol::Kind::Name:
-    case Symbol::Kind::AssociatedType:
-    case Symbol::Kind::GenericParam:
-      break;
-    }
-
-    llvm_unreachable("Bad symbol kind");
-  }
-
-  return nullptr;
-}
-
-/// If this is a rule of the form [P].[P] => [P] where [P] is a protocol
-/// symbol, return true, otherwise return false.
-bool Rule::isIdentityConformanceRule() const {
-  return (LHS.size() == 2 &&
-          RHS.size() == 1 &&
-          LHS[0] == RHS[0] &&
-          LHS[0] == LHS[1] &&
-          LHS[0].getKind() == Symbol::Kind::Protocol);
-}
-
-/// If this is a rule of the form [P].[Q] => [P] where [P] and [Q] are
-/// protocol symbols, return true, otherwise return false.
-bool Rule::isProtocolRefinementRule() const {
-  if (LHS.size() == 2 &&
-      RHS.size() == 1 &&
-      LHS[0] == RHS[0] &&
-      LHS[0].getKind() == Symbol::Kind::Protocol &&
-      (LHS[1].getKind() == Symbol::Kind::Protocol ||
-       LHS[1].getKind() == Symbol::Kind::ConcreteConformance) &&
-      LHS[0] != LHS[1]) {
-
-    // A protocol refinement rule must be from a directly-stated
-    // inheritance clause entry. It can only become redundant if it is
-    // written in terms of other protocol refinement rules; otherwise, it
-    // must appear in the protocol's requirement signature.
-    //
-    // See RewriteSystem::isValidRefinementPath() for an explanation.
-    auto *proto = LHS[0].getProtocol();
-    auto *otherProto = LHS[1].getProtocol();
-
-    auto inherited = proto->getInheritedProtocols();
-    return (std::find(inherited.begin(), inherited.end(), otherProto)
-            != inherited.end());
-  }
-
-  return false;
-}
-
-/// If this is a rule of the form [P].[concrete: C : Q] => [P] where
-/// [P] is a protocol symbol, return true.
-///
-/// This means that P constrains 'Self' to a concrete type that conforms
-/// to some Q with P : Q. We don't consider this to be a valid conformance
-/// path element, to ensure compatibility with the GSB in an odd edge
-/// case:
-///
-///    protocol P : C {}
-///    class C : P {}
-///
-/// The GSB minimizes the signature <T where T : P> to <T where T : P>,
-/// whereas the minimal conformances algorithm would otherwise minimize
-/// it down to <T where T : C> on account of the (T.[P] => T) conformance
-/// rule being redundantly expressed via [P].[concrete: C : P].
-bool Rule::isCircularConformanceRule() const {
-  if (LHS.size() != 2 || RHS.size() != 1 || LHS[0] != RHS[0])
-    return false;
-
-  if (LHS[0].getKind() != Symbol::Kind::Protocol ||
-      LHS[1].getKind() != Symbol::Kind::ConcreteConformance)
-    return false;
-
-  return true;
-}
-
-/// A protocol typealias rule takes one of the following two forms,
-/// where T is a name symbol:
-///
-/// 1) [P].T => X
-/// 2) [P].T.[concrete: C] => [P].T
-///
-/// The first case is where the protocol's underlying type is another
-/// type parameter. The second case is where the protocol's underlying
-/// type is a concrete type.
-///
-/// In the first case, X must be fully resolved, that is, it must not
-/// contain any name symbols.
-///
-/// If this rule is a protocol typealias rule, returns its name. Otherwise
-/// returns None.
-Optional<Identifier> Rule::isProtocolTypeAliasRule() const {
-  if (LHS.size() != 2 && LHS.size() != 3)
-    return None;
-
-  if (LHS[0].getKind() != Symbol::Kind::Protocol ||
-      LHS[1].getKind() != Symbol::Kind::Name)
-    return None;
-
-  if (LHS.size() == 2) {
-    // This is the case where the underlying type is a type parameter.
-    //
-    // We shouldn't have unresolved symbols on the right hand side;
-    // they should have been simplified away.
-    if (RHS.containsUnresolvedSymbols())
-      return None;
-  } else {
-    // This is the case where the underlying type is concrete.
-    assert(LHS.size() == 3);
-
-    auto prop = isPropertyRule();
-    if (!prop || prop->getKind() != Symbol::Kind::ConcreteType)
-      return None;
-  }
-
-  return LHS[1].getName();
-}
-
-/// Returns the length of the left hand side.
-unsigned Rule::getDepth() const {
-  auto result = LHS.size();
-
-  if (LHS.back().hasSubstitutions()) {
-    for (auto substitution : LHS.back().getSubstitutions()) {
-      result = std::max(result, substitution.size());
-    }
-  }
-
-  return result;
-}
-
-/// Returns the nesting depth of the concrete symbol at the end of the
-/// left hand side, or 0 if there isn't one.
-unsigned Rule::getNesting() const {
-  if (LHS.back().hasSubstitutions()) {
-    auto type = LHS.back().getConcreteType();
-
-    struct Walker : TypeWalker {
-      unsigned Nesting = 0;
-      unsigned MaxNesting = 0;
-
-      Action walkToTypePre(Type ty) override {
-        ++Nesting;
-        MaxNesting = std::max(Nesting, MaxNesting);
-
-        return Action::Continue;
-      }
-
-      Action walkToTypePost(Type ty) override {
-        --Nesting;
-
-        return Action::Continue;
-      }
-    };
-
-    Walker walker;
-    type.walk(walker);
-
-    return walker.MaxNesting;
-  }
-
-  return 0;
-}
-
-/// Linear order on rules; compares LHS followed by RHS.
-Optional<int> Rule::compare(const Rule &other, RewriteContext &ctx) const {
-  Optional<int> compare = LHS.compare(other.LHS, ctx);
-  if (!compare.hasValue() || *compare != 0)
-    return compare;
-
-  return RHS.compare(other.RHS, ctx);
-}
-
-void Rule::dump(llvm::raw_ostream &out) const {
-  out << LHS << " => " << RHS;
-  if (Permanent)
-    out << " [permanent]";
-  if (Explicit)
-    out << " [explicit]";
-  if (LHSSimplified)
-    out << " [lhs↓]";
-  if (RHSSimplified)
-    out << " [rhs↓]";
-  if (SubstitutionSimplified)
-    out << " [subst↓]";
-  if (Redundant)
-    out << " [redundant]";
-  if (Conflicting)
-    out << " [conflicting]";
-}
 
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
     : Context(ctx), Debug(ctx.getDebugOptions()) {
   Initialized = 0;
   Complete = 0;
   Minimized = 0;
+  Frozen = 0;
   RecordLoops = 0;
+  LongestInitialRule = 0;
 }
 
 RewriteSystem::~RewriteSystem() {
@@ -274,21 +40,58 @@ RewriteSystem::~RewriteSystem() {
                         Context.RuleTrieRootHistogram);
 }
 
+/// Initialize the rewrite system using rewrite rules built by the RuleBuilder.
+///
+/// - recordLoops: Whether this is a rewrite system built from user-written
+///   requirements, in which case we will perform minimization using rewrite
+///   loops recorded during completion.
+///
+/// - protos: If this is a rewrite system built from a protocol connected
+///   component, this contains the members of the protocol. For a rewrite
+///   system built from a generic signature, this is empty. Used by
+///   RewriteSystem::isInMinimizationDomain().
+///
+/// These parameters should be populated from the corresponding fields of the
+/// RuleBuilder instance:
+///
+/// - writtenRequirements: The user-written requirements, if any, used to
+///   track source locations for redundancy diagnostics.
+///
+/// - importedRules: Rewrite rules for referenced protocols. These come from
+///   the Requirement Machine instances for these protocols' connected
+///   components, so they are already confluent and can be imported verbatim.
+///
+/// - permanentRules: Permanent rules, such as associated type introduction
+///   rules for associated types defined in protocols in this connected
+///   component.
+///
+/// - requirementRules: Rules corresponding to generic requirements written
+///   by the user.
+///
+/// This can only be called once. It adds the rules to the rewrite system,
+/// allowing computeConfluentCompletion() to be called to compute the
+/// complete rewrite system.
 void RewriteSystem::initialize(
     bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
+    std::vector<StructuralRequirement> &&writtenRequirements,
+    std::vector<Rule> &&importedRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-    std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
+    std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>>
+        &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
   RecordLoops = recordLoops;
   Protos = protos;
+  WrittenRequirements = std::move(writtenRequirements);
 
-  for (const auto &rule : permanentRules)
-    addPermanentRule(rule.first, rule.second);
+  addRules(std::move(importedRules),
+           std::move(permanentRules),
+           std::move(requirementRules));
 
-  for (const auto &rule : requirementRules)
-    addExplicitRule(rule.first, rule.second);
+  for (const auto &rule : getLocalRules()) {
+    LongestInitialRule = std::max(LongestInitialRule, rule.getDepth());
+  }
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.
@@ -369,9 +172,7 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 /// \p lhs to \p rhs.
 bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
                             const RewritePath *path) {
-  // FIXME:
-  // assert(!Complete || path != nullptr &&
-  //        "Rules added by completion must have a path");
+  assert(!Frozen);
 
   assert(!lhs.empty());
   assert(!rhs.empty());
@@ -487,12 +288,84 @@ bool RewriteSystem::addPermanentRule(MutableTerm lhs, MutableTerm rhs) {
 }
 
 /// Add a new rule, marking it explicit.
-bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs) {
+bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
+                                    Optional<unsigned> requirementID) {
   bool added = addRule(std::move(lhs), std::move(rhs));
-  if (added)
+  if (added) {
     Rules.back().markExplicit();
+    Rules.back().setRequirementID(requirementID);
+  }
 
   return added;
+}
+
+/// Add a set of rules from a RuleBuilder.
+///
+/// This is used when building a rewrite system in initialize() above.
+///
+/// It is also used when conditional requirement inference pulls in additional
+/// protocols after the fact.
+void RewriteSystem::addRules(
+    std::vector<Rule> &&importedRules,
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+    std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules) {
+  unsigned ruleCount = Rules.size();
+
+  if (ruleCount == 0) {
+    // Fast path if this is called from initialization; just steal the
+    // underlying storage of the imported rule vector.
+    Rules = std::move(importedRules);
+  }
+  else {
+    // Otherwise, copy the imported rules in.
+    Rules.insert(Rules.end(), importedRules.begin(), importedRules.end());
+  }
+
+  // If this is the initial call, note the first non-imported rule so that
+  // we can skip over imported rules later.
+  if (ruleCount == 0)
+    FirstLocalRule = Rules.size();
+
+  // Add the imported rules to the trie.
+  for (unsigned newRuleID = ruleCount, e = Rules.size();
+       newRuleID < e; ++newRuleID) {
+    const auto &newRule = Rules[newRuleID];
+    // Skip simplified rules. At the very least we need to skip RHS-simplified
+    // rules since their left hand sides might duplicate existing rules; the
+    // others are skipped purely as an optimization. We can't skip subst-
+    // simplified rules, since property map construction considers them.
+    if (newRule.isLHSSimplified() ||
+        newRule.isRHSSimplified())
+      continue;
+
+    auto oldRuleID = Trie.insert(newRule.getLHS().begin(),
+                                 newRule.getLHS().end(),
+                                 newRuleID);
+    if (oldRuleID) {
+      llvm::errs() << "Imported rules have duplicate left hand sides!\n";
+      llvm::errs() << "New rule #" << newRuleID << ": " << newRule << "\n";
+      const auto &oldRule = getRule(*oldRuleID);
+      llvm::errs() << "Old rule #" << *oldRuleID << ": " << oldRule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
+
+  // Now add our own rules.
+  for (const auto &rule : permanentRules)
+    addPermanentRule(rule.first, rule.second);
+
+  for (const auto &rule : requirementRules) {
+    auto lhs = std::get<0>(rule);
+    auto rhs = std::get<1>(rule);
+    auto requirementID = std::get<2>(rule);
+
+    // When this is called while adding conditional requirements, there
+    // shouldn't be any new structural requirement IDs.
+    assert(ruleCount == 0 || !requirementID.hasValue());
+
+    addExplicitRule(lhs, rhs, requirementID);
+  }
 }
 
 /// Delete any rules whose left hand sides can be reduced by other rules.
@@ -502,7 +375,7 @@ bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs) {
 void RewriteSystem::simplifyLeftHandSides() {
   assert(Complete);
 
-  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
     if (rule.isLHSSimplified())
       continue;
@@ -545,7 +418,7 @@ void RewriteSystem::simplifyLeftHandSides() {
 void RewriteSystem::simplifyRightHandSides() {
   assert(Complete);
 
-  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
     if (rule.isRHSSimplified())
       continue;
@@ -621,6 +494,8 @@ bool RewriteSystem::isInMinimizationDomain(const ProtocolDecl *proto) const {
 
 void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
                                       RewritePath path) {
+  assert(!Frozen);
+
   RewriteLoop loop(basepoint, path);
   loop.verify(*this);
 
@@ -643,12 +518,34 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     abort(); \
   }
 
-  for (const auto &rule : Rules) {
+  for (const auto &rule : getLocalRules()) {
     const auto &lhs = rule.getLHS();
     const auto &rhs = rule.getRHS();
 
     for (unsigned index : indices(lhs)) {
       auto symbol = lhs[index];
+
+      // The left hand side can contain a single name symbol if it has the form
+      // T.N or T.N.[p], where T is some prefix that does not contain name
+      // symbols, N is a name symbol, and [p] is an optional property symbol.
+      //
+      // In the latter case, we have a protocol typealias, or a rule derived
+      // via resolving a critical pair involving a protocol typealias.
+      //
+      // Any other valid occurrence of a name symbol should have been reduced by
+      // an associated type introduction rule [P].N, marking the rule as
+      // LHS-simplified.
+      if (!rule.isLHSSimplified() &&
+          (rule.isPropertyRule()
+           ? index != lhs.size() - 2
+           : index != lhs.size() - 1)) {
+        // This is only true if the input requirements were valid.
+        if (policy == DisallowInvalidRequirements) {
+          ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
+        } else {
+          // FIXME: Assert that we diagnosed an error
+        }
+      }
 
       if (index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Layout);
@@ -667,14 +564,18 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     for (unsigned index : indices(rhs)) {
       auto symbol = rhs[index];
 
-      // RHS-simplified rules might have unresolved name symbols on the
-      // right hand side. Also, completion can introduce rules of the
-      // form T.X.[concrete: C] => T.X, where T is some resolved term,
-      // and X is a name symbol for a protocol typealias.
-      if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !(rule.isPropertyRule() &&
-            index == rhs.size() - 1)) {
+      // The right hand side can contain a single name symbol if it has the form
+      // T.N, where T is some prefix that does not contain name symbols, and
+      // N is a name symbol.
+      //
+      // In this case, we have a protocol typealias, or a rule derived via
+      // resolving a critical pair involving a protocol typealias.
+      //
+      // Any other valid occurrence of a name symbol should have been reduced by
+      // an associated type introduction rule [P].N, marking the rule as
+      // RHS-simplified.
+      if (!rule.isRHSSimplified() &&
+          index != rhs.size() - 1) {
         // This is only true if the input requirements were valid.
         if (policy == DisallowInvalidRequirements) {
           ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
@@ -690,10 +591,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      // Completion can produce rules like [P:T].[Q:R] => [P:T].[Q]
-      // which are immediately simplified away.
-      if (!rule.isRHSSimplified() &&
-          index != 0) {
+      if (index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
@@ -707,10 +605,291 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 #undef ASSERT_RULE
 }
 
+/// Determine whether this is a redundantly inheritable Objective-C protocol.
+///
+/// A redundantly-inheritable Objective-C protocol is one where we will
+/// silently accept a directly-stated redundant conformance to this protocol,
+/// and emit this protocol in the list of "inherited" protocols. There are
+/// two cases where we allow this:
+///
+//    1) For a protocol defined in Objective-C, so that we will match Clang's
+///      behavior, and
+///   2) For an @objc protocol defined in Swift that directly inherits from
+///      JavaScriptCore's JSExport, which depends on this behavior.
+static bool isRedundantlyInheritableObjCProtocol(const ProtocolDecl *inheritingProto,
+                                                 const ProtocolDecl *proto) {
+  if (!proto->isObjC()) return false;
+
+  // Check the two conditions in which we will suppress the diagnostic and
+  // emit the redundant inheritance.
+  if (!inheritingProto->hasClangNode() && !proto->getName().is("JSExport"))
+    return false;
+
+  // If the inheriting protocol already has @_restatedObjCConformance with
+  // this protocol, we're done.
+  for (auto *attr : inheritingProto->getAttrs()
+                      .getAttributes<RestatedObjCConformanceAttr>()) {
+    if (attr->Proto == proto) return true;
+  }
+
+  // Otherwise, add @_restatedObjCConformance.
+  auto &ctx = proto->getASTContext();
+  const_cast<ProtocolDecl *>(inheritingProto)
+      ->getAttrs().add(new (ctx) RestatedObjCConformanceAttr(
+          const_cast<ProtocolDecl *>(proto)));
+  return true;
+}
+
+/// Computes the set of explicit redundant requirements to
+/// emit warnings for in the source code.
+void RewriteSystem::computeRedundantRequirementDiagnostics(
+    SmallVectorImpl<RequirementError> &errors) {
+  // Collect all rule IDs for each unique requirement ID.
+  llvm::SmallDenseMap<unsigned, llvm::SmallVector<unsigned, 2>>
+      rulesPerRequirement;
+
+  // Collect non-explicit requirements that are not redundant.
+  llvm::SmallDenseSet<unsigned, 2> nonExplicitNonRedundantRules;
+
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
+       ruleID < e; ++ruleID) {
+    auto &rule = getRules()[ruleID];
+
+    if (rule.isPermanent())
+      continue;
+
+    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
+      continue;
+
+    // Concrete conformance rules do not map to requirements in the minimized
+    // signature; we don't consider them to be 'non-explicit non-redundant',
+    // so that a conformance rule (T.[P] => T) expressed in terms of a concrete
+    // conformance (T.[concrete: C : P] => T) is still diagnosed as redundant.
+    if (auto optSymbol = rule.isPropertyRule()) {
+      if (optSymbol->getKind() == Symbol::Kind::ConcreteConformance)
+        continue;
+    }
+
+    auto requirementID = rule.getRequirementID();
+
+    if (!requirementID.hasValue()) {
+      if (!rule.isRedundant())
+        nonExplicitNonRedundantRules.insert(ruleID);
+
+      continue;
+    }
+
+    rulesPerRequirement[*requirementID].push_back(ruleID);
+  }
+
+  // Compute the set of redundant rules which transitively reference a
+  // non-explicit non-redundant rule. This updates nonExplicitNonRedundantRules.
+  //
+  // Since earlier redundant paths might reference rules which appear later in
+  // the list but not vice versa, walk the redundant paths in reverse order.
+  for (const auto &pair : llvm::reverse(RedundantRules)) {
+    // Pre-condition: the replacement path only references redundant rules
+    // which we have already seen. If any of those rules transitively reference
+    // a non-explicit, non-redundant rule, they have been inserted into the
+    // nonExplicitNonRedundantRules set on previous iterations.
+    unsigned ruleID = pair.first;
+    const auto &rewritePath = pair.second;
+
+    // Check if this rewrite path references a rule that is already known to
+    // either be non-explicit and non-redundant, or reference such a rule via
+    // it's redundancy path.
+    for (auto step : rewritePath) {
+      switch (step.Kind) {
+      case RewriteStep::Rule: {
+        if (nonExplicitNonRedundantRules.count(step.getRuleID())) {
+          nonExplicitNonRedundantRules.insert(ruleID);
+          continue;
+        }
+
+        break;
+      }
+
+      case RewriteStep::LeftConcreteProjection:
+      case RewriteStep::Decompose:
+      case RewriteStep::PrefixSubstitutions:
+      case RewriteStep::Shift:
+      case RewriteStep::Relation:
+      case RewriteStep::DecomposeConcrete:
+      case RewriteStep::RightConcreteProjection:
+        break;
+      }
+    }
+
+    // Post-condition: If the current replacement path transitively references
+    // any non-explicit, non-redundant rules, then nonExplicitNonRedundantRules
+    // contains the current rule.
+  }
+
+  // We diagnose a redundancy if the rule is redundant, and if its replacement
+  // path does not transitively involve any non-explicit, non-redundant rules.
+  auto isRedundantRule = [&](unsigned ruleID) {
+    const auto &rule = getRules()[ruleID];
+
+    if (!rule.isRedundant())
+      return false;
+
+    if (nonExplicitNonRedundantRules.count(ruleID) > 0)
+      return false;
+
+    if (rule.isProtocolRefinementRule(Context) &&
+        isRedundantlyInheritableObjCProtocol(rule.getLHS()[0].getProtocol(),
+                                             rule.getLHS()[1].getProtocol()))
+      return false;
+
+    return true;
+  };
+
+  // Finally walk through the written requirements, diagnosing any that are
+  // redundant.
+  for (auto requirementID : indices(WrittenRequirements)) {
+    auto requirement = WrittenRequirements[requirementID];
+
+    // Inferred requirements can be re-stated without warning.
+    if (requirement.inferred)
+      continue;
+
+    auto pairIt = rulesPerRequirement.find(requirementID);
+
+    // If there are no rules for this structural requirement, then the
+    // requirement is unnecessary in the source code.
+    //
+    // This means the requirement was determined to be vacuous by
+    // requirement lowering and produced no rules, or the rewrite rules were
+    // trivially simplified by RewriteSystem::addRule().
+    if (pairIt == rulesPerRequirement.end()) {
+      errors.push_back(
+          RequirementError::forRedundantRequirement(requirement.req,
+                                                    requirement.loc));
+      continue;
+    }
+
+    // If all rules derived from this structural requirement are redundant,
+    // then the requirement is unnecessary in the source code.
+    //
+    // This means the rules derived from this requirement were all
+    // determined to be redundant by homotopy reduction.
+    const auto &ruleIDs = pairIt->second;
+    if (llvm::all_of(ruleIDs, isRedundantRule)) {
+      auto requirement = WrittenRequirements[requirementID];
+      errors.push_back(
+          RequirementError::forRedundantRequirement(requirement.req,
+                                                    requirement.loc));
+    }
+  }
+}
+
+/// Free up memory by purging unused data structures after completion
+/// (for a rewrite system built from a generic signature) or minimization
+/// (for a rewrite system built from user-written requirements).
+void RewriteSystem::freeze() {
+  assert(Complete);
+  assert(!Frozen);
+
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
+       ruleID < e; ++ruleID) {
+    getRule(ruleID).freeze();
+  }
+
+  WrittenRequirements.clear();
+  CheckedOverlaps.clear();
+  RelationMap.clear();
+  Relations.clear();
+  DifferenceMap.clear();
+  Differences.clear();
+  CheckedDifferences.clear();
+  Loops.clear();
+  RedundantRules.clear();
+  ConflictingRules.clear();
+}
+
+static Optional<Requirement>
+getRequirementForDiagnostics(Type subject, Symbol property,
+                             const PropertyMap &map,
+                             TypeArrayView<GenericTypeParamType> genericParams,
+                             const MutableTerm &prefix) {
+  switch (property.getKind()) {
+  case Symbol::Kind::ConcreteType: {
+    auto concreteType = map.getTypeFromSubstitutionSchema(
+        property.getConcreteType(), property.getSubstitutions(),
+        genericParams, prefix);
+    return Requirement(RequirementKind::SameType, subject, concreteType);
+  }
+
+  case Symbol::Kind::Superclass: {
+    auto concreteType = map.getTypeFromSubstitutionSchema(
+        property.getConcreteType(), property.getSubstitutions(),
+        genericParams, prefix);
+    return Requirement(RequirementKind::Superclass, subject, concreteType);
+  }
+
+  case Symbol::Kind::Protocol:
+    return Requirement(RequirementKind::Conformance, subject,
+                       property.getProtocol()->getDeclaredInterfaceType());
+
+  case Symbol::Kind::Layout:
+    return Requirement(RequirementKind::Layout, subject,
+                       property.getLayoutConstraint());
+
+  default:
+    return None;
+  }
+}
+
+void RewriteSystem::computeConflictDiagnostics(
+    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc,
+    const PropertyMap &propertyMap,
+    TypeArrayView<GenericTypeParamType> genericParams) {
+  for (auto pair : ConflictingRules) {
+    const auto &firstRule = getRule(pair.first);
+    const auto &secondRule = getRule(pair.second);
+
+    assert(firstRule.isPropertyRule() && secondRule.isPropertyRule());
+
+    if (firstRule.isSubstitutionSimplified() ||
+        secondRule.isSubstitutionSimplified())
+      continue;
+
+    bool chooseFirstRule = firstRule.getRHS().size() > secondRule.getRHS().size();
+    auto subjectRule = chooseFirstRule ? firstRule : secondRule;
+    auto subjectTerm = subjectRule.getRHS();
+
+    auto suffixRule = chooseFirstRule ? secondRule : firstRule;
+    auto suffixTerm = suffixRule.getRHS();
+
+    // If the root protocol of the subject term isn't in this minimization
+    // domain, the conflict was already diagnosed.
+    if (!isInMinimizationDomain(subjectTerm[0].getRootProtocol()))
+      continue;
+
+    Type subject = propertyMap.getTypeForTerm(subjectTerm, genericParams);
+    MutableTerm prefix(subjectTerm.begin(), subjectTerm.end() - suffixTerm.size());
+    errors.push_back(RequirementError::forConflictingRequirement(
+        *getRequirementForDiagnostics(subject, *subjectRule.isPropertyRule(),
+                                      propertyMap, genericParams, MutableTerm()),
+        *getRequirementForDiagnostics(subject, *suffixRule.isPropertyRule(),
+                                      propertyMap, genericParams, prefix),
+        signatureLoc));
+  }
+}
+
 void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "Rewrite system: {\n";
   for (const auto &rule : Rules) {
-    out << "- " << rule << "\n";
+    out << "- " << rule;
+    if (auto ID = rule.getRequirementID()) {
+      auto requirement = WrittenRequirements[*ID];
+      out << " [ID: " << *ID << " - ";
+      requirement.req.dump(out);
+      out << " at ";
+      requirement.loc.print(out, Context.getASTContext().SourceMgr);
+      out << "]";
+    }
+    out << "\n";
   }
   out << "}\n";
   if (!Relations.empty()) {
@@ -737,6 +916,18 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
 
       out << "- (#" << loopID << ") ";
       loop.dump(out, *this);
+      out << "\n";
+    }
+  }
+  if (!WrittenRequirements.empty()) {
+    out << "Written requirements: {\n";
+
+    for (unsigned reqID : indices(WrittenRequirements)) {
+      out << " - ID: " << reqID << " - ";
+      const auto &requirement = WrittenRequirements[reqID];
+      requirement.req.dump(out);
+      out << " at ";
+      requirement.loc.print(out, Context.getASTContext().SourceMgr);
       out << "\n";
     }
   }

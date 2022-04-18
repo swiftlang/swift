@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - -parse-stdlib %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-module-interface-path - -emit-module -o /dev/null -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -parse-stdlib
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface)
+// RUN: %FileCheck %s < %t.swiftinterface
 
 // CHECK-NOT: import Builtin
 

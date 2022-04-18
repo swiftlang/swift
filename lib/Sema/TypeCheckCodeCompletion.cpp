@@ -41,7 +41,6 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CompletionContextFinder.h"
 #include "swift/Strings.h"
@@ -189,13 +188,19 @@ public:
         continue;
       }
 
-      // Restore '@autoclosure'd value.
       if (auto ACE = dyn_cast<AutoClosureExpr>(expr)) {
+        // Restore '@autoclosure'd value.
         // This is only valid if the closure doesn't have parameters.
         if (ACE->getParameters()->size() == 0) {
           expr = ACE->getSingleExpressionBody();
           continue;
         }
+        // Restore autoclosure'd function reference.
+        if (auto *unwrapped = ACE->getUnwrappedCurryThunkExpr()) {
+          expr = unwrapped;
+          continue;
+        }
+
         llvm_unreachable("other AutoClosureExpr must be handled specially");
       }
 
@@ -513,11 +518,32 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   }
 }
 
-/// Remove any solutions from the provided vector that both require fixes and
-/// have a score worse than the best.
-static void filterSolutions(SolutionApplicationTarget &target,
-                            SmallVectorImpl<Solution> &solutions,
-                            CodeCompletionExpr *completionExpr) {
+static bool hasTypeForCompletion(Solution &solution,
+                                 CompletionContextFinder &contextAnalyzer) {
+  if (contextAnalyzer.hasCompletionExpr()) {
+    return solution.hasType(contextAnalyzer.getCompletionExpr());
+  } else {
+    assert(contextAnalyzer.hasCompletionKeyPathComponent());
+    return solution.hasType(
+        contextAnalyzer.getKeyPathContainingCompletionComponent(),
+        contextAnalyzer.getKeyPathCompletionComponentIndex());
+  }
+}
+
+void TypeChecker::filterSolutionsForCodeCompletion(
+    SmallVectorImpl<Solution> &solutions,
+    CompletionContextFinder &contextAnalyzer) {
+  // Ignore solutions that didn't end up involving the completion (e.g. due to
+  // a fix to skip over/ignore it).
+  llvm::erase_if(solutions, [&](Solution &S) {
+    if (hasTypeForCompletion(S, contextAnalyzer))
+      return false;
+    // FIXME: Technically this should never happen, but it currently does in
+    // result builder contexts. Re-evaluate if we can assert here when we have
+    // multi-statement closure checking for result builders.
+    return true;
+  });
+
   if (solutions.size() <= 1)
     return;
 
@@ -527,8 +553,7 @@ static void filterSolutions(SolutionApplicationTarget &target,
   })->getFixedScore();
 
   llvm::erase_if(solutions, [&](const Solution &S) {
-    return S.getFixedScore().Data[SK_Fix] != 0 &&
-        S.getFixedScore() > minScore;
+    return S.getFixedScore().Data[SK_Fix] > minScore.Data[SK_Fix];
   });
 }
 
@@ -608,15 +633,6 @@ bool TypeChecker::typeCheckForCodeCompletion(
     if (!cs.solveForCodeCompletion(target, solutions))
       return CompletionResult::Fallback;
 
-    // FIXME: instead of filtering, expose the score and viability to clients.
-    // Remove any solutions that both require fixes and have a score that is
-    // worse than the best.
-    CodeCompletionExpr *completionExpr = nullptr;
-    if (contextAnalyzer.hasCompletionExpr()) {
-      completionExpr = contextAnalyzer.getCompletionExpr();
-    }
-    filterSolutions(target, solutions, completionExpr);
-
     // Similarly, if the type-check didn't produce any solutions, fall back
     // to type-checking a sub-expression in isolation.
     if (solutions.empty())
@@ -626,19 +642,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     // closure body it could either be type-checked together with the context
     // or not, it's impossible to say without checking.
     if (contextAnalyzer.locatedInMultiStmtClosure()) {
-      auto &solution = solutions.front();
-
-      bool HasTypeForCompletionNode = false;
-      if (completionExpr) {
-        HasTypeForCompletionNode = solution.hasType(completionExpr);
-      } else {
-        assert(contextAnalyzer.hasCompletionKeyPathComponent());
-        HasTypeForCompletionNode = solution.hasType(
-            contextAnalyzer.getKeyPathContainingCompletionComponent(),
-            contextAnalyzer.getKeyPathCompletionComponentIndex());
-      }
-
-      if (!HasTypeForCompletionNode) {
+      if (!hasTypeForCompletion(solutions.front(), contextAnalyzer)) {
         // At this point we know the code completion node wasn't checked with
         // the closure's surrounding context, so can defer to regular
         // type-checking for the current call to typeCheckExpression. If that
@@ -650,6 +654,11 @@ bool TypeChecker::typeCheckForCodeCompletion(
         return CompletionResult::NotApplicable;
       }
     }
+
+    // FIXME: instead of filtering, expose the score and viability to clients.
+    // Remove solutions that skipped over/ignored the code completion point
+    // or that require fixes and have a score that is worse than the best.
+    filterSolutionsForCodeCompletion(solutions, contextAnalyzer);
 
     llvm::for_each(solutions, callback);
     return CompletionResult::Ok;
@@ -779,91 +788,3 @@ swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }
 
-Type swift::getTypeForCompletion(const constraints::Solution &S, Expr *E) {
-  if (!S.hasType(E)) {
-    assert(false && "Expression wasn't type checked?");
-    return nullptr;
-  }
-
-  auto &CS = S.getConstraintSystem();
-
-  // To aid code completion, we need to attempt to convert type placeholders
-  // back into underlying generic parameters if possible, since type
-  // of the code completion expression is used as "expected" (or contextual)
-  // type so it's helpful to know what requirements it has to filter
-  // the list of possible member candidates e.g.
-  //
-  // \code
-  // func test<T: P>(_: [T]) {}
-  //
-  // test(42.#^MEMBERS^#)
-  // \code
-  //
-  // It's impossible to resolve `T` in this case but code completion
-  // expression should still have a type of `[T]` instead of `[<<hole>>]`
-  // because it helps to produce correct contextual member list based on
-  // a conformance requirement associated with generic parameter `T`.
-  if (isa<CodeCompletionExpr>(E)) {
-    auto completionTy = S.getType(E).transform([&](Type type) -> Type {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        return S.getFixedType(typeVar);
-      return type;
-    });
-
-    return S.simplifyType(completionTy.transform([&](Type type) {
-      if (auto *placeholder = type->getAs<PlaceholderType>()) {
-        if (auto *typeVar =
-                placeholder->getOriginator().dyn_cast<TypeVariableType *>()) {
-          if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-            // Code completion depends on generic parameter type being
-            // represented in terms of `ArchetypeType` since it's easy
-            // to extract protocol requirements from it.
-            if (auto *GPD = GP->getDecl())
-              return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
-          }
-        }
-
-        return Type(CS.getASTContext().TheUnresolvedType);
-      }
-
-      return type;
-    }));
-  }
-
-  return S.getResolvedType(E);
-}
-
-bool swift::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
-                                             Expr *CompletionExpr) {
-  Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
-  if (!ParentExpr)
-    return CS.getContextualTypePurpose(CompletionExpr) == CTP_ReturnSingleExpr;
-
-  if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
-    if (ParentCE->hasSingleExpressionBody() &&
-        ParentCE->getSingleExpressionBody() == CompletionExpr) {
-      ASTNode Last = ParentCE->getBody()->getLastElement();
-      return !Last.isStmt(StmtKind::Return) || Last.isImplicit();
-    }
-  }
-  return false;
-}
-
-void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
-  assert(!GotCallback);
-
-  CompletionContextFinder finder(DC);
-  if (!finder.hasCompletionExpr())
-    return;
-
-  auto fallback = finder.getFallbackCompletionExpr();
-  if (!fallback)
-    return;
-
-  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
-  TypeChecker::typeCheckForCodeCompletion(
-      completionTarget, /*needsPrecheck*/ true,
-      [&](const Solution &S) { sawSolution(S); });
-}

@@ -159,16 +159,18 @@ class MinimalConformances {
 
   DebugOptions Debug;
 
-  // All conformance rules, sorted by (isExplicit(), getLHS()), with non-explicit
-  // rules with longer left hand sides coming first.
+  // All conformance rules in the current minimization domain, sorted by
+  // (isExplicit(), getLHS()), with non-explicit rules with longer left hand
+  // sides coming first.
   //
   // The idea here is that we want less canonical rules to be eliminated first,
   // but we prefer to eliminate non-explicit rules, in an attempt to keep protocol
   // conformance rules in the same protocol as they were originally defined in.
   SmallVector<unsigned, 4> ConformanceRules;
 
-  // Maps a conformance rule to a conformance path deriving the subject type's
-  // base type. For example, consider the following conformance rule:
+  // Maps a conformance rule in the current minimization domain to a conformance
+  // path deriving the subject type's base type. For example, consider the
+  // following conformance rule:
   //
   //   T.[P:A].[Q:B].[R] => T.[P:A].[Q:B]
   //
@@ -177,15 +179,17 @@ class MinimalConformances {
   // path for the term T.[P:A].[Q], known as the 'parent path'.
   llvm::MapVector<unsigned, SmallVector<unsigned, 2>> ParentPaths;
 
-  // Maps a conformance rule to a list of paths. Each path in the list is a unique
-  // derivation of the conformance in terms of other conformance rules.
+  // Maps a conformance rule in the current minimization domain to a list of paths.
+  // Each path in the list is a unique derivation of the conformance in terms of
+  // other conformance rules.
   llvm::MapVector<unsigned, std::vector<SmallVector<unsigned, 2>>> ConformancePaths;
 
-  // The set of conformance rules which are protocol refinements, that is rules of
-  // the form [P].[Q] => [P].
+  // The set of conformance rules (from all minimization domains) which are protocol
+  // refinements, that is rules of the form [P].[Q] => [P].
   llvm::DenseSet<unsigned> ProtocolRefinements;
 
-  // This is the result.
+  // This is the computed result set of redundant conformance rules in the current
+  // minimization domain.
   llvm::DenseSet<unsigned> &RedundantConformances;
 
   void decomposeTermIntoConformanceRuleLeftHandSides(
@@ -365,7 +369,8 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
     break;
   }
 
-  llvm_unreachable("Bad symbol kind");
+  llvm::errs() << "Bad symbol in " << lhs << "\n";
+  abort();
 }
 
 /// Collect conformance rules and parent paths, and record an initial
@@ -390,16 +395,14 @@ void MinimalConformances::collectConformanceRules() {
     if (!rule.isAnyConformanceRule())
       continue;
 
+    // Save protocol refinement relations in a side table.
+    if (rule.isProtocolRefinementRule(Context))
+      ProtocolRefinements.insert(ruleID);
+
     if (!System.isInMinimizationDomain(rule.getLHS().getRootProtocol()))
       continue;
 
     ConformanceRules.push_back(ruleID);
-
-    // Save protocol refinement relations in a side table.
-    if (rule.isProtocolRefinementRule()) {
-      ProtocolRefinements.insert(ruleID);
-      continue;
-    }
 
     auto lhs = rule.getLHS();
 
@@ -697,7 +700,7 @@ bool MinimalConformances::isValidConformancePath(
 bool MinimalConformances::isValidRefinementPath(
     const llvm::SmallVectorImpl<unsigned> &path) const {
   for (unsigned ruleID : path) {
-    if (!System.getRule(ruleID).isProtocolRefinementRule())
+    if (ProtocolRefinements.count(ruleID) == 0)
       return false;
   }
 
@@ -866,8 +869,14 @@ void MinimalConformances::computeMinimalConformances() {
     for (const auto &path : paths) {
       // Only consider a protocol refinement rule to be redundant if it is
       // witnessed by a composition of other protocol refinement rules.
-      if (isProtocolRefinement && !isValidRefinementPath(path))
+      if (isProtocolRefinement && !isValidRefinementPath(path)) {
+        if (Debug.contains(DebugFlags::MinimalConformances)) {
+          llvm::dbgs() << "Not a refinement path: ";
+          dumpConformancePath(llvm::errs(), path);
+          llvm::dbgs() << "\n";
+        }
         continue;
+      }
 
       llvm::SmallDenseSet<unsigned, 4> visited;
       visited.insert(ruleID);

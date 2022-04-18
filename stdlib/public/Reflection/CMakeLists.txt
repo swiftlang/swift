@@ -14,6 +14,6 @@ add_swift_target_library(swiftReflection STATIC
   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS} ${swiftReflection_C_COMPILE_FLAGS}
   LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
   INCORPORATE_OBJECT_LIBRARIES
-    swiftLLVMSupport swiftDemangling
+    swiftLLVMSupport swiftDemangling swiftDemanglingCR
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT dev)

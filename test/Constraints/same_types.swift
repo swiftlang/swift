@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=off
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
 
 protocol Fooable {
   associatedtype Foo // expected-note{{protocol requires nested type 'Foo'; do you want to add it?}}
@@ -38,16 +39,22 @@ struct NestedConstraint<T> {
   }
 }
 
+// CHECK-LABEL: same_types.(file).test2(_:u:)@
+// CHECK-NEXT: Generic signature: <T, U where T : Fooable, U : Fooable, T.[Fooable]Foo == X, U.[Fooable]Foo == X>
 func test2<T: Fooable, U: Fooable>(_ t: T, u: U) -> (X, X)
   where T.Foo == X, U.Foo == T.Foo {
   return (t.foo, u.foo)
 }
 
+// CHECK-LABEL: same_types.(file).test2a(_:u:)@
+// CHECK-NEXT: Generic signature: <T, U where T : Fooable, U : Fooable, T.[Fooable]Foo == X, U.[Fooable]Foo == X>
 func test2a<T: Fooable, U: Fooable>(_ t: T, u: U) -> (X, X)
   where T.Foo == X, T.Foo == U.Foo {
   return (t.foo, u.foo)
 }
 
+// CHECK-LABEL: same_types.(file).test3(_:u:)@
+// CHECK-NEXT: Generic signature: <T, U where T : Fooable, U : Fooable, T.[Fooable]Foo == X, U.[Fooable]Foo == X>
 func test3<T: Fooable, U: Fooable>(_ t: T, u: U) -> (X, X)
   where T.Foo == X, U.Foo == X, T.Foo == U.Foo {
 	// expected-warning@-1{{redundant same-type constraint 'U.Foo' == 'X'}}
@@ -55,6 +62,8 @@ func test3<T: Fooable, U: Fooable>(_ t: T, u: U) -> (X, X)
   return (t.foo, u.foo)
 }
 
+// CHECK-LABEL: same_types.(file).fail1(_:u:)@
+// CHECK-NEXT: Generic signature: <T, U where T : Fooable, U : Fooable, T.[Fooable]Foo == U.[Fooable]Foo>
 func fail1<
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
@@ -63,6 +72,8 @@ func fail1<
   return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(X, X)' to return type '(X, Y)'}}
 }
 
+// CHECK-LABEL: same_types.(file).fail2(_:u:)@
+// CHECK-NEXT: Generic signature: <T, U where T : Fooable, U : Fooable, T.[Fooable]Foo == U.[Fooable]Foo>
 func fail2<
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
@@ -75,6 +86,8 @@ func test4<T: Barrable>(_ t: T) -> Y where T.Bar == Y {
   return t.bar
 }
 
+// CHECK-LABEL: same_types.(file).fail3@
+// CHECK-NEXT: Generic signature: <T where T : Barrable>
 func fail3<T: Barrable>(_ t: T) -> X
   where T.Bar == X { // expected-error {{'X' does not conform to required protocol 'Fooable'}}
   return t.bar // expected-error{{cannot convert return expression of type 'T.Bar' }}
@@ -88,11 +101,15 @@ func test6<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y {
   return (t.bar, t.bar.foo)
 }
 
+// CHECK-LABEL: same_types.(file).test7@
+// CHECK-NEXT: Generic signature: <T where T : Barrable, T.[Barrable]Bar == Y>
 func test7<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y, T.Bar.Foo == X {
 	// expected-warning@-1{{neither type in same-type constraint ('Y.Foo' (aka 'X') or 'X') refers to a generic parameter or associated type}}
   return (t.bar, t.bar.foo)
 }
 
+// CHECK-LABEL: same_types.(file).fail4@
+// CHECK-NEXT: Generic signature: <T where T : Barrable, T.[Barrable]Bar == Y>
 func fail4<T: Barrable>(_ t: T) -> (Y, Z)
   where
   T.Bar == Y,
@@ -100,6 +117,8 @@ func fail4<T: Barrable>(_ t: T) -> (Y, Z)
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to return type '(Y, Z)'}}
 }
 
+// CHECK-LABEL: same_types.(file).fail5@
+// CHECK-NEXT: Generic signature: <T where T : Barrable, T.[Barrable]Bar == Y>
 func fail5<T: Barrable>(_ t: T) -> (Y, Z)
   where
   T.Bar.Foo == Z, // expected-note{{same-type constraint 'T.Bar.Foo' == 'Z' written here}}
@@ -107,6 +126,8 @@ func fail5<T: Barrable>(_ t: T) -> (Y, Z)
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to return type '(Y, Z)'}}
 }
 
+// CHECK-LABEL: same_types.(file).test8@
+// CHECK-NEXT: Generic signature: <T where T : Fooable>
 func test8<T: Fooable>(_ t: T)
   where T.Foo == X, // expected-note{{same-type constraint 'T.Foo' == 'X' written here}}
   T.Foo == Y {} // expected-error{{'T.Foo' cannot be equal to both 'Y' and 'X'}}
@@ -121,12 +142,16 @@ func fail6<T>(_ t: T) -> Int where T == Int { // expected-error{{same-type requi
   return t
 }
 
+// CHECK-LABEL: same_types.(file).test8(_:u:)@
+// CHECK-NEXT: Generic signature: <T, U where T : Barrable, U : Barrable, T.[Barrable]Bar == Y, U.[Barrable]Bar == Y>
 func test8<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
   where T.Bar == Y, // expected-note{{same-type constraint 'U.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
         U.Bar.Foo == X, T.Bar == U.Bar { // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
   return (t.bar, u.bar, t.bar.foo, u.bar.foo)
 }
 
+// CHECK-LABEL: same_types.(file).test8a(_:u:)@
+// CHECK-NEXT: Generic signature: <T, U where T : Barrable, U : Barrable, T.[Barrable]Bar == Y, U.[Barrable]Bar == Y>
 func test8a<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
   where
   T.Bar == Y, // expected-note{{same-type constraint 'U.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
@@ -134,6 +159,8 @@ func test8a<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
   return (t.bar, u.bar, t.bar.foo, u.bar.foo)
 }
 
+// CHECK-LABEL: same_types.(file).test8b(_:u:)@
+// CHECK-NEXT: Generic signature: <T, U where T : Barrable, U : Barrable, T.[Barrable]Bar == Y, U.[Barrable]Bar == Y>
 func test8b<T: Barrable, U: Barrable>(_ t: T, u: U)
   where U.Bar.Foo == X, // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
         T.Bar == Y, // expected-note{{same-type constraint 'U.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
@@ -166,6 +193,8 @@ struct Q : P {
 }
 
 struct S1<T : P> {
+  // CHECK-LABEL: same_types.(file).S1.foo(x:y:)@
+  // CHECK-NEXT: Generic signature: <T, X, Y where T : P, X == T.[P]A, Y == T.[P]B>
   func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.B {
     print(X.self)
     print(Y.self)
@@ -176,6 +205,8 @@ struct S1<T : P> {
 S1<Q>().foo(x: 1, y: 2)
 
 struct S2<T : P> where T.A == T.B {
+  // CHECK-LABEL: same_types.(file).S2.foo(x:y:)@
+  // CHECK-NEXT: <T, X, Y where T : P, X == Y, Y == T.[P]A, T.[P]A == T.[P]B>
   func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.B {  // expected-error{{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
     print(X.self)
     print(Y.self)
@@ -186,6 +217,8 @@ struct S2<T : P> where T.A == T.B {
 S2<Q>().foo(x: 1, y: 2)
 
 struct S3<T : P> {
+  // CHECK-LABEL: same_types.(file).S3.foo(x:y:)@
+  // CHECK-NEXT: <T, X, Y where T : P, X == Y, Y == T.[P]A>
   func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.A {} // expected-error{{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
 }
 S3<Q>().foo(x: 1, y: 2)
@@ -208,6 +241,8 @@ struct QQ : P {
 }
 
 struct S4<T : P> {
+  // CHECK-LABEL: same_types.(file).S4.foo(x:)@
+  // CHECK-NEXT: Generic signature: <T, X where T : P, X : PP, T.[P]A == X.[PP]A>
   func foo<X : PP>(x: X) where X.A == T.A {
     print(x)
     print(X.self)
@@ -223,6 +258,8 @@ protocol P1 {
   associatedtype Assoc
 }
 
+// CHECK-LABEL: same_types.(file).structuralSameType1@
+// CHECK-NEXT: Generic signature: <A, B, T, U, V, W where A : P1, B : P1, T == V, U == W, A.[P1]Assoc == X1<T, U>, B.[P1]Assoc == X1<T, U>>
 func structuralSameType1<A: P1, B: P1, T, U, V, W>(_: A, _: B, _: T, _: U, _: V, _: W)
   where A.Assoc == X1<T, U>, B.Assoc == X1<V, W>, A.Assoc == B.Assoc { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
@@ -230,11 +267,15 @@ func structuralSameType1<A: P1, B: P1, T, U, V, W>(_: A, _: B, _: T, _: U, _: V,
 
 typealias Tuple2<T, U> = (T, U)
 
+// CHECK-LABEL: same_types.(file).structuralSameType2@
+// CHECK-NEXT: Generic signature: <A, B, T, U, V, W where A : P1, B : P1, T == V, U == W, A.[P1]Assoc == (T, U), B.[P1]Assoc == (T, U)>
 func structuralSameType2<A: P1, B: P1, T, U, V, W>(_: A, _: B, _: T, _: U, _: V, _: W)
   where A.Assoc == Tuple2<T, U>, B.Assoc == Tuple2<V, W>, A.Assoc == B.Assoc { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
 // expected-error@-2{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
 
+// CHECK-LABEL: same_types.(file).structuralSameType3@
+// CHECK-NEXT: Generic signature: <T, U, V, W where T == V, U == W>
 func structuralSameType3<T, U, V, W>(_: T, _: U, _: V, _: W)
   where X1<T, U> == X1<V, W> { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
@@ -246,6 +287,8 @@ protocol P2 {
   associatedtype Assoc2
 }
 
+// CHECK-LABEL: same_types.(file).structuralSameTypeRecursive1@
+// CHECK-NEXT: Generic signature: <T, U>
 func structuralSameTypeRecursive1<T: P2, U>(_: T, _: U)
   where T.Assoc1 == Tuple2<T.Assoc1, U> // expected-error{{same-type constraint 'T.Assoc1' == '(T.Assoc1, U)' is recursive}}
 { }
@@ -257,6 +300,8 @@ protocol P4 {
   associatedtype A
 }
 
+// CHECK-LABEL: same_types.(file).test9@
+// CHECK-NEXT: Generic signature: <T where T : P4>
 func test9<T>(_: T) where T.A == X, T: P4, T.A: P3 { } // expected-error{{same-type constraint type 'X' does not conform to required protocol 'P3'}}
 
 // Same-type constraint conflict through protocol where clauses.
@@ -273,6 +318,8 @@ struct X5a {}
 
 struct X5b { }
 
+// CHECK-LABEL: same_types.(file).test9(_:u:)@
+// CHECK-NEXT: Generic signature: <T, U where T : P6, U : P6, T.[P6]Bar == U.[P6]Bar>
 func test9<T: P6, U: P6>(_ t: T, u: U)
   where T.Bar.Foo1 == X5a, // expected-note{{same-type constraint 'T.Bar.Foo1' == 'X5a' written here}}
         U.Bar.Foo2 == X5b, // expected-error{{'U.Bar.Foo2' cannot be equal to both 'X5b' and 'X5a'}}
@@ -282,36 +329,57 @@ func test9<T: P6, U: P6>(_ t: T, u: U)
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: generic parameter τ_0_0.Bar.Foo cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'
 
+// CHECK-LABEL: same_types.(file).testMetatypeSameType@
+// CHECK-NEXT: Generic signature: <T, U where T == U>
 func testMetatypeSameType<T, U>(_ t: T, _ u: U)
   where T.Type == U.Type { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'U' equivalent}}
 // expected-warning@-2{{neither type in same-type constraint ('T.Type' or 'U.Type') refers to a generic parameter or associated type}}
 
+// CHECK-LABEL: same_types.(file).testSameTypeCommutativity1@
+// CHECK-NEXT: Generic signature: <U, T where U == T.Type>
 func testSameTypeCommutativity1<U, T>(_ t: T, _ u: U)
   where T.Type == U { } // Equivalent to U == T.Type
 // expected-error@-1{{same-type requirement makes generic parameter 'U' non-generic}}
 
+// CHECK-LABEL: same_types.(file).testSameTypeCommutativity2@
+// CHECK-NEXT: Generic signature: <U, T where T : P1, T.[P1]Assoc == U?>
 func testSameTypeCommutativity2<U, T: P1>(_ t: T, _ u: U)
   where U? == T.Assoc { } // Ok, equivalent to T.Assoc == U?
 
+// CHECK-LABEL: same_types.(file).testSameTypeCommutativity3@
+// CHECK-NEXT: Generic signature: <U, T where T : P1, T.[P1]Assoc == (U) -> ()>
 func testSameTypeCommutativity3<U, T: P1>(_ t: T, _ u: U)
   where (U) -> () == T.Assoc { } // Ok, equivalent to T.Assoc == (U) -> ()
 
+// CHECK-LABEL: same_types.(file).testSameTypeCommutativity4@
+// CHECK-NEXT: Generic signature: <U, T where T == (U) -> ()>
 func testSameTypeCommutativity4<U, T>(_ t: T, _ u: U)
   where (U) -> () == T { } // Equivalent to T == (U) -> ()
 // expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
 
+// CHECK-LABEL: same_types.(file).testSameTypeCommutativity5@
+// CHECK-NEXT: Generic signature: <U, T where T : P1, T.[P1]Assoc == P3 & PPP>
 func testSameTypeCommutativity5<U, T: P1>(_ t: T, _ u: U)
   where PPP & P3 == T.Assoc { } // Ok, equivalent to T.Assoc == PPP & P3
 
+// CHECK-LABEL: same_types.(file).testSameTypeCommutativity6@
+// CHECK-NEXT: Generic signature: <U, T where T : P1>
 func testSameTypeCommutativity6<U, T: P1>(_ t: T, _ u: U)
   where U & P3 == T.Assoc { } // Equivalent to T.Assoc == U & P3
 // expected-error@-1 {{non-protocol, non-class type 'U' cannot be used within a protocol-constrained type}}
 
-// rdar;//problem/46848889
+// rdar://problem/46848889
+
+// CHECK-LABEL: same_types.(file).Foo@
+// CHECK-NEXT: Generic signature: <A, B, C where A : P1, B : P1, C : P1, A.[P1]Assoc == B.[P1]Assoc, B.[P1]Assoc == C.[P1]Assoc>
 struct Foo<A: P1, B: P1, C: P1> where A.Assoc == B.Assoc, A.Assoc == C.Assoc {}
 
+// CHECK-LABEL: same_types.(file).Bar@
+// CHECK-NEXT: Generic signature: <A, B where A : P1, B : P1, A.[P1]Assoc == B.[P1]Assoc>
 struct Bar<A: P1, B: P1> where A.Assoc == B.Assoc {
+  // CHECK-LABEL: same_types.(file).Bar.f(with:)@
+  // CHECK-NEXT: Generic signature: <A, B, C where A : P1, B : P1, C : P1, A.[P1]Assoc == B.[P1]Assoc, B.[P1]Assoc == C.[P1]Assoc>
   func f<C: P1>(with other: C) -> Foo<A, B, C> where A.Assoc == C.Assoc {
     // expected-note@-1 {{previous same-type constraint 'B.Assoc' == 'C.Assoc' inferred from type here}}
     // expected-warning@-2 {{redundant same-type constraint 'A.Assoc' == 'C.Assoc'}}

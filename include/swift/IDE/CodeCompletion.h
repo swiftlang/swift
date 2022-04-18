@@ -84,6 +84,10 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
                                            bool needLeadingDot,
                                            const SourceFile *SF);
 
+void addExprKeywords(CodeCompletionResultSink &Sink, DeclContext *DC);
+
+void addSuperKeyword(CodeCompletionResultSink &Sink, DeclContext *DC);
+
 } // end namespace ide
 } // end namespace swift
 

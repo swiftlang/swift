@@ -1699,6 +1699,11 @@ public:
   }
 
   bool
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    return true;
+  }
+
+  bool
   visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return true;
   }
@@ -1811,6 +1816,11 @@ public:
 
   MetatypeRepresentation
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
     return MetatypeRepresentation::Thin;
   }
 
@@ -2260,6 +2270,11 @@ public:
     return builder.build(ExternalTypeInfo);
   }
 
+  const TypeInfo *
+  visitParameterizedProtocolTypeRef(const ParameterizedProtocolTypeRef *PPT) {
+    return visitProtocolCompositionTypeRef(PPT->getBase());
+  }
+
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
@@ -2412,6 +2427,11 @@ public:
 const TypeInfo *
 TypeConverter::getTypeInfo(const TypeRef *TR,
                            remote::TypeInfoProvider *ExternalTypeInfo) {
+  if (!TR) {
+    DEBUG_LOG(fprintf(stderr, "null TypeRef"));
+    return nullptr;
+  }
+
   // See if we already computed the result
   auto found = Cache.find({TR, ExternalTypeInfo});
   if (found != Cache.end())

@@ -239,7 +239,6 @@ private:
   bool simplifyBranchBlock(BranchInst *BI);
   bool simplifyCondBrBlock(CondBranchInst *BI);
   bool simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI);
-  bool simplifyCheckedCastValueBranchBlock(CheckedCastValueBranchInst *CCBI);
   bool simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI);
   bool simplifyTryApplyBlock(TryApplyInst *TAI);
   bool simplifySwitchValueBlock(SwitchValueInst *SVI);
@@ -2471,49 +2470,6 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
   return MadeChange;
 }
 
-bool SimplifyCFG::simplifyCheckedCastValueBranchBlock(
-    CheckedCastValueBranchInst *CCBI) {
-  // TODO: OSSA; handle cleanups for opaque cases (simplify_cfg_opaque.sil).
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    return false;
-  }
-
-  auto SuccessBB = CCBI->getSuccessBB();
-  auto FailureBB = CCBI->getFailureBB();
-  auto ThisBB = CCBI->getParent();
-
-  bool MadeChange = false;
-  CastOptimizer CastOpt(
-      FuncBuilder, nullptr /*SILBuilderContext*/,
-      /* replaceValueUsesAction */
-      [&MadeChange](SILValue oldValue, SILValue newValue) {
-        MadeChange = true;
-      },
-      /* replaceInstUsesAction */
-      [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
-      /* eraseInstAction */
-      [&MadeChange](SILInstruction *I) {
-        MadeChange = true;
-        I->eraseFromParent();
-      },
-      /* willSucceedAction */
-      [&]() {
-        MadeChange |= removeIfDead(FailureBB);
-        addToWorklist(ThisBB);
-      },
-      /* willFailAction */
-      [&]() {
-        MadeChange |= removeIfDead(SuccessBB);
-        addToWorklist(ThisBB);
-      });
-
-  MadeChange |= bool(CastOpt.simplifyCheckedCastValueBranchInst(CCBI));
-
-  LLVM_DEBUG(if (MadeChange)
-               llvm::dbgs() << "simplify checked_cast_value block\n");
-  return MadeChange;
-}
-
 bool
 SimplifyCFG::
 simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
@@ -2907,10 +2863,6 @@ bool SimplifyCFG::simplifyBlocks() {
       break;
     case TermKind::CheckedCastBranchInst:
       Changed |= simplifyCheckedCastBranchBlock(cast<CheckedCastBranchInst>(TI));
-      break;
-    case TermKind::CheckedCastValueBranchInst:
-      Changed |= simplifyCheckedCastValueBranchBlock(
-          cast<CheckedCastValueBranchInst>(TI));
       break;
     case TermKind::CheckedCastAddrBranchInst:
       Changed |= simplifyCheckedCastAddrBranchBlock(cast<CheckedCastAddrBranchInst>(TI));

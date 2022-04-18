@@ -241,7 +241,7 @@ template <class AsyncSignature>
 class AsyncFunctionPointer {
 public:
   /// The function to run.
-  RelativeDirectPointer<AsyncFunctionType<AsyncSignature>,
+  TargetCompactFunctionPointer<InProcess, AsyncFunctionType<AsyncSignature>,
                         /*nullable*/ false,
                         int32_t> Function;
 

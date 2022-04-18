@@ -209,6 +209,9 @@ namespace swift {
     /// Emit a remark after loading a module.
     bool EnableModuleLoadingRemarks = false;
 
+    /// Resolve main function as though it were called from an async context
+    bool EnableAsyncMainResolution = false;
+
     ///
     /// Support for alternate usage modes
     ///
@@ -327,9 +330,9 @@ namespace swift {
     /// in calls to generic functions.
     bool EnableOpenedExistentialTypes = false;
 
-    /// Enable support for protocol types parameterized by primary
-    /// associated type.
-    bool EnableParameterizedProtocolTypes = false;
+    /// Enable support for parameterized protocol types in existential
+    /// position.
+    bool EnableParameterizedExistentialTypes = false;
 
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
@@ -343,18 +346,22 @@ namespace swift {
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 
-    /// Enable experimental 'distributed' actors and functions.
-    bool EnableExperimentalDistributed = false;
-
     /// Enable experimental 'move only' features.
     bool EnableExperimentalMoveOnly = false;
 
-    /// Enable experimental pairwise `buildBlock` for result builders.
-    bool EnableExperimentalPairwiseBuildBlock = false;
+    /// Enable variadic generics.
+    bool EnableExperimentalVariadicGenerics = false;
+
+    /// Enable experimental associated type inference using type witness
+    /// systems.
+    bool EnableExperimentalAssociatedTypeInference = false;
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;
+
+    /// Disable the implicit import of the _StringProcessing module.
+    bool DisableImplicitStringProcessingModuleImport = false;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
@@ -375,11 +382,6 @@ namespace swift {
     /// but will not be used for checking type equality.
     /// [TODO: Clang-type-plumbing] Turn on for feature rollout.
     bool UseClangFunctionTypes = false;
-
-    /// If set to true, compile with the SIL Opaque Values enabled.
-    /// This is for bootstrapping. It can't be in SILOptions because the
-    /// TypeChecker uses it to set resolve the ParameterConvention.
-    bool EnableSILOpaqueValues = false;
 
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
@@ -406,9 +408,6 @@ namespace swift {
     /// Diagnose switches over non-frozen enums that do not have catch-all
     /// cases.
     bool EnableNonFrozenEnumExhaustivityDiagnostics = false;
-
-    /// Enable making top-level code support concurrency
-    bool EnableExperimentalAsyncTopLevel = false;
 
     /// Regex for the passes that should report passed and missed optimizations.
     ///
@@ -525,32 +524,49 @@ namespace swift {
     /// algorithm.
     unsigned RequirementMachineMaxConcreteNesting = 30;
 
+    /// Maximum number of attempts to make when splitting concrete equivalence
+    /// classes.
+    unsigned RequirementMachineMaxSplitConcreteEquivClassAttempts = 2;
+
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.
     RequirementMachineMode RequirementMachineProtocolSignatures =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Enabled;
 
     /// Enable the new experimental generic signature minimization algorithm
     /// for abstract generic signatures.
     RequirementMachineMode RequirementMachineAbstractSignatures =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Enabled;
 
     /// Enable the new experimental generic signature minimization algorithm
     /// for user-written generic signatures.
     RequirementMachineMode RequirementMachineInferredSignatures =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Enabled;
 
-    /// Disable preprocessing pass to eliminate conformance requirements
+    /// Enable preprocessing pass to eliminate conformance requirements
     /// on generic parameters which are made concrete. Usually you want this
     /// enabled. It can be disabled for debugging and testing.
     bool EnableRequirementMachineConcreteContraction = true;
 
-    /// Enable the stronger minimization algorithm. This is just for debugging;
-    /// if you have a testcase which requires this, please submit a bug report.
-    bool EnableRequirementMachineLoopNormalization = false;
+    /// Enable the stronger minimization algorithm. Usually you want this
+    /// enabled. It can be disabled for debugging and testing.
+    bool EnableRequirementMachineLoopNormalization = true;
+
+    /// Enable reuse of requirement machines for minimization. Usually you want
+    /// this enabled. It can be disabled for debugging and testing.
+    bool EnableRequirementMachineReuse = true;
+
+    /// Enable experimental, more correct support for opaque result types as
+    /// concrete types. This will sometimes fail to produce a convergent
+    /// rewrite system.
+    bool EnableRequirementMachineOpaqueArchetypes = false;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
+
+    /// Enables `/.../` syntax regular-expression literals. This requires
+    /// experimental string processing. Note this does not affect `#/.../#`.
+    bool EnableBareSlashRegexLiterals = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -735,11 +751,7 @@ namespace swift {
 
     /// Enable experimental support for type inference through multi-statement
     /// closures.
-    bool EnableMultiStatementClosureInference = false;
-
-    /// Enable experimental support for generic parameter inference in
-    /// parameter positions from associated default expressions.
-    bool EnableTypeInferenceFromDefaultArguments = false;
+    bool EnableMultiStatementClosureInference = true;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
@@ -819,7 +831,7 @@ namespace swift {
     bool DisableOverlayModules = false;
 
     /// When set, import SPI_AVAILABLE symbols with Swift SPI attribtues.
-    bool EnableClangSPI = false;
+    bool EnableClangSPI = true;
 
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;

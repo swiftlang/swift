@@ -19,7 +19,7 @@ module OptimizerBridging {
   export *
 }
 
-module ExperimentalRegexBridging {
-  header "Parse/ExperimentalRegexBridging.h"
+module _RegexParserBridging {
+  header "Parse/RegexParserBridging.h"
   export *
 }

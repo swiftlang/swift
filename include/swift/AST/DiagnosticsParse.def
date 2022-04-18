@@ -94,6 +94,9 @@ ERROR(forbidden_extended_escaping_string,none,
 ERROR(regex_literal_parsing_error,none,
       "%0", (StringRef))
 
+ERROR(prefix_slash_not_allowed,none,
+      "prefix operator may not contain '/'", ())
+
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -140,7 +143,10 @@ ERROR(lex_invalid_escape_delimiter,none,
 ERROR(lex_invalid_closing_delimiter,none,
       "too many '#' characters in closing delimiter", ())
 
-ERROR(lex_unterminated_regex,none,
+ERROR(lex_regex_literal_invalid_starting_char,none,
+      "regex literal may not start with %0; add backslash to escape",
+      (StringRef))
+ERROR(lex_regex_literal_unterminated,none,
       "unterminated regex literal", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
@@ -213,8 +219,6 @@ ERROR(number_cant_start_decl_name,none,
       (StringRef))
 ERROR(expected_identifier_after_case_comma, PointsToFirstBadToken,
       "expected identifier after comma in enum 'case' declaration", ())
-ERROR(decl_redefinition,none,
-      "definition conflicts with previous value", ())
 ERROR(let_cannot_be_computed_property,none,
       "'let' declarations cannot be computed properties", ())
 ERROR(let_cannot_be_observing_property,none,
@@ -378,9 +382,6 @@ ERROR(expected_rbrace_actor,none,
       "expected '}' in actor", ())
 
 // Protocol
-ERROR(generic_arguments_protocol,PointsToFirstBadToken,
-      "protocols do not allow generic parameters; use associated types instead",
-      ())
 ERROR(expected_lbrace_protocol,PointsToFirstBadToken,
       "expected '{' in protocol type", ())
 ERROR(expected_rbrace_protocol,none,
@@ -1086,12 +1087,14 @@ ERROR(conditional_var_initializer_required,none,
 ERROR(wrong_condition_case_location,none,
       "pattern matching binding is spelled with 'case %0', not '%0 case'",
       (StringRef))
+ERROR(conditional_var_valid_identifiers_only,none,
+      "unwrap condition requires a valid identifier", ())
 
 // If Statement
 ERROR(expected_condition_if,PointsToFirstBadToken,
       "expected expression, var, or let in 'if' condition", ())
 ERROR(missing_condition_after_if,none,
-      "missing condition in an 'if' statement", ())
+      "missing condition in 'if' statement", ())
 ERROR(expected_lbrace_after_if,PointsToFirstBadToken,
       "expected '{' after 'if' condition", ())
 ERROR(expected_lbrace_or_if_after_else,PointsToFirstBadToken,
@@ -1107,7 +1110,7 @@ NOTE(suggest_removing_else,none,
 ERROR(expected_condition_guard,PointsToFirstBadToken,
       "expected expression, var, let or case in 'guard' condition", ())
 ERROR(missing_condition_after_guard,none,
-      "missing condition in an 'guard' statement", ())
+      "missing condition in 'guard' statement", ())
 ERROR(expected_else_after_guard,PointsToFirstBadToken,
       "expected 'else' after 'guard' condition", ())
 ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
@@ -1117,7 +1120,7 @@ ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
 ERROR(expected_condition_while,PointsToFirstBadToken,
       "expected expression, var, or let in 'while' condition", ())
 ERROR(missing_condition_after_while,none,
-      "missing condition in a 'while' statement", ())
+      "missing condition in 'while' statement", ())
 ERROR(expected_lbrace_after_while,PointsToFirstBadToken,
       "expected '{' after 'while' condition", ())
 
@@ -1497,9 +1500,8 @@ ERROR(attr_unsupported_on_target, none,
 // availability
 ERROR(attr_availability_platform,none,
       "expected platform name or '*' for '%0' attribute", (StringRef))
-ERROR(attr_availability_unavailable_deprecated,none,
-      "'%0' attribute cannot be both unconditionally 'unavailable' and "
-      "'deprecated'", (StringRef))
+ERROR(attr_availability_multiple_kinds ,none,
+      "'%0' attribute cannot be both '%1' and '%2'", (StringRef, StringRef, StringRef))
 
 WARNING(attr_availability_invalid_duplicate,none,
         "'%0' argument has already been specified", (StringRef))
@@ -1561,17 +1563,8 @@ ERROR(attr_availability_duplicate,none,
       (StringRef, StringRef))
 
 // originallyDefinedIn
-// FIXME(backDeploy): Refactor to share with back deployment attr
 ERROR(originally_defined_in_missing_rparen,none,
       "expected ')' in @_originallyDefinedIn argument list", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-ERROR(originally_defined_in_unrecognized_platform,none,
-      "unrecognized platform name in @_originallyDefinedIn argument list", ())
-
-// FIXME: This is unused and can be removed
-ERROR(originally_defined_in_unrecognized_property,none,
-      "unrecognized property in @_originallyDefinedIn argument list", ())
 
 ERROR(originally_defined_in_need_original_module_name,none,
       "expected 'module: \"original\"' in the first argument to "
@@ -1580,28 +1573,11 @@ ERROR(originally_defined_in_need_original_module_name,none,
 ERROR(originally_defined_in_need_nonempty_module_name,none,
       "original module name cannot be empty in @_originallyDefinedIn", ())
 
-// FIXME(backDeploy): Refactor to share with back deployment attr
-ERROR(originally_defined_in_need_platform_version,none,
-     "expected at least one platform version in @_originallyDefinedIn", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-WARNING(originally_defined_in_major_minor_only,none,
-        "@_originallyDefinedIn only uses major and minor version number", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-WARNING(originally_defined_in_missing_platform_name,none,
-        "* as platform name has no effect", ())
-
-// FIXME(backDeploy): Refactor to share with back deployment attr
-WARNING(originally_defined_in_swift_version, none,
-        "Swift language version checks has no effect "
-        "in @_originallyDefinedIn", ())
-
-WARNING(originally_defined_in_package_description, none,
-        "PackageDescription version checks has no effect "
-        "in @_originallyDefinedIn", ())
-
 // backDeploy
+ERROR(attr_back_deploy_expected_before_label,none,
+      "expected 'before:' in '@_backDeploy' attribute", ())
+ERROR(attr_back_deploy_expected_colon_after_before,none,
+      "expected ':' after 'before' in '@_backDeploy' attribute", ())
 ERROR(attr_back_deploy_missing_rparen,none,
       "expected ')' in '@_backDeploy' argument list", ())
 
@@ -1915,11 +1891,6 @@ ERROR(availability_query_repeated_platform, none,
 ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
       "concurrency is enabled",
-      (StringRef, bool))
-
-ERROR(attr_requires_distributed, none,
-      "'%0' %select{attribute|modifier}1 is only valid when experimental "
-      "distributed support is enabled",
       (StringRef, bool))
 
 //------------------------------------------------------------------------------

@@ -174,12 +174,6 @@ class PropertyMap {
   // To avoid wasted work from re-introducing the same induced rules,
   // we track the rules we've seen already on previous builds.
 
-  /// Maps a pair of rules where the first is a conformance rule and the
-  /// second is a superclass or concrete type rule, to a concrete
-  /// conformance.
-  llvm::DenseMap<std::pair<unsigned, unsigned>, ProtocolConformance *>
-      ConcreteConformances;
-
   /// Superclass requirements always imply a layout requirement, and
   /// concrete type requirements where the type is a class imply a
   /// superclass requirement.
@@ -238,9 +232,6 @@ public:
   Type getTypeForTerm(const MutableTerm &term,
                       TypeArrayView<GenericTypeParamType> genericParams) const;
 
-  Type getRelativeTypeForTerm(
-                      const MutableTerm &term, const MutableTerm &prefix) const;
-
   Type getTypeFromSubstitutionSchema(
                       Type schema,
                       ArrayRef<Term> substitutions,
@@ -291,7 +282,7 @@ private:
   void concretizeTypeWitnessInConformance(
                    Term key, RequirementKind requirementKind,
                    Symbol concreteConformanceSymbol,
-                   ProtocolConformance *concrete,
+                   ProtocolConformanceRef conformance,
                    AssociatedTypeDecl *assocType) const;
 
   void inferConditionalRequirements(

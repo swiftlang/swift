@@ -316,10 +316,18 @@ enum class FixKind : uint8_t {
   /// succeed.
   AllowNoopCheckedCast,
 
+  /// Warn about special runtime case where statically known
+  /// checked cast from existentials to CFType always succeed.
+  AllowNoopExistentialToCFTypeCheckedCast,
+
   /// Allow a runtime checked cast where at compile time the from is
   /// convertible, but runtime does not support such convertions. e.g.
   /// function type casts.
   AllowUnsupportedRuntimeCheckedCast,
+
+  /// Allow a runtime checked cast where it is known at compile time
+  /// always fails.
+  AllowCheckedCastToUnrelated,
 
   /// Allow reference to a static member on a protocol metatype
   /// even though result type of the reference doesn't conform
@@ -2789,6 +2797,31 @@ public:
   }
 };
 
+class AllowNoopExistentialToCFTypeCheckedCast final
+    : public CheckedCastContextualMismatchWarning {
+  AllowNoopExistentialToCFTypeCheckedCast(ConstraintSystem &cs, Type fromType,
+                                          Type toType, CheckedCastKind kind,
+                                          ConstraintLocator *locator)
+      : CheckedCastContextualMismatchWarning(
+            cs, FixKind::AllowNoopExistentialToCFTypeCheckedCast, fromType,
+            toType, kind, locator) {}
+
+public:
+  std::string getName() const override {
+    return "checked cast from existential to CFType always succeeds";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowNoopExistentialToCFTypeCheckedCast *
+  attempt(ConstraintSystem &cs, Type fromType, Type toType,
+          CheckedCastKind kind, ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowNoopExistentialToCFTypeCheckedCast;
+  }
+};
+
 class AllowUnsupportedRuntimeCheckedCast final
     : public CheckedCastContextualMismatchWarning {
   AllowUnsupportedRuntimeCheckedCast(ConstraintSystem &cs, Type fromType,
@@ -2813,6 +2846,29 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowUnsupportedRuntimeCheckedCast;
+  }
+};
+
+class AllowCheckedCastToUnrelated final
+    : public CheckedCastContextualMismatchWarning {
+  AllowCheckedCastToUnrelated(ConstraintSystem &cs, Type fromType, Type toType,
+                              CheckedCastKind kind, ConstraintLocator *locator)
+      : CheckedCastContextualMismatchWarning(
+            cs, FixKind::AllowCheckedCastToUnrelated, fromType, toType, kind,
+            locator) {}
+
+public:
+  std::string getName() const override { return "checked cast always fails"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowCheckedCastToUnrelated *attempt(ConstraintSystem &cs,
+                                              Type fromType, Type toType,
+                                              CheckedCastKind kind,
+                                              ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowCheckedCastToUnrelated;
   }
 };
 

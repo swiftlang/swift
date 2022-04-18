@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -disable-objc-attr-requires-foundation-module -enable-objc-interop > %t.swiftinterface
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name synthesized -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name synthesized
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.swiftinterface
 
@@ -7,9 +8,9 @@ public enum HasRawValue: Int {
   // CHECK-NEXT: case a, b, c
   case a, b = 5, c
   // CHECK-DAG: public typealias RawValue = Swift.Int
-  // CHECK-DAG: @inlinable public init?(rawValue: Swift.Int)
+  // CHECK-DAG: public init?(rawValue: Swift.Int)
   // CHECK-DAG: public var rawValue: Swift.Int {
-  // CHECK-DAG:   @inlinable get{{$}}
+  // CHECK-DAG:   get{{$}}
   // CHECK-DAG: }
 } // CHECK: {{^}$}}
 
@@ -20,9 +21,9 @@ public enum HasRawValue: Int {
 // CHECK-LABEL: @objc public enum ObjCEnum : Swift.Int32 {
 // CHECK-NEXT: case a, b = 5, c
 // CHECK-DAG: public typealias RawValue = Swift.Int32
-// CHECK-DAG: @inlinable public init?(rawValue: Swift.Int32)
+// CHECK-DAG: public init?(rawValue: Swift.Int32)
 // CHECK-DAG: public var rawValue: Swift.Int32 {
-// CHECK-DAG:   @inlinable get{{$}}
+// CHECK-DAG:   get{{$}}
 // CHECK-DAG: }
 // CHECK: {{^}$}}
 

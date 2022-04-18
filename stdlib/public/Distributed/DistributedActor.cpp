@@ -33,7 +33,7 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
 }
 
 SWIFT_CC(swift)
-SWIFT_EXPORT_FROM(swift_Distributed)
+SWIFT_EXPORT_FROM(swiftDistributed)
 void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
                                               size_t targetNameLength) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
@@ -65,7 +65,7 @@ using TargetExecutorSignature =
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
-SWIFT_EXPORT_FROM(swift_Distributed)
+SWIFT_EXPORT_FROM(swiftDistributed)
 TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 
 /// Accessor takes:
@@ -96,7 +96,7 @@ static DistributedAccessorSignature::ContinuationType
     swift_distributed_execute_target_resume;
 
 SWIFT_CC(swiftasync)
-static void ::swift_distributed_execute_target_resume(
+static void swift_distributed_execute_target_resume(
     SWIFT_ASYNC_CONTEXT AsyncContext *context,
     SWIFT_CONTEXT SwiftError *error) {
   auto parentCtx = context->Parent;
@@ -110,7 +110,7 @@ static void ::swift_distributed_execute_target_resume(
 }
 
 SWIFT_CC(swiftasync)
-void ::swift_distributed_execute_target(
+void swift_distributed_execute_target(
     SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     DefaultActor *actor,
     const char *targetNameStart, size_t targetNameLength,

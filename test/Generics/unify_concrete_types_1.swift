@@ -19,7 +19,7 @@ struct MergeTest<G : P1 & P2> {
   func foo2(x: G.Z1) -> G.Z2 { return x }
 }
 
-// CHECK-LABEL: Adding generic signature <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> {
+// CHECK-LABEL: Requirement machine for fresh signature < G >
 // CHECK-LABEL: Rewrite system: {
 // CHECK: - τ_0_0.[P2:Y2] => τ_0_0.[P1:Y1]
 // CHECK: - τ_0_0.[P2:Z2] => τ_0_0.[P1:Z1]

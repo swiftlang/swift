@@ -33,12 +33,15 @@
 namespace swift {
 namespace ide {
 
-using DeclFilter = std::function<bool(ValueDecl *, DeclVisibilityKind)>;
+using DeclFilter =
+    std::function<bool(ValueDecl *, DeclVisibilityKind, DynamicLookupInfo)>;
 
 /// A filter that always returns \c true.
-bool DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind);
+bool DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind,
+                   DynamicLookupInfo dynamicLookupInfo);
 
-bool KeyPathFilter(ValueDecl *decl, DeclVisibilityKind);
+bool KeyPathFilter(ValueDecl *decl, DeclVisibilityKind,
+                   DynamicLookupInfo dynamicLookupInfo);
 
 /// Returns \c true only if the completion is happening for top-level
 /// declrarations. i.e.:
@@ -76,6 +79,9 @@ bool isCodeCompletionAtTopLevel(const DeclContext *DC);
 ///     }
 bool isCompletionDeclContextLocalContext(DeclContext *DC);
 
+/// Returns \c true if \p DC can handles async call.
+bool canDeclContextHandleAsync(const DeclContext *DC);
+
 /// Return \c true if the completion happens at top-level of a library file.
 bool isCodeCompletionAtTopLevelOfLibraryFile(const DeclContext *DC);
 
@@ -112,6 +118,12 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
 
   /// Expected types of the code completion expression.
   ExpectedTypeContext expectedTypeContext;
+
+  /// Variables whose type was determined while type checking the code
+  /// completion expression and that are thus not recorded in the AST.
+  /// This in particular applies to params of closures that contain the code
+  /// completion token.
+  llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
 
   bool CanCurrDeclContextHandleAsync = false;
   bool HaveDot = false;
@@ -206,6 +218,11 @@ public:
                    const DeclContext *CurrDeclContext,
                    CodeCompletionContext *CompletionContext = nullptr);
 
+  void setSolutionSpecificVarTypes(
+      llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes) {
+    this->SolutionSpecificVarTypes = SolutionSpecificVarTypes;
+  }
+
   void setHaveDot(SourceLoc DotLoc) {
     HaveDot = true;
     this->DotLoc = DotLoc;
@@ -225,6 +242,10 @@ public:
   }
 
   void setIdealExpectedType(Type Ty) { expectedTypeContext.setIdealType(Ty); }
+
+  void setCanCurrDeclContextHandleAsync(bool CanCurrDeclContextHandleAsync) {
+    this->CanCurrDeclContextHandleAsync = CanCurrDeclContextHandleAsync;
+  }
 
   const ExpectedTypeContext *getExpectedTypeContext() const {
     return &expectedTypeContext;
@@ -327,7 +348,7 @@ public:
 
   static bool hasInterestingDefaultValue(const ParamDecl *param);
 
-  bool addItemWithoutDefaultArgs(const AbstractFunctionDecl *func);
+  bool shouldAddItemWithoutDefaultArgs(const AbstractFunctionDecl *func);
 
   /// Build argument patterns for calling. Returns \c true if any content was
   /// added to \p Builder. If \p declParams is non-empty, the size must match
@@ -510,7 +531,7 @@ public:
         : Consumer(Consumer), Filter(Filter) {}
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Kind,
                    DynamicLookupInfo dynamicLookupInfo) override {
-      if (Filter(VD, Kind))
+      if (Filter(VD, Kind, dynamicLookupInfo))
         Consumer.foundDecl(VD, Kind, dynamicLookupInfo);
     }
   };
@@ -541,7 +562,6 @@ public:
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                     bool IsConcurrencyEnabled,
-                                    bool IsDistributedEnabled,
                                     Optional<DeclKind> DK);
 
   void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK);
@@ -571,6 +591,8 @@ public:
                                  bool ResultsHaveLeadingDot);
 
   void getStmtLabelCompletions(SourceLoc Loc, bool isContinue);
+
+  void getOptionalBindingCompletions(SourceLoc Loc);
 };
 
 } // end namespace ide

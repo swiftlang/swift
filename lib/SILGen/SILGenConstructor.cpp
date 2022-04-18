@@ -835,9 +835,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     }
   }
 
-  // Distributed actor initializers implicitly initialize their transport and id
-  if (isDesignatedDistActorInit)
-    emitDistActorImplicitPropertyInits(ctor, selfArg);
+  // Some distributed actor initializers need to init the actorSystem & id now
+  if (isDesignatedDistActorInit) {
+    emitDistributedActorImplicitPropertyInits(ctor, selfArg);
+  }
 
   // Prepare the end of initializer location.
   SILLocation endOfInitLoc = RegularLocation(ctor);
@@ -1256,4 +1257,3 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
 
   emitEpilog(loc);
 }
-

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-inferred-signatures=verify 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -requirement-machine-inferred-signatures=verify
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir
 
 protocol C {
   associatedtype I

@@ -410,7 +410,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     with `type`.
   @inlinable
   public func storeBytes<T>(
-    of value: T, toByteOffset offset: Int = 0, as: T.Type
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
     _debugPrecondition(offset >= 0, "${Self}.storeBytes with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
@@ -439,7 +439,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func copyMemory(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
       "${Self}.copyMemory source has too many elements")
-    baseAddress?.copyMemory(from: source.baseAddress!, byteCount: source.count)
+    if let baseAddress = baseAddress, let sourceAddress = source.baseAddress {
+      baseAddress.copyMemory(from: sourceAddress, byteCount: source.count)
+    }
   }
 
   /// Copies from a collection of `UInt8` into this buffer's memory.

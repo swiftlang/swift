@@ -327,9 +327,6 @@ public:
     printStructurePre(Kind, D);
   }
 
-  /// To sanitize a malformed utf8 string to a well-formed one.
-  static std::string sanitizeUtf8(StringRef Text);
-
 private:
   virtual void anchor();
 };
@@ -389,7 +386,7 @@ StringRef getAccessorKindString(AccessorKind value);
 /// for the compiler features that it uses.  Note that printBody
 /// may be called multiple times if the declaration uses suppressible
 /// features.
-bool printWithCompatibilityFeatureChecks(ASTPrinter &printer,
+void printWithCompatibilityFeatureChecks(ASTPrinter &printer,
                                          PrintOptions &options,
                                          Decl *decl,
                                          llvm::function_ref<void()> printBody);

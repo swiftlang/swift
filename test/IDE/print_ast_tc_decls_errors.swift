@@ -1,6 +1,6 @@
 // Verify errors in this file to ensure that parse and type checker errors
 // occur where we expect them.
-// RUN: %target-typecheck-verify-swift -show-diagnostics-after-fatal
+// RUN: %target-typecheck-verify-swift -show-diagnostics-after-fatal -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=false > %t.printed.txt
 // RUN: %FileCheck %s -strict-whitespace < %t.printed.txt
@@ -155,7 +155,7 @@ protocol ProtocolWithInheritance4 : FooClass, FooProtocol {}
 // NO-TYREPR: {{^}}protocol ProtocolWithInheritance4 : FooClass, FooProtocol {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance4 : FooClass, FooProtocol {{{$}}
 
-protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error{{multiple inheritance from classes 'FooClass' and 'BarClass'}} expected-error{{type 'Self' cannot be a subclass of both 'BarClass' and 'FooClass'}} // expected-note{{constraint conflicts with 'Self' : 'FooClass'}}
+protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error{{multiple inheritance from classes 'FooClass' and 'BarClass'}} expected-error{{no type for 'Self' can satisfy both 'Self : BarClass' and 'Self : FooClass'}}
 // NO-TYREPR: {{^}}protocol ProtocolWithInheritance5 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance5 : FooClass, BarClass {{{$}}
 

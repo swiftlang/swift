@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify -disable-requirement-machine-concrete-contraction 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s -disable-requirement-machine-concrete-contraction 2>&1 | %FileCheck %s
 
 protocol P : C {}
 class C : P {}

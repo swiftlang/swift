@@ -19,11 +19,12 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/SILOptions.h"
 #define DEBUG_TYPE "sil-passpipeline-plan"
+
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -67,7 +68,7 @@ llvm::cl::opt<bool> SILDisableLateOMEByDefault(
         "Disable late OME for non-transparent functions by default"));
 
 llvm::cl::opt<bool>
-    EnableDestroyHoisting("enable-destroy-hoisting", llvm::cl::init(true),
+    EnableDestroyHoisting("enable-destroy-hoisting", llvm::cl::init(false),
                           llvm::cl::desc("Enable the DestroyHoisting pass."));
 
 //===----------------------------------------------------------------------===//
@@ -87,12 +88,14 @@ static void addModulePrinterPipeline(SILPassPipelinePlan &plan,
 
 static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Debug Serialization");
+  P.addAddressLowering();
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
 }
 
 static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Ownership Model Eliminator");
+  P.addAddressLowering();
   P.addOwnershipModelEliminator();
 }
 
@@ -113,6 +116,7 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Diagnostic Passes + Enabling Optimization Passes");
   P.addSILGenCleanup();
+  P.addAddressLowering();
   P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
   P.addNestedSemanticFunctionCheck();
@@ -350,7 +354,9 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Promote box allocations to stack allocations.
   P.addAllocBoxToStack();
 
-  P.addSSADestroyHoisting();
+  if (P.getOptions().DestroyHoisting == DestroyHoistingOption::On) {
+    P.addSSADestroyHoisting();
+  }
 
   // Propagate copies through stack locations.  Should run after
   // box-to-stack promotion since it is limited to propagating through
@@ -796,11 +802,10 @@ static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
 SILPassPipelinePlan
 SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
-  P.startPipeline("Address Lowering");
+  P.startPipeline("Lowering");
   P.addLowerHopToActor(); // FIXME: earlier for more opportunities?
   P.addOwnershipModelEliminator();
   P.addIRGenPrepare();
-  P.addAddressLowering();
 
   return P;
 }
@@ -913,7 +918,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // depend on other passes needed for diagnostics). Thus we can run them later
   // and avoid having SourceKit run these passes when just emitting diagnostics
   // in the editor.
-  P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
+  P.startPipeline("Non-Diagnostic Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
 
@@ -924,6 +929,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");
   P.addSerializeSILPass();
+
+  // Fix up debug info by propagating dbg_values.
+  P.addDebugInfoCanonicalizer();
 
   // Now strip any transparent functions that still have ownership.
   P.addOwnershipModelEliminator();

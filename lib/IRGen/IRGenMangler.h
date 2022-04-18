@@ -468,6 +468,22 @@ public:
     }
   }
 
+  void appendExtendedExistentialTypeShape(CanGenericSignature genSig,
+                                          CanExistentialType type,
+                                          unsigned metatypeDepth);
+
+  /// Mangle the symbol name for an extended existential type shape.
+  std::string mangleExtendedExistentialTypeShape(bool isUnique,
+                                                 CanGenericSignature genSig,
+                                                 CanExistentialType type,
+                                                 unsigned metatypeDepth);
+
+  /// Mangle an extended existential type shape for the uniquing hash.
+  std::string mangleExtendedExistentialTypeShapeForUniquing(
+                                                 CanGenericSignature genSig,
+                                                 CanExistentialType type,
+                                                 unsigned metatypeDepth);
+
   std::string mangleCoroutineContinuationPrototype(CanSILFunctionType type) {
     return mangleTypeSymbol(type, "TC");
   }
@@ -612,6 +628,13 @@ public:
                                            CanGenericSignature genericSig,
                                            CanType type,
                                            ProtocolConformanceRef conformance);
+
+  std::string
+  mangleSymbolNameForUnderlyingTypeAccessorString(OpaqueTypeDecl *opaque,
+                                                  unsigned index);
+
+  std::string mangleSymbolNameForUnderlyingWitnessTableAccessorString(
+      OpaqueTypeDecl *opaque, const Requirement &req, ProtocolDecl *protocol);
 
   std::string mangleSymbolNameForGenericEnvironment(
                                                 CanGenericSignature genericSig);

@@ -64,6 +64,8 @@ public:
   uint64_t requirementSignatureData = 0;
   /// The context data used for loading the list of associated types.
   uint64_t associatedTypesData = 0;
+  /// The context data used for loading the list of primary associated types.
+  uint64_t primaryAssociatedTypesData = 0;
 };
 
 /// A class that can lazily load members from a serialized format.
@@ -106,6 +108,11 @@ public:
   virtual void
   loadAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,
                       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) = 0;
+
+  /// Loads the primary associated types of a protocol.
+  virtual void
+  loadPrimaryAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,
+                             SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) = 0;
 
   /// Returns the replaced decl for a given @_dynamicReplacement(for:) attribute.
   virtual ValueDecl *

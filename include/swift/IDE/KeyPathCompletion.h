@@ -15,7 +15,7 @@
 
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 
 namespace swift {
 namespace ide {
@@ -32,10 +32,10 @@ class KeyPathTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
   KeyPathExpr *KeyPath;
   SmallVector<Result, 4> Results;
 
+  void sawSolutionImpl(const constraints::Solution &solution) override;
+
 public:
   KeyPathTypeCheckCompletionCallback(KeyPathExpr *KeyPath) : KeyPath(KeyPath) {}
-
-  void sawSolution(const constraints::Solution &solution) override;
 
   void deliverResults(DeclContext *DC, SourceLoc DotLoc,
                       ide::CodeCompletionContext &CompletionCtx,

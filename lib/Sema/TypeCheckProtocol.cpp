@@ -29,6 +29,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -154,13 +155,25 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     // function types that aren't in a parameter can be Sendable or not.
     // FIXME: Should we check for a Sendable bound on the requirement type?
     bool inRequirement = (adjustment != TypeAdjustment::NoescapeToEscaping);
-    (void)adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
+    Type adjustedReqtType =
+      adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
 
     bool inWitness = false;
     Type adjustedWitnessType =
       adjustInferredAssociatedType(adjustment, witnessType, inWitness);
-    if (inWitness && !inRequirement)
-      witnessType = adjustedWitnessType;
+
+    switch (variance) {
+    case VarianceKind::None:
+      break;
+    case VarianceKind::Covariant:
+      if (inRequirement && !inWitness)
+        reqtType = adjustedReqtType;
+      break;
+    case VarianceKind::Contravariant:
+      if (inWitness && !inRequirement)
+        witnessType = adjustedWitnessType;
+      break;
+    }
   };
 
   applyAdjustment(TypeAdjustment::NoescapeToEscaping);
@@ -1149,15 +1162,26 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
           return *result;
       }
     }
-    if (!solution || solution->Fixes.size())
-      return RequirementMatch(witness, MatchKind::TypeConflict,
-                              witnessType);
+    bool requiresNonSendable = false;
+    if (!solution || solution->Fixes.size()) {
+      /// If the *only* problems are that `@Sendable` attributes are missing,
+      /// allow the match in some circumstances.
+      requiresNonSendable = solution
+          && llvm::all_of(solution->Fixes, [](constraints::ConstraintFix *fix) {
+            return fix->getKind() == constraints::FixKind::AddSendableAttribute;
+          });
+      if (!requiresNonSendable)
+        return RequirementMatch(witness, MatchKind::TypeConflict,
+                                witnessType);
+    }
 
     MatchKind matchKind = MatchKind::ExactMatch;
     if (hasAnyError(optionalAdjustments))
       matchKind = MatchKind::OptionalityConflict;
     else if (anyRenaming)
       matchKind = MatchKind::RenamedMatch;
+    else if (requiresNonSendable)
+      matchKind = MatchKind::RequiresNonSendable;
     else if (getEffects(witness).containsOnly(getEffects(req)))
       matchKind = MatchKind::FewerEffects;
 
@@ -2517,6 +2541,12 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
                    withAssocTypes);
     break;
 
+  case MatchKind::RequiresNonSendable:
+    diags.diagnose(match.Witness, diag::protocol_witness_non_sendable,
+                   withAssocTypes,
+                   module->getASTContext().isSwiftVersionAtLeast(6));
+    break;
+
   case MatchKind::RenamedMatch: {
     auto diag = diags.diagnose(match.Witness, diag::protocol_witness_renamed,
                                req->getName(), withAssocTypes);
@@ -2883,29 +2913,23 @@ static void emitDeclaredHereIfNeeded(DiagnosticEngine &diags,
   diags.diagnose(value, diag::decl_declared_here, value->getName());
 }
 
-/// Determine if the witness can be made implicitly async.
-static bool isValidImplicitAsync(ValueDecl *witness, ValueDecl *requirement) {
-  if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness)) {
-    if (auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement)) {
-      return requirementFunc->hasAsync() &&
-          !(witnessFunc->hasThrows() && !requirementFunc->hasThrows());
-    }
-
-    return false;
-  }
-
-  if (auto witnessStorage = dyn_cast<AbstractStorageDecl>(witness)) {
-    if (auto requirementStorage = dyn_cast<AbstractStorageDecl>(requirement)) {
-      auto requirementAccessor = requirementStorage->getEffectfulGetAccessor();
-      if (!requirementAccessor || !requirementAccessor->hasAsync())
-        return false;
-
-      return witnessStorage->isLessEffectfulThan(
-          requirementStorage, EffectKind::Throws);
-    }
-  }
-
+/// Whether this declaration has the 'distributed' modifier on it.
+static bool isDistributedDecl(ValueDecl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+    return func->isDistributed();
+  if (auto var = dyn_cast<VarDecl>(decl))
+    return var->isDistributed();
   return false;
+}
+
+/// Determine whether there was an explicit global actor attribute on the
+/// given declaration.
+static bool hasExplicitGlobalActorAttr(ValueDecl *decl) {
+  auto globalActorAttr = decl->getGlobalActorAttr();
+  if (!globalActorAttr)
+    return false;
+
+  return !globalActorAttr->first->isImplicit();
 }
 
 bool ConformanceChecker::checkActorIsolation(
@@ -2921,325 +2945,197 @@ bool ConformanceChecker::checkActorIsolation(
     return ConcreteDeclRef(witness);
   };
 
-  // Ensure that the witness is not actor-isolated in a manner that makes it
-  // unsuitable as a witness.
-  bool isCrossActor = false;
-  DiagnosticBehavior behavior = SendableCheckContext(
-      Conformance->getDeclContext()).defaultDiagnosticBehavior();
-  Type witnessGlobalActor;
-  switch (auto witnessRestriction =
-              ActorIsolationRestriction::forDeclaration(
-                  witness, witness->getDeclContext(),
-                  /*fromExpression=*/false)) {
-  case ActorIsolationRestriction::ActorSelf: {
-    auto requirementIsolation = getActorIsolation(requirement);
-
-    // An actor-isolated witness can only conform to an actor-isolated
-    // requirement.
-    auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
-    if (requirementIsolation == ActorIsolation::ActorInstance &&
-        !(requirementFunc && requirementFunc->isDistributed())) {
-      return false;
-    }
-
-    auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness);
-    auto nominal = dyn_cast<NominalTypeDecl>(witness->getDeclContext());
-    auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
-    if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
-      // We can witness a distributed instance method in an extension, as long as
-      // that extension itself is on a DistributedActor type (including
-      // protocols that inherit from DistributedActor, even if the protocol
-      // requirement was not expressed in terms of distributed actors).
-      nominal = extension->getExtendedNominal();
-    }
-
-    /// Distributed actors can witness protocol requirements either with
-    /// nonisolated or distributed members.
-    if (nominal && nominal->isDistributedActor()) {
-      // A distributed actor may conform to an 'async throws' function
-      // requirement with a distributed function, because those are always
-      // cross-actor.
-      //
-      // If the distributed instance method is well-formed (passed checks) then it can
-      // witness this requirement. I.e. since checks to the distributed function
-      // passed, it can be called through this protocol.
-      if (requirementFunc && witnessFunc && witnessFunc->isDistributed()) {
-        // If the requirement was also a 'distributed func' we most definitely
-        // can witness it with our 'distributed func' witness.
-        if (requirementFunc->isDistributed()) {
-          return false;
-        }
-        if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
-          return false;
-        }
-
-        // The witness was distributed, but the requirement func was not
-        // 'async throws', so we can suggest adding those to the protocol
-        int suggestAddingModifiers = 0;
-        if (!requirementFunc->hasAsync()) suggestAddingModifiers += 1;
-        if (!requirementFunc->hasThrows()) suggestAddingModifiers += 2;
-        requirementFunc->diagnose(diag::note_add_async_and_throws_to_decl,
-                                  witness->getName(),
-                                  suggestAddingModifiers,
-                                  witnessClass ? witnessClass->getName() :
-                                                 nominal->getName());
-        // TODO(distributed): fixit inserts for the async/throws
-      }
-
-      // The witness definitely is distributed actor isolated,
-      // so diagnose this as an error; next we'll provide helpful notes
-      witness->diagnose(diag::distributed_actor_isolated_witness,
-                        witness->getDescriptiveKind(), witness->getName())
-          .fixItInsert(witness->getAttributeInsertionLoc(true),
-                       "distributed ");
-
-      // witness is not 'distributed', if the requirement was though,
-      // then we definitely must mark the witness distributed as well.
-      if (!requirementFunc) {
-        return true;
-      }
-
-      if (requirementFunc->isDistributed()) {
-        witness->diagnose(diag::note_add_distributed_to_decl,
-                          witness->getName(),
-                          witness->getDescriptiveKind())
-            .fixItInsert(witness->getAttributeInsertionLoc(true),
-                         "distributed ");
-        requirement->diagnose(diag::note_distributed_requirement_defined_here,
-                              requirement->getName());
-      } else if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
-        assert(!requirementFunc->isDistributed());
-        // If the requirement is 'async throws' we can add 'distributed' to the
-        // distributed actor function to witness the requirement.
-        witness->diagnose(diag::note_add_distributed_to_decl,
-                          witness->getName(), witness->getDescriptiveKind())
-            .fixItInsert(witness->getAttributeInsertionLoc(true),
-                         "distributed ");
-      }
-
-      if (!requirementFunc->hasAsync() && !requirementFunc->isDistributed()) {
-        /// The requirement is synchronous, so we can only conform to it using
-        /// 'nonisolated'...
-        witness->diagnose(diag::note_add_nonisolated_to_decl,
-                          witness->getName(), witness->getDescriptiveKind())
-            .fixItInsert(witness->getAttributeInsertionLoc(true),
-                         "nonisolated ");
-
-        /// ... or by suggesting to make it 'async'
-      }
-
-      return true;
-    }
-
-    // A synchronous actor function can witness an asynchronous protocol
-    // requirement, since calls "through" the protocol are always cross-actor,
-    // in which case the function becomes implicitly async.
-    //
-    // In this case, we're crossing actor boundaries so we need to
-    // perform Sendable checking.
-    if (witnessClass && witnessClass->isActor()) {
-      if (isValidImplicitAsync(witness, requirement)) {
-        diagnoseNonSendableTypesInReference(
-            getConcreteWitness(), DC, witness->getLoc(),
-            SendableCheckReason::Conformance);
-
-        return false;
-      }
-    }
-
-    witness->diagnose(diag::actor_isolated_witness,
-                      witness->getDescriptiveKind(),
-                      witness->getName());
-    {
-      auto witnessVar = dyn_cast<VarDecl>(witness);
-      if ((witnessVar && !witnessVar->hasStorage()) || !witnessVar) {
-        if (requirementFunc && requirementFunc->isDistributed()) {
-          // a distributed protocol requirement can be witnessed with a
-          // distributed function:
-          witness->diagnose(diag::note_add_distributed_to_decl,
-                            witness->getName(), witness->getDescriptiveKind())
-              .fixItInsert(witness->getAttributeInsertionLoc(true),
-                           "distributed ");
-          requirement
-              ->diagnose(diag::note_distributed_requirement_defined_here,
-                         requirement->getName());
-        } else {
-          // the only other way to witness is to use a nonisolated member:
-          witness
-              ->diagnose(diag::note_add_nonisolated_to_decl, witness->getName(),
-                         witness->getDescriptiveKind())
-              .fixItInsert(witness->getAttributeInsertionLoc(true),
-                           "nonisolated ");
-        }
-      }
-    }
-
-    return true;
+  // Determine the isolation of the requirement itself.
+  auto requirementIsolation = getActorIsolation(requirement);
+  if (requirementIsolation.requiresSubstitution()) {
+    auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
+    auto subs = SubstitutionMap::getProtocolSubstitutions(
+        Proto, substitutingType, ProtocolConformanceRef(Conformance));
+    requirementIsolation = requirementIsolation.subst(subs);
   }
 
-  case ActorIsolationRestriction::CrossActorSelf: {
-    if (diagnoseNonSendableTypesInReference(
-            getConcreteWitness(), DC, witness->getLoc(),
-            SendableCheckReason::Conformance)) {
-      return true;
+  auto refResult = ActorReferenceResult::forReference(
+      getConcreteWitness(), witness->getLoc(), DC, None, None,
+      None, requirementIsolation);
+  bool sameConcurrencyDomain = false;
+  switch (refResult) {
+  case ActorReferenceResult::SameConcurrencyDomain:
+    // If the witness has distributed-actor isolation, we have extra
+    // checking to do.
+    if (refResult.isolation.isDistributedActor()) {
+      sameConcurrencyDomain = true;
+      break;
     }
 
-    auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness);
-    auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
-    auto nominal = dyn_cast<NominalTypeDecl>(witness->getDeclContext());
-    auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
-    if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
-      // We can witness a distributed instance method in an extension, as long as
-      // that extension itself is on a DistributedActor type (including
-      // protocols that inherit from DistributedActor, even if the protocol
-      // requirement was not expressed in terms of distributed actors).
-      nominal = extension->getExtendedNominal();
-      witnessClass = extension->getSelfClassDecl();
-    }
-
-    if (nominal && nominal->isDistributedActor()) {
-      // A distributed actor may conform to an 'async throws' function
-      // requirement with a distributed function, because those are always
-      // cross-actor.
-      //
-      // If the distributed instance method is well-formed (passed checks) then it can
-      // witness this requirement. I.e. since checks to the distributed function
-      // passed, it can be called through this protocol.
-      if (witnessFunc && witnessFunc->isDistributed()) {
-        // If the requirement was also a 'distributed func' we most definitely
-        // can witness it with our 'distributed func' witness.
-        if (requirementFunc && requirementFunc->isDistributed()) {
-          return false;
-        }
-        if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
-          return false;
-        }
-
-        if (requirementFunc) {
-          // The witness was distributed, but the requirement func was not
-          // 'async throws', so we can suggest adding those to the protocol
-          int suggestAddingModifiers = 0;
-          if (!requirementFunc->hasAsync()) suggestAddingModifiers += 1;
-          if (!requirementFunc->hasThrows()) suggestAddingModifiers += 2;
-          requirementFunc->diagnose(diag::note_add_async_and_throws_to_decl,
-                                    witness->getName(),
-                                    suggestAddingModifiers,
-                                    witnessClass ? witnessClass->getName() :
-                                                   nominal->getName());
-          // TODO(distributed): fixit inserts for the async/throws
-        } // TODO(distributed): handle computed properties as well?
-      }
-
-      if (witnessFunc) {
-        witness
-            ->diagnose(diag::distributed_actor_isolated_witness,
-                       witness->getDescriptiveKind(), witness->getName())
-            .fixItInsert(witness->getAttributeInsertionLoc(true),
-                         "distributed ");
-      }
-
-      return true;
-    }
-
+    // Otherwise, we're done.
     return false;
-  }
 
-  case ActorIsolationRestriction::GlobalActorUnsafe:
-    LLVM_FALLTHROUGH;
+  case ActorReferenceResult::ExitsActorToNonisolated:
+    // FIXME: SE-0338 would diagnose this.
+    return false;
 
-  case ActorIsolationRestriction::GlobalActor: {
-    // Hang on to the global actor that's used for the witness. It will need
-    // to match that of the requirement.
-    isCrossActor = witnessRestriction.isCrossActor;
-    witnessGlobalActor = witness->getDeclContext()->mapTypeIntoContext(
-        witnessRestriction.getGlobalActor());
+  case ActorReferenceResult::EntersActor:
+    // Handled below.
     break;
   }
 
-  case ActorIsolationRestriction::Unsafe:
-  case ActorIsolationRestriction::Unrestricted:
-    // The witness is completely unrestricted, so ignore any annotations on
-    // the requirement.
-    return false;
+  // Keep track of what modifiers are missing from the requirement and witness,
+  // so we can decide what to diagnose.
+  enum class MissingFlags {
+    RequirementAsync = 1 << 0,
+    RequirementThrows = 1 << 1,
+    WitnessDistributed = 1 << 2,
+  };
+  OptionSet<MissingFlags> missingOptions;
+
+  // If the witness is accessible across actors and the requirement is not
+  // async, we need an async requirement.
+  // FIXME: feels like ActorReferenceResult should be reporting this back to
+  // us somehow.
+  // To enter the actor, we always need the requirement to be `async`.
+  if (!sameConcurrencyDomain &&
+      !isAsyncDecl(requirement) &&
+      !isAccessibleAcrossActors(witness, refResult.isolation, DC))
+    missingOptions |= MissingFlags::RequirementAsync;
+
+  // If we are entering a distributed actor, the witness must be 'distributed'
+  // and we need the requirement to be 'throws'.
+  bool isDistributed = refResult.isolation.isDistributedActor() &&
+      !witness->getAttrs().hasAttribute<NonisolatedAttr>();
+  if (isDistributed) {
+    // If we're coming from a non-distributed requirement, then the requirement
+    // must be 'throws' to accommodate failure.
+    if (!isDistributedDecl(requirement) && !isThrowsDecl(requirement))
+      missingOptions |= MissingFlags::RequirementThrows;
+
+    if (!isDistributedDecl(witness) &&
+        (isDistributedDecl(requirement) || !missingOptions))
+      missingOptions |= MissingFlags::WitnessDistributed;
   }
 
-  // Check whether the requirement requires some particular actor isolation.
-  Type requirementGlobalActor;
-  switch (auto requirementIsolation = getActorIsolation(requirement)) {
-  case ActorIsolation::ActorInstance:
-    llvm_unreachable("There are not actor protocols");
+  // If we aren't missing anything, do a Sendable check and move on.
+  if (!missingOptions) {
+    SourceLoc loc = witness->getLoc();
+    if (loc.isInvalid())
+      loc = Conformance->getLoc();
 
-  case ActorIsolation::GlobalActorUnsafe:
-    LLVM_FALLTHROUGH;
-
-  case ActorIsolation::GlobalActor: {
-    auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
-        Proto, Adoptee, ProtocolConformanceRef(Conformance));
-    requirementGlobalActor = requirementIsolation.getGlobalActor()
-        .subst(requirementSubs);
-    break;
-  }
-
-  case ActorIsolation::Independent:
-  case ActorIsolation::Unspecified:
-    break;
-  }
-
-  // If neither has a global actor, we're done.
-  if (!witnessGlobalActor && !requirementGlobalActor)
-    return false;
-
-  // If both have global actors and they are the same, we are done.
-  if (witnessGlobalActor && requirementGlobalActor &&
-      witnessGlobalActor->isEqual(requirementGlobalActor))
-    return false;
-
-  // For cross-actor references, check for non-sendable types.
-  if (isCrossActor) {
-    // If the requirement was imported from Objective-C, it may not have been
-    // annotated appropriately. Allow the mismatch.
-    if (requirement->hasClangNode())
+    // FIXME: Disable Sendable checking when the witness is an initializer
+    // that is explicitly marked nonisolated.
+    if (isa<ConstructorDecl>(witness) &&
+        witness->getAttrs().hasAttribute<NonisolatedAttr>())
       return false;
 
-    return diagnoseNonSendableTypesInReference(
-        getConcreteWitness(), DC, witness->getLoc(),
-        SendableCheckReason::Conformance);
-  }
+    diagnoseNonSendableTypesInReference(
+        getConcreteWitness(), DC, loc, SendableCheckReason::Conformance);
 
-  // If the witness has a global actor but the requirement does not, we have
-  // an isolation error.
-  //
-  // However, we allow this case when the requirement was imported, because
-  // it might not have been annotated.
-  if (witnessGlobalActor && !requirementGlobalActor) {
-    // If the requirement was imported from Objective-C, downgrade to a warning
-    // because it may not have been annotated appropriately.
-    if (requirement->hasClangNode())
-      behavior = std::max(behavior, DiagnosticBehavior::Warning);
-
-    witness->diagnose(
-        diag::global_actor_isolated_witness, witness->getDescriptiveKind(),
-        witness->getName(), witnessGlobalActor, Proto->getName())
-      .limitBehavior(behavior);
-    requirement->diagnose(diag::decl_declared_here, requirement->getName());
-    return behavior == DiagnosticBehavior::Unspecified;
-  }
-
-  // If the requirement has a global actor but the witness does not, it's
-  // fine.
-  if (requirementGlobalActor && !witnessGlobalActor) {
     return false;
   }
 
-  // Both have global actors but they differ, so this is an isolation error.
-  assert(!witnessGlobalActor->isEqual(requirementGlobalActor));
-  witness->diagnose(
-      diag::global_actor_isolated_requirement_witness_conflict,
-      witness->getDescriptiveKind(), witness->getName(), witnessGlobalActor,
-      Proto->getName(), requirementGlobalActor)
+  // Limit the behavior of the diagnostic based on context.
+  // If we're working with requirements imported from Clang, or with global
+  // actor isolation in general, use the default diagnostic behavior based
+  // on the conformance context.
+  DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified;
+  if (requirement->hasClangNode() ||
+      refResult.isolation.isGlobalActor() ||
+      requirementIsolation.isGlobalActor()) {
+    // If the witness or requirement has global actor isolation, downgrade
+    // based on context.
+    behavior = SendableCheckContext(
+        Conformance->getDeclContext()).defaultDiagnosticBehavior();
+  }
+
+  // Complain that this witness cannot conform to the requirement due to
+  // actor isolation.
+  bool isError = (behavior == DiagnosticBehavior::Unspecified);
+  witness->diagnose(diag::actor_isolated_witness,
+                    isDistributed && !isDistributedDecl(witness),
+                    refResult.isolation, witness->getDescriptiveKind(),
+                    witness->getName(), requirementIsolation)
     .limitBehavior(behavior);
-  requirement->diagnose(diag::decl_declared_here, requirement->getName());
-  return behavior == DiagnosticBehavior::Unspecified;
+
+  // If we need 'distributed' on the witness, add it.
+  if (missingOptions.contains(MissingFlags::WitnessDistributed)) {
+    witness->diagnose(
+        diag::note_add_distributed_to_decl, witness->getName(),
+        witness->getDescriptiveKind())
+      .fixItInsert(witness->getAttributeInsertionLoc(true),
+                              "distributed ");
+    missingOptions -= MissingFlags::WitnessDistributed;
+  }
+
+  // One way to address the issue is to make the witness function nonisolated.
+  if ((isa<AbstractFunctionDecl>(witness) || isa<SubscriptDecl>(witness)) &&
+      !hasExplicitGlobalActorAttr(witness) &&
+      !isDistributedDecl(requirement) &&
+      !isDistributedDecl(witness)) {
+    witness->diagnose(
+        diag::note_add_nonisolated_to_decl, witness->getName(),
+        witness->getDescriptiveKind())
+          .fixItInsert(witness->getAttributeInsertionLoc(true), "nonisolated ");
+  }
+
+  // If there are remaining options, they are missing async/throws on the
+  // requirement itself. If we have a source location for the requirement,
+  // provide those in a note.
+  if (missingOptions && requirement->getLoc().isValid() &&
+      isa<AbstractFunctionDecl>(requirement)) {
+    int suggestAddingModifiers = 0;
+    std::string modifiers;
+    if (missingOptions.contains(MissingFlags::RequirementAsync)) {
+      suggestAddingModifiers += 1;
+      modifiers += "async ";
+    }
+
+    if (missingOptions.contains(MissingFlags::RequirementThrows)) {
+      suggestAddingModifiers += 2;
+      modifiers += "throws ";
+    }
+
+    auto diag = requirement->diagnose(diag::note_add_async_and_throws_to_decl,
+                                      witness->getName(),
+                                      suggestAddingModifiers);
+
+    // Figure out where to insert the modifiers so we can emit a Fix-It.
+    SourceLoc insertLoc;
+    bool insertAfter = false;
+    if (auto requirementAbstractFunc =
+            dyn_cast<AbstractFunctionDecl>(requirement)) {
+      if (requirementAbstractFunc->getAsyncLoc().isValid()) {
+        // Insert before the "async" (we only have throws).
+        insertLoc = requirementAbstractFunc->getAsyncLoc();
+        insertAfter = true;
+        modifiers = " throws";
+      } else if (requirementAbstractFunc->getThrowsLoc().isValid()) {
+        // Insert before the "throws" (we only have async)".
+        insertLoc = requirementAbstractFunc->getThrowsLoc();
+      } else if (auto requirementFunc =
+                     dyn_cast<FuncDecl>(requirementAbstractFunc)) {
+        // Insert before the result type, if there is one.
+        if (auto resultTypeRepr = requirementFunc->getResultTypeRepr()) {
+          insertLoc = resultTypeRepr->getStartLoc();
+        }
+      }
+
+      // Insert after the parentheses.
+      if (insertLoc.isInvalid()) {
+        insertLoc = requirementAbstractFunc->getParameters()->getRParenLoc();
+        insertAfter = true;
+        modifiers = " " + modifiers.substr(0, modifiers.size() - 1);
+      }
+    }
+
+    if (insertLoc.isValid()) {
+      if (insertAfter)
+        diag.fixItInsertAfter(insertLoc, modifiers);
+      else
+        diag.fixItInsert(insertLoc, modifiers);
+    }
+  } else {
+    requirement->diagnose(diag::decl_declared_here, requirement->getName());
+  }
+
+  return isError;
 }
 
 bool ConformanceChecker::checkObjCTypeErasedGenerics(
@@ -4258,6 +4154,32 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                          requirement->getName());
         });
     }
+    if (best.Kind == MatchKind::RequiresNonSendable) {
+      SendableCheckContext sendFrom(witness->getDeclContext(),
+                                    SendableCheck::Explicit);
+
+      auto behavior = sendFrom.diagnosticBehavior(Conformance->getProtocol());
+      if (behavior != DiagnosticBehavior::Ignore) {
+        bool isError = behavior < DiagnosticBehavior::Warning;
+        
+        diagnoseOrDefer(requirement, isError,
+                        [this, requirement, witness, sendFrom](
+                          NormalProtocolConformance *conformance) {
+          diagnoseSendabilityErrorBasedOn(conformance->getProtocol(), sendFrom,
+                                          [&](DiagnosticBehavior limit) {
+            auto &diags = DC->getASTContext().Diags;
+            diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
+                           diag::witness_not_as_sendable,
+                           witness->getDescriptiveKind(), witness->getName(),
+                           conformance->getProtocol()->getName())
+                .limitBehavior(limit);
+            diags.diagnose(requirement, diag::less_sendable_reqt_here)
+                .limitBehavior(limit);
+            return false;
+          });
+        });
+      }
+    }
 
     auto check = checkWitness(requirement, best);
 
@@ -4840,24 +4762,113 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
+/// FIXME: It feels like this could be part of findExistentialSelfReferences().
+static Optional<Requirement>
+hasInvariantSelfRequirement(const ProtocolDecl *proto,
+                            ArrayRef<Requirement> reqSig) {
+  auto selfTy = proto->getSelfInterfaceType();
+
+  auto containsInvariantSelf = [&](Type t) -> bool {
+    struct Walker : public TypeWalker {
+      Type SelfTy;
+      bool Found = false;
+
+      Walker(Type selfTy) : SelfTy(selfTy) {}
+
+      Action walkToTypePre(Type ty) override {
+        // Check for 'Self'.
+        if (ty->isEqual(SelfTy)) {
+          Found = true;
+          return Action::Stop;
+        }
+
+        // 'Self.A' is OK.
+        if (ty->is<DependentMemberType>())
+          return Action::SkipChildren;
+
+        return Action::Continue;
+      }
+    };
+
+    Walker walker(selfTy);
+    t.walk(walker);
+
+    return walker.Found;
+  };
+
+  for (auto req : reqSig) {
+    switch (req.getKind()) {
+    case RequirementKind::SameType:
+      if (req.getSecondType()->isTypeParameter()) {
+        if (req.getFirstType()->isEqual(selfTy))
+          return req;
+      } else {
+        if (containsInvariantSelf(req.getSecondType()))
+          return req;
+      }
+      continue;
+    case RequirementKind::Superclass:
+      if (containsInvariantSelf(req.getSecondType()))
+        return req;
+      continue;
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
+      continue;
+    }
+
+    llvm_unreachable("Bad requirement kind");
+  }
+
+  return None;
+}
+
+static void diagnoseInvariantSelfRequirement(
+    SourceLoc loc, Type adoptee, const ProtocolDecl *proto,
+    Requirement req, DiagnosticEngine &diags) {
+  Type firstType, secondType;
+  unsigned kind = 0;
+
+  switch (req.getKind()) {
+  case RequirementKind::SameType:
+  if (req.getSecondType()->isTypeParameter()) {
+      // eg, 'Self == Self.A.B'
+      firstType = req.getSecondType();
+      secondType = req.getFirstType();
+    } else {
+      // eg, 'Self.A.B == G<Self>'
+      firstType = req.getFirstType();
+      secondType = req.getSecondType();
+    }
+    kind = 0;
+    break;
+  case RequirementKind::Superclass:
+    // eg, 'Self.A.B : G<Self>'
+    firstType = req.getFirstType();
+    secondType = req.getSecondType();
+    kind = 1;
+    break;
+  case RequirementKind::Conformance:
+  case RequirementKind::Layout:
+    llvm_unreachable("Invalid requirement kind");
+  }
+
+  diags.diagnose(loc, diag::non_final_class_cannot_conform_to_self_same_type,
+                 adoptee, proto->getDeclaredInterfaceType(),
+                 firstType, kind, secondType)
+      .warnUntilSwiftVersion(6);
+}
+
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
   Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
   auto &diags = proto->getASTContext().Diags;
 
-  auto DC = Conformance->getDeclContext();
+  auto *const module = DC->getParentModule();
   auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, substitutingType, ProtocolConformanceRef(Conformance));
 
   auto reqSig = proto->getRequirementSignature().getRequirements();
-
-  auto result = TypeChecker::checkGenericArguments(
-      DC->getParentModule(), Loc, Loc,
-      // FIXME: maybe this should be the conformance's type
-      proto->getDeclaredInterfaceType(),
-      { proto->getSelfInterfaceType() },
-      reqSig, QuerySubstitutionMap{substitutions});
 
   // Non-final classes should not be able to conform to protocols with a
   // same-type requirement on 'Self', since such a conformance would no
@@ -4867,36 +4878,37 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   // instead of the concrete class type itself.
   if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {
     if (!classDecl->isSemanticallyFinal()) {
-      for (auto req : reqSig) {
-        if (req.getKind() == RequirementKind::SameType &&
-            req.getFirstType()->isEqual(proto->getSelfInterfaceType())) {
-          diags.diagnose(Loc, diag::non_final_class_cannot_conform_to_self_same_type,
-                         Adoptee, proto->getDeclaredInterfaceType(),
-                         req.getSecondType())
-              .warnUntilSwiftVersion(6);
-          break;
-        }
+      if (auto req = hasInvariantSelfRequirement(proto, reqSig)) {
+        diagnoseInvariantSelfRequirement(Loc, Adoptee, proto, *req, diags);
       }
     }
   }
 
+  const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
+      module, reqSig, QuerySubstitutionMap{substitutions});
   switch (result) {
-  case RequirementCheckResult::Success:
+  case CheckGenericArgumentsResult::Success:
     // Go on to check exportability.
     break;
 
-  case RequirementCheckResult::Failure:
-    Conformance->setInvalid();
-    return;
-
-  case RequirementCheckResult::SubstitutionFailure:
+  case CheckGenericArgumentsResult::RequirementFailure:
+  case CheckGenericArgumentsResult::SubstitutionFailure:
     // Diagnose the failure generically.
     // FIXME: Would be nice to give some more context here!
     if (!Conformance->isInvalid()) {
       diags.diagnose(Loc, diag::type_does_not_conform,
                      Adoptee,
                      Proto->getDeclaredInterfaceType());
+
+      if (result == CheckGenericArgumentsResult::RequirementFailure) {
+        TypeChecker::diagnoseRequirementFailure(
+            result.getRequirementFailureInfo(), Loc, Loc,
+            proto->getDeclaredInterfaceType(), {proto->getSelfInterfaceType()},
+            QuerySubstitutionMap{substitutions}, module);
+      }
+
       Conformance->setInvalid();
+      AlreadyComplained = true;
     }
     return;
   }
@@ -5386,6 +5398,38 @@ void swift::diagnoseConformanceFailure(Type T,
     return;
   }
 
+  // Special case: a distributed actor conformance often can fail because of
+  // a missing ActorSystem (or DefaultDistributedActorSystem) typealias.
+  // In this case, the "normal" errors are an avalanche of errors related to
+  // missing things in the actor that don't help users diagnose the root problem.
+  // Instead, we want to suggest adding the typealias.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
+    auto nominal = T->getNominalOrBoundGenericNominal();
+    if (!nominal)
+      return;
+
+    if (isa<ClassDecl>(nominal) &&
+        !nominal->isDistributedActor()) {
+      if (nominal->isActor()) {
+        diags.diagnose(ComplainLoc,
+                       diag::actor_cannot_inherit_distributed_actor_protocol,
+                       nominal->getName());
+      } // else, already diagnosed elsewhere
+      return;
+    }
+
+    // If it is missing the ActorSystem type, suggest adding it:
+    auto systemTy = getDistributedActorSystemType(/*actor=*/nominal);
+    if (!systemTy || systemTy->hasError()) {
+      diags.diagnose(ComplainLoc,
+                     diag::distributed_actor_conformance_missing_system_type,
+                     nominal->getName());
+      diags.diagnose(nominal->getStartLoc(),
+                     diag::note_distributed_actor_system_can_be_defined_using_defaultdistributedactorsystem);
+      return;
+    }
+  }
+
   // Special case: for enums with a raw type, explain that the failing
   // conformance to RawRepresentable was inferred.
   if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
@@ -5524,9 +5568,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
     }
 
     // Next, check if the existential contains the protocol in question.
-    for (auto P : layout.getProtocols()) {
-      auto *PD = P->getDecl();
-
+    for (auto *PD : layout.getProtocols()) {
       // If we found the protocol we're looking for, return an abstract
       // conformance to it.
       if (PD == Proto)
@@ -5566,11 +5608,11 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
         M, *condReqs,
         [](SubstitutableType *dependentType) { return Type(dependentType); });
     switch (conditionalCheckResult) {
-    case RequirementCheckResult::Success:
+    case CheckGenericArgumentsResult::Success:
       break;
 
-    case RequirementCheckResult::Failure:
-    case RequirementCheckResult::SubstitutionFailure:
+    case CheckGenericArgumentsResult::RequirementFailure:
+    case CheckGenericArgumentsResult::SubstitutionFailure:
       return ProtocolConformanceRef::forInvalid();
     }
   }
@@ -6290,17 +6332,20 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         if (!classDecl->isDistributedActor()) {
           if (classDecl->isActor()) {
             dc->getSelfNominalTypeDecl()
-            ->diagnose(diag::distributed_actor_protocol_illegal_inheritance,
+            ->diagnose(diag::actor_cannot_inherit_distributed_actor_protocol,
                        dc->getSelfNominalTypeDecl()->getName())
                        .fixItInsert(classDecl->getStartLoc(), "distributed ");
           } else {
             dc->getSelfNominalTypeDecl()
-            ->diagnose(diag::actor_protocol_illegal_inheritance,
+            ->diagnose(diag::distributed_actor_protocol_illegal_inheritance,
                        dc->getSelfNominalTypeDecl()->getName())
                        .fixItReplace(nominal->getStartLoc(), "distributed actor");
           }
         }
       }
+    } else if (proto->isSpecificProtocol(
+                   KnownProtocolKind::DistributedActorSystem)) {
+      checkDistributedActorSystem(nominal);
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Actor)) {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
         if (!classDecl->isExplicitActor()) {
@@ -6798,8 +6843,20 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
+  case KnownDerivableProtocolKind::Identifiable:
+    if (derived.Nominal->isDistributedActor()) {
+      return derived.deriveDistributedActor(Requirement);
+    } else {
+      // No synthesis is required for other types; we should only end up
+      // attempting synthesis if the nominal was a distributed actor.
+      llvm_unreachable("Identifiable is synthesized for distributed actors");
+    }
+
   case KnownDerivableProtocolKind::DistributedActor:
     return derived.deriveDistributedActor(Requirement);
+
+  case KnownDerivableProtocolKind::DistributedActorSystem:
+    return derived.deriveDistributedActorSystem(Requirement);
 
   case KnownDerivableProtocolKind::OptionSet:
       llvm_unreachable(
@@ -6831,6 +6888,12 @@ TypeChecker::deriveTypeWitness(DeclContext *DC,
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   case KnownProtocolKind::DistributedActor:
+    return derived.deriveDistributedActor(AssocType);
+  case KnownProtocolKind::Identifiable:
+    // Identifiable only has derivation logic for distributed actors,
+    // because how it depends on the ActorSystem the actor is associated with.
+    // If the nominal wasn't a distributed actor, we should not end up here,
+    // but either way, then we'd return null (fail derivation).
     return derived.deriveDistributedActor(AssocType);
   default:
     return std::make_pair(nullptr, nullptr);

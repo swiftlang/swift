@@ -10,6 +10,7 @@ swift_compiler_sources(Optimizer
   AssumeSingleThreaded.swift
   SILPrinter.swift
   MergeCondFails.swift
+  RangeDumper.swift
   ReleaseDevirtualizer.swift
   RunUnitTests.swift
 )

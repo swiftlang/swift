@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_REQUIREMENT_SIGNATURE_H
 #define SWIFT_AST_REQUIREMENT_SIGNATURE_H
 
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 
 namespace swift {
@@ -42,13 +43,16 @@ public:
 class RequirementSignature final {
   ArrayRef<Requirement> Requirements;
   ArrayRef<ProtocolTypeAlias> TypeAliases;
+  GenericSignatureErrors Errors;
 
 public:
-  RequirementSignature() = default;
+  RequirementSignature(GenericSignatureErrors errors = GenericSignatureErrors())
+    : Errors(errors) {}
 
   RequirementSignature(ArrayRef<Requirement> requirements,
-                       ArrayRef<ProtocolTypeAlias> typeAliases)
-    : Requirements(requirements), TypeAliases(typeAliases) {}
+                       ArrayRef<ProtocolTypeAlias> typeAliases,
+                       GenericSignatureErrors errors = GenericSignatureErrors())
+    : Requirements(requirements), TypeAliases(typeAliases), Errors(errors) {}
 
   /// The requirements including any inherited protocols and conformances for
   /// associated types that are introduced in this protocol.
@@ -64,6 +68,10 @@ public:
 
   ArrayRef<ProtocolTypeAlias> getTypeAliases() const {
     return TypeAliases;
+  }
+
+  GenericSignatureErrors getErrors() const {
+    return Errors;
   }
 };
 

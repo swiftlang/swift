@@ -102,8 +102,9 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
   if (const clang::Expr *parsed = parseNumericLiteral<>(Impl, tok)) {
     auto clangTy = parsed->getType();
     auto literalType = Impl.importTypeIgnoreIUO(
-        clangTy, ImportTypeKind::Value, isInSystemModule(DC),
-        Bridgeability::None);
+        clangTy, ImportTypeKind::Value,
+        ImportDiagnosticAdder(Impl, MI, tok.getLocation()),
+        isInSystemModule(DC), Bridgeability::None, ImportTypeAttrs());
     if (!literalType)
       return nullptr;
 
@@ -112,8 +113,9 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       constantType = literalType;
     } else {
       constantType = Impl.importTypeIgnoreIUO(
-          castType, ImportTypeKind::Value, isInSystemModule(DC),
-          Bridgeability::None);
+          castType, ImportTypeKind::Value,
+          ImportDiagnosticAdder(Impl, MI, MI->getDefinitionLoc()),
+          isInSystemModule(DC), Bridgeability::None, ImportTypeAttrs());
       if (!constantType)
         return nullptr;
     }
@@ -308,6 +310,7 @@ static Optional<clang::QualType> builtinTypeForToken(const clang::Token &tok,
 
 static Optional<std::pair<llvm::APSInt, Type>>
   getIntegerConstantForMacroToken(ClangImporter::Implementation &impl,
+                                  const clang::MacroInfo *macro,
                                   DeclContext *DC,
                                   const clang::Token &token) {
 
@@ -317,8 +320,9 @@ static Optional<std::pair<llvm::APSInt, Type>>
       auto value = llvm::APSInt { literal->getValue(),
                                   literal->getType()->isUnsignedIntegerType() };
       auto type = impl.importTypeIgnoreIUO(
-          literal->getType(), ImportTypeKind::Value, isInSystemModule(DC),
-          Bridgeability::None);
+          literal->getType(), ImportTypeKind::Value,
+          ImportDiagnosticAdder(impl, macro, token.getLocation()),
+          isInSystemModule(DC), Bridgeability::None, ImportTypeAttrs());
       return {{ value, type }};
     }
 
@@ -551,7 +555,8 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     // Parse INT1.
     llvm::APSInt firstValue;
     Type firstSwiftType = nullptr;
-    if (auto firstInt = getIntegerConstantForMacroToken(impl, DC, tokenI[0])) {
+    if (auto firstInt = getIntegerConstantForMacroToken(impl, macro, DC,
+                                                        tokenI[0])) {
       firstValue     = firstInt->first;
       firstSwiftType = firstInt->second;
     } else {
@@ -566,7 +571,8 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     // Parse INT2.
     llvm::APSInt secondValue;
     Type secondSwiftType = nullptr;
-    if (auto secondInt = getIntegerConstantForMacroToken(impl, DC, tokenI[2])) {
+    if (auto secondInt = getIntegerConstantForMacroToken(impl, macro, DC,
+                                                         tokenI[2])) {
       secondValue     = secondInt->first;
       secondSwiftType = secondInt->second;
     } else {

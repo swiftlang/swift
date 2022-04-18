@@ -1746,7 +1746,12 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
 }
 
 bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
-  auto *anchor = castToExpr(getAnchor());
+  auto *anchor = getAsExpr(getAnchor());
+  // This diagnostic is used opportunistically in `diagnoseAmbiguity`,
+  // which means it cannot assume that anchor is always an expression.
+  if (!anchor)
+    return false;
+
   const auto *expr = findParentExpr(anchor);
   auto *callExpr = dyn_cast_or_null<CallExpr>(expr);
   if (!callExpr)
@@ -2351,7 +2356,9 @@ bool ContextualFailure::diagnoseAsError() {
     if (isExpr<OptionalTryExpr>(anchor) ||
         isExpr<OptionalEvaluationExpr>(anchor)) {
       auto objectType = fromType->getOptionalObjectType();
-      if (objectType->isEqual(toType)) {
+      // Cannot assume that `fromType` is always optional here since
+      // it could assume a type from context.
+      if (objectType && objectType->isEqual(toType)) {
         MissingOptionalUnwrapFailure failure(getSolution(), getType(anchor),
                                              toType,
                                              getConstraintLocator(anchor));
@@ -3028,10 +3035,8 @@ bool ContextualFailure::tryTypeCoercionFixIt(
     }
   }
 
-  CheckedCastKind Kind =
-      TypeChecker::typeCheckCheckedCast(fromType, toType,
-                                        CheckedCastContextKind::None, getDC(),
-                                        SourceLoc(), nullptr, SourceRange());
+  CheckedCastKind Kind = TypeChecker::typeCheckCheckedCast(
+      fromType, toType, CheckedCastContextKind::None, getDC());
 
   if (Kind != CheckedCastKind::Unresolved) {
     bool canUseAs = Kind == CheckedCastKind::Coercion ||
@@ -3089,10 +3094,11 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   SmallVector<std::string, 8> missingProtoTypeStrings;
   SmallVector<ProtocolDecl *, 8> missingProtocols;
   for (auto protocol : layout.getProtocols()) {
-    if (!TypeChecker::conformsToProtocol(fromType, protocol->getDecl(),
+    if (!TypeChecker::conformsToProtocol(fromType, protocol,
                                          getParentModule())) {
-      missingProtoTypeStrings.push_back(protocol->getString());
-      missingProtocols.push_back(protocol->getDecl());
+      auto protoTy = protocol->getDeclaredInterfaceType();
+      missingProtoTypeStrings.push_back(protoTy->getString());
+      missingProtocols.push_back(protocol);
     }
   }
 
@@ -3809,7 +3815,10 @@ bool MissingMemberFailure::diagnoseForDynamicCallable() const {
 }
 
 bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
-  auto *expr = castToExpr(getAnchor());
+  auto *expr = getAsExpr(getAnchor());
+  if (!expr)
+    return false;
+
   auto *parentExpr = findParentExpr(expr);
   auto &solution = getSolution();
 
@@ -3961,8 +3970,11 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
 
   // If the base expression is a reference to a function or subscript
   // parameter, offer a fixit that replaces the existential parameter type with
-  // its generic equivalent, e.g. func foo(p: any P) → func foo<T: P>(p: T).
-  // FIXME: Add an option to use 'some' vs. an explicit generic parameter.
+  // its generic equivalent, e.g. func foo(p: any P) → func foo(p: some P).
+  // Replacing 'any' with 'some' allows the code to compile without further
+  // changes, such as naming an explicit type parameter, and is future-proofed
+  // for same-type requirements on primary associated types instead of needing
+  // a where clause.
 
   if (!PD || !PD->getDeclContext()->getAsDecl())
     return true;
@@ -4011,70 +4023,42 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
   if (PD->isInOut())
     return true;
 
-  constexpr StringRef GPNamePlaceholder = "<#generic parameter name#>";
-  SourceRange TyReplacementRange;
-  SourceRange RemoveAnyRange;
-  SourceLoc GPDeclLoc;
-  std::string GPDeclStr;
-  {
-    llvm::raw_string_ostream OS(GPDeclStr);
-    auto *const GC = PD->getDeclContext()->getAsDecl()->getAsGenericContext();
-    if (GC->getParsedGenericParams()) {
-      GPDeclLoc = GC->getParsedGenericParams()->getRAngleLoc();
-      OS << ", ";
-    } else {
-      GPDeclLoc =
-          isa<AbstractFunctionDecl>(GC)
-              ? cast<AbstractFunctionDecl>(GC)->getParameters()->getLParenLoc()
-              : cast<SubscriptDecl>(GC)->getIndices()->getLParenLoc();
-      OS << "<";
-    }
-    OS << GPNamePlaceholder << ": ";
-
-    auto *TR = PD->getTypeRepr()->getWithoutParens();
-    if (auto *STR = dyn_cast<SpecifierTypeRepr>(TR)) {
-      TR = STR->getBase()->getWithoutParens();
-    }
-    if (auto *ETR = dyn_cast<ExistentialTypeRepr>(TR)) {
-      TR = ETR->getConstraint();
-      RemoveAnyRange = SourceRange(ETR->getAnyLoc(), TR->getStartLoc());
-      TR = TR->getWithoutParens();
-    }
-    if (auto *MTR = dyn_cast<MetatypeTypeRepr>(TR)) {
-      TR = MTR->getBase();
-
-      // (P & Q).Type -> T.Type
-      // (P).Type -> (T).Type
-      // ((P & Q)).Type -> ((T)).Type
-      if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
-        assert(TTR->isParenType());
-        if (!isa<CompositionTypeRepr>(TTR->getElementType(0))) {
-          TR = TR->getWithoutParens();
-        }
-      }
-    }
-    TyReplacementRange = TR->getSourceRange();
-
-    // Strip any remaining parentheses and print the conformance constraint.
-    TR->getWithoutParens()->print(OS);
-
-    if (!GC->getParsedGenericParams()) {
-      OS << ">";
-    }
+  auto *typeRepr = PD->getTypeRepr()->getWithoutParens();
+  if (auto *STR = dyn_cast<SpecifierTypeRepr>(typeRepr)) {
+    typeRepr = STR->getBase()->getWithoutParens();
   }
 
-  // First, replace the constraint type with the generic parameter type
-  // placeholder.
-  Diag.fixItReplace(TyReplacementRange, GPNamePlaceholder);
+  SourceRange anyRange;
+  TypeRepr *constraintRepr = typeRepr;
+  if (auto *existentialRepr = dyn_cast<ExistentialTypeRepr>(typeRepr)) {
+    constraintRepr = existentialRepr->getConstraint()->getWithoutParens();
+    auto anyStart = existentialRepr->getAnyLoc();
+    auto anyEnd = existentialRepr->getConstraint()->getStartLoc();
+    anyRange = SourceRange(anyStart, anyEnd);
+  }
 
-  // Remove 'any' if needed, using a character-based removal to pick up
+  bool needsParens = false;
+  while (auto *metatype = dyn_cast<MetatypeTypeRepr>(constraintRepr)) {
+    // The generic equivalent of 'any P.Type' is '(some P).Type'
+    constraintRepr = metatype->getBase()->getWithoutParens();
+    if (isa<SimpleIdentTypeRepr>(constraintRepr))
+      needsParens = !isa<TupleTypeRepr>(metatype->getBase());
+  }
+
+  std::string fix;
+  llvm::raw_string_ostream OS(fix);
+  if (needsParens)
+    OS << "(";
+  OS << "some ";
+  constraintRepr->print(OS);
+  if (needsParens)
+    OS << ")";
+
+  // When removing 'any', use a character-based removal to pick up
   // whitespaces between it and its constraint repr.
-  if (RemoveAnyRange.isValid()) {
-    Diag.fixItRemoveChars(RemoveAnyRange.Start, RemoveAnyRange.End);
-  }
-
-  // Finally, insert the generic parameter declaration.
-  Diag.fixItInsert(GPDeclLoc, GPDeclStr);
+  Diag
+    .fixItReplace(constraintRepr->getSourceRange(), fix)
+    .fixItRemoveChars(anyRange.Start, anyRange.End);
 
   return true;
 }
@@ -5918,8 +5902,11 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     return (type == params.end()) ? Type() : type->second;
   };
 
+  auto baseType = anchor.dyn_cast<TypeRepr *>();
+  if (!baseType)
+    return;
+
   SmallString<64> paramsAsString;
-  auto baseType = anchor.get<TypeRepr *>();
   if (TypeChecker::getDefaultGenericArgumentsString(paramsAsString, GTD,
                                                     getPreferredType)) {
     auto diagnostic = emitDiagnosticAt(
@@ -7968,7 +7955,7 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseConditionalCastExpr() const {
   return true;
 }
 
-bool NoopCheckedCast::diagnoseIfExpr() const {
+bool NoopCheckedCast::diagnoseIsExpr() const {
   auto *expr = getAsExpr<IsExpr>(CastExpr);
   if (!expr)
     return false;
@@ -8014,7 +8001,7 @@ bool NoopCheckedCast::diagnoseForcedCastExpr() const {
 }
 
 bool NoopCheckedCast::diagnoseAsError() {
-  if (diagnoseIfExpr())
+  if (diagnoseIsExpr())
     return true;
 
   if (diagnoseForcedCastExpr())
@@ -8024,6 +8011,11 @@ bool NoopCheckedCast::diagnoseAsError() {
     return true;
 
   llvm_unreachable("Shouldn't reach here");
+}
+
+bool NoopExistentialToCFTypeCheckedCast::diagnoseAsError() {
+  emitDiagnostic(diag::isa_is_foreign_check, getToType());
+  return true;
 }
 
 bool CoercibleOptionalCheckedCastFailure::diagnoseAsError() {
@@ -8045,6 +8037,42 @@ bool UnsupportedRuntimeCheckedCastFailure::diagnoseAsError() {
                  isExpr<IsExpr>(anchor) ? 0 : 1);
   emitDiagnostic(diag::checked_cast_not_supported_coerce_instead)
       .fixItReplace(getCastRange(), "as");
+  return true;
+}
+
+bool CheckedCastToUnrelatedFailure::diagnoseAsError() {
+  const auto toType = getToType();
+  auto *sub = CastExpr->getSubExpr()->getSemanticsProvidingExpr();
+  // FIXME: This literal diagnostics needs to be revisited by a proposal
+  // to unify casting semantics for literals.
+  // https://bugs.swift.org/browse/SR-12093
+  auto &ctx = getASTContext();
+  auto *dc = getDC();
+  if (isa<LiteralExpr>(sub)) {
+    auto *protocol = TypeChecker::getLiteralProtocol(ctx, sub);
+    // Special handle for literals conditional checked cast when they can
+    // be statically coerced to the cast type.
+    if (protocol && TypeChecker::conformsToProtocol(toType, protocol,
+                                                    dc->getParentModule())) {
+      emitDiagnostic(diag::literal_conditional_downcast_to_coercion, toType);
+      return true;
+    }
+  }
+
+  emitDiagnostic(diag::downcast_to_unrelated, getFromType(), toType)
+      .highlight(getFromRange())
+      .highlight(getToRange());
+  // If we're referring to a function with a return value (not Void) then
+  // emit a fix-it suggesting to add `()` to call the function
+  if (auto DRE = dyn_cast<DeclRefExpr>(sub)) {
+    if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
+      if (!FD->getResultInterfaceType()->isVoid()) {
+        emitDiagnostic(diag::downcast_to_unrelated_fixit,
+                       FD->getBaseIdentifier())
+            .fixItInsertAfter(sub->getEndLoc(), "()");
+      }
+    }
+  }
   return true;
 }
 

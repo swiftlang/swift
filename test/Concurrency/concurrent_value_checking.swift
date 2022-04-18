@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency -parse-as-library
 // REQUIRES: concurrency
 
 class NotConcurrent { } // expected-note 27{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}

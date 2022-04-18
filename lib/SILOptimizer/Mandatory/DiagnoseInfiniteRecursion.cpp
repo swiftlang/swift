@@ -225,8 +225,7 @@ public:
     case TermKind::CondBranchInst:
     case TermKind::SwitchValueInst:
     case TermKind::SwitchEnumInst:
-    case TermKind::CheckedCastBranchInst:
-    case TermKind::CheckedCastValueBranchInst: {
+    case TermKind::CheckedCastBranchInst: {
       SmallPtrSet<SILInstruction *, 16> visited;
       return isInvariantValue(term->getOperand(0), visited);
     }

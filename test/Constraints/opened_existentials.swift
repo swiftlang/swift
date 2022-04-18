@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-opened-existential-types -enable-parameterized-protocol-types
+// RUN: %target-typecheck-verify-swift -enable-experimental-opened-existential-types
 
 protocol Q { }
 
@@ -177,4 +177,36 @@ func testReturningOpaqueTypes(p: any P) {
 
   _ = createX(p) // expected-error{{type 'any P' cannot conform to 'P'}}
   // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+}
+
+// Type-erasing vs. opening for parameters after the opened one.
+func takeValueAndClosure<T: P>(_ value: T, body: (T) -> Void) { }
+func takeValueAndClosureBackwards<T: P>(body: (T) -> Void, _ value: T) { }
+// expected-note@-1{{required by global function 'takeValueAndClosureBackwards(body:_:)' where 'T' = 'any P'}}
+
+func genericFunctionTakingP<T: P>(_: T) { }
+func genericFunctionTakingPQ<T: P & Q>(_: T) { }
+
+func overloadedGenericFunctionTakingP<T: P>(_: T) -> Int { 0 }
+func overloadedGenericFunctionTakingP<T: P>(_: T) { }
+
+func testTakeValueAndClosure(p: any P) {
+  // Type-erase when not provided with a generic function.
+  takeValueAndClosure(p) { x in
+    print(x)
+    let _: Int = x // expected-error{{cannot convert value of type 'any P' to specified type 'Int'}}
+  }
+
+  // Do not erase when referring to a generic function.
+  takeValueAndClosure(p, body: genericFunctionTakingP)
+  takeValueAndClosure(p, body: overloadedGenericFunctionTakingP)
+  takeValueAndClosure(p, body: genericFunctionTakingPQ) // expected-error{{global function 'genericFunctionTakingPQ' requires that 'T' conform to 'Q'}}
+
+  // Do not allow opening if there are any uses of the the type parameter before
+  // the opened parameter. This maintains left-to-right evaluation order.
+  takeValueAndClosureBackwards( // expected-error{{type 'any P' cannot conform to 'P'}}
+    // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+    body: { x in x as Int }, // expected-error{{'any P' is not convertible to 'Int'}}
+    // expected-note@-1{{did you mean to use 'as!' to force downcast?}}
+    p)
 }

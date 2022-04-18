@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=FunctionTemplates -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=FunctionTemplates -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: func addSameTypeParams<T>(_ a: T, _ b: T) -> T
 // CHECK: func addMixedTypeParams<A, B>(_ a: A, _ b: B) -> A
@@ -13,6 +13,10 @@
 // CHECK:   @available(*, unavailable, message: "Variadic function is unavailable")
 // CHECK:   mutating func test2(_: Int32, _ varargs: Any...)
 // CHECK: }
+
+// TODO: import functions that take a pointer to a dependent type (rdar://90587703).
+// CHECK-NOT: func takesPointerToDependent
+// CHECK-NOT: func takesDeclTypePointer
 
 // CHECK: func lvalueReference<T>(_ ref: inout T)
 // CHECK: func constLvalueReference<T>(_: T)

@@ -1,10 +1,10 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-string-processing
+// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking
 // REQUIRES: swift_in_compiler
 
 let r0 = #/./#
 let _: Regex<Substring> = r0
 
-func takesRegex<Match>(_: Regex<Match>) {}
+func takesRegex<Output>(_: Regex<Output>) {}
 takesRegex(#//#) // okay
 
 let r1 = #/.(.)/#
@@ -14,7 +14,7 @@ let _: Regex<(Substring, Substring)>.Type = type(of: r1)
 
 struct S {}
 // expected-error @+2 {{cannot assign value of type 'Regex<(Substring, Substring)>' to type 'Regex<S>'}}
-// expected-note @+1 {{arguments to generic parameter 'Match' ('(Substring, Substring)' and 'S') are expected to be equal}}
+// expected-note @+1 {{arguments to generic parameter 'Output' ('(Substring, Substring)' and 'S') are expected to be equal}}
 let r2: Regex<S> = #/.(.)/#
 
 let r3 = #/(.)(.)/#

@@ -378,6 +378,10 @@ public:
   /// '.../lib/swift', otherwise '.../lib/swift_static'.
   bool UseSharedResourceFolder = true;
 
+  /// Indicates whether to expose all public declarations in the generated clang
+  /// header.
+  bool ExposePublicDeclsInClangHeader = false;
+
   /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
 

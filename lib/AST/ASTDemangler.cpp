@@ -621,6 +621,14 @@ Type ASTBuilder::createExistentialMetatypeType(Type instance,
                                       getMetatypeRepresentation(*repr));
 }
 
+Type ASTBuilder::createParameterizedProtocolType(Type base,
+                                                 ArrayRef<Type> args) {
+  if (!base->getAs<ProtocolType>())
+    return Type();
+  return ParameterizedProtocolType::get(base->getASTContext(),
+                                        base->castTo<ProtocolType>(), args);
+}
+
 Type ASTBuilder::createMetatypeType(Type instance,
                          Optional<Demangle::ImplMetatypeRepresentation> repr) {
   if (!repr)

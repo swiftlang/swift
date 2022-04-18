@@ -31,6 +31,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <new>
 #include <thread>
 #include "../SwiftShims/GlobalObjects.h"
 #include "../SwiftShims/RuntimeShims.h"
@@ -66,6 +67,10 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
   // arm64_32 is special since it has 32-bit pointers but __arm64__ is true.
   // Catch it early since __POINTER_WIDTH__ is generally non-portable.
   return p != nullptr;
+#elif defined(__ANDROID__) && defined(__aarch64__)
+  // Check the top of the second byte instead, since Android AArch64 reserves
+  // the top byte for its own pointer tagging since Android 11.
+  return (intptr_t)((uintptr_t)p << 8) > 0;
 #elif defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
   // On these platforms, except s390x, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
@@ -120,7 +125,7 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
   // check on the placement new allocator which we have observed on Windows,
   // Linux, and macOS.
-  new (object) HeapObject(metadata);
+  ::new (object) HeapObject(metadata);
 
   // If leak tracking is enabled, start tracking this object.
   SWIFT_LEAKS_START_TRACKING_OBJECT(object);

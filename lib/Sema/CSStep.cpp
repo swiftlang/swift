@@ -616,7 +616,7 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
       genericSignatureB.getRequirements(),
       QueryTypeSubstitutionMap{ substMap });
 
-  if (result != RequirementCheckResult::Success)
+  if (result != CheckGenericArgumentsResult::Success)
     return false;
 
   return substTypeA->isEqual(substTypeB);

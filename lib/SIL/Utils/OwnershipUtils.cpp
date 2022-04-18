@@ -35,11 +35,11 @@ bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *ti = arg->getSingleTerminator())
       if (ti->isTransformationTerminator())
-        return OwnershipForwardingMixin::get(ti)->isDirectlyForwarding();
+        return OwnershipForwardingMixin::get(ti)->preservesOwnership();
 
   if (auto *inst = value->getDefiningInstruction())
     if (auto *mixin = OwnershipForwardingMixin::get(inst))
-      return mixin->isDirectlyForwarding() &&
+      return mixin->preservesOwnership() &&
              !isa<OwnedFirstArgForwardingSingleValueInst>(inst);
 
   return false;
@@ -47,7 +47,7 @@ bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
 
 bool swift::canOpcodeForwardGuaranteedValues(Operand *use) {
   if (auto *mixin = OwnershipForwardingMixin::get(use->getUser()))
-    return mixin->isDirectlyForwarding() &&
+    return mixin->preservesOwnership() &&
            !isa<OwnedFirstArgForwardingSingleValueInst>(use->getUser());
   return false;
 }
@@ -58,11 +58,11 @@ bool swift::canOpcodeForwardOwnedValues(SILValue value) {
   if (auto *arg = dyn_cast<SILPhiArgument>(value))
     if (auto *predTerm = arg->getSingleTerminator())
       if (predTerm->isTransformationTerminator())
-        return OwnershipForwardingMixin::get(predTerm)->isDirectlyForwarding();
+        return OwnershipForwardingMixin::get(predTerm)->preservesOwnership();
 
   if (auto *inst = value->getDefiningInstruction())
     if (auto *mixin = OwnershipForwardingMixin::get(inst))
-      return mixin->isDirectlyForwarding() &&
+      return mixin->preservesOwnership() &&
              !isa<GuaranteedFirstArgForwardingSingleValueInst>(inst);
 
   return false;
@@ -71,7 +71,7 @@ bool swift::canOpcodeForwardOwnedValues(SILValue value) {
 bool swift::canOpcodeForwardOwnedValues(Operand *use) {
   auto *user = use->getUser();
   if (auto *mixin = OwnershipForwardingMixin::get(user))
-    return mixin->isDirectlyForwarding() &&
+    return mixin->preservesOwnership() &&
            !isa<GuaranteedFirstArgForwardingSingleValueInst>(user);
   return false;
 }
@@ -1078,7 +1078,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
       auto *arg = cast<SILPhiArgument>(value);
       auto *termInst = arg->getSingleTerminator();
       assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
+             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
       assert(termInst->getNumOperands() == 1 &&
              "Transforming terminators should always have a single operand");
       worklist.push_back(termInst->getAllOperands()[0].get());
@@ -1130,7 +1130,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
       auto *arg = cast<SILPhiArgument>(currentValue);
       auto *termInst = arg->getSingleTerminator();
       assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
+             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
       assert(termInst->getNumOperands() == 1 &&
              "Transformation terminators should only have single operands");
       currentValue = termInst->getAllOperands()[0].get();
@@ -1183,7 +1183,7 @@ bool swift::getAllOwnedValueIntroducers(
       auto *arg = cast<SILPhiArgument>(value);
       auto *termInst = arg->getSingleTerminator();
       assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
+             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
       assert(termInst->getNumOperands() == 1 &&
              "Transforming terminators should always have a single operand");
       worklist.push_back(termInst->getAllOperands()[0].get());
@@ -1231,7 +1231,7 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
       auto *arg = cast<SILPhiArgument>(currentValue);
       auto *termInst = arg->getSingleTerminator();
       assert(termInst && termInst->isTransformationTerminator() &&
-             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
+             OwnershipForwardingMixin::get(termInst)->preservesOwnership());
       assert(termInst->getNumOperands()
              - termInst->getNumTypeDependentOperands() == 1 &&
              "Transformation terminators should only have single operands");

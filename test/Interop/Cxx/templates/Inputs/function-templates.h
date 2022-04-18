@@ -44,6 +44,22 @@ decltype(auto) testAuto(T arg) {
   return arg;
 }
 
+template <typename T>
+struct ClassTemplate {
+  T t;
+};
+
+template <typename T>
+void takesPointerToDependent(ClassTemplate<T> *ct) {
+  ct->t++;
+}
+
+template <typename T>
+T usedInDeclType(T) {}
+
+template <typename T>
+void takesDeclTypePointer(decltype(usedInDeclType<T>()) *) {}
+
 // TODO: Add tests for Decltype, UnaryTransform, and TemplateSpecialization with
 // a dependent type once those are supported.
 

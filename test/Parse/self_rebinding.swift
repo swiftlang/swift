@@ -126,3 +126,8 @@ enum EnumCaseNamedSelf {
         self = EnumCaseNamedSelf.`self` // OK
     }
 }
+
+// rdar://90624344 - warning about `self` which cannot be fixed because it's located in implicitly generated code.
+struct TestImplicitSelfUse : Codable {
+  let `self`: Int // Ok
+}

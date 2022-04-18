@@ -519,3 +519,15 @@ case test(cond: Bool, v: Int64)
     }
   }
 }
+
+// SR-15970
+protocol SR15970_P {}
+struct SR15970_S {}
+
+func SR15970_F(x: Int) -> SR15970_P {
+  return SR15970_S() // expected-error{{return expression of type 'SR15970_S' does not conform to 'SR15970_P'}}
+}
+
+func SR15970_F1(x: Int) -> SR15970_P? {
+  return SR15970_S() // expected-error{{return expression of type 'SR15970_S' does not conform to 'SR15970_P'}}
+}
