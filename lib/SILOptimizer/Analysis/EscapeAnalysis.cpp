@@ -1035,23 +1035,10 @@ EscapeAnalysis::ConnectionGraph::getOrCreateReferenceContent(SILValue refVal,
 
   // Determine whether the object that refVal refers to only contains
   // references.
-  bool contentHasReferenceOnly = false;
-  if (refVal) {
-    SILType refType = refVal->getType();
-    if (auto *C = refType.getClassOrBoundGenericClass()) {
-      PointerKind aggregateKind = NoPointer;
-      for (auto *field : C->getStoredProperties()) {
-        SILType fieldType = refType
-                                .getFieldType(field, F->getModule(),
-                                              F->getTypeExpansionContext())
-                                .getObjectType();
-        PointerKind fieldKind = EA->findCachedPointerKind(fieldType, *F);
-        if (fieldKind > aggregateKind)
-          aggregateKind = fieldKind;
-      }
-      contentHasReferenceOnly = canOnlyContainReferences(aggregateKind);
-    }
-  }
+  bool contentHasReferenceOnly =
+      refVal ? canOnlyContainReferences(
+          EA->findCachedClassPropertiesKind(refVal->getType(), *F))
+             : false;
   getOrCreateContentNode(objNode, false, contentHasReferenceOnly);
   return objNode;
 }
