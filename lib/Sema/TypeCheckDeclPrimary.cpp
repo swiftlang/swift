@@ -2441,6 +2441,12 @@ public:
 
   /// Check that all stored properties have in-class initializers.
   void checkRequiredInClassInits(ClassDecl *cd) {
+    // Initializers may be omitted from property declarations in module
+    // interface files so don't diagnose in them.
+    SourceFile *sourceFile = cd->getDeclContext()->getParentSourceFile();
+    if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+      return;
+
     ClassDecl *source = nullptr;
     for (auto member : cd->getMembers()) {
       auto pbd = dyn_cast<PatternBindingDecl>(member);
