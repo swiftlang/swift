@@ -3374,7 +3374,7 @@ public:
     return known->second;
   }
 
-  /// Retrieve type type of the given declaration to be used in
+  /// Retrieve type of the given declaration to be used in
   /// constraint system, this is better than calling `getType()`
   /// directly because it accounts of constraint system flags.
   Type getVarType(const VarDecl *var);
