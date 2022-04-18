@@ -1072,7 +1072,7 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
 
   // TODO: we could use the ClassHierarchyAnalysis do also handle "effectively"
   // final classes, e.g. not-subclassed internal classes in WMO.
-  // This would need some re-architecting of ClassHierarchyAnalysis to make it
+  // This would need some rearchitecting of ClassHierarchyAnalysis to make it
   // available in IRGen.
   ClassDecl *toClass = classTy->getDecl();
   if (!toClass->isFinal())
