@@ -527,6 +527,7 @@ UnsafeRawBufferPointerTestSuite.test("load.unaligned")
   if #available(SwiftStdlib 5.7, *) { return false } else { return true }
 }, reason: "Requires stdlib from Swift 5.7"))
 .code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   var data: [UInt8] = [0, 0, 0, .max, .max, .max, .max, 0]
   let i = data.firstIndex(of: .max)!
   data.withUnsafeBytes {
