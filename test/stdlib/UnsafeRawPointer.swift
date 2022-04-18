@@ -100,6 +100,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.unaligned")
   return true
 }, reason: "Requires Swift 5.7's stdlib"))
 .code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   var data: [UInt8] = [0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0x0]
   var result: UInt32
   result = data.withUnsafeBytes {
