@@ -694,7 +694,7 @@ extension _StringObject {
    - Older binaries will not look at newly assigned bits, and they will not
      set them, either (unless by side effect of calling into newly built code).
      Such code must continue working.
-   - Code in new versions of the stdlib must continue to work corectly even if
+   - Code in new versions of the stdlib must continue to work correctly even if
      some of these newly assigned bits are never set -- as may be the case when
      the initialization of a string was emitted entirely into an older client
      binary.
