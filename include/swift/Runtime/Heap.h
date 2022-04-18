@@ -91,7 +91,7 @@ struct aligned_alloc<Alignment_, true> {
 
 #if defined(_WIN32)
   // FIXME: why is this even needed?  This is not permitted as per the C++
-  // standrd new.delete.placement (§17.6.3.4).
+  // standard new.delete.placement (§17.6.3.4).
   [[nodiscard]] void *operator new(std::size_t size, void *where) noexcept {
     return ::operator new(size, where);
   }
