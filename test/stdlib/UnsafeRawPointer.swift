@@ -137,6 +137,35 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.invalid.mutable")
   expectUnreachable()
 }
 
+UnsafeMutableRawPointerExtraTestSuite.test("store.unaligned")
+.skip(.custom({
+  if #available(SwiftStdlib 5.7, *) { return false }
+  return true
+}, reason: "Requires Swift 5.7's stdlib"))
+.code {
+  let count = MemoryLayout<UInt>.stride * 2
+  let p1 = UnsafeMutableRawPointer.allocate(
+    byteCount: count,
+    alignment: MemoryLayout<UInt>.alignment
+  )
+  defer { p1.deallocate() }
+  Array(repeating: UInt8.zero, count: count).withUnsafeBufferPointer {
+    p1.copyBytes(from: UnsafeRawPointer($0.baseAddress!), count: $0.count)
+  }
+  let value = UInt.max
+  let offset = 3
+  p1.storeBytes(of: value, toByteOffset: offset, as: UInt.self)
+  expectEqual(p1.load(fromByteOffset: offset-1, as: UInt8.self),
+              0)
+  expectEqual(p1.load(fromByteOffset: offset, as: UInt8.self),
+              .max)
+  let storedLength = MemoryLayout<UInt>.size
+  expectEqual(p1.load(fromByteOffset: offset-1+storedLength, as: UInt8.self),
+              .max)
+  expectEqual(p1.load(fromByteOffset: offset+storedLength, as: UInt8.self),
+              0)
+}
+
 UnsafeMutableRawPointerExtraTestSuite.test("store.invalid")
 .skip(.custom({ !_isDebugAssertConfiguration() },
               reason: "This tests a debug precondition.."))
