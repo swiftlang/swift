@@ -1148,7 +1148,7 @@ public:
   /// 'unavailable' in Swift.
   bool isUnavailableInSwift(const clang::Decl *decl) {
     return importer::isUnavailableInSwift(
-        decl, platformAvailability, SwiftContext.LangOpts.EnableObjCInterop);
+        decl, &platformAvailability, SwiftContext.LangOpts.EnableObjCInterop);
   }
 
   /// Add "Unavailable" annotation to the swift declaration.

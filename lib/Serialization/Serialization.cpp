@@ -3091,8 +3091,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
     case PatternKind::Any: {
       unsigned abbrCode = S.DeclTypeAbbrCodes[AnyPatternLayout::Code];
+      auto anyPattern = cast<AnyPattern>(pattern);
       AnyPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   S.addTypeRef(getPatternType()));
+                                   S.addTypeRef(getPatternType()),
+                                   anyPattern->isAsyncLet());
       break;
     }
     case PatternKind::Typed: {

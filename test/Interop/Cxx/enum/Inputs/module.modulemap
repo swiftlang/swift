@@ -7,3 +7,8 @@ module ScopedEnums {
   header "scoped-enums.h"
   requires cplusplus
 }
+
+module AnonymousWithSwiftName {
+  header "anonymous-with-swift-name.h"
+  requires cplusplus
+}

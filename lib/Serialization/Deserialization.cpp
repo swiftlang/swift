@@ -347,9 +347,13 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   }
   case decls_block::ANY_PATTERN: {
     TypeID typeID;
+    bool isAsyncLet;
 
-    AnyPatternLayout::readRecord(scratch, typeID);
+    AnyPatternLayout::readRecord(scratch, typeID, isAsyncLet);
     auto result = AnyPattern::createImplicit(getContext());
+    if (isAsyncLet) {
+      result->setIsAsyncLet();
+    }
     recordPatternType(result, getType(typeID));
     restoreOffset.reset();
     return result;
