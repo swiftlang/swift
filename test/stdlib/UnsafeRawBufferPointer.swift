@@ -562,6 +562,33 @@ UnsafeRawBufferPointerTestSuite.test("store.after")
   }
 }
 
+UnsafeRawBufferPointerTestSuite.test("store.unaligned")
+.skip(.custom({
+  if #available(SwiftStdlib 5.7, *) { return false }
+  return true
+}, reason: "Requires Swift 5.7's stdlib"))
+.code {
+  let count = MemoryLayout<UInt>.stride * 2
+  let p1 = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: count,
+    alignment: MemoryLayout<UInt>.alignment
+  )
+  defer { p1.deallocate() }
+  p1.copyBytes(from: repeatElement(UInt8.zero, count: count))
+  let value = UInt.max
+  let offset = 3
+  p1.storeBytes(of: value, toByteOffset: offset, as: UInt.self)
+  expectEqual(p1.load(fromByteOffset: offset-1, as: UInt8.self),
+              0)
+  expectEqual(p1.load(fromByteOffset: offset, as: UInt8.self),
+              .max)
+  let storedLength = MemoryLayout<UInt>.size
+  expectEqual(p1.load(fromByteOffset: offset-1+storedLength, as: UInt8.self),
+              .max)
+  expectEqual(p1.load(fromByteOffset: offset+storedLength, as: UInt8.self),
+              0)
+}
+
 UnsafeRawBufferPointerTestSuite.test("store.invalid")
 .skip(.custom({ !_isDebugAssertConfiguration() }, // require debugAssert
               reason: "This tests a debug precondition.."))
