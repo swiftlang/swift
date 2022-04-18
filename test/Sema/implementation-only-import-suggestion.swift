@@ -11,12 +11,12 @@
 // RUN:   %t/sdk/System/Library/PrivateFrameworks/PrivateSwift.framework/Modules/PrivateSwift.swiftmodule/source.swift \
 // RUN:   -o %t/sdk/System/Library/PrivateFrameworks/PrivateSwift.framework/Modules/PrivateSwift.swiftmodule/%target-swiftmodule-name
 
-/// Expect warnings when building a public client.
+/// Expect errors when building a public client.
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -library-level api -verify -D PUBLIC_IMPORTS -module-name MainLib
 
-/// Expect no warnings when building an SPI client.
+/// Expect no errors when building an SPI client.
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -library-level spi -D PUBLIC_IMPORTS -module-name MainLib
@@ -26,7 +26,7 @@
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -library-level spi -D PUBLIC_IMPORTS -module-name MainLib
 
-/// Expect no warnings when building a client with some other library level.
+/// Expect no errors when building a client with some other library level.
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -D PUBLIC_IMPORTS -module-name MainLib
@@ -42,7 +42,7 @@ import PublicClang_Private // expected-error{{private module 'PublicClang_Privat
 import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'MainLib'}}
 @_exported import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}
 
-/// Expect no warnings with implementation-only imports.
+/// Expect no errors with implementation-only imports.
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -library-level api -D IMPL_ONLY_IMPORTS
