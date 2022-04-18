@@ -53,3 +53,6 @@
 // CHECK:   @available(swift, obsoleted: 3, renamed: "all")
 // CHECK:   static var All: CFColorMask { get }
 // CHECK: }
+
+// CHECK: func useSOColorMask(_ mask: SOColorMask) -> SOColorMask
+// CHECK: func useCFColorMask(_ mask: CFColorMask) -> CFColorMask
