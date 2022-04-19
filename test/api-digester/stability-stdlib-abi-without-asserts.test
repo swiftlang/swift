@@ -67,6 +67,20 @@ Protocol Error has added inherited protocol Sendable
 Protocol Error has generic signature change from to <Self : Swift.Sendable>
 Enum Never has added a conformance to an existing protocol Identifiable
 
+
+Struct String.UTF16View has added a conformance to an existing protocol Equatable
+Struct String.UTF16View has added a conformance to an existing protocol Hashable
+Struct String.UTF8View has added a conformance to an existing protocol Equatable
+Struct String.UTF8View has added a conformance to an existing protocol Hashable
+Struct String.UnicodeScalarView has added a conformance to an existing protocol Equatable
+Struct String.UnicodeScalarView has added a conformance to an existing protocol Hashable
+Struct Substring.UTF16View has added a conformance to an existing protocol Equatable
+Struct Substring.UTF16View has added a conformance to an existing protocol Hashable
+Struct Substring.UTF8View has added a conformance to an existing protocol Equatable
+Struct Substring.UTF8View has added a conformance to an existing protocol Hashable
+Struct Substring.UnicodeScalarView has added a conformance to an existing protocol Equatable
+Struct Substring.UnicodeScalarView has added a conformance to an existing protocol Hashable
+
 // These haven't actually been removed; they are simply marked unavailable.
 // This seems to be a false positive in the ABI checker. This is not an ABI
 // break because the symbols are still present, and is not a source break
