@@ -4875,11 +4875,21 @@ public:
     return getImplInfo().supportsMutation();
   }
 
-  /// isSettable - Determine whether references to this decl may appear
-  /// on the left-hand side of an assignment or as the operand of a
-  /// `&` or 'inout' operator.
+  /// Determine whether references to this storage declaration may appear
+  /// on the left-hand side of an assignment, as the operand of a
+  /// `&` or 'inout' operator, or as a component in a writable key path.
   bool isSettable(const DeclContext *UseDC,
                   const DeclRefExpr *base = nullptr) const;
+
+  /// Determine whether references to this storage declaration in Swift may
+  /// appear on the left-hand side of an assignment, as the operand of a
+  /// `&` or 'inout' operator, or as a component in a writable key path.
+  ///
+  /// This method is equivalent to \c isSettable with the exception of
+  /// 'optional' storage requirements, which lack support for direct writes
+  /// in Swift.
+  bool isSettableInSwift(const DeclContext *UseDC,
+                         const DeclRefExpr *base = nullptr) const;
 
   /// Does this storage declaration have explicitly-defined accessors
   /// written in the source?
@@ -7987,6 +7997,17 @@ inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
 
   auto sd = cast<SubscriptDecl>(this);
   return sd->supportsMutation();
+}
+
+inline bool
+AbstractStorageDecl::isSettableInSwift(const DeclContext *UseDC,
+                                       const DeclRefExpr *base) const {
+  // TODO: Writing to an optional storage requirement is not supported in Swift.
+  if (getAttrs().hasAttribute<OptionalAttr>()) {
+    return false;
+  }
+
+  return isSettable(UseDC, base);
 }
 
 inline void
