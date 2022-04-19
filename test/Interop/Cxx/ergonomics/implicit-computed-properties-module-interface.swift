@@ -41,8 +41,8 @@
 // CHECK-NOT:     var
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    init(value: Int32)
-// CHECK-NEXT:    var foo: Int32 { mutating get set }
-// CHECK-NEXT:    mutating func getfoo() -> Int32
+// CHECK-NEXT:    var foo: Int32
+// CHECK-NEXT:    func getfoo() -> Int32
 // CHECK-NEXT:    mutating func setfoo(_ v: Int32)
 // CHECK-NEXT:    var value: Int32
 // CHECK-NEXT: }
@@ -50,8 +50,8 @@
 // CHECK:      struct LongNameAllUpper {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:     init(value: Int32)
-// CHECK-NEXT:     var foo: Int32 { mutating get set }
-// CHECK-NEXT:     mutating func getFOO() -> Int32
+// CHECK-NEXT:     var foo: Int32
+// CHECK-NEXT:     func getFOO() -> Int32
 // CHECK-NEXT:     mutating func setFOO(_ v: Int32)
 // CHECK-NEXT:     var value: Int32
 // CHECK-NEXT: }
@@ -59,8 +59,8 @@
 // CHECK:      struct UpperCaseMix {
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    init(value: Int32)
-// CHECK-NEXT:    var foo: Int32 { mutating get set }
-// CHECK-NEXT:    mutating func getFoo() -> Int32
+// CHECK-NEXT:    var foo: Int32
+// CHECK-NEXT:    func getFoo() -> Int32
 // CHECK-NEXT:    mutating func SetFoo(_ v: Int32)
 // CHECK-NEXT:    var value: Int32
 // CHECK-NEXT: }
@@ -68,8 +68,8 @@
 // CHECK:      struct UpperCaseGetterSetter {
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    init(value: Int32)
-// CHECK-NEXT:    var foo: Int32 { mutating get set }
-// CHECK-NEXT:    mutating func GetFoo() -> Int32
+// CHECK-NEXT:    var foo: Int32
+// CHECK-NEXT:    func GetFoo() -> Int32
 // CHECK-NEXT:    mutating func SetFoo(_ v: Int32)
 // CHECK-NEXT:    var value: Int32
 // CHECK-NEXT: }
@@ -176,19 +176,20 @@
 // CHECK-NEXT:    var val: Int32
 // CHECK-NEXT: }
 
-// CHECK:      struct ConstSetter {
-// CHECK-NEXT:    init()
-// CHECK-NEXT:    init(val: Int32)
-// CHECK-NEXT:    var x: Int32 { mutating get set }
-// CHECK-NEXT:    mutating func getX() -> Int32
-// CHECK-NEXT:    mutating func setX(_ v: Int32)
-// CHECK-NEXT:    var val: Int32
-// CHECK-NEXT: }
+// FIXME: rdar91961524
+// TODO-CHECK:      struct ConstSetter {
+// TODO-CHECK-NEXT:    init()
+// TODO-CHECK-NEXT:    init(val: Int32)
+// TODO-CHECK-NEXT:    var x: Int32 { mutating get set }
+// TODO-CHECK-NEXT:    mutating func getX() -> Int32
+// TODO-CHECK-NEXT:    mutating func setX(_ v: Int32)
+// TODO-CHECK-NEXT:    var val: Int32
+// TODO-CHECK-NEXT: }
 
 // CHECK:      struct MultipleArgsSetter {
 // CHECK-NEXT:    init()
-// CHECK-NEXT:    var x: Int32 { mutating get set }
-// CHECK-NEXT:    mutating func getXMutating() -> Int32
+// CHECK-NEXT:    var x: Int32
+// CHECK-NEXT:    func getX() -> Int32
 // CHECK-NEXT:    mutating func setXMutating(_ a: Int32, _ b: Int32)
 // CHECK-NEXT: }
 
