@@ -865,7 +865,7 @@ extension Slice {
   @_alwaysEmitIntoClient
   public func withMemoryRebound<T, Result, Element>(
     to type: T.Type, _ body: (UnsafeMutableBufferPointer<T>) throws -> Result
-  ) rethrows -> Result where Base == UnsafeMutableBufferPointer<Element>{
+  ) rethrows -> Result where Base == UnsafeMutableBufferPointer<Element> {
     try Base(rebasing: self).withMemoryRebound(to: T.self, body)
   }
 
