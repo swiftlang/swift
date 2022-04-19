@@ -750,8 +750,7 @@ void CompletionLookup::analyzeActorIsolation(
     // For "unsafe" global actor isolation, automatic 'async' only happens
     // if the context has adopted concurrency.
     if (!CanCurrDeclContextHandleAsync &&
-        !completionContextUsesConcurrencyFeatures(CurrDeclContext) &&
-        !CurrDeclContext->getParentModule()->isConcurrencyChecked()) {
+        !completionContextUsesConcurrencyFeatures(CurrDeclContext)) {
       return;
     }
     LLVM_FALLTHROUGH;
@@ -769,7 +768,7 @@ void CompletionLookup::analyzeActorIsolation(
   }
 
   // If the reference is 'async', all types must be 'Sendable'.
-  if (CurrDeclContext->getParentModule()->isConcurrencyChecked() &&
+  if (Ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::On &&
       implicitlyAsync && T) {
     auto *M = CurrDeclContext->getParentModule();
     if (isa<VarDecl>(VD)) {
