@@ -106,3 +106,15 @@ func test_fail_without_universally_available_type() -> some P {
     return Y()
   }
 }
+
+// Treat `if #unavailable` like regular conditions.
+func test_fail_with_unavailability_condition() -> some P {
+  // expected-error@-1 {{function declares an opaque return type 'some P', but the return statements in its body do not have matching underlying types}}
+  // expected-note@-2 {{add @available attribute to enclosing global function}}
+  if #unavailable(macOS 12) {
+    return X() // expected-error {{'X' is only available in macOS 11.0 or newer}} expected-note {{return statement has underlying type 'X'}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  }
+
+  return Y() // expected-note {{return statement has underlying type 'Y'}}
+}
