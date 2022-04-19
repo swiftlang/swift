@@ -430,7 +430,7 @@ and crashes are acceptable in their wake.)
 
 However, addressors are not atomic in this way: they return an address
 to the caller, which may then interleave arbitrary code before
-completing the operation.  This can present the opportunity for
+completion the operation.  This can present the opportunity for
 corruption if the interleaved code modifies the original value.
 Consider the following code::
 
