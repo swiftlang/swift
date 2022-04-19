@@ -415,8 +415,15 @@ extension String.UTF16View.Index {
 
     if _slowPath(target._guts.isForeign) {
       guard idx._foreignIsWithin(target) else { return nil }
-    } else {
-      guard target._guts.isOnUnicodeScalarBoundary(idx) else { return nil }
+    } else { // fast UTF-8
+      guard (
+        // If the transcoded offset is non-zero, then `idx` addresses a trailing
+        // surrogate, so its encoding offset is on a scalar boundary, and it's a
+        // valid UTF-16 index.
+        idx.transcodedOffset != 0
+        /// Otherwise we need to reject indices that aren't scalar aligned.
+        || target._guts.isOnUnicodeScalarBoundary(idx)
+      ) else { return nil }
     }
 
     self = idx
