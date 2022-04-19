@@ -170,7 +170,7 @@ public struct LocalTestingInvocationEncoder: DistributedTargetInvocationEncoder 
 }
 
 @available(SwiftStdlib 5.7, *)
-public class LocalTestingInvocationDecoder : DistributedTargetInvocationDecoder {
+public final class LocalTestingInvocationDecoder: DistributedTargetInvocationDecoder {
   public typealias SerializationRequirement = Codable
 
   public func decodeGenericSubstitutions() throws -> [Any.Type] {
