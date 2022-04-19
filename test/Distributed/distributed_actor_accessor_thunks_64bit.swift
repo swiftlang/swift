@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name distributed_actor_accessors -emit-irgen -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s -check-prefix CHECK-%target-import-type --dump-input=always
+// RUN: %target-swift-frontend -module-name distributed_actor_accessors -emit-irgen -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s -check-prefix CHECK-%target-import-type
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
@@ -119,7 +119,7 @@ public distributed actor MyOtherActor {
 // CHECK: missing-witness1:
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: unreachable
-// CHECK: call swiftcc void @"$s27FakeDistributedActorSystems0A17InvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"(%swift.opaque* noalias nocapture sret(%swift.opaque) %25, %swift.type* %arg_type, i8** %26, i8** %29, %T27FakeDistributedActorSystems0A17InvocationDecoderC* swiftself %15, %swift.error** noalias nocapture swifterror dereferenceable(8) %swifterror)
+// CHECK: call swiftcc void @"$s27FakeDistributedActorSystems0A17InvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"(%swift.opaque* noalias nocapture sret(%swift.opaque) [[ARG_0_RES_SLOT]], %swift.type* %arg_type, i8** [[ENCODABLE_WITNESS]], i8** [[DECODABLE_WITNESS]], %T27FakeDistributedActorSystems0A17InvocationDecoderC* swiftself [[DECODER]], %swift.error** noalias nocapture swifterror dereferenceable(8) %swifterror)
 
 // CHECK: store %swift.error* null, %swift.error** %swifterror
 // CHECK-NEXT: [[ARG_0_VAL_ADDR:%.*]] = bitcast i8* [[ARG_0_VALUE_BUF]] to %TSi*

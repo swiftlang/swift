@@ -119,7 +119,7 @@ public distributed actor MyOtherActor {
 // CHECK: missing-witness1:
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: unreachable
-// CHECK: call swiftcc void [[DECODE_NEXT_ARG]](%swift.opaque* noalias nocapture sret(%swift.opaque) [[ARG_0_RES_SLOT]], %swift.type* %arg_type, i8** [[ENCODABLE_WITNESS]], i8** [[DECODABLE_WITNESS]], %T27FakeDistributedActorSystems0A17InvocationDecoderC* swiftself [[DECODER]], %swift.error** noalias nocapture dereferenceable(4) %swifterror)
+// CHECK: call swiftcc void @"$s27FakeDistributedActorSystems0A17InvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"(%swift.opaque* noalias nocapture sret(%swift.opaque) [[ARG_0_RES_SLOT]], %swift.type* %arg_type, i8** [[ENCODABLE_WITNESS]], i8** [[DECODABLE_WITNESS]], %T27FakeDistributedActorSystems0A17InvocationDecoderC* swiftself [[DECODER]], %swift.error** noalias nocapture dereferenceable(4) %swifterror)
 
 // CHECK: store %swift.error* null, %swift.error** %swifterror
 // CHECK-NEXT: [[ARG_0_VAL_ADDR:%.*]] = bitcast i8* [[ARG_0_VALUE_BUF]] to %TSi*
