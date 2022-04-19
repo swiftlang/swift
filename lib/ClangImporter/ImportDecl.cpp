@@ -3772,6 +3772,12 @@ namespace {
       if (!Impl.SwiftContext.LangOpts.EnableCXXInterop)
         return VisitRecordDecl(decl);
 
+      decl = decl->getDefinition();
+      if (!decl) {
+        forwardDeclaration = true;
+        return nullptr;
+      }
+
       auto &clangSema = Impl.getClangSema();
       // Make Clang define any implicit constructors it may need (copy,
       // default). Make sure we only do this if the class has been fully defined
