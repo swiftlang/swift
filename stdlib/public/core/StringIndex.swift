@@ -336,7 +336,7 @@ extension String.Index {
 // (The sequence of characters in a substring depend only on the Unicode scalars
 // that make up its contents, not on their surrounding context.) Therefore, such
 // substrings must not look at or set this bit: indices must be reliably
-// interchangable between strings and their associated substrings, even if the
+// interchangeable between strings and their associated substrings, even if the
 // latter are irregular.
 //
 // Note that `startIndex` and `endIndex` have fully inlinable implementations.

@@ -2036,7 +2036,7 @@ where Magnitude: FixedWidthInteger & UnsignedInteger,
   ///     // result.low  == 128
   ///
   /// The product of `x` and `y` is `-1920`, which is too large to represent in
-  /// an `Int8` instance. The `high` and `low` compnents of the `result` value
+  /// an `Int8` instance. The `high` and `low` components of the `result` value
   /// represent `-1920` when concatenated to form a double-width integer; that
   /// is, using `result.high` as the high byte and `result.low` as the low byte
   /// of an `Int16` instance.
