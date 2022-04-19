@@ -2628,17 +2628,27 @@ LibraryLevel
 ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
                                     const ModuleDecl *module) const {
   auto &ctx = module->getASTContext();
+  namespace path = llvm::sys::path;
+  SmallString<128> scratch;
+
+  /// Is \p path under the folder SDK/a/b/c/d/e?
+  auto hasSDKPrefix =
+    [&](StringRef path, const Twine &a, const Twine &b = "",
+        const Twine &c = "", const Twine &d = "", const Twine &e = "") {
+    scratch = ctx.SearchPathOpts.getSDKPath();
+    path::append(scratch, a, b, c, d);
+    path::append(scratch, e);
+    return path.startswith(scratch);
+  };
 
   /// Is \p modulePath from System/Library/PrivateFrameworks/?
   auto fromPrivateFrameworks = [&](StringRef modulePath) -> bool {
     if (!ctx.LangOpts.Target.isOSDarwin()) return false;
 
-    namespace path = llvm::sys::path;
-    SmallString<128> scratch;
-    scratch = ctx.SearchPathOpts.getSDKPath();
-    path::append(scratch, "System", "Library", "PrivateFrameworks");
-    return hasPrefix(path::begin(modulePath), path::end(modulePath),
-                     path::begin(scratch), path::end(scratch));
+    return hasSDKPrefix(modulePath, "AppleInternal", "Library", "Frameworks") ||
+           hasSDKPrefix(modulePath, "System", "Library", "PrivateFrameworks") ||
+           hasSDKPrefix(modulePath, "System", "iOSSupport", "System", "Library", "PrivateFrameworks") ||
+           hasSDKPrefix(modulePath, "usr", "local", "include");
   };
 
   if (module->isNonSwiftModule()) {
@@ -2646,8 +2656,7 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
       // Imported clangmodules are SPI if they are defined by a private
       // modulemap or from the PrivateFrameworks folder in the SDK.
       bool moduleIsSPI = underlying->ModuleMapIsPrivate ||
-                         (underlying->isPartOfFramework() &&
-                          fromPrivateFrameworks(underlying->PresumedModuleMapFile));
+                         fromPrivateFrameworks(underlying->PresumedModuleMapFile);
       return moduleIsSPI ? LibraryLevel::SPI : LibraryLevel::API;
     }
     return LibraryLevel::Other;
