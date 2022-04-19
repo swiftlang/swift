@@ -35,17 +35,20 @@ func cContext() {
     let c = SR12723_C { app in app() }
 
     proxy(c.function)
-    // expected-error@-1 {{cannot convert value of type '(@convention(c) () -> Void) -> Void' to expected argument type '(() -> Void) -> Void'}}
+    // expected-error@-1 {{converting non-escaping value to '@convention(c) () -> Void' may allow it to escape}}
+    // expected-error@-2 {{cannot convert value of type '(@convention(c) () -> Void) -> Void' to expected argument type '(() -> Void) -> Void'}}
 
     let _ :  (@convention(block) () -> Void) -> Void = c.function 
-    // expected-error@-1 {{cannot convert value of type '(@convention(c) () -> Void) -> Void' to specified type '(@convention(block) () -> Void) -> Void'}}
+    // expected-error@-1 {{converting non-escaping value to '@convention(c) () -> Void' may allow it to escape}}
+    // expected-error@-2 {{cannot convert value of type '(@convention(c) () -> Void) -> Void' to specified type '(@convention(block) () -> Void) -> Void'}}
 
     let _ :  (@convention(c) () -> Void) -> Void = c.function // OK
 
     let _ :  (@convention(thin) () -> Void) -> Void = c.function // OK
     
     let _ :  (() -> Void) -> Void = c.function 
-    // expected-error@-1 {{cannot convert value of type '(@convention(c) () -> Void) -> Void' to specified type '(() -> Void) -> Void'}}
+    // expected-error@-1 {{converting non-escaping value to '@convention(c) () -> Void' may allow it to escape}}
+    // expected-error@-2 {{cannot convert value of type '(@convention(c) () -> Void) -> Void' to specified type '(() -> Void) -> Void'}}
 
 }
 
@@ -53,17 +56,20 @@ func thinContext() {
     let thin = SR12723_Thin { app in app() }
 
     proxy(thin.function) 
-    // expected-error@-1 {{cannot convert value of type '(@convention(thin) () -> Void) -> Void' to expected argument type '(() -> Void) -> Void'}}
+    // expected-error@-1 {{converting non-escaping value to '@convention(thin) () -> Void' may allow it to escape}}
+    // expected-error@-2 {{cannot convert value of type '(@escaping @convention(thin) () -> Void) -> Void' to expected argument type '(() -> Void) -> Void'}}
 
     let _ :  (@convention(block) () -> Void) -> Void = thin.function 
-    // expected-error@-1 {{cannot convert value of type '(@convention(thin) () -> Void) -> Void' to specified type '(@convention(block) () -> Void) -> Void'}}
+    // expected-error@-1 {{converting non-escaping value to '@convention(thin) () -> Void' may allow it to escape}}
+    // expected-error@-2 {{cannot convert value of type '(@escaping @convention(thin) () -> Void) -> Void' to specified type '(@convention(block) () -> Void) -> Void'}}
 
     let _ :  (@convention(c) () -> Void) -> Void = thin.function // OK 
 
     let _ :  (@convention(thin) () -> Void) -> Void = thin.function // OK
 
     let _ :  (() -> Void) -> Void = thin.function 
-    // expected-error@-1 {{cannot convert value of type '(@convention(thin) () -> Void) -> Void' to specified type '(() -> Void) -> Void'}}
+    // expected-error@-1 {{converting non-escaping value to '@convention(thin) () -> Void' may allow it to escape}}
+    // expected-error@-2 {{cannot convert value of type '(@escaping @convention(thin) () -> Void) -> Void' to specified type '(() -> Void) -> Void'}}
 }
 
 func blockContext() {
