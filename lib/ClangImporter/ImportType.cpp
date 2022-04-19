@@ -2465,6 +2465,19 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
           return DefaultArgumentKind::EmptyArray;
       }
     }
+  } else if (const clang::TypedefType *typedefType =
+                 type->getAs<clang::TypedefType>()) {
+    // Get the AvailabilityAttr that would be set from CF/NS_OPTIONS
+    if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
+      // If we've taken this branch it means we have an enum type, and it is
+      // likely an integer or NSInteger that is being used by NS/CF_OPTIONS to
+      // behave like a C enum in the presence of C++.
+      auto enumName = typedefType->getDecl()->getDeclName().getAsString();
+      for (auto word : llvm::reverse(camel_case::getWords(enumName))) {
+        if (camel_case::sameWordIgnoreFirstCase(word, "options"))
+          return DefaultArgumentKind::EmptyArray;
+      }
+    }
   }
 
   // NSDictionary arguments default to [:] (or nil, if nullable) if "options",
