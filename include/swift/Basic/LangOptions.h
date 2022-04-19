@@ -58,6 +58,19 @@ namespace swift {
     Complete,
   };
 
+  /// Describes how strict concurrency checking should be.
+  enum class StrictConcurrency {
+    /// Turns off strict checking, which disables (e.g.) Sendable checking in
+    /// most cases.
+    Off,
+    /// Enables concurrency checking in a limited manner that is intended to
+    /// only affect code that has already adopted the concurrency model.
+    Limited,
+    /// Enables strict concurrency checking throughout the entire model,
+    /// providing an approximation of the fully-checked model.
+    On
+  };
+
   /// Access or distribution level of a library.
   enum class LibraryLevel : uint8_t {
     /// Application Programming Interface that is publicly distributed so
@@ -310,11 +323,8 @@ namespace swift {
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
-    /// Provide additional warnings about code that is unsafe in the
-    /// eventual Swift concurrency model, and will eventually become errors
-    /// in a future Swift language version, but are too noisy for existing
-    /// language modes.
-    bool WarnConcurrency = false;
+    /// Specifies how strict concurrency checking will be.
+    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Limited;
 
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
