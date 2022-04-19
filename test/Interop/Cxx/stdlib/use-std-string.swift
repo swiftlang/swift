@@ -17,7 +17,7 @@ import std.string
 var StdStringTestSuite = TestSuite("StdString")
 
 StdStringTestSuite.test("init") {
-    var s = CxxString() // declared as `var` because of outdated libstdc++ on CentOS 7
+    let s = CxxString()
     expectEqual(s.size(), 0)
     expectTrue(s.empty())
 }
