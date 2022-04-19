@@ -1246,7 +1246,7 @@ public:
   }
 };
 
-/// Ignores any failures after the code comletion token.
+/// Ignores any failures after the code completion token.
 class CompletionArgumentTracker : public ArgumentFailureTracker {
   struct CompletionArgInfo ArgInfo;
 
