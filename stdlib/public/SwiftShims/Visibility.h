@@ -121,7 +121,7 @@
 // are known to be exported from a different image.  This never
 // includes a definition.
 //
-// Getting the right attribute on a declaratioon can be pretty awkward,
+// Getting the right attribute on a declaration can be pretty awkward,
 // but it's necessary under the C translation model.  All of this
 // ceremony is familiar to Windows programmers; C/C++ programmers
 // everywhere else usually don't bother, but since we have to get it

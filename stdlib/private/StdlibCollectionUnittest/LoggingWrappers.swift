@@ -195,7 +195,7 @@ public struct LoggingSequence<Base : Sequence> {
 
 extension LoggingSequence: LoggingType {
   // I know, I know. It doesn't matter though. The benefit of the whole logging
-  // class hiearchy is unclear...
+  // class hierarchy is unclear...
   public typealias Log = SequenceLog
 
   public init(wrapping base: Base) {

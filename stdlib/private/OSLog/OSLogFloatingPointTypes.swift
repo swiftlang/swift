@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // This file defines extensions for interpolating floating-point expressions
-// into an OSLogMesage. It defines `appendInterpolation` functions for standard
+// into an OSLogMessage. It defines `appendInterpolation` functions for standard
 // floating-point types. It also defines extensions for serializing floating-
 // point types into the argument buffer passed to os_log ABIs.
 //

@@ -239,7 +239,7 @@ Describes contributions which fix code that is not executed
 Provides context for interpreting a type that may have generic parameters
 in it. Generic parameter types are normally just represented as "first
 generic parameter in the outermost context" (or similar), so it's up to the
-generic environment to note that that type must be a Collection. (Another
+generic environment to note that type must be a Collection. (Another
 way of looking at it is that the generic environment connects
 [interface types](#interface-type) with
 [contextual types](#contextual-type)).

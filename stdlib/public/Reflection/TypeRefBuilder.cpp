@@ -209,7 +209,7 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
     return Found->second;
 
   // On failure, fill out the cache, ReflectionInfo by ReflectionInfo,
-  // until we find the field desciptor we're looking for.
+  // until we find the field descriptor we're looking for.
   while (FirstUnprocessedReflectionInfoIndex < ReflectionInfos.size()) {
     auto &Info = ReflectionInfos[FirstUnprocessedReflectionInfoIndex];
     for (auto FD : Info.Field) {

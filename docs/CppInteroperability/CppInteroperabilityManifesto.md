@@ -1625,7 +1625,7 @@ is ergonomics.
 
 While Swift structs are a bad match for non-movable C++ classes, Swift classes
 match semantics better. For example, instances of Swift classes, once allocated,
-stay at the same address until `deinit`. Instances of Swift clasess are always
+stay at the same address until `deinit`. Instances of Swift classes are always
 worked with indirectly, eliminating the need to move them around in memory.
 
 Although user-defined Swift classes have a certain memory layout determined by
@@ -2524,7 +2524,7 @@ there the Swift compiler infers the attribute for all users.
 This analysis relies on over-approximating the dynamic callgraph with the static
 callgraph. The static callgraph is feasible to compute in most cases, since
 Swift has very limited ways to abstract over an unspecialized generic function.
-Speicifically, Swift does not have generic closures. Swift does allow protocols
+Specifically, Swift does not have generic closures. Swift does allow protocols
 to have requirements for generic functions though.
 
 ### Function templates: importing as real generic functions
@@ -2963,7 +2963,7 @@ This brief sketch obviously leaves many questions unanswered on the detailed
 semantics that a `throws!` feature would have, for example whether user-written
 Swift code should be allowed to use `throws!` -- see also [this forum
 discussion](https://forums.swift.org/t/handling-c-exceptions/34823). Before we
-take any steps towards implementing C++ exception proagation, we will submit a
+take any steps towards implementing C++ exception propagation, we will submit a
 formal Swift Evolution proposal for the `throws!` feature.
 
 The other question to answer is how we would map the C++ exception to a

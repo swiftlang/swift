@@ -98,7 +98,7 @@ static Class _swift_getObjCClassOfAllocated(const void *object) {
 const ClassMetadata *swift::swift_getObjCClassFromObject(HeapObject *object) {
   auto classAsMetadata = _swift_getClass(object);
 
-  // Walk up the superclass chain skipping over artifical Swift classes.
+  // Walk up the superclass chain skipping over artificial Swift classes.
   // If we find a non-Swift class use the result of [object class] instead.
 
   while (classAsMetadata && classAsMetadata->isTypeMetadata()) {
@@ -129,7 +129,7 @@ const Metadata *swift::swift_getObjectType(HeapObject *object) {
   auto classAsMetadata = _swift_getClass(object);
 
 #if SWIFT_OBJC_INTEROP
-  // Walk up the superclass chain skipping over artifical Swift classes.
+  // Walk up the superclass chain skipping over artificial Swift classes.
   // If we find a non-Swift class use the result of [object class] instead.
 
   while (classAsMetadata && classAsMetadata->isTypeMetadata()) {
@@ -850,7 +850,7 @@ UnownedReference *swift::swift_unknownObjectUnownedInit(UnownedReference *dest,
                                                         void *value) {
   // Note that LLDB also needs to know about the memory layout of unowned
   // references. The implementation here needs to be kept in sync with
-  // lldb_private::SwiftLanguagueRuntime.
+  // lldb_private::SwiftLanguageRuntime.
   if (!value) {
     dest->Value = nullptr;
   } else if (isObjCForUnownedReference(value)) {
@@ -1441,21 +1441,21 @@ bool swift::swift_isUniquelyReferenced_nonNull_bridgeObject(uintptr_t bits) {
 }
 
 // Given a non-@objc object reference, return true iff the
-// object is non-nil and has a strong reference count greather than 1
+// object is non-nil and has a strong reference count greater than 1
 bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
                                                   const unsigned char *filename,
                                                   int32_t filenameLength,
                                                   int32_t line, int32_t column,
-                                                  unsigned verifcationType) {
-  assert((verifcationType == 0 || verifcationType == 1) &&
-         "Unknown verifcation type");
+                                                  unsigned verificationType) {
+  assert((verificationType == 0 || verificationType == 1) &&
+         "Unknown verification type");
 
   bool isEscaping =
       object != nullptr && !object->refCounts.isUniquelyReferenced();
 
   // Print a message if the closure escaped.
   if (isEscaping) {
-    auto *message = (verifcationType == 0)
+    auto *message = (verificationType == 0)
                         ? "closure argument was escaped in "
                           "withoutActuallyEscaping block"
                         : "closure argument passed as @noescape "
