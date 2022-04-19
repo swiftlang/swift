@@ -2125,6 +2125,20 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   ImportedType importedType;
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());
+  if (auto typedefType = dyn_cast<clang::TypedefType>(clangDecl->getReturnType().getTypePtr())) {
+    if (isUnavailableInSwift(typedefType->getDecl())) {
+      if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
+        // If this fails, it means that we need a stronger predicate for
+        // determining the relationship between an enum and typedef.
+        assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
+               typedefType->getCanonicalTypeInternal());
+        if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
+          importedType = {cast<NominalTypeDecl>(swiftEnum)->getDeclaredType(), false};
+        }
+      }
+    }
+  }
+
   if (auto templateType =
           dyn_cast<clang::TemplateTypeParmType>(clangDecl->getReturnType())) {
     importedType = {findGenericTypeInGenericDecls(
@@ -2150,11 +2164,15 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
              clangDecl->isOverloadedOperator() ||
              // Dependant types are trivially mapped as Any.
              clangDecl->getReturnType()->isDependentType()) {
-    importedType =
-        importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
+    // If importedType is already initialized, it means we found the enum that
+    // was supposed to be used (instead of the typedef type).
     if (!importedType) {
-      addDiag(Diagnostic(diag::return_type_not_imported));
-      return {Type(), false};
+      importedType =
+          importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
+      if (!importedType) {
+        addDiag(Diagnostic(diag::return_type_not_imported));
+        return {Type(), false};
+      }
     }
   }
 
@@ -2238,7 +2256,22 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     Type swiftParamTy;
     bool isParamTypeImplicitlyUnwrapped = false;
     bool isInOut = false;
-    if (isa<clang::PointerType>(paramTy) &&
+
+    // Sometimes we import unavailable typedefs as enums. If that's the case,
+    // use the enum, not the typedef here.
+    if (auto typedefType = dyn_cast<clang::TypedefType>(paramTy.getTypePtr())) {
+      if (isUnavailableInSwift(typedefType->getDecl())) {
+        if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
+          // If this fails, it means that we need a stronger predicate for
+          // determining the relationship between an enum and typedef.
+          assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
+                 typedefType->getCanonicalTypeInternal());
+          if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
+            swiftParamTy = cast<NominalTypeDecl>(swiftEnum)->getDeclaredType();
+          }
+        }
+      }
+    } else if (isa<clang::PointerType>(paramTy) &&
         isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
       auto pointeeType = paramTy->getPointeeType();
       auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
@@ -2265,20 +2298,21 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       swiftParamTy =
           findGenericTypeInGenericDecls(*this, templateParamType, genericParams,
                                         attrs, paramAddDiag);
-    } else {
-      if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
-        // We don't support reference type to a dependent type, just bail.
-        if (refType->getPointeeType()->isDependentType()) {
-          addImportDiagnostic(
-              param, Diagnostic(diag::parameter_type_not_imported, param),
-              param->getSourceRange().getBegin());
-          return nullptr;
-        }
-
-        paramTy = refType->getPointeeType();
-        if (!paramTy.isConstQualified())
-          isInOut = true;
+    } else if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
+      // We don't support reference type to a dependent type, just bail.
+      if (refType->getPointeeType()->isDependentType()) {
+        addImportDiagnostic(
+            param, Diagnostic(diag::parameter_type_not_imported, param),
+            param->getSourceRange().getBegin());
+        return nullptr;
       }
+
+      paramTy = refType->getPointeeType();
+      if (!paramTy.isConstQualified())
+        isInOut = true;
+    }
+
+    if (!swiftParamTy) {
       auto importedType = importType(paramTy, importKind, paramAddDiag,
                                      allowNSUIntegerAsInt, Bridgeability::Full,
                                      attrs, OptionalityOfParam);
