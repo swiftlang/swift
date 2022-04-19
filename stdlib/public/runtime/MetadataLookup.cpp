@@ -474,10 +474,13 @@ static bool sameObjCTypeManglings(Demangle::NodePointer node1,
 #endif
 
 /// Optimization for the case where we need to compare a StringRef and a null terminated C string
-/// Not converting s2 to a StringRef avoids the need to call both strlen and memcmp
+/// Not converting s2 to a StringRef avoids the need to call both strlen and memcmp when non-matching
+/// but equal length
 static bool stringRefEqualsCString(StringRef s1, const char *s2) {
   size_t length = s1.size();
-  return strncmp(s1.data(), s2, length) == 0 && s2[length] == '\0';
+  // It may be possible for s1 to contain embedded NULL characters
+  // so additionally validate that the lengths match
+  return strncmp(s1.data(), s2, length) == 0 && strlen(s2) == length;
 }
 
 bool
