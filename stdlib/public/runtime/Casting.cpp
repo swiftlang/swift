@@ -1248,7 +1248,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
         return objc_retain(protocolObj);
       }
     }
-  // Handle bridgable types.
+  // Handle bridgeable types.
   } else if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
     // Bridge the source value to an object.
     auto srcBridgedObject =

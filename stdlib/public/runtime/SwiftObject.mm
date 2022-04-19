@@ -850,7 +850,7 @@ UnownedReference *swift::swift_unknownObjectUnownedInit(UnownedReference *dest,
                                                         void *value) {
   // Note that LLDB also needs to know about the memory layout of unowned
   // references. The implementation here needs to be kept in sync with
-  // lldb_private::SwiftLanguagueRuntime.
+  // lldb_private::SwiftLanguageRuntime.
   if (!value) {
     dest->Value = nullptr;
   } else if (isObjCForUnownedReference(value)) {
@@ -1446,16 +1446,16 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
                                                   const unsigned char *filename,
                                                   int32_t filenameLength,
                                                   int32_t line, int32_t column,
-                                                  unsigned verifcationType) {
-  assert((verifcationType == 0 || verifcationType == 1) &&
-         "Unknown verifcation type");
+                                                  unsigned verificationType) {
+  assert((verificationType == 0 || verificationType == 1) &&
+         "Unknown verification type");
 
   bool isEscaping =
       object != nullptr && !object->refCounts.isUniquelyReferenced();
 
   // Print a message if the closure escaped.
   if (isEscaping) {
-    auto *message = (verifcationType == 0)
+    auto *message = (verificationType == 0)
                         ? "closure argument was escaped in "
                           "withoutActuallyEscaping block"
                         : "closure argument passed as @noescape "
