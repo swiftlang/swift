@@ -301,18 +301,12 @@ extension _StringGuts {
 // Encoding
 extension _StringGuts {
   /// Returns whether this string has a UTF-8 storage representation.
+  /// If this returns false, then the string is encoded in UTF-16.
   ///
   /// This always returns a value corresponding to the string's actual encoding.
   @_alwaysEmitIntoClient
   @inline(__always)
   internal var isUTF8: Bool { _object.isUTF8 }
-
-  /// Returns whether this string has a UTF-16 storage representation.
-  ///
-  /// This always returns a value corresponding to the string's actual encoding.
-  @_alwaysEmitIntoClient
-  @inline(__always)
-  internal var isUTF16: Bool { _object.isUTF16 }
 
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)

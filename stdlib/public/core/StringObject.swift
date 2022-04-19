@@ -1009,6 +1009,7 @@ extension _StringObject {
   }
 
   /// Returns whether this string has a UTF-8 storage representation.
+  /// If this returns false, then the string is encoded in UTF-16.
   ///
   /// This always returns a value corresponding to the string's actual encoding.
   @_alwaysEmitIntoClient
@@ -1028,15 +1029,6 @@ extension _StringObject {
     // Note that `providesFastUTF8` returns true for small strings, so we don't
     // need to check for smallness before accessing the `isForeignUTF8` bit.
     providesFastUTF8 || _countAndFlags.isForeignUTF8
-  }
-
-  /// Returns whether this string has a UTF-16 storage representation.
-  ///
-  /// This always returns a value corresponding to the string's actual encoding.
-  @_alwaysEmitIntoClient
-  @inline(__always) // Swift 5.7
-  internal var isUTF16: Bool {
-    !isUTF8
   }
 
   // Get access to fast UTF-8 contents for large strings which provide it.
