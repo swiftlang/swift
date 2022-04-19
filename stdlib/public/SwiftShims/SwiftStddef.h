@@ -23,7 +23,7 @@
 // found"
 // This is a known Clang/Ubuntu bug.
 //
-// On Windows, the complicated setup between clang and MSVC causes a cicular
+// On Windows, the complicated setup between clang and MSVC causes a circular
 // dependency between `ucrt` and `SwiftShims`, preventing a successful build of
 // the module.
 //

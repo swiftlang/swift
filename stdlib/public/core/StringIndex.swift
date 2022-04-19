@@ -323,7 +323,7 @@ extension String.Index {
   }
 }
 
-// ### Character (a.k.a. Extended Grapheme Cluster) Aligment
+// ### Character (a.k.a. Extended Grapheme Cluster) Alignment
 //
 // Swift 5.7 assigned a new bit denoting that an index is known to be
 // `Character`-aligned. This is used to enable more reliable detection &
