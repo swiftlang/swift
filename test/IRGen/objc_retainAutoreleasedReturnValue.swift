@@ -31,7 +31,7 @@ public func test(_ dict: NSDictionary) {
 // CHECK:   notail call i8* @llvm.objc.retainAutoreleasedReturnValue
 // CHECK:   ret void
 
-// OPT-LABEL: define {{.*}}swiftcc void @"$s34objc_retainAutoreleasedReturnValue4testyySo12NSDictionaryCFyADXEfU_"(%TSo12NSDictionaryC* %0)
+// OPT-LABEL: define {{.*}}swiftcc void @"$s34objc_retainAutoreleasedReturnValue10useClosureyySo12NSDictionaryC_yADXEtF09$s34objc_bcd16Value4testyySo12H10CFyADXEfU_Tf1nc_n"(%TSo12NSDictionaryC* %0)
 // OPT: entry:
 // OPT:   call {{.*}}@objc_msgSend
 // OPT:   notail call i8* @llvm.objc.retainAutoreleasedReturnValue

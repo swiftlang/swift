@@ -101,7 +101,7 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
   ) {
   }
   
-  // CHECK-NEXT: - (void (* _Nonnull)(SWIFT_NOESCAPE NSInteger (* _Nonnull)(NSInteger, NSInteger)))returnsFunctionPointerThatTakesFunctionPointer SWIFT_WARN_UNUSED_RESULT;
+  // CHECK-NEXT: - (void (* _Nonnull)(NSInteger (* _Nonnull)(NSInteger, NSInteger)))returnsFunctionPointerThatTakesFunctionPointer SWIFT_WARN_UNUSED_RESULT;
   @objc func returnsFunctionPointerThatTakesFunctionPointer() ->
     @convention(c) (_ comparator: @convention(c) (_ x: Int, _ y: Int) -> Int) -> Void {
     fatalError()
