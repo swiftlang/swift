@@ -608,9 +608,6 @@ static bool hasUnavailableConformance(ProtocolConformanceRef conformance) {
 }
 
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
-  if (dc->getParentModule()->isConcurrencyChecked())
-    return true;
-
   return contextRequiresStrictConcurrencyChecking(dc, [](const AbstractClosureExpr *) {
     return Type();
   });
@@ -2118,8 +2115,15 @@ namespace {
     ///
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
-      if (!getDeclContext()->getParentModule()->isConcurrencyChecked())
+      switch (value->getASTContext().LangOpts.StrictConcurrencyLevel) {
+      case StrictConcurrency::Off:
+      case StrictConcurrency::Limited:
+        // Never diagnose.
         return false;
+
+      case StrictConcurrency::On:
+        break;
+      }
 
       // Only diagnose direct references to mutable global state.
       auto var = dyn_cast<VarDecl>(value);
@@ -3893,9 +3897,15 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 bool swift::contextRequiresStrictConcurrencyChecking(
     const DeclContext *dc,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
-  // If Swift >= 6, everything uses strict concurrency checking.
-  if (dc->getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+  switch (dc->getASTContext().LangOpts.StrictConcurrencyLevel) {
+  case StrictConcurrency::On:
     return true;
+
+  case StrictConcurrency::Limited:
+  case StrictConcurrency::Off:
+    // Check below to see if the context has adopted concurrency features.
+    break;
+  }
 
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
