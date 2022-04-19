@@ -22,4 +22,11 @@ typedef CF_OPTIONS(unsigned, CFColorMask) {
 inline SOColorMask useSOColorMask(SOColorMask mask) { return mask; }
 inline CFColorMask useCFColorMask(CFColorMask mask) { return mask; }
 
+#if __OBJC__
+@interface ColorMaker
+- (void)makeColorWithOptions:(SOColorMask)opts;
+- (void)makeOtherColorWithInt:(int) x withOptions:(CFColorMask)opts;
+@end
+#endif // SWIFT_OBJC_INTEROP
+
 #endif // TEST_INTEROP_CXX_ENUM_INPUTS_ANONYMOUS_WITH_SWIFT_NAME_H
