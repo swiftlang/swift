@@ -616,7 +616,7 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
 /// Determine the default diagnostic behavior for this language mode.
 static DiagnosticBehavior defaultSendableDiagnosticBehavior(
     const LangOptions &langOpts) {
-  // Prior to Swift 6, all Sendable-related diagnostics are warnings.
+  // Prior to Swift 6, all Sendable-related diagnostics are warnings at most.
   if (!langOpts.isSwiftVersionAtLeast(6))
     return DiagnosticBehavior::Warning;
 
@@ -646,6 +646,30 @@ DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
     return DiagnosticBehavior::Ignore;
 
   return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
+}
+
+DiagnosticBehavior
+SendableCheckContext::implicitSendableDiagnosticBehavior() const {
+  switch (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel) {
+  case StrictConcurrency::Limited:
+    // Limited checking only diagnoses implicit Sendable within contexts that
+    // have adopted concurrency.
+    if (shouldDiagnoseExistingDataRaces(fromDC))
+      return DiagnosticBehavior::Warning;
+
+    LLVM_FALLTHROUGH;
+
+  case StrictConcurrency::Off:
+    // Explicit Sendable conformances always diagnose, even when strict
+    // strict checking is disabled.
+    if (isExplicitSendableConformance())
+      return DiagnosticBehavior::Warning;
+
+    return DiagnosticBehavior::Ignore;
+
+  case StrictConcurrency::On:
+    return defaultDiagnosticBehavior();
+  }
 }
 
 /// Determine whether the given nominal type has an explicit Sendable
@@ -742,10 +766,10 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
         : DiagnosticBehavior::Ignore;
   }
 
-  auto defaultBehavior = defaultDiagnosticBehavior();
+  DiagnosticBehavior defaultBehavior = implicitSendableDiagnosticBehavior();
 
   // If we are checking an implicit Sendable conformance, don't suppress
-  // diagnostics for declarations in the same module. We want them so make
+  // diagnostics for declarations in the same module. We want them to make
   // enclosing inferred types non-Sendable.
   if (defaultBehavior == DiagnosticBehavior::Ignore &&
       nominal->getParentSourceFile() &&
@@ -763,7 +787,7 @@ bool swift::diagnoseSendabilityErrorBasedOn(
   if (nominal) {
     behavior = fromContext.diagnosticBehavior(nominal);
   } else {
-    behavior = fromContext.defaultDiagnosticBehavior();
+    behavior = fromContext.implicitSendableDiagnosticBehavior();
   }
 
   bool wasSuppressed = diagnose(behavior);

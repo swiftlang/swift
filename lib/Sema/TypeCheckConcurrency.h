@@ -323,6 +323,9 @@ struct SendableCheckContext {
   /// Sendable conformance in this context.
   DiagnosticBehavior defaultDiagnosticBehavior() const;
 
+  /// Determine the diagnostic behavior for an implicitly non-Sendable type.
+  DiagnosticBehavior implicitSendableDiagnosticBehavior() const;
+
   /// Determine the diagnostic behavior when referencing the given nominal
   /// type in this context.
   DiagnosticBehavior diagnosticBehavior(NominalTypeDecl *nominal) const;
