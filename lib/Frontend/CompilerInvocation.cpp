@@ -692,7 +692,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.WarnConcurrency |= Args.hasArg(OPT_warn_concurrency);
+  // Swift 6+ uses the strictest concurrency level.
+  if (Opts.isSwiftVersionAtLeast(6)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::On;
+  } else if (const Arg *A = Args.getLastArg(OPT_strict_concurrency)) {
+    auto value = llvm::StringSwitch<Optional<StrictConcurrency>>(A->getValue())
+      .Case("off", StrictConcurrency::Off)
+      .Case("limited", StrictConcurrency::Limited)
+      .Case("on", StrictConcurrency::On)
+      .Default(None);
+
+    if (value)
+      Opts.StrictConcurrencyLevel = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+
+  } else if (Args.hasArg(OPT_warn_concurrency)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::On;
+  } else {
+    // Default to "limited" checking in Swift 5.x.
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Limited;
+  }
 
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);

@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -typecheck -disable-availability-checking -enable-experimental-async-top-level -swift-version 6 %s -verify
 // RUN: %target-swift-frontend -typecheck -disable-availability-checking -swift-version 6 %s -verify
 
 // REQUIRES: asserts
@@ -8,45 +7,49 @@
 // context. `a` is just a normal top-level global variable with no actor
 // isolation.
 
-var a = 10 // expected-note 15 {{var declared here}}
+var a = 10 // expected-note 2 {{var declared here}}
+// expected-note@-1 2{{mutation of this var is only permitted within the actor}}
 
+// expected-note@+1 3{{add '@MainActor' to make global function 'nonIsolatedSync()' part of global actor 'MainActor'}}
 func nonIsolatedSync() {
-    print(a) // expected-warning {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
-    a = a + 10 // expected-warning 2 {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
+    print(a) // expected-error {{main actor-isolated var 'a' can not be referenced from a non-isolated context}}
+    a = a + 10 // expected-error{{main actor-isolated var 'a' can not be referenced from a non-isolated context}}
+  // expected-error@-1{{main actor-isolated var 'a' can not be mutated from a non-isolated context}}
 }
 
 @MainActor
-func isolatedSync() { // expected-note 2 {{calls to global function 'isolatedSync()' from outside of its actor context are implicitly asynchronous}}
-    print(a) // expected-warning {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
-    a = a + 10 // expected-warning 2 {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
+func isolatedSync() {
+    print(a)
+    a = a + 10
 }
 
 func nonIsolatedAsync() async {
-    await print(a) // expected-warning {{no 'async' operations occur within 'await' expression}}
-    // expected-warning@-1 {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
-    a = a + 10 // expected-warning 2 {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
+  await print(a)
+  a = a + 10 // expected-error{{main actor-isolated var 'a' can not be mutated from a non-isolated context}}
+  // expected-note@-1{{property access is 'async'}}
+  // expected-error@-2{{expression is 'async' but is not marked with 'await'}}
 }
 
 @MainActor
-func isolatedAsync() async { // expected-note 2 {{calls to global function 'isolatedAsync()' from outside of its actor context are implicitly asynchronous}}
-    print(a) // expected-warning {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
-    a = a + 10 // expected-warning 2 {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
+func isolatedAsync() async {
+    print(a)
+    a = a + 10
 }
 
 nonIsolatedSync()
-isolatedSync() // expected-error {{call to main actor-isolated global function 'isolatedSync()' in a synchronous nonisolated context}}
+isolatedSync()
 nonIsolatedAsync() // expected-error {{'async' call in a function that does not support concurrency}}
-isolatedAsync() // expected-error {{call to main actor-isolated global function 'isolatedAsync()' in a synchronous nonisolated context}}
+isolatedAsync()
 // expected-error@-1 {{'async' call in a function that does not support concurrency}}
 
-print(a) // expected-warning {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
+print(a)
 
-if a > 10 { // expected-warning {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
+if a > 10 {
     nonIsolatedSync()
-    isolatedSync() // expected-error {{call to main actor-isolated global function 'isolatedSync()' in a synchronous nonisolated context}}
+    isolatedSync()
     nonIsolatedAsync() // expected-error {{'async' call in a function that does not support concurrency}}
-    isolatedAsync() // expected-error {{call to main actor-isolated global function 'isolatedAsync()' in a synchronous nonisolated context}}
+    isolatedAsync()
     // expected-error@-1 {{'async' call in a function that does not support concurrency}}
 
-    print(a) // expected-warning {{reference to var 'a' is not concurrency-safe because it involves shared mutable state}}
+    print(a)
 }
