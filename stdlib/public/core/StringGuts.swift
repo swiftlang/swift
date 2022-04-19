@@ -348,6 +348,17 @@ extension _StringGuts {
   internal func ensureMatchingEncoding(_ i: Index) -> Index {
     if _fastPath(hasMatchingEncoding(i)) { return i }
     if let i = _slowEnsureMatchingEncoding(i) { return i }
+    // Note that this trap is not guaranteed to trigger when the process
+    // includes client binaries compiled with a previous Swift release.
+    // (`i._canBeUTF16` can sometimes return true in that case even if the index
+    // actually came from an UTF-8 string.) However, the trap will still often
+    // trigger in this case, as long as the index was initialized by code that
+    // was compiled with 5.7+.
+    //
+    // This trap will rarely if ever trigger on OSes that have stdlibs <= 5.6,
+    // because those versions never set the `isKnownUTF16` flag in
+    // `_StringObject`. (The flag may still be set within inlinable code,
+    // though.)
     _preconditionFailure("Invalid string index")
   }
 
@@ -379,21 +390,11 @@ extension _StringGuts {
   internal func _slowEnsureMatchingEncoding(_ i: Index) -> Index? {
     guard isUTF8 else {
       // Attempt to use an UTF-8 index on a UTF-16 string. Strings don't usually
-      // get converted to UTF-16 storage, so it seems okay to trap in this case
-      // -- the index most likely comes from an unrelated string. (Trapping here
-      // may still turn out to affect binary compatibility with broken code in
+      // get converted to UTF-16 storage, so it seems okay to reject this case
+      // -- the index most likely comes from an unrelated string. (This may
+      // still turn out to affect binary compatibility with broken code in
       // existing binaries running with new stdlibs. If so, we can replace this
       // with the same transcoding hack as in the UTF-16->8 case below.)
-      //
-      // Note that this trap is not guaranteed to trigger when the process
-      // includes client binaries compiled with a previous Swift release.
-      // (`i._canBeUTF16` can sometimes return true in that case even if the
-      // index actually came from an UTF-8 string.) However, the trap will still
-      // often trigger in this case, as long as the index was initialized by
-      // code that was compiled with 5.7+.
-      //
-      // This trap can never trigger on OSes that have stdlibs <= 5.6, because
-      // those versions never set the `isKnownUTF16` flag in `_StringObject`.
       return nil
     }
     // Attempt to use an UTF-16 index on a UTF-8 string.
@@ -415,6 +416,7 @@ extension _StringGuts {
     if i.transcodedOffset != 0 {
       r = r.encoded(offsetBy: i.transcodedOffset)
     } else {
+      // Preserve alignment bits if possible.
       r = r._copyingAlignment(from: i)
     }
     return r._knownUTF8
