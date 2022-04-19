@@ -1048,7 +1048,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // The unconditional_cast can be skipped, if the result of a cast
       // is not used afterwards.
       if (!ResultNotUsed) {
-        if (!dynamicCast.canUseScalarCheckedCastInstructions())
+        if (!dynamicCast.canSILUseScalarCheckedCastInstructions())
           return nullptr;
 
         CastedValue =
@@ -1143,7 +1143,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
 
       if (MI) {
         if (SuccessBB->getSinglePredecessorBlock() &&
-            canUseScalarCheckedCastInstructions(
+            canSILUseScalarCheckedCastInstructions(
                 Inst->getModule(), MI->getType().getASTType(),
                 Inst->getTargetFormalType())) {
           SILBuilderWithScope B(Inst, builderContext);
