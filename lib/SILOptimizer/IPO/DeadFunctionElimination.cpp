@@ -328,6 +328,9 @@ class DeadFunctionAndGlobalElimination {
 
     LLVM_DEBUG(llvm::dbgs() << "    scan function " << F->getName() << '\n');
 
+    if (auto *replacedFn = F->getDynamicallyReplacedFunction())
+      ensureAlive(replacedFn);
+
     if (auto *adHocWitness = F->getReferencedAdHocRequirementWitnessFunction())
       ensureAlive(adHocWitness);
 
