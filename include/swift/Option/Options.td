@@ -699,6 +699,14 @@ def warn_concurrency : Flag<["-"], "warn-concurrency">,
   HelpText<"Warn about code that is unsafe according to the Swift Concurrency "
            "model and will become ill-formed in a future language version">;
 
+def strict_concurrency : Joined<["-"], "strict-concurrency=">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Specify the how strict concurrency checking will be. The value may "
+           "be 'off' (most 'Sendable' checking is disabled), "
+           "'limited' ('Sendable' checking is enabled in code that uses the "
+           "concurrency model, or 'on' ('Sendable' and other checking is "
+           "enabled for all code in the module)">;
+
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
   HelpText<"Report performed transformations by optimization passes whose "
