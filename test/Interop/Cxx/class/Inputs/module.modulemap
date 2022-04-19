@@ -97,3 +97,8 @@ module DictionaryOfNSStrings {
   header "dictionary-of-nsstrings.h"
   requires cplusplus
 }
+
+module ForwardDeclaredCxxRecord {
+  header "forward-declared-cxx-record.h"
+  requires cplusplus
+}
