@@ -165,7 +165,7 @@ public:
   Value findAndErase(const Key1 &k1, const Key2 &k2) {
     auto &submap = map[k1];
     auto iter = submap.find(k2);
-    assert(iter != submap.end() && "Cannot erase nonexistant element.");
+    assert(iter != submap.end() && "Cannot erase nonexistent element.");
     Value v = iter->second;
     submap.erase(iter);
     return v;
