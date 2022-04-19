@@ -604,7 +604,7 @@ public:
 
   void getPoundAvailablePlatformCompletions();
 
-  /// \p Loc is the location of the code completin token.
+  /// \p Loc is the location of the code completion token.
   /// \p isForDeclResult determines if were are spelling out the result type
   /// of a declaration.
   void getSelfTypeCompletionInDeclContext(SourceLoc Loc, bool isForDeclResult);

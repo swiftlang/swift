@@ -361,9 +361,9 @@ public:
   /// Memberwise initializer. \p AssociatedKInd is opaque and will be
   /// interpreted based on \p Kind. If \p KnownOperatorKind is \c None and the
   /// completion item is an operator, it will be determined based on the
-  /// compleiton string.
+  /// completion string.
   ///
-  /// \note The caller must ensure that the \p CompleitonString and all the
+  /// \note The caller must ensure that the \p CompletionString and all the
   /// \c Ref types outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
   ContextFreeCodeCompletionResult(

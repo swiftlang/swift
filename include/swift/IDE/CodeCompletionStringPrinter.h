@@ -66,7 +66,7 @@ public:
 
   /// Start \c AttributeAndModifierListBegin group. This must be called before
   /// any attributes/modifiers printed to the output when printing an override
-  /// compleion.
+  /// completion.
   void startPreamble();
 
   /// End the current \c AttributeAndModifierListBegin group if it's still open.

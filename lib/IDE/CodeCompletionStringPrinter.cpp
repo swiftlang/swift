@@ -92,7 +92,7 @@ void CodeCompletionStringPrinter::flush() {
 
 /// Start \c AttributeAndModifierListBegin group. This must be called before
 /// any attributes/modifiers printed to the output when printing an override
-/// compleion.
+/// completion.
 void CodeCompletionStringPrinter::startPreamble() {
   assert(!InPreamble);
   startNestedGroup(ChunkKind::AttributeAndModifierListBegin);

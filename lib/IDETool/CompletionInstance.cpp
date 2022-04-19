@@ -498,7 +498,7 @@ void CompletionInstance::performNewOperation(
   }
 
   // Cache the compiler instance if fast completion is enabled.
-  // If we didn't find a code compleiton token, we can't cache the instance
+  // If we didn't find a code completion token, we can't cache the instance
   // because performCachedOperationIfPossible wouldn't have an old code
   // completion state to compare the new one to.
   if (ShouldCacheCompilerInstance)
