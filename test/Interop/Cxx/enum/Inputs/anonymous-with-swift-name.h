@@ -19,4 +19,7 @@ typedef CF_OPTIONS(unsigned, CFColorMask) {
   kCFColorMaskAll = ~0U
 };
 
+inline SOColorMask useSOColorMask(SOColorMask mask) { return mask; }
+inline CFColorMask useCFColorMask(CFColorMask mask) { return mask; }
+
 #endif // TEST_INTEROP_CXX_ENUM_INPUTS_ANONYMOUS_WITH_SWIFT_NAME_H

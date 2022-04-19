@@ -33,6 +33,9 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/Lex/MacroInfo.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/AST/DeclVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -60,12 +63,8 @@ class SmallBitVector;
 
 namespace clang {
 class APValue;
-class Decl;
 class DeclarationName;
-class EnumDecl;
-class MacroInfo;
 class MangleContext;
-class NamedDecl;
 class ObjCInterfaceDecl;
 class ObjCMethodDecl;
 class ObjCPropertyDecl;
@@ -1867,6 +1866,26 @@ static inline Type applyToFunctionType(
   }
 
   return type;
+}
+
+inline Optional<const clang::EnumDecl *> findAnonymousEnumForTypedef(
+    const ASTContext &ctx,
+    const clang::TypedefType *typedefType) {
+  auto *typedefDecl = typedefType->getDecl();
+  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(typedefDecl->getOwningModule());
+
+  auto foundDecls = lookupTable->lookup(
+      SerializedSwiftName(typedefDecl->getName()), EffectiveClangContext());
+
+  auto found = llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
+    return decl.is<clang::NamedDecl *>() &&
+        isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>());
+  });
+
+  if (found != foundDecls.end())
+    return cast<clang::EnumDecl>(found->get<clang::NamedDecl *>());
+
+  return None;
 }
 
 }
