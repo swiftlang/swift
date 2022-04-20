@@ -1155,7 +1155,7 @@ doesStorageProduceLValue(AbstractStorageDecl *storage, Type baseType,
   }
 
   // Unsettable storage decls always produce rvalues.
-  if (!storage->isSettable(useDC, base))
+  if (!storage->isSettableInSwift(useDC, base))
     return false;
 
   if (!storage->isSetterAccessibleFrom(useDC))
@@ -6561,12 +6561,12 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
     // WritableKeyPaths to be formed in the same conditions we did
     // in previous releases even if we should not be able to set
     // the value in this context.
-    if (!storage->isSettable(DC)) {
+    if (!storage->isSettableInSwift(DC)) {
       // A non-settable component makes the key path read-only, unless
       // a reference-writable component shows up later.
       return true;
     }
-  } else if (!storage->isSettable(nullptr) ||
+  } else if (!storage->isSettableInSwift(nullptr) ||
              !storage->isSetterAccessibleFrom(DC)) {
     // A non-settable component makes the key path read-only, unless
     // a reference-writable component shows up later.

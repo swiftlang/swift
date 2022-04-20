@@ -3584,9 +3584,9 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     // supply the settability if needed. We only reference it here if the
     // setter is public.
     if (shouldUseExternalKeyPathComponent())
-      return storage->isSettable(useDC)
-        && storage->isSetterAccessibleFrom(useDC);
-    return storage->isSettable(storage->getDeclContext());
+      return storage->isSettableInSwift(useDC) &&
+             storage->isSetterAccessibleFrom(useDC);
+    return storage->isSettableInSwift(storage->getDeclContext());
   };
 
   if (auto var = dyn_cast<VarDecl>(storage)) {
