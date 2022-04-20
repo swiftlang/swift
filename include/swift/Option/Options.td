@@ -695,12 +695,12 @@ def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
 
 def warn_concurrency : Flag<["-"], "warn-concurrency">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ModuleInterfaceOptionIgnorable]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about code that is unsafe according to the Swift Concurrency "
            "model and will become ill-formed in a future language version">;
 
 def strict_concurrency : Joined<["-"], "strict-concurrency=">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Specify the how strict concurrency checking will be. The value may "
            "be 'off' (most 'Sendable' checking is disabled), "
            "'limited' ('Sendable' checking is enabled in code that uses the "
