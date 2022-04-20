@@ -54,7 +54,8 @@ func use(_ k: (S) -> Void) {}
 // CHECK-LABEL: sil hidden [ossa] @$s13parameterized11upcastInputyyF : $@convention(thin) () -> () {
 func upcastInput() {
   // CHECK: [[P_FN:%.*]] = function_ref @$s13parameterized11upcastInputyyFyAA1P_pXEfU_ : $@convention(thin) (@in_guaranteed P) -> ()
-  // CHECK: [[THICK_P_FN:%.*]] = thin_to_thick_function [[P_FN]] : $@convention(thin) (@in_guaranteed P) -> () to $@noescape @callee_guaranteed (@in_guaranteed P) -> ()
+  // CHECK: [[NOESCAPE_P_FN:%.*]] = convert_function [[P_FN]] : $@convention(thin) (@in_guaranteed P) -> () to $@convention(thin) @noescape (@in_guaranteed P) -> ()
+  // CHECK: [[THICK_P_FN:%.*]] = thin_to_thick_function [[NOESCAPE_P_FN]] : $@convention(thin) @noescape (@in_guaranteed P) -> () to $@noescape @callee_guaranteed (@in_guaranteed P) -> ()
   // CHECK: [[S_TO_P_THUNK_FN:%.*]] = function_ref @$s13parameterized1P_pIgn_AA1SVIegy_TR : $@convention(thin) (S, @noescape @callee_guaranteed (@in_guaranteed P) -> ()) -> ()
   // CHECK: [[PARTIAL_INT_THUNK_FN:%.*]] = partial_apply [callee_guaranteed] [[S_TO_P_THUNK_FN]]([[THICK_P_FN]]) : $@convention(thin) (S, @noescape @callee_guaranteed (@in_guaranteed P) -> ()) -> ()
   // CHECK: [[NOESCAPE_P_THUNK_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_INT_THUNK_FN]] : $@callee_guaranteed (S) -> () to $@noescape @callee_guaranteed (S) -> ()
@@ -69,7 +70,8 @@ func reuse(_ k: () -> any P<Int, String, Float>) {}
 // CHECK-LABEL: sil hidden [ossa] @$s13parameterized12upcastResultyyF : $@convention(thin) () -> () {
 func upcastResult() {
   // CHECK: [[RES_FN:%.*]] = function_ref @$s13parameterized12upcastResultyyFAA1SVyXEfU_ : $@convention(thin) () -> S
-  // CHECK: [[THICK_RES_FN:%.*]] = thin_to_thick_function [[RES_FN]] : $@convention(thin) () -> S to $@noescape @callee_guaranteed () -> S
+  // CHECK: [[NOESCAPE_RES_FN:%.*]] = convert_function [[RES_FN]] : $@convention(thin) () -> S to $@convention(thin) @noescape () -> S
+  // CHECK: [[THICK_RES_FN:%.*]] = thin_to_thick_function [[NOESCAPE_RES_FN]] : $@convention(thin) @noescape () -> S to $@noescape @callee_guaranteed () -> S
   // CHECK: [[S_TO_P_RES_THUNK_FN:%.*]] = function_ref @$s13parameterized1SVIgd_AA1P_pySiSSSfXPIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> S) -> @out P<Int, String, Float>
   // CHECK: [[PARTIAL_RES_THUNK_FN:%.*]] = partial_apply [callee_guaranteed] [[S_TO_P_RES_THUNK_FN]]([[THICK_RES_FN]]) : $@convention(thin) (@noescape @callee_guaranteed () -> S) -> @out P<Int, String, Float>
   // CHECK: [[NOESCAPE_RES_THUNK_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_RES_THUNK_FN]] : $@callee_guaranteed () -> @out P<Int, String, Float> to $@noescape @callee_guaranteed () -> @out P<Int, String, Float>
@@ -79,7 +81,8 @@ func upcastResult() {
   reuse({ () -> S in S() })
 
   // CHECK: [[RES_Q_FN:%.*]] = function_ref @$s13parameterized12upcastResultyyFAA1Q_pySiSSSfXPyXEfU0_ : $@convention(thin) () -> @out Q<Int, String, Float>
-  // CHECK: [[THICK_NOESCAPE_RES_Q_FN:%.*]] = thin_to_thick_function [[RES_Q_FN]] : $@convention(thin) () -> @out Q<Int, String, Float> to $@noescape @callee_guaranteed () -> @out Q<Int, String, Float>
+  // CHECK: [[NOESCAPE_RES_Q_FN:%.*]] = convert_function [[RES_Q_FN]] : $@convention(thin) () -> @out Q<Int, String, Float> to $@convention(thin) @noescape () -> @out Q<Int, String, Float>
+  // CHECK: [[THICK_NOESCAPE_RES_Q_FN:%.*]] = thin_to_thick_function [[NOESCAPE_RES_Q_FN]] : $@convention(thin) @noescape () -> @out Q<Int, String, Float> to $@noescape @callee_guaranteed () -> @out Q<Int, String, Float>
   // CHECK: [[P_TO_Q_RES_THUNK_FN:%.*]] = function_ref @$s13parameterized1Q_pySiSSSfXPIgr_AA1P_pySiSSSfXPIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> @out Q<Int, String, Float>) -> @out P<Int, String, Float>
   // CHECK: [[PARTIAL_P_TO_Q_RES_THUNK_FN:%.*]] = partial_apply [callee_guaranteed] [[P_TO_Q_RES_THUNK_FN]]([[THICK_NOESCAPE_RES_Q_FN]]) : $@convention(thin) (@noescape @callee_guaranteed () -> @out Q<Int, String, Float>) -> @out P<Int, String, Float>
   // CHECK: [[NOESCAPE_PARTIAL_P_TO_Q_RES_THUNK_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_P_TO_Q_RES_THUNK_FN]] : $@callee_guaranteed () -> @out P<Int, String, Float> to $@noescape @callee_guaranteed () -> @out P<Int, String, Float>

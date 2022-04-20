@@ -24,7 +24,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/ExtInfo.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -3682,16 +3681,6 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   auto properties = getFunctionRecursiveProperties(params, result, globalActor);
   auto arena = getArena(properties);
 
-  if (info.hasValue()) {
-    // Canonicalize all thin functions to be escaping (to keep compatibility
-    // with generic parameters). Note that one can pass SIL-level representation
-    // here, so we need additional check for maximum non-SIL value.
-    Representation rep = info.getValue().getRepresentation();
-    if (rep <= FunctionTypeRepresentation::Last &&
-        isThinRepresentation(rep))
-      info = info->withNoEscape(false);
-  }
-
   llvm::FoldingSetNodeID id;
   FunctionType::Profile(id, params, result, info);
 
@@ -4109,10 +4098,6 @@ CanSILFunctionType SILFunctionType::get(
     ext = ext.intoBuilder().withClangFunctionType(nullptr).build();
   }
 
-  // Canonicalize all thin functions to be escaping (to keep compatibility
-  // with generic parameters)
-  if (isThinRepresentation(ext.getRepresentation()))
-    ext = ext.intoBuilder().withNoEscape(false);
   
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,

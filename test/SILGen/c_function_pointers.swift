@@ -40,7 +40,7 @@ func calls(_ arg: @convention(c) (Int) -> Int, _ x: Int) -> Int {
   return arg(x)
 }
 // CHECK-LABEL: sil hidden [ossa] @$s19c_function_pointers5callsyS3iXC_SitF
-// CHECK:       bb0(%0 : $@convention(c) (Int) -> Int, %1 : $Int):
+// CHECK:       bb0(%0 : $@convention(c) @noescape (Int) -> Int, %1 : $Int):
 // CHECK:         [[RESULT:%.*]] = apply %0(%1)
 // CHECK:         return [[RESULT]]
 
@@ -60,20 +60,24 @@ func pointers_to_swift_functions(_ x: Int) {
   func local(_ y: Int) -> Int { return y }
 
   // CHECK:   [[GLOBAL_C:%.*]] = function_ref @$s19c_function_pointers6globalyS2iFTo
-  // CHECK:   apply {{.*}}([[GLOBAL_C]], [[X]])
+  // CHECK:   [[CVT:%.*]] = convert_function [[GLOBAL_C]]
+  // CHECK:   apply {{.*}}([[CVT]], [[X]])
   calls(global, x)
 
   // CHECK:   [[LOCAL_C:%.*]] = function_ref @$s19c_function_pointers0B19_to_swift_functionsyySiF5localL_yS2iFTo
-  // CHECK:   apply {{.*}}([[LOCAL_C]], [[X]])
+  // CHECK:   [[CVT:%.*]] = convert_function [[LOCAL_C]]
+  // CHECK:   apply {{.*}}([[CVT]], [[X]])
   calls(local, x)
 
-  // CHECK:   [[CLOSURE_C:%.*]] = function_ref @$s19c_function_pointers0B19_to_swift_functionsyySiFS2icfU_To
-  // CHECK:   apply {{.*}}([[CLOSURE_C]], [[X]])
+  // CHECK:   [[CLOSURE_C:%.*]] = function_ref @$s19c_function_pointers0B19_to_swift_functionsyySiFS2iXEfU_To
+  // CHECK:   [[CVT:%.*]] = convert_function [[CLOSURE_C]]
+  // CHECK:   apply {{.*}}([[CVT]], [[X]])
   calls({ $0 + 1 }, x)
 
   calls_no_args(no_args)
   // CHECK:   [[NO_ARGS_C:%.*]] = function_ref @$s19c_function_pointers7no_argsSiyFTo
-  // CHECK:   apply {{.*}}([[NO_ARGS_C]])
+  // CHECK:   [[CVT:%.*]] = convert_function [[NO_ARGS_C]]
+  // CHECK:   apply {{.*}}([[CVT]])
 }
 
 func unsupported(_ a: Any) -> Int { return 0 }
