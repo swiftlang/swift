@@ -6639,9 +6639,7 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
   if (Options.contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked))
     return false;
 
-  auto &ctx = closure->getASTContext();
-  if (closure->hasEmptyBody() ||
-      !ctx.TypeCheckerOpts.EnableMultiStatementClosureInference)
+  if (closure->hasEmptyBody())
     return false;
 
   // If body is nested in a parent that has a function builder applied,

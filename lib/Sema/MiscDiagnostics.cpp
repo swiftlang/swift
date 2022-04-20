@@ -64,14 +64,10 @@ bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
   if (closure->isSeparatelyTypeChecked())
     return false;
 
-  auto &opts = D->getASTContext().TypeCheckerOpts;
-
-  // If multi-statement inference is enabled, let's not walk
-  // into declarations contained in a multi-statement closure
-  // because they'd be handled via `typeCheckDecl` that runs
+  // Let's not walk into declarations contained in a multi-statement
+  // closure because they'd be handled via `typeCheckDecl` that runs
   // syntactic diagnostics.
-  if (opts.EnableMultiStatementClosureInference &&
-      !closure->hasSingleExpressionBody()) {
+  if (!closure->hasSingleExpressionBody()) {
     // Since pattern bindings get their types through solution application,
     // `typeCheckDecl` doesn't touch initializers (because they are already
     // fully type-checked), so pattern bindings have to be allowed to be

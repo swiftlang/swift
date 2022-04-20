@@ -1146,9 +1146,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.EnableOneWayClosureParameters |=
       Args.hasArg(OPT_experimental_one_way_closure_params);
 
-  Opts.EnableMultiStatementClosureInference |=
-      Args.hasArg(OPT_experimental_multi_statement_closures);
-
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);
 
