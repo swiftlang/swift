@@ -29,6 +29,24 @@ class PointerWrapper {
 
 enum OneOfThree { case one, two, three }
 
+final class Object {
+  init()
+}
+
+public struct Storage {
+  @_hasStorage var object: Builtin.BridgeObject { get set }
+}
+
+public struct Wrapper {
+  @_hasStorage var storage: Storage { get set }
+}
+
+public struct ClassWrapper {
+  var ref: C
+}
+
+sil @hasGuaranteedStorageArg : $@convention(method) (@guaranteed Storage) -> Builtin.Word
+
 sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @get_owned_c : $@convention(thin) () -> (@owned C)
 sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
@@ -1014,6 +1032,83 @@ exit(%copy_1_2 : @owned $C, %borrow_in : @guaranteed $C, %copy_2_2 : @owned $C):
   end_borrow %borrow_in : $C
   destroy_value %copy_1_2 : $C
   return %copy_2_2 : $C
+}
+
+// Do not hoist the end_borrow (or destroy_value) of Storage above the copy_value
+// of the BridgeObject.
+//
+// rdar://90909833 (Add mayRetainUnmanagedReference deinit barrier)
+//
+// CHECK-LABEL: sil [ossa] @testMayRetainBridgedInlined : $@convention(method) (@inout Wrapper) -> () {
+// CHECK:   [[STORAGE:%.*]] = load [take] %1 : $*Storage
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[STORAGE]] : $Storage
+// CHECK:   [[CAST:%.*]] = unchecked_bitwise_cast %{{.*}} : $Builtin.Word to $Builtin.BridgeObject
+// CHECK:   copy_value [[CAST]] : $Builtin.BridgeObject
+// CHECK:   end_borrow [[BORROW]] : $Storage
+// CHECK:   destroy_value [[STORAGE]] : $Storage
+// CHECK-LABEL: } // end sil function
+sil [ossa] @testMayRetainBridgedInlined : $@convention(method) (@inout Wrapper) -> () {
+bb0(%0 : $*Wrapper):
+  %1 = struct_element_addr %0 : $*Wrapper, #Wrapper.storage
+  %2 = load [take] %1 : $*Storage
+  // TODO: Convert this begin_borrow to lexical only after enabling
+  // lexical lifetimes in the stdlib. Until then, non-lexical
+  // begin_borrow also needs to prevent hoisting.
+  %3 = begin_borrow %2 : $Storage
+  %4 = alloc_stack $Builtin.Word
+  %5 = struct_extract %3 : $Storage, #Storage.object
+  %6 = unchecked_trivial_bit_cast %5 : $Builtin.BridgeObject to $Builtin.Word
+  store %6 to [trivial] %4 : $*Builtin.Word
+  %10 = load [trivial] %4 : $*Builtin.Word
+  dealloc_stack %4 : $*Builtin.Word
+  %13 = unchecked_bitwise_cast %10 : $Builtin.Word to $Object
+  %16 = unchecked_trivial_bit_cast %13 : $Object to $Builtin.Word
+  %17 = unchecked_bitwise_cast %16 : $Builtin.Word to $Builtin.BridgeObject
+  %18 = copy_value %17 : $Builtin.BridgeObject
+  // Do not hoist this end_borrow above the copy_value!!!
+  end_borrow %3 : $Storage
+  destroy_value %2 : $Storage
+  %20 = struct $Storage (%18 : $Builtin.BridgeObject)
+  %21 = struct $Wrapper (%20 : $Storage)
+  store %21 to [init] %0 : $*Wrapper
+  %23 = tuple ()
+  return %23 : $()
+}
+
+// Do not hoist the end_borrow (or destroy_value) of Storage above the copy_value
+// of the BridgeObject. Here, the initial bitcast is hidden by a call.
+//
+// rdar://90909833 (Add mayRetainUnmanagedReference deinit barrier)
+//
+// CHECK-LABEL: sil [ossa] @testMayRetainBridgedCall : $@convention(method) (@inout Wrapper) -> () {
+// CHECK:   [[STORAGE:%.*]] = load [take] %1 : $*Storage
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[STORAGE]] : $Storage
+// CHECK:   [[CALL:%.*]] = apply %{{.*}}([[BORROW]]) : $@convention(method) (@guaranteed Storage) -> Builtin.Word
+// CHECK:   [[CAST:%.*]] = unchecked_bitwise_cast [[CALL]] : $Builtin.Word to $Builtin.BridgeObject
+// CHECK:   copy_value [[CAST]] : $Builtin.BridgeObject
+// CHECK:   end_borrow [[BORROW]] : $Storage
+// CHECK:   destroy_value [[STORAGE]] : $Storage
+// CHECK-LABEL: } // end sil function
+sil [ossa] @testMayRetainBridgedCall : $@convention(method) (@inout Wrapper) -> () {
+bb0(%0 : $*Wrapper):
+  %1 = struct_element_addr %0 : $*Wrapper, #Wrapper.storage
+  %2 = load [take] %1 : $*Storage
+  // TODO: Convert this begin_borrow to lexical only after enabling
+  // lexical lifetimes in the stdlib. Until then, non-lexical
+  // begin_borrow also needs to prevent hoisting.
+  %3 = begin_borrow %2 : $Storage
+  %4 = function_ref @hasGuaranteedStorageArg : $@convention(method) (@guaranteed Storage) -> Builtin.Word
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed Storage) -> Builtin.Word
+  %6 = unchecked_bitwise_cast %5 : $Builtin.Word to $Builtin.BridgeObject
+  %7 = copy_value %6 : $Builtin.BridgeObject
+  // Do not hoist this end_borrow above the copy_value!!!
+  end_borrow %3 : $Storage
+  destroy_value %2 : $Storage
+  %10 = struct $Storage (%7 : $Builtin.BridgeObject)
+  %11 = struct $Wrapper (%10 : $Storage)
+  store %11 to [init] %0 : $*Wrapper
+  %23 = tuple ()
+  return %23 : $()
 }
 
 // =============================================================================

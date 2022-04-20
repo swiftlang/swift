@@ -420,7 +420,11 @@ static bool mayAccessPointer(SILInstruction *instruction) {
 static bool mayLoadWeakOrUnowned(SILInstruction *instruction) {
   // TODO: It is possible to do better here by looking at the address that is
   //       being loaded.
-  return isa<LoadWeakInst>(instruction) || isa<LoadUnownedInst>(instruction);
+  return isa<LoadWeakInst>(instruction) || isa<LoadUnownedInst>(instruction)
+    || isa<StrongCopyUnownedValue>(instruction)
+    || isa<StrongCopyUnmanagedValue>(instruction)
+    return true;
+}
 }
 
 bool swift::isDeinitBarrier(SILInstruction *instruction) {
