@@ -2747,10 +2747,28 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   ImportDiagnosticAdder addImportDiag(*this, clangDecl,
                                       clangDecl->getLocation());
   clang::QualType resultType = clangDecl->getReturnType();
-  auto importedType =
-      importType(resultType, resultKind, addImportDiag,
-                 allowNSUIntegerAsIntInResult, Bridgeability::Full,
-                 getImportTypeAttrs(clangDecl), OptionalityOfReturn);
+
+
+  ImportedType importedType;
+  if (auto typedefType = dyn_cast<clang::TypedefType>(resultType.getTypePtr())) {
+    if (isUnavailableInSwift(typedefType->getDecl())) {
+      if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
+        // If this fails, it means that we need a stronger predicate for
+        // determining the relationship between an enum and typedef.
+        assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
+               typedefType->getCanonicalTypeInternal());
+        if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
+          importedType = {cast<NominalTypeDecl>(swiftEnum)->getDeclaredType(), false};
+        }
+      }
+    }
+  }
+
+  if (!importedType)
+    importedType = importType(resultType, resultKind, addImportDiag,
+                              allowNSUIntegerAsIntInResult, Bridgeability::Full,
+                              getImportTypeAttrs(clangDecl),
+                              OptionalityOfReturn);
 
   // Adjust the result type for a throwing function.
   if (importedType.getType() && errorInfo) {
@@ -2860,7 +2878,21 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     ImportTypeKind importKind = ImportTypeKind::Parameter;
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
     Type swiftParamTy;
-    bool paramIsIUO;
+    bool paramIsIUO = false;
+    if (auto typedefType = dyn_cast<clang::TypedefType>(paramTy.getTypePtr())) {
+      if (isUnavailableInSwift(typedefType->getDecl())) {
+        if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
+          // If this fails, it means that we need a stronger predicate for
+          // determining the relationship between an enum and typedef.
+          assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
+                 typedefType->getCanonicalTypeInternal());
+          if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
+            swiftParamTy = cast<NominalTypeDecl>(swiftEnum)->getDeclaredType();
+          }
+        }
+      }
+    }
+
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
       // Not using `getImportTypeAttrs()` is unprincipled but OK for this hack.
@@ -2872,7 +2904,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
         swiftParamTy = OptionalType::get(swiftParamTy);
 
       paramIsIUO = optionalityOfParam == OTK_ImplicitlyUnwrappedOptional;
-    } else {
+    } else if (!swiftParamTy) {
       if (param->hasAttr<clang::CFReturnsRetainedAttr>())
         importKind = ImportTypeKind::CFRetainedOutParameter;
       else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
