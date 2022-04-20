@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -swift-version 6 %S/Inputs/StrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t
+// RUN: %target-typecheck-verify-swift -strict-concurrency=limited -disable-availability-checking -I %t
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
