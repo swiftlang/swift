@@ -31,6 +31,7 @@ struct S3 {
 func takeSendable(_ body: @Sendable () -> Void) {
 }
 
+@available(SwiftStdlib 5.1, *)
 func passSendable(
     c1: C1, c2: C2, c3: C3, fn: @escaping () -> Void, s1: S1, s2: S2, s3: S3
 ) async {
