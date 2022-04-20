@@ -300,7 +300,7 @@ with (2). It passes if the two are identical, otherwise the test fails.
 3  }
 4  // RUN: rm -rf %t.result && mkdir -p %t.result
 5  // RUN: %refactor -localize-string -source-filename %s -pos=2:14 > %t.result/localized.swift
-6  // RUN: diff -u %S/Iutputs/localized.swift.expected %t.result/localized.swift
+6  // RUN: diff -u %S/Outputs/localized.swift.expected %t.result/localized.swift
 ~~~
 
 ~~~swift

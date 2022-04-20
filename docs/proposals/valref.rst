@@ -364,7 +364,7 @@ Objective-C Interoperability
 Clonable Objective-C classes
 -----------------------------
 
-In Cocoa, a notion similar to cloneability is captured in the ``NSCopying`` and
+In Cocoa, a notion similar to clonability is captured in the ``NSCopying`` and
 ``NSMutableCopying`` protocols, and a notion similar to ``val`` instance
 variables is captured by the behavior of ``(copy)`` properties. However, there
 are some behavioral and semantic differences that need to be taken into account.

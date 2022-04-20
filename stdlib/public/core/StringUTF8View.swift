@@ -359,8 +359,17 @@ extension String.UTF8View.Index {
   public init?(_ idx: String.Index, within target: String.UTF8View) {
     // Note: This method used to be inlinable until Swift 5.7.
 
-    guard target._guts.hasMatchingEncoding(idx) else { return nil }
-    guard idx._encodedOffset <= target._guts.count else { return nil }
+    // As a special exception, we allow `idx` to be an UTF-16 index when `self`
+    // is a UTF-8 string, to preserve compatibility with (broken) code that
+    // keeps using indices from a bridged string after converting the string to
+    // a native representation. Such indices are invalid, but returning nil here
+    // can break code that appeared to work fine for ASCII strings in Swift
+    // releases prior to 5.7.
+    guard
+      let idx = target._guts.ensureMatchingEncodingNoTrap(idx),
+      idx._encodedOffset <= target._guts.count
+    else { return nil }
+
     if _slowPath(target._guts.isForeign) {
       guard idx._foreignIsWithin(target) else { return nil }
     } else {

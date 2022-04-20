@@ -771,7 +771,7 @@ _cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
       assert(result.second.Value == canonicalMetadata);
     }
   } else {
-    auto canonicalMetadatas = description->getCanonicicalMetadataPrespecializations();
+    auto canonicalMetadatas = description->getCanonicalMetadataPrespecializations();
     for (auto &canonicalMetadataPtr : canonicalMetadatas) {
       Metadata *canonicalMetadata = canonicalMetadataPtr.get();
       const void *const *arguments =

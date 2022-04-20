@@ -813,21 +813,13 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
     decoder = instance.claimNext();
   }
 
-  if (isa<StructDecl>(decoderDecl) || isa<EnumDecl>(decoderDecl) ||
-      decoderDecl->isFinal()) {
-    auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
-    auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
-                                           /*isDynamicallyReplacible=*/false);
+  auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+  auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
+                                         /*isDynamicallyReplacible=*/false);
 
-    auto methodPtr = FunctionPointer::forDirect(
-        classifyFunctionPointerKind(decodeSIL), fnPtr,
-        /*secondaryValue=*/nullptr, signature);
-
-    return {decoder, decoderTy, witnessTable, methodPtr, methodTy};
-  }
-
-  auto methodPtr =
-      emitVirtualMethodValue(IGF, decoderTy, SILDeclRef(decodeFn), methodTy);
+  auto methodPtr = FunctionPointer::forDirect(
+    classifyFunctionPointerKind(decodeSIL), fnPtr,
+    /*secondaryValue=*/nullptr, signature);
 
   return {decoder, decoderTy, witnessTable, methodPtr, methodTy};
 }

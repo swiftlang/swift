@@ -50,8 +50,17 @@ extension String.Index {
   ///     of `target`.
   ///   - target: The string referenced by the resulting index.
   public init?(_ sourcePosition: String.Index, within target: String) {
-    guard target._isValidIndex(sourcePosition) else { return nil }
-    self = sourcePosition._characterAligned
+    // As a special exception, we allow `sourcePosition` to be an UTF-16 index
+    // when `self` is a UTF-8 string, to preserve compatibility with (broken)
+    // code that keeps using indices from a bridged string after converting the
+    // string to a native representation. Such indices are invalid, but
+    // returning nil here can break code that appeared to work fine for ASCII
+    // strings in Swift releases prior to 5.7.
+    guard
+      let i = target._guts.ensureMatchingEncodingNoTrap(sourcePosition),
+      target._isValidIndex(i)
+    else { return nil }
+    self = i._characterAligned
   }
 
   /// Creates an index in the given string that corresponds exactly to the
@@ -101,8 +110,17 @@ extension String.Index {
       return
     }
     if let str = target as? Substring {
-      guard str._isValidIndex(sourcePosition) else { return nil }
-      self = sourcePosition
+      // As a special exception, we allow `sourcePosition` to be an UTF-16 index
+      // when `self` is a UTF-8 string, to preserve compatibility with (broken)
+      // code that keeps using indices from a bridged string after converting
+      // the string to a native representation. Such indices are invalid, but
+      // returning nil here can break code that appeared to work fine for ASCII
+      // strings in Swift releases prior to 5.7.
+      guard
+        let i = str._wholeGuts.ensureMatchingEncodingNoTrap(sourcePosition),
+        str._isValidIndex(i)
+      else { return nil }
+      self = i
       return
     }
     self.init(sourcePosition, within: String(target))

@@ -599,7 +599,7 @@ find MyProject/Sources -name '*.swift' -type f > input-files.txt
 # In some cases, projects may use multiple files with the same
 # name but in different directories (for different schemes),
 # which can be a problem. Having a file list makes working around
-# this convenient as you can manually manually edit out the files
+# this convenient as you can manually edit out the files
 # that are not of interest at this stage.
 
 mkdir Output

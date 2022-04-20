@@ -54,6 +54,11 @@ private:
   bool shouldWalkIntoGenericParams() override {
     return SEWalker.shouldWalkIntoGenericParams();
   }
+
+  bool shouldWalkSerializedTopLevelInternalDecls() override {
+    return false;
+  }
+
   bool walkToDeclPre(Decl *D) override;
   bool walkToDeclPreProper(Decl *D);
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;

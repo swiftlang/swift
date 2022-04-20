@@ -34,13 +34,7 @@ func f3<T : Q>(_: T) where T.A : C, T.A == any (C & P2) {}
 
 // CHECK-LABEL: .f4@
 // CHECK-NEXT: Generic signature: <T where T : Q>
-func f4<T : Q>(_: T) where T.A : C, T.A == any (C & P2) {}
-// expected-error@-1 {{no type for 'T.A' can satisfy both 'T.A : C' and 'T.A == any C & P2'}}
-// expected-error@-2 {{no type for 'T.A' can satisfy both 'T.A : _NativeClass' and 'T.A == any C & P2'}}
-
-// CHECK-LABEL: .f5@
-// CHECK-NEXT: Generic signature: <T where T : Q>
-func f5<T : Q>(_: T) where T.A : C, T.A == any (C & P3) {}
+func f4<T : Q>(_: T) where T.A : C, T.A == any (C & P3) {}
 // expected-error@-1 {{no type for 'T.A' can satisfy both 'T.A : C' and 'T.A == any C & P3'}}
 // expected-error@-2 {{no type for 'T.A' can satisfy both 'T.A : _NativeClass' and 'T.A == any C & P3'}}
 

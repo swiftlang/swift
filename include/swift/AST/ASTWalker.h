@@ -235,6 +235,11 @@ public:
   /// until eventually we can remove this altogether.
   virtual bool shouldWalkAccessorsTheOldWay() { return false; }
 
+  /// Whether to walk internal top level decls in serialized modules.
+  ///
+  /// TODO: Consider changing this to false by default.
+  virtual bool shouldWalkSerializedTopLevelInternalDecls() { return true; }
+
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.  If it returns false,
   /// the subtree is skipped.

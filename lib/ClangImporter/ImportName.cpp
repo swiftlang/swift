@@ -1417,7 +1417,7 @@ bool NameImporter::hasErrorMethodNameCollision(
   // been marked NS_SWIFT_UNAVAILABLE, because it's actually marked unavailable,
   // or because it was deprecated before our API sunset. We can handle
   // "conflicts" where one form is unavailable.
-  return !isUnavailableInSwift(conflict, availability,
+  return !isUnavailableInSwift(conflict, &availability,
                                enableObjCInterop());
 }
 
@@ -1736,6 +1736,21 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
             nameStream << field->getName();
           }
           result.setDeclName(swiftCtx.getIdentifier(nameStream.str()));
+          result.setEffectiveContext(D->getDeclContext());
+          return result;
+        }
+      }
+    }
+
+    // If this enum inherits from a typedef we can compute the name from the
+    // typedef (even if it's an anonymous enum).
+    if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
+      // Intentionally don't get the cannonical type here.
+      if (auto typedefType = dyn_cast<clang::TypedefType>(enumDecl->getIntegerType().getTypePtr())) {
+        // If the typedef is available in Swift, the user will get ambiguity.
+        // It also means they may not have intended this API to be imported like this.
+        if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
+          result.setDeclName(swiftCtx.getIdentifier(typedefType->getDecl()->getName()));
           result.setEffectiveContext(D->getDeclContext());
           return result;
         }

@@ -18,7 +18,7 @@ This document is designed to get you started with bidirectional API-level intero
 ```
 //In module.modulemap
 module Cxx {
-    //note that your header should be the file that containts your method implementations
+    //note that your header should be the file that contains your method implementations
     header "Cxx.hpp"
     requires cplusplus
 }

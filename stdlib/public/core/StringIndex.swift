@@ -323,7 +323,7 @@ extension String.Index {
   }
 }
 
-// ### Character (a.k.a. Extended Grapheme Cluster) Aligment
+// ### Character (a.k.a. Extended Grapheme Cluster) Alignment
 //
 // Swift 5.7 assigned a new bit denoting that an index is known to be
 // `Character`-aligned. This is used to enable more reliable detection &
@@ -336,7 +336,7 @@ extension String.Index {
 // (The sequence of characters in a substring depend only on the Unicode scalars
 // that make up its contents, not on their surrounding context.) Therefore, such
 // substrings must not look at or set this bit: indices must be reliably
-// interchangable between strings and their associated substrings, even if the
+// interchangeable between strings and their associated substrings, even if the
 // latter are irregular.
 //
 // Note that `startIndex` and `endIndex` have fully inlinable implementations.
@@ -362,6 +362,14 @@ extension String.Index {
     let idx = Self(r)
     idx._invariantCheck()
     return idx
+  }
+}
+
+extension String.Index {
+  @_alwaysEmitIntoClient // Swift 5.7
+  internal func _copyingAlignment(from index: Self) -> Self {
+    let mask = Self.__scalarAlignmentBit | Self.__characterAlignmentBit
+    return Self((_rawBits & ~mask) | (index._rawBits & mask))
   }
 }
 
@@ -473,21 +481,9 @@ extension String.Index {
   }
 
   @_alwaysEmitIntoClient // Swift 5.7
-  internal func _copyEncoding(from index: Self) -> Self {
+  internal func _copyingEncoding(from index: Self) -> Self {
     let mask = Self.__utf8Bit | Self.__utf16Bit
     return Self((_rawBits & ~mask) | (index._rawBits & mask))
-  }
-}
-
-extension String.Index {
-  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
-  internal var _isUTF8CharacterIndex: Bool {
-    _canBeUTF8 && _isCharacterAligned
-  }
-
-  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
-  internal var _isUTF8ScalarIndex: Bool {
-    _canBeUTF8 && _isScalarAligned
   }
 }
 

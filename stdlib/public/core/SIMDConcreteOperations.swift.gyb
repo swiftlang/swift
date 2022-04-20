@@ -72,7 +72,7 @@ extension SIMDMask where Storage == ${Vector} {
     )))
   }
     
-  /// Replaces `a` with the pointwise logical conjuction of `a` and `b`.
+  /// Replaces `a` with the pointwise logical conjunction of `a` and `b`.
   ///
   /// Equivalent to:
   /// ```

@@ -20,7 +20,7 @@
 namespace swift {
 
 /// A data structure responsible for efficiently allocating closure contexts for
-/// linear maps such as pullbacks, including rescursive branching trace enum
+/// linear maps such as pullbacks, including recursive branching trace enum
 /// case payloads.
 class AutoDiffLinearMapContext : public HeapObject {
 private:
