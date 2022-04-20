@@ -694,7 +694,7 @@ extension _StringObject {
    - Older binaries will not look at newly assigned bits, and they will not
      set them, either (unless by side effect of calling into newly built code).
      Such code must continue working.
-   - Code in new versions of the stdlib must continue to work corectly even if
+   - Code in new versions of the stdlib must continue to work correctly even if
      some of these newly assigned bits are never set -- as may be the case when
      the initialization of a string was emitted entirely into an older client
      binary.
@@ -1000,7 +1000,7 @@ extension _StringObject {
   @inline(__always)
   internal var isNFC: Bool {
     if isSmall {
-      // TODO(String performance): Worth implementing more sophisiticated
+      // TODO(String performance): Worth implementing more sophisticated
       // check, or else performing normalization on- construction. For now,
       // approximate it with isASCII
       return smallIsASCII
@@ -1009,6 +1009,7 @@ extension _StringObject {
   }
 
   /// Returns whether this string has a UTF-8 storage representation.
+  /// If this returns false, then the string is encoded in UTF-16.
   ///
   /// This always returns a value corresponding to the string's actual encoding.
   @_alwaysEmitIntoClient
@@ -1028,15 +1029,6 @@ extension _StringObject {
     // Note that `providesFastUTF8` returns true for small strings, so we don't
     // need to check for smallness before accessing the `isForeignUTF8` bit.
     providesFastUTF8 || _countAndFlags.isForeignUTF8
-  }
-
-  /// Returns whether this string has a UTF-16 storage representation.
-  ///
-  /// This always returns a value corresponding to the string's actual encoding.
-  @_alwaysEmitIntoClient
-  @inline(__always) // Swift 5.7
-  internal var isUTF16: Bool {
-    !isUTF8
   }
 
   // Get access to fast UTF-8 contents for large strings which provide it.

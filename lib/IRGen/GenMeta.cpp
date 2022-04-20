@@ -2556,6 +2556,15 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
 void irgen::emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *type) {
   eraseExistingTypeContextDescriptor(IGM, type);
 
+  // Special case, UFOs are opaque pointers for now.
+  if (auto cd = dyn_cast<ClassDecl>(type)) {
+    if (cd->isForeignReferenceType()) {
+      auto sd = cast<StructDecl>(type->getASTContext().getOpaquePointerDecl());
+      emitStructMetadata(IGM, sd);
+      return;
+    }
+  }
+
   if (requiresForeignTypeMetadata(type)) {
     emitForeignTypeMetadata(IGM, type);
   } else if (auto sd = dyn_cast<StructDecl>(type)) {

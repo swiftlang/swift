@@ -32,7 +32,7 @@ list(REMOVE_ITEM SWIFT_SDK_OSX_ARCHITECTURES "arm64e")
 # The back-deployed library can only be shared.
 list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
 
-# Link aginst the libswiftCore in the SDK. This intentionally avoids using
+# Link against the libswiftCore in the SDK. This intentionally avoids using
 # the locally-built libswiftCore.
 foreach(sdk ${SWIFT_SDKS})
     set(sdk_name ${SWIFT_SDK_${sdk}_LIB_SUBDIR})

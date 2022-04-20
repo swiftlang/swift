@@ -312,6 +312,49 @@ let examples: [String] = _examples.flatMap { s in
   #endif
 }
 
+
+suite.test("Trivial index conversion cases/characters")
+.forEach(in: examples) { s in
+  for i in s.indices {
+    let j = String.Index(i, within: s)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j, i)
+  }
+}
+
+suite.test("Trivial index conversion cases/scalars")
+.forEach(in: examples) { s in
+  for i in s.unicodeScalars.indices {
+    let j = String.Index(i, within: s.unicodeScalars)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j, i)
+  }
+}
+
+suite.test("Trivial index conversion cases/UTF-8")
+.forEach(in: examples) { s in
+  for i in s.utf8.indices {
+    let j = String.Index(i, within: s.utf8)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j, i)
+  }
+}
+
+suite.test("Trivial index conversion cases/UTF-16")
+.forEach(in: examples) { s in
+  guard #available(SwiftStdlib 5.7, *) else {
+    // Prior to 5.7, String.Index.init(_:within:) used to incorrectly reject
+    // indices pointing to trailing surrogates.
+    return
+  }
+
+  for i in s.utf16.indices {
+    let j = String.Index(i, within: s.utf16)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j, i)
+  }
+}
+
 #if _runtime(_ObjC)
 suite.test("Exhaustive Index Interchange")
 .forEach(in: examples) { str in
@@ -712,7 +755,7 @@ suite.test("Global vs local grapheme cluster boundaries") {
 }
 
 #if _runtime(_ObjC)
-suite.test("Index encoding correction") {
+suite.test("Index encoding correction/subscripts") {
   guard #available(SwiftStdlib 5.7, *) else {
     // String indices did not track their encoding until 5.7.
     return
@@ -746,7 +789,7 @@ suite.test("Index encoding correction") {
     ($0, s[$0], s.unicodeScalars[$0], s.utf8[$0], s.utf16[$0])
   }
 
-  s.append(".")
+  s.makeContiguousUTF8()
   //s.dumpIndices()
 
   for (i, char, scalar, u8, u16) in originals {
@@ -754,6 +797,86 @@ suite.test("Index encoding correction") {
     expectEqual(s.unicodeScalars[i], scalar, "i: \(i)")
     expectEqual(s.utf8[i], u8, "i: \(i)")
     expectEqual(s.utf16[i], u16, "i: \(i)")
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+suite.test("Index encoding correction/conversions/characters") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // String indices did not track their encoding until 5.7.
+    return
+  }
+  var s = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
+
+  let chars = s.indices.map { ($0, s[$0]) }
+
+  s.makeContiguousUTF8()
+
+  for (i, char) in chars {
+    let j = String.Index(i, within: s)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j.map { s[$0] }, char, "i: \(i)")
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+suite.test("Index encoding correction/conversions/scalars") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // String indices did not track their encoding until 5.7.
+    return
+  }
+  var s = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
+
+  let scalars = s.unicodeScalars.indices.map { ($0, s.unicodeScalars[$0]) }
+
+  s.makeContiguousUTF8()
+
+  for (i, scalar) in scalars {
+    let j = String.Index(i, within: s.unicodeScalars)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j.map { s.unicodeScalars[$0] }, scalar, "i: \(i)")
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+suite.test("Index encoding correction/conversions/UTF-8") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // String indices did not track their encoding until 5.7.
+    return
+  }
+  var s = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
+
+  let utf8Units = s.utf8.indices.map { ($0, s.utf8[$0]) }
+
+  s.makeContiguousUTF8()
+
+  for (i, u8) in utf8Units {
+    let j = String.Index(i, within: s.utf8)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j.map { s.utf8[$0] }, u8, "i: \(i)")
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+suite.test("Index encoding correction/conversions/UTF-16") {
+  guard #available(SwiftStdlib 5.7, *) else {
+    // String indices did not track their encoding until 5.7.
+    return
+  }
+  var s = ("🫱🏼‍🫲🏽 a 🧑🏽‍🌾 b" as NSString) as String
+
+  let utf16Units = s.utf16.indices.map { ($0, s.utf16[$0]) }
+
+  s.makeContiguousUTF8()
+
+  for (i, u16) in utf16Units {
+    let j = String.Index(i, within: s.utf16)
+    expectNotNil(j, "i: \(i)")
+    expectEqual(j.map { s.utf16[$0] }, u16, "i: \(i)")
   }
 }
 #endif

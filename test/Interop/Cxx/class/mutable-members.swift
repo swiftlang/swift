@@ -2,6 +2,8 @@
 //
 // REQUIRES: executable_test
 
+// REQUIRES: rdar91961524
+
 import StdlibUnittest
 import MutableMembers
 

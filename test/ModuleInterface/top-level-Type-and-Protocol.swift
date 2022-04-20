@@ -1,9 +1,8 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution %s -module-name MyModule
+// RUN: %target-swift-emit-module-interface(%t/MyModule.swiftinterface) %s -module-name MyModule
+// RUN: %target-swift-typecheck-module-from-interface(%t/MyModule.swiftinterface) -module-name MyModule
 // RUN: %FileCheck %s < %t/MyModule.swiftinterface
-
-// RUN: %target-swift-frontend -compile-module-from-interface %t/MyModule.swiftinterface -o %t/MyModule.swiftmodule
 
 // CHECK: public struct Type {
 // CHECK-NEXT: }

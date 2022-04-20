@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s | %FileCheck %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name main
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name main
+// RUN: %FileCheck %s < %t.swiftinterface
 
 // CHECK: public let Type: Swift.Int
 public let Type = 0
@@ -17,7 +19,7 @@ public class B {
   // CHECK: }
   public class `Type` {}
 
-  // CHECK-NEXT: @_hasInitialValue public var `Type`: Swift.Int
+  // CHECK-NEXT: public var `Type`: Swift.Int
   public var `Type` = 0
 // CHECK: }
 }

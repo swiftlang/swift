@@ -375,6 +375,9 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitAnyPattern(AnyPattern *P) {
+      if (P->isAsyncLet()) {
+        printCommon(P, "async_let ");
+      }
       printCommon(P, "pattern_any");
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

@@ -3515,7 +3515,7 @@ public:
     return getTypeContextDescriptorFlags().hasForeignMetadataInitialization();
   }
 
-  bool hasCanonicicalMetadataPrespecializations() const {
+  bool hasCanonicalMetadataPrespecializations() const {
     return getTypeContextDescriptorFlags().hasCanonicalMetadataPrespecializations();
   }
 
@@ -3557,7 +3557,7 @@ public:
   }
 
   const llvm::ArrayRef<TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>, /*Nullable*/ false>>
-  getCanonicicalMetadataPrespecializations() const;
+  getCanonicalMetadataPrespecializations() const;
 
   swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const;
 
@@ -3868,25 +3868,25 @@ private:
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListCount>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       1
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListEntry>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataAccessorListEntry>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ? 1 : 0;
+    return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
   }
 
 public:
@@ -4034,8 +4034,8 @@ public:
       ->Stub.get();
   }
 
-  llvm::ArrayRef<Metadata> getCanonicicalMetadataPrespecializations() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+  llvm::ArrayRef<Metadata> getCanonicalMetadataPrespecializations() const {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
@@ -4048,7 +4048,7 @@ public:
   }
 
   llvm::ArrayRef<MetadataAccessor> getCanonicalMetadataPrespecializationAccessors() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
@@ -4061,7 +4061,7 @@ public:
   }
 
   swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return nullptr;
     }
     auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
@@ -4138,19 +4138,19 @@ private:
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListCount>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       1
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListEntry>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ? 1 : 0;
+    return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
   }
 
 public:
@@ -4185,8 +4185,8 @@ public:
     return TargetStructMetadata<Runtime>::getGenericArgumentOffset();
   }
 
-  llvm::ArrayRef<Metadata> getCanonicicalMetadataPrespecializations() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+  llvm::ArrayRef<Metadata> getCanonicalMetadataPrespecializations() const {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
@@ -4199,7 +4199,7 @@ public:
   }
 
   swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return nullptr;
     }
     auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
@@ -4265,19 +4265,19 @@ private:
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListCount>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       1
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataListEntry>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ?
+    return this->hasCanonicalMetadataPrespecializations() ?
       this->template getTrailingObjects<MetadataListCount>()->count
       : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
-    return this->hasCanonicicalMetadataPrespecializations() ? 1 : 0;
+    return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
   }
 
 public:
@@ -4326,8 +4326,8 @@ public:
     return *this->template getTrailingObjects<SingletonMetadataInitialization>();
   }
 
-  llvm::ArrayRef<Metadata> getCanonicicalMetadataPrespecializations() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+  llvm::ArrayRef<Metadata> getCanonicalMetadataPrespecializations() const {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
@@ -4340,7 +4340,7 @@ public:
   }
 
   swift_once_t *getCanonicalMetadataPrespecializationCachingOnceToken() const {
-    if (!this->hasCanonicicalMetadataPrespecializations()) {
+    if (!this->hasCanonicalMetadataPrespecializations()) {
       return nullptr;
     }
     auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
@@ -4483,17 +4483,17 @@ TargetTypeContextDescriptor<Runtime>::getSingletonMetadataInitialization() const
 
 template<typename Runtime>
 inline const llvm::ArrayRef<TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>, /*Nullable*/ false>>
-TargetTypeContextDescriptor<Runtime>::getCanonicicalMetadataPrespecializations() const {
+TargetTypeContextDescriptor<Runtime>::getCanonicalMetadataPrespecializations() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Enum:
     return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
-        ->getCanonicicalMetadataPrespecializations();
+        ->getCanonicalMetadataPrespecializations();
   case ContextDescriptorKind::Struct:
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)
-        ->getCanonicicalMetadataPrespecializations();
+        ->getCanonicalMetadataPrespecializations();
   case ContextDescriptorKind::Class:
     return llvm::cast<TargetClassDescriptor<Runtime>>(this)
-        ->getCanonicicalMetadataPrespecializations();
+        ->getCanonicalMetadataPrespecializations();
   default:
     swift_unreachable("Not a type context descriptor.");
   }

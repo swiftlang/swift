@@ -1,10 +1,9 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -warn-concurrency -parse-as-library
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -strict-concurrency=limited -parse-as-library
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 import Foundation
 import ObjCConcurrency
-// expected-remark@-1{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
 
 @available(SwiftStdlib 5.5, *)
 @MainActor func onlyOnMainActor() { }
@@ -358,8 +357,6 @@ func testSender(
   // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
 
   sender.sendGeneric(sendableGeneric)
-  // expected-warning@-1 {{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
-  // FIXME(rdar://89992569): Should allow for the possibility that GenericObject will have a Sendable subclass
   sender.sendGeneric(nonSendableGeneric)
   // expected-error@-1 {{argument type 'GenericObject<SendableClass>' does not conform to expected type 'Sendable'}}
   // FIXME(rdar://89992095): Should be a warning because we're in -warn-concurrency

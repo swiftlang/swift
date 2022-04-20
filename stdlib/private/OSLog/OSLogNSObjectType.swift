@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This file defines extensions for interpolating NSObject into an OSLogMesage.
+// This file defines extensions for interpolating NSObject into an OSLogMessage.
 // It defines `appendInterpolation` function for NSObject type. It also defines
 // extensions for generating an os_log format string for NSObjects (using the
 // format specifier %@) and for serializing NSObject into the argument buffer

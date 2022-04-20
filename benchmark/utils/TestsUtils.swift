@@ -324,11 +324,13 @@ public func someProtocolFactory() -> SomeProtocol { return MyStruct() }
 // It's important that this function is in another module than the tests
 // which are using it.
 @inline(never)
+@_semantics("optimize.no.crossmodule")
 public func blackHole<T>(_ x: T) {
 }
 
 // Return the passed argument without letting the optimizer know that.
 @inline(never)
+@_semantics("optimize.no.crossmodule")
 public func identity<T>(_ x: T) -> T {
   return x
 }
@@ -337,12 +339,15 @@ public func identity<T>(_ x: T) -> T {
 // It's important that this function is in another module than the tests
 // which are using it.
 @inline(never)
+@_semantics("optimize.no.crossmodule")
 public func getInt(_ x: Int) -> Int { return x }
 
 // The same for String.
 @inline(never)
+@_semantics("optimize.no.crossmodule")
 public func getString(_ s: String) -> String { return s }
 
 // The same for Substring.
 @inline(never)
+@_semantics("optimize.no.crossmodule")
 public func getSubstring(_ s: Substring) -> Substring { return s }

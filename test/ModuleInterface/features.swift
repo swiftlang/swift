@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -module-name FeatureTest -emit-module-interface-path %t/FeatureTest.swiftinterface -enable-library-evolution  -disable-availability-checking %s
+// RUN: %target-swift-emit-module-interface(%t/FeatureTest.swiftinterface) %s -module-name FeatureTest -disable-availability-checking
+// RUN: %target-swift-typecheck-module-from-interface(%t/FeatureTest.swiftinterface) -module-name FeatureTest -disable-availability-checking
 // RUN: %FileCheck %s < %t/FeatureTest.swiftinterface
-// RUN: %target-swift-frontend -typecheck-module-from-interface -disable-availability-checking -swift-version 5 -module-name FeatureTest %t/FeatureTest.swiftinterface
 
 // REQUIRES: concurrency
 

@@ -12,7 +12,7 @@ are bridged as value types. ⚠️ This will change as soon as Swift has a way t
 
 Currently, lifetimes are extended to the end of the lexical scope if any unsafe pointers are used in that scope. TODO: 
 this should be updated to extend lifetimes whenever a C++ type is used in that scope. Currently, if there is no 
-unsafe pointer used in teh scope, then normal Swift lifetime rules apply.   
+unsafe pointer used in the scope, then normal Swift lifetime rules apply.   
 
 **Borrowing Self**
 

@@ -904,10 +904,6 @@ def experimental_multi_statement_closures :
   Flag<["-"], "experimental-multi-statement-closures">,
   HelpText<"Enable experimental support for type inference in multi-statement closures">;
 
-def experimental_type_inference_from_defaults :
-  Flag<["-"], "enable-experimental-type-inference-from-defaults">,
-  HelpText<"Enable experimental support for generic parameter inference from default values">;
-
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
   HelpText<"Directory of prebuilt modules for loading module interfaces">;

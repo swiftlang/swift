@@ -11,3 +11,13 @@ import def_async
 func testDoSomethingBig() {
   let _: () -> Int = doSomethingBig // expected-error{{invalid conversion from 'async' function of type '() async -> Int' to synchronous function type '() -> Int'}}
 }
+
+// Verify serialization of async let _ = <expression> pattern
+func testSerializedAsyncLet() async {
+  await doSerializedAsyncLet()
+} 
+
+// Verify serialization of async let _ : <type> = <expression> pattern
+func testSerializedAsyncLetTyped() async {
+  await doSerializedAsyncLetTyped()
+}
