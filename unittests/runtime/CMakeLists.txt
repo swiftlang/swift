@@ -84,10 +84,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     endif()
   endif()
 
-  if(NOT "${SWIFT_THREADING_PACKAGE}" STREQUAL "none")
-    list(APPEND PLATFORM_SOURCES Mutex.cpp)
-  endif()
-
   if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
 #    list(APPEND PLATFORM_SOURCES
 #      DistributedActor.cpp
@@ -102,8 +98,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     weak.mm
     Refcounting.mm
     Actor.cpp
-    TaskStatus.cpp
-    Mutex.cpp)
+    TaskStatus.cpp)
 
   add_swift_unittest(SwiftRuntimeTests
     Array.cpp
