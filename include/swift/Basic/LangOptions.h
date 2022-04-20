@@ -325,7 +325,7 @@ namespace swift {
     bool UseMalloc = false;
 
     /// Specifies how strict concurrency checking will be.
-    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Targeted;
+    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Minimal;
 
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
