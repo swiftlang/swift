@@ -114,6 +114,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.unaligned")
   expectEqual(result, 0xffff_0000)
 }
 
+#if !os(WASI)
 UnsafeMutableRawPointerExtraTestSuite.test("load.invalid")
 .skip(.custom({ !_isDebugAssertConfiguration() },
               reason: "This tests a debug precondition.."))
@@ -137,6 +138,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.invalid.mutable")
   }
   expectUnreachable()
 }
+#endif
 
 UnsafeMutableRawPointerExtraTestSuite.test("store.unaligned")
 .skip(.custom({
@@ -167,6 +169,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("store.unaligned")
               0)
 }
 
+#if !os(WASI)
 UnsafeMutableRawPointerExtraTestSuite.test("store.invalid")
 .skip(.custom({ !_isDebugAssertConfiguration() },
               reason: "This tests a debug precondition.."))
@@ -186,6 +189,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("store.invalid")
   p1.storeBytes(of: m, as: Missile.self)
   expectUnreachable()
 }
+#endif
 
 UnsafeMutableRawPointerExtraTestSuite.test("copyMemory") {
   let sizeInBytes = 4 * MemoryLayout<Int>.stride
