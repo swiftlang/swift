@@ -1119,8 +1119,8 @@ ParserResult<Pattern> Parser::parsePattern() {
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple();
-    
-  case tok::kw__:
+
+  case tok::kw__: {
     // Normally, '_' is invalid in type context for patterns, but they show up
     // in interface files as the name for type members that are non-public.
     // Treat them as an implicitly synthesized NamedPattern with a nameless
@@ -1134,8 +1134,12 @@ ParserResult<Pattern> Parser::parsePattern() {
       return makeParserResult(NamedPattern::createImplicit(Context, VD));
     }
     PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
-    return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
-    
+
+    const auto isAsyncLet =
+        InPatternWithAsyncAttribute && introducer == VarDecl::Introducer::Let;
+    return makeParserResult(
+        new (Context) AnyPattern(consumeToken(tok::kw__), isAsyncLet));
+  }
   case tok::identifier: {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
@@ -1174,7 +1178,10 @@ ParserResult<Pattern> Parser::parsePattern() {
     // In our recursive parse, remember that we're in a var/let pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
     T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
-    
+
+    // Reset async attribute in parser context.
+    llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
+
     ParserResult<Pattern> subPattern = parsePattern();
     if (subPattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
@@ -1383,6 +1390,9 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   // In our recursive parse, remember that we're in a var/let pattern.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
     T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+
+  // Reset async attribute in parser context.
+  llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
 
   ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic);
   if (subPattern.isNull())

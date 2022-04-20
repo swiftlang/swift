@@ -18,6 +18,7 @@
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/DynamicCasts.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -527,10 +528,9 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                             SILBasicBlock *falseBlock,
                                             ProfileCounter Target1Count,
                                             ProfileCounter Target2Count) {
-  // Check if our source type is AnyObject. In such a case, we need to ensure
-  // plus one our operand since SIL does not support guaranteed casts from an
-  // AnyObject.
-  if (op.getType().isAnyObject()) {
+  // Casting a guaranteed value requires ownership preservation.
+  if (!doesCastPreserveOwnershipForTypes(SGF.SGM.M, op.getType().getASTType(),
+                                         destFormalTy)) {
     op = op.ensurePlusOne(SGF, loc);
   }
   createCheckedCastBranch(loc, isExact, op.forward(SGF),

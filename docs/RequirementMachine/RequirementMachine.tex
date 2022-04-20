@@ -218,7 +218,7 @@ func minimum<S>(of elements: S) -> S.Iterator.Element
 \end{Verbatim}
 A particularly powerful kind of generic requirement---and perhaps the entire reason the requirement machine exists---is the same-type requirement.
 
-Supppose you're working with $\genericparam{S}$, a generic parameter ranging over $\proto{Sequence}$. Writing $\genericparam{S}.\namesym{Iterator}.\namesym{Element}$ everywhere will get awkward fast. As I mentioned, the real version of $\proto{Sequence}$ in the standard library is slightly more complex. Indeed, it defines an $\namesym{Element}$ associated type in the protocol itself, so that the user can write $\genericparam{S}.\namesym{Element}$. Simply adding the associated type definition is not enough, because now $\genericparam{S}.\namesym{Element}$ and $\genericparam{S}.\namesym{Iterator}.\namesym{Element}$ are \emph{different} type parameters and cannot be used interchangeably.
+Suppose you're working with $\genericparam{S}$, a generic parameter ranging over $\proto{Sequence}$. Writing $\genericparam{S}.\namesym{Iterator}.\namesym{Element}$ everywhere will get awkward fast. As I mentioned, the real version of $\proto{Sequence}$ in the standard library is slightly more complex. Indeed, it defines an $\namesym{Element}$ associated type in the protocol itself, so that the user can write $\genericparam{S}.\namesym{Element}$. Simply adding the associated type definition is not enough, because now $\genericparam{S}.\namesym{Element}$ and $\genericparam{S}.\namesym{Iterator}.\namesym{Element}$ are \emph{different} type parameters and cannot be used interchangeably.
 
 \index{same-type requirement}
 To express this restriction that concrete types conforming to $\proto{Sequence}$ must provide an iterator type compatible with the element type, a \texttt{where} clause in the protocol can state a same-type requirement:
@@ -261,7 +261,7 @@ But in this case, you may as well just peel off the $\namesym{Array}\langle\bull
 \[\genericparam{T}.\namesym{Element} == \namesym{Int}.\]
 
 \index{power set}
-One more small language feature is worth mentioning. You might want to define a function that constructs the the set of all subsets of a set, i.e., the power set. The $\namesym{Set}\langle\bullet\rangle$ type constructor requires that its argument conforms to $\proto{Hashable}$:
+One more small language feature is worth mentioning. You might want to define a function that constructs the set of all subsets of a set, i.e., the power set. The $\namesym{Set}\langle\bullet\rangle$ type constructor requires that its argument conforms to $\proto{Hashable}$:
 \begin{Verbatim}
 struct Set<Element : Hashable> {...}
 \end{Verbatim}
@@ -1390,7 +1390,7 @@ Finally, I can formalize the notion of ``reducing'' terms by making them ``small
 \begin{definition}[Reduction relation]\label{transinvdef} If $A^*$ is equipped with a reduction order $<$, then a relation $\rightarrow$ is a \emph{reduction relation} with respect to $<$ if $x\rightarrow y$ implies that $y<x$. Another equivalent definition is that a reduction relation $\rightarrow$ is a \emph{sub-relation} of $>$, the inverse relation of $<$. 
 \end{definition}
 \index{rewrite system}
-As you saw in the previous example, a reduction relation for a finitely-presented monoid can be constructed by orienting the equations from the presentation with respect to some reduction order, a process which converts the equations into rewrite rules. Such a set of rewrite rules is called a \emph{rewrite system}. There is a simple algorithm for for reducing a term into an irreducible form:
+As you saw in the previous example, a reduction relation for a finitely-presented monoid can be constructed by orienting the equations from the presentation with respect to some reduction order, a process which converts the equations into rewrite rules. Such a set of rewrite rules is called a \emph{rewrite system}. There is a simple algorithm for reducing a term into an irreducible form:
 \begin{algorithm}[Reducing a term]\label{reducingaterm} Let $t$ be a term in some rewrite system $R$.
 \begin{enumerate}
 \item Initialize the boolean flag to false.
@@ -2208,7 +2208,7 @@ t&\leftrightarrow ab\\
 u&\leftrightarrow a\\
 v&\leftrightarrow b
 \end{align*}
-This means that adding a new \emph{generator} to $M$ made the presentation convergent. What does this generator represent in the world of Swift? Well, $u\in M'$ is $a\in M$, which is $\protosym{View}$ in Swift; and $v\in M'$ is $b\in M$, which is $\namesym{Body}$. Therefore $t\in M'$ is $ab\in M$, which is $\protosym{View}.\namesym{Body}$. You may guess that $t$ could be a new kind of symbol, perhaps representing a ``bound'' associated type inside a specific protcol.
+This means that adding a new \emph{generator} to $M$ made the presentation convergent. What does this generator represent in the world of Swift? Well, $u\in M'$ is $a\in M$, which is $\protosym{View}$ in Swift; and $v\in M'$ is $b\in M$, which is $\namesym{Body}$. Therefore $t\in M'$ is $ab\in M$, which is $\protosym{View}.\namesym{Body}$. You may guess that $t$ could be a new kind of symbol, perhaps representing a ``bound'' associated type inside a specific protocol.
 
 \index{associated type symbol}
  The crux of the issue is that name symbols like $\namesym{Body}$ don't carry any information, and little can be said about them unless they're prefixed with some other term that is known to conform to a protocol. Thus, you cannot simply add a rewrite rule to say that $\namesym{Body}$ conforms to $\protosym{View}$:
@@ -2369,7 +2369,7 @@ Conformance validity has some useful properties.
 \end{proof}
 
 \iffalse
-This solves the quandry presented at the beginning of this chapter, where the earlier formulation of the rewrite system that lacked associated type symbols had no apparent way of implementing the \texttt{getCanonicalTypeInContext()} generic signature query.
+This solves the quandary presented at the beginning of this chapter, where the earlier formulation of the rewrite system that lacked associated type symbols had no apparent way of implementing the \texttt{getCanonicalTypeInContext()} generic signature query.
 
 Now that a term containing name symbols reduces to a canonical term with associated type symbols, it appears that mapping terms back to fully resolved type parameters is now a possibility. Unfortunately, the reality is a little bit more complicated. The inherited associated type construction I will introduce in the next section once again breaks the correspondence between terms and canonical types; this will be repaired in Section \ref{implqueries}.
 \fi
@@ -3674,7 +3674,7 @@ Now, the time has finally come to describe the implementation of the four proper
 \item[\texttt{getRequiredProtocols()}] The list of protocol requirements satisfied by a type parameter $T$ is recorded in the form of protocol symbols in the property map. This list is transformed into a minimal canonical list of protocols using Definition~\ref{minimalproto}.
 \index{layout constraints}
 \index{join of layout constraints}
-\item[\texttt{getLayoutContraint()}] A type parameter $T$ might be subject to multiple layout constraints, in which case the property map entry will store a list of layout constraints $L_1,\ldots,L_n$. This query needs to compute their join, which is the largest layout constraint that simultaneously satisfies all of them:
+\item[\texttt{getLayoutConstraint()}] A type parameter $T$ might be subject to multiple layout constraints, in which case the property map entry will store a list of layout constraints $L_1,\ldots,L_n$. This query needs to compute their join, which is the largest layout constraint that simultaneously satisfies all of them:
 \[L_1\wedge\cdots\wedge L_n.\]
 Some layout constraints are disjoint on concrete types, meaning their join is the uninhabited ``bottom'' layout constraint, which precedes all other layout constraints in the partial order. In this case, the original generic signature is said to have conflicting requirements. While such a signature does not violate the requirement machine's invariants, it cannot be satisfied by any valid set of concrete substitutions. Detecting and diagnosing conflicting requirements is discussed later.
 

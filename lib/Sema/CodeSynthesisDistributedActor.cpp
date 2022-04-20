@@ -696,10 +696,12 @@ FuncDecl *GetDistributedThunkRequest::evaluate(
     return nullptr;
   }
 
-  // Force type-checking the original function, so we can avoid synthesizing
-  // the thunks (which would have many of the same errors, if they are caused
-  // by a bad source function signature, e.g. missing conformances etc).
-  if (distributedTarget->getInterfaceType()->hasError()) {
+  // If the target function signature has errors, or if it is illegal in other
+  // ways, such as e.g. parameters not conforming to SerializationRequirement,
+  // we must avoid synthesis of the thunk because it'd also have errors,
+  // giving an ugly user experience (errors in implicit code).
+  if (distributedTarget->getInterfaceType()->hasError() ||
+      checkDistributedFunction(distributedTarget)) {
     return nullptr;
   }
 

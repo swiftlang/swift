@@ -174,7 +174,7 @@ func testConcurrency() {
 func testUnsafeSendableNothing() {
   var x = 5
   acceptUnsafeSendable {
-    x = 17
+    x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
   }
   print(x)
 }

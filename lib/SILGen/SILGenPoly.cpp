@@ -183,7 +183,7 @@ collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
     auto conformance =
-      M->lookupConformance(fromType, proto->getDecl());
+      M->lookupConformance(fromType, proto);
     assert(conformance);
     conformances.push_back(conformance);
   }

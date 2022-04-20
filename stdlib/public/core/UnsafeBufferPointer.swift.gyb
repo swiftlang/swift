@@ -296,7 +296,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
     // NOTE: We allow the subtraction to silently overflow in release builds
-    // to eliminate a superflous check when `start` and `end` are both valid
+    // to eliminate a superfluous check when `start` and `end` are both valid
     // indices. (The operation can only overflow if `start` is negative, which
     // implies it's an invalid index.) `Collection` does not specify what
     // `distance` should return when given an invalid index pair.

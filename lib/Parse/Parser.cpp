@@ -579,13 +579,16 @@ const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
 
-SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
-  SourceLoc Loc = Tok.getLoc();
+SourceLoc Parser::discardToken() {
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
-
-  recordTokenHash(Tok);
-
+  SourceLoc Loc = Tok.getLoc();
   L->lex(Tok, LeadingTrivia, TrailingTrivia);
+  return Loc;
+}
+
+SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
+  recordTokenHash(Tok);
+  auto Loc = discardToken();
   PreviousLoc = Loc;
   return Loc;
 }
@@ -1154,15 +1157,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   }
 
   return Status;
-}
-
-/// diagnoseRedefinition - Diagnose a redefinition error, with a note
-/// referring back to the original definition.
-
-void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
-  assert(New != Prev && "Cannot conflict with self");
-  diagnose(New->getLoc(), diag::decl_redefinition);
-  diagnose(Prev->getLoc(), diag::previous_decldef, Prev->getBaseName());
 }
 
 Optional<StringRef>

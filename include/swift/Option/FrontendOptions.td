@@ -562,6 +562,9 @@ def disable_deserialization_recovery :
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
+def disable_experimental_string_processing :
+  Flag<["-"], "disable-experimental-string-processing">,
+  HelpText<"Disable experimental string processing">;
 
 def enable_experimental_variadic_generics :
   Flag<["-"], "enable-experimental-variadic-generics">,
@@ -828,6 +831,11 @@ def enable_experimental_cxx_interop :
   HelpText<"Enable C++ interop code generation and config directives">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def enable_cxx_interop :
+  Flag<["-"], "enable-cxx-interop">,
+  HelpText<"Alias for -enable-experimental-cxx-interop">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
@@ -895,10 +903,6 @@ def experimental_one_way_closure_params :
 def experimental_multi_statement_closures :
   Flag<["-"], "experimental-multi-statement-closures">,
   HelpText<"Enable experimental support for type inference in multi-statement closures">;
-
-def experimental_type_inference_from_defaults :
-  Flag<["-"], "enable-experimental-type-inference-from-defaults">,
-  HelpText<"Enable experimental support for generic parameter inference from default values">;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,

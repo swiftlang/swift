@@ -3955,9 +3955,24 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
   if (constraintType->hasError())
     return ErrorType::get(getASTContext());
 
-  auto anyStart = repr->getAnyLoc();
-  auto anyEnd = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, anyStart);
   if (!constraintType->isExistentialType()) {
+    // Emit a tailored diagnostic for the incorrect optional
+    // syntax 'any P?' with a fix-it to add parenthesis.
+    auto wrapped = constraintType->getOptionalObjectType();
+    if (wrapped && (wrapped->is<ExistentialType>() ||
+                    wrapped->is<ExistentialMetatypeType>())) {
+      std::string fix;
+      llvm::raw_string_ostream OS(fix);
+      constraintType->print(OS, PrintOptions::forDiagnosticArguments());
+      diagnose(repr->getLoc(), diag::incorrect_optional_any,
+               constraintType)
+        .fixItReplace(repr->getSourceRange(), fix);
+      return constraintType;
+    }
+
+    auto anyStart = repr->getAnyLoc();
+    auto anyEnd = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
+                                             anyStart);
     diagnose(repr->getLoc(), diag::any_not_existential,
              constraintType->isTypeParameter(),
              constraintType)
@@ -3993,6 +4008,30 @@ NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
 NeverNullType
 TypeResolver::buildMetatypeType(MetatypeTypeRepr *repr, Type instanceType,
                                 Optional<MetatypeRepresentation> storedRepr) {
+  // If the instance type is an existential metatype, figure out if
+  // the syntax is of the form '(any <protocol metatype>).Type'. In
+  // this case, type resolution should produce the static metatype
+  // of that existential metatype, versus another existential metatype
+  // via the old '<protocol metatype>.Type' syntax.
+  if (instanceType->is<ExistentialMetatypeType>()) {
+    // First, look for the paren type.
+    auto *tuple = dyn_cast<TupleTypeRepr>(repr->getBase());
+    if (tuple && tuple->isParenType()) {
+      // Then, look through parens for the 'any' keyword.
+      auto *element = tuple->getWithoutParens();
+      if (auto *existential = dyn_cast<ExistentialTypeRepr>(element)) {
+        // Finally, look for a constraint ending with '.Type'. Assume the
+        // base is a protocol, otherwise resolveExistentialType would
+        // have emitted an error message and returned the concrete type
+        // instead of an existential metatype.
+        auto *constraint = existential->getConstraint()->getWithoutParens();
+        if (isa<MetatypeTypeRepr>(constraint)) {
+          return MetatypeType::get(instanceType, storedRepr);
+        }
+      }
+    }
+  }
+
   if (instanceType->isAnyExistentialType() &&
       !instanceType->is<ExistentialType>()) {
     // TODO: diagnose invalid representations?
@@ -4277,8 +4316,7 @@ public:
       // existential type.
       if (type->isConstraintType()) {
         auto layout = type->getExistentialLayout();
-        for (auto *proto : layout.getProtocols()) {
-          auto *protoDecl = proto->getDecl();
+        for (auto *protoDecl : layout.getProtocols()) {
           if (!protoDecl->existentialRequiresAny())
             continue;
 

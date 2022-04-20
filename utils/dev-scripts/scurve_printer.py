@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This is a simple script that takes in an scurve file produced by
 # csvcolumn_to_scurve and produces a png graph of the scurve.

@@ -1,0 +1,4 @@
+module LocalClang [system] {
+  header "LocalClang.h"
+  export *
+}

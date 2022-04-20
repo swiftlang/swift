@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface -enable-library-evolution %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name attrs
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name attrs
 // RUN: %FileCheck %s < %t.swiftinterface
 
 // CHECK: @_transparent public func glass() -> Swift.Int { return 0 }{{$}}

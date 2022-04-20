@@ -6959,6 +6959,11 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
+      // Track whether we are parsing an 'async let' pattern.
+      const auto hasAsyncAttr = Attributes.hasAttribute<AsyncAttr>();
+      llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute,
+                                           hasAsyncAttr);
+
       auto patternRes = parseTypedPattern();
       if (patternRes.hasCodeCompletion())
         return makeResult(makeParserCodeCompletionStatus());
@@ -7643,7 +7648,11 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
         T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
         parseMatchingPattern(/*isExprBasic*/false);
-        
+
+        // Reset async attribute in parser context.
+        llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute,
+                                             false);
+
         if (consumeIf(tok::colon)) {
           backtrack.cancelBacktrack();
           diagnose(CaseLoc, diag::case_outside_of_switch, "case");
@@ -8527,6 +8536,13 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     if (!Tok.getText().empty() && (Tok.getRawText().front() == '?' ||
                                    Tok.getRawText().front() == '!'))
       diagnose(Tok, diag::postfix_operator_name_cannot_start_with_unwrap);
+
+  // Prefix operators may not contain the `/` character when `/.../` regex
+  // literals are enabled.
+  if (Context.LangOpts.EnableBareSlashRegexLiterals) {
+    if (Attributes.hasAttribute<PrefixAttr>() && Tok.getText().contains("/"))
+      diagnose(Tok, diag::prefix_slash_not_allowed);
+  }
 
   // A common error is to try to define an operator with something in the
   // unicode plane considered to be an operator, or to try to define an

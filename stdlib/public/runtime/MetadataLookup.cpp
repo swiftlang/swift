@@ -38,6 +38,7 @@
 #include <functional>
 #include <vector>
 #include <list>
+#include <new>
 
 using namespace swift;
 using namespace Demangle;
@@ -774,7 +775,7 @@ _findContextDescriptor(Demangle::NodePointer node,
                                                     *entry,
                                                 bool created) {
       if (created)
-        new (entry) NominalTypeDescriptorCacheEntry{mangledName, foundContext};
+        ::new (entry) NominalTypeDescriptorCacheEntry{mangledName, foundContext};
       return true;
     });
 
@@ -931,7 +932,7 @@ _findProtocolDescriptor(NodePointer node,
                                                      *entry,
                                                  bool created) {
       if (created)
-        new (entry) ProtocolDescriptorCacheEntry{mangledName, foundProtocol};
+        ::new (entry) ProtocolDescriptorCacheEntry{mangledName, foundProtocol};
       return true;
     });
   }
@@ -1975,7 +1976,7 @@ static NodePointer getParameterList(NodePointer funcType) {
       funcType->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/1);
   assert(parameterContainer->getNumChildren() > 0);
 
-  // This is a type that convers entire parameter list.
+  // This is a type that covers entire parameter list.
   auto parameterList = parameterContainer->getFirstChild();
   assert(parameterList->getKind() == Node::Kind::Type);
 
@@ -2642,7 +2643,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
       !replacedFunctionKey->isAsync(), /*allowNull*/ false);
 }
 
-/// An automatic dymamic replacement entry.
+/// An automatic dynamic replacement entry.
 namespace {
 class AutomaticDynamicReplacementEntry {
   RelativeDirectPointer<DynamicReplacementScope, false> replacementScope;

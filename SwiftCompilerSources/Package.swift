@@ -11,7 +11,7 @@ let package = Package(
     .library(
       name: "Swift",
       type: .static,
-      targets: ["SIL", "Optimizer", "_RegexParser"]),
+      targets: ["SIL", "Optimizer", "_CompilerRegexParser"]),
   ],
   dependencies: [
   ],
@@ -26,8 +26,9 @@ let package = Package(
           "-cross-module-optimization"
         ])]),
     .target(
-      name: "_RegexParser",
+      name: "_CompilerRegexParser",
       dependencies: [],
+      path: "_RegexParser",
       swiftSettings: [
         .unsafeFlags([
           "-I", "../include/swift",
@@ -41,7 +42,7 @@ let package = Package(
         ])]),
     .target(
       name: "Optimizer",
-      dependencies: ["SIL", "_RegexParser"],
+      dependencies: ["SIL", "_CompilerRegexParser"],
       swiftSettings: [SwiftSetting.unsafeFlags([
           "-I", "../include/swift",
           "-cross-module-optimization"

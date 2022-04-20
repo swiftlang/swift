@@ -354,9 +354,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       auto layout = castType->getExistentialLayout();
       for (auto proto : layout.getProtocols()) {
-        if (proto->getDecl()->isMarkerProtocol()) {
+        if (proto->isMarkerProtocol()) {
           Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
-                             proto->getDecl()->getName());
+                             proto->getName());
         }
       }
     }

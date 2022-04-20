@@ -954,7 +954,11 @@ emitKeyPathComponent(IRGenModule &IGM,
       // instantiation time.
       idResolution = idRef.isIndirect()
         ? KeyPathComponentHeader::IndirectPointer
-        : KeyPathComponentHeader::Resolved;
+        // Compute absolute reference from relative reference if target supports it.
+        // Otherwise, embed absolute reference directly.
+        : (IGM.getOptions().CompactAbsoluteFunctionPointer
+          ? KeyPathComponentHeader::ResolvedAbsolute
+          : KeyPathComponentHeader::Resolved);
       break;
     }
     case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
@@ -1089,8 +1093,12 @@ emitKeyPathComponent(IRGenModule &IGM,
     fields.addInt32(header.getData());
     switch (idKind) {
     case KeyPathComponentHeader::Pointer:
-      // Use a relative offset to the referent.
-      fields.addRelativeAddress(idValue);
+      // Use a relative offset to the referent if value is not absolute.
+      if (idResolution == KeyPathComponentHeader::ResolvedAbsolute) {
+        fields.add(idValue);
+      } else {
+        fields.addRelativeAddress(idValue);
+      }
       break;
 
     case KeyPathComponentHeader::VTableOffset:

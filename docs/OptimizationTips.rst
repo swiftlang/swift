@@ -183,7 +183,7 @@ sources all together at once. This allows the optimizer to have module
 wide visibility when compiling individual declarations. Since an
 internal declaration is not visible outside of the current module, the
 optimizer can then infer `final` by automatically discovering all
-potentially overridding declarations.
+potentially overriding declarations.
 
 NOTE: Since in Swift the default access control level is ``internal``
 anyways, by enabling Whole Module Optimization, one can gain

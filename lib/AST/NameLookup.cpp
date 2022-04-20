@@ -1592,6 +1592,32 @@ void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
   filterForDiscriminator(decls, M->getDebugClient());
 }
 
+// An unfortunate hack to kick the decl checker into adding semantic members to
+// the current type before we attempt a semantic lookup. The places this method
+// looks needs to be in sync with \c extractDirectlyReferencedNominalTypes.
+// See the note in \c synthesizeSemanticMembersIfNeeded about a better, more
+// just, and peaceful world.
+void namelookup::installSemanticMembersIfNeeded(Type type, DeclNameRef name) {
+  // Look-through class-bound archetypes to ensure we synthesize e.g.
+  // inherited constructors.
+  if (auto archetypeTy = type->getAs<ArchetypeType>()) {
+    if (auto super = archetypeTy->getSuperclass()) {
+      type = super;
+    }
+  }
+
+  if (type->isExistentialType()) {
+    auto layout = type->getExistentialLayout();
+    if (auto super = layout.explicitSuperclass) {
+      type = super;
+    }
+  }
+
+  if (auto *current = type->getAnyNominal()) {
+    current->synthesizeSemanticMembersIfNeeded(name.getFullName());
+  }
+}
+
 /// Inspect the given type to determine which nominal type declarations it
 /// directly references, to facilitate name lookup into those types.
 void namelookup::extractDirectlyReferencedNominalTypes(
@@ -1624,8 +1650,7 @@ void namelookup::extractDirectlyReferencedNominalTypes(
   if (auto compositionTy = type->getAs<ProtocolCompositionType>()) {
     auto layout = compositionTy->getExistentialLayout();
 
-    for (auto proto : layout.getProtocols()) {
-      auto *protoDecl = proto->getDecl();
+    for (auto protoDecl : layout.getProtocols()) {
       decls.push_back(protoDecl);
     }
 
@@ -2304,8 +2329,8 @@ static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
     }
 
     // Protocols.
-    for (auto protocolTy : layout.getProtocols())
-      result.push_back(protocolTy->getDecl());
+    for (auto protoDecl : layout.getProtocols())
+      result.push_back(protoDecl);
     return result;
   }
 

@@ -537,6 +537,29 @@ deriveDistributedActorType_ID(
   return nullptr;
 }
 
+static Type
+deriveDistributedActorType_SerializationRequirement(
+    DerivedConformance &derived) {
+  if (!derived.Nominal->isDistributedActor())
+    return nullptr;
+
+  // Look for a type DefaultDistributedActorSystem within the parent context.
+  auto systemTy = getDistributedActorSystemType(derived.Nominal);
+
+  // There is no known actor system type, so fail to synthesize.
+  if (!systemTy || systemTy->hasError())
+    return nullptr;
+
+  auto DAS = derived.Context.getDistributedActorSystemDecl();
+  if (!DAS)
+    return nullptr;
+
+  if (auto systemNominal = systemTy->getAnyNominal())
+    return getDistributedSerializationRequirementType(systemNominal, DAS);
+
+  return nullptr;
+}
+
 /******************************************************************************/
 /**************************** ENTRY POINTS ************************************/
 /******************************************************************************/
@@ -572,7 +595,13 @@ std::pair<Type, TypeDecl *> DerivedConformance::deriveDistributedActor(
     return std::make_pair(Type(), nullptr);
 
   if (assocType->getName() == Context.Id_ActorSystem) {
-    return std::make_pair(deriveDistributedActorType_ActorSystem(*this), nullptr);
+    return std::make_pair(deriveDistributedActorType_ActorSystem(*this),
+                          nullptr);
+  }
+
+  if (assocType->getName() == Context.Id_SerializationRequirement) {
+    return std::make_pair(
+        deriveDistributedActorType_SerializationRequirement(*this), nullptr);
   }
 
   if (assocType->getName() == Context.Id_ID) {
@@ -603,10 +632,10 @@ DerivedConformance::deriveDistributedActorSystem(ValueDecl *requirement) {
 
 void DerivedConformance::tryDiagnoseFailedDistributedActorDerivation(
         DeclContext *DC, NominalTypeDecl *nominal) {
-  // TODO: offer better diagnosis for error scenarios here
+  // TODO(distributed): offer better diagnosis for error scenarios here
 }
 
 void DerivedConformance::tryDiagnoseFailedDistributedActorSystemDerivation(
     DeclContext *DC, NominalTypeDecl *nominal) {
-  // TODO: offer better diagnosis for error scenarios here
+  // TODO(distributed): offer better diagnosis for error scenarios here
 }

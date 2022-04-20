@@ -188,7 +188,15 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     LibPath = SearchPathOpts.getSDKPath();
     llvm::sys::path::append(LibPath, "usr", "lib", "swift");
     if (!Triple.isOSDarwin()) {
+      // Use the non-architecture suffixed form with directory-layout
+      // swiftmodules.
       llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
+      RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+
+      // Compatibility with older releases - use the architecture suffixed form
+      // for pre-directory-layout multi-architecture layout.  Note that some
+      // platforms (e.g. Windows) will use this even with directory layout in
+      // older releases.
       llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
     }
     RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
@@ -500,9 +508,24 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_deserialization_recovery);
   }
 
-  // Experimental string processing
-  Opts.EnableExperimentalStringProcessing |=
-      Args.hasArg(OPT_enable_experimental_string_processing);
+  // Whether '/.../' regex literals are enabled. This implies experimental
+  // string processing.
+  if (Args.hasArg(OPT_enable_bare_slash_regex)) {
+    Opts.EnableBareSlashRegexLiterals = true;
+    Opts.EnableExperimentalStringProcessing = true;
+  }
+
+  // Experimental string processing.
+  if (auto A = Args.getLastArg(OPT_enable_experimental_string_processing,
+                               OPT_disable_experimental_string_processing)) {
+    Opts.EnableExperimentalStringProcessing =
+        A->getOption().matches(OPT_enable_experimental_string_processing);
+
+    // When experimental string processing is explicitly disabled, also disable
+    // forward slash regex `/.../`.
+    if (!Opts.EnableExperimentalStringProcessing)
+      Opts.EnableBareSlashRegexLiterals = false;
+  }
 
   Opts.EnableExperimentalBoundGenericExtensions |=
     Args.hasArg(OPT_enable_experimental_bound_generic_extensions);
@@ -669,7 +692,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.WarnConcurrency |= Args.hasArg(OPT_warn_concurrency);
+  // Swift 6+ uses the strictest concurrency level.
+  if (Opts.isSwiftVersionAtLeast(6)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::On;
+  } else if (const Arg *A = Args.getLastArg(OPT_strict_concurrency)) {
+    auto value = llvm::StringSwitch<Optional<StrictConcurrency>>(A->getValue())
+      .Case("off", StrictConcurrency::Off)
+      .Case("limited", StrictConcurrency::Limited)
+      .Case("on", StrictConcurrency::On)
+      .Default(None);
+
+    if (value)
+      Opts.StrictConcurrencyLevel = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+
+  } else if (Args.hasArg(OPT_warn_concurrency)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::On;
+  } else {
+    // Default to "limited" checking in Swift 5.x.
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Limited;
+  }
 
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
@@ -757,7 +801,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
 
-  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop);
+  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop) |
+                           Args.hasArg(OPT_enable_cxx_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());
@@ -1008,9 +1053,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_disable_requirement_machine_reuse))
     Opts.EnableRequirementMachineReuse = false;
-
-  if (Args.hasArg(OPT_enable_regex_literals))
-    Opts.EnableForwardSlashRegexLiterals = true;
 
   if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
     Opts.EnableRequirementMachineOpaqueArchetypes = true;

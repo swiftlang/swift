@@ -4139,7 +4139,7 @@ public:
                       OwnershipKind::Guaranteed,
               "checked_cast_br with an AnyObject typed source cannot forward "
               "guaranteed ownership");
-      require(CBI->isDirectlyForwarding() ||
+      require(CBI->preservesOwnership() ||
                   CBI->getOperand().getOwnershipKind() !=
                       OwnershipKind::Guaranteed,
               "If checked_cast_br is not directly forwarding, it can not have "

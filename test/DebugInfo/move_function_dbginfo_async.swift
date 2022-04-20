@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -c %s -o %t/out.o
 // RUN: %llvm-dwarfdump --show-children %t/out.o | %FileCheck -check-prefix=DWARF %s
 
+// REQUIRES: rdar91467528
+
 // This test checks that:
 //
 // 1. At the IR level, we insert the appropriate llvm.dbg.addr, llvm.dbg.value.

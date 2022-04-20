@@ -46,6 +46,7 @@
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
@@ -300,31 +301,6 @@ Type TypeTransformContext::getBaseType() const {
 
 bool TypeTransformContext::isPrintingSynthesizedExtension() const {
   return !Decl.isNull();
-}
-
-std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
-  llvm::SmallString<256> Builder;
-  Builder.reserve(Text.size());
-  const llvm::UTF8* Data = reinterpret_cast<const llvm::UTF8*>(Text.begin());
-  const llvm::UTF8* End = reinterpret_cast<const llvm::UTF8*>(Text.end());
-  StringRef Replacement = u8"\ufffd";
-  while (Data < End) {
-    auto Step = llvm::getNumBytesForUTF8(*Data);
-    if (Data + Step > End) {
-      Builder.append(Replacement);
-      break;
-    }
-
-    if (llvm::isLegalUTF8Sequence(Data, Data + Step)) {
-      Builder.append(Data, Data + Step);
-    } else {
-
-      // If malformed, add replacement characters.
-      Builder.append(Replacement);
-    }
-    Data += Step;
-  }
-  return std::string(Builder.str());
 }
 
 void ASTPrinter::anchor() {}
@@ -633,9 +609,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
     bool FirstLine = true;
     for (auto Line : Lines) {
       if (FirstLine)
-        Printer << sanitizeClangDocCommentStyle(ASTPrinter::sanitizeUtf8(Line));
+        Printer << sanitizeClangDocCommentStyle(unicode::sanitizeUTF8(Line));
       else
-        Printer << ASTPrinter::sanitizeUtf8(Line);
+        Printer << unicode::sanitizeUTF8(Line);
       Printer.printNewline();
       FirstLine = false;
     }
@@ -2335,7 +2311,8 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
                             bool openBracket, bool closeBracket) {
   if (openBracket) {
     Printer << " {";
-    Printer.printNewline();
+    if (!Options.PrintEmptyMembersOnSameLine || !members.empty())
+      Printer.printNewline();
   }
   {
     IndentRAII indentMore(*this);
@@ -2768,8 +2745,8 @@ static bool usesFeatureRethrowsProtocol(
       if (auto inheritedType = inheritedEntry.getType()) {
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
-          for (ProtocolType *protoTy : layout.getProtocols()) {
-            if (usesFeatureRethrowsProtocol(protoTy->getDecl(), checked))
+          for (ProtocolDecl *proto : layout.getProtocols()) {
+            if (usesFeatureRethrowsProtocol(proto, checked))
               return true;
           }
         }
@@ -2972,7 +2949,7 @@ static void suppressingFeatureUnsafeInheritExecutor(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
-static bool usesFeaturePrimaryAssociatedTypes(Decl *decl) {
+static bool usesFeaturePrimaryAssociatedTypes2(Decl *decl) {
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
     if (protoDecl->getPrimaryAssociatedTypes().size() > 0)
       return true;
@@ -2981,7 +2958,7 @@ static bool usesFeaturePrimaryAssociatedTypes(Decl *decl) {
   return false;
 }
 
-static void suppressingFeaturePrimaryAssociatedTypes(PrintOptions &options,
+static void suppressingFeaturePrimaryAssociatedTypes2(PrintOptions &options,
                                          llvm::function_ref<void()> action) {
   bool originalPrintPrimaryAssociatedTypes = options.PrintPrimaryAssociatedTypes;
   options.PrintPrimaryAssociatedTypes = false;
@@ -3128,13 +3105,12 @@ static FeatureSet getUniqueFeaturesUsed(Decl *decl) {
   return features;
 }
 
-static void printCompatibilityCheckIf(ASTPrinter &printer,
-                                      bool isElsif,
+static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
                                       bool includeCompilerCheck,
                                       const BasicFeatureSet &features) {
   assert(!features.empty());
 
-  printer << (isElsif ? "#elsif " : "#if ");
+  printer << (isElseIf ? "#elseif " : "#if ");
   if (includeCompilerCheck)
     printer << "compiler(>=5.3) && ";
 
@@ -3150,7 +3126,7 @@ static void printCompatibilityCheckIf(ASTPrinter &printer,
   printer.printNewline();
 }
 
-/// Generate a #if ... #elsif ... #endif chain for the given
+/// Generate a #if ... #elseif ... #endif chain for the given
 /// suppressible feature checks.
 static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
                                                PrintOptions &options,
@@ -3171,18 +3147,17 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
     return;
   }
 
-  // Otherwise, enter a `#if` or `#elsif` for the next feature.
+  // Otherwise, enter a `#if` or `#elseif` for the next feature.
   Feature feature = generator.next();
-  printCompatibilityCheckIf(printer, /*elsif*/ !firstInChain,
-                            includeCompilerCheck,
-                            {feature});
+  printCompatibilityCheckIf(printer, /*elseif*/ !firstInChain,
+                            includeCompilerCheck, {feature});
 
   // Print the body.
   printBody();
   printer.printNewline();
 
   // Start suppressing the feature and recurse to either generate
-  // more `#elsif` clauses or finish off with `#endif`.
+  // more `#elseif` clauses or finish off with `#endif`.
   suppressingFeature(options, feature, [&] {
     printWithSuppressibleFeatureChecks(printer, options, /*first*/ false,
                                        includeCompilerCheck, generator,
@@ -3195,13 +3170,13 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
 ///
 /// In the most general form, with both required features and multiple
 /// suppressible features in play, the generated code pattern looks like
-/// the following (assuming that feaature $bar implies feature $baz):
+/// the following (assuming that feature $bar implies feature $baz):
 ///
 /// ```
 ///   #if compiler(>=5.3) && $foo
 ///   #if $bar
 ///   @foo @bar @baz func @test() {}
-///   #elsif $baz
+///   #elseif $baz
 ///   @foo @baz func @test() {}
 ///   #else
 ///   @foo func @test() {}
@@ -3229,7 +3204,7 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
   bool hasRequiredFeatures = features.hasAnyRequired();
   if (hasRequiredFeatures) {
     printCompatibilityCheckIf(printer,
-                              /*elsif*/ false,
+                              /*elseif*/ false,
                               /*compiler check*/ true,
                               features.requiredFeatures());
   }

@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -module-name ParameterizedProtocols -emit-module-interface-path %t/ParameterizedProtocols.swiftinterface %s
+// RUN: %target-swift-emit-module-interface(%t/ParameterizedProtocols.swiftinterface) %s -module-name ParameterizedProtocols
+// RUN: %target-swift-typecheck-module-from-interface(%t/ParameterizedProtocols.swiftinterface) -module-name ParameterizedProtocols
 // RUN: %FileCheck %s < %t/ParameterizedProtocols.swiftinterface
 
 public protocol HasPrimaryAssociatedTypes<T, U> {
@@ -7,7 +8,7 @@ public protocol HasPrimaryAssociatedTypes<T, U> {
   associatedtype U : Equatable
 }
 
-// CHECK: #if compiler(>=5.3) && $PrimaryAssociatedTypes
+// CHECK: #if compiler(>=5.3) && $PrimaryAssociatedTypes2
 // CHECK-NEXT: public protocol HasPrimaryAssociatedTypes<T, U> {
 // CHECK-NEXT:   associatedtype T : Swift.Collection
 // CHECK-NEXT:   associatedtype U : Swift.Equatable where Self.U == Self.T.Element

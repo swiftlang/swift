@@ -12,8 +12,6 @@ Swift preset parsing and handling functionality.
 """
 
 
-from __future__ import absolute_import, unicode_literals
-
 import configparser
 import functools
 import io

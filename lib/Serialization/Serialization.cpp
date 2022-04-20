@@ -1396,13 +1396,27 @@ void Serializer::serializeGenericRequirements(
   }
 }
 
-void Serializer::writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes) {
+void Serializer::writeAssociatedTypes(
+    ArrayRef<AssociatedTypeDecl *> assocTypes) {
   using namespace decls_block;
 
   auto assocTypeAbbrCode = DeclTypeAbbrCodes[AssociatedTypeLayout::Code];
 
   for (auto *assocType : assocTypes) {
     AssociatedTypeLayout::emitRecord(
+        Out, ScratchRecord, assocTypeAbbrCode,
+        addDeclRef(assocType));
+  }
+}
+
+void Serializer::writePrimaryAssociatedTypes(
+    ArrayRef<AssociatedTypeDecl *> assocTypes) {
+  using namespace decls_block;
+
+  auto assocTypeAbbrCode = DeclTypeAbbrCodes[PrimaryAssociatedTypeLayout::Code];
+
+  for (auto *assocType : assocTypes) {
+    PrimaryAssociatedTypeLayout::emitRecord(
         Out, ScratchRecord, assocTypeAbbrCode,
         addDeclRef(assocType));
   }
@@ -3077,8 +3091,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
     case PatternKind::Any: {
       unsigned abbrCode = S.DeclTypeAbbrCodes[AnyPatternLayout::Code];
+      auto anyPattern = cast<AnyPattern>(pattern);
       AnyPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   S.addTypeRef(getPatternType()));
+                                   S.addTypeRef(getPatternType()),
+                                   anyPattern->isAsyncLet());
       break;
     }
     case PatternKind::Typed: {
@@ -3706,6 +3722,7 @@ public:
     writeGenericParams(proto->getGenericParams());
     S.writeRequirementSignature(proto->getRequirementSignature());
     S.writeAssociatedTypes(proto->getAssociatedTypeMembers());
+    S.writePrimaryAssociatedTypes(proto->getPrimaryAssociatedTypes());
     writeMembers(id, proto->getAllMembers(), true);
     writeDefaultWitnessTable(proto);
   }
@@ -5044,6 +5061,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
   registerDeclTypeAbbr<AssociatedTypeLayout>();
+  registerDeclTypeAbbr<PrimaryAssociatedTypeLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
   registerDeclTypeAbbr<PrefixOperatorLayout>();
   registerDeclTypeAbbr<PostfixOperatorLayout>();

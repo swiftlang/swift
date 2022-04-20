@@ -192,7 +192,7 @@ foreach(sdk ${SWIFT_SDKS})
     # FIXME: When SDK is a cross-compile target (SDK != Host), the generated
     #        modulemap will be relative to the Host, with hardcoded paths.
     #        It is not relocatable to the target platform itself.
-    #        This affects any cross-comipled targets that use glibc.modulemap.
+    #        This affects any cross-compiled targets that use glibc.modulemap.
 
     swift_install_in_component(FILES "${glibc_modulemap_out}"
                                DESTINATION "lib/swift/${arch_subdir}"

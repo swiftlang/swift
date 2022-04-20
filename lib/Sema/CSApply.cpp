@@ -903,11 +903,6 @@ namespace {
                                bool baseIsInstance) {
       ValueDecl *member = choice.getDecl();
 
-      // FIXME: We should finish plumbing this through for dynamic
-      // lookup as well.
-      if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic)
-        return false;
-
       // If we're inside a selector expression, don't build the thunk.
       // Were not actually going to emit the member reference, just
       // look at the AST.
@@ -921,9 +916,11 @@ namespace {
       if (!baseIsInstance && member->isInstanceMember())
         return true;
 
-      // Bound optional method references are represented via
-      // DynamicMemberRefExpr instead of a curry thunk.
-      if (member->getAttrs().hasAttribute<OptionalAttr>())
+      // Bound member references that are '@objc optional' or found via dynamic
+      // lookup are always represented via DynamicMemberRefExpr instead of a
+      // curry thunk.
+      if (member->getAttrs().hasAttribute<OptionalAttr>() ||
+          choice.getKind() == OverloadChoiceKind::DeclViaDynamic)
         return false;
 
       // Figure out how many argument lists we need.
@@ -1002,7 +999,10 @@ namespace {
       auto *calleeFnTy = fnTy;
 
       if (baseExpr) {
+        // Coerce the base expression to the container type.
         const auto calleeSelfParam = calleeFnTy->getParams().front();
+        baseExpr =
+            coerceToType(baseExpr, calleeSelfParam.getOldType(), locator);
 
         // If the 'self' parameter has non-trivial ownership, adjust the
         // argument type accordingly.
@@ -1159,7 +1159,33 @@ namespace {
       Expr *thunkBody = buildSingleCurryThunkBodyCall(
           baseExpr, fnExpr, declOrClosure, thunkParamList, locator);
 
-      // Coerce to the result type of the thunk.
+      // If we called a function with a dynamic 'Self' result, we may need some
+      // special handling.
+      if (baseExpr) {
+        if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(declOrClosure)) {
+          if (fnDecl->hasDynamicSelfResult()) {
+            Type convTy;
+
+            if (cs.getType(baseExpr)->hasOpenedExistential()) {
+              // FIXME: Sometimes we need to convert to an opened existential
+              // first, because CovariantReturnConversionExpr does not support
+              // direct conversions from a class C to an existential C & P.
+              convTy = cs.getType(baseExpr)->getMetatypeInstanceType();
+              convTy =
+                  thunkTy->getResult()->replaceCovariantResultType(convTy, 0);
+            } else {
+              convTy = thunkTy->getResult();
+            }
+
+            if (!thunkBody->getType()->isEqual(convTy)) {
+              thunkBody = cs.cacheType(
+                  new (ctx) CovariantReturnConversionExpr(thunkBody, convTy));
+            }
+          }
+        }
+      }
+
+      // Now, coerce to the result type of the thunk.
       thunkBody = coerceToType(thunkBody, thunkTy->getResult(), locator);
 
       if (thunkTy->getExtInfo().isThrowing()) {
@@ -1261,20 +1287,27 @@ namespace {
         cs.cacheType(selfParamRef);
       }
 
-      auto *const selfCalleeTy = cs.getType(memberRef)->castTo<FunctionType>();
-      const auto selfCalleeParam = selfCalleeTy->getParams().front();
-      const auto selfCalleeParamTy = selfCalleeParam.getPlainType();
-
-      // Open the 'self' parameter reference if warranted.
+      bool hasOpenedExistential = false;
       Expr *selfOpenedRef = selfParamRef;
-      if (selfCalleeParamTy->hasOpenedExistential()) {
+
+      // If the 'self' parameter type is existential, it must be opened.
+      if (selfThunkParamTy->isAnyExistentialType()) {
+        Type openedTy = solution.OpenedExistentialTypes.lookup(
+            cs.getConstraintLocator(memberLocator));
+        assert(openedTy);
+
+        hasOpenedExistential = true;
+
         // If we're opening an existential:
         // - The type of 'memberRef' inside the thunk is written in terms of the
-        //   open existental archetype.
+        //   opened existental archetype.
         // - The type of the thunk is written in terms of the
         //   erased existential bounds.
-        auto opaqueValueTy = selfCalleeParamTy;
-        if (selfCalleeParam.isInOut())
+        Type opaqueValueTy = openedTy;
+        if (selfThunkParamTy->is<ExistentialMetatypeType>())
+          opaqueValueTy = MetatypeType::get(opaqueValueTy);
+
+        if (selfThunkParam.isInOut())
           opaqueValueTy = LValueType::get(opaqueValueTy);
 
         selfOpenedRef = new (ctx) OpaqueValueExpr(SourceLoc(), opaqueValueTy);
@@ -1292,6 +1325,9 @@ namespace {
       // build a dynamic member reference. Otherwise, build a nested
       // "{ args... in self.member(args...) }" thunk that calls the member.
       if (isDynamicLookup || member->getAttrs().hasAttribute<OptionalAttr>()) {
+        auto *const selfCalleeTy =
+            cs.getType(memberRef)->castTo<FunctionType>();
+
         outerThunkBody = new (ctx) DynamicMemberRefExpr(
             selfOpenedRef, SourceLoc(),
             resolveConcreteDeclRef(member, memberLocator), memberLoc);
@@ -1303,10 +1339,11 @@ namespace {
                                       memberLocator);
 
         // Close the existential if warranted.
-        if (selfCalleeParamTy->hasOpenedExistential()) {
+        if (hasOpenedExistential) {
           // If the callee's 'self' parameter has non-trivial ownership, adjust
           // the argument type accordingly.
-          adjustExprOwnershipForParam(selfOpenedRef, selfCalleeParam);
+          adjustExprOwnershipForParam(selfOpenedRef,
+                                      selfCalleeTy->getParams().front());
 
           outerThunkBody = new (ctx) OpenExistentialExpr(
               selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef),
@@ -1319,7 +1356,7 @@ namespace {
             outerThunkTy->getResult()->castTo<FunctionType>(), memberLocator);
 
         // Rewrite the body to close the existential if warranted.
-        if (selfCalleeParamTy->hasOpenedExistential()) {
+        if (hasOpenedExistential) {
           auto *body = innerThunk->getSingleExpressionBody();
           body = new (ctx) OpenExistentialExpr(
               selfParamRef, cast<OpaqueValueExpr>(selfOpenedRef), body,
@@ -1438,7 +1475,7 @@ namespace {
 
       const bool isUnboundInstanceMember =
           (!baseIsInstance && member->isInstanceMember());
-      const bool isPartialApplication =
+      const bool needsCurryThunk =
           shouldBuildCurryThunk(choice, baseIsInstance);
 
       // The formal type of the 'self' value for the member's declaration.
@@ -1452,8 +1489,6 @@ namespace {
       // the base accordingly.
       bool openedExistential = false;
 
-      // For a partial application, we have to open the existential inside
-      // the thunk itself.
       auto knownOpened = solution.OpenedExistentialTypes.find(
                            getConstraintSystem().getConstraintLocator(
                              memberLocator));
@@ -1461,15 +1496,21 @@ namespace {
         // Determine if we're going to have an OpenExistentialExpr around
         // this member reference.
         //
-        // If we have a partial application of a protocol method, we open
-        // the existential in the curry thunk, instead of opening it here,
-        // because we won't have a 'self' value until the curry thunk is
-        // applied.
+        // For an unbound reference to a method, always open the existential
+        // inside the curry thunk, because we won't have a 'self' value until
+        // the curry thunk is applied.
         //
-        // However, a partial application of a class method on a subclass
-        // existential does need to open the existential, so that it can be
-        // upcast to the appropriate class reference type.
-        if (!isPartialApplication || !containerTy->hasOpenedExistential()) {
+        // For a partial application of a protocol method, open the existential
+        // inside the curry thunk as well. This reduces abstraction and
+        // post-factum function type conversions, and results in better SILGen.
+        //
+        // For a partial application of a class method, however, we always want
+        // the thunk to accept a class to avoid potential abstraction, so the
+        // existential base must be opened eagerly in order to be upcast to the
+        // appropriate class reference type before it is passed to the thunk.
+        if (!needsCurryThunk ||
+            (!member->getDeclContext()->getSelfProtocolDecl() &&
+             !isUnboundInstanceMember)) {
           // Open the existential before performing the member reference.
           base = openExistentialReference(base, knownOpened->second, member);
           baseTy = knownOpened->second;
@@ -1508,13 +1549,15 @@ namespace {
                  base, selfParamTy, member,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
-        if (!isExistentialMetatype || openedExistential) {
-          // Convert the base to an rvalue of the appropriate metatype.
-          base = coerceToType(base,
-                              MetatypeType::get(
-                                isDynamic ? selfTy : containerTy),
-                              locator.withPathElement(
-                                ConstraintLocator::MemberRefBase));
+        // The base of an unbound reference is unused, and thus a conversion
+        // is not necessary.
+        if (!isUnboundInstanceMember) {
+          if (!isExistentialMetatype || openedExistential) {
+            // Convert the base to an rvalue of the appropriate metatype.
+            base = coerceToType(
+                base, MetatypeType::get(isDynamic ? selfTy : containerTy),
+                locator.withPathElement(ConstraintLocator::MemberRefBase));
+          }
         }
 
         if (!base)
@@ -1544,8 +1587,8 @@ namespace {
       }
 
       // Handle dynamic references.
-      if (isDynamic || (!isPartialApplication &&
-                        member->getAttrs().hasAttribute<OptionalAttr>())) {
+      if (!needsCurryThunk &&
+          (isDynamic || member->getAttrs().hasAttribute<OptionalAttr>())) {
         base = cs.coerceToRValue(base);
         Expr *ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
                                                        memberLoc);
@@ -1635,7 +1678,7 @@ namespace {
       //
       // { self in { args... in self.method(args...) } }(foo)
       //
-      // This is done instead of just hoising the expression 'foo' up
+      // This is done instead of just hoisting the expression 'foo' up
       // into the closure, which would change evaluation order.
       //
       // However, for a super method reference, eg, 'let fn = super.foo',
@@ -1644,12 +1687,12 @@ namespace {
       // very specific shape, we only emit a single closure here and
       // capture the original SuperRefExpr, since its evaluation does not
       // have side effects, instead of abstracting out a 'self' parameter.
-      const auto isSuperPartialApplication = isPartialApplication && isSuper;
+      const auto isSuperPartialApplication = needsCurryThunk && isSuper;
       if (isSuperPartialApplication) {
         ref = buildSingleCurryThunk(base, declRefExpr,
                                     cast<AbstractFunctionDecl>(member),
                                     memberLocator);
-      } else if (isPartialApplication) {
+      } else if (needsCurryThunk) {
         // Another case where we want to build a single closure is when
         // we have a partial application of a constructor on a statically-
         // derived metatype value. Again, there are no order of evaluation
@@ -1672,17 +1715,28 @@ namespace {
           return closure;
         }
 
-        auto *curryThunkTy = refTy->castTo<FunctionType>();
+        FunctionType *curryThunkTy = nullptr;
+        if (isUnboundInstanceMember) {
+          // For an unbound reference to a method, all conversions, including
+          // dynamic 'Self' handling, are done within the thunk to support
+          // the edge case of an unbound reference to a 'Self'-returning class
+          // method on a protocol metatype. The result of calling the method
+          // must be downcast to the opened archetype before being erased to the
+          // subclass existential to cope with the expectations placed
+          // on 'CovariantReturnConversionExpr'.
+          curryThunkTy = simplifyType(openedType)->castTo<FunctionType>();
+        } else {
+          curryThunkTy = refTy->castTo<FunctionType>();
 
-        // Check if we need to open an existential stored inside 'self'.
-        auto knownOpened = solution.OpenedExistentialTypes.find(
-                             getConstraintSystem().getConstraintLocator(
-                               memberLocator));
-        if (knownOpened != solution.OpenedExistentialTypes.end()) {
-          curryThunkTy = curryThunkTy
-                             ->typeEraseOpenedArchetypesWithRoot(
-                                 knownOpened->second, dc)
-                             ->castTo<FunctionType>();
+          // Check if we need to open an existential stored inside 'self'.
+          auto knownOpened = solution.OpenedExistentialTypes.find(
+              getConstraintSystem().getConstraintLocator(memberLocator));
+          if (knownOpened != solution.OpenedExistentialTypes.end()) {
+            curryThunkTy =
+                curryThunkTy
+                    ->typeEraseOpenedArchetypesWithRoot(knownOpened->second, dc)
+                    ->castTo<FunctionType>();
+          }
         }
 
         // Replace the DeclRefExpr with a closure expression which SILGen
@@ -1695,7 +1749,10 @@ namespace {
       // implicit function type conversion around the resulting expression,
       // with the destination type having 'Self' swapped for the appropriate
       // replacement type -- usually the base object type.
-      if (!member->getDeclContext()->getSelfProtocolDecl()) {
+      //
+      // Note: For unbound references this is handled inside the thunk.
+      if (!isUnboundInstanceMember &&
+          !member->getDeclContext()->getSelfProtocolDecl()) {
         if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
           if (func->hasDynamicSelfResult() &&
               !baseTy->getOptionalObjectType()) {
@@ -2869,6 +2926,20 @@ namespace {
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       auto locator = cs.getConstraintLocator(expr);
 
+      // Check whether this is a reference to `__buildSelf`, and if so,
+      // replace it with a type expression with fully resolved type.
+      if (auto *var = dyn_cast<VarDecl>(expr->getDecl())) {
+        auto &ctx = cs.getASTContext();
+        if (var->getName() == ctx.Id_builderSelf) {
+          assert(expr->isImplicit() && var->isImplicit());
+          auto builderTy =
+            solution.getResolvedType(var)->getMetatypeInstanceType();
+
+          return cs.cacheType(
+            TypeExpr::createImplicitHack(expr->getLoc(), builderTy, ctx));
+        }
+      }
+
       // Find the overload choice used for this declaration reference.
       auto selected = solution.getOverloadChoice(locator);
       return buildDeclRef(selected, expr->getNameLoc(), locator,
@@ -3655,12 +3726,8 @@ namespace {
       expr->setCastType(toType);
       cs.setType(castTypeRepr, toType);
 
-      auto castContextKind =
-          SuppressDiagnostics ? CheckedCastContextKind::None
-                              : CheckedCastContextKind::IsExpr;
       auto castKind = TypeChecker::typeCheckCheckedCast(
-          fromType, toType, castContextKind, dc, expr->getLoc(), sub,
-          castTypeRepr->getSourceRange());
+          fromType, toType, CheckedCastContextKind::IsExpr, dc);
 
       switch (castKind) {
       case CheckedCastKind::Unresolved:
@@ -3669,19 +3736,7 @@ namespace {
           
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion:
-        expr->setCastKind(castKind);
-        break;
       case CheckedCastKind::ValueCast:
-        // Check the cast target is a non-foreign type
-        if (auto cls = toType->getAs<ClassType>()) {
-          if (cls->getDecl()->getForeignClassKind() ==
-                ClassDecl::ForeignKind::CFType) {
-            ctx.Diags.diagnose(expr->getLoc(), diag::isa_is_foreign_check,
-                               toType);
-          }
-        }
-        expr->setCastKind(castKind);
-        break;
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -4112,17 +4167,16 @@ namespace {
       if (hasForcedOptionalResult(expr))
         toType = toType->getOptionalObjectType();
 
-      auto castContextKind = SuppressDiagnostics || expr->isImplicit()
-                                 ? CheckedCastContextKind::None
-                                 : CheckedCastContextKind::ForcedCast;
-
       const auto castKind = TypeChecker::typeCheckCheckedCast(
-          fromType, toType, castContextKind, dc, expr->getLoc(), sub,
-          castTypeRange);
+          fromType, toType, CheckedCastContextKind::ForcedCast, dc);
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
-        return nullptr;
+        if (expr->isImplicit())
+          return nullptr;
+
+        expr->setCastKind(CheckedCastKind::ValueCast);
+        break;
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion: {
         expr->setCastKind(castKind);
@@ -4183,7 +4237,6 @@ namespace {
              "cast requires TypeRepr; implicit casts are superfluous");
 
       // The subexpression is always an rvalue.
-      auto &ctx = cs.getASTContext();
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
@@ -4191,39 +4244,11 @@ namespace {
       const auto fromType = cs.getType(sub);
       const auto toType = expr->getCastType();
 
-      bool isSubExprLiteral = isa<LiteralExpr>(sub);
-      auto castContextKind =
-          (SuppressDiagnostics || expr->isImplicit() || isSubExprLiteral)
-              ? CheckedCastContextKind::None
-              : CheckedCastContextKind::ConditionalCast;
-
       auto castKind = TypeChecker::typeCheckCheckedCast(
-          fromType, toType, castContextKind, dc, expr->getLoc(), sub,
-          castTypeRepr->getSourceRange());
+          fromType, toType, CheckedCastContextKind::ConditionalCast, dc);
       switch (castKind) {
       // Invalid cast.
       case CheckedCastKind::Unresolved:
-        // FIXME: This literal diagnostics needs to be revisited by a proposal
-        // to unify casting semantics for literals.
-        // https://bugs.swift.org/browse/SR-12093
-        if (isSubExprLiteral) {
-          auto protocol = TypeChecker::getLiteralProtocol(ctx, sub);
-          // Special handle for literals conditional checked cast when they can
-          // be statically coerced to the cast type.
-          if (protocol && TypeChecker::conformsToProtocol(
-                              toType, protocol, dc->getParentModule())) {
-            ctx.Diags
-                .diagnose(expr->getLoc(),
-                          diag::literal_conditional_downcast_to_coercion,
-                          toType);
-          } else {
-            ctx.Diags
-                .diagnose(expr->getLoc(), diag::downcast_to_unrelated, fromType,
-                          toType)
-                .highlight(sub->getSourceRange())
-                .highlight(castTypeRepr->getSourceRange());
-          }
-        }
         expr->setCastKind(CheckedCastKind::ValueCast);
         break;
 
@@ -5376,7 +5401,7 @@ collectExistentialConformances(Type fromType, Type toType,
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : layout.getProtocols()) {
     conformances.push_back(TypeChecker::containsProtocol(
-        fromType, proto->getDecl(), module));
+        fromType, proto, module));
   }
 
   return toType->getASTContext().AllocateCopy(conformances);
@@ -6091,12 +6116,9 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
                                     Type destType, bool bridged,
                                     ConstraintLocatorBuilder locator,
                                     Expr *element) {
-  if (bridged &&
-      TypeChecker::typeCheckCheckedCast(srcType, destType,
-                                        CheckedCastContextKind::None,
-                                        rewriter.dc,
-                                        SourceLoc(), nullptr, SourceRange())
-        != CheckedCastKind::Coercion) {
+  if (bridged && TypeChecker::typeCheckCheckedCast(
+                     srcType, destType, CheckedCastContextKind::None,
+                     rewriter.dc) != CheckedCastKind::Coercion) {
     if (auto conversion =
           rewriter.buildObjCBridgeExpr(element, destType, locator))
         return conversion;

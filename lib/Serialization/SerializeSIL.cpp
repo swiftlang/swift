@@ -462,10 +462,15 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (auto *fun = F.getDynamicallyReplacedFunction()) {
     addReferencedSILFunction(fun, true);
     replacedFunctionID = S.addUniquedStringRef(fun->getName());
-  }
-  else if (F.hasObjCReplacement()) {
+  } else if (F.hasObjCReplacement()) {
     replacedFunctionID =
         S.addUniquedStringRef(F.getObjCReplacement().str());
+  }
+
+  IdentifierID usedAdHocWitnessFunctionID = 0;
+  if (auto *fun = F.getReferencedAdHocRequirementWitnessFunction()) {
+    addReferencedSILFunction(fun, true);
+    usedAdHocWitnessFunctionID = S.addUniquedStringRef(fun->getName());
   }
 
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
@@ -495,9 +500,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.hasCReferences(), (unsigned)F.getEffectsKind(),
       (unsigned)numAttrs, (unsigned)F.hasOwnership(),
       F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
-      (unsigned)F.isDynamicallyReplaceable(), (unsigned)F.isExactSelfClass(),
-      (unsigned)F.isDistributed(), FnID, replacedFunctionID, genericSigID,
-      clangNodeOwnerID, SemanticsIDs);
+      (unsigned)F.isDynamicallyReplaceable(),
+      (unsigned)F.isExactSelfClass(),
+      (unsigned)F.isDistributed(),
+      FnID, replacedFunctionID, usedAdHocWitnessFunctionID,
+      genericSigID, clangNodeOwnerID, SemanticsIDs);
 
   F.visitArgEffects(
     [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {

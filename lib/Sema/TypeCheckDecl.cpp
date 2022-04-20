@@ -703,6 +703,18 @@ ArrayRef<AssociatedTypeDecl *>
 PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *decl) const {
   SmallVector<AssociatedTypeDecl *, 2> assocTypes;
+
+  if (decl->hasLazyPrimaryAssociatedTypes()) {
+    auto &ctx = decl->getASTContext();
+    auto contextData = static_cast<LazyProtocolData *>(
+        ctx.getOrCreateLazyContextData(decl, nullptr));
+
+    contextData->loader->loadPrimaryAssociatedTypes(
+        decl, contextData->primaryAssociatedTypesData, assocTypes);
+
+    return decl->getASTContext().AllocateCopy(assocTypes);
+  }
+
   llvm::SmallDenseSet<Identifier, 2> assocTypeNames;
 
   for (auto pair : decl->getPrimaryAssociatedTypeNames()) {

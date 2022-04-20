@@ -1778,8 +1778,6 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // add a constraint from the parameter if necessary, otherwise
     // there is nothing to do but move to the next parameter.
     if (parameterBindings[paramIdx].empty() && callee) {
-      auto &ctx = cs.getASTContext();
-
       // Type inference from default value expressions.
       {
         auto *paramList = getParameterList(callee);
@@ -3265,7 +3263,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       return getTypeMatchFailure(locator);
 
     for (unsigned i: indices(layout1.getProtocols())) {
-      if (!layout1.getProtocols()[i]->isEqual(layout2.getProtocols()[i]))
+      if (layout1.getProtocols()[i] != layout2.getProtocols()[i])
         return getTypeMatchFailure(locator);
     }
 
@@ -3519,9 +3517,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
       return result;
   }
 
-  for (auto *proto : layout.getProtocols()) {
-    auto *protoDecl = proto->getDecl();
-
+  for (auto *protoDecl : layout.getProtocols()) {
     if (auto superclass = protoDecl->getSuperclass()) {
       auto subKind = std::min(ConstraintKind::Subtype, kind);
       auto result = matchTypes(type1, superclass, subKind,
@@ -3556,6 +3552,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           auto last = path.back();
 
           if (last.is<LocatorPathElt::ApplyArgToParam>()) {
+            auto proto = protoDecl->getDeclaredInterfaceType();
             auto *fix = AllowArgumentMismatch::create(
                 *this, type1, proto, getConstraintLocator(anchor, path));
 
@@ -3599,6 +3596,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           break;
         }
 
+        auto proto = protoDecl->getDeclaredInterfaceType();
         auto *fix = MissingConformance::forContextual(
             *this, type1, proto, getConstraintLocator(anchor, path));
 
@@ -7565,8 +7563,21 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   }
 
   auto castKind = TypeChecker::typeCheckCheckedCast(
-      fromType, toType, CheckedCastContextKind::None, cs.DC, SourceLoc(),
-      nullptr, SourceRange());
+      fromType, toType, CheckedCastContextKind::None, cs.DC);
+
+  if (castKind == CheckedCastKind::Unresolved) {
+    return AllowCheckedCastToUnrelated::attempt(
+        cs, origFromType, origToType, castKind,
+        cs.getConstraintLocator(locator));
+  }
+
+  if (castKind == CheckedCastKind::ValueCast) {
+    // SR-1612: Special 'is' case diagnostics for CFTypes.
+    return AllowNoopExistentialToCFTypeCheckedCast::attempt(
+        cs, origFromType, origToType, castKind,
+        cs.getConstraintLocator(locator));
+  }
+
   if (!(castKind == CheckedCastKind::Coercion ||
         castKind == CheckedCastKind::BridgingCoercion))
     return nullptr;
@@ -12815,7 +12826,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
   case FixKind::AllowCheckedCastCoercibleOptionalType:
   case FixKind::AllowNoopCheckedCast:
+  case FixKind::AllowNoopExistentialToCFTypeCheckedCast:
   case FixKind::AllowUnsupportedRuntimeCheckedCast:
+  case FixKind::AllowCheckedCastToUnrelated:
   case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype:
   case FixKind::AllowWrappedValueMismatch:
   case FixKind::RemoveExtraneousArguments:

@@ -32,7 +32,7 @@ public struct OSLogStringAlignment {
   @usableFromInline
   internal var anchor: OSLogCollectionBound
 
-  /// Initiailzes stored properties.
+  /// Initializes stored properties.
   ///
   /// - Parameters:
   ///   - minimumColumnWidth: Minimum number of characters to be displayed. If the value to be

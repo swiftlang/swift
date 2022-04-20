@@ -24,6 +24,7 @@
 #include "swift/ABI/Metadata.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
+#include <new>
 #include <set>
 
 #if SWIFT_STDLIB_HAS_ASL
@@ -207,7 +208,7 @@ TaskLocal::Item::createLink(AsyncTask *task,
   size_t amountToAllocate = Item::itemSize(valueType);
   void *allocation = task ? _swift_task_alloc_specific(task, amountToAllocate)
                           : malloc(amountToAllocate);
-  Item *item = new (allocation) Item(key, valueType);
+  Item *item = ::new (allocation) Item(key, valueType);
 
   auto next = task ? task->_private().Local.head
                    : FallbackTaskLocalStorage::get()->head;

@@ -728,8 +728,8 @@ ClangTypeConverter::visitProtocolCompositionType(ProtocolCompositionType *type) 
       clangTy->getAs<clang::ObjCObjectPointerType>()->getPointeeType());
   }
 
-  for (Type t : layout.getProtocols()) {
-    auto clangTy = convert(t);
+  for (ProtocolDecl *proto : layout.getProtocols()) {
+    auto clangTy = convert(proto->getDeclaredInterfaceType());
     if (clangTy.isNull())
       return clang::QualType();
     for (auto p : clangTy->getAs<clang::ObjCObjectPointerType>()->quals())

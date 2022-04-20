@@ -771,7 +771,7 @@ _cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
       assert(result.second.Value == canonicalMetadata);
     }
   } else {
-    auto canonicalMetadatas = description->getCanonicicalMetadataPrespecializations();
+    auto canonicalMetadatas = description->getCanonicalMetadataPrespecializations();
     for (auto &canonicalMetadataPtr : canonicalMetadatas) {
       Metadata *canonicalMetadata = canonicalMetadataPtr.get();
       const void *const *arguments =
@@ -2385,7 +2385,7 @@ static ValueWitnessTable *getMutableVWTableForInit(StructMetadata *self,
   // Otherwise, allocate permanent memory for it and copy the existing table.
   void *memory = allocateMetadata(sizeof(ValueWitnessTable),
                                   alignof(ValueWitnessTable));
-  auto newTable = new (memory) ValueWitnessTable(*oldTable);
+  auto newTable = ::new (memory) ValueWitnessTable(*oldTable);
 
   // If we ever need to check layout-completeness asynchronously from
   // initialization, we'll need this to be a store-release (and rely on
@@ -4650,7 +4650,7 @@ static const WitnessTable *_getForeignWitnessTable(
   ForeignWitnessTables.getOrInsert(
       key, [&](ForeignWitnessTableCacheEntry *entryPtr, bool created) {
         if (created)
-          new (entryPtr)
+          ::new (entryPtr)
               ForeignWitnessTableCacheEntry(key, witnessTableCandidate);
         result = entryPtr->data;
         return true;

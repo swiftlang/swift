@@ -346,7 +346,8 @@ GlobalActorAttributeRequest::evaluate(
       // ... but not if it's an async-context top-level global
       if (var->isTopLevelGlobal() &&
           (var->getDeclContext()->isAsyncContext() ||
-           var->getASTContext().LangOpts.WarnConcurrency)) {
+           var->getASTContext().LangOpts.StrictConcurrencyLevel >=
+             StrictConcurrency::On)) {
         var->diagnose(diag::global_actor_top_level_var)
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
@@ -607,9 +608,6 @@ static bool hasUnavailableConformance(ProtocolConformanceRef conformance) {
 }
 
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
-  if (dc->getParentModule()->isConcurrencyChecked())
-    return true;
-
   return contextRequiresStrictConcurrencyChecking(dc, [](const AbstractClosureExpr *) {
     return Type();
   });
@@ -618,7 +616,7 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
 /// Determine the default diagnostic behavior for this language mode.
 static DiagnosticBehavior defaultSendableDiagnosticBehavior(
     const LangOptions &langOpts) {
-  // Prior to Swift 6, all Sendable-related diagnostics are warnings.
+  // Prior to Swift 6, all Sendable-related diagnostics are warnings at most.
   if (!langOpts.isSwiftVersionAtLeast(6))
     return DiagnosticBehavior::Warning;
 
@@ -648,6 +646,30 @@ DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
     return DiagnosticBehavior::Ignore;
 
   return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
+}
+
+DiagnosticBehavior
+SendableCheckContext::implicitSendableDiagnosticBehavior() const {
+  switch (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel) {
+  case StrictConcurrency::Limited:
+    // Limited checking only diagnoses implicit Sendable within contexts that
+    // have adopted concurrency.
+    if (shouldDiagnoseExistingDataRaces(fromDC))
+      return DiagnosticBehavior::Warning;
+
+    LLVM_FALLTHROUGH;
+
+  case StrictConcurrency::Off:
+    // Explicit Sendable conformances always diagnose, even when strict
+    // strict checking is disabled.
+    if (isExplicitSendableConformance())
+      return DiagnosticBehavior::Warning;
+
+    return DiagnosticBehavior::Ignore;
+
+  case StrictConcurrency::On:
+    return defaultDiagnosticBehavior();
+  }
 }
 
 /// Determine whether the given nominal type has an explicit Sendable
@@ -744,10 +766,10 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
         : DiagnosticBehavior::Ignore;
   }
 
-  auto defaultBehavior = defaultDiagnosticBehavior();
+  DiagnosticBehavior defaultBehavior = implicitSendableDiagnosticBehavior();
 
   // If we are checking an implicit Sendable conformance, don't suppress
-  // diagnostics for declarations in the same module. We want them so make
+  // diagnostics for declarations in the same module. We want them to make
   // enclosing inferred types non-Sendable.
   if (defaultBehavior == DiagnosticBehavior::Ignore &&
       nominal->getParentSourceFile() &&
@@ -765,7 +787,7 @@ bool swift::diagnoseSendabilityErrorBasedOn(
   if (nominal) {
     behavior = fromContext.diagnosticBehavior(nominal);
   } else {
-    behavior = fromContext.defaultDiagnosticBehavior();
+    behavior = fromContext.implicitSendableDiagnosticBehavior();
   }
 
   bool wasSuppressed = diagnose(behavior);
@@ -2117,8 +2139,15 @@ namespace {
     ///
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
-      if (!getDeclContext()->getParentModule()->isConcurrencyChecked())
+      switch (value->getASTContext().LangOpts.StrictConcurrencyLevel) {
+      case StrictConcurrency::Off:
+      case StrictConcurrency::Limited:
+        // Never diagnose.
         return false;
+
+      case StrictConcurrency::On:
+        break;
+      }
 
       // Only diagnose direct references to mutable global state.
       auto var = dyn_cast<VarDecl>(value);
@@ -2941,7 +2970,7 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   }
   if (decl->getAttrs().hasAttribute<DistributedActorAttr>()) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
-      checkDistributedFunction(func, /*diagnose=*/true);
+      checkDistributedFunction(func);
     }
   }
 }
@@ -3428,34 +3457,79 @@ static bool checkClassGlobalActorIsolation(
   return true;
 }
 
+namespace {
+  /// Describes the result of checking override isolation.
+  enum class OverrideIsolationResult {
+    /// The override is permitted.
+    Allowed,
+    /// The override is permitted, but requires a Sendable check.
+    Sendable,
+    /// The override is not permitted.
+    Disallowed,
+  };
+}
+
+/// Return the isolation of the declaration overridden by this declaration,
+/// in the context of the
+static ActorIsolation getOverriddenIsolationFor(ValueDecl *value) {
+  auto overridden = value->getOverriddenDecl();
+  assert(overridden && "Doesn't have an overridden declaration");
+
+  auto isolation = getActorIsolation(overridden);
+  if (!isolation.requiresSubstitution())
+    return isolation;
+
+  SubstitutionMap subs;
+  if (Type selfType = value->getDeclContext()->getSelfInterfaceType()) {
+    subs = selfType->getMemberSubstitutionMap(
+        value->getModuleContext(), overridden);
+  }
+  return isolation.subst(subs);
+}
+
 /// Generally speaking, the isolation of the decl that overrides
 /// must match the overridden decl. But there are a number of exceptions,
 /// e.g., the decl that overrides can be nonisolated.
-/// \param newIso the isolation of the overriding declaration.
-static bool validOverrideIsolation(ActorIsolation newIso,
-                                   ValueDecl *overriddenDecl,
-                                   ActorIsolation overriddenIso) {
-  // If the isolation matches, we're done.
-  if (newIso == overriddenIso)
-    return true;
+/// \param isolation the isolation of the overriding declaration.
+static OverrideIsolationResult validOverrideIsolation(
+    ValueDecl *value, ActorIsolation isolation,
+    ValueDecl *overridden, ActorIsolation overriddenIsolation) {
+  ConcreteDeclRef valueRef(value);
+  auto declContext = value->getInnermostDeclContext();
+  if (auto genericEnv = declContext->getGenericEnvironmentOfContext()) {
+    valueRef = ConcreteDeclRef(
+        value, genericEnv->getForwardingSubstitutionMap());
+  }
 
-  // If the overriding declaration is non-isolated, it's okay.
-  if (newIso.isIndependent() || newIso.isUnspecified())
-    return true;
+  auto refResult = ActorReferenceResult::forReference(
+      valueRef, SourceLoc(), declContext, None, None,
+      isolation, overriddenIsolation);
+  switch (refResult) {
+  case ActorReferenceResult::SameConcurrencyDomain:
+    return OverrideIsolationResult::Allowed;
 
-  // If both are actor-instance isolated, we're done. This wasn't caught by
-  // the equality case above because the nominal type describing the actor
-  // will differ when we're overriding.
-  if (newIso.getKind() == overriddenIso.getKind() &&
-      newIso.getKind() == ActorIsolation::ActorInstance)
-    return true;
+  case ActorReferenceResult::ExitsActorToNonisolated:
+    return OverrideIsolationResult::Sendable;
 
-  // If the overridden declaration is from Objective-C with no actor annotation,
-  // allow it.
-  if (overriddenDecl->hasClangNode() && !overriddenIso)
-    return true;
+  case ActorReferenceResult::EntersActor:
+    // It's okay to enter the actor when the overridden declaration is
+    // asynchronous (because it will do the switch) or is accessible from
+    // anywhere.
+    if (isAsyncDecl(overridden) ||
+        isAccessibleAcrossActors(
+            overridden, refResult.isolation, declContext)) {
+      // FIXME: Perform Sendable checking here because we're entering an
+      // actor.
+      return OverrideIsolationResult::Allowed;
+    }
 
-  return false;
+    // If the overridden declaration is from Objective-C with no actor
+    // annotation, allow it.
+    if (overridden->hasClangNode() && !overriddenIsolation)
+      return OverrideIsolationResult::Allowed;
+
+    return OverrideIsolationResult::Disallowed;
+  }
 }
 
 ActorIsolation ActorIsolationRequest::evaluate(
@@ -3517,20 +3591,11 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
   // Look for and remember the overridden declaration's isolation.
   Optional<ActorIsolation> overriddenIso;
-  ValueDecl *overriddenValue = nullptr;
-  if ( (overriddenValue = value->getOverriddenDecl()) ) {
-    auto iso = getActorIsolation(overriddenValue);
-    SubstitutionMap subs;
-
-    if (Type selfType = value->getDeclContext()->getSelfInterfaceType()) {
-      subs = selfType->getMemberSubstitutionMap(
-          value->getModuleContext(), overriddenValue);
-    }
-    iso = iso.subst(subs);
-
+  ValueDecl *overriddenValue = value->getOverriddenDecl();
+  if (overriddenValue) {
     // use the overridden decl's iso as the default isolation for this decl.
-    defaultIsolation = iso;
-    overriddenIso = iso;
+    defaultIsolation = getOverriddenIsolationFor(value);
+    overriddenIso = defaultIsolation;
   }
 
   // Function used when returning an inferred isolation.
@@ -3541,8 +3606,16 @@ ActorIsolation ActorIsolationRequest::evaluate(
     if (overriddenValue) {
       // if the inferred isolation is not valid, then carry-over the overridden
       // declaration's isolation as this decl's inferred isolation.
-      if (!validOverrideIsolation(inferred, overriddenValue, *overriddenIso))
+      switch (validOverrideIsolation(
+                  value, inferred, overriddenValue, *overriddenIso)) {
+      case OverrideIsolationResult::Allowed:
+      case OverrideIsolationResult::Sendable:
+        break;
+
+      case OverrideIsolationResult::Disallowed:
         inferred = *overriddenIso;
+        break;
+      }
     }
 
     // Add an implicit attribute to capture the actor isolation that was
@@ -3639,7 +3712,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
   if (auto var = dyn_cast<VarDecl>(value)) {
     if (var->isTopLevelGlobal() &&
-        (var->getASTContext().LangOpts.WarnConcurrency ||
+        (var->getASTContext().LangOpts.StrictConcurrencyLevel >=
+             StrictConcurrency::On ||
          var->getDeclContext()->isAsyncContext())) {
       if (Type mainActor = var->getASTContext().getMainActorType())
         return inferredIsolation(
@@ -3811,38 +3885,51 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (!overridden)
     return;
 
-  // Determine the actor isolation of this declaration.
+  // Determine the actor isolation of the overriding function.
   auto isolation = getActorIsolation(value);
-
-  // Determine the actor isolation of the overridden function.=
-  auto overriddenIsolation = getActorIsolation(overridden);
-
-  if (overriddenIsolation.requiresSubstitution()) {
-    SubstitutionMap subs;
-    if (Type selfType = value->getDeclContext()->getSelfInterfaceType()) {
-      subs = selfType->getMemberSubstitutionMap(
-          value->getModuleContext(), overridden);
-    }
-
-    overriddenIsolation = overriddenIsolation.subst(subs);
-  }
-
-  if (validOverrideIsolation(isolation, overridden, overriddenIsolation))
+  
+  // Determine the actor isolation of the overridden function.
+  auto overriddenIsolation = getOverriddenIsolationFor(value);
+  switch (validOverrideIsolation(
+              value, isolation, overridden, overriddenIsolation)) {
+  case OverrideIsolationResult::Allowed:
     return;
 
+  case OverrideIsolationResult::Sendable:
+    // FIXME: Do the Sendable check.
+    return;
+
+  case OverrideIsolationResult::Disallowed:
+    // Diagnose below.
+    break;
+  }
+
   // Isolation mismatch. Diagnose it.
+  DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified;
+  if (overridden->hasClangNode() && !overriddenIsolation) {
+    behavior = SendableCheckContext(value->getInnermostDeclContext())
+        .defaultDiagnosticBehavior();
+  }
+
   value->diagnose(
       diag::actor_isolation_override_mismatch, isolation,
-      value->getDescriptiveKind(), value->getName(), overriddenIsolation);
+      value->getDescriptiveKind(), value->getName(), overriddenIsolation)
+    .limitBehavior(behavior);
   overridden->diagnose(diag::overridden_here);
 }
 
 bool swift::contextRequiresStrictConcurrencyChecking(
     const DeclContext *dc,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
-  // If Swift >= 6, everything uses strict concurrency checking.
-  if (dc->getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+  switch (dc->getASTContext().LangOpts.StrictConcurrencyLevel) {
+  case StrictConcurrency::On:
     return true;
+
+  case StrictConcurrency::Limited:
+  case StrictConcurrency::Off:
+    // Check below to see if the context has adopted concurrency features.
+    break;
+  }
 
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
@@ -4828,14 +4915,6 @@ ActorReferenceResult ActorReferenceResult::forExitsActorToNonisolated(
   return ActorReferenceResult{ExitsActorToNonisolated, None, isolation};
 }
 
-ActorReferenceResult ActorReferenceResult::forReference(
-    ConcreteDeclRef declRef, SourceLoc declRefLoc, const DeclContext *fromDC,
-    Optional<VarRefUseEnv> useKind,
-    Optional<ReferencedActor> actorInstance) {
-  return forReference(declRef, declRefLoc, fromDC, useKind, actorInstance,
-                      getInnermostIsolatedContext(fromDC));
-}
-
 // Determine if two actor isolation contexts are considered to be equivalent.
 static bool equivalentIsolationContexts(
     const ActorIsolation &lhs, const ActorIsolation &rhs) {
@@ -4854,11 +4933,26 @@ ActorReferenceResult ActorReferenceResult::forReference(
     ConcreteDeclRef declRef, SourceLoc declRefLoc, const DeclContext *fromDC,
     Optional<VarRefUseEnv> useKind,
     Optional<ReferencedActor> actorInstance,
-    ActorIsolation contextIsolation) {
-  // Compute the isolation of the declaration, adjusted for references.
-  auto declIsolation = getActorIsolationForReference(declRef.getDecl(), fromDC);
-  if (auto subs = declRef.getSubstitutions())
-    declIsolation = declIsolation.subst(subs);
+    Optional<ActorIsolation> knownDeclIsolation,
+    Optional<ActorIsolation> knownContextIsolation) {
+  // If not provided, compute the isolation of the declaration, adjusted
+  // for references.
+  ActorIsolation declIsolation = ActorIsolation::forUnspecified();
+  if (knownDeclIsolation) {
+    declIsolation = *knownDeclIsolation;
+  } else {
+    declIsolation = getActorIsolationForReference(declRef.getDecl(), fromDC);
+    if (declIsolation.requiresSubstitution())
+      declIsolation = declIsolation.subst(declRef.getSubstitutions());
+  }
+
+  // Compute the isolation of the context, if not provided.
+  ActorIsolation contextIsolation = ActorIsolation::forUnspecified();
+  if (knownContextIsolation) {
+    contextIsolation = *knownContextIsolation;
+  } else {
+    contextIsolation = getInnermostIsolatedContext(fromDC);
+  }
 
   // When the declaration is not actor-isolated, it can always be accessed
   // directly.

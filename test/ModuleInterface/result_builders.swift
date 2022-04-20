@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -module-name ResultBuilders -emit-module-interface-path %t/ResultBuilders.swiftinterface %s
+// RUN: %target-swift-emit-module-interface(%t/ResultBuilders.swiftinterface) %s -module-name ResultBuilders
 // RUN: %FileCheck %s < %t/ResultBuilders.swiftinterface
 // RUN: %target-swift-frontend -I %t -typecheck -verify %S/Inputs/result_builders_client.swift
 // RUN: %target-swift-frontend -compile-module-from-interface %t/ResultBuilders.swiftinterface -o %t/ResultBuilders.swiftmodule

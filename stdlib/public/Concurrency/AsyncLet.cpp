@@ -31,6 +31,8 @@
 #include <dlfcn.h>
 #endif
 
+#include <new>
+
 using namespace swift;
 
 namespace {
@@ -139,7 +141,7 @@ static AsyncLetImpl *asImpl(const AsyncLet *alet) {
 
 void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
                              bool didAllocateInParentTask) {
-  AsyncLetImpl *impl = new (asyncLet) AsyncLetImpl(task);
+  AsyncLetImpl *impl = ::new (asyncLet) AsyncLetImpl(task);
   impl->setDidAllocateFromParentTask(didAllocateInParentTask);
 
   auto record = impl->getTaskRecord();

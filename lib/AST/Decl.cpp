@@ -1745,6 +1745,18 @@ bool PatternBindingDecl::isAsyncLet() const {
   if (auto var = getAnchoringVarDecl(0))
     return var->isAsyncLet();
 
+  // Check for "async let _: <Type> = <expression>" pattern.
+  auto *pattern = getPatternList()[0].getPattern();
+  if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
+    auto *anyPattern = dyn_cast<AnyPattern>(typedPattern->getSubPattern());
+    return anyPattern && anyPattern->isAsyncLet();
+  }
+
+  // Check for "async let _ = <expression>" pattern.
+  if (auto *anyPattern = dyn_cast<AnyPattern>(pattern)) {
+    return anyPattern->isAsyncLet();
+  }
+
   return false;
 }
 
@@ -5585,8 +5597,8 @@ ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
 }
 
 void
-ProtocolDecl::setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
-                                           uint64_t associatedTypesData) {
+ProtocolDecl::setLazyAssociatedTypeMembers(
+    LazyMemberLoader *lazyLoader, uint64_t associatedTypesData) {
   assert(!Bits.ProtocolDecl.HasAssociatedTypes);
   assert(!Bits.ProtocolDecl.HasLazyAssociatedTypes);
 
@@ -5594,6 +5606,17 @@ ProtocolDecl::setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
       getASTContext().getOrCreateLazyContextData(this, lazyLoader));
   contextData->associatedTypesData = associatedTypesData;
   Bits.ProtocolDecl.HasLazyAssociatedTypes = true;
+}
+
+void
+ProtocolDecl::setLazyPrimaryAssociatedTypeMembers(
+    LazyMemberLoader *lazyLoader, uint64_t associatedTypesData) {
+  assert(!Bits.ProtocolDecl.HasLazyPrimaryAssociatedTypes);
+
+  auto contextData = static_cast<LazyProtocolData *>(
+      getASTContext().getOrCreateLazyContextData(this, lazyLoader));
+  contextData->primaryAssociatedTypesData = associatedTypesData;
+  Bits.ProtocolDecl.HasLazyPrimaryAssociatedTypes = true;
 }
 
 void ProtocolDecl::computeKnownProtocolKind() const {
@@ -9177,7 +9200,9 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   }
 
   if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
-    if (dc->isAsyncContext() || dc->getASTContext().LangOpts.WarnConcurrency) {
+    if (dc->isAsyncContext() ||
+        dc->getASTContext().LangOpts.StrictConcurrencyLevel
+            >= StrictConcurrency::On) {
       if (Type mainActor = dc->getASTContext().getMainActorType())
         return ActorIsolation::forGlobalActor(
             mainActor,

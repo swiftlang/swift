@@ -100,13 +100,10 @@ enum class CodeCompletionResultTypeRelation : uint8_t {
   /// The result's type is invalid at the expected position.
   Invalid,
 
-  /// The result's type is convertible to the type of the expected.
+  /// The result's type is convertible or identical to the type of the expected.
   Convertible,
 
-  /// The result's type is identical to the type of the expected.
-  Identical,
-
-  MAX_VALUE = Identical
+  MAX_VALUE = Convertible
 };
 
 class USRBasedType;
@@ -145,23 +142,14 @@ public:
     /// convertible.
     llvm::SmallVector<const USRBasedType *, 1> Types;
 
-    /// Whether a match against this type should be considered convertible
-    /// instead of identical. This is used to model optional conversions.
-    /// If we have
-    ///   let x: Int? = #^COMPLETE^#
-    /// we add both 'Int?' and 'Int' as contextual types to the
-    /// USRBasedTypeContext, but an identical match against 'Int' should only
-    /// be considered convertible.
-    bool IsConvertible;
-
   public:
     /// Compute the type relation of \p ResultType to this conextual type.
     CodeCompletionResultTypeRelation
     typeRelation(const USRBasedType *ResultType,
                  const USRBasedType *VoidType) const;
 
-    ContextualType(ArrayRef<const USRBasedType *> Types, bool IsConvertible)
-        : Types(Types.begin(), Types.end()), IsConvertible(IsConvertible) {
+    ContextualType(ArrayRef<const USRBasedType *> Types)
+        : Types(Types.begin(), Types.end()) {
       assert(!Types.empty() && "USRBasedTypeContext::ContextualType should "
                                "contain at least one type");
     }
