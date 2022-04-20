@@ -632,7 +632,7 @@ namespace  {
   /// Describes the information needed to perform property wrapper access via
   /// the enclosing self.
   struct EnclosingSelfPropertyWrapperAccess {
-    /// The (genreric) subscript that will be used to perform the access.
+    /// The (generic) subscript that will be used to perform the access.
     SubscriptDecl *subscript;
 
     /// The property being accessed.
@@ -2365,7 +2365,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     if (classDecl->checkAncestry(AncestryFlags::ObjC))
       return false;
 
-  // Accessors synthesized on-demand are never transaprent.
+  // Accessors synthesized on-demand are never transparent.
   if (accessor->hasForcedStaticDispatch())
     return false;
 
@@ -3234,7 +3234,7 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
 ///   - Stored, if the decl is a 'var'.
 ///   - StoredWithObservers, if the decl has a setter
 ///     - This indicates that the original decl had a 'didSet' and/or 'willSet'
-///   - InheritedWithObservers, if the decl has a setter and is an overridde.
+///   - InheritedWithObservers, if the decl has a setter and is an override.
 ///   - Immutable, if the decl is a 'let' or it does not have a setter.
 /// ReadWrite:
 ///   - Stored, if the decl has no accessors listed.

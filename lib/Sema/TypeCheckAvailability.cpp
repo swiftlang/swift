@@ -392,7 +392,7 @@ public:
 
 private:
   bool walkToDeclPre(Decl *D) override {
-    // Adds in a parent TRC for decls which are syntatically nested but are not
+    // Adds in a parent TRC for decls which are syntactically nested but are not
     // represented that way in the AST. (Particularly, AbstractStorageDecl
     // parents for AccessorDecl children.)
     if (auto ParentTRC = getEffectiveParentContextForDecl(D)) {
@@ -1327,7 +1327,7 @@ static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
 
     // Members of an active #if are represented both inside the
     // IfConfigDecl and in the enclosing context. Skip over the IfConfigDecl
-    // so that that the member declaration is found rather the #if itself.
+    // so that the member declaration is found rather the #if itself.
     if (isa<IfConfigDecl>(D))
       return false;
 
@@ -2823,7 +2823,7 @@ bool swift::diagnoseExplicitUnavailability(
                          rawReplaceKind, newName, EncodedMessage.Message);
       attachRenameFixIts(diag);
   } else if (isSubscriptReturningString(D, ctx)) {
-    diags.diagnose(Loc, diag::availabilty_string_subscript_migration)
+    diags.diagnose(Loc, diag::availability_string_subscript_migration)
       .highlight(R)
       .fixItInsert(R.Start, "String(")
       .fixItInsertAfter(R.End, ")");

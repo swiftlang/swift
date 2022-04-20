@@ -798,7 +798,7 @@ static bool matchCallArgumentsImpl(
         if (oldLabel == params[paramIdx].getLabel())
           break;
 
-        // If we are moving the the position with a different label
+        // If we are moving the position with a different label
         // and there is no default value for it, can't diagnose the
         // problem as a simple re-ordering.
         if (!paramInfo.hasDefaultArgument(paramIdx))
@@ -1246,7 +1246,7 @@ public:
   }
 };
 
-/// Ignores any failures after the code comletion token.
+/// Ignores any failures after the code completion token.
 class CompletionArgumentTracker : public ArgumentFailureTracker {
   struct CompletionArgInfo ArgInfo;
 
@@ -1437,7 +1437,7 @@ namespace {
 /// \returns If the argument type is existential and opening it can bind a
 /// generic parameter in the callee, returns the generic parameter, type
 /// variable (from the opened parameter type) the existential type that needs
-/// to be opened (from the argument type), and the adjustements that need to be
+/// to be opened (from the argument type), and the adjustments that need to be
 /// applied to the existential type after it is opened.
 static Optional<
     std::tuple<GenericTypeParamType *, TypeVariableType *, Type,
@@ -1851,7 +1851,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
           }
         } else {
           // Matching @autoclosure argument to @autoclosure parameter
-          // directly would mean introducting a function conversion
+          // directly would mean introducing a function conversion
           // in Swift <= 4 mode.
           cs.increaseScore(SK_FunctionConversion);
           matchingAutoClosureResult = false;
@@ -3367,7 +3367,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       // To accommodate that, let's increase the impact of this fix.
       impact += 2;
     } else {
-      // Increase the solution's score for each mismtach this fixes.
+      // Increase the solution's score for each mismatch this fixes.
       impact += mismatches.size() - 1;
     }
 
@@ -3485,7 +3485,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
             if (auto anchor = locator.getLocatorParts(path)) {
               // Let's drop `optional` or `generic argument` bits from
               // locator because that helps to diagnose reference equality
-              // operaators ("===" and "!==") since there is always a
+              // operators ("===" and "!==") since there is always a
               // `value-to-optional` or `optional-to-optional` conversion
               // associated with them (expected argument is `AnyObject?`).
               if (!path.empty() &&
@@ -3620,7 +3620,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   auto ppt2 = constraintType2->getAs<ParameterizedProtocolType>();
 
   // With two parameterized protocols, we've already made sure conformance
-  // constraints are satisified. Try to match the arguments!
+  // constraints are satisfied. Try to match the arguments!
   if (ppt1 && ppt2) {
     ArrayRef<Type> longerArgs = ppt1->getArgs();
     ArrayRef<Type> shorterArgs = ppt2->getArgs();
@@ -3630,7 +3630,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
       return getTypeMatchFailure(locator);
     }
 
-    // Line up the the arguments of the parameterized protocol.
+    // Line up the arguments of the parameterized protocol.
     // FIXME: Extend the locator path to point to the argument
     // inducing the requirement.
     for (const auto &pair : llvm::zip_first(shorterArgs, longerArgs)) {
@@ -3763,7 +3763,7 @@ ConstraintSystem::matchTypesBindTypeVar(
   // visible in the current context e.g. typealias
   // defined in constrained extension, substitution
   // of which might produce error type for base, so
-  // assignement should thead lightly and just fail
+  // assignment should tread lightly and just fail
   // if it encounters such types.
   if (type->hasError())
     return getTypeMatchFailure(locator);
@@ -4112,7 +4112,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
     // If this is a conversion from optional chain to some
     // other type e.g. contextual type or a parameter type,
     // let's use `Bind` to match object types because
-    // object type of the optinal chain is a type variable.
+    // object type of the optional chain is a type variable.
     //
     // One exception is contextual conversion - in such cases
     // let's give optional chain a chance to infer its inner type
@@ -4146,7 +4146,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
       }
     } else {
       // In cases when sub-expression isn't optional, 'try?'
-      // always adds one level of optinality regardless of
+      // always adds one level of optionality regardless of
       // language mode, so we can safely try to bind its
       // object type to contextual type without risk of
       // causing more optionality mismatches down the road.
@@ -4379,7 +4379,7 @@ bool ConstraintSystem::repairFailures(
   // a). Contextual e.g. `let _: R = foo`
   // b). Argument is a function value passed to parameter
   //     which expects its result type e.g. `foo(bar)`
-  // c). Assigment destination type matches return type of
+  // c). Assignment destination type matches return type of
   //     of the function value e.g. `foo = bar` or `foo = .bar`
   auto repairByInsertingExplicitCall = [&](Type srcType, Type dstType) -> bool {
     auto fnType = srcType->getAs<FunctionType>();
@@ -5127,7 +5127,7 @@ bool ConstraintSystem::repairFailures(
       if (hasFixFor(calleeLocator, FixKind::AddQualifierToAccessTopLevelName)) {
         if (auto overload = findSelectedOverloadFor(calleeLocator)) {
           if (auto choice = overload->choice.getDeclOrNull()) {
-            // If this is an argument of a symetric function/operator let's
+            // If this is an argument of a symmetric function/operator let's
             // not fix any position rather than first because we'd just end
             // up with ambiguity instead of reporting an actual problem with
             // mismatched type since each argument can have district bindings.
@@ -5268,7 +5268,7 @@ bool ConstraintSystem::repairFailures(
       // Since `FunctionArgument` as a last locator element represents
       // a single parameter of the function type involved in a conversion
       // to another function type, see `matchFunctionTypes`. If there is already
-      // a fix for the this convertion, we can just ignore individual function
+      // a fix for the this conversion, we can just ignore individual function
       // argument in-out mismatch failure by considered this fixed.
       if (hasFixFor(parentLoc))
         return true;
@@ -5820,7 +5820,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // If both sides are dependent members without type variables, it's
   // possible that base type is incorrect e.g. `Foo.Element` where `Foo`
-  // is a concrete type substituted for generic generic parameter,
+  // is a concrete type substituted for generic parameter,
   // so checking equality here would lead to incorrect behavior,
   // let's defer it until later proper check.
   if (!(desugar1->is<DependentMemberType>() &&
@@ -8813,7 +8813,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   if (!baseType->is<AnyMetatypeType>()) {
     bool applicable = false;
     // Special case -- in a protocol extension initializer with a class
-    // constrainted Self type, 'self' has archetype type, and only
+    // constrained Self type, 'self' has archetype type, and only
     // required initializers can be called.
     if (baseExpr && !baseExpr->isSuperExpr()) {
       auto &ctx = cs.getASTContext();
@@ -9251,7 +9251,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
 
       auto impact = 2;
-      // Impact is higher if the the base type is any function type
+      // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
         impact += 10;
@@ -9763,7 +9763,7 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   // variables.
   if (builderType->hasTypeParameter()) {
     // Find the opened type for this callee and substitute in the type
-    // parametes.
+    // parameters.
     auto substitutions = cs.getOpenedTypes(calleeLocator);
     if (!substitutions.empty()) {
       OpenedTypeMap replacements(substitutions.begin(), substitutions.end());
@@ -12408,7 +12408,7 @@ ConstraintSystem::simplifyRestrictedConstraint(
   case SolutionKind::Solved: {
     // If we have an application of a non-ephemeral parameter, then record a
     // fix if we have to treat an ephemeral conversion as non-ephemeral. It's
-    // important that this is solved as an independant constraint, as the
+    // important that this is solved as an independent constraint, as the
     // solving of this restriction may be required in order to evaluate it. For
     // example, when solving `foo(&.x)`, we need to first match types for the
     // inout-to-pointer conversion, which then allows us to resolve the overload
@@ -12734,7 +12734,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // Create a new tuple type the size of the smaller tuple with elements
     // from the larger tuple whenever either side contains a type variable.
     // For example (A, $0, B, $2) and (X, Y, $1) produces: (X, $0, B).
-    // This allows us to guarentee that the types will match, and all
+    // This allows us to guarantee that the types will match, and all
     // type variables will get bound to something as long as we default
     // excess types in the larger tuple to Any. In the prior example,
     // when the tuples (X, Y, $1) and (X, $0, B) get matched, $0 is equated
@@ -12986,7 +12986,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       // If this is a contextual mismatch between two
       // function types which we couldn't find a more
       // specific fix for. Let's assume that such types
-      // are competely disjoint and adjust impact of
+      // are completely disjoint and adjust impact of
       // the fix accordingly.
       if (auto *fnType2 = type2->getAs<FunctionType>()) {
         increaseScore(SK_Fix, 10);

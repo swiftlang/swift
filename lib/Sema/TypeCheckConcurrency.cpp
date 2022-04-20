@@ -285,7 +285,7 @@ GlobalActorAttributeRequest::evaluate(
     dc = decl->getDeclContext();
     declAttrs = &decl->getAttrs();
     // HACK: `getLoc`, when querying the attr from  a serialized decl,
-    // dependning on deserialization order, may launch into arbitrary
+    // depending on deserialization order, may launch into arbitrary
     // type-checking when querying interface types of such decls. Which,
     // in turn, may do things like query (to print) USRs. This ends up being
     // prone to request evaluator cycles.
@@ -1491,7 +1491,7 @@ static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
   // If we are in a synchronous function on the global actor,
   // suggest annotating with the global actor itself.
   if (auto fn = findAnnotatableFunction(dc)) {
-    // Suppress this for accesssors because you can't change the
+    // Suppress this for accessories because you can't change the
     // actor isolation of an individual accessor.  Arguably we could
     // add this to the entire storage declaration, though.
     // Suppress this for async functions out of caution; but don't
@@ -3436,7 +3436,7 @@ static bool checkClassGlobalActorIsolation(
 
   case ActorIsolation::GlobalActor:
   case ActorIsolation::GlobalActorUnsafe: {
-    // If the the global actors match, we're fine.
+    // If the global actors match, we're fine.
     Type superclassGlobalActor = superIsolation.getGlobalActor();
     auto module = classDecl->getParentModule();
     SubstitutionMap subsMap = classDecl->getDeclaredInterfaceType()

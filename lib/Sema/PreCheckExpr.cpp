@@ -1149,7 +1149,7 @@ namespace {
       // attempt to type-check whole expression `s.bar()` - is going
       // to have a base which points directly to declaration of `S`.
       // But when diagnostics attempts to type-check `s.bar()` standalone
-      // its base would be tranformed into `InOutExpr -> DeclRefExr`,
+      // its base would be transformed into `InOutExpr -> DeclRefExr`,
       // and `InOutType` is going to be recorded in constraint system.
       // One possible way to fix this (if diagnostics still use typecheck)
       // might be to make it so self is not wrapped into `InOutExpr`
