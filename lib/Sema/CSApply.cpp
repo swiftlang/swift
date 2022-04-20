@@ -7744,7 +7744,15 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     auto *packed = apply->getArgs()->packIntoImplicitTupleOrParen(
         ctx, [&](Expr *E) { return cs.getType(E); });
     cs.cacheType(packed);
-    return coerceToType(packed, tupleTy, cs.getConstraintLocator(packed));
+    auto *result = coerceToType(packed, tupleTy, cs.getConstraintLocator(packed));
+    // Resetting the types of tuple is necessary because
+    // `packIntoImplicitTupleOrParen` sets types in AST
+    // where `coerceToType` only updates constraint system
+    // cache. This creates a mismatch that would not be
+    // corrected by `setExprTypes` if this tuple is used
+    // as an argument that is wrapped in an autoclosure.
+    solution.setExprTypes(result);
+    return result;
   }
 
   // We're constructing a value of nominal type. Look for the constructor or
