@@ -358,6 +358,8 @@ public:
 
   constexpr Representation getRepresentation() const {
     unsigned rawRep = bits & RepresentationMask;
+    assert(rawRep <= unsigned(Representation::Last) &&
+           "unexpected SIL representation");
     return Representation(rawRep);
   }
 
