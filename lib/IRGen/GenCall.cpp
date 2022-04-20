@@ -265,14 +265,19 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
 
-static void addInoutParameterAttributes(IRGenModule &IGM,
+static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
                                         llvm::AttributeList &attrs,
                                         const TypeInfo &ti, unsigned argIndex,
                                         bool aliasable) {
   llvm::AttrBuilder b;
-  // Aliasing inouts is unspecified, but we still want aliasing to be memory-
-  // safe, so we can't mark inouts as noalias at the LLVM level.
-  // They still can't be captured without doing unsafe stuff, though.
+  // Thanks to exclusivity checking, it is not possible to alias inouts except
+  // those that are inout_aliasable.
+  if (!aliasable && paramSILType.getASTType()->getAnyPointerElementType()) {
+    // To ward against issues with LLVM's alias analysis, for now, only add the
+    // attribute if it's a pointer being passed inout.
+    b.addAttribute(llvm::Attribute::NoAlias);
+  }
+  // Aliasing inouts can't be captured without doing unsafe stuff.
   b.addAttribute(llvm::Attribute::NoCapture);
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
@@ -1510,8 +1515,9 @@ void SignatureExpansion::expand(SILParameterInfo param) {
 
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
-    addInoutParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size(),
-                          conv == ParameterConvention::Indirect_InoutAliasable);
+    addInoutParameterAttributes(
+        IGM, paramSILType, Attrs, ti, ParamIRTypes.size(),
+        conv == ParameterConvention::Indirect_InoutAliasable);
     addPointerParameter(IGM.getStorageType(getSILFuncConventions().getSILType(
         param, IGM.getMaximalTypeExpansionContext())));
     return;
