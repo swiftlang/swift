@@ -807,7 +807,7 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
       continue;
 
     auto *params = FD->getParameters();
-    // No arguemnts.
+    // No arguments.
     if (params->size() != 0)
       continue;
 

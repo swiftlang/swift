@@ -127,13 +127,13 @@ struct Obligation {
   /// A token returned when an \c Obligation is fulfilled or failed. An \c
   /// Obligation is the only type that may construct fulfillment tokens.
   ///
-  /// \c FullfillmentToken prevents misuse of the \c Obligation
+  /// \c FulfillmentToken prevents misuse of the \c Obligation
   /// structure by requiring its state to be changed along all program paths.
-  struct FullfillmentToken {
+  struct FulfillmentToken {
     friend Obligation;
 
   private:
-    FullfillmentToken() = default;
+    FulfillmentToken() = default;
   };
 
   /// An \c Obligation::Key is a reduced set of the common data contained in an
@@ -225,16 +225,16 @@ public:
 
 public:
   bool isOwed() const { return state == State::Owed; }
-  FullfillmentToken fullfill() {
+  FulfillmentToken fulfill() {
     assert(state == State::Owed &&
            "Cannot fulfill an obligation more than once!");
     state = State::Fulfilled;
-    return FullfillmentToken{};
+    return FulfillmentToken{};
   }
-  FullfillmentToken fail() {
+  FulfillmentToken fail() {
     assert(state == State::Owed && "Cannot fail an obligation more than once!");
     state = State::Failed;
-    return FullfillmentToken{};
+    return FulfillmentToken{};
   }
 };
 
@@ -278,7 +278,7 @@ private:
   /// fail is called with the unmatched expectation value.
   void matchExpectationOrFail(
       ObligationMap &OM, const Expectation &expectation,
-      llvm::function_ref<Obligation::FullfillmentToken(Obligation &)> fulfill,
+      llvm::function_ref<Obligation::FulfillmentToken(Obligation &)> fulfill,
       llvm::function_ref<void(const Expectation &)> fail) {
     auto entry = OM.find(Obligation::Key::forExpectation(expectation));
     if (entry == OM.end()) {
@@ -440,13 +440,13 @@ bool DependencyVerifier::verifyObligations(
           case Expectation::Kind::Negative:
             llvm_unreachable("Should have been handled above!");
           case Expectation::Kind::Member:
-            return O.fullfill();
+            return O.fulfill();
           case Expectation::Kind::PotentialMember:
             assert(O.getName().empty());
-            return O.fullfill();
+            return O.fulfill();
           case Expectation::Kind::Provides:
           case Expectation::Kind::DynamicMember:
-            return O.fullfill();
+            return O.fulfill();
           }
 
           llvm_unreachable("Unhandled expectation kind!");

@@ -493,7 +493,7 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
         ctx, baseTy->getAs<AnyFunctionType>()->getParams());
     auto diagKind = diag::override_type_mismatch_with_fixits_init;
     unsigned numArgs = baseInit->getParameters()->size();
-    return computeFixitsForOverridenDeclaration(
+    return computeFixitsForOverriddenDeclaration(
         decl, base, [&](bool HasNotes) -> Optional<InFlightDiagnostic> {
           if (!HasNotes)
             return None;
@@ -504,7 +504,7 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
     if (isa<AbstractFunctionDecl>(base))
       baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
 
-    return computeFixitsForOverridenDeclaration(
+    return computeFixitsForOverriddenDeclaration(
         decl, base, [&](bool HasNotes) -> Optional<InFlightDiagnostic> {
           if (!HasNotes)
             return None;

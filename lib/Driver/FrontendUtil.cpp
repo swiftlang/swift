@@ -52,7 +52,7 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   // frontend command.
   Args.push_back("-whole-module-optimization");
 
-  // Explictly disable batch mode to avoid a spurious warning when combining
+  // Explicitly disable batch mode to avoid a spurious warning when combining
   // -enable-batch-mode with -whole-module-optimization.  This is an
   // implementation detail.
   Args.push_back("-disable-batch-mode");

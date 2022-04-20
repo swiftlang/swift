@@ -18,7 +18,7 @@ public class D {}
 
 @available(macOS 10.9, *)
 @_originallyDefinedIn(module: "original", _myProject 2.0) // expected-error {{reference to undefined version '2.0' for availability macro '_myProject'}}
-public func macroVersionned() {}
+public func macroVersioned() {}
 
 // Fallback to the default diagnostic when the macro is unknown.
 @available(macOS 10.9, *)

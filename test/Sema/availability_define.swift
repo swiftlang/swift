@@ -38,9 +38,9 @@ public func onMyProjectV3() {}
 // expected-error @-1 {{expected version number}}
 public func brokenVersion() {}
 
-@available(_unkownMacro, *) // expected-error {{expected declaration}}
+@available(_unknownMacro, *) // expected-error {{expected declaration}}
 // expected-error @-1 {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
-public func unkownMacro() {}
+public func unknownMacro() {}
 
 @available(_iOS9) // expected-error {{must handle potential future platforms with '*'}}
 public func noOtherOSes() {}

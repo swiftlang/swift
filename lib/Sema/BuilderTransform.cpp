@@ -1969,7 +1969,7 @@ public:
       auto *DC = Fn.getAsDeclContext();
       auto &diagEngine = DC->getASTContext().Diags;
 
-      // Suppress any diangostics which could be produced by this expression.
+      // Suppress any diagnostics which could be produced by this expression.
       DiagnosticTransaction transaction(diagEngine);
 
       HasError |= ConstraintSystem::preCheckExpression(

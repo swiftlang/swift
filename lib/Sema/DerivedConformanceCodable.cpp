@@ -301,7 +301,7 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 }
 
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
-/// match with the the given VarDecls.
+/// match with the given VarDecls.
 ///
 /// \param varDecls The \c var decls to validate against.
 /// \param codingKeysTypeDecl The \c CodingKeys enum decl to validate.
@@ -1416,7 +1416,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
         //     explicit that the key will not be decoded.
         // (b) If the type is Decodable only and the key does not exist in
         //     the enum, do nothing. This is because the user has explicitly
-        //     made it clear that that they don't want the key to be decoded.
+        //     made it clear that they don't want the key to be decoded.
         // (c) If the type is Codable, do nothing. This is because removing
         //     the key will break encoding which is most likely not what the
         //     user expects.
@@ -1646,14 +1646,14 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
                               /*Implicit=*/true);
 
       // generate: let onlyKey = allKeys.popFirst;
-      auto *allKeysPopFisrtCallExpr = CallExpr::createImplicitEmpty(
+      auto *allKeysPopFirstCallExpr = CallExpr::createImplicitEmpty(
           C, UnresolvedDotExpr::createImplicit(C, allKeysExpr, C.Id_popFirst));
 
       auto *theKeyPattern = BindingPattern::createImplicit(
           C, /*isLet=*/true, NamedPattern::createImplicit(C, theKeyDecl));
 
       guardElements.emplace_back(SourceLoc(), theKeyPattern,
-                                 allKeysPopFisrtCallExpr);
+                                 allKeysPopFirstCallExpr);
 
       // generate: allKeys.isEmpty;
       auto *allKeysIsEmptyExpr =

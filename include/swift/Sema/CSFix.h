@@ -103,7 +103,7 @@ enum class FixKind : uint8_t {
   GenericArgumentsMismatch,
 
   /// Fix up @autoclosure argument to the @autoclosure parameter,
-  /// to for a call to be able to foward it properly, since
+  /// to for a call to be able to forward it properly, since
   /// @autoclosure conversions are unsupported starting from
   /// Swift version 5.
   AutoClosureForwarding,
@@ -251,7 +251,7 @@ enum class FixKind : uint8_t {
   /// inferred in current context e.g. because it's a multi-statement closure.
   SpecifyClosureReturnType,
 
-  /// Object literal type coudn't be inferred because the module where
+  /// Object literal type couldn't be inferred because the module where
   /// the default type that implements the associated literal protocol
   /// is declared was not imported.
   SpecifyObjectLiteralTypeImport,
@@ -274,7 +274,7 @@ enum class FixKind : uint8_t {
   /// Allow key path to be bound to a function type with more than 1 argument
   AllowMultiArgFuncKeyPathMismatch,
 
-  /// Specify key path root type when it cannot be infered from context.
+  /// Specify key path root type when it cannot be inferred from context.
   SpecifyKeyPathRootType,
 
   /// Unwrap optional base on key path application.
@@ -321,7 +321,7 @@ enum class FixKind : uint8_t {
   AllowNoopExistentialToCFTypeCheckedCast,
 
   /// Allow a runtime checked cast where at compile time the from is
-  /// convertible, but runtime does not support such convertions. e.g.
+  /// convertible, but runtime does not support such conversions. e.g.
   /// function type casts.
   AllowUnsupportedRuntimeCheckedCast,
 
@@ -450,7 +450,7 @@ public:
 
   /// Retrieve anchor expression associated with this fix.
   /// NOTE: such anchor comes directly from locator without
-  /// any simplication attempts.
+  /// any simplification attempts.
   ASTNode getAnchor() const;
   ConstraintLocator *getLocator() const { return Locator; }
 

@@ -157,7 +157,7 @@ public:
         }
       }
 
-      // Substitute OpaqueValue with its representing existental.
+      // Substitute OpaqueValue with its representing existential.
       if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
         auto value = OpenExistentials.find(OVE);
 
@@ -589,7 +589,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     return false;
 
   // Interpolation components are type-checked separately.
-  if (contextAnalyzer.locatedInStringIterpolation())
+  if (contextAnalyzer.locatedInStringInterpolation())
     return false;
 
   // FIXME: There is currently no way to distinguish between

@@ -781,7 +781,7 @@ namespace {
             printLineEllipsis(Out);
           }
         } else if (lineNumber - lastLineNumber > maxIntermediateLines) {
-          // Use an ellipsis to denote an ommitted part of the file.
+          // Use an ellipsis to denote an omitted part of the file.
           printNumberedLine(SM, BufferID, lastLineNumber + 1, lineNumberIndent,
                             Out);
           printLineEllipsis(Out);

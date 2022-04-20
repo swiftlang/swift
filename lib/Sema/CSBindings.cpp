@@ -353,7 +353,7 @@ void BindingSet::inferTransitiveProtocolRequirements(
     std::tie(parent, currentVar) = workList.pop_back_val();
 
     // At all of the protocols associated with current type variable
-    // are transitive to its parent, propogate them down the subtype/equivalence
+    // are transitive to its parent, propagate them down the subtype/equivalence
     // chain.
     if (parent) {
       propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
@@ -378,7 +378,7 @@ void BindingSet::inferTransitiveProtocolRequirements(
                                      inferredProtocols.end());
     }
 
-    // Propogate inferred protocols to all of the members of the
+    // Propagate inferred protocols to all of the members of the
     // equivalence class.
     for (const auto &equivalence : bindings.Info.EquivalentTo) {
       auto eqBindings = inferredBindings.find(equivalence.first);
@@ -1301,7 +1301,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       EquivalentTo.insert({bindingTypeVar, constraint});
 
       // Don't record adjacency between base and result types,
-      // this is just an auxiliary contraint to enforce ordering.
+      // this is just an auxiliary constraint to enforce ordering.
       break;
     }
 
@@ -1894,7 +1894,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   unsigned defaultImpact = 1;
 
   if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
-    // If it is represetative for a key path root, let's emit a more
+    // If it is representative for a key path root, let's emit a more
     // specific diagnostic.
     auto *keyPathRoot =
         cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
@@ -2023,9 +2023,9 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       if (argLoc && argLoc->isAfterCodeCompletionLoc())
         return false;
 
-      // Don't penailze solutions that have holes for ignored arguments.
+      // Don't penalize solutions that have holes for ignored arguments.
       if (cs.hasArgumentsIgnoredForCodeCompletion()) {
-        // Avoid simplifying the locator if the constriant system didn't ignore
+        // Avoid simplifying the locator if the constraint system didn't ignore
         // any arguments.
         auto argExpr = simplifyLocatorToAnchor(TypeVar->getImpl().getLocator());
         if (cs.isArgumentIgnoredForCodeCompletion(argExpr.dyn_cast<Expr *>())) {
