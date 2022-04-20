@@ -130,11 +130,11 @@ struct once_t {
   linux::ulock_t            lock;
 };
 
-using once_t = std::atomic<int>;
+void once_slow(once_t &predicate, void (*fn)(void *), void *context);
 
 inline void once(once_t &predicate, void (*fn)(void *), void *context) {
   // Sadly we can't use ::pthread_once() for this (no context)
-  if (predicate.load(std::memory_order_acquire) < 0)
+  if (predicate.flag.load(std::memory_order_acquire) < 0)
     return;
 
   once_slow(predicate, fn, context);

@@ -126,6 +126,8 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
 
 using once_t = std::atomic<std::int64_t>;
 
+void once_slow(once_t &predicate, void (*fn)(void *), void *context);
+
 inline void once(once_t &predicate, void (*fn)(void *), void *context) {
   // Sadly we can't use ::pthread_once() for this (no context)
   if (predicate.load(std::memory_order_acquire) < 0)
