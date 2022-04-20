@@ -2172,7 +2172,8 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   // type-checking the call to mainType.main().
 
   auto resolution = resolveValueMember(
-      *declContext, nominal->getInterfaceType(), context.Id_main);
+      *declContext, nominal->getInterfaceType(), context.Id_main,
+      constraints::ConstraintSystemFlags::IgnoreAsyncSyncMismatch);
   FuncDecl *mainFunction =
       resolveMainFunctionDecl(declContext, resolution, context);
   if (!mainFunction) {
