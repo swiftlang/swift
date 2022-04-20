@@ -1093,7 +1093,7 @@ static bool printSwiftFeature(CompilerInstance &instance) {
   out << "    \"LastOption\"\n";
   out << "  ],\n";
   out << "  \"SupportedFeatures\": [\n";
-  // Print supported featur names here.
+  // Print supported feature names here.
   out << "    \"LastFeature\"\n";
   out << "  ]\n";
   return false;
@@ -1478,7 +1478,7 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // to live.
   if (Instance.getInvocation()
           .getFrontendOptions()
-          .ReuseFrontendForMutipleCompilations) {
+          .ReuseFrontendForMultipleCompilations) {
     return;
   }
 
@@ -1510,7 +1510,7 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
-  // If we emitted any errors while perfoming the end-of-pipeline actions, bail.
+  // If we emitted any errors while performing the end-of-pipeline actions, bail.
   if (Instance.getDiags().hadAnyError())
     return true;
 
@@ -1616,7 +1616,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILProcessing(*SM);
 
-  // Cancellation check after SILOptimzation.
+  // Cancellation check after SILOptimization.
   if (Instance.isCancellationRequested())
     return true;
 

@@ -256,9 +256,9 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 }
 
 void CompilerInstance::setupStatsReporter() {
-  const auto &Invok = getInvocation();
+  const auto &Invoke = getInvocation();
   const std::string &StatsOutputDir =
-      Invok.getFrontendOptions().StatsOutputDir;
+      Invoke.getFrontendOptions().StatsOutputDir;
   if (StatsOutputDir.empty())
     return;
 
@@ -281,9 +281,9 @@ void CompilerInstance::setupStatsReporter() {
     return nullptr;
   };
 
-  const auto &FEOpts = Invok.getFrontendOptions();
-  const auto &LangOpts = Invok.getLangOptions();
-  const auto &SILOpts = Invok.getSILOptions();
+  const auto &FEOpts = Invoke.getFrontendOptions();
+  const auto &LangOpts = Invoke.getLangOptions();
+  const auto &SILOpts = Invoke.getSILOptions();
   const std::string &OutFile =
       FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
   auto Reporter = std::make_unique<UnifiedStatsReporter>(
@@ -296,9 +296,9 @@ void CompilerInstance::setupStatsReporter() {
       StatsOutputDir,
       &getSourceMgr(),
       getClangSourceManager(getASTContext()),
-      Invok.getFrontendOptions().TraceStats,
-      Invok.getFrontendOptions().ProfileEvents,
-      Invok.getFrontendOptions().ProfileEntities);
+      Invoke.getFrontendOptions().TraceStats,
+      Invoke.getFrontendOptions().ProfileEvents,
+      Invoke.getFrontendOptions().ProfileEntities);
   // Hand the stats reporter down to the ASTContext so the rest of the compiler
   // can use it.
   getASTContext().setStatsReporter(Reporter.get());
@@ -358,9 +358,9 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
-bool CompilerInstance::setup(const CompilerInvocation &Invok,
+bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error) {
-  Invocation = Invok;
+  Invocation = Invoke;
 
   setupDependencyTrackerIfNeeded();
 
@@ -1229,7 +1229,7 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
   if (forPrimary ||
       typeOpts.SkipFunctionBodies ==
           FunctionBodySkipping::NonInlinableWithoutTypes ||
-      frontendOpts.ReuseFrontendForMutipleCompilations) {
+      frontendOpts.ReuseFrontendForMultipleCompilations) {
     opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
   }
   return opts;
