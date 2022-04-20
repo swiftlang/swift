@@ -11,8 +11,7 @@ func reasyncFunction(_ value: Optional<Int>, _ fn: () async throws -> Int) reasy
 
 // CHECK-LABEL: sil hidden @$s26mandatory_inlining_reasync20callsReasyncFunctionSiyF : $@convention(thin) () -> Int {
 // CHECK: [[FN:%.*]] = function_ref @$s26mandatory_inlining_reasync20callsReasyncFunctionSiyFSiyXEfU_ : $@convention(thin) () -> Int
-// CHECK-NEXT: [[CONV:%.*]] = convert_function [[FN]] : $@convention(thin) () -> Int to $@convention(thin) @noescape () -> Int
-// CHECK-NEXT: [[THICK:%.*]] = thin_to_thick_function [[CONV]] : $@convention(thin) @noescape () -> Int to $@noescape @callee_guaranteed () -> Int
+// CHECK-NEXT: [[THICK:%.*]] = thin_to_thick_function [[FN]] : $@convention(thin) () -> Int to $@noescape @callee_guaranteed () -> Int
 //  FIXME: it looks like the hop is being removed but not this instruction
 // CHECK-NEXT: [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT: br bb1
