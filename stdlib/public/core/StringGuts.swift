@@ -301,18 +301,12 @@ extension _StringGuts {
 // Encoding
 extension _StringGuts {
   /// Returns whether this string has a UTF-8 storage representation.
+  /// If this returns false, then the string is encoded in UTF-16.
   ///
   /// This always returns a value corresponding to the string's actual encoding.
   @_alwaysEmitIntoClient
   @inline(__always)
   internal var isUTF8: Bool { _object.isUTF8 }
-
-  /// Returns whether this string has a UTF-16 storage representation.
-  ///
-  /// This always returns a value corresponding to the string's actual encoding.
-  @_alwaysEmitIntoClient
-  @inline(__always)
-  internal var isUTF16: Bool { _object.isUTF16 }
 
   @_alwaysEmitIntoClient // Swift 5.7
   @inline(__always)
@@ -333,7 +327,17 @@ extension _StringGuts {
     i._hasMatchingEncoding(isUTF8: isUTF8)
   }
 
-  /// Return an index whose encoding can be assumed to match that of `self`.
+  /// Return an index whose encoding can be assumed to match that of `self`,
+  /// trapping if `i` has an incompatible encoding.
+  ///
+  /// If `i` is UTF-8 encoded, but `self` is an UTF-16 string, then trap.
+  ///
+  /// If `i` is UTF-16 encoded, but `self` is an UTF-8 string, then transcode
+  /// `i`'s offset to UTF-8 and return the resulting index. This allows the use
+  /// of indices from a bridged Cocoa string after the string has been converted
+  /// to a native Swift string. (Such indices are technically still considered
+  /// invalid, but we allow this specific case to keep compatibility with
+  /// existing code that assumes otherwise.)
   ///
   /// Detecting an encoding mismatch isn't always possible -- older binaries did
   /// not set the flags that this method relies on. However, false positives
@@ -341,33 +345,57 @@ extension _StringGuts {
   /// be a real one.
   @_alwaysEmitIntoClient
   @inline(__always)
-  internal func ensureMatchingEncoding(_ i: String.Index) -> String.Index {
+  internal func ensureMatchingEncoding(_ i: Index) -> Index {
     if _fastPath(hasMatchingEncoding(i)) { return i }
+    if let i = _slowEnsureMatchingEncoding(i) { return i }
+    // Note that this trap is not guaranteed to trigger when the process
+    // includes client binaries compiled with a previous Swift release.
+    // (`i._canBeUTF16` can sometimes return true in that case even if the index
+    // actually came from an UTF-8 string.) However, the trap will still often
+    // trigger in this case, as long as the index was initialized by code that
+    // was compiled with 5.7+.
+    //
+    // This trap will rarely if ever trigger on OSes that have stdlibs <= 5.6,
+    // because those versions never set the `isKnownUTF16` flag in
+    // `_StringObject`. (The flag may still be set within inlinable code,
+    // though.)
+    _preconditionFailure("Invalid string index")
+  }
+
+  /// Return an index that corresponds to the same position as `i`, but whose
+  /// encoding can be assumed to match that of `self`, returning `nil` if `i`
+  /// has incompatible encoding.
+  ///
+  /// If `i` is UTF-8 encoded, but `self` is an UTF-16 string, then return nil.
+  ///
+  /// If `i` is UTF-16 encoded, but `self` is an UTF-8 string, then transcode
+  /// `i`'s offset to UTF-8 and return the resulting index. This allows the use
+  /// of indices from a bridged Cocoa string after the string has been converted
+  /// to a native Swift string. (Such indices are technically still considered
+  /// invalid, but we allow this specific case to keep compatibility with
+  /// existing code that assumes otherwise.)
+  ///
+  /// Detecting an encoding mismatch isn't always possible -- older binaries did
+  /// not set the flags that this method relies on. However, false positives
+  /// cannot happen: if this method detects a mismatch, then it is guaranteed to
+  /// be a real one.
+  internal func ensureMatchingEncodingNoTrap(_ i: Index) -> Index? {
+    if hasMatchingEncoding(i) { return i }
     return _slowEnsureMatchingEncoding(i)
   }
 
   @_alwaysEmitIntoClient
   @inline(never)
   @_effects(releasenone)
-  internal func _slowEnsureMatchingEncoding(_ i: String.Index) -> String.Index {
+  internal func _slowEnsureMatchingEncoding(_ i: Index) -> Index? {
     guard isUTF8 else {
       // Attempt to use an UTF-8 index on a UTF-16 string. Strings don't usually
-      // get converted to UTF-16 storage, so it seems okay to trap in this case
-      // -- the index most likely comes from an unrelated string. (Trapping here
-      // may still turn out to affect binary compatibility with broken code in
+      // get converted to UTF-16 storage, so it seems okay to reject this case
+      // -- the index most likely comes from an unrelated string. (This may
+      // still turn out to affect binary compatibility with broken code in
       // existing binaries running with new stdlibs. If so, we can replace this
       // with the same transcoding hack as in the UTF-16->8 case below.)
-      //
-      // Note that this trap is not guaranteed to trigger when the process
-      // includes client binaries compiled with a previous Swift release.
-      // (`i._canBeUTF16` can sometimes return true in that case even if the
-      // index actually came from an UTF-8 string.) However, the trap will still
-      // often trigger in this case, as long as the index was initialized by
-      // code that was compiled with 5.7+.
-      //
-      // This trap can never trigger on OSes that have stdlibs <= 5.6, because
-      // those versions never set the `isKnownUTF16` flag in `_StringObject`.
-      _preconditionFailure("Invalid string index")
+      return nil
     }
     // Attempt to use an UTF-16 index on a UTF-8 string.
     //
@@ -383,10 +411,15 @@ extension _StringGuts {
     // FIXME: Consider emitting a runtime warning here.
     // FIXME: Consider performing a linked-on-or-after check & trapping if the
     // client executable was built on some particular future Swift release.
-    let utf16 = String(self).utf16
-    let base = utf16.index(utf16.startIndex, offsetBy: i._encodedOffset)
-    if i.transcodedOffset == 0 { return base }
-    return base.encoded(offsetBy: i.transcodedOffset)._knownUTF8
+    let utf16 = String.UTF16View(self)
+    var r = utf16.index(utf16.startIndex, offsetBy: i._encodedOffset)
+    if i.transcodedOffset != 0 {
+      r = r.encoded(offsetBy: i.transcodedOffset)
+    } else {
+      // Preserve alignment bits if possible.
+      r = r._copyingAlignment(from: i)
+    }
+    return r._knownUTF8
   }
 }
 

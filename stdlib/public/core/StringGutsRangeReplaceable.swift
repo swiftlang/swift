@@ -466,10 +466,9 @@ extension _StringGuts {
     _internalInvariant(
       subrange.lowerBound >= startIndex && subrange.upperBound <= endIndex)
 
-    if _slowPath(isUTF16) {
-      // UTF-16 (i.e., foreign) string. The mutation will convert this to the
-      // native UTF-8 encoding, so we need to do some extra work to preserve our
-      // bounds.
+    guard _fastPath(isUTF8) else {
+      // UTF-16 string. The mutation will convert this to the native UTF-8
+      // encoding, so we need to do some extra work to preserve our bounds.
       let utf8StartOffset = String(self).utf8.distance(
         from: self.startIndex, to: startIndex)
       let oldUTF8Count = String(self).utf8.distance(
