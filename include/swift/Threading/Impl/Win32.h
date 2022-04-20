@@ -90,6 +90,8 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
 
 typedef std::atomic<int64_t> once_t;
 
+void once_slow(once_t &predicate, void (*fn)(void *), void *context);
+
 inline void once(once_t &predicate, void (*fn)(void *), void *context) {
   // Using INIT_ONCE is slower than doing this.
   if (predicate.load(std::memory_order_acquire) < 0)
