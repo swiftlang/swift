@@ -212,10 +212,6 @@ public:
       // If this is a closure, only walk into its children if they
       // are type-checked in the context of the enclosing expression.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        // TODO: This has to be deleted once `EnableMultiStatementClosureInference`
-        //       is enabled by default.
-        if (!closure->hasSingleExpressionBody())
-          return { false, expr };
         for (auto &Param : *closure->getParameters()) {
           Param->setSpecifier(swift::ParamSpecifier::Default);
         }
