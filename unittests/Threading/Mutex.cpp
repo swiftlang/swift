@@ -17,28 +17,50 @@
 #include <map>
 #include <random>
 
-#include "ThreadingHelpers.h"
+#include "LockingHelpers.h"
 
 using namespace swift;
 
 // -----------------------------------------------------------------------------
 
-template <typename M> void basicLockableThreaded(M &mutex) {
-  int count1 = 0;
-  int count2 = 0;
+TEST(MutexTest, BasicLockable) {
+  Mutex mutex(/* checked = */ true);
+  basicLockable(mutex);
+}
 
-  threadedExecute(10, [&](int) {
-    for (int j = 0; j < 50; ++j) {
-      mutex.lock();
-      auto count = count2;
-      count1++;
-      count2 = count + 1;
-      mutex.unlock();
-    }
-  });
+TEST(LazyMutexTest, BasicLockable) {
+  static LazyMutex mutex;
+  basicLockable(mutex);
+}
 
-  ASSERT_EQ(count1, 500);
-  ASSERT_EQ(count2, 500);
+TEST(LazyUnsafeMutexTest, BasicLockable) {
+  static LazyUnsafeMutex mutex;
+  basicLockable(mutex);
+}
+
+TEST(SmallMutex, BasicLockable) {
+  SmallMutex mutex;
+  basicLockable(mutex);
+}
+
+TEST(MutexTest, TryLockable) {
+  Mutex mutex(/* checked = */ true);
+  tryLockable(mutex);
+}
+
+TEST(LazyMutexTest, TryLockable) {
+  static LazyMutex mutex;
+  tryLockable(mutex);
+}
+
+TEST(LazyUnsafeMutexTest, TryLockable) {
+  static LazyUnsafeMutex mutex;
+  tryLockable(mutex);
+}
+
+TEST(SmallMutex, TryLockable) {
+  SmallMutex mutex;
+  tryLockable(mutex);
 }
 
 TEST(MutexTest, BasicLockableThreaded) {
@@ -61,34 +83,6 @@ TEST(SmallMutex, BasicLockableThreaded) {
   basicLockableThreaded(mutex);
 }
 
-template <typename M> void lockableThreaded(M &mutex) {
-  mutex.lock();
-  threadedExecute(5, [&](int) { ASSERT_FALSE(mutex.try_lock()); });
-  mutex.unlock();
-  threadedExecute(1, [&](int) {
-    ASSERT_TRUE(mutex.try_lock());
-    mutex.unlock();
-  });
-
-  int count1 = 0;
-  int count2 = 0;
-  threadedExecute(10, [&](int) {
-    for (int j = 0; j < 50; ++j) {
-      if (mutex.try_lock()) {
-        auto count = count2;
-        count1++;
-        count2 = count + 1;
-        mutex.unlock();
-      } else {
-        j--;
-      }
-    }
-  });
-
-  ASSERT_EQ(count1, 500);
-  ASSERT_EQ(count2, 500);
-}
-
 TEST(MutexTest, LockableThreaded) {
   Mutex mutex(/* checked = */ true);
   lockableThreaded(mutex);
@@ -104,23 +98,6 @@ TEST(SmallMutexTest, LockableThreaded) {
   lockableThreaded(Mutex);
 }
 
-template <typename SL, typename M> void scopedLockThreaded(M &mutex) {
-  int count1 = 0;
-  int count2 = 0;
-
-  threadedExecute(10, [&](int) {
-    for (int j = 0; j < 50; ++j) {
-      SL guard(mutex);
-      auto count = count2;
-      count1++;
-      count2 = count + 1;
-    }
-  });
-
-  ASSERT_EQ(count1, 500);
-  ASSERT_EQ(count2, 500);
-}
-
 TEST(MutexTest, ScopedLockThreaded) {
   Mutex mutex(/* checked = */ true);
   scopedLockThreaded<Mutex::ScopedLock>(mutex);
@@ -134,29 +111,6 @@ TEST(LazyMutexTest, ScopedLockThreaded) {
 TEST(SmallMutexTest, ScopedLockThreaded) {
   SmallMutex mutex(/* checked = */ true);
   scopedLockThreaded<ScopedLockT<SmallMutex, false>>(mutex);
-}
-
-template <typename SL, typename SU, typename M>
-void scopedUnlockUnderScopedLockThreaded(M &mutex) {
-  int count1 = 0;
-  int count2 = 0;
-  int badCount = 0;
-
-  threadedExecute(10, [&](int) {
-    for (int j = 0; j < 50; ++j) {
-      SL guard(mutex);
-      {
-        SU unguard(mutex);
-        badCount++;
-      }
-      auto count = count2;
-      count1++;
-      count2 = count + 1;
-    }
-  });
-
-  ASSERT_EQ(count1, 500);
-  ASSERT_EQ(count2, 500);
 }
 
 TEST(MutexTest, ScopedUnlockUnderScopedLockThreaded) {
@@ -177,24 +131,6 @@ TEST(SmallMutexTest, ScopedUnlockUnderScopedLockThreaded) {
                                       SmallMutex::ScopedUnlock>(mutex);
 }
 
-template <typename M> void criticalSectionThreaded(M &mutex) {
-  int count1 = 0;
-  int count2 = 0;
-
-  threadedExecute(10, [&](int) {
-    for (int j = 0; j < 50; ++j) {
-      mutex.withLock([&] {
-        auto count = count2;
-        count1++;
-        count2 = count + 1;
-      });
-    }
-  });
-
-  ASSERT_EQ(count1, 500);
-  ASSERT_EQ(count2, 500);
-}
-
 TEST(MutexTest, CriticalSectionThreaded) {
   Mutex mutex(/* checked = */ true);
   criticalSectionThreaded(mutex);
@@ -203,54 +139,4 @@ TEST(MutexTest, CriticalSectionThreaded) {
 TEST(LazyMutexTest, CriticalSectionThreaded) {
   static LazyMutex Mutex;
   criticalSectionThreaded(Mutex);
-}
-
-template <typename SRL, bool Locking, typename RW>
-void scopedReadThreaded(RW &lock) {
-  const int threadCount = 10;
-
-  std::set<int> writerHistory;
-  std::vector<std::set<int>> readerHistory;
-  readerHistory.assign(threadCount, std::set<int>());
-
-  int protectedValue = 0;
-  writerHistory.insert(protectedValue);
-
-  threadedExecute(threadCount,
-                  [&](int index) {
-                    if (Locking) {
-                      for (int i = 0; i < 50; ++i) {
-                        {
-                          SRL guard(lock);
-                          readerHistory[index].insert(protectedValue);
-                        }
-                        std::this_thread::yield();
-                      }
-                    } else {
-                      lock.readLock();
-                      for (int i = 0; i < 50; ++i) {
-                        readerHistory[index].insert(protectedValue);
-
-                        {
-                          SRL unguard(lock);
-                          std::this_thread::yield();
-                        }
-                      }
-                      lock.readUnlock();
-                    }
-                  },
-                  [&] {
-                    for (int i = 0; i < 25; ++i) {
-                      lock.writeLock();
-                      protectedValue += i;
-                      writerHistory.insert(protectedValue);
-                      lock.writeUnlock();
-                    }
-                  });
-
-  for (auto &history : readerHistory) {
-    for (auto value : history) {
-      ASSERT_EQ(writerHistory.count(value), 1U);
-    }
-  }
 }

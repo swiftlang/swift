@@ -1,5 +1,7 @@
 add_swift_unittest(SwiftThreadingTests
   Mutex.cpp
+  Once.cpp
+  LinuxUlock.cpp
   )
 
 target_link_libraries(SwiftThreadingTests

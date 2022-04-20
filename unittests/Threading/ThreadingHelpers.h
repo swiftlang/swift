@@ -1,4 +1,4 @@
-//===--- Concurrent.cpp - Concurrent data structure tests -----------------===//
+//===--- ThreadingHelpers.h - Utilities to help test threading ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
