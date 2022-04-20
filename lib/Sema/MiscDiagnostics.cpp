@@ -2645,6 +2645,8 @@ public:
     // If there are no candidates, then the body has no return statements, and
     // we have nothing to infer the underlying type from.
     if (Candidates.empty()) {
+      Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
+
       // We try to find if the last element of the `Body` multi element
       // `BraceStmt` is an expression that produces a value that satisfies all
       // the opaque type requirements and if that is the case, it means we can
@@ -2661,29 +2663,26 @@ public:
                                                   requirement.getProtocolDecl(),
                                                   Implementation->getModuleContext(),
                                                   /*allowMissing=*/ false);
-              if (!conformance.isInvalid()) {
-                return true;
-              }
+              return !conformance.isInvalid();
             }
+            // If we encounter any requirements other than `Conformance`, we do
+            // not attempt to type check the expression.
             return false;
           });
 
           // If all requirements are fulfilled, we offer to insert `return` to
           // fix the issue.
           if (conforms) {
-            Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
             Ctx.Diags
                 .diagnose(expr->getStartLoc(),
                           diag::opaque_type_missing_return_last_expr_note)
                 .fixItInsert(expr->getStartLoc(), "return ");
-            return;
           }
         }
       }
 
       // We have not found any candidates for where adding a `return` would fix
-      // the issue and are therefore falling back to the generic error message.
-      Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
+      // the issue.
       return;
     }
 
