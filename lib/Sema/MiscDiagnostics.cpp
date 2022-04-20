@@ -2653,20 +2653,20 @@ public:
         auto element = Body->getLastElement();
         // Let's see if the last statement would make for a valid return value.
         if (auto expr = element.dyn_cast<Expr *>()) {
-          bool conforms = true;
-
-          for (auto requirement :
-               OpaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements()) {
-            auto protocolConformance =
-                TypeChecker::conformsToProtocol(expr->getType()->getRValueType(),
-                                                requirement.getProtocolDecl(),
-                                                Implementation->getModuleContext(),
-                                                /*allowMissing=*/ false);
-            if (protocolConformance.isInvalid()) {
-              conforms = false;
-              break;
+          bool conforms = llvm::all_of(OpaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements(),
+                                       [&expr, this](auto requirement) {
+            if (requirement.getKind() == RequirementKind::Conformance) {
+              auto conformance =
+                  TypeChecker::conformsToProtocol(expr->getType()->getRValueType(),
+                                                  requirement.getProtocolDecl(),
+                                                  Implementation->getModuleContext(),
+                                                  /*allowMissing=*/ false);
+              if (!conformance.isInvalid()) {
+                return true;
+              }
             }
-          }
+            return false;
+          });
 
           // If all requirements are fulfilled, we offer to insert `return` to
           // fix the issue.
