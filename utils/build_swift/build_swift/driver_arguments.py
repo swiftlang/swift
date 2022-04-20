@@ -594,6 +594,10 @@ def create_argument_parser():
                 "for each cross-compiled toolchain's destdir, useful when building "
                 "multiple toolchains and can be disabled if only cross-compiling one.")
 
+    option('--custom-native-toolchain', store,
+           default=None,
+           help="Specify a custom location to find compilers and tools")
+
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,

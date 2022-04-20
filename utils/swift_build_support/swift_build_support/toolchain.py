@@ -208,7 +208,22 @@ class Haiku(GenericUnix):
         super(Haiku, self)
 
 
+class Custom(Toolchain):
+    def __init__(self, path):
+        self.base_path = path
+
+    def find_tool(self, *names):
+        names = set(names)
+        for dirpath, _, filenames in os.walk(self.base_path):
+            candidates = set(filenames) & names
+            if candidates:
+                return os.path.join(dirpath, next(iter(candidates)))
+
+
 def host_toolchain(**kwargs):
+    native_toolchain_path = kwargs.pop('custom_native_toolchain', None)
+    if native_toolchain_path is not None:
+        return Custom(native_toolchain_path)
     sys = platform.system()
     if sys == 'Darwin':
         return MacOSX(kwargs.pop('xcrun_toolchain', 'default'))

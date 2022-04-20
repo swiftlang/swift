@@ -598,7 +598,8 @@ def main_normal():
         print_note('Using toolchain {}'.format(xcrun_toolchain))
         args.darwin_xcrun_toolchain = xcrun_toolchain
 
-    toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
+    toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain,
+                               custom_native_toolchain=args.custom_native_toolchain)
     os.environ['TOOLCHAINS'] = args.darwin_xcrun_toolchain
 
     if args.host_cc is not None:
