@@ -13,7 +13,7 @@
 /// A type whose values can safely be passed across concurrency domains by copying.
 ///
 /// You can safely pass values of a sendable type
-/// from one concurrency domains to another ---
+/// from one concurrency domain to another ---
 /// for example, you can pass a sendable value as the argument
 /// when calling an actor's methods.
 /// All of the following can be marked as sendable:
@@ -24,7 +24,7 @@
 ///
 /// - Reference types that internally manage access to their state
 ///
-/// - Functions and closures (via `@Sendable`)
+/// - Functions and closures (by marking them with `@Sendable`)
 ///
 /// Although this protocol doesn't have any required methods or properties,
 /// it does have semantic requirements that are enforced at compile time.
@@ -61,7 +61,7 @@
 /// Otherwise, you need to declare conformance to `Sendable` explicitly.
 ///
 /// Structures that have nonsendable stored properties
-/// and enumerations that nonsendable associated values
+/// and enumerations that have nonsendable associated values
 /// can be marked as `@unchecked Sendable`,
 /// disabling compile-time correctness checks,
 /// after you manually verify that
@@ -103,7 +103,7 @@
 /// and the captured values must be of a sendable type.
 ///
 /// In a context that expects a sendable closure,
-/// a closure closure that satisfies the requirements
+/// a closure that satisfies the requirements
 /// implicitly conforms to `Sendable` ---
 /// for example, in a call to `Task.detached(priority:operation:)`.
 ///
