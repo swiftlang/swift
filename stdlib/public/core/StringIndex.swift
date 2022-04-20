@@ -365,6 +365,14 @@ extension String.Index {
   }
 }
 
+extension String.Index {
+  @_alwaysEmitIntoClient // Swift 5.7
+  internal func _copyingAlignment(from index: Self) -> Self {
+    let mask = Self.__scalarAlignmentBit | Self.__characterAlignmentBit
+    return Self((_rawBits & ~mask) | (index._rawBits & mask))
+  }
+}
+
 // ### Index Encoding
 //
 // Swift 5.7 introduced bookkeeping to keep track of the Unicode encoding
@@ -473,21 +481,9 @@ extension String.Index {
   }
 
   @_alwaysEmitIntoClient // Swift 5.7
-  internal func _copyEncoding(from index: Self) -> Self {
+  internal func _copyingEncoding(from index: Self) -> Self {
     let mask = Self.__utf8Bit | Self.__utf16Bit
     return Self((_rawBits & ~mask) | (index._rawBits & mask))
-  }
-}
-
-extension String.Index {
-  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
-  internal var _isUTF8CharacterIndex: Bool {
-    _canBeUTF8 && _isCharacterAligned
-  }
-
-  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
-  internal var _isUTF8ScalarIndex: Bool {
-    _canBeUTF8 && _isScalarAligned
   }
 }
 
