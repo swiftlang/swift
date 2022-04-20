@@ -43,7 +43,8 @@ public func usesWithUnsafeContinuation() async {
   let _: Int = await Builtin.withUnsafeContinuation { c in }
 
   // CHECK: [[FN:%.*]] = function_ref @$s4test26usesWithUnsafeContinuationyyYaFyBcXEfU_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
-  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[FN]]
+  // CHECK: [[TMP:%.*]] = convert_function [[FN]] : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () to $@convention(thin) @noescape (Builtin.RawUnsafeContinuation) -> ()
+  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[TMP]]
   // CHECK: [[BOX:%.*]] = alloc_stack $Int
   // CHECK: [[CC:%.*]] = get_async_continuation_addr Int, [[BOX]] : $*Int
   // CHECK: apply [[CLOSURE]]([[CC]]) : $@noescape @callee_guaranteed (Builtin.RawUnsafeContinuation) -> ()
@@ -57,7 +58,8 @@ public func usesWithUnsafeContinuation() async {
   let _: String = await Builtin.withUnsafeContinuation { c in }
 
   // CHECK: [[FN:%.*]] = function_ref @$s4test26usesWithUnsafeContinuationyyYaFyBcXEfU0_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
-  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[FN]]
+  // CHECK: [[TMP:%.*]] = convert_function [[FN]] : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () to $@convention(thin) @noescape (Builtin.RawUnsafeContinuation) -> ()
+  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[TMP]]
   // CHECK: [[BOX:%.*]] = alloc_stack $String
   // CHECK: [[CC:%.*]] = get_async_continuation_addr String, [[BOX]] : $*String
   // CHECK: apply [[CLOSURE]]([[CC]]) : $@noescape @callee_guaranteed (Builtin.RawUnsafeContinuation) -> ()
@@ -72,7 +74,8 @@ public func usesWithUnsafeContinuation() async {
   let _: Any = await Builtin.withUnsafeContinuation { c in }
 
   // CHECK: [[FN:%.*]] = function_ref @$s4test26usesWithUnsafeContinuationyyYaFyBcXEfU1_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
-  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[FN]]
+  // CHECK: [[TMP:%.*]] = convert_function [[FN]] : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () to $@convention(thin) @noescape (Builtin.RawUnsafeContinuation) -> ()
+  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[TMP]]
   // CHECK: [[BOX:%.*]] = alloc_stack $Any
   // CHECK: [[CC:%.*]] = get_async_continuation_addr Any, [[BOX]] : $*Any
   // CHECK: apply [[CLOSURE]]([[CC]]) : $@noescape @callee_guaranteed (Builtin.RawUnsafeContinuation) -> ()
@@ -91,7 +94,8 @@ public func usesWithUnsafeThrowingContinuation() async throws {
   let _: Int = try await Builtin.withUnsafeThrowingContinuation { c in }
 
   // CHECK: [[FN:%.*]] = function_ref @$s4test34usesWithUnsafeThrowingContinuationyyYaKFyBcXEfU_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
-  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[FN]]
+  // CHECK: [[TMP:%.*]] = convert_function [[FN]] : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () to $@convention(thin) @noescape (Builtin.RawUnsafeContinuation) -> ()
+  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[TMP]]
   // CHECK: [[BOX:%.*]] = alloc_stack $Int
   // CHECK: [[CC:%.*]] = get_async_continuation_addr [throws] Int, [[BOX]] : $*Int
   // CHECK: apply [[CLOSURE]]([[CC]]) : $@noescape @callee_guaranteed (Builtin.RawUnsafeContinuation) -> ()
