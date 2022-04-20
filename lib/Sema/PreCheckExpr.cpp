@@ -1443,12 +1443,10 @@ namespace {
     bool walkToDeclPre(Decl *D) override { return isa<PatternBindingDecl>(D); }
 
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
-      // With multi-statement closure inference enabled, constraint generation
-      // is responsible for pattern verification and type-checking in the body
-      // of the closure, so there is no need to walk into patterns.
-      bool walkIntoPatterns =
-          !(isa<ClosureExpr>(DC) &&
-            Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference);
+      // Constraint generation is responsible for pattern verification and
+      // type-checking in the body of the closure, so there is no need to
+      // walk into patterns.
+      bool walkIntoPatterns = !isa<ClosureExpr>(DC);
       return {walkIntoPatterns, pattern};
     }
   };
@@ -1460,9 +1458,6 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // If we won't be checking the body of the closure, don't walk into it here.
   if (!closure->hasSingleExpressionBody()) {
     if (LeaveClosureBodiesUnchecked)
-      return false;
-
-    if (!Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference)
       return false;
   }
 

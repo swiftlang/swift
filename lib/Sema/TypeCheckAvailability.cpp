@@ -3136,21 +3136,7 @@ private:
   }
 
   bool shouldWalkIntoClosure(AbstractClosureExpr *closure) const {
-    // Multi-statement closures are collected by ExprWalker::rewriteFunction
-    // and checked by ExprWalker::processDelayed in CSApply.cpp.
-    // Single-statement closures only have the attributes checked
-    // by TypeChecker::checkClosureAttributes in that rewriteFunction.
-    // Multi-statement closures will be checked explicitly later (as the decl
-    // context in the Where). Single-expression closures will not be
-    // revisited, and are not automatically set as the context of the 'where'.
-    // Don't double-check multi-statement closures, but do check
-    // single-statement closures, setting the closure as the decl context.
-    //
-    // Note about SE-0326: When a flag is enabled multi-statement closures
-    // are type-checked together with enclosing context, so walker behavior
-    // should match that of single-expression closures.
-    return closure->hasSingleExpressionBody() ||
-           Context.TypeCheckerOpts.EnableMultiStatementClosureInference;
+    return true;
   }
 
   /// Walk an abstract closure expression, checking for availability

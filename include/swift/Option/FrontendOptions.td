@@ -900,10 +900,6 @@ def experimental_one_way_closure_params :
   Flag<["-"], "experimental-one-way-closure-params">,
   HelpText<"Enable experimental support for one-way closure parameters">;
 
-def experimental_multi_statement_closures :
-  Flag<["-"], "experimental-multi-statement-closures">,
-  HelpText<"Enable experimental support for type inference in multi-statement closures">;
-
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
   HelpText<"Directory of prebuilt modules for loading module interfaces">;
