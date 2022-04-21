@@ -221,7 +221,7 @@ private:
   // It is used if a function has no source-file association.
   llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
 
-  // The IGMs where sepecializations of functions are emitted. The key is the
+  // The IGMs where specializations of functions are emitted. The key is the
   // non-specialized function.
   // Storing all specializations of a function in the same IGM increases the
   // chances of function merging.

@@ -531,7 +531,7 @@ struct StructLoweringState {
   llvm::MapVector<SILValue, SILValue> argsToLoadedValueMap;
   // All applies for which we did an alloc
   llvm::MapVector<SILInstruction *, SILValue> applyRetToAllocMap;
-  // recerse map of the one above
+  // reverse map of the one above
   llvm::MapVector<SILInstruction *, SILInstruction *> allocToApplyRetMap;
   // All call sites with SILArgument that needs to be re-written
   // Calls are removed from the set when rewritten.
@@ -1079,7 +1079,7 @@ static AllocStackInst *allocate(StructLoweringState &pass, SILType type) {
   // Insert an alloc_stack at the beginning of the function.
   SILBuilderWithScope allocBuilder(&*pass.F->begin());
   // Don't put any variable debug info into the alloc_stack, there will be a
-  // debug_value insterted later. TODO: It may be more elegant to insert
+  // debug_value inserted later. TODO: It may be more elegant to insert
   // the variable info into the alloc_stack instead of additionally generating a
   // debug_value.
   AllocStackInst *alloc = allocBuilder.createAllocStack(
@@ -1205,7 +1205,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
   optimizableLoad->getParent()->erase(optimizableLoad);
 }
 
-static bool isYieldUseRewriteable(StructLoweringState &pass,
+static bool isYieldUseRewritable(StructLoweringState &pass,
                                   YieldInst *inst, Operand *operand) {
   assert(inst == operand->getUser());
   return pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
@@ -1236,7 +1236,7 @@ static bool hasMandatoryRewriteUse(StructLoweringState &pass,
       return true;
     }
     case SILInstructionKind::YieldInst:
-      if (isYieldUseRewriteable(pass, cast<YieldInst>(userIns), user))
+      if (isYieldUseRewritable(pass, cast<YieldInst>(userIns), user))
         return true;
       break;
     default:
@@ -1291,7 +1291,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
       break;
     }
     case SILInstructionKind::YieldInst: {
-      if (isYieldUseRewriteable(pass, cast<YieldInst>(userIns), use))
+      if (isYieldUseRewritable(pass, cast<YieldInst>(userIns), use))
         usesToMod.push_back(use);
       break;
     }
@@ -1840,7 +1840,7 @@ static bool allUsesAreReplaceable(StructLoweringState &pass,
       break;
     }
     case SILInstructionKind::YieldInst:
-      if (!isYieldUseRewriteable(pass, cast<YieldInst>(userIns), user))
+      if (!isYieldUseRewritable(pass, cast<YieldInst>(userIns), user))
         return false;
       break;
     case SILInstructionKind::StructExtractInst:

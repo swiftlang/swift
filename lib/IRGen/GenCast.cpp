@@ -1072,7 +1072,7 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
 
   // TODO: we could use the ClassHierarchyAnalysis do also handle "effectively"
   // final classes, e.g. not-subclassed internal classes in WMO.
-  // This would need some re-architecting of ClassHierarchyAnalysis to make it
+  // This would need some rearchitecting of ClassHierarchyAnalysis to make it
   // available in IRGen.
   ClassDecl *toClass = classTy->getDecl();
   if (!toClass->isFinal())
@@ -1093,7 +1093,7 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
         IGF.IGM.getAddrOfTypeMetadataAccessFunction(targetFormalType,
                                                     NotForDefinition);
     auto request = DynamicMetadataRequest(MetadataState::Complete);
-    // We know that we are not in a gneric class context, so we can safely
+    // We know that we are not in a generic class context, so we can safely
     // determine that the call here does not need to take that into account.
     auto response =
         IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, {}, request);
@@ -1106,7 +1106,7 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
       targetFormalType, GenericSignature(), /*suppress cast*/ true);
   llvm::Value *rhs = IGF.Builder.CreateBitCast(objMetadata, IGF.IGM.Int8PtrTy);
   
-  // return isa_ptr == metadat_ptr ? instance : nullptr
+  // return isa_ptr == metadata_ptr ? instance : nullptr
   llvm::Value *isEqual = IGF.Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ,
                                               lhs, rhs);
   auto *instanceTy = cast<llvm::PointerType>(instance->getType());

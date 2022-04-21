@@ -841,8 +841,8 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
       auto nominal = ext->getExtendedNominal();
       // If the extended type is an ObjC class, it won't have a nominal type
       // descriptor, so we'll just emit an extension context.
-      auto clas = dyn_cast<ClassDecl>(nominal);
-      if (!clas || clas->isForeign() || hasKnownSwiftMetadata(*this, clas)) {
+      auto clazz = dyn_cast<ClassDecl>(nominal);
+      if (!clazz || clazz->isForeign() || hasKnownSwiftMetadata(*this, clazz)) {
         IRGen.noteUseOfTypeContextDescriptor(nominal, DontRequireMetadata);
         return getAddrOfLLVMVariableOrGOTEquivalent(
                                 LinkEntity::forNominalTypeDescriptor(nominal));
@@ -2195,7 +2195,7 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
     if (const auto *MD = DC->getParentModule())
       isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
   } else if (entity.hasSILFunction()) {
-    // SIL serialized entitites (functions, witness tables, vtables) do not have
+    // SIL serialized entities (functions, witness tables, vtables) do not have
     // an associated DeclContext and are serialized into the current module.  As
     // a result, we explicitly handle SIL Functions here. We do not expect other
     // types to be referenced directly.
@@ -3295,7 +3295,7 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
   // rdar://problem/53836960: i386 ld64 also mis-links relative references
   // to GOT entries.
   // rdar://problem/59782487: issue with on-device JITd expressions.
-  // The JIT gets confused by private vars accessed accross object files.
+  // The JIT gets confused by private vars accessed across object files.
   if (!IGM.getOptions().UseJIT &&
       (!IGM.Triple.isOSDarwin() || IGM.Triple.getArch() != llvm::Triple::x86)) {
     gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
@@ -3707,21 +3707,21 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
   }
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    auto clas = dyn_cast<ClassDecl>(decl);
-    if (!clas || clas->isForeignReferenceType()) {
+    auto clazz = dyn_cast<ClassDecl>(decl);
+    if (!clazz || clazz->isForeignReferenceType()) {
       return getTypeContextDescriptorEntityReference(*this, nominal);
     }
 
-    switch (clas->getForeignClassKind()) {
+    switch (clazz->getForeignClassKind()) {
     case ClassDecl::ForeignKind::RuntimeOnly:
-      return getObjCClassByNameReference(*this, clas);
+      return getObjCClassByNameReference(*this, clazz);
 
     case ClassDecl::ForeignKind::CFType:
-      return getTypeContextDescriptorEntityReference(*this, clas);
+      return getTypeContextDescriptorEntityReference(*this, clazz);
 
     case ClassDecl::ForeignKind::Normal:
-      if (hasKnownSwiftMetadata(*this, clas)) {
-        return getTypeContextDescriptorEntityReference(*this, clas);
+      if (hasKnownSwiftMetadata(*this, clazz)) {
+        return getTypeContextDescriptorEntityReference(*this, clazz);
       }
 
       // Note: we would like to use an Objective-C class reference, but the
@@ -3729,7 +3729,7 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
       // *after* computing a relative offset, causing incorrect relative
       // offsets in the metadata. Therefore, reference Objective-C classes by
       // their runtime names.
-      return getObjCClassByNameReference(*this, clas);
+      return getObjCClassByNameReference(*this, clazz);
     }
   }
   llvm_unreachable("bad foreign type kind");

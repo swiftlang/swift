@@ -413,10 +413,10 @@ namespace {
     // function type (the function to be called on returning).
     void expandAsyncReturnType();
 
-    // Expand the componends for the async suspend call of the function type.
+    // Expand the components for the async suspend call of the function type.
     void expandAsyncAwaitType();
 
-    // Expand the componends for the primary entrypoint of the async function
+    // Expand the components for the primary entrypoint of the async function
     // type.
     void expandAsyncEntryType();
 
@@ -2544,7 +2544,7 @@ public:
 
     auto layout = getAsyncContextLayout();
 
-    // Innitialize the async context for returning if we're not using
+    // Initialize the async context for returning if we're not using
     // the special convention which suppresses that.
     if (!getCallee().shouldPassContinuationDirectly()) {
       // Set the caller context to the current context.

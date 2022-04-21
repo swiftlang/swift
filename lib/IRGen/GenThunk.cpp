@@ -523,7 +523,7 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
     }
       
     void noteResilientSuperclass() {}
-    void noteStartOfImmediateMembers(ClassDecl *clas) {}
+    void noteStartOfImmediateMembers(ClassDecl *clazz) {}
   };
   
   LookUpNonoverriddenMethods(IGF, classDecl, method).layout();

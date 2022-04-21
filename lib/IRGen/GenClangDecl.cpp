@@ -91,7 +91,7 @@ clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
       return const_cast<clang::FunctionDecl *>(definition);
     }
 
-    // If this is a potentially not-yet-instanciated template, we might
+    // If this is a potentially not-yet-instantiated template, we might
     // still have a body.
     if (fd->getTemplateInstantiationPattern())
       return fd;

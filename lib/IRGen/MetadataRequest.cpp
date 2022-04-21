@@ -278,7 +278,7 @@ usesExtendedExistentialMetadata(CanExistentialMetatypeType type) {
     depth++;
   }
 
-  // The only exitential types that don't currently use ExistentialType
+  // The only existential types that don't currently use ExistentialType
   // are Any and AnyObject, which don't use extended metadata.
   if (usesExtendedExistentialMetadata(cur))
     return std::make_pair(cast<ExistentialType>(cur), depth);
@@ -2101,7 +2101,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   // Emit a branch around the caching code if we're working with responses
   // and the fetched result is not complete.  We can avoid doing this if
   // the response is statically known to be complete, and we don't need to
-  // do it if this is an in-place initiazation cache because the store
+  // do it if this is an in-place initialization cache because the store
   // is done within the runtime.
   llvm::BasicBlock *completionCheckBB = nullptr;
   llvm::Value *directState = nullptr;
@@ -2959,7 +2959,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     call->setDoesNotAccessMemory();
     call->setCallingConv(IGM.SwiftCC);
 
-    // Store the result back to the cache. Metadata instantatiation should
+    // Store the result back to the cache. Metadata instantiation should
     // already have emitted the necessary barriers to publish the instantiated
     // metadata to other threads, so we only need to expose the pointer.
     // Worst case, another thread might race with us and reinstantiate the

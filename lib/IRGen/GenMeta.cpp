@@ -4217,7 +4217,7 @@ namespace {
   //        Without this template typealias, the following errors are produced
   //        when compiling on Linux and Windows, respectively:
   //
-  //        template argument for template template parameter must be a class
+  //        template argument for template parameter must be a class
   //        template or type alias template
   //
   //        invalid template argument for template parameter
@@ -4408,7 +4408,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 
   // If the class does not require dynamic initialization, or if it only
   // requires dynamic initialization on a newer Objective-C runtime, add it
-  // to the Objctive-C class list.
+  // to the Objective-C class list.
   if (IGM.ObjCInterop) {
     switch (strategy) {
     case ClassMetadataStrategy::Resilient:
@@ -4917,7 +4917,7 @@ namespace {
   //        Without this template typealias, the following errors are produced
   //        when compiling on Linux and Windows, respectively:
   //
-  //        template argument for template template parameter must be a class
+  //        template argument for template parameter must be a class
   //        template or type alias template
   //
   //        invalid template argument for template parameter
@@ -5123,7 +5123,7 @@ namespace {
   //        Without this template typealias, the following errors are produced
   //        when compiling on Linux and Windows, respectively:
   //
-  //        template argument for template template parameter must be a class
+  //        template argument for template parameter must be a class
   //        template or type alias template
   //
   //        invalid template argument for template parameter
@@ -5597,10 +5597,10 @@ bool irgen::requiresForeignTypeMetadata(CanType type) {
 }
 
 bool irgen::requiresForeignTypeMetadata(NominalTypeDecl *decl) {
-  if (auto *clas = dyn_cast<ClassDecl>(decl)) {
-    assert(!clas->isForeignReferenceType());
+  if (auto *clazz = dyn_cast<ClassDecl>(decl)) {
+    assert(!clazz->isForeignReferenceType());
     
-    switch (clas->getForeignClassKind()) {
+    switch (clazz->getForeignClassKind()) {
     case ClassDecl::ForeignKind::Normal:
     case ClassDecl::ForeignKind::RuntimeOnly:
       return false;
