@@ -2076,7 +2076,7 @@ bool CompletionLookup::tryModuleCompletions(Type ExprType, bool TypesOnly) {
                                        .withModuleQualifier(false);
       if (TypesOnly)
         Request = Request.onlyTypes();
-      RequestedCachedResults.push_back(Request);
+      RequestedCachedResults.insert(Request);
     }
     return true;
   }
@@ -2639,7 +2639,7 @@ void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
 
   lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
                      /*IncludeTopLevel=*/false, Loc);
-  RequestedCachedResults.push_back(
+  RequestedCachedResults.insert(
       RequestedResultsTy::toplevelResults().withModuleQualifier(
           ModuleQualifier));
 
@@ -2941,9 +2941,9 @@ void CompletionLookup::collectPrecedenceGroups() {
     if (Module == CurrModule)
       continue;
 
-    RequestedCachedResults.push_back(RequestedResultsTy::fromModule(Module)
-                                         .onlyPrecedenceGroups()
-                                         .withModuleQualifier(false));
+    RequestedCachedResults.insert(RequestedResultsTy::fromModule(Module)
+                                      .onlyPrecedenceGroups()
+                                      .withModuleQualifier(false));
   }
 }
 
@@ -3033,7 +3033,7 @@ void CompletionLookup::getTypeCompletionsInDeclContext(SourceLoc Loc,
   lookupVisibleDecls(AccessFilteringConsumer, CurrDeclContext,
                      /*IncludeTopLevel=*/false, Loc);
 
-  RequestedCachedResults.push_back(
+  RequestedCachedResults.insert(
       RequestedResultsTy::toplevelResults().onlyTypes().withModuleQualifier(
           ModuleQualifier));
 }
