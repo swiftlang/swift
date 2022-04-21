@@ -375,9 +375,9 @@ extension Optional: Equatable where Wrapped: Equatable {
   /// `numberToMatch` constant is wrapped as an optional before comparing to the
   /// optional `numberFromString`:
   ///
-  ///     let numberToFind: Int = 23
+  ///     let numberToMatch: Int = 23
   ///     let numberFromString: Int? = Int("23")      // Optional(23)
-  ///     if numberToFind == numberFromString {
+  ///     if numberToMatch == numberFromString {
   ///         print("It's a match!")
   ///     }
   ///     // Prints "It's a match!"
