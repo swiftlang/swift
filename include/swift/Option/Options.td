@@ -702,9 +702,9 @@ def warn_concurrency : Flag<["-"], "warn-concurrency">,
 def strict_concurrency : Joined<["-"], "strict-concurrency=">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Specify the how strict concurrency checking will be. The value may "
-           "be 'off' (most 'Sendable' checking is disabled), "
-           "'limited' ('Sendable' checking is enabled in code that uses the "
-           "concurrency model, or 'on' ('Sendable' and other checking is "
+           "be 'explicit' (most 'Sendable' checking is disabled), "
+           "'targeted' ('Sendable' checking is enabled in code that uses the "
+           "concurrency model, or 'complete' ('Sendable' and other checking is "
            "enabled for all code in the module)">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,

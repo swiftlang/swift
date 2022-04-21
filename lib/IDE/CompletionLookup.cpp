@@ -768,7 +768,7 @@ void CompletionLookup::analyzeActorIsolation(
   }
 
   // If the reference is 'async', all types must be 'Sendable'.
-  if (Ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::On &&
+  if (Ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::Complete &&
       implicitlyAsync && T) {
     auto *M = CurrDeclContext->getParentModule();
     if (isa<VarDecl>(VD)) {

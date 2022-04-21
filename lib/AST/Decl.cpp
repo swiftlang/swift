@@ -9202,7 +9202,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
     if (dc->isAsyncContext() ||
         dc->getASTContext().LangOpts.StrictConcurrencyLevel
-            >= StrictConcurrency::On) {
+            >= StrictConcurrency::Complete) {
       if (Type mainActor = dc->getASTContext().getMainActorType())
         return ActorIsolation::forGlobalActor(
             mainActor,
