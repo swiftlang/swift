@@ -1,0 +1,4 @@
+module ProtocolNamingConflict [extern_c] {
+  header "protocol-naming-conflict.h"
+  requires objc
+}
