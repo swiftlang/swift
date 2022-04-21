@@ -2183,3 +2183,15 @@ IgnoreDefaultExprTypeMismatch::create(ConstraintSystem &cs, Type argType,
   return new (cs.getAllocator())
       IgnoreDefaultExprTypeMismatch(cs, argType, paramType, locator);
 }
+
+bool AddExplicitExistentialCoercion::diagnose(const Solution &solution,
+                                              bool asNote) const {
+  return false;
+}
+
+AddExplicitExistentialCoercion *
+AddExplicitExistentialCoercion::create(ConstraintSystem &cs, Type resultTy,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AddExplicitExistentialCoercion(cs, resultTy, locator);
+}
