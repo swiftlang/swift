@@ -5,6 +5,72 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0349][]:
+
+  Loading data from raw memory represented by `UnsafeRawPointer`,
+  `UnsafeRawBufferPointer` and their mutable counterparts now supports unaligned
+  accesses. This previously required a workaround involving an intermediate
+  copy:
+
+  ```swift
+  let result = unalignedData.withUnsafeBytes { buffer -> UInt32 in
+    var storage = UInt32.zero
+    withUnsafeMutableBytes(of: &storage) {
+      $0.copyBytes(from: buffer.prefix(MemoryLayout<UInt32>.size))
+    }
+    return storage
+  }
+  ```
+  Now:
+  ```swift
+  let result = unalignedData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+  ```
+  Additionally, the counterpart `storeBytes(of:toByteOffset:as:)` had its
+  alignment restriction lifted, so that storing to arbitrary offsets of raw
+  memory can now succeed.
+
+* [SE-0334][]:
+
+  - `UnsafeRawPointer` and `UnsafeMutableRawPointer` have new functionality for
+  pointer arithmetic, adding functions to obtain a pointer advanced to the next
+  or previous alignment boundary:
+
+    ```swift
+    extension UnsafeRawPointer {
+      public func alignedUp<T>(for: T.type) -> UnsafeRawPointer
+      public func alignedDown<T>(for: T.type) -> UnsafeRawPointer
+      public func alignedUp(toMultipleOf alignment: Int) -> UnsafeRawPointer
+      public func alignedDown(toMultipleOf alignment: Int) -> UnsafeRawPointer
+    }
+    ```
+  - It is now possible to use a pointer to `struct` to obtain a pointer to one
+  of its stored properties:
+
+    ```swift
+    withUnsafeMutablePointer(to: &myStruct) {
+      let interiorPointer = $0.pointer(to: \.myProperty)!
+      return myCFunction(interiorPointer)
+    }
+    ```
+  - Comparisons between pointers have been simplified by being more permissive.
+  Since pointers are representations of memory locations within a single pool of
+  underlying memory, Swift now allows comparing pointers without requiring type
+  conversions with the `==`, `!=`, `<`,`<=`,`>`, and `>=` operators. 
+
+* [SE-0333][]:
+
+  It is now possible to use the `withMemoryRebound<T>()` method on raw memory,
+  that is `UnsafeRawPointer` , `UnsafeRawBufferPointer` and their mutable
+  counterparts. Additionally, we clarified the semantics of
+  `withMemoryRebound<T>()` when used on typed memory (`UnsafePointer<Pointee>`,
+  `UnsafeBufferPointer<Pointee>` and their mutable counterparts). Whereas
+  `Pointee` and `T` were previously required to have the same stride, you can
+  now rebind in cases where `Pointee` is an aggregate of `T` or vice-versa. For
+  example, given an `UnsafeMutableBufferPointer<CGPoint>`, you can now use
+  `withMemoryRebound` to operate temporarily on a
+  `UnsafeMutableBufferPointer<CGFloat>`, because `CGPoint` is an aggregate of
+  `CGFloat`.
+
 * [SE-0352][]:
 
   It's now possible to call a generic function with a value of protocol type
@@ -128,7 +194,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
   Distributed actors provide stronger isolation guarantees than "local" actors, and enable additional checks to be made on return types and parameters of distributed methods, e.g. checking if they conform to `Codable`. Distributed methods can be called on "remote" references of distributed actors, turning those invocations into remote procedure calls, by means of pluggable and user extensible distributed actor system implementations. 
   
-  Swift does not provide any specific distributed actor system by itself, however, packages in the ecosystem fulfil the role of providing those implementations.
+  Swift does not provide any specific distributed actor system by itself, however, packages in the ecosystem fulfill the role of providing those implementations.
   
   ```swift
   distributed actor Greeter { 
@@ -9170,20 +9236,23 @@ Swift 1.0
 [SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
 [SE-0320]: <https://github.com/apple/swift-evolution/blob/main/proposals/0320-codingkeyrepresentable.md>
 [SE-0322]: <https://github.com/apple/swift-evolution/blob/main/proposals/0322-temporary-buffers.md>
-[SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
 [SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
+[SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
+[SE-0326]: <https://github.com/apple/swift-evolution/blob/main/proposals/0326-extending-multi-statement-closure-inference.md>
 [SE-0327]: <https://github.com/apple/swift-evolution/blob/main/proposals/0327-actor-initializers.md>
 [SE-0328]: <https://github.com/apple/swift-evolution/blob/main/proposals/0328-structural-opaque-result-types.md>
 [SE-0331]: <https://github.com/apple/swift-evolution/blob/main/proposals/0331-remove-sendable-from-unsafepointer.md>
-[SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
+[SE-0333]: <https://github.com/apple/swift-evolution/blob/main/proposals/0333-with-memory-rebound.md>
+[SE-0334]: <https://github.com/apple/swift-evolution/blob/main/proposals/0334-pointer-usability-improvements.md>
 [SE-0335]: <https://github.com/apple/swift-evolution/blob/main/proposals/0335-existential-any.md>
-[SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
 [SE-0336]: <https://github.com/apple/swift-evolution/blob/main/proposals/0336-distributed-actor-isolation.md>
-[SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
+[SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
 [SE-0340]: <https://github.com/apple/swift-evolution/blob/main/proposals/0340-swift-noasync.md>
+[SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
+[SE-0343]: <https://github.com/apple/swift-evolution/blob/main/proposals/0343-top-level-concurrency.md>
 [SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
-[SE-0326]: <https://github.com/apple/swift-evolution/blob/main/proposals/0326-extending-multi-statement-closure-inference.md>
 [SE-0347]: <https://github.com/apple/swift-evolution/blob/main/proposals/0347-type-inference-from-default-exprs.md>
+[SE-0349]: <https://github.com/apple/swift-evolution/blob/main/proposals/0349-unaligned-loads-and-stores.md>
 [SE-0352]: <https://github.com/apple/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
