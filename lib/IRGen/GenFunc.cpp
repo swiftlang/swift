@@ -2434,7 +2434,9 @@ llvm::Function *IRGenFunction::getOrCreateResumeFromSuspensionFn() {
 }
 
 llvm::Function *IRGenFunction::createAsyncSuspendFn() {
-  StringRef name = "__swift_suspend_point";
+  llvm::SmallString<40> nameBuffer;
+  llvm::raw_svector_ostream(nameBuffer) << CurFn->getName() << ".1";
+  StringRef name(nameBuffer);
   if (llvm::GlobalValue *F = IGM.Module.getNamedValue(name))
     return cast<llvm::Function>(F);
 
@@ -2455,7 +2457,8 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   suspendFn->setDoesNotThrow();
   IRGenFunction suspendIGF(IGM, suspendFn);
   if (IGM.DebugInfo)
-    IGM.DebugInfo->emitArtificialFunction(suspendIGF, suspendFn);
+    IGM.DebugInfo->emitOutlinedFunction(suspendIGF, suspendFn,
+                                        CurFn->getName());
   auto &Builder = suspendIGF.Builder;
 
   llvm::Value *resumeFunction = suspendFn->getArg(0);
