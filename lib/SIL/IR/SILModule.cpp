@@ -752,12 +752,6 @@ bool SILModule::isOptimizedOnoneSupportModule() const {
          getSwiftModule()->isOnoneSupportModule();
 }
 
-void SILModule::addPublicCMOSymbol(StringRef symbol) {
-  if (!publicCMOSymbols)
-    publicCMOSymbols = std::make_shared<TBDSymbolSet>();
-  publicCMOSymbols->insert(symbol.str());
-}
-
 void SILModule::setSerializeSILAction(SILModule::ActionCallback Action) {
   assert(!SerializeSILAction && "Serialization action can be set only once");
   SerializeSILAction = Action;
