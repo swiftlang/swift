@@ -58,6 +58,20 @@ namespace swift {
     Complete,
   };
 
+  /// Describes how strict concurrency checking should be.
+  enum class StrictConcurrency {
+    /// Enforce Sendable constraints where it has been explicitly adopted and
+    /// perform actor-isolation checking wherever code has adopted concurrency.
+    Minimal,
+    /// Enforce Sendable constraints and perform actor-isolation checking
+    /// wherever code has adopted concurrency, including code that has
+    /// explicitly adopted Sendable.
+    Targeted,
+    /// Enforce Sendable constraints and actor-isolation checking throughout
+    /// the entire module.
+    Complete,
+  };
+
   /// Access or distribution level of a library.
   enum class LibraryLevel : uint8_t {
     /// Application Programming Interface that is publicly distributed so
@@ -310,11 +324,8 @@ namespace swift {
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
-    /// Provide additional warnings about code that is unsafe in the
-    /// eventual Swift concurrency model, and will eventually become errors
-    /// in a future Swift language version, but are too noisy for existing
-    /// language modes.
-    bool WarnConcurrency = false;
+    /// Specifies how strict concurrency checking will be.
+    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Minimal;
 
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
