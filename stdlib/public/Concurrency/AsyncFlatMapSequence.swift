@@ -38,7 +38,7 @@ extension AsyncSequence {
   /// - Parameter transform: A mapping closure. `transform` accepts an element
   ///   of this sequence as its parameter and returns an `AsyncSequence`.
   /// - Returns: A single, flattened asynchronous sequence that contains all
-  ///   elements in all the asychronous sequences produced by `transform`.
+  ///   elements in all the asynchronous sequences produced by `transform`.
   @preconcurrency 
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(

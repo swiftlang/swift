@@ -235,7 +235,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     task->runInFullyEstablishedContext();
 
     assert(ActiveTask::get() == nullptr &&
-           "active task wasn't cleared before susspending?");
+           "active task wasn't cleared before suspending?");
   } else {
     // There's no extra bookkeeping to do for simple jobs besides swapping in
     // the voucher.
@@ -459,7 +459,7 @@ public:
     return { job, 0 };
   }
 
-  /// Return a reference to a job that hasn't been preprocesssed yet.
+  /// Return a reference to a job that hasn't been preprocessed yet.
   static JobRef getUnpreprocessed(Job *job) {
     assert(job && "passing a null job");
     return { job, NeedsPreprocessing };
@@ -940,7 +940,7 @@ private:
 
   /// Schedule a processing job.  This can generally only be
   /// done if we know nobody else is trying to do it at the same time,
-  /// e.g. if this thread just sucessfully transitioned the actor from
+  /// e.g. if this thread just successfully transitioned the actor from
   /// Idle to Scheduled.
   void scheduleActorProcessJob(JobPriority priority);
 };
@@ -1387,7 +1387,7 @@ Job * DefaultActorImpl::drainOne() {
     // Dequeue the first job and set up a new head
     newState = newState.withFirstJob(getNextJobInQueue(firstJob));
     if (_status().compare_exchange_weak(oldState, newState,
-                            /* sucess */ std::memory_order_release,
+                            /* success */ std::memory_order_release,
                             /* failure */ std::memory_order_acquire)) {
       SWIFT_TASK_DEBUG_LOG("Drained first job %p from actor %p", firstJob, this);
       traceActorStateTransition(this, oldState, newState);
@@ -1650,7 +1650,7 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
   // Note that this doesn't change the active task and so doesn't
   // need to either update ActiveTask or flagAsRunning/flagAsSuspended.
 
-  // If there's alreaady tracking info set up, just change the executor
+  // If there's already tracking info set up, just change the executor
   // there and tail-call the task.  We don't want these frames to
   // potentially accumulate linearly.
   if (oldTracking) {
