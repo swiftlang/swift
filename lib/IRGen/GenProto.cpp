@@ -957,7 +957,7 @@ static bool isDependentConformance(
     auto assocConformance =
       conformance->getAssociatedConformance(req.getFirstType(), assocProtocol);
 
-    // We migh be presented with a broken AST.
+    // We might be presented with a broken AST.
     if (assocConformance.isInvalid())
       return false;
 

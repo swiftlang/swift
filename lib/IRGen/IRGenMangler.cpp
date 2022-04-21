@@ -116,14 +116,14 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // Classes defined in Objective-C don't have descriptors.
       // TODO: We could assign a symbolic reference discriminator to refer
       // to objc class refs.
-      if (auto clas = dyn_cast<ClassDecl>(type)) {
+      if (auto clazz = dyn_cast<ClassDecl>(type)) {
         // Swift-defined classes can be symbolically referenced.
-        if (hasKnownSwiftMetadata(IGM, const_cast<ClassDecl*>(clas)))
+        if (hasKnownSwiftMetadata(IGM, const_cast<ClassDecl*>(clazz)))
           return true;
 
         // Foreign class types can be symbolically referenced.
-        if (clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType ||
-            const_cast<ClassDecl *>(clas)->isForeignReferenceType())
+        if (clazz->getForeignClassKind() == ClassDecl::ForeignKind::CFType ||
+            const_cast<ClassDecl *>(clazz)->isForeignReferenceType())
           return true;
 
         // Otherwise no.

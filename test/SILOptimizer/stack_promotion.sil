@@ -1,3 +1,5 @@
+// rdar://92120075 
+// XFAIL OS=windows
 // RUN: %target-sil-opt -compute-effects -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage canonical

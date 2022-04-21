@@ -543,7 +543,7 @@ static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
 
   for (auto yield: type->getYields()) {
     // We can't mangle types on inout and indirect yields because they're
-    // absractable.
+    // abstractable.
     if (yield.isIndirectInOut()) {
       out << "inout";
     } else if (yield.isFormalIndirect()) {
@@ -608,7 +608,7 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
   case Kind::AssociatedType:
   case Kind::AssociatedConformance:
   case Kind::SILFunction:
-    llvm_unreachable("no type for schema using type discriminiation");
+    llvm_unreachable("no type for schema using type discrimination");
 
   case Kind::CoroutineYieldTypes: {
     auto fnType = Storage.get<CanSILFunctionType>(StoredKind);

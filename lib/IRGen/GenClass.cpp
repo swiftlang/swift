@@ -452,7 +452,7 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
                                                         os.str());
   builder.setAsBodyOfStruct(ResultTy);
 
-  // Create the StructLayout, which is transfered to the caller (the caller is
+  // Create the StructLayout, which is transferred to the caller (the caller is
   // responsible for deleting it).
   return new StructLayout(builder, classType.getClassOrBoundGenericClass(),
                           ResultTy, builder.getElements());
@@ -2570,7 +2570,7 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
   if (C->hasClangNode()) return C;
   
   // FIXME: If the root class specifies its own runtime ObjC base class,
-  // assume that that base class ultimately inherits NSObject.
+  // assume that base class ultimately inherits NSObject.
   if (C->getAttrs().hasAttribute<SwiftNativeObjCRuntimeBaseAttr>())
     return IGM.getObjCRuntimeBaseClass(
              IGM.Context.getSwiftId(KnownFoundationEntity::NSObject),
