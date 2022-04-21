@@ -107,7 +107,7 @@ class AbstractTypeWitness {
   Type TheType;
 
   /// The defaulted associated type that was used to infer this type witness.
-  /// Need not necessarilly match \c AssocType, but their names must.
+  /// Need not necessarily match \c AssocType, but their names must.
   AssociatedTypeDecl *DefaultedAssocType;
 
 public:
@@ -906,7 +906,7 @@ public:
                     llvm::function_ref<bool(AbstractFunctionDecl *)>predicate);
 };
 
-/// A system for recording and probing the intergrity of a type witness solution
+/// A system for recording and probing the integrity of a type witness solution
 /// for a set of unresolved associated type declarations.
 ///
 /// Right now can reason only about abstract type witnesses, i.e., same-type

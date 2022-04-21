@@ -1680,7 +1680,7 @@ AllowNonClassTypeToConvertToAnyObject::create(ConstraintSystem &cs, Type type,
 
 bool AddQualifierToAccessTopLevelName::diagnose(const Solution &solution,
                                                 bool asNote) const {
-  MissingQuialifierInMemberRefFailure failure(solution, getLocator());
+  MissingQualifierInMemberRefFailure failure(solution, getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -2027,7 +2027,7 @@ bool AllowNoopExistentialToCFTypeCheckedCast::diagnose(const Solution &solution,
 
 // Although function types maybe compile-time convertible because
 // compiler can emit thunks at SIL to handle the conversion when
-// required, only convertions that are supported by the runtime are
+// required, only conversions that are supported by the runtime are
 // when types are trivially equal or non-throwing from type is equal
 // to throwing to type without throwing clause conversions are not
 // possible at runtime.

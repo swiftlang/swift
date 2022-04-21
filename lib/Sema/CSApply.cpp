@@ -132,7 +132,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
   if (!decl)
     return ConcreteDeclRef();
 
-  // Get the generic signatue of the decl and compute the substitutions.
+  // Get the generic signature of the decl and compute the substitutions.
   auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
   auto subst = computeSubstitutions(sig, locator);
 
@@ -1300,7 +1300,7 @@ namespace {
 
         // If we're opening an existential:
         // - The type of 'memberRef' inside the thunk is written in terms of the
-        //   opened existental archetype.
+        //   opened existential archetype.
         // - The type of the thunk is written in terms of the
         //   erased existential bounds.
         Type opaqueValueTy = openedTy;
@@ -5779,7 +5779,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
       // Since it was allowed to pass function types to @autoclosure
       // parameters in Swift versions < 5, it has to be handled as
-      // a regular function coversion by `coerceToType`.
+      // a regular function conversion by `coerceToType`.
       if (isAutoClosureArgument(argExpr)) {
         // In Swift >= 5 mode we only allow `@autoclosure` arguments
         // to be used by value if parameter would return a function
@@ -5857,7 +5857,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
       // If parameter is an autoclosure, we need to make sure that:
       //   - argument type is coerced to parameter result type
-      //   - impilict autoclosure is created to wrap argument expression
+      //   - implicit autoclosure is created to wrap argument expression
       //   - new types are propagated to constraint system
       auto *closureType = param.getPlainType()->castTo<FunctionType>();
 
@@ -6852,8 +6852,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // leave an explicit escape to noescape cast here such that SILGen can skip
     // the cast and emit a code for the escaping function.
     bool isInDefaultArgumentContext = false;
-    if (auto initalizerCtx = dyn_cast<Initializer>(dc))
-      isInDefaultArgumentContext = (initalizerCtx->getInitializerKind() ==
+    if (auto initializerCtx = dyn_cast<Initializer>(dc))
+      isInDefaultArgumentContext = (initializerCtx->getInitializerKind() ==
                                     InitializerKind::DefaultArgument);
     auto toEI = toFunc->getExtInfo();
     assert(toType->is<FunctionType>());
@@ -6995,7 +6995,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           expr = cs.cacheType(
               new (ctx) FunctionConversionExpr(expr, escapingToFuncTy));
         }
-        // Apply an explict function conversion *only* for the escape to
+        // Apply an explicit function conversion *only* for the escape to
         // noescape conversion. This conversion will be stripped by the
         // default argument generator. (We can't return a @noescape function)
         auto newExpr =
@@ -7156,7 +7156,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return cs.cacheType(new (ctx) UnresolvedTypeConversionExpr(expr, toType));
 
   // Use an opaque type to abstract a value of the underlying concrete type.
-  // The full check here would be that `toType` and `fromType` are structually
+  // The full check here would be that `toType` and `fromType` are structurally
   // equal except in any position where `toType` has an opaque archetype. The
   // below is just an approximate check since the above would be expensive to
   // verify and still relies on the type checker ensuing `fromType` is
@@ -8679,7 +8679,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
   // used again. Here, however, we recover from a rewriting failure and continue
   // using the Rewriter. To make sure we don't continue with an ExprStack that
   // is still in the state when rewriting was aborted, save it here and restore
-  // it once rewritingt this target has finished.
+  // it once rewriting this target has finished.
   llvm::SaveAndRestore<SmallVector<Expr *, 8>> RestoreExprStack(
       Rewriter.ExprStack);
   auto &solution = Rewriter.solution;

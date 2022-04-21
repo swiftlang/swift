@@ -548,6 +548,11 @@ SmallVector<InheritedNominalEntry, 4> getDirectlyInheritedNominalTypeDecls(
 SelfBounds getSelfBoundsFromWhereClause(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl);
 
+/// Retrieve the set of nominal type declarations that appear as the
+/// constraint type of any "Self" constraints in the generic signature of the
+/// given protocol or protocol extension.
+SelfBounds getSelfBoundsFromGenericSignature(const ExtensionDecl *extDecl);
+
 /// Retrieve the TypeLoc at the given \c index from among the set of
 /// type declarations that are directly "inherited" by the given declaration.
 inline const TypeLoc &getInheritedTypeLocAtIndex(

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -experimental-multi-statement-closures -enable-experimental-static-assert
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-static-assert
 
 func isInt<T>(_ value: T) -> Bool {
   return value is Int

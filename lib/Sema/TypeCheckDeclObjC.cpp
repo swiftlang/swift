@@ -399,11 +399,11 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   if (!type)
     return false;
 
-  auto clas = type->getClassOrBoundGenericClass();
-  if (!clas)
+  auto clazz = type->getClassOrBoundGenericClass();
+  if (!clazz)
     return false;
 
-  switch (clas->getForeignClassKind()) {
+  switch (clazz->getForeignClassKind()) {
   case ClassDecl::ForeignKind::Normal:
     return false;
 
@@ -417,7 +417,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   case ClassDecl::ForeignKind::RuntimeOnly:
     VD->diagnose(diag::objc_in_objc_runtime_visible,
                  VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
-                 clas->getName())
+                 clazz->getName())
         .limitBehavior(behavior);
     Reason.describe(VD);
     break;
@@ -784,7 +784,7 @@ bool swift::isRepresentableInObjC(
 
       completionHandlerParams.push_back(AnyFunctionType::Param(type));
 
-      // Make sure that the paraneter type is representable in Objective-C.
+      // Make sure that the parameter type is representable in Objective-C.
       if (!type->isRepresentableIn(
               ForeignLanguage::ObjectiveC, const_cast<FuncDecl *>(FD))) {
         softenIfAccessNote(AFD, Reason.getAttr(),
@@ -2292,7 +2292,7 @@ namespace {
 /// given class or any of its superclasses. We intentionally don't respect
 /// access control, since everything is visible to the Objective-C runtime.
 static AbstractFunctionDecl *
-lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
+lookupOverriddenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
                           bool inheritingInits = true) {
   assert(classDecl);
 
@@ -2313,7 +2313,7 @@ lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
                              OrderDeclarations());
   }
 
-  // If we've reached the bottom of the inheritance heirarchy, we're done.
+  // If we've reached the bottom of the inheritance hierarchy, we're done.
   if (!classDecl->hasSuperclass())
     return nullptr;
 
@@ -2324,7 +2324,7 @@ lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
   if (isa<ConstructorDecl>(method) && !inheritingInits)
     return nullptr;
 
-  return lookupOverridenObjCMethod(classDecl->getSuperclassDecl(), method,
+  return lookupOverriddenObjCMethod(classDecl->getSuperclassDecl(), method,
                                    inheritingInits);
 }
 
@@ -2380,7 +2380,7 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     // purposes, but a subclass already depends on its superclasses and any
     // extensions for many other reasons.
     auto *overriddenMethod =
-        lookupOverridenObjCMethod(classDecl->getSuperclassDecl(), method);
+        lookupOverriddenObjCMethod(classDecl->getSuperclassDecl(), method);
     if (!overriddenMethod)
       continue;
 

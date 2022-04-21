@@ -857,7 +857,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           }
 
           if (declToDiagnose) {
-            // Figure out if the the declaration we've redeclared is a
+            // Figure out if the declaration we've redeclared is a
             // synthesized witness for a protocol requirement.
             bool isProtocolRequirement = false;
             if (auto VD = dyn_cast<ValueDecl>(current->isImplicit() ? current
@@ -2697,9 +2697,9 @@ public:
     if (!PD->getPrimaryAssociatedTypeNames().empty())
       (void) PD->getPrimaryAssociatedTypes();
 
-    // Explicity compute the requirement signature to detect errors.
+    // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
-    // a member referenecs another declaration whose generic signature
+    // a member references another declaration whose generic signature
     // has a conformance requirement to this protocol.
     auto reqSig = PD->getRequirementSignature();
 
@@ -2845,7 +2845,7 @@ public:
 
   /// FIXME: This is an egregious hack to turn off availability checking
   /// for specific functions that were missing availability in older versions
-  /// of existing libraries that we must nonethess still support.
+  /// of existing libraries that we must nonetheless still support.
   static bool hasHistoricallyWrongAvailability(FuncDecl *func) {
     return func->getName().isCompoundName("swift_deletedAsyncMethodError", { });
   }
@@ -3370,7 +3370,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     }
   }
 
-  // For source compatibilty, allow duplicate internal parameter names
+  // For source compatibility, allow duplicate internal parameter names
   // on protocol requirements.
   //
   // FIXME: Consider turning this into a warning or error if we do

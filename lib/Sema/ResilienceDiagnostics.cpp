@@ -71,7 +71,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   auto diagName = D->getName();
   bool isAccessor = false;
 
-  // Swift 4.2 did not check accessor accessiblity.
+  // Swift 4.2 did not check accessor accessibility.
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
     isAccessor = true;
 

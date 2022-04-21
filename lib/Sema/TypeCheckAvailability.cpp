@@ -392,7 +392,7 @@ public:
 
 private:
   bool walkToDeclPre(Decl *D) override {
-    // Adds in a parent TRC for decls which are syntatically nested but are not
+    // Adds in a parent TRC for decls which are syntactically nested but are not
     // represented that way in the AST. (Particularly, AbstractStorageDecl
     // parents for AccessorDecl children.)
     if (auto ParentTRC = getEffectiveParentContextForDecl(D)) {
@@ -1327,7 +1327,7 @@ static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
 
     // Members of an active #if are represented both inside the
     // IfConfigDecl and in the enclosing context. Skip over the IfConfigDecl
-    // so that that the member declaration is found rather the #if itself.
+    // so that the member declaration is found rather the #if itself.
     if (isa<IfConfigDecl>(D))
       return false;
 
@@ -2823,7 +2823,7 @@ bool swift::diagnoseExplicitUnavailability(
                          rawReplaceKind, newName, EncodedMessage.Message);
       attachRenameFixIts(diag);
   } else if (isSubscriptReturningString(D, ctx)) {
-    diags.diagnose(Loc, diag::availabilty_string_subscript_migration)
+    diags.diagnose(Loc, diag::availability_string_subscript_migration)
       .highlight(R)
       .fixItInsert(R.Start, "String(")
       .fixItInsertAfter(R.End, ")");
@@ -3136,21 +3136,7 @@ private:
   }
 
   bool shouldWalkIntoClosure(AbstractClosureExpr *closure) const {
-    // Multi-statement closures are collected by ExprWalker::rewriteFunction
-    // and checked by ExprWalker::processDelayed in CSApply.cpp.
-    // Single-statement closures only have the attributes checked
-    // by TypeChecker::checkClosureAttributes in that rewriteFunction.
-    // Multi-statement closures will be checked explicitly later (as the decl
-    // context in the Where). Single-expression closures will not be
-    // revisited, and are not automatically set as the context of the 'where'.
-    // Don't double-check multi-statement closures, but do check
-    // single-statement closures, setting the closure as the decl context.
-    //
-    // Note about SE-0326: When a flag is enabled multi-statement closures
-    // are type-checked together with enclosing context, so walker behavior
-    // should match that of single-expression closures.
-    return closure->hasSingleExpressionBody() ||
-           Context.TypeCheckerOpts.EnableMultiStatementClosureInference;
+    return true;
   }
 
   /// Walk an abstract closure expression, checking for availability

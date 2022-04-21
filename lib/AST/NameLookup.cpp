@@ -980,6 +980,39 @@ SelfBounds swift::getSelfBoundsFromWhereClause(
                            SelfBoundsFromWhereClauseRequest{decl}, {});
 }
 
+SelfBounds SelfBoundsFromGenericSignatureRequest::evaluate(
+    Evaluator &evaluator, const ExtensionDecl *extDecl) const {
+  SelfBounds result;
+  ASTContext &ctx = extDecl->getASTContext();
+  auto selfType = extDecl->getSelfInterfaceType();
+  for (const auto &req : extDecl->getGenericRequirements()) {
+    auto kind = req.getKind();
+    if (kind != RequirementKind::Conformance &&
+        kind != RequirementKind::Superclass)
+      continue;
+    // The left-hand side of the type constraint must be 'Self'.
+    bool isSelfLHS = selfType->isEqual(req.getFirstType());
+    if (!isSelfLHS)
+      continue;
+
+    auto rhsDecls = directReferencesForType(req.getSecondType());
+    SmallVector<ModuleDecl *, 2> modulesFound;
+    auto rhsNominals = resolveTypeDeclsToNominal(
+        evaluator, ctx, rhsDecls, modulesFound, result.anyObject);
+    result.decls.insert(result.decls.end(), rhsNominals.begin(),
+                        rhsNominals.end());
+  }
+
+  return result;
+}
+
+SelfBounds
+swift::getSelfBoundsFromGenericSignature(const ExtensionDecl *extDecl) {
+  auto &ctx = extDecl->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           SelfBoundsFromGenericSignatureRequest{extDecl}, {});
+}
+
 TinyPtrVector<TypeDecl *>
 TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
                                           ExtensionDecl *ext) const {

@@ -64,7 +64,7 @@ void swift::registerIDETypeCheckRequestFunctions(Evaluator &evaluator) {
 /// We want to consider the extension applied in the first case but not the
 /// second case. In the first case the constraint `T: FontStyle` from the
 /// definition of `foo` should be considered an 'at-least' constraint and any
-/// additional constraints on `T` (like `T == FonstStyleOne`) can be
+/// additional constraints on `T` (like `T == FontStyleOne`) can be
 /// fulfilled by picking a more specialized version of `T`.
 /// However, in the second case, `T: FontStyle` should be considered an
 /// 'at-most' constraint and we can't make the assumption that `x` has a more

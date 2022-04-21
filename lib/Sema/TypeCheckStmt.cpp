@@ -1162,7 +1162,7 @@ public:
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, switchStmt);
 
-    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
+    // Preemptively visit all Decls (#if/#warning/#error) that still exist in
     // the list of raw cases.
     for (auto &node : switchStmt->getRawCases()) {
       if (!node.is<Decl *>())
@@ -1798,7 +1798,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
                                             SourceLoc Loc) const {
   auto &ctx = DC->getASTContext();
   assert(DiagnosticSuppression::isEnabled(ctx.Diags) &&
-         "Diagnosing and Single ASTNode type checknig don't mix");
+         "Diagnosing and Single ASTNode type checking don't mix");
 
   // Initializers aren't walked by ASTWalker and thus we don't find the context
   // to type check using ASTNodeFinder. Also, initializers aren't representable

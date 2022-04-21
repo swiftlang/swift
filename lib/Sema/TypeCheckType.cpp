@@ -3618,7 +3618,7 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                               TypeResolutionOptions options) {
-  // TODO: more diagnotics
+  // TODO: more diagnostics
   return resolveType(repr->getBase(), options);
 }
 

@@ -167,7 +167,7 @@ Type RequirementFailure::getOwnerType() const {
   auto anchor = getRawAnchor();
 
   // If diagnostic is anchored at assignment expression
-  // it means that requirement failure happend while trying
+  // it means that requirement failure happened while trying
   // to convert source to destination, which means that
   // owner type is actually not an assignment expression
   // itself but its source.
@@ -229,7 +229,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   };
 
   // TODO: potentially we are tracking more information than we need to here
-  // because the decl might also availiable via the contextual type. In the long
+  // because the decl might also available via the contextual type. In the long
   // run we probably want to refactor to get rid of get/set contextual.
   if (auto opaqueLocator =
           getLocator()->findFirst<LocatorPathElt::OpenedOpaqueArchetype>()) {
@@ -1056,7 +1056,7 @@ bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
       if (paramInterfaceTy->isTypeParameter() &&
           attributeKind == AttributeKind::Escaping) {
         auto diagnoseGenericParamFailure = [&](GenericTypeParamDecl *decl) {
-          emitDiagnostic(diag::converting_noespace_param_to_generic_type,
+          emitDiagnostic(diag::converting_noescape_param_to_generic_type,
                          PD->getName(), paramInterfaceTy);
 
           auto declLoc = decl->getLoc();
@@ -1298,7 +1298,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
           .fixItReplace(rootType->getSourceRange(),
                         unwrappedBaseType.getString());
     } else {
-      emitDiagnostic(diag::invalid_optional_infered_keypath_root, baseType,
+      emitDiagnostic(diag::invalid_optional_inferred_keypath_root, baseType,
                      Member, unwrappedBaseType);
       emitDiagnostic(diag::optional_key_path_root_base_chain, Member)
           .fixItInsert(sourceRange.End, "?.");
@@ -1810,7 +1810,7 @@ AssignmentFailure::AssignmentFailure(Expr *destExpr, const Solution &solution,
                                      SourceLoc diagnosticLoc)
     : FailureDiagnostic(solution, destExpr), DestExpr(destExpr),
       Loc(diagnosticLoc),
-      DeclDiagnostic(findDeclDiagonstic(getASTContext(), destExpr)),
+      DeclDiagnostic(findDeclDiagnostic(getASTContext(), destExpr)),
       TypeDiagnostic(diag::assignment_lhs_not_lvalue) {}
 
 bool AssignmentFailure::diagnoseAsError() {
@@ -2086,7 +2086,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
         auto indexType = getType(unaryArg);
 
         // In Swift versions lower than 5, this check will fail as read only
-        // key paths can masquerade as writable for compatibilty reasons.
+        // key paths can masquerade as writable for compatibility reasons.
         // This is fine as in this case we just fall back on old diagnostics.
         if (indexType->isKeyPath() || indexType->isPartialKeyPath()) {
           return {expr, member};
@@ -2200,7 +2200,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
   return member->choice;
 }
 
-Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
+Diag<StringRef> AssignmentFailure::findDeclDiagnostic(ASTContext &ctx,
                                                       const Expr *destExpr) {
   if (isa<ApplyExpr>(destExpr) || isa<SelfApplyExpr>(destExpr))
     return diag::assignment_lhs_is_apply_expression;
@@ -2587,7 +2587,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
           locator->getLastElementAs<LocatorPathElt::ContextualType>()) {
     CTP = contextualTy->getPurpose();
   } else {
-    // Here we need to figure out where where `nil` is located.
+    // Here we need to figure out where `nil` is located.
     // It could be e.g. an argument to a subscript/call, assignment
     // source like `s[0] = nil` or an array element like `[nil]` or
     // `[nil: 42]` as a sub-expression to a larger one.
@@ -4463,7 +4463,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
         locator->isLastElement<LocatorPathElt::ClosureBody>()))
     return false;
 
-  // If this is a misplaced `missng argument` situation, it would be
+  // If this is a misplaced `missing argument` situation, it would be
   // diagnosed by invalid conversion fix.
   if (isMisplacedMissingArgument(getSolution(), locator))
     return false;
@@ -4742,7 +4742,7 @@ bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure) {
     funcType = paramType->getAs<FunctionType>();
   } else if (locator->isLastElement<LocatorPathElt::ClosureResult>() ||
              locator->isLastElement<LocatorPathElt::ClosureBody>()) {
-    // Based on the locator we know this this is something like this:
+    // Based on the locator we know this is something like this:
     // `let _: () -> ((Int) -> Void) = { return {} }`.
     funcType = getType(getRawAnchor())
                    ->castTo<FunctionType>()
@@ -5576,7 +5576,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
     // We only want to emit the note + fix-it if the function does not
     // have an explicit return type. The reason we also need to check
     // whether the parameter list has a valid loc is to guard against
-    // cases like like 'var foo: () { return 1 }' as here that loc will
+    // cases like 'var foo: () { return 1 }' as here that loc will
     // be invalid. We also need to check that the name is not empty,
     // because certain decls will have empty name (like setters).
     if (FD->getResultTypeRepr() == nullptr &&
@@ -5613,7 +5613,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   auto eltType = getFromType();
   auto contextualType = getToType();
 
-  auto diagnoseAllOccurances = [&](Diag<Type, Type> diagnostic) {
+  auto diagnoseAllOccurrences = [&](Diag<Type, Type> diagnostic) {
     assert(AffectedElements.size() > 1);
     for (auto *element : AffectedElements) {
       emitDiagnosticAt(element->getLoc(), diagnostic, eltType, contextualType);
@@ -5633,7 +5633,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   if (auto *AE = getAsExpr<ArrayExpr>(anchor)) {
     if (!(treatAsDictionary = isFixedToDictionary(AE))) {
       if (AffectedElements.size() > 1) {
-        diagnoseAllOccurances(diag::cannot_convert_array_element);
+        diagnoseAllOccurrences(diag::cannot_convert_array_element);
         return true;
       }
 
@@ -5647,7 +5647,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     switch (eltLoc.getIndex()) {
     case 0: { // key
       if (AffectedElements.size() > 1) {
-        diagnoseAllOccurances(diag::cannot_convert_dict_key);
+        diagnoseAllOccurrences(diag::cannot_convert_dict_key);
         return true;
       }
 
@@ -5658,7 +5658,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
 
     case 1: { // value
       if (AffectedElements.size() > 1) {
-        diagnoseAllOccurances(diag::cannot_convert_dict_value);
+        diagnoseAllOccurrences(diag::cannot_convert_dict_value);
         return true;
       }
 
@@ -7262,7 +7262,7 @@ bool UnableToInferProtocolLiteralType::diagnoseAsError() {
   return true;
 }
 
-bool MissingQuialifierInMemberRefFailure::diagnoseAsError() {
+bool MissingQualifierInMemberRefFailure::diagnoseAsError() {
   auto selectedOverload = getOverloadChoiceIfAvailable(getLocator());
   if (!selectedOverload)
     return false;

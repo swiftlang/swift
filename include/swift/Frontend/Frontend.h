@@ -606,7 +606,7 @@ private:
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
 
-  /// \return false if successsful, true on error.
+  /// \return false if successful, true on error.
   bool setupDiagnosticVerifierIfNeeded();
 
   Optional<unsigned> setUpCodeCompletionBuffer();
