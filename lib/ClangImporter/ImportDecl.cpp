@@ -4480,13 +4480,15 @@ namespace {
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
       auto method = VisitFunctionDecl(decl);
 
-      CXXMethodBridging bridgingInfo(decl);
-      if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
-        auto name = bridgingInfo.getClangName().drop_front(3);
-        Impl.GetterSetterMap[name].first = static_cast<FuncDecl *>(method);
-      } else if (bridgingInfo.classify() == CXXMethodBridging::Kind::setter) {
-        auto name = bridgingInfo.getClangName().drop_front(3);
-        Impl.GetterSetterMap[name].second = static_cast<FuncDecl *>(method);
+      if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties) {
+        CXXMethodBridging bridgingInfo(decl);
+        if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
+          auto name = bridgingInfo.getClangName().drop_front(3);
+          Impl.GetterSetterMap[name].first = static_cast<FuncDecl *>(method);
+        } else if (bridgingInfo.classify() == CXXMethodBridging::Kind::setter) {
+          auto name = bridgingInfo.getClangName().drop_front(3);
+          Impl.GetterSetterMap[name].second = static_cast<FuncDecl *>(method);
+        }
       }
 
       return method;
