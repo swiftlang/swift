@@ -1969,12 +1969,6 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
 
       // If we're in a module, we really need moduleMacro to be valid.
       if (isModule && !moduleMacro) {
-#ifndef NDEBUG
-        // Refetch this just for the assertion.
-        clang::MacroDirective *MD = pp.getLocalMacroDirective(macro.first);
-        assert(isa<clang::VisibilityMacroDirective>(MD));
-#endif
-
         // FIXME: "public" visibility macros should actually be added to the 
         // table.
         return;
