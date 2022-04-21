@@ -90,6 +90,6 @@ public:
   }
 };
 
-} // end namepsace swift
+} // end namespace swift
 
 #endif // SWIFT_AST_GENERIC_SIGNATURE_BUILDER_IMPL_H

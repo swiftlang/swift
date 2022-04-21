@@ -485,7 +485,7 @@ public:
     case RequirementSource::Concrete: {
       Type conformingType = source->getStoredType();
       if (conformingType) {
-        // A concrete requirement source for a self-conforming exitential type
+        // A concrete requirement source for a self-conforming existential type
         // stores the original type, and not the conformance, because there is
         // no way to recover the original type from the conformance.
         assert(conformingType->isExistentialType());
@@ -704,7 +704,7 @@ struct GenericSignatureBuilder::Implementation {
   llvm::DenseSet<ExplicitRequirement> ExplicitConformancesImpliedByConcrete;
 
 #ifndef NDEBUG
-  /// Whether we've already computed redundant requiremnts.
+  /// Whether we've already computed redundant requirements.
   bool computedRedundantRequirements = false;
 
   /// Whether we've already finalized the builder.
@@ -2497,7 +2497,7 @@ static int compareDependentPaths(ArrayRef<AssociatedTypeDecl *> path1,
   if (path1.size() != path2.size())
     return path1.size() < path2.size() ? -1 : 1;
 
-  // The paths are the same length, so order by comparing the associted
+  // The paths are the same length, so order by comparing the associated
   // types.
   for (unsigned index : indices(path1)) {
     if (int result = compareAssociatedTypes(path1[index], path2[index]))
@@ -4691,7 +4691,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   // Consider the second equivalence class to be modified.
   // Transfer Same-type requirements and delayed requirements.
   if (equivClass2) {
-    // Mark as modified and transfer deplayed requirements to the primary queue.
+    // Mark as modified and transfer deployed requirements to the primary queue.
     equivClass2->modified(*this);
     equivClass->sameTypeConstraints.insert(
                                    equivClass->sameTypeConstraints.end(),
@@ -7547,7 +7547,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
         if (lhs.source != rhs.source || lhs.target != rhs.target)
           return false;
 
-        // Check whethe we should diagnose redundancy for both constraints.
+        // Check whether we should diagnose redundancy for both constraints.
         if (!lhs.constraint.source->shouldDiagnoseRedundancy(true) ||
             !rhs.constraint.source->shouldDiagnoseRedundancy(false))
           return true;

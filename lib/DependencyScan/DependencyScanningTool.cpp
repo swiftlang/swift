@@ -138,7 +138,7 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
       module_dependency_cache_serialization::readInterModuleDependenciesCache(
           path, *SharedCache);
   if (readFailed) {
-    Diags.diagnose(SourceLoc(), diag::warn_scaner_deserialize_failed, path);
+    Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed, path);
   }
   return readFailed;
 }

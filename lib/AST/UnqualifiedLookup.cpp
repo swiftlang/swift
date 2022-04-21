@@ -274,7 +274,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   (void)localCounter; // for debugging
 #endif
   FrontendStatsTracer StatsTracer(Ctx.Stats,
-                                  "performUnqualifedLookup",
+                                  "performUnqualifiedLookup",
                                   DC->getParentSourceFile());
 
   if (Loc.isValid() && DC->getParentSourceFile()) {

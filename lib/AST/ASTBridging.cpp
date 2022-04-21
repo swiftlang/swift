@@ -25,7 +25,7 @@ DiagnosticEngine *getDiagnosticEngine(const BridgedDiagnosticEngine &bridged) {
 
 /// BridgedDiagnosticArgument -> DiagnosticArgument
 DiagnosticArgument
-getDiagnosticArugment(const BridgedDiagnosticArgument &bridged) {
+getDiagnosticArgument(const BridgedDiagnosticArgument &bridged) {
   switch (bridged.kind) {
   case BridgedDiagnosticArgumentKind_StringRef:
     return {getStringRef(bridged.value.stringRefValue)};
@@ -50,7 +50,7 @@ void DiagnosticEngine_diagnose(
   SmallVector<DiagnosticArgument, 2> arguments;
   for (auto bridgedArg :
        getArrayRef<BridgedDiagnosticArgument>(bridgedArguments)) {
-    arguments.push_back(getDiagnosticArugment(bridgedArg));
+    arguments.push_back(getDiagnosticArgument(bridgedArg));
   }
   auto inflight = D->diagnose(loc, diagID, arguments);
 

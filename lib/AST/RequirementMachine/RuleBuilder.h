@@ -36,7 +36,7 @@ class Requirement;
 
 namespace rewriting {
 
-/// A utility class for bulding rewrite rules from the top-level requirements
+/// A utility class for building rewrite rules from the top-level requirements
 /// of a generic signature.
 ///
 /// This also collects requirements from the transitive closure of all protocols

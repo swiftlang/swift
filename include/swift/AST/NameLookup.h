@@ -210,7 +210,7 @@ public:
   filter(llvm::function_ref<bool(LookupResultEntry, /*isOuter*/ bool)> pred);
 
   /// Shift down results by dropping inner results while keeping outer
-  /// results (if any), the innermost of which are recogized as inner
+  /// results (if any), the innermost of which are recognized as inner
   /// results afterwards.
   void shiftDownResults();
 };
@@ -628,7 +628,7 @@ private:
 };
   
   
-/// The bridge between the legacy UnqualifedLookupFactory and the new ASTScope
+/// The bridge between the legacy UnqualifiedLookupFactory and the new ASTScope
 /// lookup system
 class AbstractASTScopeDeclConsumer {
 public:

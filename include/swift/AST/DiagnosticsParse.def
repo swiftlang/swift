@@ -731,7 +731,7 @@ ERROR(sil_witness_protocol_conformance_not_found,none,
 ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
       "expected '%0' in differentiability witness", (StringRef))
 ERROR(sil_diff_witness_unknown_kind,PointsToFirstBadToken,
-      "unknonwn differentiability kind '%0'; expected 'forward', 'reverse', "
+      "unknown differentiability kind '%0'; expected 'forward', 'reverse', "
       "'normal', or 'linear'", (StringRef))
 ERROR(sil_diff_witness_serialized_declaration,none,
       "differentiability witness declaration should not be serialized", ())
@@ -1062,7 +1062,7 @@ ERROR(expected_expr_throw,PointsToFirstBadToken,
 ERROR(expected_await_not_async,none,
       "found 'async' in expression; did you mean 'await'?", ())
 
-// Yield Statment
+// Yield Statement
 ERROR(expected_expr_yield,PointsToFirstBadToken,
       "expected expression in 'yield' statement", ())
 ERROR(unexpected_label_yield,none,

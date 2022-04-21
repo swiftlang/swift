@@ -5437,7 +5437,7 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
 //------------------------------------------------------------------------------
 
 ERROR(dynamic_with_transparent,none,
-      "a declaration cannot be both '@_tranparent' and 'dynamic'",
+      "a declaration cannot be both '@_transparent' and 'dynamic'",
       ())
 
 //------------------------------------------------------------------------------

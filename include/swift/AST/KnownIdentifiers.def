@@ -235,7 +235,7 @@ IDENTIFIER_(nsError)
 
 // Custom string interpolation type used by os log APIs.
 IDENTIFIER(OSLogMessage)
-// Types that are specialy handled in diagnostics for the os log APIs.
+// Types that are specially handled in diagnostics for the os log APIs.
 IDENTIFIER(OSLog)
 IDENTIFIER(OSLogType)
 

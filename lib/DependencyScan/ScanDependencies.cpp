@@ -1223,7 +1223,7 @@ static void deserializeDependencyCache(CompilerInstance &instance,
   auto loadPath = opts.SerializedDependencyScannerCachePath;
   if (module_dependency_cache_serialization::readInterModuleDependenciesCache(
           loadPath, cache)) {
-    Context.Diags.diagnose(SourceLoc(), diag::warn_scaner_deserialize_failed,
+    Context.Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed,
                            loadPath);
   } else if (opts.EmitDependencyScannerCacheRemarks) {
     Context.Diags.diagnose(SourceLoc(), diag::remark_reuse_cache, loadPath);

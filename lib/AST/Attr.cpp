@@ -871,16 +871,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (!Options.IsForSwiftInterface)
       break;
     // When we are printing Swift interface, we have to skip the override keyword
-    // if the overriden decl is invisible from the interface. Otherwise, an error
+    // if the overridden decl is invisible from the interface. Otherwise, an error
     // will occur while building the Swift module because the overriding decl
     // doesn't override anything.
     // We couldn't skip every `override` keywords because they change the
-    // ABI if the overriden decl is also publically visible.
+    // ABI if the overridden decl is also publically visible.
     // For public-override-internal case, having `override` doesn't have ABI
     // implication. Thus we can skip them.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (auto *BD = VD->getOverriddenDecl()) {
-        // If the overriden decl won't be printed, printing override will fail
+        // If the overridden decl won't be printed, printing override will fail
         // the build of the interface file.
         if (!Options.shouldPrint(BD))
           return false;
