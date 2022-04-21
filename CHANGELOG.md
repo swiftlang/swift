@@ -40,7 +40,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
       public func alignedUp<T>(for: T.type) -> UnsafeRawPointer
       public func alignedDown<T>(for: T.type) -> UnsafeRawPointer
       public func alignedUp(toMultipleOf alignment: Int) -> UnsafeRawPointer
-    	public func alignedDown(toMultipleOf alignment: Int) -> UnsafeRawPointer
+      public func alignedDown(toMultipleOf alignment: Int) -> UnsafeRawPointer
     }
     ```
   - It is now possible to use a pointer to `struct` to obtain a pointer to one
