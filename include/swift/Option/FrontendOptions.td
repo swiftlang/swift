@@ -836,6 +836,11 @@ def enable_cxx_interop :
   HelpText<"Alias for -enable-experimental-cxx-interop">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def cxx_interop_getters_setters_as_properties :
+  Flag<["-"], "cxx-interop-getters-setters-as-properties">,
+  HelpText<"Import getters and setters as computed properties in Swift">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;

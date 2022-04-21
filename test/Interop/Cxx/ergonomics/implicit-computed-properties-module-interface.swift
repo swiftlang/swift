@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=ImplicitComputedProperties -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=ImplicitComputedProperties -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop -cxx-interop-getters-setters-as-properties | %FileCheck %s
 
 // CHECK:      struct VoidGetter {
 // CHECK-NOT:     var
