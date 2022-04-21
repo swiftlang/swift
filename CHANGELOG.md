@@ -5,6 +5,28 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0352][]:
+
+  It's now possible to call a generic function with a value of protocol type
+  in places that would previously fail because `any` types do not conform
+  to their protocols. For example:
+
+  ```
+  protocol P {
+    associatedtype A
+    func getA() -> A
+  }
+
+  func takeP<T: P>(_ value: T) { }
+
+  func test(p: any P) {
+    takeP(p) // was an error "type 'any P' cannot conform to 'P'", now accepted
+  }
+  ```
+
+  This operates by "opening" the value of protocol type and passing the
+  underlying type directly to the generic function.
+
 * [SE-0347][]:
 
   It's now possible to use a default value expression with a generic parameter type
@@ -9162,6 +9184,7 @@ Swift 1.0
 [SE-0345]: <https://github.com/apple/swift-evolution/blob/main/proposals/0345-if-let-shorthand.md>
 [SE-0326]: <https://github.com/apple/swift-evolution/blob/main/proposals/0326-extending-multi-statement-closure-inference.md>
 [SE-0347]: <https://github.com/apple/swift-evolution/blob/main/proposals/0347-type-inference-from-default-exprs.md>
+[SE-0352]: <https://github.com/apple/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
