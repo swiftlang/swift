@@ -316,7 +316,7 @@ public:
   bool isPlatformRelevant(StringRef platform) const;
 
   /// Returns true when the given declaration with the given deprecation
-  /// should be inlucded in the cutoff of imported deprecated APIs marked
+  /// should be included in the cutoff of imported deprecated APIs marked
   /// unavailable.
   bool treatDeprecatedAsUnavailable(const clang::Decl *clangDecl,
                                     const llvm::VersionTuple &version,

@@ -43,7 +43,7 @@ class ConformsToSync : NSObject, Club {
 ///////
 // selector conflicts
 
-// attempting to satisfy the ObjC async requirement in two ways simultaenously
+// attempting to satisfy the ObjC async requirement in two ways simultaneously
 // is problematic due to a clash in selector names on this ObjC-compatible type
 class SelectorConflict : NSObject, RequiredObserverOnlyCompletion {
   func hello() async -> Bool { true } // expected-note {{method 'hello()' declared here}}
