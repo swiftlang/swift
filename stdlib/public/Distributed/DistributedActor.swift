@@ -135,7 +135,7 @@ extension DistributedActor {
 
   /// Executes the passed 'body' only when the distributed actor is local instance.
   ///
-  /// The `Self` passed to the the body closure is isolated, meaning that the
+  /// The `Self` passed to the body closure is isolated, meaning that the
   /// closure can be used to call non-distributed functions, or even access actor
   /// state.
   ///
