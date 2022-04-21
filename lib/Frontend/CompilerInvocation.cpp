@@ -697,7 +697,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
   } else if (const Arg *A = Args.getLastArg(OPT_strict_concurrency)) {
     auto value = llvm::StringSwitch<Optional<StrictConcurrency>>(A->getValue())
-      .Case("explicit", StrictConcurrency::Explicit)
+      .Case("minimal", StrictConcurrency::Minimal)
       .Case("targeted", StrictConcurrency::Targeted)
       .Case("complete", StrictConcurrency::Complete)
       .Default(None);

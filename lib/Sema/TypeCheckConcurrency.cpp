@@ -659,7 +659,7 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
 
     LLVM_FALLTHROUGH;
 
-  case StrictConcurrency::Explicit:
+  case StrictConcurrency::Minimal:
     // Explicit Sendable conformances always diagnose, even when strict
     // strict checking is disabled.
     if (isExplicitSendableConformance())
@@ -2140,7 +2140,7 @@ namespace {
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
       switch (value->getASTContext().LangOpts.StrictConcurrencyLevel) {
-      case StrictConcurrency::Explicit:
+      case StrictConcurrency::Minimal:
       case StrictConcurrency::Targeted:
         // Never diagnose.
         return false;
@@ -3926,7 +3926,7 @@ bool swift::contextRequiresStrictConcurrencyChecking(
     return true;
 
   case StrictConcurrency::Targeted:
-  case StrictConcurrency::Explicit:
+  case StrictConcurrency::Minimal:
     // Check below to see if the context has adopted concurrency features.
     break;
   }
