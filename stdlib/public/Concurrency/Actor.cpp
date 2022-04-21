@@ -422,20 +422,6 @@ namespace {
 
 class DefaultActorImpl;
 
-/// A job to process a default actor.  Allocated inline in the actor.
-class ProcessInlineJob : public Job {
-public:
-  ProcessInlineJob(JobPriority priority)
-    : Job({JobKind::DefaultActorInline, priority}, &process) {}
-
-  SWIFT_CC(swiftasync)
-  static void process(Job *job);
-
-  static bool classof(const Job *job) {
-    return job->Flags.getKind() == JobKind::DefaultActorInline;
-  }
-};
-
 /// A job to process a default actor that's allocated separately from
 /// the actor.
 class ProcessOutOfLineJob : public Job {
@@ -450,25 +436,6 @@ public:
 
   static bool classof(const Job *job) {
     return job->Flags.getKind() == JobKind::DefaultActorSeparate;
-  }
-};
-
-/// Information about the currently-running processing job.
-struct RunningJobInfo {
-  enum KindType : uint8_t {
-    Inline, Other
-  };
-  KindType Kind;
-
-  bool wasInlineJob() const {
-    return Kind == Inline;
-  }
-
-  static RunningJobInfo forOther() {
-    return {Other};
-  }
-  static RunningJobInfo forInline() {
-    return {Inline};
   }
 };
 
@@ -531,12 +498,6 @@ public:
     return Value != other.Value;
   }
 };
-
-/// TODO (rokhinip): The layout of the ActiveActorStatus seems to be broken in
-/// arm64_32 with priority escalation support, disable this for now.
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
-#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0
-#endif
 
 /// Similar to the ActiveTaskStatus, this denotes the ActiveActorState for
 /// tracking the atomic state of the actor
@@ -904,24 +865,15 @@ static_assert(sizeof(ActiveActorStatus) == ACTIVE_ACTOR_STATUS_SIZE,
 ///     We must either release the actor or create a new processing job
 ///     for it to maintain the balance.
 ///
-/// The current behaviour of actors is such that we only use the inline
-/// processing job to schedule the actor and not OOL jobs. As a result, the
-/// subset of rules that currently apply are (1), (3), (5), (6).
+/// The current behaviour of actors is such that we only have a single
+/// processing job for an actor at a given time. Stealers jobs support does not
+/// exist yet. As a result, the subset of rules that currently apply
+/// are (1), (3), (5), (6).
 class DefaultActorImpl : public HeapObject {
-  friend class ProcessInlineJob;
-  union {
-    // When the ProcessInlineJob storage is initialized, its metadata pointer
-    // will point to Job's metadata. When it isn't, the metadata pointer is
-    // NULL. Use HeapObject to initialize the metadata pointer to NULL and allow
-    // it to be checked without fully initializing the ProcessInlineJob.
-    HeapObject JobStorageHeapObject{nullptr};
-
-    ProcessInlineJob JobStorage;
-  };
-  // This field needs to be aligned to ACTIVE_ACTOR_STATUS but we need to
-  // hide this from the compiler cause otherwise it adds a bunch of extra
-  // padding to the structure. We will enforce this via static asserts.
-  char StatusStorage[sizeof(ActiveActorStatus)];
+  // Note: There is some padding that is added here by the compiler in order to
+  // enforce alignment. This is space that is available for us to use in
+  // the future
+  alignas(sizeof(ActiveActorStatus)) char StatusStorage[sizeof(ActiveActorStatus)];
 
 public:
   /// Properly construct an actor, except for the heap header.
@@ -933,7 +885,6 @@ public:
     _status().store(status, std::memory_order_relaxed);
 
     SWIFT_TASK_DEBUG_LOG("Creating default actor %p", this);
-    JobStorageHeapObject.metadata = nullptr;
     concurrency::trace::actor_create(this);
   }
 
@@ -987,26 +938,20 @@ private:
 
   void deallocateUnconditional();
 
-  /// Schedule an inline processing job.  This can generally only be
+  /// Schedule a processing job.  This can generally only be
   /// done if we know nobody else is trying to do it at the same time,
   /// e.g. if this thread just sucessfully transitioned the actor from
   /// Idle to Scheduled.
-  void scheduleActorProcessJob(JobPriority priority,
-                                     bool hasActiveInlineJob);
-
-  static DefaultActorImpl *fromInlineJob(Job *job) {
-    assert(isa<ProcessInlineJob>(job));
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winvalid-offsetof"
-    return reinterpret_cast<DefaultActorImpl*>(
-      reinterpret_cast<char*>(job) - offsetof(DefaultActorImpl, JobStorage));
-#pragma clang diagnostic pop
-  }
+  void scheduleActorProcessJob(JobPriority priority);
 };
 
 } /// end anonymous namespace
 
-static_assert(sizeof(DefaultActorImpl) <= sizeof(DefaultActor) &&
+// We can't use sizeof(DefaultActor) since the alignment requirement on the
+// default actor means that we have some padding added when calculating
+// sizeof(DefaultActor). However that padding isn't available for us to use
+// in DefaultActorImpl.
+static_assert(sizeof(DefaultActorImpl) <= ((sizeof(void *) * NumWords_DefaultActor) + sizeof(HeapObject)) &&
               alignof(DefaultActorImpl) <= alignof(DefaultActor),
               "DefaultActorImpl doesn't fit in DefaultActor");
 static_assert(DefaultActorImpl::offsetOfActiveActorStatus() % ACTIVE_ACTOR_STATUS_SIZE == 0,
@@ -1206,31 +1151,18 @@ dispatch_lock_t *DefaultActorImpl::drainLockAddr() {
 void DefaultActorImpl::deallocateUnconditional() {
   concurrency::trace::actor_deallocate(this);
 
-  if (JobStorageHeapObject.metadata != nullptr)
-    JobStorage.~ProcessInlineJob();
   auto metadata = cast<ClassMetadata>(this->metadata);
   swift_deallocClassInstance(this, metadata->getInstanceSize(),
                              metadata->getInstanceAlignMask());
 }
 
-void DefaultActorImpl::scheduleActorProcessJob(JobPriority priority, bool useInlineJob) {
-  Job *job;
-  if (useInlineJob) {
-    if (JobStorageHeapObject.metadata != nullptr)
-      JobStorage.~ProcessInlineJob();
-    job = ::new (&JobStorage) ProcessInlineJob(priority);
-  } else {
-    assert(false && "Should not be here - we don't have support for any OOL actor process jobs yet");
-    // TODO (rokhinip): Don't we need to take a +1 per ref count rules specified?
-    swift_retain(this);
-    job = new ProcessOutOfLineJob(this, priority);
-  }
+void DefaultActorImpl::scheduleActorProcessJob(JobPriority priority) {
+  Job *job = new ProcessOutOfLineJob(this, priority);
   SWIFT_TASK_DEBUG_LOG(
       "Scheduling processing job %p for actor %p at priority %#zx", job, this,
       priority);
   swift_task_enqueueGlobal(job);
 }
-
 
 bool DefaultActorImpl::tryLock(bool asDrainer) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -1327,7 +1259,7 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
       if (!oldState.isScheduled() && newState.isScheduled()) {
         // We took responsibility to schedule the actor for the first time. See
         // also ownership rule (1)
-        return scheduleActorProcessJob(newState.getMaxPriority(), true);
+        return scheduleActorProcessJob(newState.getMaxPriority());
       }
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -1413,7 +1345,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
       if (newState.isScheduled()) {
         // See ownership rule (6) in DefaultActorImpl
         assert(newState.getFirstJob());
-        scheduleActorProcessJob(newState.getMaxPriority(), true);
+        scheduleActorProcessJob(newState.getMaxPriority());
       } else {
         // See ownership rule (5) in DefaultActorImpl
         SWIFT_TASK_DEBUG_LOG("Actor %p is idle now", this);
@@ -1558,7 +1490,7 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
   // Leave the tracking info.
   trackingInfo.leave();
 
-  // Balances with the retain taken in Process{Inline,OutOfLine}Job::process
+  // Balances with the retain taken in ProcessOutOfLineJob::process
   swift_release(actor);
 }
 
@@ -1590,14 +1522,6 @@ static void swift_job_runImpl(Job *job, ExecutorRef executor) {
   }
 }
 
-SWIFT_CC(swiftasync)
-void ProcessInlineJob::process(Job *job) {
-  DefaultActorImpl *actor = DefaultActorImpl::fromInlineJob(job);
-
-  swift_retain(actor);
-  return defaultActorDrain(actor); // 'return' forces tail call
-}
-
 // Currently unused
 SWIFT_CC(swiftasync)
 void ProcessOutOfLineJob::process(Job *job) {
@@ -1606,6 +1530,7 @@ void ProcessOutOfLineJob::process(Job *job) {
 
   delete self;
 
+  // Balances with the swift_release in defaultActorDrain()
   swift_retain(actor);
   return defaultActorDrain(actor); // 'return' forces tail call
 }
