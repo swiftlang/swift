@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=limited
+// RUN: %target-typecheck-verify-swift -strict-concurrency=targeted
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
 

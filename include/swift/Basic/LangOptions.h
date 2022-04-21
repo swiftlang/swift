@@ -60,15 +60,16 @@ namespace swift {
 
   /// Describes how strict concurrency checking should be.
   enum class StrictConcurrency {
-    /// Turns off strict checking, which disables (e.g.) Sendable checking in
-    /// most cases.
-    Off,
-    /// Enables concurrency checking in a limited manner that is intended to
-    /// only affect code that has already adopted the concurrency model.
-    Limited,
-    /// Enables strict concurrency checking throughout the entire model,
-    /// providing an approximation of the fully-checked model.
-    On
+    /// Enforce Sendable constraints where it has been explicitly adopted and
+    /// perform actor-isolation checking wherever code has adopted concurrency.
+    Explicit,
+    /// Enforce Sendable constraints and perform actor-isolation checking
+    /// wherever code has adopted concurrency, including code that has
+    /// explicitly adopted Sendable.
+    Targeted,
+    /// Enforce Sendable constraints and actor-isolation checking throughout
+    /// the entire module.
+    Complete,
   };
 
   /// Access or distribution level of a library.
@@ -324,7 +325,7 @@ namespace swift {
     bool UseMalloc = false;
 
     /// Specifies how strict concurrency checking will be.
-    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Limited;
+    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Targeted;
 
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
