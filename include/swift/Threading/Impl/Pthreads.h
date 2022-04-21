@@ -18,8 +18,11 @@
 #define SWIFT_THREADING_IMPL_PTHREADS_H
 
 #include <pthread.h>
+#include <errno.h>
+
 #include <atomic>
 #include <cstdint>
+
 #include "swift/Threading/Errors.h"
 
 namespace swift {
@@ -70,6 +73,7 @@ inline void mutex_init(mutex_handle &handle, bool checked=false) {
     SWIFT_PTHREADS_CHECK(::pthread_mutexattr_init(&attr));
     SWIFT_PTHREADS_CHECK(::pthread_mutexattr_settype(&attr,
                                                      PTHREAD_MUTEX_ERRORCHECK));
+    SWIFT_PTHREADS_CHECK(::pthread_mutex_init(&handle, &attr));
     SWIFT_PTHREADS_CHECK(::pthread_mutexattr_destroy(&attr));
   }
 }
@@ -128,7 +132,7 @@ using once_t = std::atomic<std::int64_t>;
 
 void once_slow(once_t &predicate, void (*fn)(void *), void *context);
 
-inline void once(once_t &predicate, void (*fn)(void *), void *context) {
+inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
   // Sadly we can't use ::pthread_once() for this (no context)
   if (predicate.load(std::memory_order_acquire) < 0)
     return;

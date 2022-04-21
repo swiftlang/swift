@@ -84,7 +84,7 @@ inline void tls_alloc_once(once_t &token, tls_key &key, tls_dtor dtor) {
 //   we have to simulate thread-local storage.  Fortunately, all of
 //   these platforms (at least for now) support pthread_getspecific
 //   or similar.
-#ifdef SWIFT_THREAD_LOCAL
+#if SWIFT_THREAD_LOCAL
 template <class T>
 class ThreadLocal {
   VALIDATE_THREAD_LOCAL_TYPE(T)

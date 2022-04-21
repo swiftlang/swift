@@ -57,7 +57,7 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) { }
 
 typedef bool once_t;
 
-inline void once(once_t &predicate, void (*fn)(void *), void *ctx) {
+inline void once_impl(once_t &predicate, void (*fn)(void *), void *ctx) {
   if (!predicate) {
     predicate = true;
     fn(ctx);

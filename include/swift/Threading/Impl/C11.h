@@ -144,7 +144,7 @@ typedef ::atomic_int once_t;
 
 void once_slow(once_t &predicate, void (*fn)(void *), void *context);
 
-inline void once(once_t &predicate, void (*fn)(void *), void *context) {
+inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
   // Sadly we can't use call_once() for this (no context)
   if (::atomic_load_explicit(&predicate, ::memory_order_acquire) < 0)
     return;

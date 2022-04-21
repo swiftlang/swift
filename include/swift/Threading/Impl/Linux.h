@@ -18,7 +18,10 @@
 #define SWIFT_THREADING_IMPL_LINUX_H
 
 #include <pthread.h>
+#include <errno.h>
+
 #include <atomic>
+
 #include "swift/Threading/Errors.h"
 
 #include "Linux/ulock.h"
@@ -26,14 +29,14 @@
 namespace swift {
 namespace threading_impl {
 
-#define SWIFT_LINUXTHREADS_CHECK(expr)                                      \
+#define SWIFT_LINUXTHREADS_CHECK(expr)                                  \
 do {                                                                    \
   int res_ = (expr);                                                    \
   if (res_ != 0)                                                        \
     swift::threading::fatal(#expr " failed with error %d\n", res_);     \
 } while (0)
 
-#define SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(expr)                       \
+#define SWIFT_LINUXTHREADS_RETURN_TRUE_OR_FALSE(expr)                   \
 do {                                                                    \
   int res_ = (expr);                                                    \
   switch (res_) {                                                       \
@@ -71,6 +74,7 @@ inline void mutex_init(mutex_handle &handle, bool checked=false) {
     SWIFT_LINUXTHREADS_CHECK(::pthread_mutexattr_init(&attr));
     SWIFT_LINUXTHREADS_CHECK(::pthread_mutexattr_settype(&attr,
                                                      PTHREAD_MUTEX_ERRORCHECK));
+    SWIFT_LINUXTHREADS_CHECK(::pthread_mutex_init(&handle, &attr));
     SWIFT_LINUXTHREADS_CHECK(::pthread_mutexattr_destroy(&attr));
   }
 }
@@ -85,7 +89,7 @@ inline void mutex_unlock(mutex_handle &handle) {
   SWIFT_LINUXTHREADS_CHECK(::pthread_mutex_unlock(&handle));
 }
 inline bool mutex_try_lock(mutex_handle &handle) {
-  SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(::pthread_mutex_trylock(&handle));
+  SWIFT_LINUXTHREADS_RETURN_TRUE_OR_FALSE(::pthread_mutex_trylock(&handle));
 }
 
 inline void mutex_unsafe_lock(mutex_handle &handle) {
@@ -113,7 +117,7 @@ inline void lazy_mutex_unlock(lazy_mutex_handle &handle) {
   SWIFT_LINUXTHREADS_CHECK(::pthread_mutex_unlock(&handle));
 }
 inline bool lazy_mutex_try_lock(lazy_mutex_handle &handle) {
-  SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(::pthread_mutex_trylock(&handle));
+  SWIFT_LINUXTHREADS_RETURN_TRUE_OR_FALSE(::pthread_mutex_trylock(&handle));
 }
 
 inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
@@ -132,7 +136,7 @@ struct once_t {
 
 void once_slow(once_t &predicate, void (*fn)(void *), void *context);
 
-inline void once(once_t &predicate, void (*fn)(void *), void *context) {
+inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
   // Sadly we can't use ::pthread_once() for this (no context)
   if (predicate.flag.load(std::memory_order_acquire) < 0)
     return;

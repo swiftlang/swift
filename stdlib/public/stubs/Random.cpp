@@ -109,7 +109,7 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
         
       if (fd != -1) {
         // ###FIXME: Why is this locked?  None of the others are.
-        static StaticMutex mutex;
+        static LazyMutex mutex;
         mutex.withLock([&] {
           actual_nbytes = WHILE_EINTR(read(fd, buf, nbytes));
         });

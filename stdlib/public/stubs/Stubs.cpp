@@ -576,7 +576,7 @@ __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
   return false;
 # endif
 
-#elif SWIFT_THREADING_PTHREADS
+#elif SWIFT_THREADING_PTHREADS || SWIFT_THREADING_LINUX
 
 # if defined(__OpenBSD__)
   stack_t sinfo;

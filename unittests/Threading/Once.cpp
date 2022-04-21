@@ -13,6 +13,8 @@
 #include "swift/Threading/Once.h"
 #include "gtest/gtest.h"
 
+#include <cstring>
+
 #include "ThreadingHelpers.h"
 
 using namespace swift;
@@ -54,8 +56,12 @@ TEST(OnceTest, once_threaded) {
   };
 
   for (unsigned tries = 0; tries < 1000; ++tries) {
-    swift::once_t predicate = {0};
+    swift::once_t predicate;
     unsigned      callCount = 0;
+
+    // We're being naughty here; swift::once_t is supposed to be global/static,
+    // but since we know what we're doing, this should be OK.
+    std::memset(&predicate, 0, sizeof(predicate));
 
     threadedExecute(16, [&](int) {
       swift::once(predicate, fn, &callCount);
