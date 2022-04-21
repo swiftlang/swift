@@ -999,7 +999,8 @@ bool diagnoseDeclRefExportability(SourceLoc loc,
 bool diagnoseConformanceExportability(SourceLoc loc,
                                       const RootProtocolConformance *rootConf,
                                       const ExtensionDecl *ext,
-                                      const ExportContext &where);
+                                      const ExportContext &where,
+                                      bool useConformanceAvailabilityErrorsOpt = false);
 
 /// \name Availability checking
 ///

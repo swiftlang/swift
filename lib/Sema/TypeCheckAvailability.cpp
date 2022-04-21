@@ -2584,7 +2584,8 @@ bool swift::diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
 bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
                                            const RootProtocolConformance *rootConf,
                                            const ExtensionDecl *ext,
-                                           const ExportContext &where) {
+                                           const ExportContext &where,
+                                           bool useConformanceAvailabilityErrorsOption) {
   auto *attr = AvailableAttr::isUnavailable(ext);
   if (!attr)
     return false;
@@ -2641,7 +2642,10 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   diags.diagnose(loc, diag::conformance_availability_unavailable,
                  type, proto,
                  platform.empty(), platform, EncodedMessage.Message)
-      .limitBehavior(behavior);
+      .limitBehavior(behavior)
+      .warnUntilSwiftVersionIf(useConformanceAvailabilityErrorsOption &&
+                               !ctx.LangOpts.EnableConformanceAvailabilityErrors,
+                               6);
 
   switch (attr->getVersionAvailability(ctx)) {
   case AvailableVersionComparison::Available:
@@ -2995,7 +2999,8 @@ public:
     
     if (auto EE = dyn_cast<ErasureExpr>(E)) {
       for (ProtocolConformanceRef C : EE->getConformances()) {
-        diagnoseConformanceAvailability(E->getLoc(), C, Where);
+        diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
+                                        /*useConformanceAvailabilityErrorsOpt=*/true);
       }
     }
 
@@ -3777,7 +3782,8 @@ bool
 swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
                                        const ExportContext &where,
-                                       Type depTy, Type replacementTy) {
+                                       Type depTy, Type replacementTy,
+                                       bool useConformanceAvailabilityErrorsOption) {
   assert(!where.isImplicit());
 
   if (!conformance.isConcrete())
@@ -3811,12 +3817,14 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   };
 
   if (auto *ext = dyn_cast<ExtensionDecl>(rootConf->getDeclContext())) {
-    if (TypeChecker::diagnoseConformanceExportability(loc, rootConf, ext, where)) {
+    if (TypeChecker::diagnoseConformanceExportability(loc, rootConf, ext, where,
+                                                      useConformanceAvailabilityErrorsOption)) {
       maybeEmitAssociatedTypeNote();
       return true;
     }
 
-    if (diagnoseExplicitUnavailability(loc, rootConf, ext, where)) {
+    if (diagnoseExplicitUnavailability(loc, rootConf, ext, where,
+                                       useConformanceAvailabilityErrorsOption)) {
       maybeEmitAssociatedTypeNote();
       return true;
     }
@@ -3844,7 +3852,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   SubstitutionMap subConformanceSubs =
       concreteConf->getSubstitutions(DC->getParentModule());
   if (diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where,
-                                          depTy, replacementTy))
+                                          depTy, replacementTy,
+                                          useConformanceAvailabilityErrorsOption))
     return true;
 
   return false;
@@ -3854,11 +3863,13 @@ bool
 swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                            SubstitutionMap subs,
                                            const ExportContext &where,
-                                           Type depTy, Type replacementTy) {
+                                           Type depTy, Type replacementTy,
+                                           bool useConformanceAvailabilityErrorsOption) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
     if (diagnoseConformanceAvailability(loc, conformance, where,
-                                        depTy, replacementTy))
+                                        depTy, replacementTy,
+                                        useConformanceAvailabilityErrorsOption))
       hadAnyIssues = true;
   }
   return hadAnyIssues;

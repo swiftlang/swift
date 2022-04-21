@@ -158,7 +158,8 @@ bool
 TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                                               const RootProtocolConformance *rootConf,
                                               const ExtensionDecl *ext,
-                                              const ExportContext &where) {
+                                              const ExportContext &where,
+                                              bool useConformanceAvailabilityErrorsOption) {
   if (!where.mustOnlyReferenceExportedDecls())
     return false;
 
@@ -178,6 +179,9 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                      rootConf->getProtocol()->getName(),
                      static_cast<unsigned>(*reason),
                      M->getName(),
-                     static_cast<unsigned>(originKind));
+                     static_cast<unsigned>(originKind))
+      .warnUntilSwiftVersionIf(useConformanceAvailabilityErrorsOption &&
+                               !ctx.LangOpts.EnableConformanceAvailabilityErrors,
+                               6);
   return true;
 }
