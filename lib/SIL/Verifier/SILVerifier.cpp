@@ -1315,9 +1315,9 @@ public:
       case SILInstructionKind::DebugValueInst:
         DebugVarTy = inst->getOperand(0)->getType();
         if (DebugVarTy.isAddress()) {
-          auto Expr = varInfo->DIExpr.operands();
-          if (!Expr.empty() &&
-              Expr.begin()->getOperator() == SILDIExprOperator::Dereference)
+          // FIXME: op_deref could be applied to address types only.
+          // FIXME: Add this check
+          if (varInfo->DIExpr.startsWithDeref())
             DebugVarTy = DebugVarTy.getObjectType();
         }
         break;
@@ -1343,9 +1343,16 @@ public:
           require(DebugVars[argNum].first == varInfo->Name,
                   "Scope contains conflicting debug variables for one function "
                   "argument");
-          // Check for type
-          require(DebugVars[argNum].second == DebugVarTy,
+          // The source variable might change its location (e.g. due to
+          // optimizations). Check for most common transformations (e.g. loading
+          // to SSA value and vice versa) as well
+          require(DebugVars[argNum].second == DebugVarTy ||
+                  (DebugVars[argNum].second.isAddress() &&
+                   DebugVars[argNum].second.getObjectType() == DebugVarTy) ||
+                  (DebugVarTy.isAddress() &&
+                   DebugVars[argNum].second == DebugVarTy.getObjectType()),
                   "conflicting debug variable type!");
+          DebugVars[argNum].second = DebugVarTy;
         } else {
           // Reserve enough space.
           while (DebugVars.size() <= argNum) {
