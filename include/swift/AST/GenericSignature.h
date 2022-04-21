@@ -537,7 +537,7 @@ GenericSignature buildGenericSignature(
 enum class GenericSignatureErrorFlags {
   /// The original requirements referenced a non-existent type parameter,
   /// or the original requirements were in conflict with each other, meaning
-  /// there are no possible concrete substitutions which statisfy the
+  /// there are no possible concrete substitutions which satisfy the
   /// generic signature.
   HasInvalidRequirements = (1<<0),
 

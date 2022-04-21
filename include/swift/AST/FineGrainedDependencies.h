@@ -165,7 +165,7 @@ public:
   Value findAndErase(const Key1 &k1, const Key2 &k2) {
     auto &submap = map[k1];
     auto iter = submap.find(k2);
-    assert(iter != submap.end() && "Cannot erase nonexistant element.");
+    assert(iter != submap.end() && "Cannot erase nonexistent element.");
     Value v = iter->second;
     submap.erase(iter);
     return v;
@@ -260,10 +260,10 @@ public:
   Optional<Value> find(const Key2 &k2, Key1 &k1) const { return find(k1, k2); }
 
   /// Return the submap for a given Key1. May create one, after the fashion of
-  /// the standard libary.
+  /// the standard library.
   const Key2Map &operator[](const Key1 &k1) { return map1[k1]; }
   /// Return the submap for a given Key2. May create one, after the fashion of
-  /// the standard libary.
+  /// the standard library.
   const Key1Map &operator[](const Key2 &k2) { return map2[k2]; }
 
   NullablePtr<const Key2Map> find(const Key1 &k1) const {
@@ -558,10 +558,10 @@ public:
 
   bool verify() const;
 
-  /// Since I don't have Swift enums, ensure name corresspondence here.
+  /// Since I don't have Swift enums, ensure name correspondence here.
   static void verifyNodeKindNames();
 
-  /// Since I don't have Swift enums, ensure name corresspondence here.
+  /// Since I don't have Swift enums, ensure name correspondence here.
   static void verifyDeclAspectNames();
 
 private:
@@ -637,11 +637,11 @@ class DepGraphNode {
   ///
   /// However, at present, the frontend does not record this information for
   /// every Decl; it only records it for the source-file-as-a-whole in the
-  /// interface hash. The inteface hash is a product of all the tokens that are
+  /// interface hash. The interface hash is a product of all the tokens that are
   /// not inside of function bodies. Thus, if there is no fingerprint, when the
   /// frontend creates an interface node,
   //  it adds a dependency to it from the implementation source file node (which
-  //  has the intefaceHash as its fingerprint).
+  //  has the interfaceHash as its fingerprint).
   Optional<Fingerprint> fingerprint;
 
   friend ::llvm::yaml::MappingTraits<DepGraphNode>;

@@ -48,7 +48,7 @@
 // existing rewrite rules with the overlap term U.V.W in the middle. If we then
 // add a third rewrite step for the new rule inverted, (U.Y => X.W), we get a
 // loop that begins and ends at X.W. This loop encodes that the new rule
-// (X.W => U.Y) is redundant because it can be expresed in terms of other rules.
+// (X.W => U.Y) is redundant because it can be expressed in terms of other rules.
 //
 // The homotopy reduction algorithm in HomotopyReduction.cpp uses rewrite loops
 // to find a minimal set of rewrite rules, which are then used to construct a

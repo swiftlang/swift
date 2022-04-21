@@ -56,7 +56,7 @@ class Term;
 ///
 /// This transformation allows DependentMemberTypes to be manipulated as
 /// terms, with the actual concrete type structure remaining opaque to
-/// the requirement machine. This tranformation is implemented in
+/// the requirement machine. This transformation is implemented in
 /// RewriteContext::getConcreteSubstitutionSchema().
 ///
 /// For example, the superclass requirement

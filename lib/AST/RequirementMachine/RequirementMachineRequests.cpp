@@ -19,7 +19,7 @@
 //   user-written requirements.
 // - AbstractGenericSignatureRequest computes minimal generic signatures from a
 //   set of abstract Requirements.
-// - InferredGenericSignatureRequst computes minimal generic signatures from a
+// - InferredGenericSignatureRequest computes minimal generic signatures from a
 //   set of user-written requirements on a parsed generic declaration.
 //
 // Each request begins by constructing some desugared requirements using the

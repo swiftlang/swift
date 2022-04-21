@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Implements a pass for simplifying substitutions in concrete type symbols.
-// Substitutions can be simplifed in one of two ways; either a substitution
+// Substitutions can be simplified in one of two ways; either a substitution
 // term can be replaced by a more canonical term, or it can be replaced by a
 // concrete type.
 //

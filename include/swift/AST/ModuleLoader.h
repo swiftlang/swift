@@ -272,7 +272,7 @@ public:
   /// Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }
 
-  /// Discover overlays declared alongside this file and add infomation about
+  /// Discover overlays declared alongside this file and add information about
   /// them to it.
   void findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module, FileUnit *file);
 

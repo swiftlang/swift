@@ -300,7 +300,7 @@ ERROR(batch_scan_input_file_corrupted,none,
       (StringRef))
 
 ERROR(unknown_platform_name, none,
-      "unkown platform name %0", (StringRef))
+      "unknown platform name %0", (StringRef))
 
 ERROR(unknown_swift_module_name, none,
       "cannot find Swift module with name %0", (StringRef))

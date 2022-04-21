@@ -325,7 +325,7 @@ namespace llvm {
       return swift::SubstitutionMap::getFromOpaqueValue(ptr);
     }
 
-    /// Note: Assuming storage is at leaste 4-byte aligned.
+    /// Note: Assuming storage is at least 4-byte aligned.
     enum { NumLowBitsAvailable = 2 };
   };
 
