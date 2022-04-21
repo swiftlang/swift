@@ -347,7 +347,7 @@ GlobalActorAttributeRequest::evaluate(
       if (var->isTopLevelGlobal() &&
           (var->getDeclContext()->isAsyncContext() ||
            var->getASTContext().LangOpts.StrictConcurrencyLevel >=
-             StrictConcurrency::On)) {
+             StrictConcurrency::Complete)) {
         var->diagnose(diag::global_actor_top_level_var)
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
@@ -651,7 +651,7 @@ DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
 DiagnosticBehavior
 SendableCheckContext::implicitSendableDiagnosticBehavior() const {
   switch (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel) {
-  case StrictConcurrency::Limited:
+  case StrictConcurrency::Targeted:
     // Limited checking only diagnoses implicit Sendable within contexts that
     // have adopted concurrency.
     if (shouldDiagnoseExistingDataRaces(fromDC))
@@ -659,7 +659,7 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
 
     LLVM_FALLTHROUGH;
 
-  case StrictConcurrency::Off:
+  case StrictConcurrency::Explicit:
     // Explicit Sendable conformances always diagnose, even when strict
     // strict checking is disabled.
     if (isExplicitSendableConformance())
@@ -667,7 +667,7 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
 
     return DiagnosticBehavior::Ignore;
 
-  case StrictConcurrency::On:
+  case StrictConcurrency::Complete:
     return defaultDiagnosticBehavior();
   }
 }
@@ -2140,12 +2140,12 @@ namespace {
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
       switch (value->getASTContext().LangOpts.StrictConcurrencyLevel) {
-      case StrictConcurrency::Off:
-      case StrictConcurrency::Limited:
+      case StrictConcurrency::Explicit:
+      case StrictConcurrency::Targeted:
         // Never diagnose.
         return false;
 
-      case StrictConcurrency::On:
+      case StrictConcurrency::Complete:
         break;
       }
 
@@ -3713,7 +3713,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (auto var = dyn_cast<VarDecl>(value)) {
     if (var->isTopLevelGlobal() &&
         (var->getASTContext().LangOpts.StrictConcurrencyLevel >=
-             StrictConcurrency::On ||
+             StrictConcurrency::Complete ||
          var->getDeclContext()->isAsyncContext())) {
       if (Type mainActor = var->getASTContext().getMainActorType())
         return inferredIsolation(
@@ -3922,11 +3922,11 @@ bool swift::contextRequiresStrictConcurrencyChecking(
     const DeclContext *dc,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
   switch (dc->getASTContext().LangOpts.StrictConcurrencyLevel) {
-  case StrictConcurrency::On:
+  case StrictConcurrency::Complete:
     return true;
 
-  case StrictConcurrency::Limited:
-  case StrictConcurrency::Off:
+  case StrictConcurrency::Targeted:
+  case StrictConcurrency::Explicit:
     // Check below to see if the context has adopted concurrency features.
     break;
   }
