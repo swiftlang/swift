@@ -36,6 +36,7 @@ public struct ActorAddress: Hashable, Sendable, Codable {
 
 // ==== Noop Transport ---------------------------------------------------------
 
+@available(SwiftStdlib 5.7, *)
 public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
   public typealias ActorID = ActorAddress
   public typealias InvocationDecoder = FakeInvocationDecoder
@@ -111,6 +112,7 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
 // ==== Fake Roundtrip Transport -----------------------------------------------
 
 // TODO(distributed): not thread safe...
+@available(SwiftStdlib 5.7, *)
 public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = ActorAddress
   public typealias InvocationEncoder = FakeInvocationEncoder
@@ -256,6 +258,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
 }
 
+@available(SwiftStdlib 5.7, *)
 public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
   public typealias SerializationRequirement = Codable
 
@@ -300,7 +303,12 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
 }
 
 // === decoding --------------------------------------------------------------
-public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+
+// !!! WARNING !!!
+// This is a 'final class' on purpose, to see that we retain the ad-hoc witness
+// for 'decodeNextArgument'; Do not change it to just a class!
+@available(SwiftStdlib 5.7, *)
+public final class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
   public typealias SerializationRequirement = Codable
 
   var genericSubs: [Any.Type] = []
@@ -353,7 +361,7 @@ public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.7, *)
 public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandler {
   public typealias SerializationRequirement = Codable
 
@@ -382,9 +390,11 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
 
 // ==== Helpers ----------------------------------------------------------------
 
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_actor_is_remote")
 func __isRemoteActor(_ actor: AnyObject) -> Bool
 
+@available(SwiftStdlib 5.7, *)
 func __isLocalActor(_ actor: AnyObject) -> Bool {
   return !__isRemoteActor(actor)
 }
