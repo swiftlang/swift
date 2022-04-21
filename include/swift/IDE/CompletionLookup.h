@@ -209,9 +209,17 @@ public:
     static RequestedResultsTy toplevelResults() {
       return {nullptr, false, false, false, true};
     }
+
+    friend bool operator==(const RequestedResultsTy &LHS,
+                           const RequestedResultsTy &RHS) {
+      return LHS.TheModule == RHS.TheModule && LHS.OnlyTypes == RHS.OnlyTypes &&
+             LHS.OnlyPrecedenceGroups == RHS.OnlyPrecedenceGroups &&
+             LHS.NeedLeadingDot == RHS.NeedLeadingDot &&
+             LHS.IncludeModuleQualifier == RHS.IncludeModuleQualifier;
+    }
   };
 
-  std::vector<RequestedResultsTy> RequestedCachedResults;
+  llvm::SetVector<RequestedResultsTy> RequestedCachedResults;
 
 public:
   CompletionLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
@@ -597,5 +605,30 @@ public:
 
 } // end namespace ide
 } // end namespace swift
+
+namespace llvm {
+using RequestedResultsTy = swift::ide::CompletionLookup::RequestedResultsTy;
+template <>
+struct DenseMapInfo<RequestedResultsTy> {
+  static inline RequestedResultsTy getEmptyKey() {
+    return {DenseMapInfo<swift::ModuleDecl *>::getEmptyKey(), false, false,
+            false, false};
+  }
+  static inline RequestedResultsTy getTombstoneKey() {
+    return {DenseMapInfo<swift::ModuleDecl *>::getTombstoneKey(), false, false,
+            false, false};
+  }
+  static unsigned getHashValue(const RequestedResultsTy &Val) {
+    return hash_combine(
+        DenseMapInfo<swift::ModuleDecl *>::getHashValue(Val.TheModule),
+        Val.OnlyTypes, Val.OnlyPrecedenceGroups, Val.NeedLeadingDot,
+        Val.IncludeModuleQualifier);
+  }
+  static bool isEqual(const RequestedResultsTy &LHS,
+                      const RequestedResultsTy &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
 
 #endif // SWIFT_IDE_COMPLETIONLOOKUP_H
