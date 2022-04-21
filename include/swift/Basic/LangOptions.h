@@ -62,7 +62,7 @@ namespace swift {
   enum class StrictConcurrency {
     /// Enforce Sendable constraints where it has been explicitly adopted and
     /// perform actor-isolation checking wherever code has adopted concurrency.
-    Explicit,
+    Minimal,
     /// Enforce Sendable constraints and perform actor-isolation checking
     /// wherever code has adopted concurrency, including code that has
     /// explicitly adopted Sendable.
