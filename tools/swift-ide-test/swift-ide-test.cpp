@@ -767,6 +767,11 @@ static llvm::cl::opt<bool>
                      llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+    CxxInteropGettersSettersAsProperties("cxx-interop-getters-setters-as-properties",
+        llvm::cl::desc("Imports getters and setters as computed properties."),
+        llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 CanonicalizeType("canonicalize-type", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
 
@@ -4276,6 +4281,9 @@ int main(int argc, char *argv[]) {
   }
   if (options::EnableCxxInterop) {
     InitInvok.getLangOptions().EnableCXXInterop = true;
+  }
+  if (options::CxxInteropGettersSettersAsProperties) {
+    InitInvok.getLangOptions().CxxInteropGettersSettersAsProperties = true;
   }
   if (options::EnableExperimentalConcurrency) {
     InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
