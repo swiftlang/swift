@@ -114,7 +114,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   It's now possible to use a default value expression with a generic parameter type
   to default the argument and its type:
 
-  ```
+  ```swift
   func compute<C: Collection>(_ values: C = [0, 1, 2]) {
     ...
   }
