@@ -6,7 +6,6 @@
 
 import _Concurrency
 import StdlibUnittest
-import Dispatch
 
 var tests = TestSuite("Time")
 
