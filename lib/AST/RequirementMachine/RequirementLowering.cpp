@@ -340,7 +340,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
   }
 
   for (auto memberType : compositionType->getMembers()) {
-    if (memberType->isExistentialType())
+    if (memberType->isConstraintType())
       desugarConformanceRequirement(subjectType, memberType,
                                     loc, result, errors);
     else
