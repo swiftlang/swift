@@ -2272,7 +2272,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     // materialize the nominal type descriptor and call this thunk.
     auto generateThunkFn = [&IGM,
                             checkPrespecialized](IRGenFunction &subIGF) {
-      subIGF.CurFn->setDoesNotAccessMemory();
+      subIGF.CurFn->setOnlyReadsMemory();
+      subIGF.CurFn->setWillReturn();
       subIGF.CurFn->setCallingConv(IGM.SwiftCC);
       IGM.setHasNoFramePointer(subIGF.CurFn);
 
@@ -2853,7 +2854,8 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
           ? "__swift_instantiateConcreteTypeFromMangledNameAbstract"
           : "__swift_instantiateConcreteTypeFromMangledName";
   auto generateInstantiationFn = [&IGM, request](IRGenFunction &subIGF) {
-    subIGF.CurFn->setDoesNotAccessMemory();
+    subIGF.CurFn->setOnlyReadsMemory();
+    subIGF.CurFn->setWillReturn();
     IGM.setHasNoFramePointer(subIGF.CurFn);
 
     auto params = subIGF.collectParameters();
@@ -2956,7 +2958,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
            llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
     }
     call->setDoesNotThrow();
-    call->setDoesNotAccessMemory();
+    call->setOnlyReadsMemory();
     call->setCallingConv(IGM.SwiftCC);
 
     // Store the result back to the cache. Metadata instantatiation should
@@ -2991,7 +2993,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
   
   auto call = IGF.Builder.CreateCall(instantiationFn, cache);
   call->setDoesNotThrow();
-  call->setDoesNotAccessMemory();
+  call->setOnlyReadsMemory();
   
   auto response = MetadataResponse::forComplete(call);
   
