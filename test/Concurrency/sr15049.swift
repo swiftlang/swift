@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -strict-concurrency=limited
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -strict-concurrency=targeted
 // REQUIRES: concurrency
 
 func testAsyncSequenceTypedPatternSendable<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.Element == Int, Seq: Sendable {

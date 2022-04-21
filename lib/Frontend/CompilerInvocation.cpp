@@ -462,7 +462,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableOpenedExistentialTypes =
     Args.hasFlag(OPT_enable_experimental_opened_existential_types,
                  OPT_disable_experimental_opened_existential_types,
-                 false);
+                 true);
 
   Opts.EnableExperimentalVariadicGenerics |=
     Args.hasArg(OPT_enable_experimental_variadic_generics);
@@ -694,12 +694,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   // Swift 6+ uses the strictest concurrency level.
   if (Opts.isSwiftVersionAtLeast(6)) {
-    Opts.StrictConcurrencyLevel = StrictConcurrency::On;
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
   } else if (const Arg *A = Args.getLastArg(OPT_strict_concurrency)) {
     auto value = llvm::StringSwitch<Optional<StrictConcurrency>>(A->getValue())
-      .Case("off", StrictConcurrency::Off)
-      .Case("limited", StrictConcurrency::Limited)
-      .Case("on", StrictConcurrency::On)
+      .Case("minimal", StrictConcurrency::Minimal)
+      .Case("targeted", StrictConcurrency::Targeted)
+      .Case("complete", StrictConcurrency::Complete)
       .Default(None);
 
     if (value)
@@ -709,10 +709,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
 
   } else if (Args.hasArg(OPT_warn_concurrency)) {
-    Opts.StrictConcurrencyLevel = StrictConcurrency::On;
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
   } else {
     // Default to "limited" checking in Swift 5.x.
-    Opts.StrictConcurrencyLevel = StrictConcurrency::Limited;
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Targeted;
   }
 
   Opts.WarnImplicitOverrides =
@@ -806,6 +806,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());
+
+  Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 

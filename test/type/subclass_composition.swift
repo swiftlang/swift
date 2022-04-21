@@ -315,7 +315,6 @@ func dependentMemberTypes<T : BaseIntAndP2>(
 func conformsToAnyObject<T : AnyObject>(_: T) {}
 // expected-note@-1 {{where 'T' = 'any P1'}}
 func conformsToP1<T : P1>(_: T) {}
-// expected-note@-1 {{required by global function 'conformsToP1' where 'T' = 'any P1'}}
 func conformsToP2<T : P2>(_: T) {}
 func conformsToBaseIntAndP2<T : Base<Int> & P2>(_: T) {}
 // expected-note@-1 {{where 'T' = 'FakeDerived'}}
@@ -428,8 +427,6 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
   // expected-error@-1 {{global function 'conformsToAnyObject' requires that 'any P1' be a class type}}
 
   conformsToP1(p1)
-  // expected-error@-1 {{type 'any P1' cannot conform to 'P1'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
   // FIXME: Following diagnostics are not great because when
   // `conformsTo*` methods are re-typechecked, they loose information

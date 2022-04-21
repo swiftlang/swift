@@ -521,7 +521,7 @@ Runtime.test("abstraction barrier on casting generic param bound to existential"
        dynamicWithErasedType,
        dynamicExistentialWithErasedType,
        dynamicDoubleWrappedExistentialWithErasedType)
-    = castWithAbstractionBarrier(x)
+    = castWithAbstractionBarrier(x as SomeProtocol)
 
   expectTrue(staticWithConcreteType == SomeProtocol.self)
   expectTrue(dynamicWithConcreteType == SomeProtocol.self)

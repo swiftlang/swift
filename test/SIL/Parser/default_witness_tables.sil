@@ -15,7 +15,7 @@ public protocol ResilientProtocol {
   func defaultE()
 }
 
-// CHECK-LABEL: sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+// CHECK-LABEL: sil {{.*}}@defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   %result = tuple ()
@@ -23,7 +23,7 @@ bb0(%0 : $*Self):
 }
 
 
-// CHECK-LABEL: sil @defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+// CHECK-LABEL: sil {{.*}}@defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 sil @defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   %result = tuple ()
@@ -39,7 +39,7 @@ protocol InternalProtocol {
   func defaultF()
 }
 
-// CHECK-LABEL: sil hidden @defaultF
+// CHECK-LABEL: sil hidden {{.*}}@defaultF
 sil hidden @defaultF : $@convention(witness_method: InternalProtocol) <Self where Self : InternalProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   %result = tuple ()

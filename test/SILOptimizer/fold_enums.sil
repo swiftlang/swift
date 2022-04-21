@@ -157,7 +157,7 @@ public enum F {
   case F3(Float, Float, Float)
 }
 
-// CHECK-LABEL: sil @_TF10fold_enums13recreate_enumFOS_1FS0_
+// CHECK-LABEL: sil {{.*}}@_TF10fold_enums13recreate_enumFOS_1FS0_
 // CHECK: bb0(%0 : $F)
 // CHECK-NOT: bb1
 // CHECK: return %0 : $F
