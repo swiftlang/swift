@@ -3463,7 +3463,7 @@ ERROR(autodiff_attr_original_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
       "cannot differentiate functions with both a differentiable 'inout' "
-      "parameter and a result", ())
+      "parameter and a differentiable result", ())
 ERROR(autodiff_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
@@ -5042,12 +5042,16 @@ ERROR(differentiable_function_type_invalid_result,none,
       (StringRef, bool))
 ERROR(differentiable_function_type_multiple_semantic_results,none,
       "'@differentiable' function type cannot have both a differentiable "
-      "'inout' parameter and a result", ())
-ERROR(differentiable_function_type_no_differentiability_parameters, 
-      none,
+      "'inout' parameter and a differentiable result", ())
+ERROR(differentiable_function_type_no_differentiability_parameters,none,
       "'@differentiable' function type requires at least one differentiability "
       "parameter, i.e. a non-'@noDerivative' parameter whose type conforms to "
       "'Differentiable'%select{| with its 'TangentVector' equal to itself}0",
+      (/*isLinear*/ bool))
+ERROR(differentiable_function_type_no_differentiable_result,none,
+      "'@differentiable' function type requires a differentiable result, i.e. "
+      "a non-'Void' type that conforms to 'Differentiable'%select{| with its "
+      "'TangentVector' equal to itself}0",
       (/*isLinear*/ bool))
 
 // SIL

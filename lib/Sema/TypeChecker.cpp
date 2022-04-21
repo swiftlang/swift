@@ -619,7 +619,7 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                            dc, stage);
     }) != params.end();
     bool alreadyDiagnosedOneParam = false;
-    bool hasInoutDiffParameter = false;
+    bool hasInoutDifferentiableParameter = false;
     for (unsigned i = 0, end = fnTy->getNumParams(); i != end; ++i) {
       auto param = params[i];
       if (param.isNoDerivative())
@@ -627,7 +627,7 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
       auto paramType = param.getPlainType();
       if (TypeChecker::isDifferentiable(paramType, isLinear, dc, stage)) {
         if (param.isInOut())
-          hasInoutDiffParameter = true;
+          hasInoutDifferentiableParameter = true;
         continue;
       }
       auto diagLoc =
@@ -657,12 +657,13 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
     }
 
     // Check the result.
-    bool resultIsDifferentiable =
-        isDifferentiable(result, /*tangentVectorEqualsSelf*/ isLinear, dc,
-        stage);
+    bool resultExists = !(result->isVoid());
+    bool resultIsDifferentiable = TypeChecker::isDifferentiable(
+        result, /*tangentVectorEqualsSelf*/ isLinear, dc, stage);
+    bool differentiableResultExists = resultExists && resultIsDifferentiable;
 
     // Reject the case where there are multiple semantic results.
-    if (resultIsDifferentiable && hasInoutDiffParameter) {
+    if (differentiableResultExists && hasInoutDifferentiableParameter) {
       auto diagLoc = repr ? (*repr)->getArgsTypeRepr()->getLoc() : loc;
       auto diag = ctx.Diags.diagnose(
           diagLoc,
@@ -674,12 +675,25 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
       }
     }
 
-    // Reject the case where there are no semantic results.
-    if (!resultIsDifferentiable && !hasInoutDiffParameter) {
+    // Reject the case where the semantic result is not differentiable.
+    if (!resultIsDifferentiable && !hasInoutDifferentiableParameter) {
       auto diagLoc = repr ? (*repr)->getResultTypeRepr()->getLoc() : loc;
       auto resultStr = fnTy->getResult()->getString();
       auto diag = ctx.Diags.diagnose(
           diagLoc, diag::differentiable_function_type_invalid_result, resultStr,
+          isLinear);
+      hadAnyError = true;
+
+      if (repr) {
+          diag.highlight((*repr)->getResultTypeRepr()->getSourceRange());
+      }
+    }
+
+    // Reject the case where there are no semantic results.
+    if (!resultExists && !hasInoutDifferentiableParameter) {
+      auto diagLoc = repr ? (*repr)->getResultTypeRepr()->getLoc() : loc;
+      auto diag = ctx.Diags.diagnose(
+          diagLoc, diag::differentiable_function_type_no_differentiable_result,
           isLinear);
       hadAnyError = true;
 

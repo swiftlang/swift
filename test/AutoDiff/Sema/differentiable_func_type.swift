@@ -28,6 +28,12 @@ let _: @differentiable(reverse) (Float, NonDiffType) -> Float
 // expected-error @+1 {{result type 'NonDiffType' does not conform to 'Differentiable' and satisfy 'NonDiffType == NonDiffType.TangentVector', but the enclosing function type is '@differentiable(_linear)'}}
 let _: @differentiable(_linear) (Float) -> NonDiffType
 
+// expected-error @+1 {{'@differentiable' function type cannot have both a differentiable 'inout' parameter and a differentiable result}}
+let _: @differentiable(reverse) (inout Float) -> Float
+
+// expected-error @+1 {{'@differentiable' function type cannot have both a differentiable 'inout' parameter and a differentiable result}}
+let _: @differentiable(_linear) (inout Float) -> Float
+
 // Emit `@noDerivative` fixit iff there is at least one valid linearity parameter.
 // expected-error @+1 {{parameter type 'NonDiffType' does not conform to 'Differentiable' and satisfy 'NonDiffType == NonDiffType.TangentVector', but the enclosing function type is '@differentiable(_linear)'; did you want to add '@noDerivative' to this parameter?}} {{41-41=@noDerivative }}
 let _: @differentiable(_linear) (Float, NonDiffType) -> Float
@@ -40,10 +46,10 @@ let _: @differentiable(_linear) (Float) -> NonDiffType
 
 let _: @differentiable(_linear) (Float) -> Float
 
-// expected-error @+1 {{'@differentiable' function type cannot have both a differentiable 'inout' parameter and a result}}
+// expected-error @+1 {{'@differentiable' function type cannot have both a differentiable 'inout' parameter and a differentiable result}}
 let _: @differentiable(reverse) (inout Float) -> Float
 
-// expected-error @+1 {{'@differentiable' function type cannot have both a differentiable 'inout' parameter and a result}}
+// expected-error @+1 {{'@differentiable' function type cannot have both a differentiable 'inout' parameter and a differentiable result}}
 let _: @differentiable(_linear) (inout Float) -> Float
 
 // expected-error @+1 {{result type '@differentiable(reverse) (U) -> Float' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}

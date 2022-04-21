@@ -366,13 +366,6 @@ GenericSignature autodiff::getDifferentiabilityWitnessGenericSignature(
   return derivativeGenSig;
 }
 
-TangentSpace TangentSpace::getTuple(TupleType *tupleTy) {
-  assert(!tupleTy->isVoid() &&
-         "Attempted to get tangent space of 'Void', which cannot be "
-         "differentiated.");
-  return {Kind::Tuple, tupleTy};
-}
-
 Type TangentSpace::getType() const {
   switch (kind) {
   case Kind::TangentVector:

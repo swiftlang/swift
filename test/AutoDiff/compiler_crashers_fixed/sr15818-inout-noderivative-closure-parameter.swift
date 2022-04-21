@@ -1,14 +1,13 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
-
 import _Differentiation
 
-// expected-error @+1 {{result type 'Void' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
+// expected-error @+1 {{@differentiable' function type requires a differentiable result, i.e. a non-'Void' type that conforms to 'Differentiable'}}
 typealias MyType = @differentiable(reverse) (inout @noDerivative Float, Float) -> Void
 
 @differentiable(reverse)
-func myFunc(_ x:  inout @noDerivative Float, _ q: Float) -> Void {}
+func myFunc(_ x: inout @noDerivative Float, _ q: Float) -> Void {}
 
-print(myFunc as MyType)
+let castedFunc = myFunc as MyType
 
 // Original crash:
 // Assertion failed: (Index < Length && "Invalid index!"), function operator[], file ArrayRef.h, line 257.

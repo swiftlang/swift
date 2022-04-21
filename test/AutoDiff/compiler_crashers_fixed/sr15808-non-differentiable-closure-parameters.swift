@@ -1,23 +1,18 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
-
 // SR-15808: In AST, type checking skips a closure with non-differentiable input
 // where `Void` is included as a parameter without being marked `@noDerivative`.
 // It also crashes when the output is `Void` and no input is `inout`. As a
 // result, the compiler crashes during Sema.
-
 import _Differentiation
 
-// expected-error @+2 {{parameter type '()' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
-// expected-error @+1 {{result type 'Void' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
+// expected-error @+1 {{'@differentiable' function type requires a differentiable result, i.e. a non-'Void' type that conforms to 'Differentiable'}}
 func helloWorld(_ x: @differentiable(reverse) (()) -> Void) {}
 
-// expected-error @+1 {{parameter type '()' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 func helloWorld(_ x: @differentiable(reverse) (()) -> Float) {}
 
-// expected-error @+1 {{result type 'Void' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
+// expected-error @+1 {{'@differentiable' function type requires a differentiable result, i.e. a non-'Void' type that conforms to 'Differentiable'}}
 func helloWorld(_ x: @differentiable(reverse) (Float) -> Void) {}
 
-// expected-error @+1 {{parameter type 'Void' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 func helloWorld(_ x: @differentiable(reverse) (@noDerivative Float, Void) -> Float) {}
 
 // Original crash:
