@@ -4281,7 +4281,8 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
   }
   if (options::WarnConcurrency) {
-    InitInvok.getLangOptions().WarnConcurrency = true;
+    InitInvok.getLangOptions().StrictConcurrencyLevel =
+        StrictConcurrency::Complete;
   }
   if (options::DisableImplicitConcurrencyImport) {
     InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;

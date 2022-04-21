@@ -346,7 +346,8 @@ GlobalActorAttributeRequest::evaluate(
       // ... but not if it's an async-context top-level global
       if (var->isTopLevelGlobal() &&
           (var->getDeclContext()->isAsyncContext() ||
-           var->getASTContext().LangOpts.WarnConcurrency)) {
+           var->getASTContext().LangOpts.StrictConcurrencyLevel >=
+             StrictConcurrency::Complete)) {
         var->diagnose(diag::global_actor_top_level_var)
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
@@ -727,9 +728,6 @@ static bool hasUnavailableConformance(ProtocolConformanceRef conformance) {
 }
 
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
-  if (dc->getParentModule()->isConcurrencyChecked())
-    return true;
-
   return contextRequiresStrictConcurrencyChecking(dc, [](const AbstractClosureExpr *) {
     return Type();
   });
@@ -738,7 +736,7 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
 /// Determine the default diagnostic behavior for this language mode.
 static DiagnosticBehavior defaultSendableDiagnosticBehavior(
     const LangOptions &langOpts) {
-  // Prior to Swift 6, all Sendable-related diagnostics are warnings.
+  // Prior to Swift 6, all Sendable-related diagnostics are warnings at most.
   if (!langOpts.isSwiftVersionAtLeast(6))
     return DiagnosticBehavior::Warning;
 
@@ -768,6 +766,30 @@ DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
     return DiagnosticBehavior::Ignore;
 
   return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
+}
+
+DiagnosticBehavior
+SendableCheckContext::implicitSendableDiagnosticBehavior() const {
+  switch (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel) {
+  case StrictConcurrency::Targeted:
+    // Limited checking only diagnoses implicit Sendable within contexts that
+    // have adopted concurrency.
+    if (shouldDiagnoseExistingDataRaces(fromDC))
+      return DiagnosticBehavior::Warning;
+
+    LLVM_FALLTHROUGH;
+
+  case StrictConcurrency::Minimal:
+    // Explicit Sendable conformances always diagnose, even when strict
+    // strict checking is disabled.
+    if (isExplicitSendableConformance())
+      return DiagnosticBehavior::Warning;
+
+    return DiagnosticBehavior::Ignore;
+
+  case StrictConcurrency::Complete:
+    return defaultDiagnosticBehavior();
+  }
 }
 
 /// Determine whether the given nominal type has an explicit Sendable
@@ -864,10 +886,10 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
         : DiagnosticBehavior::Ignore;
   }
 
-  auto defaultBehavior = defaultDiagnosticBehavior();
+  DiagnosticBehavior defaultBehavior = implicitSendableDiagnosticBehavior();
 
   // If we are checking an implicit Sendable conformance, don't suppress
-  // diagnostics for declarations in the same module. We want them so make
+  // diagnostics for declarations in the same module. We want them to make
   // enclosing inferred types non-Sendable.
   if (defaultBehavior == DiagnosticBehavior::Ignore &&
       nominal->getParentSourceFile() &&
@@ -885,7 +907,7 @@ bool swift::diagnoseSendabilityErrorBasedOn(
   if (nominal) {
     behavior = fromContext.diagnosticBehavior(nominal);
   } else {
-    behavior = fromContext.defaultDiagnosticBehavior();
+    behavior = fromContext.implicitSendableDiagnosticBehavior();
   }
 
   bool wasSuppressed = diagnose(behavior);
@@ -2048,8 +2070,15 @@ namespace {
     ///
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
-      if (!getDeclContext()->getParentModule()->isConcurrencyChecked())
+      switch (value->getASTContext().LangOpts.StrictConcurrencyLevel) {
+      case StrictConcurrency::Minimal:
+      case StrictConcurrency::Targeted:
+        // Never diagnose.
         return false;
+
+      case StrictConcurrency::Complete:
+        break;
+      }
 
       // Only diagnose direct references to mutable global state.
       auto var = dyn_cast<VarDecl>(value);
@@ -3954,7 +3983,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
   if (auto var = dyn_cast<VarDecl>(value)) {
     if (var->isTopLevelGlobal() &&
-        (var->getASTContext().LangOpts.WarnConcurrency ||
+        (var->getASTContext().LangOpts.StrictConcurrencyLevel >=
+             StrictConcurrency::Complete ||
          var->getDeclContext()->isAsyncContext())) {
       if (Type mainActor = var->getASTContext().getMainActorType())
         return inferredIsolation(
@@ -4155,9 +4185,15 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 bool swift::contextRequiresStrictConcurrencyChecking(
     const DeclContext *dc,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
-  // If Swift >= 6, everything uses strict concurrency checking.
-  if (dc->getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+  switch (dc->getASTContext().LangOpts.StrictConcurrencyLevel) {
+  case StrictConcurrency::Complete:
     return true;
+
+  case StrictConcurrency::Targeted:
+  case StrictConcurrency::Minimal:
+    // Check below to see if the context has adopted concurrency features.
+    break;
+  }
 
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
