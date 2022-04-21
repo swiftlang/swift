@@ -54,7 +54,7 @@ _swift_stdlib_threadLocalStorageGet(void) {
   static swift::tls_key key;
   static swift::once_t token;
 
-  swift::tls_alloc_once(token, key, [](void *)pointer {
+  swift::tls_alloc_once(token, key, [](void *pointer) {
     _stdlib_destroyTLS(pointer);
   });
 

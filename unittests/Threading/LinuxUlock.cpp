@@ -30,9 +30,9 @@ private:
 public:
   UlockMutex() : lock_(0) {}
 
-  void lock() { linux::ulock_lock(&lock); }
-  void unlock() { linux::ulock_unlock(&lock); }
-  bool try_lock() { return linux::ulock_trylock(&lock); }
+  void lock() { linux::ulock_lock(&lock_); }
+  void unlock() { linux::ulock_unlock(&lock_); }
+  bool try_lock() { return linux::ulock_trylock(&lock_); }
 };
 
 TEST(LinuxUlockTest, SingleThreaded) {

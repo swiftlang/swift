@@ -94,7 +94,7 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
 
 using once_t = ::dispatch_once_t;
 
-inline void once(once_t &predicate, void (*fn)(void *), void *context) {
+inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
   dispatch_once_f(&predicate, context, fn);
 }
 

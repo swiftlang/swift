@@ -143,6 +143,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   target_link_libraries(SwiftRuntimeTests
     PRIVATE
     swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
+    swiftThreading${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
     )
 endif()

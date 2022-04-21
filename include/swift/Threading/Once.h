@@ -27,7 +27,7 @@ using once_t = threading_impl::once_t;
 /// The predicate argument must refer to a global or static variable of static
 /// extent of type swift::once_t.
 inline void once(once_t &predicate, void (*fn)(void *), void *context=nullptr) {
-  threading_impl::once(predicate, fn, context);
+  threading_impl::once_impl(predicate, fn, context);
 }
 
 }

@@ -64,4 +64,4 @@ swift::threading_impl::once_slow(once_t &predicate,
   linux::ulock_unlock(&predicate.lock);
 }
 
-#endif // SWIFT_THREADING_PTHREADS
+#endif // SWIFT_THREADING_LINUX
