@@ -4393,7 +4393,7 @@ DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
       "Did you forget to define a __swift_interopStaticCast helper function?");
   FuncDecl *staticCastFn = cast<FuncDecl>(results.back());
 
-  // Now we have to force instanciate this. We can't let the type checker do
+  // Now we have to force instantiate this. We can't let the type checker do
   // this yet because it can't infer the "To" type.
   auto subst =
       SubstitutionMap::get(staticCastFn->getGenericSignature(), {derived, base},
@@ -5207,7 +5207,7 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     return nullptr;
   }
 
-  // Instanciate a specialization of this template using the substitution map.
+  // Instantiate a specialization of this template using the substitution map.
   auto *templateArgList = clang::TemplateArgumentList::CreateCopy(
       func->getASTContext(), templateSubst);
   auto &sema = getClangInstance().getSema();

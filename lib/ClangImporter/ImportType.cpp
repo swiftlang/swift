@@ -2121,7 +2121,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
 
   // Only eagerly import the return type if it's not too expensive (the current
-  // huristic for that is if it's not a record type).
+  // heuristic for that is if it's not a record type).
   ImportedType importedType;
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());

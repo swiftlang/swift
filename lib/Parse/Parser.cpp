@@ -413,7 +413,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
   // Token list ordered by their appearance in the source file.
   std::vector<Token> Tokens;
 
-  // Registered token kind change. These changes are regiestered before the
+  // Registered token kind change. These changes are registered before the
   // token is consumed, so we need to keep track of them here.
   llvm::DenseMap<const void*, tok> TokenKindChangeMap;
 
@@ -504,7 +504,7 @@ public:
       return;
     }
 
-    // Update Token kind if a kind update was regiestered before.
+    // Update Token kind if a kind update was registered before.
     auto Found = TokenKindChangeMap.find(Tok.getLoc().
                                          getOpaquePointerValue());
     if (Found != TokenKindChangeMap.end()) {
@@ -790,7 +790,7 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
         consumeToken();
         
         // If the following token is either <identifier> or :, it means that
-        // this `var` or `let` shoud be interpreted as a label
+        // this `var` or `let` should be interpreted as a label
         if ((Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) ||
              peekToken().is(tok::colon)) {
           backtrack.cancelBacktrack();
