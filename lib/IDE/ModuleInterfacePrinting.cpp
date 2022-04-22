@@ -625,9 +625,7 @@ void swift::ide::printModuleInterface(
         return true;
       if (ImportedMod == TargetClangMod)
         return false;
-      // FIXME: const-ness on the clang API.
-      return ImportedMod->isSubModuleOf(
-        const_cast<clang::Module*>(TargetClangMod));
+      return ImportedMod->isSubModuleOf(TargetClangMod);
     };
 
     if (auto ID = dyn_cast<ImportDecl>(D)) {
