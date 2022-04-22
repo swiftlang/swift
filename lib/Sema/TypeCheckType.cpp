@@ -4306,7 +4306,6 @@ public:
                            proto->getDeclaredInterfaceType(),
                            proto->getExistentialType(),
                            /*isAlias=*/false)
-            .limitBehavior(DiagnosticBehavior::Warning)
             .fixItReplace(replaceRepr->getSourceRange(), fix);
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
@@ -4325,7 +4324,6 @@ public:
                              alias->getDeclaredInterfaceType(),
                              ExistentialType::get(alias->getDeclaredInterfaceType()),
                              /*isAlias=*/true)
-              .limitBehavior(DiagnosticBehavior::Warning)
               .fixItReplace(replaceRepr->getSourceRange(), fix);
         }
       }

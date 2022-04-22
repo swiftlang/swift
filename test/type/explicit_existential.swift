@@ -244,8 +244,8 @@ protocol Output {
   associatedtype A
 }
 
-// expected-warning@+2{{use of protocol 'Input' as a type must be written 'any Input'}}{{30-35=any Input}}
-// expected-warning@+1{{use of protocol 'Output' as a type must be written 'any Output'}}{{40-46=any Output}}
+// expected-error@+2{{use of protocol 'Input' as a type must be written 'any Input'}}{{30-35=any Input}}
+// expected-error@+1{{use of protocol 'Output' as a type must be written 'any Output'}}{{40-46=any Output}}
 typealias InvalidFunction = (Input) -> Output
 func testInvalidFunctionAlias(fn: InvalidFunction) {}
 
@@ -253,7 +253,7 @@ typealias ExistentialFunction = (any Input) -> any Output
 func testFunctionAlias(fn: ExistentialFunction) {}
 
 typealias Constraint = Input
-func testConstraintAlias(x: Constraint) {} // expected-warning{{use of 'Constraint' (aka 'Input') as a type must be written 'any Constraint'}}{{29-39=any Constraint}}
+func testConstraintAlias(x: Constraint) {} // expected-error{{use of 'Constraint' (aka 'Input') as a type must be written 'any Constraint'}}{{29-39=any Constraint}}
 
 typealias Existential = any Input
 func testExistentialAlias(x: Existential, y: any Constraint) {}
@@ -287,26 +287,26 @@ func testAnyFixIt() {
     func method() -> any HasAssoc {}
   }
 
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=any HasAssoc}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=any HasAssoc}}
   let _: HasAssoc = ConformingType()
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{19-27=any HasAssoc}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{19-27=any HasAssoc}}
   let _: Optional<HasAssoc> = nil
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-23=any HasAssoc.Type}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-23=any HasAssoc.Type}}
   let _: HasAssoc.Type = ConformingType.self
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-25=any (HasAssoc).Type}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-25=any (HasAssoc).Type}}
   let _: (HasAssoc).Type = ConformingType.self
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-27=any ((HasAssoc)).Type}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-27=any ((HasAssoc)).Type}}
   let _: ((HasAssoc)).Type = ConformingType.self
-  // expected-warning@+2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{30-38=(any HasAssoc)}}
+  // expected-error@+2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{30-38=(any HasAssoc)}}
   let _: HasAssoc.Protocol = HasAssoc.self
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{11-19=any HasAssoc}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{11-19=any HasAssoc}}
   let _: (HasAssoc).Protocol = (any HasAssoc).self
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
   let _: HasAssoc? = ConformingType()
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-23=(any HasAssoc.Type)}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-23=(any HasAssoc.Type)}}
   let _: HasAssoc.Type? = ConformingType.self
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
+  // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
   let _: HasAssoc.Protocol? = (any HasAssoc).self
 
   // expected-error@+1 {{optional 'any' type must be written '(any HasAssoc)?'}}{{10-23=(any HasAssoc)?}}
