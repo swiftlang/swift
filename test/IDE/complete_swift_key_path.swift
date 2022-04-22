@@ -32,7 +32,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_INOUT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_VARIADIC | %FileCheck %s -check-prefix=ARRAYTYPE-DOT
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_KEY_PATH_BASE | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// FIXME: We need the argument after the code completion token to determine the base of the key path in this test case. But since we ignore the types of arguments after the code completion token, we can't determine the base type.
+// DISABLED: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_KEY_PATH_BASE | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_KEY_PATH_RESULT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE_AFTER_SELF | %FileCheck %s -check-prefix=OBJ-NODOT

@@ -1,0 +1,13 @@
+#ifndef TEST_INTEROP_CXX_CLASS_INLINE_FUNCTION_CODEGEN_INPUTS_CONSTRUCTOR_CALLS_FUNCTION_FROM_NESTED_CALLS_H
+#define TEST_INTEROP_CXX_CLASS_INLINE_FUNCTION_CODEGEN_INPUTS_CONSTRUCTOR_CALLS_FUNCTION_FROM_NESTED_CALLS_H
+
+inline int get42Level4() { return 42; }
+inline int get42Level3() { return get42Level4(); }
+inline int get42Level2() { return get42Level3(); }
+inline int get42Level1() { return get42Level2(); }
+
+struct Hold42WithLongInitCallGraph {
+  int m = get42Level1();
+};
+
+#endif // TEST_INTEROP_CXX_CLASS_INLINE_FUNCTION_THROUGH_MEMBER_INPUTS_CONSTRUCTOR_CALLS_FUNCTION_FROM_NESTED_STRUCT_H

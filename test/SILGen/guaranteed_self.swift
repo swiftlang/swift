@@ -365,7 +365,7 @@ class D: C {
     super.init()
   }
 
-  // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s15guaranteed_self1DC3foo{{[_0-9a-zA-Z]*}}FTD : $@convention(method) (Int, @guaranteed D) -> ()
+  // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s15guaranteed_self1DC3foo{{[_0-9a-zA-Z]*}}FTD : $@convention(method) (Int, @guaranteed D) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : @guaranteed $D):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         destroy_value [[SELF_COPY]]

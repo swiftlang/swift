@@ -21,6 +21,8 @@ add_dependencies(libSwiftScan
 target_link_libraries(libSwiftScan PRIVATE
     swiftDependencyScan
     swiftDriverTool
+    swiftStaticMirror
+    swiftReflection
     swiftCompilerStub)
 
 set_target_properties(libSwiftScan

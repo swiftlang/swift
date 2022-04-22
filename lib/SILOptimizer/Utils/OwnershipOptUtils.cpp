@@ -127,6 +127,29 @@ void swift::extendLocalBorrow(BeginBorrowInst *beginBorrow,
   }
 }
 
+bool swift::computeGuaranteedBoundary(SILValue value,
+                                      PrunedLivenessBoundary &boundary) {
+  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
+
+  // Place end_borrows that cover the load_borrow uses. It is not necessary to
+  // cover the outer borrow scope of the extract's operand. If a lexical
+  // borrow scope exists for the outer value, which is now in memory, then
+  // its alloc_stack will be marked lexical, and the in-memory values will be
+  // kept alive until the end of the outer scope.
+  SmallVector<Operand *, 4> usePoints;
+  bool noEscape = findInnerTransitiveGuaranteedUses(value, &usePoints);
+
+  SmallVector<SILBasicBlock *, 4> discoveredBlocks;
+  PrunedLiveness liveness(&discoveredBlocks);
+  for (auto *use : usePoints) {
+    assert(!use->isLifetimeEnding());
+    liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ false);
+  }
+  boundary.compute(liveness);
+
+  return noEscape;
+}
+
 //===----------------------------------------------------------------------===//
 //                        GuaranteedOwnershipExtension
 //===----------------------------------------------------------------------===//
@@ -297,8 +320,29 @@ static void cleanupOperandsBeforeDeletion(SILInstruction *oldValue,
 // directly checking ownership requirements. This does not determine whether the
 // scope of the newValue can be fully extended.
 bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
-                                                SILValue newValue) {
+                                                SILValue newValue,
+                                                ArrayRef<Operand *> oldUses) {
   auto newOwnershipKind = newValue.getOwnershipKind();
+
+  // If the either value is lexical, replacing its uses may result in
+  // shortening or lengthening its lifetime in ways that don't respect lexical
+  // scope and deinit barriers.
+  //
+  // Specifically, we have the following cases:
+  //
+  // +--------+--------+
+  // |oldValue|newValue|
+  // +--------+--------+
+  // |  not   |  not   | legal
+  // +--------+--------+
+  // |lexical |  not   | illegal
+  // +--------+--------+
+  // |   *    |lexical | legal so long as it doesn't extend newValue's lifetime
+  // +--------+--------+
+  if ((oldValue->isLexical() && !newValue->isLexical()) ||
+      (newValue->isLexical() &&
+       !areUsesWithinLexicalValueLifetime(newValue, oldUses)))
+    return false;
 
   // If our new kind is ValueOwnershipKind::None, then we are fine. We
   // trivially support that. This check also ensures that we can always
@@ -347,20 +391,60 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
 // extend the lifetime of \p oldValue to cover the new uses.
 static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
                                      OwnershipFixupContext &context) {
-  if (!OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue))
-    return false;
+  switch (oldValue.getOwnershipKind()) {
+  case OwnershipKind::Guaranteed: {
+    // Check that the old lifetime can be extended and record the necessary
+    // book-keeping in the OwnershipFixupContext.
+    context.clear();
 
-  if (oldValue.getOwnershipKind() != OwnershipKind::Guaranteed)
+    // Check that no transitive uses have a PointerEscape, and record the leaf
+    // uses for liveness extension.
+    //
+    // FIXME: Use findExtendedTransitiveGuaranteedUses and switch the
+    // implementation of borrowCopyOverGuaranteedUses to
+    // GuaranteedOwnershipExtension.  Utils then, reborrows are considered
+    // pointer escapes, causing findTransitiveGuaranteedUses to return false. So
+    // they can be ignored.
+    auto visitReborrow = [&](Operand *reborrow) {};
+    if (!findTransitiveGuaranteedUses(oldValue, context.guaranteedUsePoints,
+                                      visitReborrow)) {
+      return false;
+    }
+    return OwnershipRAUWHelper::hasValidRAUWOwnership(
+        oldValue, newValue, context.guaranteedUsePoints);
+  }
+  default: {
+    SmallVector<Operand *, 8> ownedUsePoints;
+    // If newValue is lexical, find the uses of oldValue so that it can be
+    // determined whether the replacement would illegally extend the lifetime
+    // of newValue.
+    if (newValue->isLexical() &&
+        !findUsesOfSimpleValue(oldValue, &ownedUsePoints))
+      return false;
+    return OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
+                                                      ownedUsePoints);
+  }
+  }
+}
+
+bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
+                                              ArrayRef<Operand *> uses) {
+  assert(value->isLexical());
+
+  // The lexical lifetime of a function argument is the whole body of the
+  // function.
+  if (isa<SILFunctionArgument>(value))
     return true;
 
-  // Check that the old lifetime can be extended and record the necessary
-  // book-keeping in the OwnershipFixupContext.
-  context.clear();
+  if (auto borrowedValue = BorrowedValue(value)) {
+    PrunedLiveness liveness;
+    auto *function = value->getFunction();
+    borrowedValue.computeLiveness(liveness);
+    DeadEndBlocks deadEndBlocks(function);
+    return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
+  }
 
-  // Check that no transitive uses have a PointerEscape, and record the leaf
-  // uses for liveness extension.
-  return findExtendedTransitiveGuaranteedUses(oldValue,
-                                              context.guaranteedUsePoints);
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1112,7 +1196,9 @@ SILValue OwnershipRAUWPrepare::prepareReplacement(SILValue newValue) {
   if (oldValue->use_empty())
     return newValue;
 
-  assert(OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue) &&
+  assert(
+      OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
+                                                 ctx.guaranteedUsePoints) &&
       "Should have checked if can perform this operation before calling it?!");
   // If our new value is just none, we can pass anything to it so just RAUW
   // and return.
@@ -1570,7 +1656,10 @@ OwnershipReplaceSingleUseHelper::OwnershipReplaceSingleUseHelper(
 
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
-  if (!OwnershipRAUWHelper::hasValidRAUWOwnership(use->get(), newValue)) {
+  SmallVector<Operand *, 1> oldUses;
+  oldUses.push_back(use);
+  if (!OwnershipRAUWHelper::hasValidRAUWOwnership(use->get(), newValue,
+                                                  oldUses)) {
     invalidate();
     return;
   }

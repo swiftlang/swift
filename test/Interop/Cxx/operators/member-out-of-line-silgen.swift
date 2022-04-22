@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s -check-prefix CHECK-%target-abi
+// RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s -check-prefix CHECK-%target-abi
+
+// XFAIL: *
 
 import MemberOutOfLine
 

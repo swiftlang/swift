@@ -163,3 +163,20 @@ func testAsyncWithConversions() async {
   // expected-error@-1:7{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   // expected-note@-2:7{{call is 'async'}}
 }
+
+// rdar://88692889 - make sure overload resolution cues off the presence of
+// 'await' in the body to determine whether to prefer async functions, not
+// whether the closure is in a context where it will be converted to async.
+@available(SwiftStdlib 5.1, *)
+struct OverloadInImplicitAsyncClosure {
+  init(int: Int) async throws {
+    let task = Task { () -> Self in
+      let result = try Self(int: int)
+      return result
+    }
+
+    self = try await task.value
+  }
+
+  init(int: Int) throws { }
+}

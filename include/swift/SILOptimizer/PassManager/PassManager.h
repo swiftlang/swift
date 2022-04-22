@@ -143,6 +143,10 @@ class SILPassManager {
 
   /// The number of passes run so far.
   unsigned NumPassesRun = 0;
+  unsigned numSubpassesRun = 0;
+
+  unsigned maxNumPassesToRun = UINT_MAX;
+  unsigned maxNumSubpassesToRun = UINT_MAX;
 
   /// For invoking Swift passes.
   SwiftPassInvocation swiftPassInvocation;
@@ -325,11 +329,7 @@ public:
   ~SILPassManager();
 
   /// Verify all analyses.
-  void verifyAnalyses() const {
-    for (auto *A : Analyses) {
-      A->verify();
-    }
-  }
+  void verifyAnalyses() const;
 
   /// Precompute all analyses.
   void forcePrecomputeAnalyses(SILFunction *F) {
@@ -344,15 +344,21 @@ public:
   /// Discussion: We leave it up to the analyses to decide how to implement
   /// this. If no override is provided the SILAnalysis should just call the
   /// normal verify method.
-  void verifyAnalyses(SILFunction *F) const {
-    for (auto *A : Analyses) {
-      A->verify(F);
-    }
-  }
+  void verifyAnalyses(SILFunction *F) const;
 
   void executePassPipelinePlan(const SILPassPipelinePlan &Plan);
 
+  bool continueWithNextSubpassRun(SILInstruction *forInst, SILFunction *function,
+                                  SILTransform *trans);
+
+  static bool isPassDisabled(StringRef passName);
+  static bool disablePassesForFunction(SILFunction *function);
+
 private:
+  bool doPrintBefore(SILTransform *T, SILFunction *F);
+
+  bool doPrintAfter(SILTransform *T, SILFunction *F, bool PassChangedSIL);
+
   void execute();
 
   /// Add a pass of a specific kind.
@@ -384,7 +390,8 @@ private:
   bool analysesUnlocked();
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
-  void dumpPassInfo(const char *Title, SILTransform *Tr, SILFunction *F);
+  void dumpPassInfo(const char *Title, SILTransform *Tr, SILFunction *F,
+                    int passIdx = -1);
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
   void dumpPassInfo(const char *Title, unsigned TransIdx,

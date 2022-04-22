@@ -76,4 +76,15 @@ OptionalDifferentiationTests.test("Optional.TangentVector operations") {
   }
 }
 
+OptionalDifferentiationTests.test("Optional.TangentVector reflection") {
+  let tan = Optional<Float>.TangentVector(42)
+  let children = Array(Mirror(reflecting: tan).children)
+  expectEqual(1, children.count)
+  // We test `==` first because `as?` will flatten optionals.
+  expectTrue(type(of: children[0].value) == Float.self)
+  if let child = expectNotNil(children[0].value as? Float) {
+    expectEqual(42, child)
+  }
+}
+
 runAllTests()

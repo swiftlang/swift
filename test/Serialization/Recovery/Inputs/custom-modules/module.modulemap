@@ -14,3 +14,4 @@ module Typedefs { header "Typedefs.h" }
 module TypeRemovalObjC { header "TypeRemovalObjC.h" }
 module Types { header "Types.h" }
 module Conformance { header "Conformance.h" }
+module AnyObjectLookup { header "AnyObjectLookup.h" }

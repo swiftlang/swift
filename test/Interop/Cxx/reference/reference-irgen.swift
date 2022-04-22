@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir -I %S/Inputs -enable-cxx-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
 
 import Reference
 
@@ -39,8 +39,8 @@ public func setCxxRef() {
 // CHECK: call void @{{_Z15setStaticIntRefRi|"\?setStaticIntRef@@YAXAEAH@Z"}}(i32* %{{.*}})
 
 public func setCxxConstRef() {
-  var val: CInt = 21
-  setConstStaticIntRef(&val)
+  let val: CInt = 21
+  setConstStaticIntRef(val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main14setCxxConstRefyyF"()
@@ -55,8 +55,8 @@ public func setCxxRvalueRef() {
 // CHECK: call void @{{_Z21setStaticIntRvalueRefOi|"\?setStaticIntRvalueRef@@YAX\$\$QEAH@Z"}}(i32* %{{.*}})
 
 public func setCxxConstRvalueRef() {
-  var val: CInt = 21
-  setConstStaticIntRvalueRef(&val)
+  let val: CInt = 21
+  setConstStaticIntRvalueRef(val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main20setCxxConstRvalueRefyyF"()

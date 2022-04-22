@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-distributed -disable-availability-checking -parse-as-library %s | %FileCheck %s
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-swift-emit-silgen -disable-availability-checking -parse-as-library %s | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -9,7 +9,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-import _Distributed
+import Distributed
 
 distributed actor Philosopher {
 
@@ -41,9 +41,10 @@ struct ActorAddress: Sendable, Hashable, Codable {
 
 struct FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
-  typealias InvocationDecoder = FakeInvocation
-  typealias InvocationEncoder = FakeInvocation
+  typealias InvocationDecoder = FakeInvocationDecoder
+  typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
+  typealias ResultHandler = FakeResultHandler
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor,
@@ -63,32 +64,71 @@ struct FakeActorSystem: DistributedActorSystem {
 
   func resignID(_ id: ActorID) {}
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    fatalError("Not implemented")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+    fatalError("Not implemented")
   }
 }
 
-struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+// === Sending / encoding -------------------------------------------------
+struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
+}
 
-  // === Receiving / decoding -------------------------------------------------
+// === Receiving / decoding -------------------------------------------------
+class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
 
   func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
-  ) throws { /* ... */ }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
   func decodeReturnType() throws -> Any.Type? { nil }
   func decodeErrorType() throws -> Any.Type? { nil }
+}
 
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
+public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = Codable
+
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onReturnVoid() async throws {
+    fatalError("Not implemented: \(#function)")
+  }
+
+  public func onThrow<Err: Error>(error: Err) async throws {
+    fatalError("Not implemented: \(#function)")
   }
 }
 
@@ -97,7 +137,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 // ==== Execute ----------------------------------------------------------------
 
 func test(system: FakeActorSystem) async {
-  _ = Philosopher(system: system)
+  _ = Philosopher(actorSystem: system)
 }
 
 @main struct Main {

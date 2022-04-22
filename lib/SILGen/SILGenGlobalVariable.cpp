@@ -228,6 +228,12 @@ void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding,
                                                unsigned pbdEntry) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(binding->getDeclContext());
 
+  // Add unused context pointer argument required to pass to `Builtin.once`
+  SILBasicBlock &entry = *F.begin();
+  SILType rawPointerSILTy =
+      getLoweredLoadableType(getASTContext().TheRawPointerType);
+  entry.createFunctionArgument(rawPointerSILTy);
+
   {
     Scope scope(Cleanups, binding);
 

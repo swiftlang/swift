@@ -74,6 +74,12 @@ func testCFString() -> String {
   return str
 }
 
+func testInvalidStringLiterals() {
+  // <rdar://67840900> - assertion/crash from importing a macro with a string
+  // literal containing invalid UTF-8 characters
+  _ = INVALID_UTF8_STRING // expected-error {{cannot find 'INVALID_UTF8_STRING' in scope}}
+}
+
 func testInvalidIntegerLiterals() {
   var l1 = INVALID_INTEGER_LITERAL_1 // expected-error {{cannot find 'INVALID_INTEGER_LITERAL_1' in scope}}
   // FIXME: <rdar://problem/16445608> Swift should set up a DiagnosticConsumer for Clang

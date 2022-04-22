@@ -628,6 +628,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   NodeVector Children;
   NodeVector Conformances;
   NodeVector Accessors;
+  SDKNode *Result = nullptr;
 
   for (auto &Pair : *Node) {
     auto keyString = GetScalarString(Pair.getKey()); 
@@ -742,14 +743,21 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         break;
       }
       }
-    }
-    else {
+    } else if (keyString == ABIRootKey) {
+      Result = constructSDKNode(Ctx,
+        cast<llvm::yaml::MappingNode>(Pair.getValue()));
+    } else if (keyString == ConstValuesKey) {
+      // We don't need to consume the const values from the compiler-side
+      Pair.skip();
+    } else {
       Ctx.diagnose(Pair.getKey(), diag::sdk_node_unrecognized_key,
                               keyString);
       Pair.skip();
     }
   };
-  SDKNode *Result = Info.createSDKNode(Kind);
+  if (Result)
+    return Result;
+  Result = Info.createSDKNode(Kind);
   for (auto C : Children) {
     Result->addChild(C);
   }
@@ -1189,7 +1197,8 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
   if (auto *PD = dyn_cast<ProtocolDecl>(D)) {
-    return printGenericSignature(Ctx, PD->getRequirementSignature(), Canonical);
+    return printGenericSignature(Ctx, PD->getRequirementSignature().getRequirements(),
+                                 Canonical);
   }
   PrintOptions Opts = getTypePrintOpts(Ctx.getOpts());
   if (auto *GC = D->getAsGenericContext()) {
@@ -2210,7 +2219,147 @@ static parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
   }
   return {std::move(FileBufOrErr.get()), Result};
 }
+enum class ConstKind: uint8_t {
+  StringLiteral = 0,
+  IntegerLiteral,
+  FloatLiteral,
+  BooleanLiteral,
+  Array,
+  Dictionary,
+};
+
+struct ConstExprInfo {
+  StringRef filePath;
+  ConstKind kind;
+  unsigned offset = 0;
+  unsigned length = 0;
+  StringRef value;
+  StringRef referencedD;
+  ConstExprInfo(StringRef filePath, ConstKind kind, unsigned offset,
+                unsigned length, StringRef value, StringRef referencedD):
+    filePath(filePath), kind(kind), offset(offset), length(length), value(value),
+    referencedD(referencedD) {}
+  ConstExprInfo() = default;
+};
+
+class ConstExtractor: public ASTWalker {
+  SDKContext &SCtx;
+  SourceManager &SM;
+  std::vector<ConstExprInfo> allConsts;
+
+  void record(Expr *E, ConstKind kind, StringRef Value, StringRef ReferencedD) {
+    auto startLoc = E->getStartLoc();
+    // Asserts?
+    if (startLoc.isInvalid())
+      return;
+    auto endLoc = E->getEndLoc();
+    assert(endLoc.isValid());
+    endLoc = Lexer::getLocForEndOfToken(SM, endLoc);
+    auto bufferId = SM.findBufferContainingLoc(startLoc);
+    auto length = SM.getByteDistance(startLoc, endLoc);
+    auto file = SM.getIdentifierForBuffer(bufferId);
+    auto offset = SM.getLocOffsetInBuffer(startLoc, bufferId);
+    allConsts.emplace_back(file, kind, offset, length, Value, ReferencedD);
+  }
+
+  void record(Expr *E, Expr *ValueProvider, StringRef ReferecedD = "") {
+    std::string content;
+    llvm::raw_string_ostream os(content);
+    ValueProvider->printConstExprValue(&os, nullptr);
+    assert(!content.empty());
+    auto buffered = SCtx.buffer(content);
+    switch(ValueProvider->getKind()) {
+#define CASE(X) case ExprKind::X: record(E, ConstKind::X, buffered, ReferecedD); break;
+      CASE(StringLiteral)
+      CASE(IntegerLiteral)
+      CASE(FloatLiteral)
+      CASE(BooleanLiteral)
+      CASE(Dictionary)
+      CASE(Array)
+#undef CASE
+    default:
+      return;
+    }
+  }
+
+  StringRef getDeclName(Decl *D) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      std::string content;
+      llvm::raw_string_ostream os(content);
+      VD->getName().print(os);
+      return SCtx.buffer(content);
+    }
+    return StringRef();
+  }
+
+  bool handleSimpleReference(Expr *E) {
+    assert(E);
+    Decl *ReferencedDecl = nullptr;
+    if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+      ReferencedDecl = MRE->getDecl().getDecl();
+    } else if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+      ReferencedDecl = DRE->getDecl();
+    } else {
+      return false;
+    }
+    assert(ReferencedDecl);
+    if (auto *VAR = dyn_cast<VarDecl>(ReferencedDecl)) {
+      if (!VAR->getAttrs().hasAttribute<CompileTimeConstAttr>()) {
+        return false;
+      }
+      if (auto *PD = VAR->getParentPatternBinding()) {
+        if (auto *init = PD->getInit(PD->getPatternEntryIndexForVarDecl(VAR))) {
+          record(E, init, getDeclName(ReferencedDecl));
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (E->isSemanticallyConstExpr()) {
+      record(E, E);
+      return { false, E };
+    }
+    if (handleSimpleReference(E)) {
+      return { false, E };
+    }
+    return { true, E };
+  }
+public:
+  ConstExtractor(SDKContext &SCtx, ASTContext &Ctx): SCtx(SCtx),
+    SM(Ctx.SourceMgr) {}
+  void extract(ModuleDecl *MD) { MD->walk(*this); }
+  std::vector<ConstExprInfo> &getAllConstValues() { return allConsts; }
+};
 } // End of anonymous namespace
+
+template <> struct swift::json::ObjectTraits<ConstExprInfo> {
+  static void mapping(Output &out, ConstExprInfo &info) {
+    out.mapRequired("filePath", info.filePath);
+    StringRef kind;
+    switch(info.kind) {
+#define CASE(X) case ConstKind::X: kind = #X; break;
+    CASE(StringLiteral)
+    CASE(IntegerLiteral)
+    CASE(FloatLiteral)
+    CASE(BooleanLiteral)
+    CASE(Dictionary)
+    CASE(Array)
+#undef CASE
+    }
+    out.mapRequired("kind", kind);
+    out.mapRequired("offset", info.offset);
+    out.mapRequired("length", info.length);
+    out.mapRequired("value", info.value);
+    if (!info.referencedD.empty())
+      out.mapRequired("decl", info.referencedD);
+  }
+};
+
+struct swift::ide::api::PayLoad {
+  std::vector<ConstExprInfo> *allContsValues = nullptr;
+};
 
 // Construct all roots vector from a given file where a forest was
 // previously dumped.
@@ -2220,16 +2369,24 @@ void SwiftDeclCollector::deSerialize(StringRef Filename) {
 }
 
 // Serialize the content of all roots to a given file using JSON format.
-void SwiftDeclCollector::serialize(StringRef Filename, SDKNode *Root) {
+void SwiftDeclCollector::serialize(StringRef Filename, SDKNode *Root,
+                                   PayLoad OtherInfo) {
   std::error_code EC;
   llvm::raw_fd_ostream fs(Filename, EC, llvm::sys::fs::OF_None);
   json::Output yout(fs);
-  yout << Root;
+  assert(Root->getKind() == SDKNodeKind::Root);
+  SDKNodeRoot &root = *static_cast<SDKNodeRoot*>(Root);
+  yout.beginObject();
+  yout.mapRequired(ABIRootKey, root);
+  if (auto *constValues = OtherInfo.allContsValues) {
+    yout.mapRequired(ConstValuesKey, *constValues);
+  }
+  yout.endObject();
 }
 
 // Serialize the content of all roots to a given file using JSON format.
 void SwiftDeclCollector::serialize(StringRef Filename) {
-  SwiftDeclCollector::serialize(Filename, RootNode);
+  SwiftDeclCollector::serialize(Filename, RootNode, PayLoad());
 }
 
 SDKNodeRoot *
@@ -2295,14 +2452,19 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
   return Collector.getSDKRoot();
 }
 
-void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile) {
+void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, PayLoad load,
+                                  StringRef OutputFile) {
   assert(Root);
   auto Opts = Root->getSDKContext().getOpts();
   if (Opts.Verbose)
     llvm::errs() << "Dumping SDK...\n";
-  SwiftDeclCollector::serialize(OutputFile, Root);
+  SwiftDeclCollector::serialize(OutputFile, Root, load);
   if (Opts.Verbose)
     llvm::errs() << "Dumped to "<< OutputFile << "\n";
+}
+
+void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile) {
+  dumpSDKRoot(Root, PayLoad(), OutputFile);
 }
 
 int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
@@ -2335,7 +2497,7 @@ int swift::ide::api::deserializeSDKDump(StringRef dumpPath, StringRef OutputPath
 }
 
 void swift::ide::api::dumpModuleContent(ModuleDecl *MD, StringRef OutputFile,
-                                        bool ABI) {
+                                        bool ABI, bool Empty) {
   CheckerOptions opts;
   opts.ABI = ABI;
   opts.SwiftOnly = true;
@@ -2346,8 +2508,17 @@ void swift::ide::api::dumpModuleContent(ModuleDecl *MD, StringRef OutputFile,
   opts.Verbose = false;
   SDKContext ctx(opts);
   SwiftDeclCollector collector(ctx);
+  ConstExtractor extractor(ctx, MD->getASTContext());
+  PayLoad payload;
+  SWIFT_DEFER {
+    payload.allContsValues = &extractor.getAllConstValues();
+    dumpSDKRoot(collector.getSDKRoot(), payload, OutputFile);
+  };
+  if (Empty) {
+    return;
+  }
   collector.lookupVisibleDecls({MD});
-  dumpSDKRoot(collector.getSDKRoot(), OutputFile);
+  extractor.extract(MD);
 }
 
 int swift::ide::api::findDeclUsr(StringRef dumpPath, CheckerOptions Opts) {

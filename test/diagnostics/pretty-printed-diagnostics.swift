@@ -124,13 +124,6 @@ foo(b:
 // CHECK:             |                ^ note: Remove '=' to make 'x' a computed property [remove '= ' and replace 'let' with 'var']
 // CHECK: [[#LINE+1]] | }
 
-// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:9
-// CHECK: [[#LINE-1]] |
-// CHECK: [[#LINE]]   | let x = { () -> Result in
-// CHECK:             |          +++++++++++++++++
-// CHECK:             |         ^ error: cannot infer return type for closure with multiple statements; add explicit type to disambiguate
-// CHECK: [[#LINE+1]] |   let y = 1
-
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:8
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | struct B: Decodable {
@@ -148,12 +141,6 @@ foo(b:
 // CHECK:             |           ++++++~~~~------
 // CHECK:             |                       ^ error: argument 'a' must precede argument 'b' [remove ', a: 2' and insert 'a: 2, ']
 // CHECK: [[#LINE+1]] |
-
-// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:20
-// CHECK: [[#LINE-1]] |
-// CHECK: [[#LINE]]   | let 👍👍👍 = {
-// CHECK:    | --> error: cannot infer return type for closure with multiple statements; add explicit type to disambiguate [insert ' () -> <#Result#> in ']
-// CHECK: [[#LINE+1]] |   let y = 1
 
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:5
 // CHECK: [[#LINE-2]] | // Multi-line fix-its

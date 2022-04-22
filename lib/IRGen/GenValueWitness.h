@@ -46,6 +46,11 @@ namespace irgen {
   ConstantReference emitValueWitnessTable(IRGenModule &IGM, CanType type,
                                           bool isPattern,
                                           bool relativeReference);
+
+  /// Given an abstract type --- a type possibly expressed in terms of
+  /// unbound generic types --- return the formal type within the type's
+  /// primary defining context.
+  CanType getFormalTypeInPrimaryContext(CanType abstractType);
 }
 }
 

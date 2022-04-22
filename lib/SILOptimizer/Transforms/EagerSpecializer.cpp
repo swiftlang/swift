@@ -309,8 +309,8 @@ public:
         substConv(ReInfo.getSubstitutedType(), GenericFunc->getModule()),
         Builder(*GenericFunc), Loc(GenericFunc->getLocation()) {
     Builder.setCurrentDebugScope(GenericFunc->getDebugScope());
-    IsClassF = Builder.getModule().findFunction(
-      "_swift_isClassOrObjCExistentialType", SILLinkage::PublicExternal);
+    IsClassF = Builder.getModule().loadFunction(
+      "_swift_isClassOrObjCExistentialType", SILModule::LinkingMode::LinkAll);
     assert(IsClassF);
   }
 
@@ -848,9 +848,9 @@ void EagerSpecializerTransform::run() {
       targetFunc = SA->getTargetFunction();
       if (!targetFunc->isDefinition()) {
         auto &module = FuncBuilder.getModule();
-        bool success = module.loadFunction(targetFunc);
+        bool success = module.loadFunction(targetFunc,
+                                           SILModule::LinkingMode::LinkAll);
         assert(success);
-        module.linkFunction(targetFunc);
       }
       onlyCreatePrespecializations = true;
     }

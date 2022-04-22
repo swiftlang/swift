@@ -2,7 +2,7 @@
 
 import Builtin
 
-sil_stage canonical
+sil_stage raw
 
 // CHECK: define hidden swiftcc void @f010_irgen_identity(%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1, %swift.type* %T)
 // CHECK: entry:
@@ -12,7 +12,7 @@ sil_stage canonical
 // CHECK: %{{.*}} = call %swift.opaque* %initializeWithTake(%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T)
 // CHECK-NOT: call
 // CHECK: ret void
-sil hidden @f010_irgen_identity : $@convention(thin) <T> (@in T) -> @out T {
-bb0(%0 : $T):
+sil hidden [ossa] @f010_irgen_identity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : @owned $T):
   return %0 : $T
 }

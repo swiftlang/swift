@@ -34,6 +34,8 @@
 #include <objc/runtime.h>
 #include <Foundation/Foundation.h>
 
+#include <new>
+
 using namespace swift;
 using namespace swift::hashable_support;
 
@@ -196,7 +198,7 @@ __SwiftValue *swift::bridgeAnythingToSwiftValueObject(OpaqueValue *src,
    */
 
   auto header = getSwiftValueHeader(instance);
-  new (header) SwiftValueHeader();
+  ::new (header) SwiftValueHeader();
   header->type = srcType;
 
   auto payload = getSwiftValuePayload(instance, alignMask);

@@ -46,6 +46,35 @@ public func _autorelease(_ x: AnyObject) {
 }
 #endif
 
+
+@available(SwiftStdlib 5.7, *)
+@_silgen_name("swift_getFunctionFullNameFromMangledName")
+public // SPI (Distributed)
+func _getFunctionFullNameFromMangledNameImpl(
+  _ mangledName: UnsafePointer<UInt8>, _ mangledNameLength: UInt
+) -> (UnsafePointer<UInt8>, UInt)
+
+/// Given a function's mangled name, return a human readable name.
+/// Used e.g. by Distributed.RemoteCallTarget to hide mangled names.
+@available(SwiftStdlib 5.7, *)
+public // SPI (Distributed)
+func _getFunctionFullNameFromMangledName(mangledName: String) -> String? {
+  let mangledNameUTF8 = Array(mangledName.utf8)
+  let (stringPtr, count) =
+    mangledNameUTF8.withUnsafeBufferPointer { (mangledNameUTF8) in
+    return _getFunctionFullNameFromMangledNameImpl(
+      mangledNameUTF8.baseAddress!,
+      UInt(mangledNameUTF8.endIndex))
+  }
+
+  guard count > 0 else {
+    return nil
+  }
+
+  return String._fromUTF8Repairing(
+    UnsafeBufferPointer(start: stringPtr, count: Int(count))).0
+}
+
 // FIXME(ABI)#51 : this API should allow controlling different kinds of
 // qualification separately: qualification with module names and qualification
 // with type names that we are nested in.

@@ -116,13 +116,41 @@ extension _Pointer /*: Equatable */ {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
+
+  /// Returns a Boolean value indicating whether two pointers represent
+  /// the same memory address.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
+  ///            otherwise, `false`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public static func == <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+
+  /// Returns a Boolean value indicating whether two pointers represent
+  /// different memory addresses.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` and `rhs` reference different memory addresses;
+  ///            otherwise, `false`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public static func != <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
+    return Bool(Builtin.cmp_ne_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 }
 
 extension _Pointer /*: Comparable */ {
   // - Note: This is an unsigned comparison unlike Strideable's
   //   implementation.
   /// Returns a Boolean value indicating whether the first pointer references
-  /// an earlier memory location than the second pointer.
+  /// a memory location earlier than the second pointer references.
   ///
   /// - Parameters:
   ///   - lhs: A pointer.
@@ -132,6 +160,62 @@ extension _Pointer /*: Comparable */ {
   @_transparent
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+
+  /// Returns a Boolean value indicating whether the first pointer references
+  /// a memory location earlier than the second pointer references.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` references a memory address
+  ///            earlier than `rhs`; otherwise, `false`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public static func < <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
+    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+
+  /// Returns a Boolean value indicating whether the first pointer references
+  /// a memory location earlier than or same as the second pointer references.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` references a memory address
+  ///            earlier than or the same as `rhs`; otherwise, `false`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public static func <= <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
+    return Bool(Builtin.cmp_ule_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+
+  /// Returns a Boolean value indicating whether the first pointer references
+  /// a memory location later than the second pointer references.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` references a memory address
+  ///            later than `rhs`; otherwise, `false`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public static func > <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
+    return Bool(Builtin.cmp_ugt_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+
+  /// Returns a Boolean value indicating whether the first pointer references
+  /// a memory location later than or same as the second pointer references.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` references a memory address
+  ///            later than or the same as `rhs`; otherwise, `false`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public static func >= <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
+    return Bool(Builtin.cmp_uge_RawPointer(lhs._rawValue, rhs._rawValue))
   }
 }
 

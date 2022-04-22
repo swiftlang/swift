@@ -791,6 +791,12 @@ public:
     // the block header.
     printBlockArgumentUses(BB);
 
+    // If the basic block has a name available, print it as well
+    auto debugName = BB->getDebugName();
+    if (debugName.hasValue()) {
+      *this << "// " << debugName.getValue() << '\n';
+    }
+
     // Then print the name of our block, the arguments, and the block colon.
     *this << Ctx.getID(BB);
     printBlockArguments(BB);
@@ -1315,6 +1321,8 @@ public:
       *this << "[dynamic_lifetime] ";
     if (AVI->isLexical())
       *this << "[lexical] ";
+    if (AVI->getWasMoved())
+      *this << "[moved] ";
     *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo(),
                   &AVI->getModule().getASTContext().SourceMgr);
@@ -1675,6 +1683,8 @@ public:
   void visitDebugValueInst(DebugValueInst *DVI) {
     if (DVI->poisonRefs())
       *this << "[poison] ";
+    if (DVI->getWasMoved())
+      *this << "[moved] ";
     *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo(),
                   &DVI->getModule().getASTContext().SourceMgr);
@@ -1737,23 +1747,10 @@ public:
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
 
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {
-    *this << CI->getSourceFormalType() << " in "
-          << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType()
-          << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
-          << Ctx.getID(CI->getFailureBB());
-  }
-
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
-  }
-
-  void visitUnconditionalCheckedCastValueInst(
-      UnconditionalCheckedCastValueInst *CI) {
-    *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getOperand())
-          << " to " << CI->getTargetFormalType();
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
@@ -1793,12 +1790,6 @@ public:
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
           << getIDAndType(CI->getOperand()) << " to " << CI->getType();
-  }
-  void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
-  }
-  void visitPointerToThinFunctionInst(PointerToThinFunctionInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUpcastInst(UpcastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
@@ -1896,6 +1887,20 @@ public:
   void visitMoveValueInst(MoveValueInst *I) {
     if (I->getAllowDiagnostics())
       *this << "[allows_diagnostics] ";
+    if (I->isLexical())
+      *this << "[lexical] ";
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMarkMustCheckInst(MarkMustCheckInst *I) {
+    using CheckKind = MarkMustCheckInst::CheckKind;
+    switch (I->getCheckKind()) {
+    case CheckKind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case CheckKind::NoImplicitCopy:
+      *this << "[no_implicit_copy] ";
+      break;
+    }
     *this << getIDAndType(I->getOperand());
   }
 
@@ -2814,7 +2819,6 @@ static StringRef getLinkageString(SILLinkage linkage) {
   case SILLinkage::Private: return "private ";
   case SILLinkage::PublicExternal: return "public_external ";
   case SILLinkage::HiddenExternal: return "hidden_external ";
-  case SILLinkage::SharedExternal: return "shared_external ";
   }
   llvm_unreachable("bad linkage");
 }
@@ -2870,7 +2874,6 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   switch (isSerialized()) {
   case IsNotSerialized: break;
-  case IsSerializable: OS << "[serializable] "; break;
   case IsSerialized: OS << "[serialized] "; break;
   }
 
@@ -2977,6 +2980,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (auto *replacedFun = getDynamicallyReplacedFunction()) {
     OS << "[dynamic_replacement_for \"";
     OS << replacedFun->getName();
+    OS << "\"] ";
+  }
+
+  if (auto *usedFunc = getReferencedAdHocRequirementWitnessFunction()) {
+    OS << "[ref_adhoc_requirement_witness \"";
+    OS << usedFunc->getName();
     OS << "\"] ";
   }
 
@@ -3839,6 +3848,11 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
                },
                [&] { OS << ", "; });
   }
+}
+
+void KeyPathPatternComponent::print(SILPrintContext &ctxt) const {
+  SILPrinter printer(ctxt);
+  printer.printKeyPathPatternComponent(*this);
 }
 
 //===----------------------------------------------------------------------===//

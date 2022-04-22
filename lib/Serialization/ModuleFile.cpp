@@ -108,7 +108,7 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   // pointers as we lazily deserialize them.
   allocateBuffer(Decls, core->Decls);
   allocateBuffer(LocalDeclContexts, core->LocalDeclContexts);
-  allocateBuffer(NormalConformances, core->NormalConformances);
+  allocateBuffer(Conformances, core->Conformances);
   allocateBuffer(SILLayouts, core->SILLayouts);
   allocateBuffer(Types, core->Types);
   allocateBuffer(ClangTypes, core->ClangTypes);
@@ -774,7 +774,15 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
     // one.
     if (name.isSimpleName()) {
       for (auto item : *iter) {
-        auto vd = cast<ValueDecl>(getDecl(item.second));
+        auto declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          consumeError(declOrError.takeError());
+          continue;
+        }
+
+        auto vd = cast<ValueDecl>(declOrError.get());
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
@@ -784,7 +792,15 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
       }
     } else {
       for (auto item : *iter) {
-        auto vd = cast<ValueDecl>(getDecl(item.second));
+        auto declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          consumeError(declOrError.takeError());
+          continue;
+        }
+
+        auto vd = cast<ValueDecl>(declOrError.get());
         if (!vd->getName().matchesRef(name))
           continue;
 
@@ -800,7 +816,15 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
   }
 
   for (auto item : *iter) {
-    auto vd = cast<ValueDecl>(getDecl(item.second));
+    auto declOrError = getDeclChecked(item.second);
+    if (!declOrError) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(declOrError.takeError());
+      consumeError(declOrError.takeError());
+      continue;
+    }
+
+    auto vd = cast<ValueDecl>(declOrError.get());
     results.push_back(vd);
   }
 }
@@ -818,6 +842,8 @@ void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
       for (auto item : list) {
         auto decl = getDeclChecked(item.second);
         if (!decl) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(decl.takeError());
           llvm::consumeError(decl.takeError());
           continue;
         }
@@ -839,6 +865,8 @@ void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
     for (auto item : list) {
         auto decl = getDeclChecked(item.second);
         if (!decl) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(decl.takeError());
           llvm::consumeError(decl.takeError());
           continue;
         }
@@ -973,9 +1001,9 @@ ModuleFile::getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl *> &results)
   }
 }
 
-void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
+void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results, bool recursive) {
   if (UnderlyingModule)
-    UnderlyingModule->getDisplayDecls(results);
+    UnderlyingModule->getDisplayDecls(results, recursive);
 
   PrettyStackTraceModuleFile stackEntry(*this);
   getImportDecls(results);

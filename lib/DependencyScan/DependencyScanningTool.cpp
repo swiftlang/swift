@@ -53,7 +53,7 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   std::string ResultStr;
   llvm::raw_string_ostream StrOS(ResultStr);
   swift::targetinfo::printTargetInfo(Invocation, StrOS);
-  return create_clone(ResultStr.c_str());
+  return c_string_utils::create_clone(ResultStr.c_str());
 }
 
 DependencyScanningTool::DependencyScanningTool()
@@ -138,7 +138,7 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
       module_dependency_cache_serialization::readInterModuleDependenciesCache(
           path, *SharedCache);
   if (readFailed) {
-    Diags.diagnose(SourceLoc(), diag::warn_scaner_deserialize_failed, path);
+    Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed, path);
   }
   return readFailed;
 }

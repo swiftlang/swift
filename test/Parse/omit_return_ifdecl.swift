@@ -680,9 +680,9 @@ func ff_implicitTupleShuffle(_ input: (one: Int, two: Int)) -> (two: Int, one: I
     #endif
 }
 
-func ff_implicitCollectionUpcast(_ deriveds: [Derived]) -> [Base] {
+func ff_implicitCollectionUpcast(_ derived: [Derived]) -> [Base] {
     #if true
-    deriveds
+    derived
     #endif
 }
 
@@ -2421,7 +2421,7 @@ class D_optionalTryUnusedImplicit {
 
 
 
-// Miscellanceous
+// Miscellaneous
 
 class CSuperExpr_Base { init() {} }
 class CSuperExpr_Derived : CSuperExpr_Base { override init() { super.init() } }

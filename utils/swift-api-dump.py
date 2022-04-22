@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This tool dumps imported Swift APIs to help validate changes in the
 # projection of (Objective-)C APIs into Swift, which is a function of the
@@ -20,8 +20,6 @@
 #  /path/to/bin/dir/swift-api-dump.py -swift-version 4.2 -o output-dir \
 #      -s macosx iphoneos watchos appletvos
 #
-
-from __future__ import print_function
 
 import argparse
 import multiprocessing
@@ -106,6 +104,8 @@ def create_parser():
                         help='Enable experimental concurrency model.')
     parser.add_argument('--enable-experimental-distributed', action='store_true',
                         help='Enable experimental distributed actors.')
+    parser.add_argument('--enable-experimental-string-processing', action='store_true',
+                        help='Enable experimental string processing.')
     parser.add_argument('-swift-version', metavar='N',
                         help='the Swift version to use')
     parser.add_argument('-show-overlay', action='store_true',
@@ -332,8 +332,6 @@ def main():
     extra_args = ['-skip-imports']
     if args.enable_experimental_concurrency:
         extra_args = extra_args + ['-enable-experimental-concurrency']
-    if args.enable_experimental_distributed:
-        extra_args = extra_args + ['-enable-experimental-distributed']
     if args.enable_experimental_string_processing:
         extra_args = extra_args + ['-enable-experimental-string-processing']
     if args.swift_version:

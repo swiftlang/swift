@@ -31,9 +31,9 @@
 /// move by the same amount in each direction. That is, for any index `i` into
 /// a bidirectional collection `c`:
 ///
-/// - If `i >= c.startIndex && i < c.endIndex`,
+/// - If `i >= c.startIndex && i < c.endIndex`, then
 ///   `c.index(before: c.index(after: i)) == i`.
-/// - If `i > c.startIndex && i <= c.endIndex`
+/// - If `i > c.startIndex && i <= c.endIndex`, then
 ///   `c.index(after: c.index(before: i)) == i`.
 public protocol BidirectionalCollection: Collection
 where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {

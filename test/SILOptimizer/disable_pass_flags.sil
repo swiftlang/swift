@@ -1,0 +1,24 @@
+// RUN: %target-sil-opt -sil-combine %s | %FileCheck %s --check-prefix=CHECK_ENABLED
+// RUN: %target-sil-opt -sil-combine %s -sil-disable-pass=SILCombine | %FileCheck %s --check-prefix=CHECK_DISABLED
+// RUN: %target-sil-opt -sil-combine %s -sil-disable-pass=SILCombine -sil-disable-pass-only-function=test | %FileCheck %s --check-prefix=CHECK_DISABLED
+// RUN: %target-sil-opt -sil-combine %s -sil-disable-pass=SILCombine -sil-disable-pass-only-function=other | %FileCheck %s --check-prefix=CHECK_ENABLED
+// RUN: %target-sil-opt -sil-combine %s -sil-disable-pass=simplify-begin_cow_mutation | %FileCheck %s --check-prefix=CHECK_DISABLED
+// RUN: %target-sil-opt -sil-combine %s -sil-disable-pass=simplify-begin_cow_mutation -sil-disable-pass-only-function=test | %FileCheck %s --check-prefix=CHECK_DISABLED
+// RUN: %target-sil-opt -sil-combine %s -sil-disable-pass=simplify-begin_cow_mutation -sil-disable-pass-only-function=other | %FileCheck %s --check-prefix=CHECK_ENABLED
+
+// REQUIRES: swift_in_compiler
+
+import Builtin
+
+class Buffer {}
+
+// CHECK_ENABLED-NOT: begin_cow_mutation
+// CHECK_ENABLED-NOT: end_cow_mutation
+// CHECK_DISABLED: begin_cow_mutation
+// CHECK_DISABLED: end_cow_mutation
+sil [ossa] @test : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %0 : $Buffer
+  %e = end_cow_mutation %b : $Buffer
+  return %e : $Buffer
+}

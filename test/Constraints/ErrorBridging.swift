@@ -34,14 +34,14 @@ var ns4 = compo as NSError
 
 // NSError conversion must be explicit.
 // TODO: fixit to insert 'as NSError'
-ns4 = compo // expected-error{{cannot assign value of type 'HairyError & Runcible' to type 'NSError'}}
+ns4 = compo // expected-error{{cannot assign value of type 'any HairyError & Runcible' to type 'NSError'}}
 
 let e1 = ns1 as? FooError
 let e1fix = ns1 as FooError // expected-error {{'NSError' is not convertible to 'FooError'}}
 // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{17-19=as!}}
 
 let esub = ns1 as Error
-let esub2 = ns1 as? Error // expected-warning{{conditional cast from 'NSError' to 'Error' always succeeds}}
+let esub2 = ns1 as? Error // expected-warning{{conditional cast from 'NSError' to 'any Error' always succeeds}}
 
 // SR-1562 / rdar://problem/26370984
 enum MyError : Error {

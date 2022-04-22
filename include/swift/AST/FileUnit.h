@@ -246,7 +246,7 @@ public:
   ///
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
-  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
+  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const {
     getTopLevelDecls(results);
   }
 

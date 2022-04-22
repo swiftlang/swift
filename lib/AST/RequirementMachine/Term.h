@@ -71,15 +71,15 @@ public:
 
   static Term get(const MutableTerm &term, RewriteContext &ctx);
 
-  ArrayRef<const ProtocolDecl *> getRootProtocols() const {
-    return begin()->getRootProtocols();
+  const ProtocolDecl *getRootProtocol() const {
+    return begin()->getRootProtocol();
   }
 
   bool containsUnresolvedSymbols() const;
 
   void dump(llvm::raw_ostream &out) const;
 
-  int compare(Term other, RewriteContext &ctx) const;
+  Optional<int> compare(Term other, RewriteContext &ctx) const;
 
   friend bool operator==(Term lhs, Term rhs) {
     return lhs.Ptr == rhs.Ptr;
@@ -144,14 +144,14 @@ public:
     Symbols.append(from, to);
   }
 
-  int compare(const MutableTerm &other, RewriteContext &ctx) const;
+  Optional<int> compare(const MutableTerm &other, RewriteContext &ctx) const;
 
   bool empty() const { return Symbols.empty(); }
 
   size_t size() const { return Symbols.size(); }
 
-  ArrayRef<const ProtocolDecl *> getRootProtocols() const {
-    return begin()->getRootProtocols();
+  const ProtocolDecl *getRootProtocol() const {
+    return begin()->getRootProtocol();
   }
 
   const Symbol *begin() const { return Symbols.begin(); }

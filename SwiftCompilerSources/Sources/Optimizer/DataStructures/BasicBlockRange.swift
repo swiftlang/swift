@@ -51,47 +51,62 @@ struct BasicBlockRange : CustomStringConvertible, CustomReflectable {
   /// The dominating begin block.
   let begin: BasicBlock
 
-  /// The exclusive range, i.e. not containing the end blocks.
-  private(set) var range: Stack<BasicBlock>
+  /// The inclusive range, i.e. the exclusive range plus the end blocks.
+  private(set) var inclusiveRange: Stack<BasicBlock>
   
+  /// The exclusive range, i.e. not containing the end blocks.
+  var range: LazyFilterSequence<Stack<BasicBlock>> {
+    inclusiveRange.lazy.filter { contains($0) }
+  }
+
   /// All inserted blocks.
   private(set) var inserted: Stack<BasicBlock>
 
-  private var insertedSet: BasicBlockSet
+  private var wasInserted: BasicBlockSet
+  private var inExclusiveRange: BasicBlockSet
   private var worklist: BasicBlockWorklist
   
   init(begin: BasicBlock, _ context: PassContext) {
     self.begin = begin
-    self.range = Stack(context)
+    self.inclusiveRange = Stack(context)
     self.inserted = Stack(context)
-    self.insertedSet = BasicBlockSet(context)
+    self.wasInserted = BasicBlockSet(context)
+    self.inExclusiveRange = BasicBlockSet(context)
     self.worklist = BasicBlockWorklist(context)
+    worklist.pushIfNotVisited(begin)
   }
 
   /// Insert a potential end block.
   mutating func insert(_ block: BasicBlock) {
-    if !insertedSet.contains(block) {
-      insertedSet.insert(block)
+    if !wasInserted.contains(block) {
+      wasInserted.insert(block)
       inserted.append(block)
     }
-    if block != begin {
-      worklist.pushIfNotVisited(contentsOf: block.predecessors)
-
-      while let b = worklist.pop() {
-        range.append(b)
-        if b != begin {
-          worklist.pushIfNotVisited(contentsOf: b.predecessors)
+    worklist.pushIfNotVisited(block)
+    while let b = worklist.pop() {
+      inclusiveRange.append(b)
+      if b != begin {
+        for pred in b.predecessors {
+          worklist.pushIfNotVisited(pred)
+          inExclusiveRange.insert(pred)
         }
       }
     }
   }
 
+  /// Insert a sequence of potential end blocks.
+  mutating func insert<S: Sequence>(contentsOf other: S) where S.Element == BasicBlock {
+    for block in other {
+      insert(block)
+    }
+  }
+
   /// Returns true if the exclusive range contains `block`.
-  func contains(_ block: BasicBlock) -> Bool { worklist.hasBeenPushed(block) }
+  func contains(_ block: BasicBlock) -> Bool { inExclusiveRange.contains(block) }
   
   /// Returns true if the inclusive range contains `block`.
   func inclusiveRangeContains (_ block: BasicBlock) -> Bool {
-    contains(block) || insertedSet.contains(block)
+    worklist.hasBeenPushed(block)
   }
 
   /// Returns true if the range is valid and that's iff the begin block dominates all blocks of the range.
@@ -104,14 +119,14 @@ struct BasicBlockRange : CustomStringConvertible, CustomReflectable {
 
   /// Returns the end blocks.
   var ends: LazyFilterSequence<Stack<BasicBlock>> {
-    inserted.lazy.filter { !worklist.hasBeenPushed($0) }
+    inserted.lazy.filter { !contains($0) }
   }
 
   /// Returns the exit blocks.
   var exits: LazySequence<FlattenSequence<
-                    LazyMapSequence<Stack<BasicBlock>,
+                    LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
                                     LazyFilterSequence<SuccessorArray>>>> {
-    range.lazy.flatMap {
+    range.flatMap {
       $0.successors.lazy.filter {
         !inclusiveRangeContains($0) || $0 == begin
       }
@@ -124,13 +139,15 @@ struct BasicBlockRange : CustomStringConvertible, CustomReflectable {
   }
   
   var description: String {
-    """
-    begin:     \(begin.name)
-    range:     \(range)
-    ends:      \(ends)
-    exits:     \(exits)
-    interiors: \(interiors)
-    """
+    return (isValid ? "" : "<invalid>\n") +
+      """
+      begin:     \(begin.name)
+      range:     \(range)
+      inclrange: \(inclusiveRange)
+      ends:      \(ends)
+      exits:     \(exits)
+      interiors: \(interiors)
+      """
   }
 
   var customMirror: Mirror { Mirror(self, children: []) }
@@ -138,8 +155,9 @@ struct BasicBlockRange : CustomStringConvertible, CustomReflectable {
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
     worklist.deinitialize()
+    inExclusiveRange.deinitialize()
+    wasInserted.deinitialize()
     inserted.deinitialize()
-    insertedSet.deinitialize()
-    range.deinitialize()
+    inclusiveRange.deinitialize()
   }
 }

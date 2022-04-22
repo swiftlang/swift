@@ -168,8 +168,7 @@ public:
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
-  using TargetClassMetadata =
-      typename Runtime::template TargetClassMetadata<Runtime>;
+  using TargetClassMetadata = TargetClassMetadataType<Runtime>;
 
 private:
   /// The maximum number of bytes to read when reading metadata. Anything larger
@@ -420,7 +419,7 @@ public:
           return nullptr;
         }
       } else {
-        resolved = RemoteAbsolutePointer("", remoteAddress);
+        resolved = Reader->getSymbol(RemoteAddress(remoteAddress));
       }
 
       switch (kind) {
@@ -1663,10 +1662,6 @@ protected:
     return Reader->readString(RemoteAddress(namePtr), className);
   }
 
-  template <typename T>
-  using TargetClassMetadataT =
-      typename Runtime::template TargetClassMetadata<T>;
-
   MetadataRef readMetadata(StoredPointer address) {
     auto cached = MetadataCache.find(address);
     if (cached != MetadataCache.end())
@@ -1681,7 +1676,7 @@ protected:
     switch (getEnumeratedMetadataKind(KindValue)) {
       case MetadataKind::Class:
 
-        return _readMetadata<TargetClassMetadataT>(address);
+        return _readMetadata<TargetClassMetadataType>(address);
 
       case MetadataKind::Enum:
         return _readMetadata<TargetEnumMetadata>(address);

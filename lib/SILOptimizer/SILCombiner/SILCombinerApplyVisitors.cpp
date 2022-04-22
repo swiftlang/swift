@@ -433,8 +433,8 @@ bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
     if (!init)
       return false;
     auto initRef = SILDeclRef(init.getDecl(), SILDeclRef::Kind::Allocator);
-    auto initFn = AI->getModule().findFunction(initRef.mangle(),
-                                               SILLinkage::PublicExternal);
+    auto initFn = AI->getModule().loadFunction(initRef.mangle(),
+                                               SILModule::LinkingMode::LinkAll);
     if (!initFn)
       return false;
 
@@ -1571,6 +1571,39 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *fInverseApply,
   return true;
 }
 
+/// Should replace a call to `getContiguousArrayStorageType<A>(for:)` by the
+/// metadata constructor of the return type.
+///  getContiguousArrayStorageType<Int>(for:)
+///    => metatype @thick ContiguousArrayStorage<Int>.Type
+/// We know that `getContiguousArrayStorageType` will not return the AnyObject
+/// type optimization for any non class or objc existential type instantiation.
+static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
+  auto metaTy = dyn_cast<MetatypeType>(storageMetaTy);
+  if (!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thick)
+    return false;
+
+  auto storageTy = metaTy.getInstanceType()->getCanonicalType();
+  if (!storageTy->is_ContiguousArrayStorage())
+    return false;
+
+  auto boundGenericTy = dyn_cast<BoundGenericType>(storageTy);
+  if (!boundGenericTy)
+    return false;
+
+  auto genericArgs = boundGenericTy->getGenericArgs();
+  if (genericArgs.size() != 1)
+    return false;
+  auto ty = genericArgs[0]->getCanonicalType();
+  if (ty->getStructOrBoundGenericStruct() || ty->getEnumOrBoundGenericEnum() ||
+      isa<BuiltinVectorType>(ty) || isa<BuiltinIntegerType>(ty) ||
+      isa<BuiltinFloatType>(ty) || isa<TupleType>(ty) ||
+      isa<AnyFunctionType>(ty) ||
+      (ty->isAnyExistentialType() && !ty->isObjCExistentialType()))
+    return true;
+
+  return false;
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
@@ -1604,8 +1637,19 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
           return nullptr;
       }
     }
-  }
+    if (SF->hasSemanticsAttr(semantics::ARRAY_GET_CONTIGUOUSARRAYSTORAGETYPE)) {
+      auto silTy = AI->getType();
+      auto storageTy = AI->getType().getASTType();
 
+      // getContiguousArrayStorageType<Int> => ContiguousArrayStorage<Int>
+      if (shouldReplaceCallByMetadataConstructor(storageTy)) {
+        auto metatype = Builder.createMetatype(AI->getLoc(), silTy);
+        AI->replaceAllUsesWith(metatype);
+        eraseInstFromFunction(*AI);
+        return nullptr;
+      }
+    }
+  }
 
   // (apply (thin_to_thick_function f)) to (apply f)
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {

@@ -3,6 +3,9 @@
 // RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
 // REQUIRES: objc_interop
 
+// Temporarily disable on arm64e (rdar://89986398)
+// UNSUPPORTED: CPU=arm64e
+
 // Disable asan builds until we build swift-reflection-dump and the reflection library with the same compile: rdar://problem/30406870
 // REQUIRES: no_asan
 

@@ -291,11 +291,13 @@ enum class TypeMatchFlags {
   AllowABICompatible = 1 << 3,
   /// Allow escaping function parameters to override optional non-escaping ones.
   ///
-  /// This is necessary because Objective-C allows optional function paramaters
+  /// This is necessary because Objective-C allows optional function parameters
   /// to be non-escaping, but Swift currently does not.
   IgnoreNonEscapingForOptionalFunctionParam = 1 << 4,
   /// Allow compatible opaque archetypes.
-  AllowCompatibleOpaqueTypeArchetypes = 1 << 5
+  AllowCompatibleOpaqueTypeArchetypes = 1 << 5,
+  /// Ignore the @Sendable attributes on functions when matching types.
+  IgnoreFunctionSendability = 1 << 6,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
@@ -413,6 +415,11 @@ protected:
     Count : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(ParameterizedProtocolType, TypeBase, 32,
+    /// The number of type arguments.
+    ArgCount : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 1+32,
     /// Whether an element of the tuple is inout, __shared or __owned.
     /// Values cannot have such tuple types in the language.
@@ -502,7 +509,7 @@ public:
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
   /// slower, but stricter minimization at need (e.g. redeclaration checking).
-  CanType getMinimalCanonicalType() const;
+  CanType getMinimalCanonicalType(const DeclContext *useDC) const;
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
@@ -513,13 +520,13 @@ public:
   TypeBase *getWithoutSyntaxSugar();
 
   /// getASTContext - Return the ASTContext that this type belongs to.
-  ASTContext &getASTContext();
-  
+  ASTContext &getASTContext() const;
+
   /// isEqual - Return true if these two types are equal, ignoring sugar.
   ///
   /// To compare sugar, check for pointer equality of the underlying TypeBase *
   /// values, obtained by calling getPointer().
-  bool isEqual(Type Other);
+  bool isEqual(Type Other) const;
   
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
@@ -621,7 +628,7 @@ public:
 
   /// Determine whether the type involves the given opened existential
   /// archetype.
-  bool hasOpenedExistential(OpenedArchetypeType *opened);
+  bool hasOpenedExistentialWithRoot(const OpenedArchetypeType *root) const;
 
   /// Determine whether the type involves an opaque type.
   bool hasOpaqueArchetype() const {
@@ -637,13 +644,14 @@ public:
   /// Determine whether the type is an opened existential type with Error inside
   bool isOpenedExistentialWithError();
 
-  /// Retrieve the set of opened existential archetypes that occur
-  /// within this type.
-  void getOpenedExistentials(SmallVectorImpl<OpenedArchetypeType *> &opened);
+  /// Retrieve the set of root opened archetypes that occur within this type.
+  void getRootOpenedExistentials(
+      SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
 
-  /// Erase the given opened existential type by replacing it with its
-  /// existential type throughout the given type.
-  Type eraseOpenedExistential(OpenedArchetypeType *opened);
+  /// Replace opened archetypes with the given root with their most
+  /// specific non-dependent upper bounds throughout this type.
+  Type typeEraseOpenedArchetypesWithRoot(const OpenedArchetypeType *root,
+                                         const DeclContext *useDC) const;
 
   /// Given a declaration context, returns a function type with the 'self'
   /// type curried as the input if the declaration context describes a type.
@@ -683,7 +691,7 @@ public:
   bool canDynamicallyBeOptionalType(bool includeExistential);
 
   /// Determine whether this type contains a type parameter somewhere in it.
-  bool hasTypeParameter() {
+  bool hasTypeParameter() const {
     return getRecursiveProperties().hasTypeParameter();
   }
 
@@ -691,7 +699,7 @@ public:
   ///
   /// "Unresolved" dependent member types have no known associated type,
   /// and are only used transiently in the type checker.
-  const DependentMemberType *findUnresolvedDependentMemberType();
+  DependentMemberType *findUnresolvedDependentMemberType();
 
   /// Return the root generic parameter of this type parameter type.
   GenericTypeParamType *getRootGenericParam();
@@ -758,13 +766,18 @@ public:
   bool isClassExistentialType();
 
   /// Opens an existential instance or meta-type and returns the opened type.
-  Type openAnyExistentialType(OpenedArchetypeType *&opened);
+  Type openAnyExistentialType(OpenedArchetypeType *&opened,
+                              GenericSignature parentSig);
 
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 
   /// Determines whether this type is an actor type.
   bool isActorType();
+
+  /// Determines whether this type conforms or inherits (if it's a protocol
+  /// type) from `DistributedActor`.
+  bool isDistributedActor();
 
   /// Determines the element type of a known
   /// [Autoreleasing]Unsafe[Mutable][Raw]Pointer variant, or returns null if the
@@ -1234,6 +1247,10 @@ public:
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
+
+  /// Return true if this type is potentially an AnyObject existential after
+  /// substitution.
+  bool isPotentiallyAnyObject();
 
   /// Whether this is an existential composition containing
   /// Error.
@@ -2077,7 +2094,7 @@ public:
     return value.toRaw() != other.value.toRaw();
   }
 
-  uint8_t toRaw() const { return value.toRaw(); }
+  uint16_t toRaw() const { return value.toRaw(); }
 };
 
 class YieldTypeFlags {
@@ -2755,6 +2772,7 @@ BEGIN_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
                                         MetatypeRepresentation repr) {
     return CanExistentialMetatypeType(ExistentialMetatypeType::get(type, repr));
   }
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getExistentialInstanceType)
 END_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
   
 /// ModuleType - This is the type given to a module value, e.g. the "Builtin" in
@@ -5184,7 +5202,7 @@ public:
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
   /// slower, but stricter minimization at need (e.g. redeclaration checking).
-  CanType getMinimalCanonicalType() const;
+  CanType getMinimalCanonicalType(const DeclContext *useDC) const;
 
   /// Retrieve the set of members composed to create this type.
   ///
@@ -5241,7 +5259,109 @@ private:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
+  CanTypeArrayRef getMembers() const {
+    return CanTypeArrayRef(getPointer()->getMembers());
+  }
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
+
+/// ParameterizedProtocolType - A type that constrains one or more primary
+/// associated type of a protocol to a list of argument types.
+///
+/// Written like a bound generic type, eg Sequence<Int>.
+///
+/// For now, these are only supported in generic requirement-like contexts:
+/// - Inheritance clauses of protocols, generic parameters, associated types
+/// - Conformance requirements in where clauses
+/// - Extensions
+/// - Opaque result types
+///
+/// Assuming that the primary associated type of Sequence is Element, the
+/// desugaring is that T : Sequence<Int> is equivalent to
+///
+/// \code
+/// T : Sequence where T.Element == Int.
+/// \endcode
+class ParameterizedProtocolType final : public TypeBase,
+    public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<ParameterizedProtocolType, Type> {
+  friend struct ExistentialLayout;
+  friend TrailingObjects;
+
+  ProtocolType *Base;
+
+public:
+  /// Retrieve an instance of a protocol composition type with the
+  /// given set of members.
+  static Type get(const ASTContext &C, ProtocolType *base,
+                  ArrayRef<Type> args);
+
+  ProtocolType *getBaseType() const {
+    return Base;
+  }
+
+  ProtocolDecl *getProtocol() const {
+    return Base->getDecl();
+  }
+
+  ArrayRef<Type> getArgs() const {
+    return {getTrailingObjects<Type>(),
+            Bits.ParameterizedProtocolType.ArgCount};
+  }
+
+  bool requiresClass() const {
+    return getBaseType()->requiresClass();
+  }
+
+  void getRequirements(Type baseType, SmallVectorImpl<Requirement> &reqs) const;
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, Base, getArgs());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ProtocolType *base,
+                      ArrayRef<Type> args);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ParameterizedProtocol;
+  }
+
+private:
+  ParameterizedProtocolType(const ASTContext *ctx,
+                            ProtocolType *base,
+                            ArrayRef<Type> args,
+                            RecursiveTypeProperties properties);
+};
+BEGIN_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
+  CanProtocolType getBaseType() const {
+    return CanProtocolType(getPointer()->getBaseType());
+  }
+  CanTypeArrayRef getArgs() const {
+    return CanTypeArrayRef(getPointer()->getArgs());
+  }
+END_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
+
+/// The generalized shape of an existential type.
+struct ExistentialTypeGeneralization {
+  /// The generalized existential type.  May refer to type parameters
+  /// from the generalization signature.
+  Type Shape;
+
+  /// The generalization signature and substitutions.
+  SubstitutionMap Generalization;
+
+  /// Retrieve the generalization for the given existential type.
+  ///
+  /// Substituting the generalization substitutions into the shape
+  /// should produce the original existential type.
+  ///
+  /// If there is a generic type substitution which can turn existential
+  /// type A into existential type B, then:
+  /// - the generalized shape types of A and B must be equal and
+  /// - the generic signatures of the generalization substitutions of
+  ///   A and B must be equal.
+  static ExistentialTypeGeneralization get(Type existentialType);
+};
 
 /// An existential type, spelled with \c any .
 ///
@@ -5257,7 +5377,7 @@ class ExistentialType final : public TypeBase {
         ConstraintType(constraintType) {}
 
 public:
-  static Type get(Type constraint);
+  static Type get(Type constraint, bool forceExistential = false);
 
   Type getConstraintType() const { return ConstraintType; }
 
@@ -5267,6 +5387,9 @@ public:
 
     if (auto composition = ConstraintType->getAs<ProtocolCompositionType>())
       return composition->requiresClass();
+
+    if (auto paramProtocol = ConstraintType->getAs<ParameterizedProtocolType>())
+      return paramProtocol->requiresClass();
 
     return false;
   }
@@ -5472,7 +5595,8 @@ public:
   /// primary archetype.
   ArchetypeType *getParent() const;
 
-  /// Return the root archetype parent of this archetype.
+  /// Return the archetype that represents the root generic parameter of its
+  /// interface type.
   ArchetypeType *getRoot() const;
 
   /// Determine whether this is a root archetype within the environment.
@@ -5598,7 +5722,7 @@ enum class OpaqueSubstitutionKind {
   // Can be done if the underlying type is accessible from the context we
   // substitute into. Private types cannot be accessed from a different TU.
   SubstituteSameModuleMaximalResilience,
-  // Substitute in a different module from the opaque definining decl. Can only
+  // Substitute in a different module from the opaque defining decl. Can only
   // be done if the underlying type is public.
   SubstituteNonResilientModule
 };
@@ -5608,9 +5732,12 @@ enum class OpaqueSubstitutionKind {
 /// archetypes with underlying types visible at a given resilience expansion
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
+public:
+  using SeenDecl = std::pair<OpaqueTypeDecl *, SubstitutionMap>;
+private:
   ResilienceExpansion contextExpansion;
   llvm::PointerIntPair<const DeclContext *, 1, bool> inContextAndIsWholeModule;
-  llvm::SmallPtrSetImpl<OpaqueTypeDecl *> *seenDecls;
+  llvm::DenseSet<SeenDecl> *seenDecls;
 
 public:
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
@@ -5622,7 +5749,7 @@ public:
 
   ReplaceOpaqueTypesWithUnderlyingTypes(
       const DeclContext *inContext, ResilienceExpansion contextExpansion,
-      bool isWholeModuleContext, llvm::SmallPtrSetImpl<OpaqueTypeDecl *> &seen);
+      bool isWholeModuleContext, llvm::DenseSet<SeenDecl> &seen);
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -5669,45 +5796,77 @@ class OpenedArchetypeType final : public ArchetypeType,
          LayoutConstraint layout);
 
 public:
+  /// Compute the parameter that serves as the \c Self type for an opened
+  /// archetype from the given outer generic signature.
+  ///
+  /// This type is a generic parameter one level deeper
+  /// than the deepest generic context depth.
+  static Type getSelfInterfaceTypeFromContext(GenericSignature parentSig,
+                                              ASTContext &ctx);
+
+public:
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType> get(
-      CanType existential, Optional<UUID> knownID = None);
+  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential,
+                                                 GenericSignature parentSig,
+                                                 Optional<UUID> knownID = None);
 
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
   /// \param interfaceType The interface type represented by this archetype.
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType> get(
-      CanType existential, Type interfaceType, Optional<UUID> knownID = None);
+  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential,
+                                                 Type interfaceType,
+                                                 GenericSignature parentSig,
+                                                 Optional<UUID> knownID = None);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
+  ///
+  /// Use this function when you are unsure of whether the
+  /// \c existential type is a metatype or an instance type. This function
+  /// will unwrap any existential metatype containers.
   ///
   /// \param existential The existential type or existential metatype to open.
   /// \param interfaceType The interface type represented by this archetype.
-  static CanType getAny(CanType existential, Type interfaceType);
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
+  static CanType getAny(CanType existential, Type interfaceType,
+                        GenericSignature parentSig);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
   ///
+  /// Use this function when you are unsure of whether the
+  /// \c existential type is a metatype or an instance type. This function
+  /// will unwrap any existential metatype containers.
+  ///
   /// \param existential The existential type or existential metatype to open.
-  static CanType getAny(CanType existential);
+  /// \param parentSig The generic signature of the context opening
+  /// this existential.
+  static CanType getAny(CanType existential, GenericSignature parentSig);
 
   /// Retrieve the ID number of this opened existential.
   UUID getOpenedExistentialID() const;
-  
-  /// Retrieve the opened existential type
-  Type getOpenedExistentialType() const;
+
+  /// Return the archetype that represents the root generic parameter of its
+  /// interface type.
+  OpenedArchetypeType *getRoot() const {
+    return cast<OpenedArchetypeType>(ArchetypeType::getRoot());
+  }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;
@@ -6223,7 +6382,7 @@ BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
 END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
 
 /// getASTContext - Return the ASTContext that this type belongs to.
-inline ASTContext &TypeBase::getASTContext() {
+inline ASTContext &TypeBase::getASTContext() const {
   // If this type is canonical, it has the ASTContext in it.
   if (isCanonical())
     return *const_cast<ASTContext*>(Context);
@@ -6294,7 +6453,8 @@ inline bool TypeBase::isConstraintType() const {
 
 inline bool CanType::isConstraintTypeImpl(CanType type) {
   return (isa<ProtocolType>(type) ||
-          isa<ProtocolCompositionType>(type));
+          isa<ProtocolCompositionType>(type) ||
+          isa<ParameterizedProtocolType>(type));
 }
 
 inline bool TypeBase::isExistentialType() {
@@ -6306,9 +6466,10 @@ inline bool TypeBase::isAnyExistentialType() {
 }
 
 inline bool CanType::isExistentialTypeImpl(CanType type) {
-  return (isa<ProtocolType>(type) ||
-          isa<ProtocolCompositionType>(type) ||
-          isa<ExistentialType>(type));
+  return isa<ProtocolType>(type) ||
+         isa<ProtocolCompositionType>(type) ||
+         isa<ExistentialType>(type) ||
+         isa<ParameterizedProtocolType>(type);
 }
 
 inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
@@ -6340,8 +6501,7 @@ inline bool TypeBase::isOpenedExistentialWithError() {
 
   CanType T = getCanonicalType();
   if (auto archetype = dyn_cast<OpenedArchetypeType>(T)) {
-    auto openedExistentialType = archetype->getOpenedExistentialType();
-    return openedExistentialType->isExistentialWithError();
+    return archetype->getExistentialType()->isExistentialWithError();
   }
   return false;
 }
@@ -6405,6 +6565,8 @@ inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
     return Ty->getDecl();
   if (auto Ty = dyn_cast<ExistentialType>(*this))
     return Ty->getConstraintType()->getNominalOrBoundGenericNominal();
+  if (auto Ty = dyn_cast<ParameterizedProtocolType>(*this))
+    return Ty->getBaseType()->getNominalOrBoundGenericNominal();
   return nullptr;
 }
 
@@ -6415,7 +6577,8 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 inline Type TypeBase::getNominalParent() {
   if (auto existential = getAs<ExistentialType>())
     return existential->getConstraintType()->getNominalParent();
-
+  if (auto ppt = getAs<ParameterizedProtocolType>())
+    return ppt->getBaseType()->getNominalParent();
   return castTo<AnyGenericType>()->getParent();
 }
 
@@ -6583,9 +6746,9 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
     return false;
 
   case TypeKind::Metatype:
-  case TypeKind::ExistentialMetatype:
     return !cast<const AnyMetatypeType>(this)->hasRepresentation();
 
+  case TypeKind::ExistentialMetatype:
   case TypeKind::Existential:
     return false;
 

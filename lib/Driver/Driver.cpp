@@ -812,7 +812,8 @@ static bool computeIncremental(const llvm::opt::InputArgList *ArgList,
 
   if (ShowIncrementalBuildDecisions) {
     llvm::outs() << "Incremental compilation has been disabled, because it "
-                 << ReasonToDisable;
+                 << ReasonToDisable
+                 << "\n";
   }
   return false;
 }
@@ -979,7 +980,7 @@ Driver::buildCompilation(const ToolChain &TC,
   computeArgsHash(ArgsHash, *TranslatedArgList);
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
   InputInfoMap outOfDateMap;
-  std::string whyIgnoreIncrementallity =
+  std::string whyIgnoreIncrementality =
       !Incremental
           ? ""
           : buildRecordPath.empty()
@@ -1078,7 +1079,7 @@ Driver::buildCompilation(const ToolChain &TC,
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
   buildActions(TopLevelActions, TC, OI,
-               whyIgnoreIncrementallity.empty() ? &outOfDateMap : nullptr, *C);
+               whyIgnoreIncrementality.empty() ? &outOfDateMap : nullptr, *C);
 
   if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
@@ -1109,8 +1110,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // This has to happen after building jobs, because otherwise we won't even
   // emit .swiftdeps files for the next build.
-  if (!whyIgnoreIncrementallity.empty())
-    C->disableIncrementalBuild(whyIgnoreIncrementallity);
+  if (!whyIgnoreIncrementality.empty())
+    C->disableIncrementalBuild(whyIgnoreIncrementality);
 
   if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
@@ -1815,7 +1816,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_recover_EQ)) {
     // Just validate the args. The frontend will parse these again and actually
-    // use them. To avoid emitting warnings multiple times we surpress warnings
+    // use them. To avoid emitting warnings multiple times we suppress warnings
     // here but not in the frontend.
     (void)parseSanitizerRecoverArgValues(A, OI.SelectedSanitizers, Diags,
                                          /*emitWarnings=*/false);
@@ -1980,7 +1981,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
-        if (Ty == file_types::TY_ObjCHeader) {
+        if (Ty == file_types::TY_ClangHeader) {
           auto *HeaderInput = C.createAction<InputAction>(*A, Ty);
           StringRef PersistentPCHDir;
           if (const Arg *A = Args.getLastArg(options::OPT_pch_output_dir)) {
@@ -2063,7 +2064,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_LLVM_IR:
       case file_types::TY_LLVM_BC:
       case file_types::TY_SerializedDiagnostics:
-      case file_types::TY_ObjCHeader:
+      case file_types::TY_ClangHeader:
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:
       case file_types::TY_ExternalSwiftDeps:
@@ -3477,12 +3478,12 @@ void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
                                               StringRef workingDirectory,
                                               CommandOutput *Output) const {
 
-  if (hasExistingAdditionalOutput(*Output, file_types::TY_ObjCHeader))
+  if (hasExistingAdditionalOutput(*Output, file_types::TY_ClangHeader))
     return;
 
   StringRef ObjCHeaderPath;
   if (OutputMap) {
-    auto iter = OutputMap->find(file_types::TY_ObjCHeader);
+    auto iter = OutputMap->find(file_types::TY_ClangHeader);
     if (iter != OutputMap->end())
       ObjCHeaderPath = iter->second;
   }
@@ -3492,13 +3493,13 @@ void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
       ObjCHeaderPath = A->getValue();
 
   if (!ObjCHeaderPath.empty()) {
-    Output->setAdditionalOutputForType(file_types::TY_ObjCHeader,
+    Output->setAdditionalOutputForType(file_types::TY_ClangHeader,
                                        ObjCHeaderPath);
   } else {
     // Put the header next to the primary output file.
     // FIXME: That's not correct if the user /just/ passed -emit-header
     // and not -emit-module.
-    addAuxiliaryOutput(C, *Output, file_types::TY_ObjCHeader,
+    addAuxiliaryOutput(C, *Output, file_types::TY_ClangHeader,
                        /*output file map*/ nullptr, workingDirectory);
   }
 }

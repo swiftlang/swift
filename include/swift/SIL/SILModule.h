@@ -163,9 +163,11 @@ public:
       llvm::ilist<SILDifferentiabilityWitness>;
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
+  using BasicBlockNameMapType =
+      llvm::DenseMap<const SILBasicBlock *, std::string>;
 
   enum class LinkingMode : uint8_t {
-    /// Link functions with non-public linkage. Used by the mandatory pipeline.
+    /// Link functions with shared linkage. Used by the mandatory pipeline.
     LinkNormal,
 
     /// Link all functions. Used by the performance pipeine.
@@ -305,6 +307,12 @@ private:
   /// The stage of processing this module is at.
   SILStage Stage;
 
+  /// True if SIL conventions force address-only to be passed by address.
+  ///
+  /// Used for bootstrapping the AddressLowering pass. This should eventually
+  /// be inferred from the SIL stage to be true only when Stage == Lowered.
+  bool loweredAddresses;
+
   /// The set of deserialization notification handlers.
   DeserializationNotificationHandlerSet deserializationNotificationHandlers;
 
@@ -323,28 +331,35 @@ private:
   /// projections, shared between all functions in the module.
   std::unique_ptr<IndexTrieNode> indexTrieRoot;
 
-  /// A mapping from opened archetypes to the instructions which define them.
+  /// A mapping from root opened archetypes to the instructions which define
+  /// them.
   ///
   /// The value is either a SingleValueInstrution or a PlaceholderValue, in case
-  /// an opened-archetype definition is lookedup during parsing or deserializing
-  /// SIL, where opened archetypes can be forward referenced.
+  /// an opened archetype definition is looked up during parsing or
+  /// deserializing SIL, where opened archetypes can be forward referenced.
   ///
   /// In theory we wouldn't need to have the SILFunction in the key, because
-  /// opened archetypes _should_ be unique across the module. But currently
+  /// opened archetypes \em should be unique across the module. But currently
   /// in some rare cases SILGen re-uses the same opened archetype for multiple
   /// functions.
-  using OpenedArchetypeKey = std::pair<ArchetypeType*, SILFunction*>;
-  llvm::DenseMap<OpenedArchetypeKey, SILValue> openedArchetypeDefs;
+  using OpenedArchetypeKey = std::pair<OpenedArchetypeType *, SILFunction *>;
+  llvm::DenseMap<OpenedArchetypeKey, SILValue> RootOpenedArchetypeDefs;
 
-  /// The number of PlaceholderValues in openedArchetypeDefs.
+  /// The number of PlaceholderValues in RootOpenedArchetypeDefs.
   int numUnresolvedOpenedArchetypes = 0;
 
   /// The options passed into this SILModule.
   const SILOptions &Options;
 
+  /// The number of functions created in this module, which will be the index of
+  /// the next function.
+  unsigned nextFunctionIndex = 0;
+
   /// Set if the SILModule was serialized already. It is used
   /// to ensure that the module is serialized only once.
   bool serialized;
+
+  bool parsedAsSerializedSIL;
 
   /// Set if we have registered a deserialization notification handler for
   /// lowering ownership in non transparent functions.
@@ -359,6 +374,10 @@ private:
 
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
+
+#ifndef NDEBUG
+  BasicBlockNameMapType basicBlockNames;
+#endif
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options);
@@ -408,24 +427,25 @@ public:
     regDeserializationNotificationHandlerForAllFuncOME = true;
   }
 
-  /// Returns the instruction which defines an opened archetype, e.g. an
-  /// open_existential_addr.
+  /// Returns the instruction which defines the given root opened archetype,
+  /// e.g. an open_existential_addr.
   ///
   /// In case the opened archetype is not defined yet (e.g. during parsing or
   /// deserilization), a PlaceholderValue is returned. This should not be the
   /// case outside of parsing or deserialization.
-  SILValue getOpenedArchetypeDef(CanArchetypeType archetype,
-                                 SILFunction *inFunction);
+  SILValue getRootOpenedArchetypeDef(CanOpenedArchetypeType archetype,
+                                     SILFunction *inFunction);
 
-  /// Returns the instruction which defines an opened archetype, e.g. an
-  /// open_existential_addr.
+  /// Returns the instruction which defines the given root opened archetype,
+  /// e.g. an open_existential_addr.
   ///
   /// In contrast to getOpenedArchetypeDef, it is required that all opened
   /// archetypes are resolved.
-  SingleValueInstruction *getOpenedArchetypeInst(CanArchetypeType archetype,
-                                                 SILFunction *inFunction) {
-    return cast<SingleValueInstruction>(getOpenedArchetypeDef(archetype,
-                                                              inFunction));
+  SingleValueInstruction *
+  getRootOpenedArchetypeDefInst(CanOpenedArchetypeType archetype,
+                                SILFunction *inFunction) {
+    return cast<SingleValueInstruction>(
+        getRootOpenedArchetypeDef(archetype, inFunction));
   }
 
   /// Returns true if there are unresolved opened archetypes in the module.
@@ -439,6 +459,12 @@ public:
   /// Called after an instruction is moved from one function to another.
   void notifyMovedInstruction(SILInstruction *inst, SILFunction *fromFunction);
 
+  unsigned getNewFunctionIndex() { return nextFunctionIndex++; }
+
+  // This may be larger that the number of live functions in the 'functions'
+  // linked list because it includes the indices of zombie functions.
+  unsigned getNumFunctionIndices() const { return nextFunctionIndex; }
+
   /// Set a serialization action.
   void setSerializeSILAction(ActionCallback SerializeSILAction);
   ActionCallback getSerializeSILAction() const;
@@ -446,6 +472,29 @@ public:
   /// Set a flag indicating that this module is serialized already.
   void setSerialized() { serialized = true; }
   bool isSerialized() const { return serialized; }
+
+  void setParsedAsSerializedSIL() {
+    serialized = true;
+    parsedAsSerializedSIL = true;
+  }
+  bool isParsedAsSerializedSIL() const { return parsedAsSerializedSIL; }
+
+  void setBasicBlockName(const SILBasicBlock *block, StringRef name) {
+#ifndef NDEBUG
+    basicBlockNames[block] = name.str();
+#endif
+  }
+  Optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
+#ifndef NDEBUG
+    auto Known = basicBlockNames.find(block);
+    if (Known == basicBlockNames.end())
+      return None;
+
+    return StringRef(Known->second);
+#else
+    return None;
+#endif
+  }
 
   /// Serialize a SIL module using the configured SerializeSILAction.
   void serialize();
@@ -663,9 +712,20 @@ public:
   /// \return null if this module has no such function
   SILFunction *lookUpFunction(SILDeclRef fnRef);
 
-  /// Attempt to deserialize the SILFunction. Returns true if deserialization
-  /// succeeded, false otherwise.
-  bool loadFunction(SILFunction *F);
+  /// Attempt to deserialize function \p F and all functions which are referenced
+  /// from \p F (according to the \p LinkMode).
+  ///
+  /// Returns true if deserialization succeeded, false otherwise.
+  bool loadFunction(SILFunction *F, LinkingMode LinkMode);
+
+  /// Attempt to deserialize a function with \p name and all functions which are
+  /// referenced from that function (according to the \p LinkMode).
+  ///
+  /// If \p linkage is provided, the deserialized function is required to have
+  /// that linkage. Returns null, if this is not the case.
+  SILFunction *loadFunction(StringRef name,
+                            LinkingMode LinkMode,
+                            Optional<SILLinkage> linkage = None);
 
   /// Update the linkage of the SILFunction with the linkage of the serialized
   /// function.
@@ -674,19 +734,10 @@ public:
   /// AST, e.g. cross-module-optimization can change the SIL linkages.
   void updateFunctionLinkage(SILFunction *F);
 
-  /// Attempt to link the SILFunction. Returns true if linking succeeded, false
-  /// otherwise.
+  /// Attempt to deserialize function \p F and all required referenced functions.
   ///
-  /// \return false if the linking failed.
-  bool linkFunction(SILFunction *F,
-                    LinkingMode LinkMode = LinkingMode::LinkNormal);
-
-  /// Check if a given function exists in any of the modules with a
-  /// required linkage, i.e. it can be linked by linkFunction.
-  ///
-  /// \return null if this module has no such function. Otherwise
-  /// the declaration of a function.
-  SILFunction *findFunction(StringRef Name, SILLinkage Linkage);
+  /// Returns true if linking succeeded, false otherwise.
+  bool linkFunction(SILFunction *F, LinkingMode LinkMode);
 
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.
@@ -700,15 +751,15 @@ public:
   ///        table.
   /// \arg deserializeLazily If we cannot find the witness table should we
   ///                        attempt to lazily deserialize it.
-  SILWitnessTable *
-  lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily=true);
-  SILWitnessTable *
-  lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
+  SILWitnessTable *lookUpWitnessTable(const ProtocolConformance *C);
 
   /// Attempt to lookup \p Member in the witness table for \p C.
+  ///
+  /// Also, deserialize all referenced functions according to the \p linkgingMode.
   std::pair<SILFunction *, SILWitnessTable *>
   lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
-                               SILDeclRef Requirement);
+                               SILDeclRef Requirement,
+                               SILModule::LinkingMode linkingMode);
 
   /// Look up the SILDefaultWitnessTable representing the default witnesses
   /// of a resilient protocol, if any.
@@ -760,6 +811,11 @@ public:
     assert(s >= Stage && "regressing stage?!");
     Stage = s;
   }
+
+  /// True if SIL conventions force address-only to be passed by address.
+  bool useLoweredAddresses() const { return loweredAddresses; }
+
+  void setLoweredAddresses(bool val) { loweredAddresses = val; }
 
   llvm::IndexedInstrProfReader *getPGOReader() const { return PGOReader.get(); }
 
@@ -927,15 +983,13 @@ inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
     // entirely.
     return LexicalLifetimes != LexicalLifetimesOption::Off;
   case SILStage::Canonical:
+  case SILStage::Lowered:
     // In Canonical SIL, lexical markers are used to ensure that object
     // lifetimes do not get observably shortened from the end of a lexical
     // scope.  That behavior only occurs when lexical lifetimes is (fully)
     // enabled.  (When only diagnostic markers are enabled, the markers are
     // stripped as part of lowering from raw to canonical SIL.)
     return LexicalLifetimes == LexicalLifetimesOption::On;
-  case SILStage::Lowered:
-    // We do not support OSSA in Lowered SIL, so this is always false.
-    return false;
   }
 }
 

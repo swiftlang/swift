@@ -132,7 +132,7 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
   // to fake it.
   float f = (float)d;
   // Double-rounding can only occur if the result of rounding to float is
-  // an exact-halfway case for the the subsequent rounding to float16. We
+  // an exact-halfway case for the subsequent rounding to float16. We
   // can check for that significand bit pattern quickly (though we need
   // to be careful about values that will result in a subnormal float16,
   // as those will round in a different position):

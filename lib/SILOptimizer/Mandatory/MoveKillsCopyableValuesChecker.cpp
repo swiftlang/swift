@@ -20,11 +20,16 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 
 using namespace swift;
@@ -84,6 +89,7 @@ bool CheckerLivenessInfo::compute() {
   while (SILValue value = defUseWorklist.pop()) {
     LLVM_DEBUG(llvm::dbgs() << "New Value: " << value);
     SWIFT_DEFER { LLVM_DEBUG(llvm::dbgs() << "Finished Value: " << value); };
+
     for (Operand *use : value->getUses()) {
       auto *user = use->getUser();
       LLVM_DEBUG(llvm::dbgs() << "    User: " << *user);
@@ -190,9 +196,19 @@ namespace {
 struct MoveKillsCopyableValuesChecker {
   SILFunction *fn;
   CheckerLivenessInfo livenessInfo;
-  SmallSetVector<MoveValueInst *, 1> movesWithinLivenessBoundary;
+  DominanceInfo *dominanceToUpdate;
+  SILLoopInfo *loopInfoToUpdate;
 
-  MoveKillsCopyableValuesChecker(SILFunction *fn) : fn(fn) {}
+  MoveKillsCopyableValuesChecker(SILFunction *fn)
+      : fn(fn), livenessInfo(), dominanceToUpdate(nullptr),
+        loopInfoToUpdate(nullptr) {}
+
+  void setDominanceToUpdate(DominanceInfo *newDFI) {
+    dominanceToUpdate = newDFI;
+  }
+
+  void setLoopInfoToUpdate(SILLoopInfo *newLFI) { loopInfoToUpdate = newLFI; }
+
   bool check();
 
   void emitDiagnosticForMove(SILValue borrowedValue,
@@ -355,15 +371,19 @@ bool MoveKillsCopyableValuesChecker::check() {
   LLVM_DEBUG(llvm::dbgs() << "Visiting Function: " << fn->getName() << "\n");
   auto valuesToProcess =
       llvm::makeArrayRef(valuesToCheck.begin(), valuesToCheck.end());
+  auto &mod = fn->getModule();
 
+  // If we do not emit any diagnostics, we need to put in a break after each dbg
+  // info carrying inst for a lexical value that we find a move on. This ensures
+  // that we avoid a behavior today in SelectionDAG that causes dbg info addr to
+  // be always sunk to the end of a block.
+  //
+  // TODO: We should add llvm.dbg.addr support for fastisel and also teach
+  // CodeGen how to handle llvm.dbg.addr better.
   while (!valuesToProcess.empty()) {
     auto lexicalValue = valuesToProcess.front();
     valuesToProcess = valuesToProcess.drop_front(1);
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *lexicalValue);
-
-    // Before we do anything, see if we can find a name for our value. We do
-    // this early since we need this for all of our diagnostics below.
-    StringRef varName = getDebugVarName(lexicalValue);
 
     // Then compute liveness.
     SWIFT_DEFER { livenessInfo.clear(); };
@@ -377,7 +397,9 @@ bool MoveKillsCopyableValuesChecker::check() {
 
     // Then look at all of our found consuming uses. See if any of these are
     // _move that are within the boundary.
-    SWIFT_DEFER { movesWithinLivenessBoundary.clear(); };
+    bool foundMove = false;
+    auto dbgVarInst = DebugVarCarryingInst::getFromValue(lexicalValue);
+    StringRef varName = DebugVarCarryingInst::getName(dbgVarInst);
     for (auto *use : livenessInfo.consumingUse) {
       if (auto *mvi = dyn_cast<MoveValueInst>(use->getUser())) {
         // Only emit diagnostics if our move value allows us to.
@@ -392,17 +414,30 @@ bool MoveKillsCopyableValuesChecker::check() {
         LLVM_DEBUG(llvm::dbgs() << "Move Value: " << *mvi);
         if (livenessInfo.liveness.isWithinBoundary(mvi)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
-          movesWithinLivenessBoundary.insert(mvi);
+          emitDiagnosticForMove(lexicalValue, varName, mvi);
         } else {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: No!\n");
+          if (auto varInfo = dbgVarInst.getVarInfo()) {
+            auto *next = mvi->getNextInstruction();
+            SILBuilderWithScope builder(next);
+            // We need to make sure any undefs we put in are the same loc/debug
+            // scope as our original so that the backend treats them as
+            // referring to the same "debug entity".
+            builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
+            builder.createDebugValue(
+                dbgVarInst->getLoc(),
+                SILUndef::get(mvi->getOperand()->getType(), mod), *varInfo,
+                false /*poison*/, true /*moved*/);
+          }
         }
+        foundMove = true;
       }
     }
 
-    // Ok, we found all of our moves that violate the boundary condition, lets
-    // emit diagnostics for each of them.
-    for (auto *mvi : movesWithinLivenessBoundary) {
-      emitDiagnosticForMove(lexicalValue, varName, mvi);
+    // If we found a move, mark our debug var inst as having a moved value. This
+    // ensures we emit llvm.dbg.addr instead of llvm.dbg.declare in IRGen.
+    if (foundMove) {
+      dbgVarInst.markAsMoved();
     }
   }
 
@@ -440,8 +475,20 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
 
     MoveKillsCopyableValuesChecker checker(getFunction());
 
-    if (MoveKillsCopyableValuesChecker(getFunction()).check()) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    // If we already had dominance or loop info generated, update them when
+    // splitting blocks.
+    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+    if (dominanceAnalysis->hasFunctionInfo(fn))
+      checker.setDominanceToUpdate(dominanceAnalysis->get(fn));
+    auto *loopAnalysis = getAnalysis<SILLoopAnalysis>();
+    if (loopAnalysis->hasFunctionInfo(fn))
+      checker.setLoopInfoToUpdate(loopAnalysis->get(fn));
+
+    if (checker.check()) {
+      AnalysisPreserver preserveDominance(dominanceAnalysis);
+      AnalysisPreserver preserveLoop(loopAnalysis);
+      invalidateAnalysis(
+          SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
 
     // Now search through our function one last time and any move_value

@@ -2,7 +2,6 @@
 // REQUIRES: static_stdlib
 // REQUIRES: concurrency
 // REQUIRES: libdispatch_static
-// REQUIRES: rdar80900643
 
 // RUN: %empty-directory(%t)
 // RUN: echo 'public func asyncFunc() async { print("Hello") }' > %t/asyncModule.swift

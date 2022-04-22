@@ -766,32 +766,6 @@ bb0(%0 : @owned $Builtin.BridgeObject):
   return %3 : $(Builtin.Word, Builtin.Word)
 }
 
-// CHECK-LABEL:   sil [ossa] @cse_thin_function_to_pointer :
-// CHECK:           [[REF:%[0-9]+]] = thin_function_to_pointer
-// CHECK-NOT:       thin_function_to_pointer
-// CHECK:           tuple ([[REF]] : $Builtin.RawPointer, [[REF]] : $Builtin.RawPointer)
-// CHECK-LABEL: } // end sil function 'cse_thin_function_to_pointer'
-sil [ossa] @cse_thin_function_to_pointer : $@convention(thin) (@convention(thin) () -> ()) -> (Builtin.RawPointer, Builtin.RawPointer) {
-bb0(%0 : $@convention(thin) () -> ()):
-  %1 = thin_function_to_pointer %0 : $@convention(thin) () -> () to $Builtin.RawPointer
-  %2 = thin_function_to_pointer %0 : $@convention(thin) () -> () to $Builtin.RawPointer
-  %3 = tuple (%1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer)
-  return %3 : $(Builtin.RawPointer, Builtin.RawPointer)
-}
-
-// CHECK-LABEL:   sil [ossa] @cse_pointer_to_thin_function :
-// CHECK:           [[REF:%[0-9]+]] = pointer_to_thin_function
-// CHECK-NOT:       pointer_to_thin_function
-// CHECK:           tuple ([[REF]] : $@convention(thin) () -> (), [[REF]] : $@convention(thin) () -> ())
-// CHECK-LABEL: } // end sil function 'cse_pointer_to_thin_function'
-sil [ossa] @cse_pointer_to_thin_function : $@convention(thin) (Builtin.RawPointer) -> (@convention(thin) () -> (), @convention(thin) () -> ()) {
-bb0(%0 : $Builtin.RawPointer):
-  %1 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@convention(thin) () -> ()
-  %2 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@convention(thin) () -> ()
-  %3 = tuple(%1 : $@convention(thin) () -> (), %2 : $@convention(thin) () -> ())
-  return %3 : $(@convention(thin) () -> (), @convention(thin) () -> ())
-}
-
 sil [ossa] [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
 
 // CHECK-LABEL:   sil [ossa] @dont_cse_get_count_on_low_level_sil :
@@ -1316,4 +1290,50 @@ bb0(%0 : @owned $E):
   end_lifetime %u2 : $B
   %r = tuple ()
   return %r : $()
+}
+
+sil [ossa] @get_owned_c : $@convention(thin) () -> (@owned C)
+sil [ossa] @get_owned_s : $@convention(thin) () -> (@owned S)
+sil [ossa] @take_guaranteed_c : $@convention(thin) (@guaranteed C) -> ()
+
+struct S {
+    var c : C
+}
+
+// The RAUW utility doesn't properly handle reborrows yet.  Until it does, don't
+// replace in the face of non-dominated reborrows.
+//
+// CHECK-LABEL: sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow : {{.*}} {
+// CHECK:         struct_extract
+// CHECK:         struct_extract
+// CHECK:         struct_extract
+// CHECK-LABEL: } // end sil function 'dont_rauw_guaranteed_with_nondominated_reborrow'
+sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow : $@convention(thin) (@owned S) -> (@owned C) {
+entry(%instance : @owned $S):
+    cond_br undef, left, right
+
+left:
+    %guaranteed_s_left = begin_borrow %instance : $S
+    %new = struct_extract %guaranteed_s_left : $S, #S.c
+    %old = struct_extract %guaranteed_s_left : $S, #S.c
+    %take_guaranteed_c = function_ref @take_guaranteed_c : $@convention(thin) (@guaranteed C) -> ()
+    apply %take_guaranteed_c(%new) : $@convention(thin) (@guaranteed C) -> ()
+    %borrow = begin_borrow %old : $C
+    br exit(%borrow : $C, %guaranteed_s_left : $S, %instance : $S)
+
+right:
+    destroy_value %instance : $S
+    %get_owned_s = function_ref @get_owned_s : $@convention(thin) () -> (@owned S)
+    %owned_s = apply %get_owned_s() : $@convention(thin) () -> (@owned S)
+    %guaranteed_s = begin_borrow %owned_s : $S
+    %projection = struct_extract %guaranteed_s : $S, #S.c
+    %borrow_right = begin_borrow %projection : $C
+    br exit(%borrow_right : $C, %guaranteed_s : $S, %owned_s : $S)
+    
+exit(%borrow_2 : @guaranteed $C, %guaranteed_s_2 : @guaranteed $S, %owned_s_2 : @owned $S):
+    %copy = copy_value %borrow_2 : $C
+    end_borrow %borrow_2 : $C
+    end_borrow %guaranteed_s_2 : $S
+    destroy_value %owned_s_2 : $S
+    return %copy : $C
 }

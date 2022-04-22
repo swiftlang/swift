@@ -817,7 +817,7 @@ public:
   }
 
   /// Returns the number of resolved argument types for an applied disjunction
-  /// constriant. This is always zero for disjunctions that do not represent
+  /// constraint. This is always zero for disjunctions that do not represent
   /// an applied overload.
   unsigned countResolvedArgumentTypes(ConstraintSystem &cs) const;
 

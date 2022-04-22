@@ -28,9 +28,10 @@ class Klass {}
 
 // CHECK-SIL-LABEL: sil hidden @$s8moveonly7useMoveyAA5KlassCADnF : $@convention(thin) (@owned Klass) -> @owned Klass {
 // CHECK-SIL: bb0([[ARG:%.*]] :
-// CHECK-SIL-NEXT: debug_value
+// CHECK-SIL-NEXT: debug_value [moved]
 // CHECK-SIL-NEXT: strong_retain
 // CHECK-SIL-NEXT: move_value
+// CHECK-SIL-NEXT: debug_value [moved] undef
 // CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: strong_release
@@ -61,9 +62,10 @@ func useMove(_ k: __owned Klass) -> Klass {
 
 // CHECK-SIL-LABEL: sil hidden @$s8moveonly7useMoveyxxnRlzClF : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned T {
 // CHECK-SIL: bb0([[ARG:%.*]] :
-// CHECK-SIL-NEXT: debug_value
+// CHECK-SIL-NEXT: debug_value [moved]
 // CHECK-SIL-NEXT: strong_retain
 // CHECK-SIL-NEXT: move_value
+// CHECK-SIL-NEXT: debug_value [moved] undef
 // CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: strong_release

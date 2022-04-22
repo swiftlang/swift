@@ -261,6 +261,9 @@ internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
+#if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
+  _precondition(condition(), message, file: file, line: line)
+#else
   // Only check in debug mode.
   if _slowPath(_isDebugAssertConfiguration()) {
     if !_fastPath(condition()) {
@@ -268,6 +271,7 @@ internal func _debugPrecondition(
         flags: _fatalErrorFlags())
     }
   }
+#endif
 }
 
 @usableFromInline @_transparent
@@ -275,10 +279,14 @@ internal func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
+#if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
+  _preconditionFailure(message, file: file, line: line)
+#else
   if _slowPath(_isDebugAssertConfiguration()) {
     _precondition(false, message, file: file, line: line)
   }
   _conditionallyUnreachable()
+#endif
 }
 
 /// Internal checks.

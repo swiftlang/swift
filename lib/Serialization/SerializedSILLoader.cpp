@@ -48,7 +48,8 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
   // another has the full definition.
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Callee, onlyUpdateLinkage)) {
+    if (auto Func = Des->lookupSILFunction(Callee,
+                                      /*declarationOnly*/ onlyUpdateLinkage)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
                  << Des->getModuleIdentifier().str() << "\n");
       if (!Func->empty())
@@ -60,13 +61,9 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
 }
 
 SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
-                                                    bool declarationOnly,
                                                     Optional<SILLinkage> Linkage) {
-  // It is possible that one module has a declaration of a SILFunction, while
-  // another has the full definition.
-  SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Name, declarationOnly)) {
+    if (auto *Func = Des->lookupSILFunction(Name, /*declarationOnly*/ true)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
                  << Des->getModuleIdentifier().str() << "\n");
       if (Linkage) {
@@ -81,12 +78,10 @@ SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
           continue;
         }
       }
-      if (!Func->empty() || declarationOnly)
-        return Func;
-      retVal = Func;
+      return Func;
     }
   }
-  return retVal;
+  return nullptr;
 }
 
 bool SerializedSILLoader::hasSILFunction(StringRef Name,

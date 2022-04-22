@@ -42,5 +42,9 @@ TAG(GenericWitnessTableCache, 16)
 TAG(GenericClassMetadata, 17)
 TAG(GenericValueMetadata, 18)
 TAG(SingletonGenericWitnessTableCache, 19)
+TAG(GlobalMetadataCache, 20)
+TAG(GlobalWitnessTableCache, 21)
+TAG(ExtendedExistentialTypes, 22)
+TAG(ExtendedExistentialTypeShapes, 23)
 
 #undef TAG

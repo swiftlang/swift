@@ -53,6 +53,15 @@ public:
     return true;
   }
 
+  bool VisitCXXConstructorDecl(clang::CXXConstructorDecl *CXXCD) {
+    callback(CXXCD);
+    for (clang::CXXCtorInitializer *CXXCI : CXXCD->inits()) {
+      if (clang::FieldDecl *FD = CXXCI->getMember())
+        callback(FD);
+    }
+    return true;
+  }
+
   bool VisitCXXConstructExpr(clang::CXXConstructExpr *CXXCE) {
     callback(CXXCE->getConstructor());
     return true;
@@ -77,15 +86,15 @@ public:
 // the initializer of the variable.
 clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
   if (auto fd = dyn_cast<clang::FunctionDecl>(decl)) {
-    // If this is a potentially not-yet-instanciated template, we might
-    // still have a body.
-    if (fd->getTemplateInstantiationPattern())
-      return fd;
-
     const clang::FunctionDecl *definition;
     if (fd->hasBody(definition)) {
       return const_cast<clang::FunctionDecl *>(definition);
     }
+
+    // If this is a potentially not-yet-instantiated template, we might
+    // still have a body.
+    if (fd->getTemplateInstantiationPattern())
+      return fd;
   } else if (auto vd = dyn_cast<clang::VarDecl>(decl)) {
     clang::VarDecl *initializingDecl = vd->getInitializingDeclaration();
     if (initializingDecl) {

@@ -100,7 +100,7 @@ static bool isRecursiveCall(FullApplySite applySite) {
 
   if (auto *WMI = dyn_cast<WitnessMethodInst>(callee)) {
     auto funcAndTable = parentFunc->getModule().lookUpFunctionInWitnessTable(
-        WMI->getConformance(), WMI->getMember());
+        WMI->getConformance(), WMI->getMember(), SILModule::LinkingMode::LinkNormal);
     return funcAndTable.first == parentFunc;
   }
   return false;
@@ -225,8 +225,7 @@ public:
     case TermKind::CondBranchInst:
     case TermKind::SwitchValueInst:
     case TermKind::SwitchEnumInst:
-    case TermKind::CheckedCastBranchInst:
-    case TermKind::CheckedCastValueBranchInst: {
+    case TermKind::CheckedCastBranchInst: {
       SmallPtrSet<SILInstruction *, 16> visited;
       return isInvariantValue(term->getOperand(0), visited);
     }

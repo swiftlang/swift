@@ -70,7 +70,7 @@ protected:
   /// Whether the mangling predates concurrency, and therefore shouldn't
   /// include concurrency features such as global actors or @Sendable
   /// function types.
-  bool PredatesConcurrency = false;
+  bool Preconcurrency = false;
 
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
@@ -105,7 +105,9 @@ public:
     ObjCAsSwiftThunk,
     DistributedThunk,
     DistributedAccessor,
-    AccessibleFunctionRecord
+    AccessibleFunctionRecord,
+    BackDeploymentThunk,
+    BackDeploymentFallback,
   };
 
   ASTMangler(bool DWARFMangling = false)
@@ -183,6 +185,8 @@ public:
                                              Type SelfType,
                                              Type GlobalActorBound,
                                              ModuleDecl *Module);
+
+  std::string mangleDistributedThunk(const FuncDecl *thunk);
 
   /// Mangle a completion handler block implementation function, used for importing ObjC
   /// APIs as async.

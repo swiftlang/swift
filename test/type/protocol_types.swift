@@ -3,7 +3,7 @@
 protocol HasSelfRequirements {
   func foo(_ x: Self)
 
-  func returnsOwnProtocol() -> HasSelfRequirements // expected-warning {{protocol 'HasSelfRequirements' as a type must be explicitly marked as 'any'}}
+  func returnsOwnProtocol() -> HasSelfRequirements // expected-error {{use of protocol 'HasSelfRequirements' as a type must be written 'any HasSelfRequirements'}}
 }
 protocol Bar {
   // init() methods should not prevent use as an existential.
@@ -74,7 +74,7 @@ do {
 
   func checkIt(_ js: Any) throws {
     switch js {
-    case let dbl as HasAssoc: // expected-warning {{protocol 'HasAssoc' as a type must be explicitly marked as 'any'}}
+    case let dbl as HasAssoc: // expected-error {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
       throw MyError.bad(dbl)
 
     default:
@@ -83,7 +83,7 @@ do {
   }
 }
 
-func testHasAssoc(_ x: Any, _: HasAssoc) { // expected-warning {{protocol 'HasAssoc' as a type must be explicitly marked as 'any'}}
+func testHasAssoc(_ x: Any, _: HasAssoc) { // expected-error {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   if let p = x as? any HasAssoc {
     p.foo() // don't crash here.
   }
@@ -92,12 +92,12 @@ func testHasAssoc(_ x: Any, _: HasAssoc) { // expected-warning {{protocol 'HasAs
     typealias Assoc = Int
     func foo() {}
 
-    func method() -> HasAssoc {} // expected-warning {{protocol 'HasAssoc' as a type must be explicitly marked as 'any'}}
+    func method() -> HasAssoc {} // expected-error {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   }
 }
 
 // SR-38
-var b: HasAssoc // expected-warning {{protocol 'HasAssoc' as a type must be explicitly marked as 'any'}}
+var b: HasAssoc // expected-error {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
 
 // Further generic constraint error testing - typealias used inside statements
 protocol P {}
@@ -118,20 +118,20 @@ typealias X = Struct1<Pub & Bar>
 _ = Struct1<Pub & Bar>.self
 
 typealias AliasWhere<T> = T
-where T : HasAssoc, T.Assoc == HasAssoc // expected-warning {{protocol 'HasAssoc' as a type must be explicitly marked as 'any'}}
+where T : HasAssoc, T.Assoc == HasAssoc // expected-error {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
 
 struct StructWhere<T>
 where T : HasAssoc,
       T.Assoc == any HasAssoc {}
 
-protocol ProtocolWhere where T == HasAssoc { // expected-warning {{protocol 'HasAssoc' as a type must be explicitly marked as 'any'}}
+protocol ProtocolWhere where T == HasAssoc { // expected-error {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   associatedtype T
 
   associatedtype U : HasAssoc
     where U.Assoc == any HasAssoc
 }
 
-extension HasAssoc where Assoc == HasAssoc {} // expected-warning {{protocol 'HasAssoc' as a type must be explicitly marked as 'any'}}
+extension HasAssoc where Assoc == HasAssoc {} // expected-error {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
 
 func FunctionWhere<T>(_: T)
 where T : HasAssoc,

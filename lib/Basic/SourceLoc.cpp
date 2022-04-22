@@ -220,6 +220,23 @@ unsigned SourceManager::getByteDistance(SourceLoc Start, SourceLoc End) const {
   return End.Value.getPointer() - Start.Value.getPointer();
 }
 
+unsigned SourceManager::getColumnInBuffer(SourceLoc Loc,
+                                          unsigned BufferID) const {
+  assert(Loc.isValid());
+
+  const StringRef Buffer = getEntireTextForBuffer(BufferID);
+  const char *Ptr = static_cast<const char *>(Loc.getOpaquePointerValue());
+
+  StringRef UpToLoc = Buffer.slice(0, Ptr - Buffer.data());
+
+  size_t ColumnNo = UpToLoc.size();
+  size_t NewlinePos = UpToLoc.find_last_of("\r\n");
+  if (NewlinePos != StringRef::npos)
+    ColumnNo -= NewlinePos;
+
+  return static_cast<unsigned>(ColumnNo);
+}
+
 StringRef SourceManager::getEntireTextForBuffer(unsigned BufferID) const {
   return LLVMSourceMgr.getMemoryBuffer(BufferID)->getBuffer();
 }

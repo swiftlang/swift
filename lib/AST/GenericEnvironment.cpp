@@ -242,7 +242,11 @@ Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
   auto archetype = cast<ArchetypeType>(type);
   if (isa<OpaqueTypeArchetypeType>(archetype->getRoot()))
     return Type();
-  
+
+  // Leave opened archetypes alone; they're handled contextually.
+  if (isa<OpenedArchetypeType>(archetype))
+    return Type(type);
+
   return archetype->getInterfaceType();
 }
 
@@ -290,8 +294,11 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     switch (getKind()) {
     case Kind::Normal:
     case Kind::OpenedExistential:
-      return mapTypeIntoContext(type, conformanceLookupFn);
-
+      if (type->hasTypeParameter()) {
+        return mapTypeIntoContext(type, conformanceLookupFn);
+      } else {
+        return type;
+      }
     case Kind::Opaque:
       return maybeApplyOpaqueTypeSubstitutions(type);
     }
@@ -349,16 +356,27 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
 
     case Kind::OpenedExistential: {
       // FIXME: The existential layout's protocols might differ from the
-      // canonicalized set of protocols determined by the generic signature,
-      // so use the existential layout's version. We should align these at
+      // canonicalized set of protocols determined by the generic signature.
+      // Before NestedArchetypeType was removed, we used the former when
+      // building a root OpenedArchetypeType, and the latter when building
+      // nested archetypes.
+      // For compatibility, continue using the existential layout's version when
+      // the interface type is a generic parameter. We should align these at
       // some point.
-      auto layout = getOpenedExistentialType()->getExistentialLayout();
-      SmallVector<ProtocolDecl *, 4> protos;
-      for (auto protoType : layout.getProtocols())
-        protos.push_back(protoType->getDecl());
-      result = OpenedArchetypeType::getNew(this, requirements.anchor,
-                                           protos, superclass,
-                                           requirements.layout);
+      if (depType->is<GenericTypeParamType>()) {
+        auto layout = getOpenedExistentialType()->getExistentialLayout();
+        SmallVector<ProtocolDecl *, 2> protos;
+        for (auto proto : layout.getProtocols())
+          protos.push_back(proto);
+
+        result = OpenedArchetypeType::getNew(this, requirements.anchor, protos,
+                                             superclass, requirements.layout);
+      } else {
+        result = OpenedArchetypeType::getNew(this, requirements.anchor,
+                                             requirements.protos, superclass,
+                                             requirements.layout);
+      }
+
       break;
     }
 

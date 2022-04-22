@@ -234,28 +234,6 @@ public struct ParsingError : Error {
 //                            Bridging Utilities
 //===----------------------------------------------------------------------===//
 
-extension BridgedStringRef {
-  public var string: String {
-    let buffer = UnsafeBufferPointer<UInt8>(start: data, count: Int(length))
-    return String(decoding: buffer, as: UTF8.self)
-  }
-
-  func takeString() -> String {
-    let str = string
-    freeBridgedStringRef(self)
-    return str
-  }
-}
-
-extension String {
-  public func withBridgedStringRef<T>(_ c: (BridgedStringRef) -> T) -> T {
-    var str = self
-    return str.withUTF8 { buffer in
-      return c(BridgedStringRef(data: buffer.baseAddress, length: buffer.count))
-    }
-  }
-}
-
 extension Array where Element == Value {
   public func withBridgedValues<T>(_ c: (BridgedValueArray) -> T) -> T {
     return self.withUnsafeBytes { valPtr in
@@ -265,33 +243,3 @@ extension Array where Element == Value {
   }
 }
 
-public typealias SwiftObject = UnsafeMutablePointer<BridgedSwiftObject>
-
-extension UnsafeMutablePointer where Pointee == BridgedSwiftObject {
-  init<T: AnyObject>(_ object: T) {
-    let ptr = Unmanaged.passUnretained(object).toOpaque()
-    self = ptr.bindMemory(to: BridgedSwiftObject.self, capacity: 1)
-  }
-
-  func getAs<T: AnyObject>(_ objectType: T.Type) -> T {
-    return Unmanaged<T>.fromOpaque(self).takeUnretainedValue()
-  }
-}
-
-extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
-  func getAs<T: AnyObject>(_ objectType: T.Type) -> T? {
-    if let pointer = self {
-      return Unmanaged<T>.fromOpaque(pointer).takeUnretainedValue()
-    }
-    return nil
-  }
-}
-
-extension BridgedArrayRef {
-  func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
-    return data.withMemoryRebound(to: ty, capacity: numElements) { (ptr: UnsafePointer<T>) -> R in
-      let buffer = UnsafeBufferPointer(start: ptr, count: numElements)
-      return c(buffer)
-    }
-  }
-}

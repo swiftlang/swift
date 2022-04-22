@@ -15,7 +15,8 @@
 
 #include "CodeCompletion.h"
 #include "SourceKit/Core/LangSupport.h"
-#include "swift/IDE/CodeCompletion.h"
+//#include "swift/IDE/CodeCompletionContext.h"
+#include "swift/IDE/SwiftCompletionInfo.h"
 #include "llvm/ADT/StringMap.h"
 
 namespace swift {

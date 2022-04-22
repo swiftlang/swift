@@ -1,4 +1,6 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=NonMemberInline -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=NonMemberInline -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+
+// XFAIL: *
 
 // CHECK:      func + (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func - (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper

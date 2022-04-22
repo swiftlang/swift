@@ -119,9 +119,7 @@ namespace irgen {
   AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,
                                            CanSILFunctionType originalType,
                                            CanSILFunctionType substitutedType,
-                                           SubstitutionMap substitutionMap,
-                                           bool useSpecialConvention,
-                                           FunctionPointer::Kind kind);
+                                           SubstitutionMap substitutionMap);
 
   /// Given an async function, get the pointer to the function to be called and
   /// the size of the context to be allocated.
@@ -135,8 +133,7 @@ namespace irgen {
   std::pair<llvm::Value *, llvm::Value *> getAsyncFunctionAndSize(
       IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
       FunctionPointer functionPointer, llvm::Value *thickContext,
-      std::pair<bool, bool> values = {true, true},
-      Size initialContextSize = Size(0));
+      std::pair<bool, bool> values = {true, true});
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
                                      SILFunctionTypeRepresentation convention,
                                      bool isAsync);

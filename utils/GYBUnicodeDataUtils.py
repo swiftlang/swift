@@ -355,9 +355,6 @@ class UnicodeTrieGenerator(object):
                 else:
                     return idx
 
-            # NOTE: Python 2's `map` function returns a list. Where Python 3's
-            # `map` function returns an iterator. To work around this the
-            # result of the `map` is explicitly converted to a `list`.
             return list(map(map_index, indexes))
 
         # If self.bmp_data contains identical data blocks, keep the first one,

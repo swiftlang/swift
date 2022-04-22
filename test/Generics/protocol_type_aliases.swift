@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
-// RUN: %FileCheck %s < %t.dump
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify > %t.dump 2>&1
 
 
 func sameType<T>(_: T.Type, _: T.Type) {}
@@ -54,6 +53,9 @@ protocol Q3_1: P3, P3_1 {} // expected-error{{generic signature requires types '
 
 // Subprotocols can force associated types in their parents to be concrete, and
 // this should be understood for types constrained by the subprotocols.
+
+// CHECK-LABEL: .Q4@
+// CHECK: Requirement signature: <Self where Self : P, Self.[P]A == Int>
 protocol Q4: P {
     typealias A = Int // expected-warning{{typealias overriding associated type 'A' from protocol 'P'}}
 }
@@ -70,22 +72,21 @@ func getP_X<T: P>(_: T.Type) -> T.X.Type { return T.X.self }
 func checkQ4_A<T: Q4>(x: T.Type) { sameType(getP_A(x), Int.self) }
 func checkQ4_X<T: Q4>(x: T.Type) { sameType(getP_X(x), Int.self) }
 
-// FIXME: these do not work, seemingly mainly due to the 'recursive decl validation'
-// FIXME in GenericSignatureBuilder.cpp.
-/*
 func checkQ5_A<T: Q5>(x: T.Type) { sameType(getP_A(x), Int.self) }
 func checkQ5_X<T: Q5>(x: T.Type) { sameType(getP_X(x), Int.self) }
-*/
 
 
-// Typealiases happen to allow imposing same type requirements between parent
-// protocols
+
+// Typealiases allow imposing same type requirements between parent protocols
 protocol P6_1 {
     associatedtype A // expected-note{{'A' declared here}}
 }
 protocol P6_2 {
     associatedtype B
 }
+
+// CHECK-LABEL: .Q6@
+// CHECK-NEXT: Requirement signature: <Self where Self : P6_1, Self : P6_2, Self.[P6_1]A == Self.[P6_2]B>
 protocol Q6: P6_1, P6_2 {
     typealias A = B // expected-warning{{typealias overriding associated type}}
 }
@@ -101,7 +102,10 @@ protocol P7 {
   typealias A = Int
 }
 
+// CHECK-LABEL: .P7a@
+// CHECK: Requirement signature: <Self where Self : P7, Self.[P7a]A == Int>
 protocol P7a : P7 {
   associatedtype A   // expected-warning{{associated type 'A' is redundant with type 'A' declared in inherited protocol 'P7'}}
 }
 
+func testP7A<T : P7a>(_: T, a: T.A) -> Int { return a }

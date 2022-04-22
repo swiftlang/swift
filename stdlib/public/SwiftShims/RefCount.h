@@ -37,6 +37,7 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Heap.h"
 
 
 /*
@@ -625,8 +626,9 @@ class RefCountBitsT {
 
 typedef RefCountBitsT<RefCountIsInline> InlineRefCountBits;
 
-class alignas(sizeof(void*) * 2) SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
-{
+class alignas(2 * sizeof(void*)) SideTableRefCountBits
+    : public swift::aligned_alloc<2 * sizeof(void *)>,
+      public RefCountBitsT<RefCountNotInline> {
   uint32_t weakBits;
 
   public:
@@ -768,7 +770,7 @@ class RefCounts {
       return;
     }
     // Immortal and no objc complications share a bit, so don't let setting
-    // the complications one clear the immmortal one
+    // the complications one clear the immortal one
     if (oldbits.isImmortal(true) || oldbits.pureSwiftDeallocation() == nonobjc){
       assert(!oldbits.hasSideTable());
       return;
@@ -1319,7 +1321,12 @@ class HeapObjectSideTableEntry {
 
   public:
   HeapObjectSideTableEntry(HeapObject *newObject)
-    : object(newObject), refCounts()
+    : object(newObject), 
+#if __arm__ || __powerpc__ // https://bugs.swift.org/browse/SR-5846
+   refCounts(SideTableRefCounts::Initialized)
+#else
+   refCounts()
+#endif
   { }
 
 #pragma clang diagnostic push

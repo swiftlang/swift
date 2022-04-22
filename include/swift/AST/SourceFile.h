@@ -84,9 +84,9 @@ private:
   /// This is \c None until it is filled in by the import resolution phase.
   Optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
 
-  /// Which imports have made use of @_predatesConcurrency.
+  /// Which imports have made use of @preconcurrency.
   llvm::SmallDenseSet<AttributedImport<ImportedModule>>
-      PredatesConcurrencyImportsUsed;
+      PreconcurrencyImportsUsed;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -243,8 +243,8 @@ public:
   std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
   /// A selector that is used by two different declarations in the same class.
-  /// Fields: classDecl, selector, isInstanceMethod.
-  using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
+  /// Fields: typeDecl, selector, isInstanceMethod.
+  using ObjCMethodConflict = std::tuple<NominalTypeDecl *, ObjCSelector, bool>;
 
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
@@ -301,12 +301,12 @@ public:
   /// resolution.
   void setImports(ArrayRef<AttributedImport<ImportedModule>> imports);
 
-  /// Whether the given import has used @_predatesConcurrency.
-  bool hasImportUsedPredatesConcurrency(
+  /// Whether the given import has used @preconcurrency.
+  bool hasImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import) const;
 
-  /// Note that the given import has used @_predatesConcurrency/
-  void setImportUsedPredatesConcurrency(
+  /// Note that the given import has used @preconcurrency/
+  void setImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import);
 
   enum ImportQueryKind {
@@ -335,7 +335,7 @@ public:
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
-  // Is \p targetDecl accessible as an explictly imported SPI from this file?
+  // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
 
   bool shouldCrossImport() const;
@@ -581,6 +581,9 @@ public:
   }
 
   ArrayRef<OpaqueTypeDecl *> getOpaqueReturnTypeDecls();
+
+  /// Returns true if the source file contains concurrency in the top-level
+  bool isAsyncTopLevelSourceFile() const;
 
 private:
 

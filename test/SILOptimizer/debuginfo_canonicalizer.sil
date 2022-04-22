@@ -1,0 +1,138 @@
+// RUN: %target-sil-opt -sil-onone-debuginfo-canonicalizer -enable-sil-verify-all %s 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+struct Int64 {
+  var value: Builtin.Int64
+}
+
+class Klass {
+  var value: Int64
+}
+
+// Since we only take the last debug_value associated with a SILDebugVariable,
+// we only should see someVar for debug_value %2.
+//
+// CHECK-LABEL: sil @yieldOnceCoroutine : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64 {
+// CHECK: bb0([[ARG:%.*]] : $Klass):
+// CHECK-NEXT: debug_value [moved] [[ARG]] : $Klass, let, name "someVar"
+// CHECK-NEXT: [[ADDR:%.*]] = ref_element_addr [[ARG]] : $Klass
+// CHECK-NEXT: yield [[ADDR]] : $*Int64, resume bb1, unwind bb2
+//
+// CHECK: bb1:
+// CHECK-NEXT: debug_value [moved] [[ARG]] : $Klass, let, name "someVar"
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+//
+// CHECK: bb2:
+// CHECK-NEXT: debug_value [moved] [[ARG]] : $Klass, let, name "someVar"
+// CHECK-NEXT: unwind
+// CHECK: } // end sil function 'yieldOnceCoroutine'
+sil @yieldOnceCoroutine : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64 {
+bb0(%0 : $Klass):
+  debug_value [moved] %0 : $Klass, let, name "someVar"
+  %1 = ref_element_addr %0 : $Klass, #Klass.value
+  yield %1 : $*Int64, resume bb1, unwind bb2
+
+bb1:
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2:
+  unwind
+}
+
+// CHECK-LABEL: sil @testSimple : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   debug_value [moved] [[ARG]]
+// CHECK:   begin_apply
+// CHECK-NEXT:   debug_value [moved] [[ARG]]
+// CHECK:   end_apply
+// CHECK-NEXT:   debug_value [moved] [[ARG]]
+// CHECK: } // end sil function 'testSimple'
+sil @testSimple : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  debug_value [moved] %0 : $Klass, let, name "arg"
+  %f = function_ref @yieldOnceCoroutine : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
+  (%3, %4) = begin_apply %f(%0) : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
+  %9999 = tuple()
+  end_apply %4
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @testDiamond : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   debug_value [moved] [[ARG]]
+// CHECK:   begin_apply
+// CHECK-NEXT: debug_value [moved] [[ARG]]
+// CHECK-NEXT:   cond_br undef, [[BB_LHS:bb[0-9]+]], [[BB_RHS:bb[0-9]+]]
+//
+// CHECK: [[BB_LHS]]:
+// CHECK:   end_apply
+// CHECK-NEXT:   debug_value [moved] [[ARG]]
+// CHECK-NEXT:   br [[BB_CONT:bb[0-9]+]]
+//
+// CHECK: [[BB_RHS]]:
+// CHECK:   abort_apply
+// CHECK-NEXT:   debug_value [moved] [[ARG]]
+// CHECK: } // end sil function 'testDiamond'
+sil @testDiamond : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  debug_value [moved] %0 : $Klass, let, name "arg"
+  %f = function_ref @yieldOnceCoroutine : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
+  (%3, %token) = begin_apply %f(%0) : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_apply %token
+  br bb3
+
+bb2:
+  abort_apply %token
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @testUndefDiamond : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   debug_value [moved] [[ARG]]
+// CHECK:   begin_apply
+// CHECK-NEXT: debug_value [moved] [[ARG]]
+// CHECK-NEXT:   cond_br undef, [[BB_LHS:bb[0-9]+]], [[BB_RHS:bb[0-9]+]]
+//
+// CHECK: [[BB_LHS]]:
+// CHECK:   end_apply
+// CHECK-NEXT:   debug_value [moved] [[ARG]]
+// CHECK-NEXT:   br [[BB_CONT:bb[0-9]+]]
+//
+// CHECK: [[BB_RHS]]:
+// CHECK-NEXT:   debug_value [moved] undef
+// CHECK-NEXT:   abort_apply
+// CHECK-NEXT:   debug_value [moved] undef
+// CHECK-NEXT:   br [[BB_CONT]]
+// CHECK: } // end sil function 'testUndefDiamond'
+sil @testUndefDiamond : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  debug_value [moved] %0 : $Klass, let, name "arg"
+  %f = function_ref @yieldOnceCoroutine : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
+  (%3, %token) = begin_apply %f(%0) : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_apply %token
+  br bb3
+
+bb2:
+  debug_value [moved] undef : $Klass, let, name "arg"
+  abort_apply %token
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}

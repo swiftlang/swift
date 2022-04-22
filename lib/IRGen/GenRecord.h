@@ -550,7 +550,7 @@ private:
       if (field.isEmpty()) continue;
 
       // If the field is not ABI-accessible, suppress this.
-      if (!field.isABIAccessible()) continue;
+      if (!field.isABIAccessible()) return 0;
 
       // If we've already found an index, then there isn't a
       // unique non-empty field.

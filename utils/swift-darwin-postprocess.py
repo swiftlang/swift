@@ -32,7 +32,8 @@ def main(arguments):
 # (rdar://78851265)
 def unrpathize(filename):
     dylibsOutput = subprocess.check_output(
-        ['xcrun', 'dyldinfo', '-dylibs', filename])
+        ['xcrun', 'dyldinfo', '-dylibs', filename],
+        universal_newlines=True)
 
     # Do not rewrite @rpath-relative load commands for these libraries:
     # they are test support libraries that are never installed under
@@ -60,8 +61,7 @@ def unrpathize(filename):
 
     # Build a command to invoke install_name_tool.
     command = ['install_name_tool']
-    for binaryline in dylibsOutput.splitlines():
-        line = binaryline.decode("utf-8", "strict")
+    for line in dylibsOutput.splitlines():
         match = dylib_regex.match(line)
         if match and match.group('filename') not in allow_list:
             command.append('-change')

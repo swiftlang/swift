@@ -287,7 +287,7 @@ func prefer_readonly_keypath_over_reference_writable() {
 }
 
 
-// rdar://problem/52779809 - condiitional conformance shadows names of members reachable through dynamic lookup
+// rdar://problem/52779809 - conditional conformance shadows names of members reachable through dynamic lookup
 
 protocol P {
   var foo: Int { get }

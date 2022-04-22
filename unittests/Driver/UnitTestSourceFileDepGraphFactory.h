@@ -62,7 +62,7 @@ private:
 
   /// Return true if when the name appears in a unit test, it represents a
   /// context, not a baseName. Return false if a single name is a baseName,
-  /// without context Return None if there shoud be two names
+  /// without context Return None if there should be two names
   static Optional<bool> singleNameIsContext(NodeKind kind);
 
   static constexpr char nameContextSeparator = ',';

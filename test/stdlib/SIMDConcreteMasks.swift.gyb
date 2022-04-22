@@ -15,11 +15,11 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %line-directive %t/SIMDConcreteMasks.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
+// UNSUPPORTED: freestanding
 
 import StdlibUnittest
 
 %{
-from __future__ import division
 from SwiftIntTypes import all_integer_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 storagescalarCounts = [2,4,8,16,32,64]

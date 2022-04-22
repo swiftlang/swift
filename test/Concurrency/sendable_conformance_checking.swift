@@ -147,6 +147,21 @@ actor A10: AsyncThrowingProtocolWithNotSendable {
 }
 
 // rdar://86653457 - Crash due to missing Sendable conformances.
+// expected-warning@+1{{non-final class 'Klass' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
 class Klass<Output: Sendable>: Sendable {}
 final class SubKlass: Klass<[S]> {}
 public struct S {}
+
+// rdar://88700507 - redundant conformance of @MainActor-isolated subclass to 'Sendable'
+@MainActor class MainSuper {}
+class MainSub: MainSuper, @unchecked Sendable {}
+
+class SendableSuper: @unchecked Sendable {}
+class SendableSub: SendableSuper, @unchecked Sendable {}
+
+class SendableExtSub: SendableSuper {}
+extension SendableExtSub: @unchecked Sendable {}
+
+// Still want to know about same-class redundancy
+class MultiConformance: @unchecked Sendable {} // expected-note {{'MultiConformance' declares conformance to protocol 'Sendable' here}}
+extension MultiConformance: @unchecked Sendable {} // expected-error {{redundant conformance of 'MultiConformance' to protocol 'Sendable'}}

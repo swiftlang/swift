@@ -601,6 +601,13 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
       break;
     }
 
+    case Node::Kind::ParameterizedProtocol: {
+      Buffer << Separator;
+      Separator = '_';
+      RETURN_IF_ERROR(mangleChildNodes(node->getChild(1), depth + 1));
+      break;
+    }
+
     case Node::Kind::BoundGenericFunction: {
       fullSubstitutionMap = true;
 
@@ -1218,6 +1225,15 @@ ManglingError Remangler::mangleErrorType(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleParameterizedProtocol(Node *node,
+                                                     unsigned int depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
+  char separator = 'y';
+  RETURN_IF_ERROR(mangleGenericArgs(node, separator, depth + 1));
+  Buffer << "XP";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleExistentialMetatype(Node *node, unsigned depth) {
   if (node->getFirstChild()->getKind() == Node::Kind::MetatypeRepresentation) {
     RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
@@ -1322,6 +1338,7 @@ ManglingError Remangler::mangleFunctionSignatureSpecialization(Node *node,
           break;
         }
         case FunctionSigSpecializationParamKind::ClosureProp:
+        case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
           RETURN_IF_ERROR(mangleIdentifier(Param->getChild(1), depth + 1));
           for (unsigned i = 2, e = Param->getNumChildren(); i != e; ++i) {
             RETURN_IF_ERROR(mangleType(Param->getChild(i), depth + 1));
@@ -1399,6 +1416,9 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
       }
       break;
     }
+    case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      Buffer << "pk";
+      break;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Buffer << 'c';
       break;
@@ -1623,6 +1643,8 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::AsyncAwaitResumePartialFunction:
       case Node::Kind::AsyncSuspendResumePartialFunction:
       case Node::Kind::AccessibleFunctionRecord:
+      case Node::Kind::BackDeploymentThunk:
+      case Node::Kind::BackDeploymentFallback:
         mangleInReverseOrder = true;
         break;
       default:
@@ -3403,6 +3425,48 @@ ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleBackDeploymentThunk(Node *node,
+                                                   unsigned depth) {
+  Buffer << "Twb";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
+                                                      unsigned depth) {
+  Buffer << "TwB";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleUniquable(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
+  Buffer << "Mq";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
+                                                            unsigned depth) {
+  NodePointer genSig, type;
+  if (node->getNumChildren() == 1) {
+    genSig = nullptr;
+    type = node->getChild(0);
+  } else {
+    genSig = node->getChild(0);
+    type = node->getChild(1);
+  }
+
+  if (genSig) {
+    RETURN_IF_ERROR(mangle(genSig, depth + 1));  
+  }
+  RETURN_IF_ERROR(mangle(type, depth + 1));
+
+  if (genSig)
+    Buffer << "XG";
+  else
+    Buffer << "Xg";
+
+  return ManglingError::Success;
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
@@ -3457,6 +3521,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericFunction:
+    case Node::Kind::ParameterizedProtocol:
       return true;
 
     case Node::Kind::Structure:
@@ -3557,6 +3622,12 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
       if (isSpecialized(nominalType))
         return getUnspecialized(nominalType, Factory);
       return nominalType;
+    }
+
+    case Node::Kind::ParameterizedProtocol: {
+      NodePointer unboundType = node->getChild(0);
+      DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, unboundType);
+      return unboundType;
     }
 
     case Node::Kind::BoundGenericFunction: {

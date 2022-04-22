@@ -90,7 +90,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
           ->getDeclaredInterfaceType(),
       cs.getConstraintLocator(intLiteral));
 
-  // Float <covertible> $T_float
+  // Float <convertible> $T_float
   cs.addConstraint(ConstraintKind::Conversion, floatTy, floatLiteralTy,
                    cs.getConstraintLocator(intLiteral));
 
@@ -109,7 +109,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
   }
 
   // Let's test transitive literal requirement coverage,
-  // literal requirements are prepagated up the subtype chain.
+  // literal requirements are propagated up the subtype chain.
 
   auto *otherTy = cs.createTypeVariable(cs.getConstraintLocator({}),
                                         /*options=*/0);
@@ -223,7 +223,7 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
 
 /// Let's try a more complicated situation where there protocols
 /// are inferred from multiple sources on different levels of
-/// convertion chain.
+/// conversion chain.
 ///
 ///  (P1) T0   T4 (T3)         T6 (P4)
 ///        \   /              /

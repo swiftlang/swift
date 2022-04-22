@@ -247,6 +247,9 @@ public:
     return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
   }
 
+  /// Returns the column for the given source location in the given buffer.
+  unsigned getColumnInBuffer(SourceLoc Loc, unsigned BufferID) const;
+
   StringRef getEntireTextForBuffer(unsigned BufferID) const;
 
   StringRef extractText(CharSourceRange Range,

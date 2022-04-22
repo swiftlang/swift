@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -escapes-dump -escapes-internal-verify -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -parse-serialized-sil %s -escapes-dump -escapes-internal-verify -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 

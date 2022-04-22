@@ -108,19 +108,22 @@ ArgumentList *ArgumentList::createTypeChecked(ASTContext &ctx,
                 originalArgs->isImplicit(), originalArgs);
 }
 
-ArgumentList *ArgumentList::createImplicit(ASTContext &ctx, SourceLoc lParenLoc,
-                                           ArrayRef<Argument> args,
-                                           SourceLoc rParenLoc,
-                                           AllocationArena arena) {
-  return create(ctx, lParenLoc, args, rParenLoc,
-                /*firstTrailingClosureIdx*/ None, /*implicit*/ true,
+ArgumentList *
+ArgumentList::createImplicit(ASTContext &ctx, SourceLoc lParenLoc,
+                             ArrayRef<Argument> args, SourceLoc rParenLoc,
+                             Optional<unsigned> firstTrailingClosureIndex,
+                             AllocationArena arena) {
+  return create(ctx, lParenLoc, args, rParenLoc, firstTrailingClosureIndex,
+                /*implicit*/ true,
                 /*originalArgs*/ nullptr, arena);
 }
 
-ArgumentList *ArgumentList::createImplicit(ASTContext &ctx,
-                                           ArrayRef<Argument> args,
-                                           AllocationArena arena) {
-  return createImplicit(ctx, SourceLoc(), args, SourceLoc(), arena);
+ArgumentList *
+ArgumentList::createImplicit(ASTContext &ctx, ArrayRef<Argument> args,
+                             Optional<unsigned> firstTrailingClosureIndex,
+                             AllocationArena arena) {
+  return createImplicit(ctx, SourceLoc(), args, SourceLoc(),
+                        firstTrailingClosureIndex, arena);
 }
 
 ArgumentList *ArgumentList::forImplicitSingle(ASTContext &ctx, Identifier label,

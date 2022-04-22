@@ -44,12 +44,12 @@ public func _asyncLetEnd(
 /// Wait if necessary and then project the result value of an async let
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_asyncLet_get")
-public func _asyncLet_get(_ asyncLet: Builtin.RawPointer, _ resultBuffer: Builtin.RawPointer) async -> Builtin.RawPointer
+public func _asyncLet_get(_ asyncLet: Builtin.RawPointer, _ resultBuffer: Builtin.RawPointer) async
 
 /// Wait if necessary and then project the result value of an async let that throws
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_asyncLet_get_throwing")
-public func _asyncLet_get_throwing(_ asyncLet: Builtin.RawPointer, _ resultBuffer: Builtin.RawPointer) async throws -> Builtin.RawPointer
+public func _asyncLet_get_throwing(_ asyncLet: Builtin.RawPointer, _ resultBuffer: Builtin.RawPointer) async throws
 
 /// Wait if necessary and then tear down the async let task
 @available(SwiftStdlib 5.1, *)

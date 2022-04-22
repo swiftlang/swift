@@ -16,12 +16,7 @@ import shutil
 import sys
 import tempfile
 import unittest
-try:
-    # py2
-    from StringIO import StringIO
-except ImportError:
-    # py3
-    from io import StringIO
+from io import StringIO
 
 from build_swift.build_swift.wrappers import xcrun
 

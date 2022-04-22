@@ -49,10 +49,15 @@ let releaseDevirtualizerPass = FunctionPass(
           }
         }
 
-        if instruction is ReleaseValueInst || instruction is StrongReleaseInst {
-          lastRelease = instruction as? RefCountingInst
-        } else if instruction.mayRelease {
-          lastRelease = nil
+        switch instruction {
+          case is ReleaseValueInst, is StrongReleaseInst:
+            lastRelease = instruction as? RefCountingInst
+          case is DeallocRefInst, is SetDeallocatingInst:
+            lastRelease = nil
+          default:
+            if instruction.mayRelease {
+              lastRelease = nil
+            }
         }
       }
     }
@@ -77,7 +82,7 @@ private func tryDevirtualizeReleaseOfObject(
 
   let type = allocRefInstruction.type
 
-  guard let dealloc = context.getDestructor(ofClass: type) else {
+  guard let dealloc = context.calleeAnalysis.getDestructor(ofExactType: type) else {
     return
   }
 

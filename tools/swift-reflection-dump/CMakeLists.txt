@@ -5,4 +5,5 @@ add_swift_host_tool(swift-reflection-dump
 )
 target_link_libraries(swift-reflection-dump
                       PRIVATE
+                        swiftStaticMirror
                         swiftReflection)

@@ -332,3 +332,25 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
   %15 = tuple ()
   return %15 : $()
 }
+
+public protocol AnyAction {
+}
+
+public struct MyAction : AnyAction {
+}
+
+// Make sure that we do not crash on this test case!
+//
+// TODO: Maybe we could handle this?
+sil shared @cast_optimizer_metatype_crasher : $@convention(thin) (@thick MyAction.Type) -> @thick AnyAction.Type {
+bb0(%0 : $@thick MyAction.Type):
+  %1 = alloc_stack $@thick AnyAction.Type
+  %2 = alloc_stack $@thick MyAction.Type
+  store %0 to %2 : $*@thick MyAction.Type
+  unconditional_checked_cast_addr MyAction.Type in %2 : $*@thick MyAction.Type to AnyAction.Type in %1 : $*@thick AnyAction.Type
+  dealloc_stack %2 : $*@thick MyAction.Type
+  %6 = tuple ()
+  %7 = load %1 : $*@thick AnyAction.Type
+  dealloc_stack %1 : $*@thick AnyAction.Type
+  return %7 : $@thick AnyAction.Type
+}

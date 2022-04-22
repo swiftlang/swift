@@ -33,7 +33,6 @@
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Indenting.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -983,7 +982,7 @@ public:
 
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
-    auto Kind = CodeCompletionResult::getCodeCompletionDeclKind(D);
+    auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
     bool IsSystem = D->getModuleContext()->isSystemModule();
     SemaToks.emplace_back(Kind, ByteOffset, Length, IsRef, IsSystem);
   }

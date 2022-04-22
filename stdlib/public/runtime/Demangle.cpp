@@ -240,6 +240,9 @@ _buildDemanglerForBuiltinType(const Metadata *type, Demangle::Demangler &Dem) {
 #define BUILTIN_TYPE(Symbol, Name) \
   if (type == &METADATA_SYM(Symbol).base) \
     return Dem.createNode(Node::Kind::BuiltinTypeName, Name);
+#if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
+#endif
 #include "swift/Runtime/BuiltinTypes.def"
   return nullptr;
 }
@@ -717,6 +720,9 @@ char *swift_demangle(const char *mangledName,
   if (!Demangle::isSwiftSymbol(mangledName))
     return nullptr; // Not a mangled name
 
+#if !SWIFT_STDLIB_HAS_TYPE_PRINTING
+  return nullptr;
+#else
   // Demangle the name.
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
@@ -740,4 +746,5 @@ char *swift_demangle(const char *mangledName,
   }
 
   return outputBuffer;
+#endif
 }

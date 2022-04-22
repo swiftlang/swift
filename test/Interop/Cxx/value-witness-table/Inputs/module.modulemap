@@ -12,3 +12,13 @@ module CopyConstructors {
   header "copy-constructors.h"
   requires cplusplus
 }
+
+module ClassTemplateMetadata {
+  header "class-template-metadata.h"
+  requires cplusplus
+}
+
+module WitnessLifetimeOperations {
+  header "witness-lifetime-operations.h"
+  requires cplusplus
+}

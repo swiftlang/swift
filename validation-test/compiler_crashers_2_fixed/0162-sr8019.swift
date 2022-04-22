@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
 
 protocol P {}
 struct A<C> {}
-extension A: P where A: P {} // expected-error {{type 'A<C>' in conformance requirement does not refer to a generic parameter or associated type}}
+extension A: P where A: P {} // expected-warning {{redundant conformance constraint 'A<C>' : 'P'}}

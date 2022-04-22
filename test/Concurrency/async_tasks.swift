@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -strict-concurrency=targeted -disable-availability-checking
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)
@@ -99,7 +99,7 @@ func test_nonsendableContinuation() async throws {
 
   let _: NotSendable = try await withUnsafeThrowingContinuation { continuation in
     Task {
-      continuation.resume(returning: NotSendable()) // expected-warning{{capture of 'continuation' with non-sendable type 'UnsafeContinuation<NotSendable, Error>' in a `@Sendable` closure}}
+      continuation.resume(returning: NotSendable()) // expected-warning{{capture of 'continuation' with non-sendable type 'UnsafeContinuation<NotSendable, any Error>' in a `@Sendable` closure}}
     }
   }
 }
@@ -126,5 +126,14 @@ func test_detached_throwing() async -> String {
     return try await handle.value
   } catch {
     print("caught: \(error)")
+  }
+}
+
+// ==== Detached Tasks with inout Params---------------------------------------
+@available(SwiftStdlib 5.1, *)
+func printOrderNumber(n: inout Int) async {
+  Task.detached {
+      n+=1 //expected-error {{mutable capture of 'inout' parameter 'n' is not allowed in concurrently-executing code}}
+      print(n) //expected-error {{mutable capture of 'inout' parameter 'n' is not allowed in concurrently-executing code}}
   }
 }

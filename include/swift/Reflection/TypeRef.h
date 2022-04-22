@@ -563,6 +563,42 @@ public:
   }
 };
 
+class ParameterizedProtocolTypeRef final : public TypeRef {
+  const ProtocolCompositionTypeRef *Base;
+  std::vector<const TypeRef *> Args;
+
+  static TypeRefID Profile(const ProtocolCompositionTypeRef *Protocol,
+                           std::vector<const TypeRef *> Args) {
+    TypeRefID ID;
+    ID.addPointer(Protocol);
+    for (auto Arg : Args) {
+      ID.addPointer(Arg);
+    }
+    return ID;
+  }
+
+public:
+  ParameterizedProtocolTypeRef(const ProtocolCompositionTypeRef *Protocol,
+                               std::vector<const TypeRef *> Args)
+      : TypeRef(TypeRefKind::ParameterizedProtocol), Base(Protocol),
+        Args(Args) {}
+
+  template <typename Allocator>
+  static const ParameterizedProtocolTypeRef *
+  create(Allocator &A, const ProtocolCompositionTypeRef *Protocol,
+         std::vector<const TypeRef *> Args) {
+    FIND_OR_CREATE_TYPEREF(A, ParameterizedProtocolTypeRef, Protocol, Args);
+  }
+
+  const ProtocolCompositionTypeRef *getBase() const { return Base; }
+
+  const std::vector<const TypeRef *> &getArgs() const { return Args; }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::ParameterizedProtocol;
+  }
+};
+
 class MetatypeTypeRef final : public TypeRef {
   const TypeRef *InstanceType;
   bool WasAbstract;

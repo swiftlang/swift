@@ -324,7 +324,7 @@ class ClassWithUnavailableProperties {
   @available(OSX, introduced: 10.9)
   lazy var availableOn10_9Stored: Int = 9
   
-  @available(OSX, introduced: 10.51)
+  @available(OSX, introduced: 10.51) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
   lazy var availableOn10_51Stored : Int = 10
 
   @available(OSX, introduced: 10.9)
@@ -418,7 +418,6 @@ class ClassWithReferencesInInitializers {
   lazy var lazyPropWithInitializer10_51: Int = globalFuncAvailableOn10_51()
 
   lazy var lazyPropWithInitializer10_52: Int = globalFuncAvailableOn10_52() // expected-error {{'globalFuncAvailableOn10_52()' is only available in macOS 10.52 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing property}}
 }
 
 func accessUnavailableProperties(_ o: ClassWithUnavailableProperties) {
@@ -716,21 +715,9 @@ class ClassWithDeclarationsOfUnavailableClasses {
       // expected-note@-1 5{{add @available attribute to enclosing class}}
 
   @available(OSX, introduced: 10.51)
-  init() {
-    unavailablePropertyOfUnavailableType = ClassAvailableOn10_51()
-    unavailablePropertyOfUnavailableType = ClassAvailableOn10_51()
-  }
+  init() {}
 
   var propertyOfUnavailableType: ClassAvailableOn10_51 // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
-
-  @available(OSX, introduced: 10.51)
-  lazy var unavailablePropertyOfUnavailableType: ClassAvailableOn10_51 = ClassAvailableOn10_51()
-  
-  @available(OSX, introduced: 10.51)
-  lazy var unavailablePropertyOfOptionalUnavailableType: ClassAvailableOn10_51? = nil
-
-  @available(OSX, introduced: 10.51)
-  lazy var unavailablePropertyOfUnavailableTypeWithInitializer: ClassAvailableOn10_51 = ClassAvailableOn10_51()
   
   @available(OSX, introduced: 10.51)
   static var unavailableStaticPropertyOfUnavailableType: ClassAvailableOn10_51 = ClassAvailableOn10_51()
@@ -1294,15 +1281,12 @@ class ClassForFixit {
 
   lazy var fixitForReferenceInLazyPropertyType: ClassAvailableOn10_51? = nil
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing property}} {{3-3=@available(macOS 10.51, *)\n  }}
 
   private lazy var fixitForReferenceInPrivateLazyPropertyType: ClassAvailableOn10_51? = nil
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing property}} {{3-3=@available(macOS 10.51, *)\n  }}
 
   lazy private var fixitForReferenceInLazyPrivatePropertyType: ClassAvailableOn10_51? = nil
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing property}} {{3-3=@available(macOS 10.51, *)\n  }}
 
   static var fixitForReferenceInStaticPropertyType: ClassAvailableOn10_51? = nil
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}

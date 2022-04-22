@@ -19,6 +19,7 @@
 namespace swift {
   class SILModule;
   class SILFunction;
+  class SILInstruction;
   class PrettyStackTraceSILFunctionTransform;
 
   /// The base class for all SIL-level transformations.
@@ -128,6 +129,10 @@ namespace swift {
     void restartPassPipeline() { PM->restartWithCurrentFunction(this); }
 
     SILFunction *getFunction() { return F; }
+
+    bool continueWithNextSubpassRun(SILInstruction *forInst = nullptr) {
+      return PM->continueWithNextSubpassRun(forInst, F, this);
+    }
 
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
       PM->invalidateAnalysis(F, K);

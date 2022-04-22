@@ -99,3 +99,12 @@ struct S11: Sendable {
 }
 
 @_nonSendable public struct S12 { }
+
+// Don't complain about global-actor-qualified classes or their subclasses.
+@MainActor
+open class TestThing {}
+open class TestSubThing : TestThing {}
+
+@MainActor(unsafe)
+open class TestThing2 {}
+open class TestSubThing2 : TestThing2 {}

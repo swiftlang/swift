@@ -50,9 +50,10 @@ extension AsyncSequence {
   ///   of the base sequence that satisfy the given predicate. If the predicate
   ///   throws an error, the sequence contains only values produced prior to
   ///   the error.
+  @preconcurrency
   @inlinable
   public __consuming func prefix(
-    while predicate: @escaping (Element) async throws -> Bool
+    while predicate: @Sendable @escaping (Element) async throws -> Bool
   ) rethrows -> AsyncThrowingPrefixWhileSequence<Self> {
     return AsyncThrowingPrefixWhileSequence(self, predicate: predicate)
   }
@@ -139,3 +140,13 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), predicate: predicate)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingPrefixWhileSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingPrefixWhileSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

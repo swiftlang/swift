@@ -23,11 +23,11 @@
 // found"
 // This is a known Clang/Ubuntu bug.
 //
-// On Windows, the complicated setup between clang and MSVC causes a cicular
+// On Windows, the complicated setup between clang and MSVC causes a circular
 // dependency between `ucrt` and `SwiftShims`, preventing a successful build of
 // the module.
 //
-// Opt to use teh compiler vended type whenever possible.
+// Opt to use the compiler vended type whenever possible.
 #if defined(__clang__)
 typedef __SIZE_TYPE__ __swift_size_t;
 #else

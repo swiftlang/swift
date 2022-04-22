@@ -14,7 +14,7 @@ import Foundation
 // CHECK-LABEL: @${{.*}}testSimpleInterpolationyy
 func testSimpleInterpolation() {
   let x = "World"
-  constant_vprintf("Hello \(5) \(x)")
+  print("Hello \(5) \(x)")
   // Match the format string. For now we don't expect all allocations to be avoided
   // CHECK: string_literal utf8 "Hello %ld %s"
 }

@@ -22,7 +22,7 @@ public extension Proto {
   // paramter of `AttributedSlice1<T>`) and an unbound generic paramters.
   // This used to cause issues when printing the type.
   func formatted<S>(width: ListFormatStyle<S, Self>.Width) -> String {
-// CHECK: func formatted<S>(width width: ListFormatStyle<S, AttributesSlice1<T>>.Width) -> String
+// CHECK: func formatted<S>(width width: test.ListFormatStyle<S, test.AttributesSlice1<T>>.Width) -> String
     fatalError()
   }
 }

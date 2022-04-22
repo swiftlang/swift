@@ -496,7 +496,8 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   std::string allocatorMangledName =
       SILDeclRef(arrayAllocateDecl, SILDeclRef::Kind::Func).mangle();
   SILFunction *arrayAllocateFun =
-      module.findFunction(allocatorMangledName, SILLinkage::PublicExternal);
+      module.loadFunction(allocatorMangledName,
+                          SILModule::LinkingMode::LinkNormal);
   assert(arrayAllocateFun);
 
   SILFunction *arrayFinalizeFun = nullptr;
@@ -505,9 +506,9 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
       std::string finalizeMangledName =
           SILDeclRef(arrayFinalizeDecl, SILDeclRef::Kind::Func).mangle();
       arrayFinalizeFun =
-          module.findFunction(finalizeMangledName, SILLinkage::SharedExternal);
+          module.loadFunction(finalizeMangledName,
+                              SILModule::LinkingMode::LinkNormal);
       assert(arrayFinalizeFun);
-      module.linkFunction(arrayFinalizeFun);
     }
   }
 

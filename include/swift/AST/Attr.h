@@ -287,12 +287,13 @@ public:
     /// Whether this attribute is only valid when concurrency is enabled.
     ConcurrencyOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 16),
 
-    /// Whether this attribute is only valid when distributed is enabled.
-    DistributedOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
-
     /// Whether this attribute is valid on additional decls in ClangImporter.
-    OnAnyClangDecl = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 18),
+    OnAnyClangDecl = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
   };
+
+  static_assert(
+      (unsigned(DeclKindIndex::Last_Decl) + 17) < 64,
+      "Overflow decl attr options bitfields");
 
   LLVM_READNONE
   static uint64_t getOptions(DeclAttrKind DK);
@@ -384,10 +385,6 @@ public:
 
   static bool isConcurrencyOnly(DeclAttrKind DK) {
     return getOptions(DK) & ConcurrencyOnly;
-  }
-
-  static bool isDistributedOnly(DeclAttrKind DK) {
-    return getOptions(DK) & DistributedOnly;
   }
 
   static bool isUserInaccessible(DeclAttrKind DK) {
@@ -614,6 +611,8 @@ enum class PlatformAgnosticAvailabilityKind {
   PackageDescriptionVersionSpecific,
   /// The declaration is unavailable for other reasons.
   Unavailable,
+  /// The declaration is unavailable from asynchronous contexts
+  NoAsync,
 };
 
 /// Defines the @available attribute.
@@ -632,14 +631,16 @@ public:
                    const llvm::VersionTuple &Obsoleted,
                    SourceRange ObsoletedRange,
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
-                   bool Implicit)
+                   bool Implicit,
+                   bool IsSPI)
     : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
       Message(Message), Rename(Rename), RenameDecl(RenameDecl),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
       PlatformAgnostic(PlatformAgnostic),
-      Platform(Platform)
+      Platform(Platform),
+      IsSPI(IsSPI)
   {}
 
 #undef INIT_VER_TUPLE
@@ -685,6 +686,9 @@ public:
   /// The platform of the availability.
   const PlatformKind Platform;
 
+  /// Whether this is available as SPI.
+  const bool IsSPI;
+
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;
 
@@ -696,6 +700,9 @@ public:
 
   /// Whether this is an unconditionally deprecated entity.
   bool isUnconditionallyDeprecated() const;
+
+  /// Whether this is a noasync attribute.
+  bool isNoAsync() const;
 
   /// Returns the platform-agnostic availability.
   PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {
@@ -2172,6 +2179,30 @@ public:
   }
 };
 
+/// The @_backDeploy(...) attribute, used to make function declarations available
+/// for back deployment to older OSes via emission into the client binary.
+class BackDeployAttr: public DeclAttribute {
+public:
+  BackDeployAttr(SourceLoc AtLoc, SourceRange Range,
+                 PlatformKind Platform,
+                 const llvm::VersionTuple Version,
+                 bool Implicit)
+    : DeclAttribute(DAK_BackDeploy, AtLoc, Range, Implicit),
+      Platform(Platform),
+      Version(Version) {}
+
+  /// The platform the symbol is available for back deployment on.
+  const PlatformKind Platform;
+
+  /// The earliest platform version that may use the back deployed implementation.
+  const llvm::VersionTuple Version;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_BackDeploy;
+  }
+};
+
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -2231,6 +2262,11 @@ public:
   /// Returns the first @available attribute that indicates
   /// a declaration will be deprecated in the future, or null otherwise.
   const AvailableAttr *getSoftDeprecated(const ASTContext &ctx) const;
+
+  /// Returns the first @available attribute that indicates
+  /// a declaration is unavailable from asynchronous contexts, or null
+  /// otherwise.
+  const AvailableAttr *getNoAsync(const ASTContext &ctx) const;
 
   SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,

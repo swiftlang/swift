@@ -118,8 +118,15 @@ struct Foo {
 }
 
 // RUN: %empty-directory(%t.result)
+
+// Ensure that a syntactic rename request does not require the stdlib
+// RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/empty.json %s -- -resource-dir /no/stdlib/here
+
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/x.in.json %s >> %t.result/x.expected
 // RUN: %diff -u %S/syntactic-rename/x.expected %t.result/x.expected
+
+// Note: Even though the #if is true, it is not evaluated since we only parse.
+// Thus, both the #if and #else are inactive
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/z.in.json %s >> %t.result/z.expected
 // RUN: %diff -u %S/syntactic-rename/z.expected %t.result/z.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/foo.in.json %s >> %t.result/foo_arity1.expected

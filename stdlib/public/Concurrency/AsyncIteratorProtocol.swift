@@ -26,7 +26,7 @@ import Swift
 /// conforms to `AsyncIteratorProtocol`. The following example shows a `Counter`
 /// type that uses an inner iterator to monotonically generate `Int` values
 /// until reaching a `howHigh` value. While this example isn't itself
-/// asychronous, it shows the shape of a custom sequence and iterator, and how
+/// asynchronous, it shows the shape of a custom sequence and iterator, and how
 /// to use it as if it were asynchronous:
 ///
 ///     struct Counter : AsyncSequence {
@@ -37,7 +37,7 @@ import Swift
 ///             let howHigh: Int
 ///             var current = 1
 ///             mutating func next() async -> Int? {
-///                 // A genuinely asychronous implementation uses the `Task`
+///                 // A genuinely asynchronous implementation uses the `Task`
 ///                 // API to check for cancellation here and return early.
 ///                 guard current <= howHigh else {
 ///                     return nil

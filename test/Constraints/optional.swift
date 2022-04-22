@@ -169,9 +169,9 @@ func testTernaryWithNil<T>(b: Bool, s: String, i: Int, a: Any, t: T, m: T.Type, 
   let t16 = b ? nil : m
   let _: Double = t16 // expected-error{{value of type 'T.Type?'}}
   let t17 = b ? p : nil
-  let _: Double = t17 // expected-error{{value of type '(Proto1 & Proto2)?'}}
+  let _: Double = t17 // expected-error{{value of type '(any Proto1 & Proto2)?'}}
   let t18 = b ? nil : p
-  let _: Double = t18 // expected-error{{value of type '(Proto1 & Proto2)?'}}
+  let _: Double = t18 // expected-error{{value of type '(any Proto1 & Proto2)?'}}
   let t19 = b ? arr : nil
   let _: Double = t19 // expected-error{{value of type '[Int]?'}}
   let t20 = b ? nil : arr
@@ -426,7 +426,7 @@ func test_force_unwrap_not_being_too_eager() {
 // rdar://problem/57097401
 func invalidOptionalChaining(a: Any) {
   a == "="? // expected-error {{cannot use optional chaining on non-optional value of type 'String'}}
-  // expected-error@-1 {{protocol 'Any' as a type cannot conform to 'Equatable'}}
+  // expected-error@-1 {{type 'Any' cannot conform to 'Equatable'}}
   // expected-note@-2 {{requirement from conditional conformance of 'Any?' to 'Equatable'}} expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 

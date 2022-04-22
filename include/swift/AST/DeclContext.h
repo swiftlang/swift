@@ -201,6 +201,7 @@ struct FragileFunctionKind {
     AlwaysEmitIntoClient,
     DefaultArgument,
     PropertyInitializer,
+    BackDeploy,
     None
   };
 
@@ -211,6 +212,9 @@ struct FragileFunctionKind {
     return (lhs.kind == rhs.kind &&
             lhs.allowUsableFromInline == rhs.allowUsableFromInline);
   }
+
+  /// Casts to `unsigned` for diagnostic %selects.
+  unsigned getSelector() { return static_cast<unsigned>(kind); }
 };
 
 /// A DeclContext is an AST object which acts as a semantic container

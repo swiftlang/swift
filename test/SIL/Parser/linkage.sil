@@ -12,8 +12,8 @@ bb0:
   return %0 : $()
 }
 
-// CHECK-LABEL: sil non_abi @always_emit_into_client_definition : $@convention(thin) () -> ()
-sil non_abi @always_emit_into_client_definition : $() -> () {
+// CHECK-LABEL: sil non_abi [serialized] @always_emit_into_client_definition : $@convention(thin) () -> ()
+sil non_abi [serialized] @always_emit_into_client_definition : $() -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -40,8 +40,8 @@ bb0:
   return %0 : $()
 }
 
-// CHECK-LABEL: sil public_external @public_available_externally_definition : $@convention(thin) () -> ()
-sil public_external @public_available_externally_definition : $() -> () {
+// CHECK-LABEL: sil public_external [serialized] @public_available_externally_definition : $@convention(thin) () -> ()
+sil public_external [serialized] @public_available_externally_definition : $() -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()

@@ -2,8 +2,8 @@
 
 // thunk for @escaping @callee_guaranteed () -> ()
 // Check that the [without_actually_escaping] thunk attribute is parsed and printed.
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @testWithoutActuallyEscapingThunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
-sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @testWithoutActuallyEscapingThunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @testWithoutActuallyEscapingThunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @testWithoutActuallyEscapingThunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
   %1 = apply %0() : $@callee_guaranteed () -> ()
   return %1 : $()

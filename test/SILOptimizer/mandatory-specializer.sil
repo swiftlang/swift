@@ -31,7 +31,12 @@ bb0(%0 : $Builtin.Int32):
   return %2 : $Builtin.Int32
 }
 
-sil shared_external [transparent] [serialized] [thunk] [canonical] @$sSiSLsSL1loiySbx_xtFZTW : $@convention(witness_method: Comparable) (@in_guaranteed Int, @in_guaranteed Int, @thick Int.Type) -> Bool
+sil shared [transparent] [serialized] [thunk] [canonical] @$sSiSLsSL1loiySbx_xtFZTW : $@convention(witness_method: Comparable) (@in_guaranteed Int, @in_guaranteed Int, @thick Int.Type) -> Bool {
+bb0(%0 : $*Int, %1 : $*Int, %2 : $@thick Int.Type):
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = struct $Bool (%3 : $Builtin.Int1)
+  return %4 : $Bool
+}
 
 sil_witness_table public_external [serialized] Int: Comparable module Swift {
   base_protocol Equatable: Int: Equatable module Swift

@@ -72,7 +72,7 @@ extension Task where Success == Never, Failure == Never {
 extension Task where Success == Never, Failure == Never {
   /// Throws an error if the task was canceled.
   ///
-  /// The error is always an instance of `Task.CancellationError`.
+  /// The error is always an instance of `CancellationError`.
   ///
   /// - SeeAlso: `isCancelled()`
   public static func checkCancellation() throws {

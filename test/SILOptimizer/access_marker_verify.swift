@@ -635,7 +635,7 @@ func testShims() -> UInt32 {
 
 // --- global variable initialization.
 var globalString1 = "⓪" // start non-empty
-// CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) () -> () {
+// CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) (Builtin.RawPointer) -> () {
 // CHECK: alloc_global @$s20access_marker_verify13globalString1SSvp
 // CHECK: [[GA:%.*]] = global_addr @$s20access_marker_verify13globalString1SSvp : $*String
 // CHECK: apply
@@ -645,7 +645,7 @@ var globalString1 = "⓪" // start non-empty
 // CHECK-LABEL: } // end sil function '{{.*}}WZ'
 
 var globalString2 = globalString1
-// CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) () -> () {
+// CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) (Builtin.RawPointer) -> () {
 // CHECK: alloc_global @$s20access_marker_verify13globalString2SSvp
 // CHECK: [[GA:%.*]] = global_addr @$s20access_marker_verify13globalString2SSvp : $*String
 // CHECK: apply
@@ -1045,7 +1045,7 @@ func testPointerInit(x: Int, y: UnsafeMutablePointer<Int>) {
 class testInitExistentialGlobal {
   static var testProperty: P = StructP()
 }
-// CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) () -> () {
+// CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) (Builtin.RawPointer) -> () {
 // CHECK:   alloc_global @$s20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ
 // CHECK:   [[GADR:%.*]] = global_addr @$s20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ : $*P
 // CHECK:   %{{.*}} = apply %{{.*}}({{.*}}) : $@convention(method) (@thin StructP.Type) -> StructP

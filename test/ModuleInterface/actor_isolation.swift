@@ -1,14 +1,17 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule -emit-module-interface-path %t/Test.swiftinterface -module-name Test -enable-experimental-concurrency %s
+// RUN: %target-swift-frontend -emit-module -o %t/Preconcurrency.swiftmodule -module-name Preconcurrency %S/Inputs/preconcurrency.swift
+
+// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule -emit-module-interface-path %t/Test.swiftinterface -module-name Test -enable-experimental-concurrency -I %t %s
 // RUN: %FileCheck %s < %t/Test.swiftinterface
 // RUN: %FileCheck %s -check-prefix SYNTHESIZED < %t/Test.swiftinterface
-// RUN: %target-swift-frontend -typecheck-module-from-interface -module-name Test %t/Test.swiftinterface
+// RUN: %target-swift-typecheck-module-from-interface(%t/Test.swiftinterface) -module-name Test -I %t
 
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-module-interface-path %t/TestFromModule.swiftinterface -module-name Test -enable-experimental-concurrency
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-module-interface-path %t/TestFromModule.swiftinterface -module-name Test -enable-experimental-concurrency -I %t 
 // RUN: %FileCheck %s < %t/TestFromModule.swiftinterface
-// RUN: %target-swift-frontend -typecheck-module-from-interface -module-name Test %t/TestFromModule.swiftinterface
+// RUN: %target-swift-typecheck-module-from-interface(%t/TestFromModule.swiftinterface) -module-name Test -I %t
 
 // REQUIRES: concurrency
+import Preconcurrency
 
 // CHECK: public actor SomeActor
 
@@ -95,6 +98,13 @@ public protocol P2 {
 public class C8 : P2 {
   // CHECK: @{{(Test.)?}}SomeGlobalActor public func method()
   public func method() {}
+}
+
+// CHECK-NOT: StructWithImplicitlyNonSendable{{.*}}Sendable
+@available(SwiftStdlib 5.1, *)
+@_frozen
+public struct StructWithImplicitlyNonSendable {
+  var ns: NotSendable? = nil
 }
 
 // FIXME: Work around a bug where module printing depends on the "synthesized"

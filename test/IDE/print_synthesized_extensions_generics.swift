@@ -19,11 +19,11 @@ extension P1 where T : B<Int> {
 
 public class C<T : A, U> {}
 extension C : P1 {}
-// CHECK:      extension C where T : B<U> {
+// CHECK:      extension C where T : print_synthesized_extensions_generics.B<U> {
 // CHECK-NEXT:   func qux()
 // CHECK-NEXT: }
 
-// CHECK:      extension C where T : B<Int> {
+// CHECK:      extension C where T : print_synthesized_extensions_generics.B<Int> {
 // CHECK-NEXT:   func flob()
 // CHECK-NEXT: }
 
@@ -70,7 +70,7 @@ extension P2 where T.T : A {
 public class G<T : P1> {}
 extension G : P2 {}
 
-// CHECK:      extension G where T.T : A {
+// CHECK:      extension G where T.T : print_synthesized_extensions_generics.A {
 // CHECK-NEXT:   func blah()
 // CHECK-NEXT: }
 

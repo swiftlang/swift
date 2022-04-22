@@ -21,20 +21,21 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SwiftNameTranslation.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
+#include "swift/IDE/Refactoring.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/Utils.h"
-#include "swift/IDE/Refactoring.h"
-#include "swift/IDE/IDERequests.h"
 #include "swift/Markup/XMLUtils.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
@@ -760,7 +761,7 @@ static StringRef getModuleName(const ValueDecl *VD,
       static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   if (auto ClangNode = VD->getClangNode()) {
     if (const auto *ClangMod = Importer->getClangOwningModule(ClangNode))
-      return copyString(Allocator, ClangMod->getFullModuleName());
+      return StringRef(ClangMod->getFullModuleName()).copy(Allocator);
     return "";
   }
 
@@ -824,7 +825,7 @@ struct DeclInfo {
 
 static StringRef copyAndClearString(llvm::BumpPtrAllocator &Allocator,
                                     SmallVectorImpl<char> &Str) {
-  auto Ref = copyString(Allocator, StringRef(Str.data(), Str.size()));
+  auto Ref = StringRef(Str.data(), Str.size()).copy(Allocator);
   Str.clear();
   return Ref;
 }
@@ -983,10 +984,11 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
         Invoc.getLangOptions().Target,
         /*PrettyPrint=*/false,
         AccessLevel::Private,
-        /*EmitSynthesizedMembers*/ false,
-        /*PrintMessages*/ false,
-        /*SkipInheritedDocs*/ false,
-        /*IncludeSPISymbols*/ true,
+        /*EmitSynthesizedMembers=*/false,
+        /*PrintMessages=*/false,
+        /*SkipInheritedDocs=*/false,
+        /*IncludeSPISymbols=*/true,
+        /*IncludeClangDocs=*/true
     };
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
@@ -998,7 +1000,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
     SmallVector<ParentInfo, 4> Parents;
     for (auto &Component : PathComponents) {
       SwiftLangSupport::printUSR(Component.VD, OS);
-      Parents.emplace_back(copyString(Allocator, Component.Title),
+      Parents.emplace_back(Component.Title.str().copy(Allocator),
                            Component.Kind,
                            copyAndClearString(Allocator, Buffer));
     };
@@ -1009,7 +1011,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
       SmallVector<ParentInfo, 4> FIParents;
       for (auto &Component: FI.ParentContexts) {
         SwiftLangSupport::printUSR(Component.VD, OS);
-        FIParents.emplace_back(copyString(Allocator, Component.Title),
+        FIParents.emplace_back(Component.Title.str().copy(Allocator),
                                Component.Kind,
                                copyAndClearString(Allocator, Buffer));
       }

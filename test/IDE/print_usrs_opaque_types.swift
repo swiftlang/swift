@@ -7,7 +7,7 @@
 
 // CHECK: [[@LINE+1]]:{{[0-9]+}} s:14swift_ide_test0C21UnifyingGenericParams1xQrx_tq_Rszr0_lF
 func testUnifyingGenericParams<T, U>(x: T) -> some Collection where T == U {
-  // expected-error@-1 {{same-type requirement makes generic parameters 'T' and 'U' equivalent}}
+  // expected-warning@-1 {{same-type requirement makes generic parameters 'U' and 'T' equivalent}}
   return []
 }
 
@@ -18,14 +18,14 @@ func testUnifyingGenericParams2<T, U>(x: T) -> some Collection where T: Collecti
 
 // CHECK: [[@LINE+1]]:{{[0-9]+}} s:14swift_ide_test0C24ConcretizingGenericParam1xQrSi_tSiRszlF
 func testConcretizingGenericParam<T>(x: T) -> some Collection where T == Int {
-  // expected-error@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
+  // expected-warning@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
   return []
 }
 
 struct GenericContext<T> {
   // CHECK: [[@LINE+1]]:{{[0-9]+}} s:14swift_ide_test14GenericContextV0c8UnifyingD6Params1xQrx_tqd__RszlF
   func testUnifyingGenericParams<U>(x: T) -> some Collection where T == U {
-    // expected-error@-1 {{same-type requirement makes generic parameters 'U' and 'T' equivalent}}
+    // expected-warning@-1 {{same-type requirement makes generic parameters 'U' and 'T' equivalent}}
     return []
   }
 
@@ -36,7 +36,7 @@ struct GenericContext<T> {
 
   // CHECK: [[@LINE+1]]:{{[0-9]+}} s:14swift_ide_test14GenericContextVyQrxcqd__Rszluip
   subscript<U>(x: T) -> some Collection where T == U {
-    // expected-error@-1 {{same-type requirement makes generic parameters 'U' and 'T' equivalent}}
+    // expected-warning@-1 {{same-type requirement makes generic parameters 'U' and 'T' equivalent}}
     // CHECK: [[@LINE+1]]:{{[0-9]+}} s:14swift_ide_test14GenericContextVyQrxcqd__Rszluig
     get {
       return []

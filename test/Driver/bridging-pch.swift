@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -typecheck -driver-print-actions -import-objc-header %S/Inputs/bridging-header.h %s 2>&1 | %FileCheck %s -check-prefix=YESPCHACT
-// YESPCHACT: 0: input, "{{.*}}Inputs/bridging-header.h", objc-header
+// YESPCHACT: 0: input, "{{.*}}Inputs/bridging-header.h", clang-header
 // YESPCHACT: 1: generate-pch, {0}, pch
 // YESPCHACT: 2: input, "{{.*}}bridging-pch.swift", swift
 // YESPCHACT: 3: compile, {2, 1}, none
@@ -30,13 +30,13 @@
 // Test persistent PCH
 
 // RUN: %target-build-swift -typecheck -driver-print-actions -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHACT
-// PERSISTENT-YESPCHACT: 0: input, "{{.*}}Inputs/bridging-header.h", objc-header
+// PERSISTENT-YESPCHACT: 0: input, "{{.*}}Inputs/bridging-header.h", clang-header
 // PERSISTENT-YESPCHACT: 1: generate-pch, {0}, none
 // PERSISTENT-YESPCHACT: 2: input, "{{.*}}bridging-pch.swift", swift
 // PERSISTENT-YESPCHACT: 3: compile, {2, 1}, none
 
 // RUN: %target-build-swift -c -driver-print-actions -embed-bitcode -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHACTBC
-// PERSISTENT-YESPCHACTBC: 0: input, "{{.*}}Inputs/bridging-header.h", objc-header
+// PERSISTENT-YESPCHACTBC: 0: input, "{{.*}}Inputs/bridging-header.h", clang-header
 // PERSISTENT-YESPCHACTBC: 1: generate-pch, {0}, none
 // PERSISTENT-YESPCHACTBC: 2: input, "{{.*}}bridging-pch.swift", swift
 // PERSISTENT-YESPCHACTBC: 3: compile, {2, 1}, llvm-bc

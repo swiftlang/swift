@@ -489,9 +489,8 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
 }
 
 IsSerialized_t CallSiteDescriptor::isSerialized() const {
-  if (getClosure()->getFunction()->isSerialized() &&
-      getApplyCallee()->isSerialized())
-    return IsSerializable;
+  if (getClosure()->getFunction()->isSerialized())
+    return IsSerialized;
   return IsNotSerialized;
 }
 

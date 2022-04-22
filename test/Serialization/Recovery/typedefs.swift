@@ -2,7 +2,7 @@
 
 // Cannot use -parse-as-library here because that would compile also the
 // #if VERIFY path, which contains top-level code.
-// RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck -check-prefix CHECK-VTABLE %s
+// RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -requirement-machine-inferred-signatures=on | %FileCheck -check-prefix CHECK-VTABLE %s
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
 
@@ -87,7 +87,19 @@ public class UserDynamicConvenienceSub: UserDynamicConvenience {
 }
 _ = UserDynamicConvenienceSub(conveniently: 0)
 
-public class UserSub : User {} // expected-error {{cannot inherit from class 'User' because it has overridable members that could not be loaded}}
+public class UserSub : User {}
+// expected-error@-1 {{cannot inherit from class 'User' because it has overridable members that could not be loaded}}
+// expected-note@-2 {{could not deserialize 'wrappedProp'}}
+// expected-note@-3 {{could not deserialize 'returnsWrappedMethod()'}}
+// expected-note@-4 {{could not deserialize 'constrainedWrapped'}}
+// expected-note@-5 {{could not deserialize 'subscript(_:)'}}
+// expected-note@-6 {{could not deserialize 'subscript(_:)'}}
+// expected-note@-7 {{could not deserialize 'init(wrapped:)'}}
+// expected-note@-8 {{could not deserialize 'init(generic:)'}}
+// expected-note@-9 {{could not deserialize 'init(wrappedRequired:)'}}
+// expected-note@-10 {{could not deserialize 'init(wrappedRequiredInSub:)'}}
+// expected-note@-11 {{could not deserialize 'init(wrappedDynamic:)'}}
+// expected-note@-12 {{could not deserialize 'init(wrappedRequiredDynamic:)'}}
 
 #endif // VERIFY
 
@@ -114,7 +126,7 @@ open class User {
   // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() (vtable entries: 1) */
   public func returnsWrappedMethod() -> WrappedInt { fatalError() }
 
-  // CHECK: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == UnwrappedInt
+  // CHECK: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == Int32
   // CHECK-RECOVERY: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == Int32
   public func constrainedUnwrapped<T: HasAssoc>(_: T) where T.Assoc == UnwrappedInt { fatalError() }
   // CHECK: func constrainedWrapped<T>(_: T) where T : HasAssoc, T.Assoc == WrappedInt

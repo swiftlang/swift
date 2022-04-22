@@ -52,7 +52,7 @@ class C {
 ({ x in 2+x })(#^CLOSURE_CALLED_IN_PLACE_1^#
 
 // WITH_GLOBAL_INT: Begin completions
-// WITH_GLOBAL_INT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: globalFuncInt()[#Int#]; name=globalFuncInt()
+// WITH_GLOBAL_INT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]: globalFuncInt()[#Int#]; name=globalFuncInt()
 // WITH_GLOBAL_INT: End completions
 
 // rdar://19634354
@@ -67,7 +67,7 @@ while true {
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_AND_ASSOC_TYPE | %FileCheck %s -check-prefix=GENERIC_PARAM_AND_ASSOC_TYPE
 struct CustomGenericCollection<Key> : ExpressibleByDictionaryLiteral {
   // GENERIC_PARAM_AND_ASSOC_TYPE: Begin completions
-  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended/TypeRelation[Identical]:      count[#Int#]; name=count
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended/TypeRelation[Convertible]:      count[#Int#]; name=count
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[GenericTypeParam]/Local:       Key[#Key#]; name=Key
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Value[#Value#]; name=Value
   // GENERIC_PARAM_AND_ASSOC_TYPE: End completions

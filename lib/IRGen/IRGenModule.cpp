@@ -132,6 +132,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
     break;
   }
+  if (!Opts.TrapFuncName.empty()) {
+    CGO.TrapFuncName = Opts.TrapFuncName;
+  }
 
   auto &HSI = Importer->getClangPreprocessor()
                   .getHeaderSearchInfo()
@@ -600,9 +603,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
 
-  AccessibleFunctionRecordTy = createStructType(
-      *this, "swift.accessible_function",
-      {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy, Int32Ty});
+  AccessibleFunctionRecordTy =
+      createStructType(*this, "swift.accessible_function",
+                       {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
+                        RelativeAddressTy, Int32Ty});
 
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
@@ -658,9 +662,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
 
   SwiftContextTy->setBody({
-    SwiftContextPtrTy,    // Parent
-    TaskContinuationFunctionPtrTy, // ResumeParent,
-    SizeTy,               // Flags
+    SwiftContextPtrTy,             // Parent
+    TaskContinuationFunctionPtrTy, // ResumeParent
   });
 
   AsyncTaskAndContextTy = createStructType(
@@ -670,6 +673,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ContinuationAsyncContextTy = createStructType(
       *this, "swift.continuation_context",
       {SwiftContextTy,       // AsyncContext header
+       SizeTy,               // flags
        SizeTy,               // await synchronization
        ErrorPtrTy,           // error result pointer
        OpaquePtrTy,          // normal result address
@@ -1148,7 +1152,7 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  if (auto *wt = SIL.lookUpWitnessTable(Conf, /*deserializeLazily=*/false)) {
+  if (auto *wt = SIL.lookUpWitnessTable(Conf)) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
         LazilyEmittedWitnessTables.insert(wt).second) {
@@ -1573,7 +1577,9 @@ static llvm::GlobalObject *createForceImportThunk(IRGenModule &IGM) {
                                llvm::GlobalValue::LinkOnceODRLinkage, buf,
                                &IGM.Module);
     ForceImportThunk->setAttributes(IGM.constructInitialAttributes());
-    ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
+    ApplyIRLinkage(IGM.IRGen.Opts.InternalizeSymbols
+                      ? IRLinkage::Internal
+                      : IRLinkage::ExternalExport).to(ForceImportThunk);
     if (IGM.Triple.supportsCOMDAT())
       if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))
         GO->setComdat(IGM.Module.getOrInsertComdat(ForceImportThunk->getName()));
@@ -1739,7 +1745,7 @@ bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
-      (Triple.isOSDarwin() ||
+      (Triple.isOSDarwin() || Triple.isOSWindows() ||
        (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
   if (canPrespecializeTarget && isStandardLibrary()) {
     return IRGen.Opts.PrespecializeGenericMetadata;

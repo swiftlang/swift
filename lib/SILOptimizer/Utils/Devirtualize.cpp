@@ -1073,7 +1073,7 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
 
   std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
-      wmi->getConformance(), wmi->getMember());
+      wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
 
   if (!f)
     return false;
@@ -1153,7 +1153,7 @@ swift::tryDevirtualizeWitnessMethod(ApplySite applySite,
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
 
   std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
-      wmi->getConformance(), wmi->getMember());
+      wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
 
   return devirtualizeWitnessMethod(applySite, f, wmi->getConformance(), ore);
 }

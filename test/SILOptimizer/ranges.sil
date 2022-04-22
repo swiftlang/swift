@@ -1,0 +1,150 @@
+// RUN: %target-sil-opt %s -dump-ranges -o /dev/null | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+// CHECK-LABEL: Instruction range in basic_test:
+// CHECK-NEXT: begin:      %3 = string_literal utf8 "begin"
+// CHECK-NEXT: ends:       %7 = string_literal utf8 "end"
+// CHECK-NEXT:             %15 = string_literal utf8 "end"
+// CHECK-NEXT: exits:      %18 = string_literal utf8 "outside"
+// CHECK-NEXT: interiors:  %14 = string_literal utf8 "interior"
+// CHECK-NEXT:             %10 = string_literal utf8 "interior"
+// CHECK-NEXT: Block range in basic_test:
+// CHECK-NEXT: begin:     bb1
+// CHECK-NEXT: range:     [bb1, bb3]
+// CHECK-NEXT: inclrange: [bb2, bb1, bb4, bb3]
+// CHECK-NEXT: ends:      [bb2, bb4]
+// CHECK-NEXT: exits:     [bb5]
+// CHECK-NEXT: interiors: [bb3]
+// CHECK-NEXT: End function basic_test
+sil @basic_test : $@convention(thin) () -> () {
+bb0:
+  %0 = string_literal utf8 "outside"
+  br bb1
+bb1:
+  %2 = string_literal utf8 "outside"
+  %3 = string_literal utf8 "begin"
+  %4 = string_literal utf8 "inside"
+  cond_br undef, bb2, bb3
+bb2:
+  %6 = string_literal utf8 "inside"
+  %7 = string_literal utf8 "end"
+  %8 = string_literal utf8 "outside"
+  br bb6
+bb3:
+  %10 = string_literal utf8 "interior"
+  %11 = string_literal utf8 "inside"
+  cond_br undef, bb4, bb5
+bb4:
+  %13 = string_literal utf8 "inside"
+  %14 = string_literal utf8 "interior"
+  %15 = string_literal utf8 "end"
+  %16 = string_literal utf8 "outside"
+  br bb6
+bb5:
+  %18 = string_literal utf8 "outside"
+  br bb6
+bb6:
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: Instruction range in loops:
+// CHECK-NEXT: begin:      %3 = string_literal utf8 "begin"
+// CHECK-NEXT: ends:       %10 = string_literal utf8 "end"
+// CHECK-NEXT: exits:      %12 = tuple ()
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: Block range in loops:
+// CHECK-NEXT: begin:     bb1
+// CHECK-NEXT: range:     [bb5, bb3, bb2, bb4, bb1]
+// CHECK-NEXT: inclrange: [bb6, bb5, bb3, bb2, bb4, bb1]
+// CHECK-NEXT: ends:      [bb6]
+// CHECK-NEXT: exits:     [bb7]
+// CHECK-NEXT: interiors: []
+// CHECK-NEXT: End function loops
+sil @loops : $@convention(thin) () -> () {
+bb0:
+  %0 = string_literal utf8 "outside"
+  br bb1
+bb1:
+  %2 = string_literal utf8 "outside"
+  %3 = string_literal utf8 "begin"
+  %4 = string_literal utf8 "inside"
+  br bb2
+bb2:
+  cond_br undef, bb3, bb4
+bb3:
+  cond_br undef, bb5, bb7
+bb4:
+  br bb5
+bb5:
+  cond_br undef, bb2, bb6
+bb6:
+  %8 = string_literal utf8 "end"
+  cond_br undef, bb1, bb7
+bb7:
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: Instruction range in minimal:
+// CHECK-NEXT: begin:      %0 = string_literal utf8 "begin"
+// CHECK-NEXT: ends:       %1 = string_literal utf8 "end"
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: Block range in minimal:
+// CHECK-NEXT: begin:     bb0
+// CHECK-NEXT: range:     []
+// CHECK-NEXT: inclrange: [bb0]
+// CHECK-NEXT: ends:      [bb0]
+// CHECK-NEXT: exits:     []
+// CHECK-NEXT: interiors: []
+// CHECK-NEXT: End function minimal
+sil @minimal : $@convention(thin) () -> () {
+bb0:
+  %0 = string_literal utf8 "begin"
+  %1 = string_literal utf8 "end"
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: Instruction range in invalid:
+// CHECK-NEXT: <invalid>
+// CHECK:      Block range in invalid:
+// CHECK-NEXT: <invalid>
+// CHECK:      End function invalid
+sil @invalid : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+bb1:
+  %1 = string_literal utf8 "begin"
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %4 = string_literal utf8 "end"
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL:Instruction range in valid_blocks_invalid_instructions:
+// CHECK-NEXT: <invalid>
+// CHECK:      Block range in valid_blocks_invalid_instructions:
+// CHECK-NEXT: begin:     bb0
+// CHECK-NEXT: range:     []
+// CHECK-NEXT: inclrange: [bb0]
+// CHECK-NEXT: ends:      [bb0]
+// CHECK-NEXT: exits:     []
+// CHECK-NEXT: interiors: []
+// CHECK-NEXT: End function valid_blocks_invalid_instructions
+sil @valid_blocks_invalid_instructions : $@convention(thin) () -> () {
+bb0:
+  %0 = string_literal utf8 "end"
+  %1 = string_literal utf8 "begin"
+  %2 = string_literal utf8 "end"
+  %r = tuple()
+  return %r : $()
+}
+

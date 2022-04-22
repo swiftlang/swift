@@ -92,6 +92,14 @@ module WinSDK [system] {
       export *
     }
 
+    // api-ms-win-core-memory-l1-1-0.dll
+    module memory {
+      header "memoryapi.h"
+      export *
+
+      link "OneCore.Lib"
+    }
+
     // api-ms-win-core-namedpipe-l1-1-2-0.dll
     module namedpipe {
       header "namedpipeapi.h"
@@ -398,6 +406,13 @@ module WinSDK [system] {
     link "WinSpool.Lib"
   }
 
+  module PSAPI {
+    header "Psapi.h"
+    export *
+
+    link "psapi.lib"
+  }
+
   module RichEdit {
     header "Richedit.h"
     export *
@@ -409,6 +424,13 @@ module WinSDK [system] {
     export *
 
     link "sensorsapi.lib"
+  }
+
+  module ToolHelp {
+    header "TlHelp32.h"
+    export *
+
+    link "kernel32.Lib"
   }
 
   module UI {

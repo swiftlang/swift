@@ -18,15 +18,15 @@
 #define SWIFT_IDE_REPL_CODE_COMPLETION_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
+#include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include <memory>
-#include <vector>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace swift {
 

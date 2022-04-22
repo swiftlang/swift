@@ -11,7 +11,11 @@
 #===----------------------------------------------------------------------===#
 
 if(NOT swift_concurrency_extra_sources)
-  set(swift_concurrency_extra_sources)
+  set(swift_concurrency_extra_sources
+    Clock.swift
+    ContinuousClock.swift
+    SuspendingClock.swift
+    TaskSleepDuration.swift)
 endif()
 
 if(NOT swift_concurrency_install_component)
@@ -61,6 +65,9 @@ else()
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=never")
 endif()
 
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+  "-D__STDC_WANT_LIB_EXT1__=1")
+
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ../CompatibilityOverride/CompatibilityOverride.cpp
   Actor.cpp
@@ -68,6 +75,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncLet.cpp
   AsyncLet.swift
   CheckedContinuation.swift
+  Clock.cpp
   GlobalExecutor.cpp
   Errors.swift
   Error.cpp

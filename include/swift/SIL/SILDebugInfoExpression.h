@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/raw_ostream.h"
@@ -108,6 +109,12 @@ public:
     return DIOp;
   }
 };
+
+/// Returns the hashcode for the di expr element.
+inline llvm::hash_code hash_value(const SILDIExprElement &elt) {
+  return llvm::hash_combine(elt.getKind(), elt.getAsDecl(), elt.getAsDecl(),
+                            elt.getAsConstInt());
+}
 
 /// For a given SILDIExprOperator, provides information
 /// like its textual name and operand types.
@@ -273,5 +280,11 @@ public:
             SILDIExprOperator::Fragment;
   }
 };
+
+/// Returns the hashcode for the di expr element.
+inline llvm::hash_code hash_value(const SILDebugInfoExpression &elt) {
+  return llvm::hash_combine_range(elt.element_begin(), elt.element_end());
+}
+
 } // end namespace swift
 #endif

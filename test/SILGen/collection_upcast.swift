@@ -108,21 +108,3 @@ func testSetUpcastBridged(_ set: Set<BridgedSwift>) {
   // CHECK-NOT: destroy_value [[SET]]
   let anyObjectSet = set as Set<NSObject>
 }
-
-protocol P {
-  func selfArrayUpcast() -> [Self]
-  func selfDictionaryUpcast() -> [String : Self]
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s17collection_upcast44testCollectionUpcastWithCovariantSelfErasure{{.*}}F
-// CHECK: bb0([[ARG:%0]] : $*P):
-func testCollectionUpcastWithCovariantSelfErasure(arg: P) {
-  let array = arg.selfArrayUpcast() // [P]
-  // CHECK: open_existential_addr immutable_access [[ARG]] : $*P to $*@opened([[N:".*"]]) P
-  // CHECK: [[UPCAST_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCast{{.*}}F
-  // CHECK: apply [[UPCAST_FN]]<@opened([[N]]) P, P>(%{{[0-9]+}}) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
-  let dictionary = arg.selfDictionaryUpcast() // [String : P]
-  // CHECK: open_existential_addr immutable_access [[ARG]] : $*P to $*@opened([[N:".*"]]) P
-  // CHECK: [[UPCAST_FN:%[0-9]+]] = function_ref @$ss17_dictionaryUpCast{{.*}}F
-  // CHECK: apply [[UPCAST_FN]]<String, @opened([[N]]) P, String, P>(%{{[0-9]+}}) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
-}

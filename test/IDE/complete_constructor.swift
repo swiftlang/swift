@@ -284,7 +284,7 @@ struct ClosureInInit1 {
   var prop1: S = {
     return S(#^CLOSURE_IN_INIT_1^#
   }
-// CLOSURE_IN_INIT_1: Decl[Constructor]/CurrNominal/Flair[ArgLabels]{{(/TypeRelation\[Identical\])?}}:      ['(']{#Int#}[')'][#S#];
+// CLOSURE_IN_INIT_1: Decl[Constructor]/CurrNominal/Flair[ArgLabels]{{(/TypeRelation\[Convertible\])?}}:      ['(']{#Int#}[')'][#S#];
   var prop2: S = {
     return S(#^CLOSURE_IN_INIT_2?check=CLOSURE_IN_INIT_1^#
   }()
@@ -330,8 +330,8 @@ class DependentTypeInClosure<Data: DataType> {
 func testDependentTypeInClosure() {
   let _: DependentTypeInClosure = .#^DEPENDENT_IN_CLOSURE_3^#
 // DEPENDENT_IN_CLOSURE_3: Begin completions, 2 items
-// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#(arg): DataType#}, {#fn: (Data.Content) -> Void##(Data.Content) -> Void#})[#DependentTypeInClosure<DataType>#];
-// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#arg: DataType#}, {#fn: () -> Data.Content##() -> Data.Content#})[#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#(arg): DataType#}, {#fn: (Data.Content) -> Void##(Data.Content) -> Void#})[#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#arg: DataType#}, {#fn: () -> Data.Content##() -> Data.Content#})[#DependentTypeInClosure<DataType>#];
 // DEPENDENT_IN_CLOSURE_3: End completions
 
   let _ = DependentTypeInClosure(#^DEPENDENT_IN_CLOSURE_1^#)
@@ -360,4 +360,20 @@ func testInitWithUnresolved() {
 // INIT_WITH_UNRESOLVEDTYPE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg: _#}, {#fn: (_.Content) -> Void##(_.Content) -> Void#}[')'][#InitWithUnresolved<_>#];
 // INIT_WITH_UNRESOLVEDTYPE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg2: _#}[')'][#InitWithUnresolved<_>#];
 // INIT_WITH_UNRESOLVEDTYPE_1: End completions
+}
+
+func testIgnoreGenericArgsAfterCompletionToken() {
+  struct IPv4 {}
+
+  public struct HostRecord<IPType> {
+    init(position: inout Int) throws {}
+  }
+
+  func deserializeRecord() throws -> HostRecord<IPv4> {
+    var position = 42
+    return try #^IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN^#HostRecord<IPv4>(position: &position)
+// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN: Begin completions
+// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN-DAG: Decl[Struct]/Local: HostRecord[#HostRecord#];
+// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN: End completions
+  }
 }

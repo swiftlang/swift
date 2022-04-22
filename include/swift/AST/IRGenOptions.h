@@ -87,6 +87,13 @@ enum class SwiftAsyncFramePointerKind : unsigned {
    Never,  // Don't emit Swift async extended frame info.
 };
 
+enum class ReflectionMetadataMode : unsigned {
+  None,         ///< Don't emit reflection metadata at all.
+  DebuggerOnly, ///< Emit reflection metadata for the debugger, don't link them
+                ///  into runtime metadata and don't force them to stay alive.
+  Runtime,      ///< Make reflection metadata fully available.
+};
+
 using clang::PointerAuthSchema;
 
 struct PointerAuthOptions : clang::PointerAuthOptions {
@@ -182,6 +189,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// The swift async context entry in the extended frame info.
   PointerAuthSchema AsyncContextExtendedFrameEntry;
+
+  /// Extended existential type shapes in flight.
+  PointerAuthSchema ExtendedExistentialTypeShape;
+
+  /// Non-unique extended existential type shapes in flight.
+  PointerAuthSchema NonUniqueExtendedExistentialTypeShape;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -295,7 +308,7 @@ public:
   unsigned ValueNames : 1;
 
   /// Emit nominal type field metadata.
-  unsigned EnableReflectionMetadata : 1;
+  ReflectionMetadataMode ReflectionMetadata : 2;
 
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
@@ -312,6 +325,11 @@ public:
   unsigned LazyInitializeClassMetadata : 1;
   unsigned LazyInitializeProtocolConformances : 1;
   unsigned IndirectAsyncFunctionPointer : 1;
+
+  /// Use absolute function references instead of relative ones.
+  /// Mainly used on WebAssembly, that doesn't support relative references
+  /// to code from data.
+  unsigned CompactAbsoluteFunctionPointer : 1;
 
   /// Normally if the -read-legacy-type-info flag is not specified, we look for
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
@@ -370,6 +388,13 @@ public:
 
   unsigned InternalizeAtLink : 1;
 
+  /// Internalize symbols (static library) - do not export any public symbols.
+  unsigned InternalizeSymbols : 1;
+
+  /// Whether to avoid emitting zerofill globals as preallocated type metadata
+  /// and protocol conformance caches.
+  unsigned NoPreallocatedInstantiationCaches : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -402,6 +427,10 @@ public:
 
   JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 
+  /// If not an empty string, trap intrinsics are lowered to calls to this
+  /// function instead of to trap instructions.
+  std::string TrapFuncName = "";
+
   IRGenOptions()
       : DWARFVersion(2),
         OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
@@ -419,11 +448,12 @@ public:
         LLVMLTOKind(IRGenLLVMLTOKind::None),
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false),
-        ValueNames(false), EnableReflectionMetadata(true),
+        ValueNames(false), ReflectionMetadata(ReflectionMetadataMode::Runtime),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false),
-        IndirectAsyncFunctionPointer(false), DisableLegacyTypeInfo(false),
+        IndirectAsyncFunctionPointer(false),
+        CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
@@ -432,7 +462,8 @@ public:
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
-        InternalizeAtLink(false),
+        InternalizeAtLink(false), InternalizeSymbols(false),
+        NoPreallocatedInstantiationCaches(false),
         CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}

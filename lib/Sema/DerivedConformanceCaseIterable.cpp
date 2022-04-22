@@ -98,9 +98,9 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
 
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl) =
-      declareDerivedProperty(Context.Id_allCases, returnTy, returnTy,
-                             /*isStatic=*/true, /*isFinal=*/true);
+  std::tie(propDecl, pbDecl) = declareDerivedProperty(
+      SynthesizedIntroducer::Var, Context.Id_allCases, returnTy, returnTy,
+      /*isStatic=*/true, /*isFinal=*/true);
 
   // Define the getter.
   auto *getterDecl = addGetterToReadOnlyDerivedProperty(propDecl, returnTy);

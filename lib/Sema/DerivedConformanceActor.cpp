@@ -138,10 +138,10 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   }
   Type executorType = executorDecl->getDeclaredInterfaceType();
 
-  auto propertyPair =
-    derived.declareDerivedProperty(ctx.Id_unownedExecutor,
-                                   executorType, executorType,
-                                   /*static*/ false, /*final*/ false);
+  auto propertyPair = derived.declareDerivedProperty(
+      DerivedConformance::SynthesizedIntroducer::Var, ctx.Id_unownedExecutor,
+      executorType, executorType,
+      /*static*/ false, /*final*/ false);
   auto property = propertyPair.first;
   property->setSynthesized(true);
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,

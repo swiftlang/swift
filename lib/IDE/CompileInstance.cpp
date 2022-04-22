@@ -12,6 +12,7 @@
 
 #include "swift/IDE/CompileInstance.h"
 
+#include "DependencyChecking.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
@@ -204,6 +205,16 @@ bool CompileInstance::performCachedSemaIfPossible(DiagnosticConsumer *DiagC) {
 
   SourceManager &SM = CI->getSourceMgr();
   auto FS = SM.getFileSystem();
+
+  if (shouldCheckDependencies()) {
+    if (areAnyDependentFilesInvalidated(*CI, *FS, /*excludeBufferID=*/None,
+                                        DependencyCheckedTimestamp,
+                                        InMemoryDependencyHash)) {
+      return true;
+    }
+    DependencyCheckedTimestamp = std::chrono::system_clock::now();
+  }
+
   SourceManager tmpSM(FS);
 
   // Collect modified function body.
@@ -230,9 +241,6 @@ bool CompileInstance::setupCI(
     llvm::ArrayRef<const char *> origArgs,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
     DiagnosticConsumer *diagC) {
-  CI->addDiagnosticConsumer(diagC);
-  SWIFT_DEFER { CI->removeDiagnosticConsumer(diagC); };
-
   auto &Diags = CI->getDiags();
 
   SmallVector<const char *, 16> args;
@@ -269,7 +277,12 @@ bool CompileInstance::setupCI(
   invocation.getFrontendOptions().LLVMArgs.clear();
 
   /// Declare the frontend to be used for multiple compilations.
-  invocation.getFrontendOptions().ReuseFrontendForMutipleCompilations = true;
+  invocation.getFrontendOptions().ReuseFrontendForMultipleCompilations = true;
+
+  // Enable dependency trakcing (excluding system modules) to invalidate the
+  // compiler instance if any dependent files are modified.
+  invocation.getFrontendOptions().IntermoduleDependencyTracking =
+      IntermoduleDepTrackingMode::ExcludeSystem;
 
   std::string InstanceSetupError;
   if (CI->setup(invocation, InstanceSetupError)) {
@@ -280,7 +293,7 @@ bool CompileInstance::setupCI(
   return true;
 }
 
-void CompileInstance::performSema(
+bool CompileInstance::performSema(
     llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
     DiagnosticConsumer *DiagC,
@@ -297,30 +310,33 @@ void CompileInstance::performSema(
     if (!performCachedSemaIfPossible(DiagC)) {
       // If we compileted cacehd Sema operation. We're done.
       ++CachedReuseCount;
-      return;
+      return CI->getDiags().hadAnyError();
     }
   }
 
   // Performing a new operation. Reset the compiler instance.
-  CachedArgHash = hash_code();
-  CachedReuseCount = 0;
   CI = std::make_unique<CompilerInstance>();
+  CI->addDiagnosticConsumer(DiagC);
 
   if (!setupCI(Args, fileSystem, DiagC)) {
     // Failed to setup the CI.
     CI.reset();
-    return;
+    return true;
   }
 
-  CI->addDiagnosticConsumer(DiagC);
-  SWIFT_DEFER { CI->removeDiagnosticConsumer(DiagC); };
-
-  // CI is potentially reusable.
+  // Remember cache related information.
+  DependencyCheckedTimestamp = std::chrono::system_clock::now();
   CachedArgHash = ArgsHash;
+  CachedReuseCount = 0;
+  InMemoryDependencyHash.clear();
+  cacheDependencyHashIfNeeded(*CI, /*excludeBufferID=*/None,
+                              InMemoryDependencyHash);
 
   // Perform!
   CI->getASTContext().CancellationFlag = CancellationFlag;
   CI->performSema();
+  CI->removeDiagnosticConsumer(DiagC);
+  return CI->getDiags().hadAnyError();
 }
 
 bool CompileInstance::performCompile(
@@ -334,14 +350,24 @@ bool CompileInstance::performCompile(
   if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
     return true;
 
-  performSema(Args, fileSystem, DiagC, CancellationFlag);
-  if (CI->getDiags().hadAnyError())
+  if (performSema(Args, fileSystem, DiagC, CancellationFlag))
     return true;
 
   // Cancellation check after Sema.
   if (CI->isCancellationRequested())
     return true;
 
+  CI->addDiagnosticConsumer(DiagC);
+  SWIFT_DEFER { CI->removeDiagnosticConsumer(DiagC); };
   int ReturnValue = 0;
   return performCompileStepsPostSema(*CI, ReturnValue, /*observer=*/nullptr);
+}
+
+bool CompileInstance::shouldCheckDependencies() const {
+  assert(CI);
+  using namespace std::chrono;
+  auto now = system_clock::now();
+  auto threshold =
+      DependencyCheckedTimestamp + seconds(Opts.DependencyCheckIntervalSecond);
+  return threshold <= now;
 }

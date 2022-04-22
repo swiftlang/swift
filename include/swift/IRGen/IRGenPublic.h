@@ -31,7 +31,7 @@ class IRGenModule;
 std::pair<IRGenerator *, IRGenModule *>
 createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
                   StringRef MainInputFilenameForDebugInfo,
-                  StringRef PrivateDiscriminator);
+                  StringRef PrivateDiscriminator, IRGenOptions &options);
 
 /// Delete the IRGenModule and IRGenerator obtained by the above call.
 void deleteIRGenModule(std::pair<IRGenerator *, IRGenModule *> &Module);

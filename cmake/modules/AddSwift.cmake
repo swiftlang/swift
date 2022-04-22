@@ -162,9 +162,9 @@ function(_add_host_variant_c_compile_link_flags name)
     # side effects are introduced should a new search path be added.
     target_compile_options(${name} PRIVATE
       $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:
-      -arch ${SWIFT_HOST_VARIANT_ARCH}
       "-F${SWIFT_SDK_${SWIFT_HOST_VARIANT_ARCH}_PATH}/../../../Developer/Library/Frameworks"
     >)
+    set_property(TARGET ${name} PROPERTY OSX_ARCHITECTURES "${SWIFT_HOST_VARIANT_ARCH}")
   endif()
 
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
@@ -344,7 +344,7 @@ function(_add_host_variant_link_flags target)
     target_link_libraries(${target} PRIVATE
       pthread
       dl)
-    if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "armv6|armv7|i686")
+    if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "armv5|armv6|armv7|i686")
       target_link_libraries(${target} PRIVATE atomic)
     endif()
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL FREEBSD)
@@ -636,7 +636,7 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(options HAS_SWIFT_MODULES)
+  set(options HAS_SWIFT_MODULES THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
   set(single_parameter_options SWIFT_COMPONENT BOOTSTRAPPING)
   set(multiple_parameter_options LLVM_LINK_COMPONENTS)
 
@@ -857,6 +857,19 @@ function(add_swift_host_tool executable)
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>">
         )
     endif()
+  endif()
+
+  if(ASHT_THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
+    string(CONCAT lto_codegen_only_link_options
+      "$<"
+        "$<AND:"
+          "$<BOOL:${LLVM_LINKER_IS_LD64}>,"
+          "$<BOOL:${SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS}>,"
+          "$<STREQUAL:${SWIFT_TOOLS_ENABLE_LTO},thin>"
+        ">:"
+        "LINKER:-flto-codegen-only"
+      ">")
+    target_link_options(${executable} PRIVATE "${lto_codegen_only_link_options}")
   endif()
 
   if(NOT ${ASHT_SWIFT_COMPONENT} STREQUAL "no_component")

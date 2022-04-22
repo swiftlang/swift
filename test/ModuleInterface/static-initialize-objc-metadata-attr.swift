@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -target %target-pre-stable-abi-triple -module-name Module | %FileCheck %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name Module -target %target-pre-stable-abi-triple
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Module
+// RUN: %FileCheck %s < %t.swiftinterface
 // REQUIRES: objc_interop
 
 import Foundation

@@ -1,5 +1,5 @@
 // REQUIRES: OS=macosx
-// RUN: %target-swift-frontend -typecheck %s -F %S/Inputs/frameworks -enable-clang-spi -verify
+// RUN: %target-swift-frontend -typecheck %s -F %S/Inputs/frameworks -verify -library-level api
 
 import SPIContainerImporter
 

@@ -56,7 +56,7 @@ var ao1 : AnyObject
 var ao2 = ao1
 
 var aot1 : AnyObject.Type
-var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have type 'AnyObject.Type', which may be unexpected}} \
+var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have type 'any AnyObject.Type', which may be unexpected}} \
                        // expected-note {{add an explicit type annotation to silence this warning}} {{9-9=: AnyObject.Type}}
 
 

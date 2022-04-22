@@ -535,6 +535,8 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
   //
   // FIXME: Conformance lookup should really depend on source location for
   // this to be 100% correct.
+  // FIXME: When a class and an extension with the same availability declare the
+  // same conformance, this silently takes the class and drops the extension.
   if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
       rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
     return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
@@ -544,12 +546,22 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
 
   // If one entry is fixed and the other is not, we have our answer.
   if (lhs->isFixed() != rhs->isFixed()) {
+    auto isReplaceableOrMarker = [](ConformanceEntry *entry) -> bool {
+      ConformanceEntryKind kind = entry->getRankingKind();
+      if (isReplaceable(kind))
+        return true;
+
+      // Allow replacement of an explicit conformance to a marker protocol.
+      // (This permits redundant explicit declarations of `Sendable`.)
+      return (kind == ConformanceEntryKind::Explicit
+              && entry->getProtocol()->isMarkerProtocol());
+    };
+
     // If the non-fixed conformance is not replaceable, we have a failure to
     // diagnose.
-    diagnoseSuperseded = (lhs->isFixed() &&
-                          !isReplaceable(rhs->getRankingKind())) ||
-                         (rhs->isFixed() &&
-                          !isReplaceable(lhs->getRankingKind()));
+    // FIXME: We should probably diagnose if they have different constraints.
+    diagnoseSuperseded = (lhs->isFixed() && !isReplaceableOrMarker(rhs)) ||
+                         (rhs->isFixed() && !isReplaceableOrMarker(lhs));
       
     return lhs->isFixed() ? Ordering::Before : Ordering::After;
   }
@@ -1049,8 +1061,8 @@ void ConformanceLookupTable::lookupConformances(
 }
 
 void ConformanceLookupTable::getAllProtocols(
-       NominalTypeDecl *nominal,
-       SmallVectorImpl<ProtocolDecl *> &scratch) {
+    NominalTypeDecl *nominal, SmallVectorImpl<ProtocolDecl *> &scratch,
+    bool sorted) {
   // We need to expand all implied conformances to find the complete
   // set of protocols to which this nominal type conforms.
   updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
@@ -1063,7 +1075,9 @@ void ConformanceLookupTable::getAllProtocols(
     scratch.push_back(conformance.first);
   }
 
-  // FIXME: sort the protocols in some canonical order?
+  if (sorted) {
+    llvm::array_pod_sort(scratch.begin(), scratch.end(), TypeDecl::compare);
+  }
 }
 
 int ConformanceLookupTable::compareProtocolConformances(

@@ -107,7 +107,7 @@ protocol P12 {
 extension Int : P11 {}
 struct S3 : P12 { // expected-error {{type 'S3' does not conform to protocol 'P12'}}
     func bar() -> P11 { return 0 }
-    // expected-note@-1 {{cannot infer 'A' = 'P11' because 'P11' as a type cannot conform to protocols; did you mean to use an opaque result type?}}{{19-19=some }}
+    // expected-note@-1 {{cannot infer 'A' = 'any P11' because 'any P11' as a type cannot conform to protocols; did you mean to use an opaque result type?}}{{19-19=some }}
 }
 
 protocol P13 {
@@ -116,7 +116,7 @@ protocol P13 {
 }
 struct S4: P13 { // expected-error {{type 'S4' does not conform to protocol 'P13'}}
   var bar: P11 { return 0 }
-  // expected-note@-1 {{cannot infer 'A' = 'P11' because 'P11' as a type cannot conform to protocols; did you mean to use an opaque result type?}}{{12-12=some }}
+  // expected-note@-1 {{cannot infer 'A' = 'any P11' because 'any P11' as a type cannot conform to protocols; did you mean to use an opaque result type?}}{{12-12=some }}
 }
 
 protocol P14 {
@@ -125,7 +125,7 @@ protocol P14 {
 }
 struct S5: P14 { // expected-error {{type 'S5' does not conform to protocol 'P14'}}
   subscript(i: Int) -> P11 { return i }
-  // expected-note@-1 {{cannot infer 'A' = 'P11' because 'P11' as a type cannot conform to protocols; did you mean to use an opaque result type?}}{{24-24=some }}
+  // expected-note@-1 {{cannot infer 'A' = 'any P11' because 'any P11' as a type cannot conform to protocols; did you mean to use an opaque result type?}}{{24-24=some }}
 }
 
 // SR-12759

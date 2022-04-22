@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
-// RUN: %FileCheck %s < %t.dump
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=off
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=on 2>&1 | %FileCheck %s
 
 protocol P1 { 
   func p1()
@@ -203,7 +202,7 @@ struct X8 : P12 {
 
 struct X9<T: P12, U: P12> where T.B == U.B {
   // CHECK-LABEL: X9.upperSameTypeConstraint
-	// CHECK: Generic signature: <T, U, V where T == X8, U : P12, U.[P12]B == X8.B>
+	// CHECK: Generic signature: <T, U, V where T == X8, U : P12, U.[P12]B == X7>
   // CHECK: Canonical generic signature: <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 == X8, τ_0_1 : P12, τ_0_1.[P12]B == X7>
 	func upperSameTypeConstraint<V>(_: V) where T == X8 { }
 }
@@ -219,7 +218,7 @@ struct X10: P11, P12 {
 
 struct X11<T: P12, U: P12> where T.B == U.B.A {
 	// CHECK-LABEL: X11.upperSameTypeConstraint
-	// CHECK: Generic signature: <T, U, V where T : P12, U == X10, T.[P12]B == X10.A>
+	// CHECK: Generic signature: <T, U, V where T : P12, U == X10, T.[P12]B == X10>
 	// CHECK: Canonical generic signature: <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 : P12, τ_0_1 == X10, τ_0_0.[P12]B == X10>
 	func upperSameTypeConstraint<V>(_: V) where U == X10 { }
 }
@@ -270,7 +269,7 @@ struct X18: P18, P17 {
 }
 
 // CHECK-LABEL: .X19.foo@
-// CHECK: Generic signature: <T, U where T == X18.A>
+// CHECK: Generic signature: <T, U where T == X18>
 struct X19<T: P18> where T == T.A {
   func foo<U>(_: U) where T == X18 { }
 }
@@ -323,22 +322,6 @@ struct X24<T: P20> : P24 {
   typealias C = T
 }
 
-// CHECK-LABEL: .P25a@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P25a]A == X24<Self.[P25a]B>, Self.[P25a]B : P20>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P25a]A == X24<τ_0_0.[P25a]B>, τ_0_0.[P25a]B : P20>
-protocol P25a {
-  associatedtype A: P24 // expected-warning{{redundant conformance constraint 'Self.A' : 'P24'}}
-  associatedtype B: P20 where A == X24<B> // expected-note{{conformance constraint 'Self.A' : 'P24' implied here}}
-}
-
-// CHECK-LABEL: .P25b@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P25b]A == X24<Self.[P25b]B>, Self.[P25b]B : P20>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P25b]A == X24<τ_0_0.[P25b]B>, τ_0_0.[P25b]B : P20>
-protocol P25b {
-  associatedtype A
-  associatedtype B: P20 where A == X24<B>
-}
-
 protocol P25c {
   associatedtype A: P24
   associatedtype B where A == X<B> // expected-error{{cannot find type 'X' in scope}}
@@ -347,32 +330,6 @@ protocol P25c {
 protocol P25d {
   associatedtype A
   associatedtype B where A == X24<B> // expected-error{{type 'Self.B' does not conform to protocol 'P20'}}
-}
-
-// Similar to the above, but with superclass constraints.
-protocol P26 {
-  associatedtype C: X3
-}
-
-struct X26<T: X3> : P26 {
-  typealias C = T
-}
-
-// CHECK-LABEL: .P27a@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P27a]A == X26<Self.[P27a]B>, Self.[P27a]B : X3>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P27a]A == X26<τ_0_0.[P27a]B>, τ_0_0.[P27a]B : X3>
-protocol P27a {
-  associatedtype A: P26 // expected-warning{{redundant conformance constraint 'Self.A' : 'P26'}}
-
-  associatedtype B: X3 where A == X26<B> // expected-note{{conformance constraint 'Self.A' : 'P26' implied here}}
-}
-
-// CHECK-LABEL: .P27b@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P27b]A == X26<Self.[P27b]B>, Self.[P27b]B : X3>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P27b]A == X26<τ_0_0.[P27b]B>, τ_0_0.[P27b]B : X3>
-protocol P27b {
-  associatedtype A
-  associatedtype B: X3 where A == X26<B>
 }
 
 // ----------------------------------------------------------------------------

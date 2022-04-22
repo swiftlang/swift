@@ -135,6 +135,11 @@ https://medium.com/kinandcartacreated/contributing-to-swift-part-2-efebcf7b6c93
 
 ## Code generation, runtime and ABI
 
+- [Bringing Swift to Windows][] by Saleem Abdulrasool (talk, Nov 2019): This talk
+  covers the story of bringing Swift to Windows from the ground up through an unusual
+  route: cross-compilation on Linux. It covers interesting challenges in porting
+  the Swift compiler, standard library, and core libraries that were overcome in the
+  process of bringing Swift to a platform that challenges the Unix design assumptions.
 - [The Swift Runtime][] by Jordan Rose (blog post series, Aug-Oct 2020):
   This blog post series describes the runtime layout for different structures,
   runtime handling for metadata, as well as basic runtime functionality such
@@ -187,6 +192,7 @@ https://medium.com/kinandcartacreated/contributing-to-swift-part-2-efebcf7b6c93
   value witness tables, type metadata, abstraction patterns, reabstraction,
   reabstraction thunks and protocol witness tables.
 
+[Bringing Swift to Windows]: https://www.youtube.com/watch?v=Zjlxa1NIfJc
 [Mac OS 9]: https://belkadan.com/blog/2020/04/Swift-on-Mac-OS-9/
 [The Swift Runtime]: https://belkadan.com/blog/tags/swift-runtime/
 [Part 1: Heap Objects]: https://belkadan.com/blog/2020/08/Swift-Runtime-Heap-Objects/

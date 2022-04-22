@@ -5,4 +5,4 @@ RUN: %debug-remote-run -v echo hello 2>&1 >/dev/null | %FileCheck -check-prefix 
 
 CHECK: {{^hello$}}
 
-VERBOSE: /usr/bin/env echo hello
+VERBOSE: /usr/bin/env {{.*}}echo hello

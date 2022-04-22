@@ -3,6 +3,8 @@
 // on the same platform at the same time.
 // RUN: %target-sil-opt -enable-sil-verify-all %s -release-devirtualizer -module-name=test | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 sil_stage canonical
 
 import Builtin
@@ -39,6 +41,27 @@ bb0:
   %1 = alloc_ref $B
   strong_release %1 : $B
   dealloc_ref %1 : $B
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_devirtualize_devirtualized
+// CHECK: alloc_ref
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: set_deallocating
+// CHECK-NEXT: dealloc_ref
+// CHECK-NEXT: dealloc_stack_ref
+// CHECK-NEXT: tuple
+// CHECK: } // end sil function 'dont_devirtualize_devirtualized'
+sil @dont_devirtualize_devirtualized : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $B
+  strong_retain %1 : $B
+  strong_release %1 : $B
+  set_deallocating %1 : $B
+  dealloc_ref %1 : $B
+  dealloc_stack_ref %1 : $B
   %r = tuple ()
   return %r : $()
 }

@@ -1403,7 +1403,7 @@ class AnotherClass : MyNSObj { }
 
 sil @MyNSObj_self : $@convention(method) (@guaranteed MyNSObj) -> @owned MyNSObj
 
-sil shared [transparent] [serializable] [reabstraction_thunk] @reabstraction_thunk1 : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnotherClass) -> @out AnotherClass {
+sil shared [transparent] [serialized] [reabstraction_thunk] @reabstraction_thunk1 : $@convention(thin) (@in (), @owned @callee_owned () -> @owned AnotherClass) -> @out AnotherClass {
 bb0(%0 : $*AnotherClass, %1 : $*(), %2 : $@callee_owned () -> @owned AnotherClass):
   %3 = apply %2() : $@callee_owned () -> @owned AnotherClass
   store %3 to %0 : $*AnotherClass
@@ -1412,7 +1412,7 @@ bb0(%0 : $*AnotherClass, %1 : $*(), %2 : $@callee_owned () -> @owned AnotherClas
 }
 
 // @nonobjc curry thunk of MyNSObj.self()
-sil shared [serializable] [thunk] @curry_thunk_for_MyNSObj_self : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj {
+sil shared [serialized] [thunk] @curry_thunk_for_MyNSObj_self : $@convention(thin) (@owned MyNSObj) -> @owned @callee_owned () -> @owned MyNSObj {
 bb0(%0 : $MyNSObj):
   // function_ref @nonobjc MyNSObj.self()
   %1 = function_ref @MyNSObj_self : $@convention(method) (@guaranteed MyNSObj) -> @owned MyNSObj

@@ -2714,7 +2714,17 @@ ManglingError Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node,
                                                               unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
-
+ManglingError Remangler::mangleParameterizedProtocol(Node *node,
+                                                     unsigned int depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+ManglingError Remangler::mangleUniquable(Node *node, unsigned int depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
+                                                     unsigned int depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
 ManglingError
 Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node,
                                                       unsigned depth) {
@@ -2798,5 +2808,16 @@ Demangle::mangleNodeAsObjcCString(NodePointer node,
 ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
                                                         unsigned depth) {
   Buffer << "HF";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBackDeploymentThunk(Node *node, unsigned depth) {
+  Buffer << "Twb";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
+                                                      unsigned depth) {
+  Buffer << "TwB";
   return ManglingError::Success;
 }

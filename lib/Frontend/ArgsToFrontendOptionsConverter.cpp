@@ -169,7 +169,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
 
-  // None here means error, not just "no inputs". Propagage unconditionally.
+  // None here means error, not just "no inputs". Propagate unconditionally.
   if (!inputsAndOutputs)
     return true;
 
@@ -274,6 +274,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
+  Opts.ExposePublicDeclsInClangHeader =
+      Args.hasArg(OPT_clang_header_expose_public_decls);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
@@ -297,6 +299,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     auto SplitMap = StringRef(A).split('=');
     Opts.serializedPathObfuscator.addMapping(SplitMap.first, SplitMap.second);
   }
+  Opts.emptyABIDescriptor = Args.hasArg(OPT_empty_abi_descriptor);
   return false;
 }
 
@@ -624,13 +627,8 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     return true;
   }
   if (!FrontendOptions::canActionEmitClangHeader(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+      Opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
-    return true;
-  }
-  if (!FrontendOptions::canActionEmitClangHeader(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasCxxHeaderOutputPath()) {
-    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_cxx_header);
     return true;
   }
   if (!FrontendOptions::canActionEmitLoadedModuleTrace(Opts.RequestedAction) &&

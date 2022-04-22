@@ -270,6 +270,10 @@ def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to persist automatically created precompiled bridging headers">;
 
+def async_main: Flag<["-"], "async-main">,
+    Flags<[FrontendOption]>,
+    HelpText<"Resolve main function as if it were called from an asynchronous context">;
+
 // FIXME: Unhide this once it doesn't depend on an output file map.
 def incremental : Flag<["-"], "incremental">,
   Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -532,13 +536,11 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
          SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
-def emit_cxx_header : Flag<["-"], "emit-cxx-header">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
-  HelpText<"Emit a C++ header file">;
-def emit_cxx_header_path : Separate<["-"], "emit-cxx-header-path">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput]>,
-  MetaVarName<"<path>">, HelpText<"Emit a C++ header file to <path>">;
+  HelpText<"Emit an Objective-C and C++ header file to <path>">,
+  Alias<emit_objc_header_path>;
 
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
@@ -606,10 +608,6 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
-def enable_experimental_cxx_interop :
-  Flag<["-"], "enable-experimental-cxx-interop">,
-  HelpText<"Allow importing C++ modules into Swift (experimental feature)">;
-
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
@@ -626,15 +624,15 @@ def no_emit_module_separately:
 
 def requirement_machine_protocol_signatures_EQ : Joined<["-"], "requirement-machine-protocol-signatures=">,
   Flags<[FrontendOption]>,
-  HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', or 'verify'">;
+  HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', 'verify' or 'check'">;
 
 def requirement_machine_abstract_signatures_EQ : Joined<["-"], "requirement-machine-abstract-signatures=">,
   Flags<[FrontendOption]>,
-  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', or 'verify'">;
+  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', 'verify' or 'check'">;
 
 def requirement_machine_inferred_signatures_EQ : Joined<["-"], "requirement-machine-inferred-signatures=">,
   Flags<[FrontendOption]>,
-  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', or 'verify'">;
+  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', 'verify' or 'check'">;
 
 def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
@@ -678,6 +676,10 @@ def disable_actor_data_race_checks :
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Disable runtime checks for actor data races">;
 
+def enable_bare_slash_regex : Flag<["-"], "enable-bare-slash-regex">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Enable the use of forward slash regular-expression literal syntax">;
+
 def warn_implicit_overrides :
   Flag<["-"], "warn-implicit-overrides">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -693,9 +695,17 @@ def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
 
 def warn_concurrency : Flag<["-"], "warn-concurrency">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ModuleInterfaceOptionIgnorable]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about code that is unsafe according to the Swift Concurrency "
            "model and will become ill-formed in a future language version">;
+
+def strict_concurrency : Joined<["-"], "strict-concurrency=">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Specify the how strict concurrency checking will be. The value may "
+           "be 'explicit' (most 'Sendable' checking is disabled), "
+           "'targeted' ('Sendable' checking is enabled in code that uses the "
+           "concurrency model, or 'complete' ('Sendable' and other checking is "
+           "enabled for all code in the module)">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
@@ -810,9 +820,13 @@ def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Perform cross-module optimization">;
 
+def disableCrossModuleOptimization : Flag<["-"], "disable-cmo">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Disable cross-module optimization">;
+
 def ExperimentalPerformanceAnnotations : Flag<["-"], "experimental-performance-annotations">,
   Flags<[HelpHidden, FrontendOption]>,
-  HelpText<"Perform cross-module optimization">;
+  HelpText<"Enable experimental performance annotations">;
 
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
@@ -843,6 +857,10 @@ def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
 def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   Flags<[FrontendOption]>,
   HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
+
+def file_compilation_dir : Separate<["-"], "file-compilation-dir">,
+  Flags<[FrontendOption]>, MetaVarName<"<path>">,
+  HelpText<"The compilation directory to embed in the debug info. Coverage mapping is not supported yet.">;
 
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,
@@ -1147,6 +1165,11 @@ def clang_target : Separate<["-"], "clang-target">,
 def disable_clang_target : Flag<["-"], "disable-clang-target">,
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Disable a separately specified target triple for Clang instance to use">;
+
+def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Require inlinable code with no '@available' attribute to back-deploy "
+           "to this version of the '-target' OS">;
 
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,

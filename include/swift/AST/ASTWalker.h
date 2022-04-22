@@ -217,7 +217,7 @@ public:
   /// TapExpr.
   virtual bool shouldWalkIntoTapExpression() { return true; }
 
-  /// This method configures whether the the walker should visit the underlying
+  /// This method configures whether the walker should visit the underlying
   /// value of a property wrapper placeholder.
   virtual bool shouldWalkIntoPropertyWrapperPlaceholderValue() { return true; }
 
@@ -234,6 +234,11 @@ public:
   /// method to return true; instead, refactor existing code as needed
   /// until eventually we can remove this altogether.
   virtual bool shouldWalkAccessorsTheOldWay() { return false; }
+
+  /// Whether to walk internal top level decls in serialized modules.
+  ///
+  /// TODO: Consider changing this to false by default.
+  virtual bool shouldWalkSerializedTopLevelInternalDecls() { return true; }
 
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.  If it returns false,

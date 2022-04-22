@@ -225,6 +225,42 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
   dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
 }
 
+#define DISPATCH_UP_OR_MONOTONIC_TIME_MASK  (1ULL << 63)
+
+SWIFT_CC(swift)
+static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
+                                                     long long nsec,
+                                                     long long tsec,
+                                                     long long tnsec,
+                                                     int clock, Job *job) {
+  assert(job && "no job provided");
+
+  dispatch_function_t dispatchFunction = &__swift_run_job;
+  void *dispatchContext = job;
+
+  JobPriority priority = job->getPriority();
+
+  auto queue = getGlobalQueue(priority);
+
+  job->SchedulerPrivate[Job::DispatchQueueIndex] =
+      DISPATCH_QUEUE_GLOBAL_EXECUTOR;
+
+  long long nowSec;
+  long long nowNsec;
+  swift_get_time(&nowSec, &nowNsec, (swift_clock_id)clock);
+
+  uint64_t delta = (sec - nowSec) * NSEC_PER_SEC + nsec - nowNsec;
+
+  dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delta);
+
+  if (clock == swift_clock_id_continuous) {
+    when |= DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
+  }
+  // TODO: this should pass the leeway/tolerance along when it is not -1 nanoseconds
+  // either a dispatch_source can be created or a better dispatch_after_f can be made for this
+  dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
+}
+
 SWIFT_CC(swift)
 static void swift_task_enqueueMainExecutorImpl(Job *job) {
   assert(job && "no job provided");

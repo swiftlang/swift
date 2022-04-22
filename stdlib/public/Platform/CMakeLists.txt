@@ -130,13 +130,7 @@ foreach(sdk ${SWIFT_SDKS})
     set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
     set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
 
-    if(${sdk} STREQUAL ANDROID)
-      set(glibc_modulemap_source "bionic.modulemap.gyb")
-    elseif(${sdk} STREQUAL OPENBSD)
-      set(glibc_modulemap_source "libc-openbsd.modulemap.gyb")
-    else()
-      set(glibc_modulemap_source "glibc.modulemap.gyb")
-    endif()
+    set(glibc_modulemap_source "glibc.modulemap.gyb")
     set(glibc_modulemap_out "${module_dir}/glibc.modulemap")
     set(glibc_modulemap_out_static "${module_dir_static}/glibc.modulemap")
 
@@ -198,7 +192,7 @@ foreach(sdk ${SWIFT_SDKS})
     # FIXME: When SDK is a cross-compile target (SDK != Host), the generated
     #        modulemap will be relative to the Host, with hardcoded paths.
     #        It is not relocatable to the target platform itself.
-    #        This affects any cross-comipled targets that use glibc.modulemap.
+    #        This affects any cross-compiled targets that use glibc.modulemap.
 
     swift_install_in_component(FILES "${glibc_modulemap_out}"
                                DESTINATION "lib/swift/${arch_subdir}"

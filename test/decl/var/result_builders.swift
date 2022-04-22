@@ -25,19 +25,19 @@ var globalWithEmptyImplicitGetter: Int {}
 // expected-error@-3 {{result builder attribute 'Maker' can only be applied to a variable if it defines a getter}}
 
 @Maker
-var globalWithEmptyExplicitGetter: Int { get {} }  // expected-error{{type 'Maker' has no member 'buildBlock'}}
+var globalWithEmptyExplicitGetter: Int { get {} }  // expected-error{{result builder 'Maker' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
 
 @Maker
-var globalWithSingleGetter: Int { 0 } // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+var globalWithSingleGetter: Int { 0 } // expected-error {{result builder 'Maker' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
 
 @Maker
-var globalWithMultiGetter: Int { 0; 0 } // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+var globalWithMultiGetter: Int { 0; 0 } // expected-error {{result builder 'Maker' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
 
 @Maker
-func globalFunction() {} // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+func globalFunction() {} // expected-error {{result builder 'Maker' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
 
 @Maker
-func globalFunctionWithFunctionParam(fn: () -> ()) {}  // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+func globalFunctionWithFunctionParam(fn: () -> ()) {}  // expected-error {{result builder 'Maker' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
 
 func makerParam(@Maker
                 fn: () -> ()) {}
@@ -199,21 +199,51 @@ enum InvalidBuilder11 { // expected-error {{result builder must provide at least
     case buildBlock(Any) // expected-note {{enum case 'buildBlock' cannot be used to satisfy the result builder requirement}}
 }
 
+@resultBuilder
+struct ValidPairwiseBuilder1 {
+  static func buildPartialBlock(first: Int) -> Int { fatalError() }
+  static func buildPartialBlock(accumulated: Int, next: Int) -> Int { fatalError() }
+}
+
+@resultBuilder
+struct UnavailablePairwiseBuilder {
+  @available(*, unavailable)
+  static func buildPartialBlock(first: Int) -> Int { fatalError() }
+  @available(*, unavailable)
+  static func buildPartialBlock(accumulated: Int, next: Int) -> Int { fatalError() }
+  // available
+  // static func buildBlock(_: Int...) -> Int { fatalError() }
+}
+
+@resultBuilder
+struct InvalidPairwiseBuilder1 {} // expected-error {{result builder must provide at least one static 'buildBlock' method, or both 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)'}}
+
+@resultBuilder
+struct InvalidPairwiseBuilder2 { // expected-error {{result builder must provide at least one static 'buildBlock' method, or both 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)'}}
+  static func buildPartialBlock(first: Any) -> Any { fatalError() }
+}
+@resultBuilder
+struct InvalidPairwiseBuilder3 { // expected-error {{result builder must provide at least one static 'buildBlock' method, or both 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)'}}
+  static func buildPartialBlock(accumulated: Any, next: Any) -> Any { fatalError() }
+}
+
 struct S {
   @ValidBuilder1 var v1: Int { 1 }
   @ValidBuilder2 var v2: Int { 1 }
   @ValidBuilder3 var v3: Int { 1 }
   @ValidBuilder4 var v4: Int { 1 }
   @ValidBuilder5 func v5() -> Int {}
-  @InvalidBuilder1 var i1: Int { 1 } // expected-error {{type 'InvalidBuilder1' has no member 'buildBlock'}}
-  @InvalidBuilder2 var i2: Int { 1 } // expected-error {{instance member 'buildBlock' cannot be used on type 'InvalidBuilder2'; did you mean to use a value of this type instead?}}
-  @InvalidBuilder3 var i3: Int { 1 } // expected-error {{instance member 'buildBlock' cannot be used on type 'InvalidBuilder3'; did you mean to use a value of this type instead?}}
-  @InvalidBuilder4 var i4: Int { 1 } // expected-error {{instance member 'buildBlock' cannot be used on type 'InvalidBuilder4'; did you mean to use a value of this type instead?}}
-  @InvalidBuilder5 var i5: Int { 1 } // expected-error {{instance member 'buildBlock' cannot be used on type 'InvalidBuilder5'; did you mean to use a value of this type instead?}}
-  @InvalidBuilder6 var i6: Int { 1 } // expected-error {{cannot call value of non-function type 'Int'}}
-  @InvalidBuilder7 var i7: Int { 1 }
-  @InvalidBuilder8 var i8: Int { 1 }
-  @InvalidBuilder9 var i9: Int { 1 }
-  @InvalidBuilder10 var i10: Int { 1 }
-  @InvalidBuilder11 var i11: InvalidBuilder11 { 1 }
+  @InvalidBuilder1 var i1: Int { 1 } // expected-error {{result builder 'InvalidBuilder1' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @InvalidBuilder2 var i2: Int { 1 } // expected-error {{result builder 'InvalidBuilder2' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @InvalidBuilder3 var i3: Int { 1 } // expected-error {{result builder 'InvalidBuilder3' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @InvalidBuilder4 var i4: Int { 1 } // expected-error {{result builder 'InvalidBuilder4' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @InvalidBuilder5 var i5: Int { 1 } // expected-error {{result builder 'InvalidBuilder5' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @InvalidBuilder6 var i6: Int { 1 } // expected-error {{result builder 'InvalidBuilder6' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @InvalidBuilder7 var i7: Int { 1 } // expected-error {{result builder 'InvalidBuilder7' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @InvalidBuilder8 var i8: Int { 1 } // expected-error {{result builder 'InvalidBuilder8' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @InvalidBuilder9 var i9: Int { 1 } // expected-error {{result builder 'InvalidBuilder9' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @InvalidBuilder10 var i10: Int { 1 } // expected-error {{result builder 'InvalidBuilder10' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @InvalidBuilder11 var i11: InvalidBuilder11 { 1 } // expected-error {{result builder 'InvalidBuilder11' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+  @ValidPairwiseBuilder1 var i12: Int { 1 }
+  @UnavailablePairwiseBuilder var i13: Int { 1; 1; 1 } // expected-error {{result builder 'UnavailablePairwiseBuilder' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
 }

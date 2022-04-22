@@ -484,7 +484,7 @@ static_assert(sizeof(Projection) == sizeof(uintptr_t),
 /// The main purpose of this class is to enable one to reason about iterated
 /// chains of projections. Some example usages are:
 ///
-/// 1. Converting value projections to aggregate projections or vis-a-versa.
+/// 1. Converting value projections to aggregate projections or vice versa.
 /// 2. Performing tuple operations on two paths (using the mathematical
 ///    definition of tuples as ordered sets).
 class ProjectionPath {

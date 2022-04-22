@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the ASTNode, which is a union of Stmt, Expr, and Decl.
+// This file defines the ASTNode, which is a union of Stmt, Expr, Decl,
+// Pattern, TypeRepr, StmtCondition, and CaseLabelItem.
 //
 //===----------------------------------------------------------------------===//
 
@@ -43,11 +44,9 @@ namespace swift {
   enum class PatternKind : uint8_t;
   enum class StmtKind;
 
-  using StmtCondition = llvm::MutableArrayRef<StmtConditionElement>;
-
   struct ASTNode
       : public llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *, TypeRepr *,
-                                  StmtCondition *, CaseLabelItem *> {
+                                  StmtConditionElement *, CaseLabelItem *> {
     // Inherit the constructors from PointerUnion.
     using PointerUnion::PointerUnion;
 

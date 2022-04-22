@@ -257,6 +257,11 @@ findDebugLocationAndVariable(SILValue originalValue) {
   for (auto *use : originalValue->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
       return dvi->getVarInfo().map([&](SILDebugVariable var) {
+        // We need to drop `op_deref` here as we're transferring debug info
+        // location from debug_value instruction (which describes how to get value)
+        // into alloc_stack (which describes the location)
+        if (var.DIExpr.startsWithDeref())
+          var.DIExpr.eraseElement(var.DIExpr.element_begin());
         return std::make_pair(dvi->getDebugLocation(), var);
       });
   }
@@ -452,6 +457,14 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
         config.parameterIndices,
         original->getInterfaceType()->castTo<AnyFunctionType>());
+
+    if (silParameterIndices->getCapacity() < parameterIndices->getCapacity()) {
+      assert(original->getCaptureInfo().hasLocalCaptures());
+      silParameterIndices =
+        silParameterIndices->extendingCapacity(original->getASTContext(),
+                                               parameterIndices->getCapacity());
+    }
+
     // If all indices in `parameterIndices` are in `daParameterIndices`, and
     // it has fewer indices than our current candidate and a primitive VJP,
     // then `attr` is our new candidate.

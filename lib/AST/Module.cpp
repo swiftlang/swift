@@ -788,7 +788,7 @@ bool ModuleDecl::shouldCollectDisplayDecls() const {
   return true;
 }
 
-static void collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports) {
+void swift::collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports) {
   for (const FileUnit *file : M->getFiles()) {
     if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
       if (source->hasImports()) {
@@ -949,22 +949,32 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   return Result;
 }
 
-void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
-  if (isParsedModule(this)) {
+void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive) const {
+  if (Recursive && isParsedModule(this)) {
     SmallPtrSet<ModuleDecl *, 4> Modules;
     collectParsedExportedImports(this, Modules);
     for (const ModuleDecl *import : Modules) {
-      import->getDisplayDecls(Results);
+      import->getDisplayDecls(Results, Recursive);
     }
   }
   // FIXME: Should this do extra access control filtering?
   FORWARD(getDisplayDecls, (Results));
 
 #ifndef NDEBUG
-  llvm::DenseSet<Decl *> visited;
-  for (auto *D : Results) {
-    auto inserted = visited.insert(D).second;
-    assert(inserted && "there should be no duplicate decls");
+  if (Recursive) {
+    llvm::DenseSet<Decl *> visited;
+    for (auto *D : Results) {
+      // decls synthesized from implicit clang decls may appear multiple times;
+      // e.g. if multiple modules with underlying clang modules are re-exported.
+      // including duplicates of these is harmless, so skip them when counting
+      // this assertion
+      if (const auto *CD = D->getClangDecl()) {
+        if (CD->isImplicit()) continue;
+      }
+
+      auto inserted = visited.insert(D).second;
+      assert(inserted && "there should be no duplicate decls");
+    }
   }
 #endif
 }
@@ -1010,8 +1020,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   }
 
   // Otherwise, the existential might conform abstractly.
-  for (auto proto : layout.getProtocols()) {
-    auto *protoDecl = proto->getDecl();
+  for (auto protoDecl : layout.getProtocols()) {
 
     // If we found the protocol we're looking for, return an abstract
     // conformance to it.
@@ -1036,8 +1045,20 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 }
 
 /// Whether we should create missing conformances to the given protocol.
-static bool shouldCreateMissingConformances(ProtocolDecl *proto) {
-  return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
+static bool shouldCreateMissingConformances(Type type, ProtocolDecl *proto) {
+  // Sendable may be able to be synthesized.
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    return true;
+  }
+
+  // A 'distributed actor' may have to create missing Codable conformances.
+  if (auto nominal = dyn_cast_or_null<ClassDecl>(type->getAnyNominal())) {
+    return nominal->isDistributedActor() &&
+           (proto->isSpecificProtocol(swift::KnownProtocolKind::Decodable) ||
+            proto->isSpecificProtocol(swift::KnownProtocolKind::Encodable));
+  }
+
+  return false;
 }
 
 ProtocolConformanceRef ProtocolConformanceRef::forMissingOrInvalid(
@@ -1045,7 +1066,7 @@ ProtocolConformanceRef ProtocolConformanceRef::forMissingOrInvalid(
   // Introduce "missing" conformances when appropriate, so that type checking
   // (and even code generation) can continue.
   ASTContext &ctx = proto->getASTContext();
-  if (shouldCreateMissingConformances(proto)) {
+  if (shouldCreateMissingConformances(type, proto)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(
           type, proto, GenericSignature(), { },
@@ -1077,7 +1098,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   // If we aren't supposed to allow missing conformances through for this
   // protocol, replace the result with an "invalid" result.
   if (!allowMissing &&
-      shouldCreateMissingConformances(protocol) &&
+      shouldCreateMissingConformances(type, protocol) &&
       result.hasMissingConformance(this))
     return ProtocolConformanceRef::forInvalid();
 
@@ -1297,16 +1318,38 @@ LookupConformanceInModuleRequest::evaluate(
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominal->lookupConformance(protocol, conformances)) {
-    if (!protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
-      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      // Try to infer Sendable conformance.
+      GetImplicitSendableRequest cvRequest{nominal};
+      if (auto conformance = evaluateOrDefault(
+              ctx.evaluator, cvRequest, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Encodable) ||
+               protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
+      if (nominal->isDistributedActor()) {
+        auto protoKind =
+            protocol->isSpecificProtocol(KnownProtocolKind::Encodable)
+                ? KnownProtocolKind::Encodable
+                : KnownProtocolKind::Decodable;
+        auto request = GetDistributedActorImplicitCodableRequest{
+          nominal, protoKind};
 
-    // Try to infer Sendable conformance.
-    GetImplicitSendableRequest cvRequest{nominal};
-    if (auto conformance = evaluateOrDefault(
-            ctx.evaluator, cvRequest, nullptr)) {
-      conformances.clear();
-      conformances.push_back(conformance);
+        if (auto conformance =
+                evaluateOrDefault(ctx.evaluator, request, nullptr)) {
+          conformances.clear();
+          conformances.push_back(conformance);
+        } else {
+          return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+        }
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
     } else {
+      // Was unable to infer the missing conformance.
       return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
     }
   }
@@ -2302,14 +2345,14 @@ SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   Imports = getASTContext().AllocateCopy(imports);
 }
 
-bool SourceFile::hasImportUsedPredatesConcurrency(
+bool SourceFile::hasImportUsedPreconcurrency(
     AttributedImport<ImportedModule> import) const {
-  return PredatesConcurrencyImportsUsed.count(import) != 0;
+  return PreconcurrencyImportsUsed.count(import) != 0;
 }
 
-void SourceFile::setImportUsedPredatesConcurrency(
+void SourceFile::setImportUsedPreconcurrency(
     AttributedImport<ImportedModule> import) {
-  PredatesConcurrencyImportsUsed.insert(import);
+  PreconcurrencyImportsUsed.insert(import);
 }
 
 bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
@@ -2585,17 +2628,27 @@ LibraryLevel
 ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
                                     const ModuleDecl *module) const {
   auto &ctx = module->getASTContext();
+  namespace path = llvm::sys::path;
+  SmallString<128> scratch;
+
+  /// Is \p path under the folder SDK/a/b/c/d/e?
+  auto hasSDKPrefix =
+    [&](StringRef path, const Twine &a, const Twine &b = "",
+        const Twine &c = "", const Twine &d = "", const Twine &e = "") {
+    scratch = ctx.SearchPathOpts.getSDKPath();
+    path::append(scratch, a, b, c, d);
+    path::append(scratch, e);
+    return path.startswith(scratch);
+  };
 
   /// Is \p modulePath from System/Library/PrivateFrameworks/?
   auto fromPrivateFrameworks = [&](StringRef modulePath) -> bool {
     if (!ctx.LangOpts.Target.isOSDarwin()) return false;
 
-    namespace path = llvm::sys::path;
-    SmallString<128> scratch;
-    scratch = ctx.SearchPathOpts.getSDKPath();
-    path::append(scratch, "System", "Library", "PrivateFrameworks");
-    return hasPrefix(path::begin(modulePath), path::end(modulePath),
-                     path::begin(scratch), path::end(scratch));
+    return hasSDKPrefix(modulePath, "AppleInternal", "Library", "Frameworks") ||
+           hasSDKPrefix(modulePath, "System", "Library", "PrivateFrameworks") ||
+           hasSDKPrefix(modulePath, "System", "iOSSupport", "System", "Library", "PrivateFrameworks") ||
+           hasSDKPrefix(modulePath, "usr", "local", "include");
   };
 
   if (module->isNonSwiftModule()) {
@@ -2603,8 +2656,7 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
       // Imported clangmodules are SPI if they are defined by a private
       // modulemap or from the PrivateFrameworks folder in the SDK.
       bool moduleIsSPI = underlying->ModuleMapIsPrivate ||
-                         (underlying->isPartOfFramework() &&
-                          fromPrivateFrameworks(underlying->PresumedModuleMapFile));
+                         fromPrivateFrameworks(underlying->PresumedModuleMapFile);
       return moduleIsSPI ? LibraryLevel::SPI : LibraryLevel::API;
     }
     return LibraryLevel::Other;
@@ -2873,7 +2925,17 @@ bool FileUnit::walk(ASTWalker &walker) {
   getTopLevelDecls(Decls);
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
+
+  bool SkipInternal = getKind() == FileUnitKind::SerializedAST &&
+      !walker.shouldWalkSerializedTopLevelInternalDecls();
   for (Decl *D : Decls) {
+    if (SkipInternal) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        if (!VD->isAccessibleFrom(nullptr))
+          continue;
+      }
+    }
+
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into decl", D);
 #endif
@@ -3036,6 +3098,24 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName) {
 
   // Otherwise, we don't have a matching opaque decl.
   return nullptr;
+}
+
+bool SourceFile::isAsyncTopLevelSourceFile() const {
+  return isScriptMode() &&
+         (bool)evaluateOrDefault(getASTContext().evaluator,
+                                 GetSourceFileAsyncNode{this}, ASTNode());
+}
+
+ASTNode GetSourceFileAsyncNode::evaluate(Evaluator &eval,
+                                         const SourceFile *sf) const {
+  for (Decl *d : sf->getTopLevelDecls()) {
+    TopLevelCodeDecl *tld = dyn_cast<TopLevelCodeDecl>(d);
+    if (tld && tld->getBody()) {
+      if (ASTNode asyncNode = tld->getBody()->findAsyncNode())
+        return asyncNode;
+    }
+  }
+  return ASTNode();
 }
 
 //===----------------------------------------------------------------------===//

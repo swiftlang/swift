@@ -38,9 +38,9 @@ public func onMyProjectV3() {}
 // expected-error @-1 {{expected version number}}
 public func brokenVersion() {}
 
-@available(_unkownMacro, *) // expected-error {{expected declaration}}
+@available(_unknownMacro, *) // expected-error {{expected declaration}}
 // expected-error @-1 {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
-public func unkownMacro() {}
+public func unknownMacro() {}
 
 @available(_iOS9) // expected-error {{must handle potential future platforms with '*'}}
 public func noOtherOSes() {}
@@ -68,20 +68,31 @@ func client() {
 
 @inlinable
 public func forbidMacrosInInlinableCode() {
-  if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
-  if #available(_iOS9, _macOS10_11, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
-  if #available(iOS 9.0, _macOS10_11, tvOS 9.0, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
-  if #unavailable(_iOS9Aligned) { } // expected-error {{availability macro cannot be used in inlinable global function}}
-  if #unavailable(_iOS9, _macOS10_11) { } // expected-error {{availability macro cannot be used in inlinable global function}}
-  if #unavailable(iOS 9.0, _macOS10_11, tvOS 9.0) { } // expected-error {{availability macro cannot be used in inlinable global function}}
+  if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
+  if #available(_iOS9, _macOS10_11, *) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
+  if #available(iOS 9.0, _macOS10_11, tvOS 9.0, *) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
+  if #unavailable(_iOS9Aligned) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
+  if #unavailable(_iOS9, _macOS10_11) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
+  if #unavailable(iOS 9.0, _macOS10_11, tvOS 9.0) { } // expected-error {{availability macro cannot be used in an '@inlinable' function}}
 }
 
 @_alwaysEmitIntoClient
 public func forbidMacrosInInlinableCode1() {
-  if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
-  if #available(_iOS9, _macOS10_11, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
-  if #available(iOS 9.0, _macOS10_11, tvOS 9.0, *) { } // expected-error {{availability macro cannot be used in inlinable global function}}
-  if #unavailable(_iOS9Aligned) { } // expected-error {{availability macro cannot be used in inlinable global function}}
-  if #unavailable(_iOS9, _macOS10_11) { } // expected-error {{availability macro cannot be used in inlinable global function}}
-  if #unavailable(iOS 9.0, _macOS10_11, tvOS 9.0) { } // expected-error {{availability macro cannot be used in inlinable global function}}
+  if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
+  if #available(_iOS9, _macOS10_11, *) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
+  if #available(iOS 9.0, _macOS10_11, tvOS 9.0, *) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
+  if #unavailable(_iOS9Aligned) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
+  if #unavailable(_iOS9, _macOS10_11) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
+  if #unavailable(iOS 9.0, _macOS10_11, tvOS 9.0) { } // expected-error {{availability macro cannot be used in an '@_alwaysEmitIntoClient' function}}
+}
+
+@available(_iOS8Aligned, *)
+@_backDeploy(before: _iOS9Aligned)
+public func forbidMacrosInInlinableCode2() {
+  if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+  if #available(_iOS9, _macOS10_11, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+  if #available(iOS 9.0, _macOS10_11, tvOS 9.0, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+  if #unavailable(_iOS9Aligned) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+  if #unavailable(_iOS9, _macOS10_11) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+  if #unavailable(iOS 9.0, _macOS10_11, tvOS 9.0) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
 }

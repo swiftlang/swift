@@ -82,7 +82,7 @@ protocol Proto {
 // TODO: dynamic initializing ctor must be objc dispatched
 // CHECK-LABEL: sil hidden [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fC
 // CHECK:         function_ref @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTD
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTD
 // CHECK:         objc_method {{%.*}} : $Foo, #Foo.init!initializer.foreign :
 
 // CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTo
@@ -125,27 +125,27 @@ protocol Proto {
 // Dynamic witnesses use objc dispatch:
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s7dynamic3FooCAA5ProtoA2aDP0A6Method{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         function_ref @$s7dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s7dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTD
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s7dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTD
 // CHECK:         objc_method {{%.*}} : $Foo, #Foo.dynamicMethod!foreign :
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s7dynamic3FooCAA5ProtoA2aDP0A4PropSivgTW
 // CHECK:         function_ref @$s7dynamic3FooC0A4PropSivgTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s7dynamic3FooC0A4PropSivgTD
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s7dynamic3FooC0A4PropSivgTD
 // CHECK:         objc_method {{%.*}} : $Foo, #Foo.dynamicProp!getter.foreign :
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s7dynamic3FooCAA5ProtoA2aDP0A4PropSivsTW
 // CHECK:         function_ref @$s7dynamic3FooC0A4PropSivsTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s7dynamic3FooC0A4PropSivsTD
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s7dynamic3FooC0A4PropSivsTD
 // CHECK:         objc_method {{%.*}} : $Foo, #Foo.dynamicProp!setter.foreign :
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s7dynamic3FooCAA5ProtoA2aDPAAS2i_tcigTW
 // CHECK:         function_ref @$s7dynamic3FooCAAS2i_tcigTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s7dynamic3FooCAAS2i_tcigTD
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s7dynamic3FooCAAS2i_tcigTD
 // CHECK:         objc_method {{%.*}} : $Foo, #Foo.subscript!getter.foreign :
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s7dynamic3FooCAA5ProtoA2aDPAAS2i_tcisTW
 // CHECK:         function_ref @$s7dynamic3FooCAAS2i_tcisTD
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s7dynamic3FooCAAS2i_tcisTD
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s7dynamic3FooCAAS2i_tcisTD
 // CHECK:         objc_method {{%.*}} : $Foo, #Foo.subscript!setter.foreign :
 
 // Superclass dispatch

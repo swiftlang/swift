@@ -97,20 +97,12 @@ public:
   /// Simplify checked_cast_br. It may change the control flow.
   SILInstruction *simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst);
 
-  /// Simplify checked_cast_value_br. It may change the control flow.
-  SILInstruction *
-  simplifyCheckedCastValueBranchInst(CheckedCastValueBranchInst *Inst);
-
   /// Simplify checked_cast_addr_br. It may change the control flow.
   SILInstruction *
   simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst);
 
   /// Optimize checked_cast_br. This cannot change the control flow.
   SILInstruction *optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst);
-
-  /// Optimize checked_cast_value_br. This cannot change the control flow.
-  SILInstruction *
-  optimizeCheckedCastValueBranchInst(CheckedCastValueBranchInst *Inst);
 
   /// Optimize checked_cast_addr_br. This cannot change the control flow.
   SILInstruction *

@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/SILNode.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILBuilder.h"
@@ -140,19 +142,6 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
 }
 
 //===----------------------------------------------------------------------===//
-//                            Bridging C functions
-//===----------------------------------------------------------------------===//
-
-void OStream_write(BridgedOStream os, BridgedStringRef str) {
-  static_cast<raw_ostream *>(os.streamAddr)->write((const char*)(str.data), str.length);
-}
-
-/// Frees a string which was allocated by getCopiedBridgedStringRef.
-void freeBridgedStringRef(BridgedStringRef str) {
-  llvm::MallocAllocator().Deallocate(str.data, str.length);
-}
-
-//===----------------------------------------------------------------------===//
 //                                SILFunction
 //===----------------------------------------------------------------------===//
 
@@ -211,6 +200,16 @@ BridgedType SILFunction_getSILResultType(BridgedFunction function) {
   SILFunctionConventions conv(f->getConventionsInContext());
   SILType resTy = conv.getSILResultType(f->getTypeExpansionContext());
   return {resTy.getOpaqueValue()};
+}
+
+SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  if (f->getResilienceExpansion() != ResilienceExpansion::Maximal)
+    return 0;
+
+  ASTContext &ctxt = f->getModule().getASTContext();
+  return AvailabilityContext::forDeploymentTarget(ctxt).isContainedIn(
+    ctxt.getSwift51Availability());
 }
 
 //===----------------------------------------------------------------------===//
@@ -294,7 +293,12 @@ BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ) {
 //===----------------------------------------------------------------------===//
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
-  return {static_cast<SILArgument *>(argument.obj)->getParent()};
+  return {castToArgument(argument)->getParent()};
+}
+
+SwiftInt SILArgument_isExclusiveIndirectParameter(BridgedArgument argument) {
+  auto *arg = castToArgument<SILFunctionArgument>(argument);
+  return arg->getArgumentConvention().isExclusiveIndirectParameter();
 }
 
 //===----------------------------------------------------------------------===//
@@ -309,6 +313,10 @@ BridgedStringRef SILNode_debugDescription(BridgedNode node) {
   llvm::raw_string_ostream os(str);
   castToSILNode(node)->print(os);
   return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+}
+
+BridgedFunction SILNode_getFunction(BridgedNode node) {
+  return {castToSILNode(node)->getFunction()};
 }
 
 static Operand *castToOperand(BridgedOperand operand) {
@@ -356,6 +364,17 @@ SwiftInt SILType_isAddress(BridgedType type) {
 
 SwiftInt SILType_isTrivial(BridgedType type, BridgedFunction function) {
   return castToSILType(type).isTrivial(*castToFunction(function));
+}
+
+SwiftInt SILType_isReferenceCounted(BridgedType type, BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  return castToSILType(type).isReferenceCounted(f->getModule()) ? 1 : 0;
+}
+
+SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType type,
+                                                  BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  return castToSILType(type).isNonTrivialOrContainsRawPointer(*f);
 }
 
 SwiftInt SILType_isNominal(BridgedType type) {
@@ -507,6 +526,11 @@ BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result
   return {static_cast<MultipleValueInstructionResult *>(result.obj)->getParent()};
 }
 
+SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result) {
+  auto *rs = static_cast<MultipleValueInstructionResult *>(result.obj);
+  return (SwiftInt)rs->getIndex();
+}
+
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst) {
   return castToInst<MultipleValueInstruction>(inst)->getNumResults();
 }
@@ -540,6 +564,10 @@ BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri) {
   return {castToInst<FunctionRefInst>(fri)->getReferencedFunction()};
 }
 
+BridgedStringRef StringLiteralInst_getValue(BridgedInstruction sli) {
+  return getBridgedStringRef(castToInst<StringLiteralInst>(sli)->getValue());
+}
+
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei) {
   return castToInst<TupleExtractInst>(tei)->getFieldIndex();
 }
@@ -560,12 +588,28 @@ SwiftInt StructElementAddrInst_fieldIndex(BridgedInstruction seai) {
   return castToInst<StructElementAddrInst>(seai)->getFieldIndex();
 }
 
+SwiftInt ProjectBoxInst_fieldIndex(BridgedInstruction pbi) {
+  return castToInst<ProjectBoxInst>(pbi)->getFieldIndex();
+}
+
 SwiftInt EnumInst_caseIndex(BridgedInstruction ei) {
   return getCaseIndex(castToInst<EnumInst>(ei)->getElement());
 }
 
 SwiftInt UncheckedEnumDataInst_caseIndex(BridgedInstruction uedi) {
   return getCaseIndex(castToInst<UncheckedEnumDataInst>(uedi)->getElement());
+}
+
+SwiftInt InitEnumDataAddrInst_caseIndex(BridgedInstruction ieda) {
+  return getCaseIndex(castToInst<InitEnumDataAddrInst>(ieda)->getElement());
+}
+
+SwiftInt UncheckedTakeEnumDataAddrInst_caseIndex(BridgedInstruction utedi) {
+  return getCaseIndex(castToInst<UncheckedTakeEnumDataAddrInst>(utedi)->getElement());
+}
+
+SwiftInt InjectEnumAddrInst_caseIndex(BridgedInstruction ieai) {
+  return getCaseIndex(castToInst<InjectEnumAddrInst>(ieai)->getElement());
 }
 
 SwiftInt RefElementAddrInst_fieldIndex(BridgedInstruction reai) {
@@ -578,6 +622,15 @@ SwiftInt PartialApplyInst_numArguments(BridgedInstruction pai) {
 
 SwiftInt ApplyInst_numArguments(BridgedInstruction ai) {
   return castToInst<ApplyInst>(ai)->getNumArguments();
+}
+
+SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg(BridgedInstruction pai) {
+  auto *paiInst = castToInst<PartialApplyInst>(pai);
+  return ApplySite(paiInst).getCalleeArgIndexOfFirstAppliedArg();
+}
+
+SwiftInt PartialApplyInst_isOnStack(BridgedInstruction pai) {
+  return castToInst<PartialApplyInst>(pai)->isOnStack() ? 1 : 0;
 }
 
 SwiftInt AllocRefInstBase_isObjc(BridgedInstruction arb) {
@@ -612,6 +665,14 @@ SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store) {
   return (SwiftInt)castToInst<StoreInst>(store)->getOwnershipQualifier();
 }
 
+SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr) {
+  return castToInst<CopyAddrInst>(copyAddr)->isTakeOfSrc() ? 1 : 0;
+}
+
+SwiftInt CopyAddrInst_isInitializationOfDest(BridgedInstruction copyAddr) {
+  return castToInst<CopyAddrInst>(copyAddr)->isInitializationOfDest() ? 1 : 0;
+}
+
 void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic) {
   castToInst<RefCountingInst>(rc)->setAtomicity(
       isAtomic ? RefCountingInst::Atomicity::Atomic
@@ -621,6 +682,10 @@ void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic) {
 bool RefCountingInst_getIsAtomic(BridgedInstruction rc) {
   return castToInst<RefCountingInst>(rc)->getAtomicity() ==
          RefCountingInst::Atomicity::Atomic;
+}
+
+SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr) {
+  return castToInst<CondBranchInst>(cbr)->getNumTrueArgs();
 }
 
 //===----------------------------------------------------------------------===//

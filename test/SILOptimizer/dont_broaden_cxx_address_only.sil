@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -silgen-cleanup %s -I %S/Inputs -enable-sil-verify-all -enable-cxx-interop | %FileCheck %s
+// RUN: %target-sil-opt -silgen-cleanup %s -I %S/Inputs -enable-sil-verify-all -enable-experimental-cxx-interop | %FileCheck %s
 
 sil_stage canonical
 
@@ -16,7 +16,7 @@ import CXXTypesWithUserProvidedDestructor
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 // CHECK-LABEL: end sil function 'test_foo'
-sil shared [transparent] [serializable] [ossa] @test_foo : $@convention(method) (Int32, @thin HasUserProvidedDestructor.Type) -> @out HasUserProvidedDestructor {
+sil shared [transparent] [serialized] [ossa] @test_foo : $@convention(method) (Int32, @thin HasUserProvidedDestructor.Type) -> @out HasUserProvidedDestructor {
 bb0(%0 : $*HasUserProvidedDestructor, %1 : $Int32, %2 : $@thin HasUserProvidedDestructor.Type):
   %3 = struct_element_addr %0 : $*HasUserProvidedDestructor, #HasUserProvidedDestructor.x
   store %1 to [trivial] %3 : $*Int32
@@ -34,7 +34,7 @@ bb0(%0 : $*HasUserProvidedDestructor, %1 : $Int32, %2 : $@thin HasUserProvidedDe
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 // CHECK-LABEL: end sil function 'test_bar'
-sil shared [transparent] [serializable] [ossa] @test_bar : $@convention(method) (Int32, @thin HasMemberWithUserProvidedDestructor.Type) -> @out HasMemberWithUserProvidedDestructor {
+sil shared [transparent] [serialized] [ossa] @test_bar : $@convention(method) (Int32, @thin HasMemberWithUserProvidedDestructor.Type) -> @out HasMemberWithUserProvidedDestructor {
 bb0(%0 : $*HasMemberWithUserProvidedDestructor, %1 : $Int32, %2 : $@thin HasMemberWithUserProvidedDestructor.Type):
   %3 = struct_element_addr %0 : $*HasMemberWithUserProvidedDestructor, #HasMemberWithUserProvidedDestructor.y
   %3a = struct_element_addr %3 : $*Loadable, #Loadable.x

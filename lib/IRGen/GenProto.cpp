@@ -673,6 +673,7 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
       emitDynamicTypeOfHeapObject(IGF, instanceRef,
                                   MetatypeRepresentation::Thick,
                                   instanceType,
+                                  Fn.getGenericSignature(),
                                   /*allow artificial subclasses*/ true);
     IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                           MetadataState::Complete);
@@ -736,6 +737,7 @@ void BindPolymorphicParameter::emit(Explosion &nativeParam, unsigned paramIndex)
     emitDynamicTypeOfHeapObject(IGF, instanceRef,
                                 MetatypeRepresentation::Thick,
                                 instanceType,
+                                SubstFnType->getInvocationGenericSignature(),
                                 /* allow artificial subclasses */ true);
   IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                         MetadataState::Complete);
@@ -944,7 +946,7 @@ static bool isDependentConformance(
 
   // Check whether any of the conformances are dependent.
   auto proto = conformance->getProtocol();
-  for (const auto &req : proto->getRequirementSignature()) {
+  for (const auto &req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 
@@ -955,7 +957,7 @@ static bool isDependentConformance(
     auto assocConformance =
       conformance->getAssociatedConformance(req.getFirstType(), assocProtocol);
 
-    // We migh be presented with a broken AST.
+    // We might be presented with a broken AST.
     if (assocConformance.isInvalid())
       return false;
 
@@ -1470,7 +1472,7 @@ public:
 
     /// Build the instantiation function that runs at the end of witness
     /// table specialization.
-    llvm::Constant *buildInstantiationFunction();
+    llvm::Function *buildInstantiationFunction();
   };
 
   /// A resilient witness table consists of a list of descriptor/witness pairs,
@@ -1739,7 +1741,7 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
   }
 }
 
-llvm::Constant *FragileWitnessTableBuilder::buildInstantiationFunction() {
+llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
   // We need an instantiation function if any base conformance
   // is non-dependent.
   if (SpecializedBaseConformances.empty())
@@ -1960,7 +1962,12 @@ namespace {
         }
 
         // Add the witness.
-        B.addRelativeAddress(witnesses.front());
+        llvm::Constant *witness = witnesses.front();
+        if (auto *fn = llvm::dyn_cast<llvm::Function>(witness)) {
+          B.addCompactFunctionReference(fn);
+        } else {
+          B.addRelativeAddress(witness);
+        }
         witnesses = witnesses.drop_front();
       }
       assert(witnesses.empty() && "Wrong # of resilient witnesses");
@@ -1977,9 +1984,12 @@ namespace {
                (Description.witnessTablePrivateSize << 1) |
                 Description.requiresSpecialization);
       // Instantiation function
-      B.addRelativeAddressOrNull(Description.instantiationFn);
+      B.addCompactFunctionReferenceOrNull(Description.instantiationFn);
+
       // Private data
-      {
+      if (IGM.IRGen.Opts.NoPreallocatedInstantiationCaches) {
+        B.addInt32(0);
+      } else {
         auto privateDataTy =
           llvm::ArrayType::get(IGM.Int8PtrTy,
                                swift::NumGenericMetadataPrivateDataWords);
@@ -2250,7 +2260,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 
   unsigned tableSize = 0;
   llvm::GlobalVariable *global = nullptr;
-  llvm::Constant *instantiationFunction = nullptr;
+  llvm::Function *instantiationFunction = nullptr;
   bool isDependent = isDependentConformance(conf);
   SmallVector<llvm::Constant *, 4> resilientWitnesses;
 
@@ -3162,7 +3172,7 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
   // For now, treat all archetypes independently.
   enumerateUnfulfilledRequirements([&](GenericRequirement requirement) {
     llvm::Value *requiredValue =
-      emitGenericRequirementFromSubstitutions(IGF, Generics, M,
+      emitGenericRequirementFromSubstitutions(IGF, Generics,
                                               requirement, subs);
     out.add(requiredValue);
   });
@@ -3284,14 +3294,17 @@ NecessaryBindings NecessaryBindings::computeBindings(
 /// that takes the (thick) parent metatype as an argument.
 GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
                                                  NominalTypeDecl *typeDecl)
-    : TheDecl(typeDecl) {
+  : GenericTypeRequirements(IGM, typeDecl->getGenericSignatureOfContext()) {}
+
+GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
+                                                 GenericSignature ncGenerics) {
   // We only need to do something here if the declaration context is
   // somehow generic.
-  auto ncGenerics = typeDecl->getGenericSignatureOfContext();
   if (!ncGenerics || ncGenerics->areAllParamsConcrete()) return;
 
   // Construct a representative function type.
   auto generics = ncGenerics.getCanonicalSignature();
+  Generics = generics;
   auto fnType = SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 SILCoroutineKind::None,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
@@ -3335,12 +3348,9 @@ void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
                                                Address buffer) {
   if (Requirements.empty()) return;
 
-  auto generics =
-      TheDecl->getGenericSignatureOfContext().getCanonicalSignature();
-  auto &module = *TheDecl->getParentModule();
   emitInitOfGenericRequirementsBuffer(IGF, Requirements, buffer,
                                       [&](GenericRequirement requirement) {
-    return emitGenericRequirementFromSubstitutions(IGF, generics, module,
+    return emitGenericRequirementFromSubstitutions(IGF, Generics,
                                                    requirement, subs);
   });
 }
@@ -3373,7 +3383,6 @@ void irgen::emitInitOfGenericRequirementsBuffer(IRGenFunction &IGF,
 llvm::Value *
 irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                                CanGenericSignature generics,
-                                               ModuleDecl &module,
                                                GenericRequirement requirement,
                                                SubstitutionMap subs) {
   CanType depTy = requirement.TypeParameter;

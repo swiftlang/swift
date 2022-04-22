@@ -42,7 +42,7 @@ func testClonable(c: Clonable) {
   let _: () -> () -> Clonable = c.getCloneFn
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sxIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sxIegr_22partial_apply_protocol8Clonable_pIegr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out Clonable
 // CHECK:       bb0(%0 : $*Clonable, %1 : @guaranteed $@callee_guaranteed () -> @out τ_0_0):
 // CHECK-NEXT:    [[INNER_RESULT:%.*]] = alloc_stack $τ_0_0
 // CHECK-NEXT:    apply %1([[INNER_RESULT]])

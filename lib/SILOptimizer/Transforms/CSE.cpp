@@ -430,14 +430,6 @@ public:
     return hash;
   }
 
-  hash_code visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
-  }
-
-  hash_code visitPointerToThinFunctionInst(PointerToThinFunctionInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
-  }
-
   hash_code visitWitnessMethodInst(WitnessMethodInst *X) {
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(X->getKind(),
@@ -815,8 +807,8 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
   if (!VI) return false;
 
   llvm::SmallSetVector<SILInstruction *, 16> Candidates;
-  auto OldOpenedArchetype = Inst->getOpenedArchetype();
-  auto NewOpenedArchetype = VI->getOpenedArchetype();
+  const auto OldOpenedArchetype = Inst->getDefinedOpenedArchetype();
+  const auto NewOpenedArchetype = VI->getDefinedOpenedArchetype();
 
   // Collect all candidates that may contain opened archetypes
   // that need to be replaced.
@@ -1152,8 +1144,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::BridgeObjectToWordInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
-  case SILInstructionKind::ThinFunctionToPointerInst:
-  case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:

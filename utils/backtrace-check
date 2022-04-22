@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 
 """
@@ -21,8 +21,6 @@ imagine we can just check the format.
 StaticString, StaticString, UInt, flags : UInt32) -> () + 444
 """
 
-
-from __future__ import absolute_import, print_function, unicode_literals
 
 import argparse
 import re
@@ -72,10 +70,6 @@ def main():
     found_stack_trace_start = False
     found_stack_trace_entry = False
     for line in lines:
-        # In Python 2, string objects can contain Unicode characters.
-        if sys.version_info.major == 2:
-            line = line.decode('utf-8', 'replace')
-
         line = line.rstrip('\n')
 
         # First see if we found the start of our stack trace start. If so, set

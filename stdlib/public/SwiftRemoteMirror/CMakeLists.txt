@@ -12,6 +12,7 @@ if(SWIFT_BUILD_DYNAMIC_STDLIB)
                              ${SWIFT_RUNTIME_LINK_FLAGS}
                            INCORPORATE_OBJECT_LIBRARIES swiftLLVMSupport
                            SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+                           DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
                            INSTALL_IN_COMPONENT
                              swift-remote-mirror)
 endif()

@@ -553,7 +553,7 @@ extension MutableCollection where Self: RandomAccessCollection {
   /// Use the `shuffle()` method to randomly reorder the elements of an array.
   ///
   ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
-  ///     names.shuffle(using: myGenerator)
+  ///     names.shuffle()
   ///     // names == ["Luis", "Camila", "Luciana", "Sofía", "Alejandro", "Diego"]
   ///
   /// This method is equivalent to calling `shuffle(using:)`, passing in the
