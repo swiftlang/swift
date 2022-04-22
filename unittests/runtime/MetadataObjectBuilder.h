@@ -76,9 +76,7 @@ inline void addProtocolDescriptor(AnyObjectBuilder &builder,
 
   ObjectRef<const char> selfType;
   if (!baseProtocols.empty()) {
-    auto subbuilder = builder.createSubobject<const char>(/*align*/ 2);
-    mangleGenericParamType(subbuilder, 0, 0);
-    selfType = subbuilder.ref();
+    selfType = createMangledTypeString(builder, typeParam(0, 0));
   }
 
   // Requirement signature requirement descriptors

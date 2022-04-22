@@ -637,7 +637,7 @@ Types
   type ::= protocol-list 'p'                 // existential type
   type ::= protocol-list superclass 'Xc'     // existential type with superclass
   type ::= protocol-list 'Xl'                // existential type with AnyObject
-  type ::= protocol-list 'y' (type* '_')* type* retroactive-conformance* 'Xp'   // parameterized protocol type
+  type ::= protocol-list 'y' (type* '_')* type* retroactive-conformance* 'XP'   // parameterized protocol type
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
@@ -918,21 +918,9 @@ root protocol conformance, and the suffix 'g'.
 
 ::
 
-  // No generalization signature, no type expression.
-  extended-existential-shape ::= generic-signature 'Xg' extended-existential-value-storage
-
-  // Generalization signature (the second one), no type expression.
-  extended-existential-shape ::= generic-signature generic-signature 'XG' extended-existential-value-storage
-
-  // No generalization signature, type expression.
-  extended-existential-shape ::= generic-signature type 'Xh' extended-existential-value-storage
-
-  // Generalization signature (the second one), type expression.
-  extended-existential-shape ::= generic-signature generic-signature type 'Xh' extended-existential-value-storage
-
-  extended-existential-value-storage ::= 'o' // opaque
-  extended-existential-value-storage ::= 'c' // class
-  extended-existential-value-storage ::= 'm' // metatype
+  // No generalization signature.
+  extended-existential-shape ::= type 'Xg' // no generalization signature
+  extended-existential-shape ::= generic-signature type 'XG'
 
 Identifiers
 ~~~~~~~~~~~

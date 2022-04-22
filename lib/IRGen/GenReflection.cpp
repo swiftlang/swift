@@ -317,7 +317,12 @@ getTypeRefImpl(IRGenModule &IGM,
                CanType type,
                CanGenericSignature sig,
                MangledTypeRefRole role) {
+  bool useFlatUnique = false;
   switch (role) {
+  case MangledTypeRefRole::FlatUnique:
+    useFlatUnique = true;
+    break;
+
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
     // Note that we're using all of the nominal types referenced by this type,
@@ -342,7 +347,9 @@ getTypeRefImpl(IRGenModule &IGM,
   }
 
   IRGenMangler Mangler;
-  auto SymbolicName = Mangler.mangleTypeForReflection(IGM, sig, type);
+  auto SymbolicName =
+    useFlatUnique ? Mangler.mangleTypeForFlatUniqueTypeRef(sig, type)
+                  : Mangler.mangleTypeForReflection(IGM, sig, type);
   return {IGM.getAddrOfStringForTypeRef(SymbolicName, role),
           SymbolicName.runtimeSizeInBytes()};
 }
