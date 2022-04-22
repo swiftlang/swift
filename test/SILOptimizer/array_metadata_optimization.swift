@@ -12,9 +12,9 @@ public func makeArrayInt(x: Int) -> [Int] {
   return [0, 1, x]
 }
 
-// CHECK: sil @$s4test14makeArrayClass1xSayAA1CCGAE_tF
+// CHECK: sil {{.*}}@$s4test14makeArrayClass1xSayAA1CCGAE_tF
 // CHECK:   alloc_ref [tail_elems $C * {{.*}} : $Builtin.Word] $_ContiguousArrayStorage<AnyObject>
-// NOOPTCLASS: sil @$s4test14makeArrayClass1xSayAA1CCGAE_tF
+// NOOPTCLASS: sil {{.*}}@$s4test14makeArrayClass1xSayAA1CCGAE_tF
 // NOOPTCLASS:   function_ref @$ss29getContiguousArrayStorageType3fors01
 // NOOPTCLASS:   alloc_ref_dynamic [tail_elems $C * {{.*}} : $Builtin.Word]
 public class C {}

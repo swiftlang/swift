@@ -1,0 +1,81 @@
+// RUN: %target-sil-opt %s -dump-escape-info -module-name=test -o /dev/null | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: objc_interop
+// REQUIRES: PTRSIZE=64
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class X {}
+
+sil [escapes !%0, !%0.c*.v**] @$ss23_ContiguousArrayStorageCfD : $@convention(method) <Element> (@owned _ContiguousArrayStorage<Element>) -> ()
+
+sil [defined_escapes %0 => %r.0.v**, %0.c*.v** => %r.0.v**.c*.v**, %0.c*.v** => %r.1.v**] @array_adopt_storage_class : $@convention(method) (@owned _ContiguousArrayStorage<X>, Int, @thin Array<X>.Type) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+
+sil [escapes %0 => %r.0.s0.**] @array_adopt_storage : $@convention(thin) (@owned _ContiguousArrayStorage<Int>) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+sil @take_ptr : $@convention(thin) (UnsafeMutablePointer<Int>) -> ()
+
+// CHECK-LABEL: Escape information for call_array_adopt_storage:
+// CHECK: return[s0.**]: %0 = alloc_ref $_ContiguousArrayStorage<Int>
+// CHECK: End function call_array_adopt_storage
+sil @call_array_adopt_storage : $@convention(thin) () -> @owned Array<Int> {
+bb0:
+  %0 = alloc_ref $_ContiguousArrayStorage<Int>
+  %1 = function_ref @array_adopt_storage : $@convention(thin) (@owned _ContiguousArrayStorage<Int>) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+  %2 = apply %1(%0) : $@convention(thin) (@owned _ContiguousArrayStorage<Int>) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+  %3 = tuple_extract %2 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
+  %4 = tuple_extract %2 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
+  %5 = function_ref @take_ptr : $@convention(thin) (UnsafeMutablePointer<Int>) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (UnsafeMutablePointer<Int>) -> ()
+  return %3 : $Array<Int>
+}
+
+// CHECK-LABEL: Escape information for release_array:
+// CHECK:  -    :   %1 = alloc_ref [tail_elems $Array<Int> * %0 : $Builtin.Word] $_ContiguousArrayStorage<X>
+// CHECK:  -    :   %2 = alloc_ref $X
+// CHECK: End function release_array
+sil @release_array : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 2
+  %1 = alloc_ref [tail_elems $Array<Int> * %0 : $Builtin.Word] $_ContiguousArrayStorage<X>
+  %2 = alloc_ref $X
+  %3 = upcast %1 : $_ContiguousArrayStorage<X> to $__ContiguousArrayStorageBase
+  %4 = ref_tail_addr %3 : $__ContiguousArrayStorageBase, $X
+  store %2 to %4 : $*X
+  %6 = enum $Optional<_ContiguousArrayStorage<X>>, #Optional.some!enumelt, %1 : $_ContiguousArrayStorage<X>
+  release_value %6 : $Optional<_ContiguousArrayStorage<X>>
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: Escape information for store_to_adopt_storage_result:
+// CHECK:  -    :   %3 = alloc_ref [tail_elems $X * %2 : $Builtin.Word] $_ContiguousArrayStorage<X>
+// CHECK:  -    :   %11 = alloc_ref $X
+// CHECK: End function store_to_adopt_storage_result
+sil @store_to_adopt_storage_result : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = struct $Int (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = alloc_ref [tail_elems $X * %2 : $Builtin.Word] $_ContiguousArrayStorage<X>
+  %4 = metatype $@thin Array<X>.Type
+  %5 = function_ref @array_adopt_storage_class : $@convention(method) (@owned _ContiguousArrayStorage<X>, Int, @thin Array<X>.Type) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+  %6 = apply %5(%3, %1, %4) : $@convention(method) (@owned _ContiguousArrayStorage<X>, Int, @thin Array<X>.Type) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+  %7 = tuple_extract %6 : $(Array<X>, UnsafeMutablePointer<X>), 0
+  %8 = tuple_extract %6 : $(Array<X>, UnsafeMutablePointer<X>), 1
+  %9 = struct_extract %8 : $UnsafeMutablePointer<X>, #UnsafeMutablePointer._rawValue
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*X
+  %11 = alloc_ref $X
+  store %11 to %10 : $*X
+  %13 = struct_extract %7 : $Array<X>, #Array._buffer
+  %14 = struct_extract %13 : $_ArrayBuffer<X>, #_ArrayBuffer._storage
+  %15 = struct_extract %14 : $_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
+  strong_release %15 : $Builtin.BridgeObject
+  %17 = tuple ()
+  return %17 : $()
+}
+
