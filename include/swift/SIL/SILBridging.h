@@ -247,6 +247,7 @@ BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst);
 bool SILInstruction_mayRelease(BridgedInstruction inst);
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result);
+SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result);
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst);
 BridgedMultiValueResult
   MultipleValueInstruction_getResult(BridgedInstruction inst, SwiftInt index);
