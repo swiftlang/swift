@@ -8143,3 +8143,35 @@ bool DefaultExprTypeMismatch::diagnoseAsError() {
 
   return true;
 }
+
+bool MissingExplicitExistentialCoercion::diagnoseAsError() {
+  auto diagnostic = emitDiagnostic(diag::result_requires_explicit_coercion,
+                                   ErasedResultType);
+  fixIt(diagnostic);
+  return true;
+}
+
+bool MissingExplicitExistentialCoercion::diagnoseAsNote() {
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!selectedOverload)
+    return false;
+
+  const auto &choice = selectedOverload->choice;
+
+  if (auto *decl = choice.getDeclOrNull()) {
+    auto diagnostic = emitDiagnosticAt(
+        decl, diag::candidate_result_requires_explicit_coercion,
+        ErasedResultType);
+    fixIt(diagnostic);
+    return true;
+  }
+
+  return false;
+}
+
+void MissingExplicitExistentialCoercion::fixIt(
+    InFlightDiagnostic &diagnostic) const {
+  auto printOpts = PrintOptions::forDiagnosticArguments();
+  diagnostic.fixItInsertAfter(getSourceRange().End,
+                              "as " + ErasedResultType->getString(printOpts));
+}
