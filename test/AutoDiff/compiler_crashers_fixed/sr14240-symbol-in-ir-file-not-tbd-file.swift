@@ -11,6 +11,8 @@ import _Differentiation
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(WASILibc)
+  import WASILibc
 #elseif os(Windows)
   import CRT
 #else

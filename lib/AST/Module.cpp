@@ -2623,9 +2623,8 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
 }
 
 bool SourceFile::shouldCrossImport() const {
-  if (Kind == SourceFileKind::SIL || Kind == SourceFileKind::Interface)
-    return false;
-  return getASTContext().LangOpts.EnableCrossImportOverlays;
+  return Kind != SourceFileKind::SIL && Kind != SourceFileKind::Interface &&
+         getASTContext().LangOpts.EnableCrossImportOverlays;
 }
 
 void ModuleDecl::clearLookupCache() {
