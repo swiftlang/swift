@@ -1017,6 +1017,12 @@ computeInnerAccessPath(AccessPath::PathNode outerPath,
       && !isa<TupleElementAddrInst>(innerAddress)) {
     return false;
   }
+  if (!innerPath.getIndex().isSubObjectProjection()) {
+    llvm::dbgs() << "InnerPath index: ";
+    innerPath.getIndex().dump();
+    llvm::dbgs() << "Inner address: " << innerAddress;
+    innerAddress->getFunction()->dump();
+  }
   assert(ProjectionIndex(innerAddress).Index
          == innerPath.getIndex().getSubObjectIndex());
 
@@ -1197,6 +1203,13 @@ static SILValue projectLoadValue(SILValue addr, AccessPath accessPath,
     return rootVal;
 
   auto pathNode = accessPath.getPathNode();
+  //!!!
+  if (!pathNode.getIndex().isSubObjectProjection()) {
+    llvm::dbgs() << "Projected load index: ";
+    accessPath.dump();
+    llvm::dbgs() << "Load address: " << addr;
+    addr->getFunction()->dump();
+  }
   int elementIdx = pathNode.getIndex().getSubObjectIndex();
   if (auto *SEI = dyn_cast<StructElementAddrInst>(addr)) {
     assert(ProjectionIndex(SEI).Index == elementIdx);
@@ -1494,6 +1507,11 @@ public:
       LLVM_DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");
       return;
     }
+    //!!!
+    if (F->hasName("$s12_RegexParser6SourceV25lexMatchingOptionSequence7contextAA3ASTV0efG0VSgAA14ParsingContextV_tKF")) {
+      llvm::DebugFlag = true;
+      llvm::setCurrentDebugType("sil-licm");
+    }
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
@@ -1511,6 +1529,8 @@ public:
                                ASA, RunsOnHighLevelSil);
       Changed |= Opt.optimize();
     }
+    //!!!
+    llvm::DebugFlag = false;
 
     if (Changed) {
       LA->lockInvalidation();
