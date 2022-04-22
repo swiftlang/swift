@@ -244,6 +244,7 @@ namespace {
     IMPL(BuiltinInteger, Trivial)
     IMPL(BuiltinIntegerLiteral, Trivial)
     IMPL(BuiltinFloat, Trivial)
+    IMPL(BuiltinRawPointer, Trivial)
     IMPL(BuiltinRawUnsafeContinuation, Trivial)
     IMPL(BuiltinJob, Trivial)
     IMPL(BuiltinExecutor, Trivial)
@@ -257,14 +258,6 @@ namespace {
     IMPL(Module, Trivial)
 
 #undef IMPL
-
-    RetTy visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
-                                     AbstractionPattern orig,
-                                     IsTypeExpansionSensitive_t isSensitive) {
-      RecursiveProperties props = mergeIsTypeExpansionSensitive(isSensitive,
-                                          RecursiveProperties::forRawPointer());
-      return asImpl().handleTrivial(type, props);
-    }
 
     RetTy visitBuiltinUnsafeValueBufferType(
                                          CanBuiltinUnsafeValueBufferType type,

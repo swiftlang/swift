@@ -11,7 +11,7 @@ final public class Escaper {
     myItem = items[0]
   }
 
-// CHECK-LABEL: sil [noinline] {{.*}}@$s4test7EscaperC15badStuffHappensyyF : $@convention(method) (@guaranteed Escaper) -> () {
+// CHECK-LABEL: sil [noinline] @$s4test7EscaperC15badStuffHappensyyF : $@convention(method) (@guaranteed Escaper) -> () {
 // CHECK: %2 = alloc_ref $Item
 // CHECK: alloc_ref{{(_dynamic)?}} [stack] [tail_elems $Item * %{{[0-9]+}} : $Builtin.Word]{{.*}} $_ContiguousArrayStorage<{{(Item|AnyObject)}}>
 // CHECK: return
