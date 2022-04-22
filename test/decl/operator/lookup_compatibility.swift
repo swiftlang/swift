@@ -105,7 +105,7 @@ func testOperatorLookup() {
   // through ExportsAC.
   >>>1
 
-  // We've been evil and overriden TernaryPrecedence in both modules A and B.
+  // We've been evil and overridden TernaryPrecedence in both modules A and B.
   // Make sure we emit an ambiguity error without emitting a 'broken stdlib'
   // error.
   true ? () : () // expected-error {{multiple precedence groups found}}

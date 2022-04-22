@@ -6,8 +6,8 @@ protocol Foo {
   associatedtype Bar : Foo
 }
 
-struct Oroborous : Foo {
-  typealias Bar = Oroborous
+struct Ouroboros : Foo {
+  typealias Bar = Ouroboros
 }
 
 // -----

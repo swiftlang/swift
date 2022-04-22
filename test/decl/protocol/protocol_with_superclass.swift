@@ -326,7 +326,7 @@ protocol DuplicateSuper : Concrete, Concrete {}
 // expected-warning@-1 {{redundant superclass constraint 'Self' : 'Concrete'}}
 // expected-error@-2 {{duplicate inheritance from 'Concrete'}}
 
-// Ambigous name lookup situation
+// Ambiguous name lookup situation
 protocol Amb : Concrete {}
 // expected-note@-1 {{'Amb' previously declared here}}
 // expected-note@-2 {{found this candidate}}
