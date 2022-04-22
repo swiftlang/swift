@@ -2725,10 +2725,6 @@ ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
                                                      unsigned int depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
-ManglingError Remangler::mangleExtendedExistentialValueStorage(Node *node,
-                                                     unsigned int depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
-}
 ManglingError
 Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node,
                                                       unsigned depth) {

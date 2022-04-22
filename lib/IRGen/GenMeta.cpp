@@ -5783,9 +5783,11 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 
 static void addRelativeAddressOfTypeRef(IRGenModule &IGM,
                                         ConstantStructBuilder &B,
-                                        Type type) {
-  auto typeName =
-    IGM.getTypeRef(type, nullptr, MangledTypeRefRole::Metadata).first;
+                                        Type type,
+                                        GenericSignature sig,
+                                        MangledTypeRefRole role =
+                                          MangledTypeRefRole::Metadata) {
+  auto typeName = IGM.getTypeRef(type, sig, role).first;
   B.addRelativeAddress(typeName);
 }
 
@@ -5802,7 +5804,7 @@ static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
     ++metadata.NumGenericExtraArguments;
 
   B.addInt(IGM.Int32Ty, flags.getIntValue());
-  addRelativeAddressOfTypeRef(IGM, B, paramType);
+  addRelativeAddressOfTypeRef(IGM, B, paramType, nullptr);
   addReference();
 }
 
@@ -6019,14 +6021,17 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
   CanExistentialType existentialType =
     cast<ExistentialType>(info.Shape->getCanonicalType());
 
+  CanType shapeType = existentialType;
+  for (unsigned i = 0; i != metatypeDepth; ++i)
+    shapeType = CanExistentialMetatypeType::get(shapeType);
+
   auto linkage = getExistentialShapeLinkage(genSig, existentialType);
   assert(linkage != FormalLinkage::PublicUnique);
   bool isUnique = (linkage != FormalLinkage::PublicNonUnique);
   bool isShared = (linkage != FormalLinkage::Private);
 
   auto entity =
-    LinkEntity::forExtendedExistentialTypeShape(genSig, existentialType,
-                                                metatypeDepth,
+    LinkEntity::forExtendedExistentialTypeShape(genSig, shapeType,
                                                 isUnique, isShared);
 
   auto shape = IGM.getOrCreateLazyGlobalVariable(entity,
@@ -6044,14 +6049,6 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
 
       // Relative address to the cache variable.
       b.addRelativeAddress(cache);
-
-      // Mangle without a prefix.
-      auto uniqueString =
-        IRGenMangler().mangleExtendedExistentialTypeShapeForUniquing(
-            genSig, existentialType, metatypeDepth);
-
-      // The unique hash.
-      b.addUniqueHash(uniqueString);
     }
 
     CanGenericSignature reqSig =
@@ -6085,6 +6082,16 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     // ExtendedExistentialTypeShapeFlags Flags;
     b.addInt32(flags.getIntValue());
 
+    // RelativePointer<const char> ExistentialType;
+    // This must always be a flat string if we're emitting a
+    // non-unique shape.  We don't need it to be a flat string if
+    // we're emitting a unique shape, but we do need it to not
+    // recurse back into this code to produce a shape, and the
+    // easiest way to achieve that is to always ask for a flat
+    // unique string.
+    addRelativeAddressOfTypeRef(IGM, b, shapeType, genSig,
+                                MangledTypeRefRole::FlatUnique);
+
     auto addSignatureHeader = [&](CanGenericSignature sig) {
       return GenericSignatureHeaderBuilder(IGM, b);
     };
@@ -6099,7 +6106,7 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
 
     // RelativePointer<const char> TypeExpression; // optional
     if (flags.hasTypeExpression()) {
-      addRelativeAddressOfTypeRef(IGM, b, typeExpression);
+      addRelativeAddressOfTypeRef(IGM, b, typeExpression, /*sig*/nullptr);
     }
 
     // RelativePointer<const ValueWitnessTable> SuggestedValueWitnesses; // optional

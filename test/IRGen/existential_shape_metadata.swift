@@ -1,14 +1,16 @@
 // RUN: %target-swift-frontend -emit-ir %s -swift-version 5  -disable-availability-checking -enable-parameterized-existential-types | %IRGenFileCheck %s
 
-// CHECK-LABEL: @"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq" = linkonce_odr hidden constant
+// CHECK-LABEL: @"$sl26existential_shape_metadata2Q0_pyxXPXGMq" = linkonce_odr hidden constant
 // CHECK-SAME:  { i32 {{.*}}sub ([[INT]] ptrtoint (i8** @{{[0-9]+}} to [[INT]])
-// CHECK-SAME:    [16 x i8] c"2\C6\0A\EA>\EE/`\DBphz\CB\FA7\8E",
 // CHECK-SAME:    i32 6400,
+// CHECK-SAME:    i32 {{.*}} @"flat unique 26existential_shape_metadata2Q0_pyxXP"
 // CHECK-SAME:    i16 2, i16 2, i16 3, i16 0,
 // CHECK-SAME:    i16 1, i16 0, i16 1, i16 0, i32 1,
 
-// CHECK-LABEL: @"$s1TQyd__Rsz26existential_shape_metadata2R033_881A0B6978EB4286E7CFF1E27030ACACLLRd__llXGo" = internal constant
+// CHECK-LABEL: @"$sl26existential_shape_metadata2R033_881A0B6978EB4286E7CFF1E27030ACACLL_pyxXPXG" = internal constant
 // CHECK-SAME:  { i32 6400,
+//   This could use a symbolic reference because this doesn't have to be uniqued.
+// CHECK-SAME:    i32 {{.*}} @"flat unique 26existential_shape_metadata2R033_881A0B6978EB4286E7CFF1E27030ACACLL_pyxXP"
 // CHECK-SAME:    i16 2, i16 2, i16 3, i16 0,
 // CHECK-SAME:    i16 1, i16 0, i16 1, i16 0, i32 1,
 
@@ -51,7 +53,7 @@ public func testConcrete() -> Any.Type {
   // CHECK:   [[T0:%.*]] = getelementptr inbounds [1 x i8*], [1 x i8*]* [[ARGS]], i32 0, i32 0
   // CHECK:   store i8*  bitcast (%swift.type* @"$sSiN" to i8*), i8** [[T0]], align
   // CHECK:   [[T0:%.*]] = bitcast [1 x i8*]* [[ARGS]] to i8**
-  // CHECK:   [[CALL:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
+  // CHECK:   [[CALL:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$sl26existential_shape_metadata2Q0_pyxXPXGMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
   // CHECK:   store atomic %swift.type* [[CALL]], %swift.type** @"$s26existential_shape_metadata2Q0_pySiXPML" release, align
   // CHECK:   br label %[[CONT]]
   // CHECK: [[CONT]]:
@@ -68,7 +70,7 @@ public func testDependent<T>(t: T.Type) -> Any.Type {
   // CHECK: [[T1:%.*]] = bitcast %swift.type* %T to i8*
   // CHECK: store i8* [[T1]], i8** [[T0]], align
   // CHECK: [[T0:%.*]] = bitcast [1 x i8*]* [[ARGS]] to i8**
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$sl26existential_shape_metadata2Q0_pyxXPXGMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
   // CHECK: ret %swift.type* [[METADATA]]
   return (any Q0<T>).self
 }
@@ -83,7 +85,7 @@ public func testComplexApplication<T>(t: T.Type) -> Any.Type {
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[B_T]] to i8*
   // CHECK: store i8* [[T1]], i8** [[T0]], align
   // CHECK: [[T0:%.*]] = bitcast [1 x i8*]* [[ARGS]] to i8**
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$sl26existential_shape_metadata2Q0_pyxXPXGMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
   // CHECK: ret %swift.type* [[METADATA]]
   return (any Q0<B<T>>).self
 }
@@ -97,7 +99,7 @@ public func test_private<T>(t: T.Type) -> Any.Type {
   // CHECK: store i8* [[T1]], i8** [[T0]], align
   // CHECK: [[T0:%.*]] = bitcast [1 x i8*]* [[ARGS]] to i8**
   //   FIXME: this should be unique?
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata_unique({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2R033_881A0B6978EB4286E7CFF1E27030ACACLLRd__llXGo{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata_unique({{.*}}@"$sl26existential_shape_metadata2R033_881A0B6978EB4286E7CFF1E27030ACACLL_pyxXPXG{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
   // CHECK: ret %swift.type* [[METADATA]]
   return (any R0<T>).self
 }
@@ -119,4 +121,4 @@ public func test_privateApplication<T>(t: T.Type) -> Any.Type {
   // CHECK: [[T0:%.*]] = getelementptr inbounds [1 x i8*], [1 x i8*]* [[ARGS]], i32 0, i32 0
   // CHECK: store i8* {{.*}}"$s26existential_shape_metadata1C33_881A0B6978EB4286E7CFF1E27030ACACLLVMf"{{.*}}, i8** [[T0]], align
   // CHECK: [[T0:%.*]] = bitcast [1 x i8*]* [[ARGS]] to i8**
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$s1TQyd__Rsz26existential_shape_metadata2Q0Rd__llXGoMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getExtendedExistentialTypeMetadata({{.*}}@"$sl26existential_shape_metadata2Q0_pyxXPXGMq{{(\.ptrauth)?}}" to i8*), i8** [[T0]])

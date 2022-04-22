@@ -362,6 +362,10 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
              ProtocolRequirementFlags::AssociatedTypeInProtocolContextByte);
     break;
 
+  case MangledTypeRefRole::FlatUnique:
+    assert(mangling.SymbolicReferences.empty());
+    break;
+
   case MangledTypeRefRole::Metadata:
   case MangledTypeRefRole::Reflection:
     break;
