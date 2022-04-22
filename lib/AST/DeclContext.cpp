@@ -85,10 +85,11 @@ ProtocolDecl *DeclContext::getExtendedProtocolDecl() const {
 
 VarDecl *DeclContext::getNonLocalVarDecl() const {
   if (auto *init = dyn_cast<PatternBindingInitializer>(this)) {
-   if (auto *var =
-         init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
-      return var;
-     }
+    if (auto binding = init->getBinding()) {
+      if (auto *var = binding->getAnchoringVarDecl(init->getBindingIndex())) {
+        return var;
+      }
+    }
   }
   return nullptr;
 }

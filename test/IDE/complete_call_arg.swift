@@ -1382,3 +1382,20 @@ func testTopLevelFuncWithErrorParam() {
 // TOP_LEVEL_FUNC_WITH_ERROR_PARAM-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): A#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 // TOP_LEVEL_FUNC_WITH_ERROR_PARAM: End completions
 }
+
+func testVarInitializedByCallingClosure() {
+  struct MyBundle {
+    func vrl(forResource: String, withExtension: String?)
+  }
+
+  struct Foo {
+    private lazy var calculatorContext: Void = {
+      let Bundle_main = MyBundle()
+      Bundle_main.vrl(forResource: "turnips", #^VAR_INITIALIZED_BY_CALLING_CLOSURE^#withExtension: "js")
+    }()
+  }
+
+// VAR_INITIALIZED_BY_CALLING_CLOSURE: Begin completions, 1 items
+// VAR_INITIALIZED_BY_CALLING_CLOSURE-DAG: Pattern/Local/Flair[ArgLabels]:     {#withExtension: String?#}[#String?#];
+// VAR_INITIALIZED_BY_CALLING_CLOSURE: End completions
+}

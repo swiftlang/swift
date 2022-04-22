@@ -1800,6 +1800,36 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   assert(DiagnosticSuppression::isEnabled(ctx.Diags) &&
          "Diagnosing and Single ASTNode type checknig don't mix");
 
+  // Initializers aren't walked by ASTWalker and thus we don't find the context
+  // to type check using ASTNodeFinder. Also, initializers aren't representable
+  // by ASTNodes that can be type checked using typeCheckASTNode.
+  // Handle them specifically here.
+  if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
+    if (auto *PBD = patternInit->getBinding()) {
+      auto i = patternInit->getBindingIndex();
+      PBD->getPattern(i)->forEachVariable(
+          [](VarDecl *VD) { (void)VD->getInterfaceType(); });
+      if (PBD->getInit(i)) {
+        if (!PBD->isInitializerChecked(i)) {
+          typeCheckPatternBinding(PBD, i,
+                                  /*LeaveClosureBodyUnchecked=*/true);
+          return false;
+        }
+      }
+    }
+  } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
+      auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
+      (void)Param->getTypeCheckedDefaultExpr();
+      return false;
+    }
+    if (auto *SD = dyn_cast<SubscriptDecl>(defaultArg->getParent())) {
+      auto *Param = SD->getIndices()->get(defaultArg->getIndex());
+      (void)Param->getTypeCheckedDefaultExpr();
+      return false;
+    }
+  }
+
   // Find innermost ASTNode at Loc from DC. Results the reference to the found
   // ASTNode and the decl context of it.
   class ASTNodeFinder : public ASTWalker {

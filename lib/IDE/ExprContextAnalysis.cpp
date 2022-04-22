@@ -43,9 +43,6 @@ using namespace ide;
 //===----------------------------------------------------------------------===//
 
 void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
-  while (isa<AbstractClosureExpr>(DC))
-    DC = DC->getParent();
-
   // Make sure the extension has been bound.
   {
     // Even if the extension is invalid (e.g. nested in a function or another
@@ -77,60 +74,7 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
     }
   }
 
-  // Type-check this context.
-  switch (DC->getContextKind()) {
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-  case DeclContextKind::SerializedLocal:
-  case DeclContextKind::EnumElementDecl:
-  case DeclContextKind::GenericTypeDecl:
-  case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::ExtensionDecl:
-    // Nothing to do for these.
-    break;
-
-  case DeclContextKind::Initializer:
-    if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
-      if (auto *PBD = patternInit->getBinding()) {
-        auto i = patternInit->getBindingIndex();
-        PBD->getPattern(i)->forEachVariable(
-            [](VarDecl *VD) { (void)VD->getInterfaceType(); });
-        if (PBD->getInit(i)) {
-          if (!PBD->isInitializerChecked(i))
-            typeCheckPatternBinding(PBD, i,
-                                    /*LeaveClosureBodyUnchecked=*/true);
-        }
-      }
-    } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
-        auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
-        (void)Param->getTypeCheckedDefaultExpr();
-      }
-      if (auto *SD = dyn_cast<SubscriptDecl>(defaultArg->getParent())) {
-        auto *Param = SD->getIndices()->get(defaultArg->getIndex());
-        (void)Param->getTypeCheckedDefaultExpr();
-      }
-    }
-    break;
-
-  case DeclContextKind::TopLevelCodeDecl:
-    swift::typeCheckASTNodeAtLoc(DC, Loc);
-    break;
-
-  case DeclContextKind::AbstractFunctionDecl: {
-    auto *AFD = cast<AbstractFunctionDecl>(DC);
-    auto &SM = DC->getASTContext().SourceMgr;
-    auto bodyRange = AFD->getBodySourceRange();
-    if (SM.rangeContainsTokenLoc(bodyRange, Loc)) {
-      swift::typeCheckASTNodeAtLoc(DC, Loc);
-    } else {
-      assert(bodyRange.isInvalid() && "The body should not be parsed if the "
-                                      "completion happens in the signature");
-    }
-    break;
-  }
-  }
+  swift::typeCheckASTNodeAtLoc(DC, Loc);
 }
 
 //===----------------------------------------------------------------------===//
