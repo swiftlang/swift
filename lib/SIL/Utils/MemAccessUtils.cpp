@@ -80,7 +80,7 @@ public:
       }
     }
     // If the result is now invalid, reset it and process the current phi as an
-    // unrecgonized access instead.
+    // unrecognized access instead.
     if (!useDefVisitor.isResultValid()) {
       useDefVisitor.restoreResult(savedResult);
       visitNonAccess(phiArg);
@@ -534,7 +534,7 @@ isDistinctFrom(const AccessRepresentation &other) const {
     // Any type of nested/argument address may be within the same object.
     //
     // We also currently assume Unidentified access may be within an object
-    // purely to handle KeyPath accesses. The deriviation of the KeyPath
+    // purely to handle KeyPath accesses. The derivation of the KeyPath
     // address must separately appear to be a Class access so that all Class
     // accesses are accounted for.
     return false;
@@ -1249,7 +1249,7 @@ class AccessPathVisitor : public FindAccessVisitorImpl<AccessPathVisitor> {
           pathLength(pathLength) {}
   };
 
-  // Only access projections affect this path. Since they are are not allowed
+  // Only access projections affect this path. Since they are not allowed
   // beyond phis, this path is not part of AccessPathVisitor::Result.
   llvm::SmallVector<AccessPath::Index, 8> reversePath;
   // Holds a non-zero value if an index_addr has been processed without yet
@@ -1525,7 +1525,7 @@ class AccessPathDefUseTraversal {
 
   // Indices of the path to match from inner to outer component.
   // A cursor is used to represent the most recently visited def.
-  // During def-use traversal, the cursor starts at the end of pathIndicies and
+  // During def-use traversal, the cursor starts at the end of pathIndices and
   // decrements with each projection.
   // The first index represents an exact match.
   // Index < 0 represents some subobject of the requested path.
@@ -1535,7 +1535,7 @@ class AccessPathDefUseTraversal {
   // prior to reaching the base address.
   struct DFSEntry {
     // Next potential use to visit and flag indicating whether traversal has
-    // reachaed the access base yet.
+    // reached the access base yet.
     llvm::PointerIntPair<Operand *, 1, bool> useAndIsRef;
     int pathCursor; // position within pathIndices
     int offset;     // index_addr offsets seen prior to this use
@@ -2508,7 +2508,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
   }
   if (auto ID = builtin->getIntrinsicID()) {
     switch (ID.getValue()) {
-      // Exhaustively verifying all LLVM instrinsics that access memory is
+      // Exhaustively verifying all LLVM intrinsics that access memory is
       // impractical. Instead, we call out the few common cases and return in
       // the default case.
     default:

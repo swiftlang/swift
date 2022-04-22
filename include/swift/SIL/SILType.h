@@ -304,7 +304,7 @@ public:
   bool isAddressOnly(const SILFunction &F) const;
 
   /// True if the underlying AST type is trivial, meaning it is loadable and can
-  /// be trivially copied, moved or detroyed. Returns false for address types
+  /// be trivially copied, moved or destroyed. Returns false for address types
   /// even though they are technically trivial.
   bool isTrivial(const SILFunction &F) const;
 
@@ -510,7 +510,7 @@ public:
   }
 
   /// Return the reference ownership of this type if it is a reference storage
-  /// type. Otherwse, return None.
+  /// type. Otherwise, return None.
   Optional<ReferenceOwnership> getReferenceStorageOwnership() const {
     auto type = getASTType()->getAs<ReferenceStorageType>();
     if (!type)

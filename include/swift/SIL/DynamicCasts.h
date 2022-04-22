@@ -67,7 +67,7 @@ DynamicCastFeasibility classifyDynamicCast(
     ModuleDecl *context,
     CanType sourceType, CanType targetType,
     bool isSourceTypeExact = false,
-    bool isWholdModuleOpts = false);
+    bool isWholeModuleOpts = false);
 
 SILValue emitSuccessfulScalarUnconditionalCast(SILBuilder &B, SILLocation loc,
                                                SILDynamicCastInst inst);

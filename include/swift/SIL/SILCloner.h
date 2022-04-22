@@ -189,7 +189,7 @@ public:
 
   SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
     // If we have open existentials to substitute, check whether that's
-    // relevant to this this particular substitution.
+    // relevant to this particular substitution.
     if (!OpenedExistentialSubs.empty()) {
       for (auto ty : Subs.getReplacementTypes()) {
         // If we found a type containing an opened existential, substitute

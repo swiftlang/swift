@@ -279,7 +279,7 @@ void PrunedLivenessBoundary::compute(const PrunedLiveness &liveness,
     switch (liveness.getBlockLiveness(bb)) {
     case PrunedLiveBlocks::LiveOut:
       // A lifetimeEndBlock may be determined to be LiveOut after analyzing the
-      // extended liveness. It is irrelevent for finding the boundary.
+      // extended liveness. It is irrelevant for finding the boundary.
       break;
     case PrunedLiveBlocks::LiveWithin: {
       // The liveness boundary is inside this block. Insert a final destroy
