@@ -124,6 +124,8 @@ inline void tls_set(tls_key key, void *value) {
   FlsSetValue(key, value);
 }
 
-}
+} // namespace threading_impl
+
+} // namespace swift
 
 #endif // SWIFT_THREADING_IMPL_WIN32_H
