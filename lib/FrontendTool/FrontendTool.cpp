@@ -702,7 +702,8 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
     return false;
   }
 
-  if (Invocation.getSILOptions().CrossModuleOptimization) {
+  if (Invocation.getSILOptions().CMOMode ==
+      CrossModuleOptimizationMode::Aggressive) {
     Instance.getDiags().diagnose(SourceLoc(),
                                  diag::tbd_not_supported_with_cmo);
     return false;
@@ -1406,7 +1407,7 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
     }
 
     // Cross-module optimization does not support TBD.
-    if (Invocation.getSILOptions().CrossModuleOptimization) {
+    if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive) {
       return false;
     }
 

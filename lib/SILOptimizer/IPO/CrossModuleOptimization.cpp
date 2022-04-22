@@ -613,9 +613,20 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
       return;
     if (!M.isWholeModule())
       return;
+      
+    bool conservative = false;
+    switch (M.getOptions().CMOMode) {
+      case swift::CrossModuleOptimizationMode::Off:
+        return;
+      case swift::CrossModuleOptimizationMode::Default:
+        conservative = true;
+        break;
+      case swift::CrossModuleOptimizationMode::Aggressive:
+        conservative = false;
+        break;
+    }
 
-    CrossModuleOptimization CMO(M,
-      /*conservative*/ !M.getOptions().CrossModuleOptimization);
+    CrossModuleOptimization CMO(M, conservative);
     CMO.serializeFunctionsInModule();
   }
 };
