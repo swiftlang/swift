@@ -2186,7 +2186,119 @@ IgnoreDefaultExprTypeMismatch::create(ConstraintSystem &cs, Type argType,
 
 bool AddExplicitExistentialCoercion::diagnose(const Solution &solution,
                                               bool asNote) const {
-  return false;
+  MissingExplicitExistentialCoercion failure(solution, ErasedResultType,
+                                             getLocator());
+  return failure.diagnose(asNote);
+}
+
+bool AddExplicitExistentialCoercion::isRequired(
+    ConstraintSystem &cs, Type resultTy,
+    SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>>
+        &openedExistentials,
+    ConstraintLocatorBuilder locator) {
+  using ExistentialList =
+      SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>> &;
+
+  struct CoercionChecker : public TypeWalker {
+    bool RequiresCoercion = false;
+
+    ConstraintSystem &cs;
+    ExistentialList OpenedExistentials;
+
+    CoercionChecker(ConstraintSystem &cs, ExistentialList openedExistentials)
+        : cs(cs), OpenedExistentials(openedExistentials) {}
+
+    Action walkToTypePre(Type componentTy) override {
+      // In cases where result references a member type, we need to check
+      // whether such type would is resolved to concrete or not.
+      if (auto *member = componentTy->getAs<DependentMemberType>()) {
+        Type memberBaseTy = member->getBase();
+
+        // Find the base of this member chain.
+        while (true) {
+          if (auto *memberTy = memberBaseTy->getAs<DependentMemberType>()) {
+            memberBaseTy = memberTy->getBase();
+          } else {
+            break;
+          }
+        }
+
+        auto typeVar = memberBaseTy->getAs<TypeVariableType>();
+        if (!typeVar)
+          return Action::SkipChildren;
+
+        // If the base is an opened existential type, let's see whether
+        // erase would produce an existential in this case and if so,
+        // we need to check whether any requirements are going to be lost
+        // in process.
+
+        auto opened =
+            llvm::find_if(OpenedExistentials, [&typeVar](const auto &entry) {
+              return typeVar == entry.first;
+            });
+
+        if (opened == OpenedExistentials.end())
+          return Action::SkipChildren;
+
+        auto erasedMemberTy = typeEraseOpenedExistentialReference(
+            Type(member), opened->second->getExistentialType(), opened->first,
+            TypePosition::Covariant);
+
+        // If result is an existential type and the base has `where` clauses
+        // associated with its associated types, the call needs a coercion.
+        if (erasedMemberTy->isExistentialType() &&
+            hasConstrainedAssociatedTypes(opened->second)) {
+          RequiresCoercion = true;
+          return Action::Stop;
+        }
+
+        return Action::SkipChildren;
+      }
+
+      // The case where there is a direct access to opened existential type
+      // e.g. `$T` or `[$T]`.
+      if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+        auto opened =
+            llvm::find_if(OpenedExistentials, [&typeVar](const auto &entry) {
+              return typeVar == entry.first;
+            });
+
+        if (opened != OpenedExistentials.end()) {
+          RequiresCoercion |= hasConstrainedAssociatedTypes(opened->second);
+          return RequiresCoercion ? Action::Stop : Action::SkipChildren;
+        }
+      }
+
+      return Action::Continue;
+    }
+
+  private:
+    bool hasConstrainedAssociatedTypes(ArchetypeType *archetypeTy) {
+      assert(archetypeTy);
+      for (auto *protocol : archetypeTy->getConformsTo()) {
+        if (llvm::any_of(protocol->getAssociatedTypeMembers(),
+                         [](const auto *assocTypeDecl) {
+                           return bool(assocTypeDecl->getTrailingWhereClause());
+                         }))
+          return true;
+      }
+      return false;
+    }
+  };
+
+  // First, let's check whether coercion is already there.
+  if (auto *anchor = getAsExpr(locator.getAnchor())) {
+    auto *parent = cs.getParentExpr(anchor);
+    // Support both `as` and `as!` coercions.
+    if (parent &&
+        (isa<CoerceExpr>(parent) || isa<ForcedCheckedCastExpr>(parent)))
+      return false;
+  }
+
+  CoercionChecker check(cs, openedExistentials);
+  resultTy.walk(check);
+
+  return check.RequiresCoercion;
 }
 
 AddExplicitExistentialCoercion *

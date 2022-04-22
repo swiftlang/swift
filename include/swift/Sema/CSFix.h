@@ -3000,6 +3000,12 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  static bool isRequired(
+      ConstraintSystem &cs, Type resultTy,
+      SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>>
+          &openedExistentials,
+      ConstraintLocatorBuilder locator);
+
   static AddExplicitExistentialCoercion *create(ConstraintSystem &cs,
                                                 Type resultTy,
                                                 ConstraintLocator *locator);
