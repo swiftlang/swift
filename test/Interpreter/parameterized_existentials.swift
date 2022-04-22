@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-parameterized-existential-types)
 // REQUIRES: executable_test
 
-// REQUIRES: disabled
-
 import StdlibUnittest
 
 var ParameterizedProtocolsTestSuite = TestSuite("ParameterizedProtocols")

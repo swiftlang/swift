@@ -516,11 +516,10 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::ExtendedExistentialTypeShape: {
     auto genSig = getExtendedExistentialTypeShapeGenSig();
     auto existentialType = getExtendedExistentialTypeShapeType();
-    auto metatypeDepth = getExtendedExistentialTypeShapeMetatypeDepth();
     auto isUnique = isExtendedExistentialTypeShapeUnique();
 
     return mangler.mangleExtendedExistentialTypeShape(
-                     isUnique, genSig, existentialType, metatypeDepth);
+                     isUnique, genSig, existentialType);
   }
   }
   llvm_unreachable("bad entity kind!");

@@ -84,8 +84,7 @@ SymbolicMangling
 IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
                                   llvm::function_ref<void ()> body) {
   Mod = IGM.getSwiftModule();
-  OptimizeProtocolNames = false;
-  UseObjCRuntimeNames = true;
+  configureForSymbolicMangling();
 
   llvm::SaveAndRestore<bool>
     AllowSymbolicReferencesLocally(AllowSymbolicReferences);
@@ -173,7 +172,22 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   });
 }
 
+SymbolicMangling
+IRGenMangler::mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
+                                             CanType type) {
+  // Use runtime information like we would for a symbolic mangling,
+  // just don't allow actual symbolic references anywhere in the
+  // mangled name.
+  configureForSymbolicMangling();
 
+  // We don't make the substitution adjustments above because they're
+  // target-specific and so would break the goal of getting a unique
+  // string.
+  appendType(type, sig);
+
+  assert(SymbolicReferences.empty());
+  return {finalize(), {}};
+}
 
 std::string IRGenMangler::mangleProtocolConformanceDescriptor(
                                  const RootProtocolConformance *conformance) {
@@ -279,6 +293,11 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
   case MangledTypeRefRole::Metadata:
   case MangledTypeRefRole::Reflection:
     prefix = "symbolic ";
+    break;
+
+  case MangledTypeRefRole::FlatUnique:
+    prefix = "flat unique ";
+    assert(mangling.SymbolicReferences.empty());
     break;
   }
   auto prefixLen = strlen(prefix);
@@ -401,11 +420,10 @@ std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
 std::string
 IRGenMangler::mangleExtendedExistentialTypeShape(bool isUnique,
                                                  CanGenericSignature genSig,
-                                                 CanExistentialType type,
-                                                 unsigned metatypeDepth) {
+                                                 CanType shapeType) {
   beginMangling();
 
-  appendExtendedExistentialTypeShape(genSig, type, metatypeDepth);
+  appendExtendedExistentialTypeShape(genSig, shapeType);
 
   // If this is non-unique, add a suffix to avoid accidental misuse
   // (and to make it easier to analyze in an image).
@@ -415,51 +433,16 @@ IRGenMangler::mangleExtendedExistentialTypeShape(bool isUnique,
   return finalize();
 }
 
-std::string
-IRGenMangler::mangleExtendedExistentialTypeShapeForUniquing(
-                                                 CanGenericSignature genSig,
-                                                 CanExistentialType type,
-                                                 unsigned metatypeDepth) {
-  beginManglingWithoutPrefix();
-  appendExtendedExistentialTypeShape(genSig, type, metatypeDepth);
-  return finalize();
-}
 void
 IRGenMangler::appendExtendedExistentialTypeShape(CanGenericSignature genSig,
-                                                 CanExistentialType type,
-                                                 unsigned metatypeDepth) {
-  // Append the requirement signature of the existential.
-  auto &ctx = type->getASTContext();
-  auto reqSig = ctx.getOpenedArchetypeSignature(type, genSig);
-  appendGenericSignature(reqSig, genSig);
-
+                                                 CanType shapeType) {
   // Append the generalization signature.
   if (genSig) appendGenericSignature(genSig);
 
-  // Append the type expression, if we have metatypes.
-  // Metatypes are called out because they're currently the only
-  // type expression we support.
-  if (metatypeDepth) {
-    assert(reqSig.getGenericParams().size() == 1);
-    Type type = reqSig.getGenericParams()[0];
-    for (unsigned i = 0; i != metatypeDepth; ++i)
-      type = MetatypeType::get(type);
-    appendType(type, reqSig);
-  }
+  // Append the existential type.
+  appendType(shapeType, genSig);
 
   // Append the shape operator.
-  if (!genSig) {
-    appendOperator(metatypeDepth ? "Xh" : "Xg");
-  } else {
-    appendOperator(metatypeDepth ? "XH" : "XG");
-  }
-
-  // Append the value storage.
-  if (metatypeDepth)
-    appendOperator("m");
-  else if (type->requiresClass())
-    appendOperator("c");
-  else
-    appendOperator("o");
+  appendOperator(genSig ? "XG" : "Xg");
 }
 
