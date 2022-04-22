@@ -794,7 +794,9 @@ bool CompilerInvocation::shouldImportSwiftConcurrency() const {
 
 bool CompilerInvocation::shouldImportSwiftStringProcessing() const {
   return getLangOptions().EnableExperimentalStringProcessing &&
-      !getLangOptions().DisableImplicitStringProcessingModuleImport;
+      !getLangOptions().DisableImplicitStringProcessingModuleImport &&
+      getFrontendOptions().InputMode !=
+        FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
