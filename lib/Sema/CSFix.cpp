@@ -2247,7 +2247,7 @@ bool AddExplicitExistentialCoercion::isRequired(
         // If result is an existential type and the base has `where` clauses
         // associated with its associated types, the call needs a coercion.
         if (erasedMemberTy->isExistentialType() &&
-            hasConstrainedAssociatedTypes(opened->second)) {
+            hasConstrainedAssociatedTypes(member)) {
           RequiresCoercion = true;
           return Action::Stop;
         }
@@ -2273,6 +2273,19 @@ bool AddExplicitExistentialCoercion::isRequired(
     }
 
   private:
+    bool hasConstrainedAssociatedTypes(DependentMemberType *member) {
+      auto *assocType = member->getAssocType();
+
+      // If this member has associated type requirements, we are done.
+      if (assocType->getTrailingWhereClause())
+        return true;
+
+      if (auto *DMT = member->getBase()->getAs<DependentMemberType>())
+        return hasConstrainedAssociatedTypes(DMT);
+
+      return false;
+    }
+
     bool hasConstrainedAssociatedTypes(ArchetypeType *archetypeTy) {
       assert(archetypeTy);
       for (auto *protocol : archetypeTy->getConformsTo()) {

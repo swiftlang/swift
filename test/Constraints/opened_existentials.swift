@@ -213,6 +213,7 @@ func testTakeValueAndClosure(p: any P) {
 
 protocol B {
   associatedtype C: P where C.A == Double
+  associatedtype D: P
 }
 
 func testExplicitCoercionRequirement(v: any B) {
@@ -222,7 +223,7 @@ func testExplicitCoercionRequirement(v: any B) {
   func getComplex<T: B>(_: T) -> ([(x: (a: T.C, b: Int), y: Int)], [Int: T.C]) { fatalError() }
 
   func overloaded<T: B>(_: T) -> (x: Int, y: T.C) { fatalError() }
-  // expected-note@-1 {{inferred result type '(x: Int, y: any P)' requires explicit coercion due to loss of generic requirements}} {{240:20-20=as (x: Int, y: any P)}}
+  // expected-note@-1 {{inferred result type '(x: Int, y: any P)' requires explicit coercion due to loss of generic requirements}} {{241:20-20=as (x: Int, y: any P)}}
   func overloaded<T: P>(_: T) -> Int { 42 }
   // expected-note@-1 {{candidate requires that 'any B' conform to 'P' (requirement specified as 'T' : 'P')}}
 
@@ -238,4 +239,8 @@ func testExplicitCoercionRequirement(v: any B) {
   _ = getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]) // Ok
 
   _ = overloaded(v) // expected-error {{no exact matches in call to local function 'overloaded'}}
+
+  func getAssocNoRequirements<T: B>(_: T) -> (Int, [T.D]) { fatalError() }
+
+  _ = getAssocNoRequirements(v) // Ok, `D` doesn't have any requirements
 }
