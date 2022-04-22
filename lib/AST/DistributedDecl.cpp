@@ -62,45 +62,6 @@
 using namespace swift;
 
 /******************************************************************************/
-/********************** Distributed Actor Properties **************************/
-/******************************************************************************/
-
-VarDecl* swift::lookupDistributedActorProperty(NominalTypeDecl *decl, DeclName name) {
-  assert(decl && "decl was null");
-  auto &C = decl->getASTContext();
-
-  auto clazz = dyn_cast<ClassDecl>(decl);
-  if (!clazz)
-    return nullptr;
-
-  auto refs = decl->lookupDirect(name);
-  if (refs.size() != 1)
-    return nullptr;
-
-  auto var = dyn_cast<VarDecl>(refs.front());
-  if (!var)
-    return nullptr;
-
-  Type expectedType = Type();
-  if (name == C.Id_id) {
-    expectedType = getDistributedActorIDType(decl);
-  } else if (name == C.Id_actorSystem) {
-    expectedType = getDistributedActorSystemType(decl);
-  } else {
-    llvm_unreachable("Unexpected distributed actor property lookup!");
-  }
-  if (!expectedType)
-    return nullptr;
-
-  if (!var->getInterfaceType()->isEqual(expectedType))
-    return nullptr;
-
-  assert(var->isSynthesized() && "Expected compiler synthesized property");
-  return var;
-}
-
-
-/******************************************************************************/
 /************** Distributed Actor System Associated Types *********************/
 /******************************************************************************/
 

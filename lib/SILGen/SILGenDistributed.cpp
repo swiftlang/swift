@@ -171,7 +171,7 @@ static void emitActorSystemInit(SILGenFunction &SGF,
   // By construction, automatically generated distributed actor ctors have
   // exactly one ActorSystem-conforming argument to the constructor,
   // so we grab the first one from the params.
-  VarDecl *var = lookupDistributedActorProperty(classDecl, C.Id_actorSystem);
+  VarDecl *var = classDecl->getDistributedActorSystemProperty();
   assert(var);
       
   initializeProperty(SGF, loc, actorSelf.getValue(), var, systemValue);
@@ -204,7 +204,7 @@ void SILGenFunction::emitDistActorIdentityInit(ConstructorDecl *ctor,
 
   // --- create a temporary storage for the result of the call
   // it will be deallocated automatically as we exit this scope
-  VarDecl *var = lookupDistributedActorProperty(classDecl, C.Id_id);
+  VarDecl *var = classDecl->getDistributedActorIDProperty();
   auto resultTy = getLoweredType(F.mapTypeIntoContext(var->getInterfaceType()));
   auto temp = emitTemporaryAllocation(loc, resultTy);
 
@@ -317,7 +317,7 @@ void SILGenFunction::emitDistributedActorReady(
   ManagedValue actorSystem;
   SGFContext sgfCxt;
   {
-    VarDecl *property = lookupDistributedActorProperty(classDecl, C.Id_actorSystem);
+    VarDecl *property = classDecl->getDistributedActorSystemProperty();
     Type formalType = F.mapTypeIntoContext(property->getInterfaceType());
     SILType loweredType = getLoweredType(formalType).getAddressType();
     SILValue actorSystemRef = emitActorPropertyReference(
@@ -451,11 +451,11 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
     auto classDecl = dc->getSelfClassDecl();
     
     initializeProperty(*this, loc, remote,
-                       lookupDistributedActorProperty(classDecl, C.Id_id),
+                       classDecl->getDistributedActorIDProperty(),
                        idArg);
 
     initializeProperty(*this, loc, remote,
-                       lookupDistributedActorProperty(classDecl, C.Id_actorSystem),
+                       classDecl->getDistributedActorSystemProperty(),
                        actorSystemArg);
 
     // ==== Branch to return the fully initialized remote instance
@@ -498,12 +498,12 @@ void SILGenFunction::emitDistributedActorSystemResignIDCall(
 
   // ==== locate: self.id
   auto idRef = emitActorPropertyReference(
-      *this, loc, actorSelf.getValue(), lookupDistributedActorProperty(actorDecl, ctx.Id_id));
+      *this, loc, actorSelf.getValue(), actorDecl->getDistributedActorIDProperty());
 
   // ==== locate: self.actorSystem
   auto systemRef = emitActorPropertyReference(
       *this, loc, actorSelf.getValue(),
-      lookupDistributedActorProperty(actorDecl, ctx.Id_actorSystem));
+      actorDecl->getDistributedActorSystemProperty());
 
   // Perform the call.
   emitDistributedActorSystemWitnessCall(
