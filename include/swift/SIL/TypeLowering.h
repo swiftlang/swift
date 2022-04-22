@@ -98,15 +98,6 @@ enum IsTrivial_t : bool {
   IsTrivial = true
 };
 
-/// Is a lowered SIL type the Builtin.RawPointer or a struct/tuple/enum which
-/// contains a Builtin.RawPointer?
-/// HasRawPointer is true only for types that are known to contain
-/// Builtin.RawPointer. It is not assumed true for generic or resilient types.
-enum HasRawPointer_t : bool {
-  DoesNotHaveRawPointer = false,
-  HasRawPointer = true
-};
-
 /// Is a lowered SIL type fixed-ABI?  That is, can the current context
 /// assign it a fixed size and alignment and perform value operations on it
 /// (such as copies, destroys, constructions, and projections) without
@@ -181,7 +172,6 @@ public:
       ResilientFlag              = 1 << 3,
       TypeExpansionSensitiveFlag = 1 << 4,
       InfiniteFlag               = 1 << 5,
-      HasRawPointerFlag          = 1 << 6,
     };
 
     uint8_t Flags;
@@ -194,14 +184,12 @@ public:
         IsTrivial_t isTrivial, IsFixedABI_t isFixedABI,
         IsAddressOnly_t isAddressOnly, IsResilient_t isResilient,
         IsTypeExpansionSensitive_t isTypeExpansionSensitive =
-            IsNotTypeExpansionSensitive,
-        HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer)
+            IsNotTypeExpansionSensitive)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
                 (isResilient ? ResilientFlag : 0U) |
-                (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
-                (hasRawPointer ? HasRawPointerFlag : 0U)) {}
+                (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -209,11 +197,6 @@ public:
 
     static constexpr RecursiveProperties forTrivial() {
       return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient};
-    }
-
-    static constexpr RecursiveProperties forRawPointer() {
-      return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
-              IsNotTypeExpansionSensitive, HasRawPointer};
     }
 
     static constexpr RecursiveProperties forReference() {
@@ -235,9 +218,6 @@ public:
 
     IsTrivial_t isTrivial() const {
       return IsTrivial_t((Flags & NonTrivialFlag) == 0);
-    }
-    IsTrivial_t isOrContainsRawPointer() const {
-      return IsTrivial_t((Flags & HasRawPointerFlag) != 0);
     }
     IsFixedABI_t isFixedABI() const {
       return IsFixedABI_t((Flags & NonFixedABIFlag) == 0);
@@ -333,10 +313,6 @@ public:
   /// value type with no reference type members that require releasing.
   bool isTrivial() const {
     return Properties.isTrivial();
-  }
-  
-  bool isOrContainsRawPointer() const {
-    return Properties.isOrContainsRawPointer();
   }
   
   /// Returns true if the type is a scalar reference-counted reference, which

@@ -371,12 +371,6 @@ SwiftInt SILType_isReferenceCounted(BridgedType type, BridgedFunction function) 
   return castToSILType(type).isReferenceCounted(f->getModule()) ? 1 : 0;
 }
 
-SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType type,
-                                                  BridgedFunction function) {
-  SILFunction *f = castToFunction(function);
-  return castToSILType(type).isNonTrivialOrContainsRawPointer(*f);
-}
-
 SwiftInt SILType_isNominal(BridgedType type) {
   return castToSILType(type).getNominalOrBoundGenericNominal() ? 1 : 0;
 }
