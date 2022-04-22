@@ -25,8 +25,8 @@ func zim(y: Bar, x: Foo, z: Baz) { print("hooray") }
 
       return try await zim(y: y, x: x, z: z)
     } catch {
-      // CHECK: oopsie woopsie
-      print("oopsie woopsie")
+      // CHECK: oopsie whoopsie
+      print("oopsie whoopsie")
     }
   }
 }
