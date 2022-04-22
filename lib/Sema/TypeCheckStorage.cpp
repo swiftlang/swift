@@ -165,12 +165,12 @@ static void enumerateStoredPropertiesAndMissing(
     ASTContext &ctx = decl->getASTContext();
     for (auto *member : decl->getMembers()) {
       if (auto *var = dyn_cast<VarDecl>(member)) {
-        if (!var->isStatic() && var->hasStorage() &&
-            var->isSynthesized()) {
-          if (var->getName() == ctx.Id_id)
+        if (!var->isStatic() && var->hasStorage()) {
+          if (var->getName() == ctx.Id_id) {
             distributedActorId = var;
-          else if (var->getName() == ctx.Id_actorSystem)
+          } else if (var->getName() == ctx.Id_actorSystem) {
             distributedActorSystem = var;
+          }
         }
 
         if (distributedActorId && distributedActorSystem)
@@ -186,9 +186,13 @@ static void enumerateStoredPropertiesAndMissing(
 
   for (auto *member : decl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
-      if (!var->isStatic() && var->hasStorage() &&
-          var != distributedActorId &&
-          var != distributedActorSystem) {
+      if (!var->isStatic() && var->hasStorage()) {
+        // Skip any properties that we already emitted explicitly
+        if (var == distributedActorId)
+          continue;
+        if (var == distributedActorSystem)
+          continue;
+
         addStoredProperty(var);
       }
     }
