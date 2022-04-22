@@ -57,14 +57,14 @@ func checkCaseCondition() {
 }
 
 func checkOptionalBindingCondition(optional: String?) {
-  if let unwraped = optional {
-    print(unwraped)
+  if let unwrapped = optional {
+    print(unwrapped)
   }
 
   switch optional {
-case var unwraped?:
-unwraped += "!"
-    print(unwraped)
+case var unwrapped?:
+unwrapped += "!"
+    print(unwrapped)
 default:
 break
 }
