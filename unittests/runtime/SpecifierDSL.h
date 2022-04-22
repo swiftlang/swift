@@ -21,10 +21,20 @@
 #include "ObjectBuilder.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/ABI/Metadata.h"
+#include "swift/Demangling/Demangler.h"
 #include <sstream>
 
 namespace swift {
 namespace specifierDSL {
+
+struct ProtocolSpecifier {
+  const ProtocolDescriptor *descriptor;
+};
+
+/// Construct a protocol specifier for a protocol descriptor reference.
+inline ProtocolSpecifier protocol(const ProtocolDescriptor *descriptor) {
+  return ProtocolSpecifier{descriptor};
+}
 
 struct TypeSpecifier;
 
@@ -40,12 +50,26 @@ struct ParamTypeSpecifier {
 };
 struct MemberTypeSpecifier {
   IndirectTypeSpecifier _base;
+  ProtocolSpecifier protocol;
   std::string name;
 
   const TypeSpecifier &base() const { return *_base.ptr.get(); }
 };
+struct ProtocolTypeSpecifier {
+  ProtocolSpecifier protocol;
+};
+struct ParameterizedProtocolTypeSpecifier {
+  ProtocolSpecifier base;
+  std::vector<std::pair<std::string, TypeSpecifier>> args;
+};
+struct ProtocolCompositionTypeSpecifier {
+  std::vector<TypeSpecifier> components;
+};
 struct TypeSpecifier : TaggedUnion<ParamTypeSpecifier,
-                                   MemberTypeSpecifier> {
+                                   MemberTypeSpecifier,
+                                   ProtocolTypeSpecifier,
+                                   ProtocolCompositionTypeSpecifier,
+                                   ParameterizedProtocolTypeSpecifier> {
   using TaggedUnion::TaggedUnion;
 };
 
@@ -60,99 +84,180 @@ inline TypeSpecifier typeParam(unsigned depth, unsigned index) {
 }
 
 /// Construct a type specifier for a dependent member type.
-inline TypeSpecifier member(TypeSpecifier &&base, std::string &&member) {
-  return MemberTypeSpecifier{std::move(base), std::move(member)};
+inline TypeSpecifier member(TypeSpecifier &&base,
+                            ProtocolSpecifier &&protocol,
+                            std::string &&member) {
+  return MemberTypeSpecifier{std::move(base),
+                             std::move(protocol),
+                             std::move(member)};
 }
 
-inline void mangleNatural(AnyObjectBuilder &builder, size_t value) {
-  std::ostringstream str;
-  str << value;
-  builder.addBytes(str.str());
+/// Construct a type specifier for a protocol type.
+inline TypeSpecifier protocolType(ProtocolSpecifier &&protocol) {
+  return ProtocolTypeSpecifier{std::move(protocol)};
 }
 
-inline void mangleIndex(AnyObjectBuilder &builder, unsigned value) {
-  if (value > 0)
-    mangleNatural(builder, value - 1);
-  builder.add8('_');
+inline void addCompositionComponent(std::vector<TypeSpecifier> &components,
+                                    ProtocolSpecifier &&protocol) {
+  components.push_back(protocolType(std::move(protocol)));
+}
+inline void addCompositionComponent(std::vector<TypeSpecifier> &components,
+                                    TypeSpecifier &&type) {
+  components.push_back(std::move(type));
+}
+inline void addCompositionComponents(std::vector<TypeSpecifier> &components) {}
+template <class Spec, class... Specs>
+inline void addCompositionComponents(std::vector<TypeSpecifier> &components,
+                                     Spec &&spec, Specs &&...specs) {
+  addCompositionComponent(components, std::forward<Spec>(spec));
+  addCompositionComponents(components, std::forward<Specs>(specs)...);
 }
 
-inline void mangleIdentifier(AnyObjectBuilder &builder, llvm::StringRef value) {
-  mangleNatural(builder, value.size());
-  // assumes no non-ASCII characters, which is fine for testing
-  builder.addBytes(value);
+template <class... Specs>
+inline TypeSpecifier protocolComposition(Specs &&...specs) {
+  std::vector<TypeSpecifier> components;
+  addCompositionComponents(components, std::forward<Specs>(specs)...);
+  return ProtocolCompositionTypeSpecifier{std::move(components)};
 }
 
-inline void mangleGenericParamIndex(AnyObjectBuilder &builder,
-                                    unsigned depth, unsigned index) {
+inline void addParameterizedProtocolArguments(
+              std::vector<std::pair<std::string, TypeSpecifier>> &args) {}
+template <class... Specs>
+inline void addParameterizedProtocolArguments(
+              std::vector<std::pair<std::string, TypeSpecifier>> &args,
+              std::string &&associatedTypeName,
+              TypeSpecifier &&type,
+              Specs &&...specs) {
+  args.push_back(std::make_pair(std::move(associatedTypeName), std::move(type)));
+  addParameterizedProtocolArguments(args, std::forward<Specs>(specs)...);
+}
 
-  if (depth == 0) {
-    assert(index != 0 && "didn't special-case depth=0, index=0 in caller");
-    builder.add8('q');
-    mangleIndex(builder, index - 1);
-  } else {
-    builder.add8('q');
-    builder.add8('d');
-    mangleIndex(builder, depth - 1);
-    mangleIndex(builder, index);
+template <class... Specs>
+inline TypeSpecifier parameterizedProtocol(ProtocolSpecifier &&base,
+                                           Specs &&...specs) {
+  std::vector<std::pair<std::string, TypeSpecifier>> args;
+  addParameterizedProtocolArguments(args, std::forward<Specs>(specs)...);
+  return ParameterizedProtocolTypeSpecifier{std::move(base),
+                                            std::move(args)};
+}
+
+/// A class which "demangles" various DSL specifiers into demangle
+/// tree nodes.
+class Demangler {
+  NodeFactory factory;
+
+  using NodePointer = Demangle::NodePointer;
+  using Kind = Demangle::Node::Kind;
+
+  NodePointer node(Kind kind, llvm::ArrayRef<NodePointer> children) {
+    auto node = factory.createNode(kind);
+    for (auto child: children)
+      node->addChild(child, factory);
+    return node;
   }
-}
+  NodePointer nodeWithIndex(Kind kind, Node::IndexType index) {
+    return factory.createNode(kind, index);
+  }
+  NodePointer nodeWithText(Kind kind, llvm::StringRef string) {
+    auto node = factory.createNode(kind, string);
+    return node;
+  }
 
-inline void mangleGenericParamType(AnyObjectBuilder &builder,
-                                   unsigned depth, unsigned index) {
-  if (depth == 0 && index == 0) {
-    builder.add8('x');
-  } else {
-    builder.add8('q');
-    mangleGenericParamIndex(builder, depth, index);
+  NodePointer demangleModule(const ModuleContextDescriptor *descriptor) {
+    assert(descriptor->Parent.isNull());
+    return nodeWithText(Kind::Module, descriptor->Name.get());
   }
-}
+  NodePointer demangleProtocol(const ProtocolDescriptor *descriptor) {
+    return node(Kind::Protocol,
+                {demangleContext(descriptor->Parent.get()),
+                 nodeWithText(Kind::Identifier, descriptor->Name.get())});
+  }
+  NodePointer demangleProtocol(const ProtocolSpecifier &spec) {
+    return demangleProtocol(spec.descriptor);
+  }
 
-inline void
-mangleDependentMemberType(AnyObjectBuilder &builder,
-                          const MemberTypeSpecifier &spec) {
-  std::vector<const std::string *> path;
-  path.push_back(&spec.name);
+  NodePointer demangleContext(const ContextDescriptor *context) {
+    if (auto module = dyn_cast<ModuleContextDescriptor>(context))
+      return demangleModule(module);
+    if (auto protocol = dyn_cast<ProtocolDescriptor>(context))
+      return demangleProtocol(protocol);
+    swift_unreachable("unknown context");
+  }
 
-  auto cur = &spec.base();
-  while (auto member = cur->dyn_cast<MemberTypeSpecifier>()) {
-    path.push_back(&member->name);
-    cur = &member->base();
+  NodePointer demangleParamType(const ParamTypeSpecifier &spec) {
+    return node(Kind::DependentGenericParamType,
+                {nodeWithIndex(Kind::Index, spec.depth),
+                 nodeWithIndex(Kind::Index, spec.index)});
   }
-  bool first = true;
-  for (auto *memberName : llvm::reverse(path)) {
-    if (!first) builder.add8('_');
-    first = false;
-    mangleIdentifier(builder, *memberName);
+
+  NodePointer demangleMemberType(const MemberTypeSpecifier &spec) {
+    return node(Kind::DependentMemberType,
+                {demangleType(spec.base()),
+                 node(Kind::DependentAssociatedTypeRef,
+                      {nodeWithText(Kind::Identifier, spec.name),
+                       demangleProtocol(spec.protocol)})});
   }
-  auto &param = cur->get<ParamTypeSpecifier>();
-  if (param.depth == 0 && param.index == 0)
-    builder.addBytes(path.size() == 1 ? "Qz" : "QZ");
-  else {
-    builder.addBytes(path.size() == 1 ? "Qy" : "QY");
-    mangleGenericParamIndex(builder, param.depth, param.index);
+
+  NodePointer demangleProtocolType(const ProtocolTypeSpecifier &spec) {
+    return demangleProtocol(spec.protocol);
   }
-}
+
+  NodePointer demangleProtocolCompositionType(
+                        const ProtocolCompositionTypeSpecifier &spec) {
+    std::vector<NodePointer> components;
+    for (auto &component: spec.components) {
+      components.push_back(demangleType(component));
+    }
+    return node(Kind::ProtocolList,
+                {node(Kind::TypeList, components)});
+  }
+
+  NodePointer demangleParameterizedProtocolType(
+                      const ParameterizedProtocolTypeSpecifier &spec) {
+    // Demangle the base protocol and then wrap it up like the tree expects,
+    // which for some reason is this.
+    auto base = demangleProtocol(spec.base);
+    base = node(Kind::Type,
+                {node(Kind::ProtocolList,
+                      {node(Kind::Type,
+                            {base})})});
+
+    std::vector<NodePointer> argVector;
+    for (auto &arg: spec.args) {
+      // TODO: also include the associated type names
+      argVector.push_back(demangleType(arg.second));
+    }
+    auto args = node(Kind::TypeList, argVector);
+    return node(Kind::ParameterizedProtocol,
+                {base, args});
+  }
+
+  NodePointer demangleTypeImpl(const TypeSpecifier &spec) {
+#define CASE(ID)                                              \
+    if (auto type = spec.dyn_cast<ID##Specifier>())           \
+      return demangle##ID(*type);
+    CASE(ParamType)
+    CASE(MemberType)
+    CASE(ProtocolType)
+    CASE(ProtocolCompositionType)
+    CASE(ParameterizedProtocolType)
+#undef CASE
+    swift_unreachable("unknown type specifier");
+  }
+
+public:
+  NodePointer demangleType(const TypeSpecifier &spec) {
+    return node(Kind::Type, {demangleTypeImpl(spec)});
+  }
+};
 
 inline ObjectRef<const char>
 createMangledTypeString(AnyObjectBuilder &builder, const TypeSpecifier &spec) {
+  Demangler demangler;
+  auto node = demangler.demangleType(spec);
   auto nameBuilder = builder.createSubobject<const char>(/*align*/ 2);
-  if (auto paramType = spec.dyn_cast<ParamTypeSpecifier>()) {
-    mangleGenericParamType(nameBuilder, paramType->depth, paramType->index);
-  } else if (auto memberType = spec.dyn_cast<MemberTypeSpecifier>()) {
-    mangleDependentMemberType(builder, *memberType);
-  } else {
-    swift_unreachable("unknown type specifier");
-  }
+  nameBuilder.addString(Demangle::nodeToString(node));
   return nameBuilder.ref();
-}
-
-struct ProtocolSpecifier {
-  const ProtocolDescriptor *descriptor;
-};
-
-/// Construct a protocol specifier for a protocol descriptor reference.
-inline ProtocolSpecifier protocol(const ProtocolDescriptor *descriptor) {
-  return ProtocolSpecifier{descriptor};
 }
 
 /// Add a ProtocolDescriptorRef.
