@@ -750,9 +750,9 @@ namespace {
 
   /// If \p expr is a call and that call contains the code completion token,
   /// add the expressions of all arguments after the code completion token to
-  /// \p ignoredArguemnts.
+  /// \p ignoredArguments.
   /// Otherwise, returns an empty vector.
-  /// Asssumes that we are solving for code completion.
+  /// Assumes that we are solving for code completion.
   void getArgumentsAfterCodeCompletionToken(
       Expr *expr, ConstraintSystem &CS,
       SmallVectorImpl<Expr *> &ignoredArguments) {
@@ -2359,7 +2359,7 @@ namespace {
           // from the right-hand side (which is not the case for `OneWayEqual`)
           // e.g.:
           //
-          // sturct S { var x, y: Int }
+          // struct S { var x, y: Int }
           //
           // func test(s: S) {
           //   let (x, y) = (s.x, s.y)
@@ -2367,7 +2367,7 @@ namespace {
           //
           // Single type variable approach results in the following constraint:
           // `$T_x_y = ($T_s_x, $T_s_y)` where both `$T_s_x` and `$T_s_y` have
-          // to allow l-value, but `$T_x_y` does not. Early simplication of `=`
+          // to allow l-value, but `$T_x_y` does not. Early simplification of `=`
           // constraint (due to right-hand side being a "concrete" tuple type)
           // would drop l-value option from `$T_s_x` and `$T_s_y` which leads to
           // a failure during member lookup because `x` and `y` are both
@@ -2760,7 +2760,7 @@ namespace {
       closure->walk(collectVarRefs);
 
       // If walker discovered error expressions, let's fail constraint
-      // genreation only if closure is going to participate
+      // generation only if closure is going to participate
       // in the type-check. This allows us to delay validation of
       // multi-statement closures until body is opened.
       if (CS.participatesInInference(closure) &&

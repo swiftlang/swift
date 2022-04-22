@@ -1071,11 +1071,11 @@ func rdar_74435602(error: Error?) {
 // SR-14280
 let _: (@convention(block) () -> Void)? = Bool.random() ? nil : {} // OK
 let _: (@convention(thin) () -> Void)? = Bool.random() ? nil : {} // OK
-let _: (@convention(c) () -> Void)? = Bool.random() ? nil : {} // OK on type checking, diagnostics are deffered to SIL
+let _: (@convention(c) () -> Void)? = Bool.random() ? nil : {} // OK on type checking, diagnostics are deferred to SIL
 
 let _: (@convention(block) () -> Void)? = Bool.random() ? {} : {} // OK
 let _: (@convention(thin) () -> Void)? = Bool.random() ? {} : {} // OK
-let _: (@convention(c) () -> Void)? = Bool.random() ? {} : {} // OK on type checking, diagnostics are deffered to SIL
+let _: (@convention(c) () -> Void)? = Bool.random() ? {} : {} // OK on type checking, diagnostics are deferred to SIL
 
 // Make sure that diagnostic is attached to the closure even when body is empty (implicitly returns `Void`)
 var emptyBodyMismatch: () -> Int {

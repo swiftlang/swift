@@ -335,7 +335,7 @@ public:
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
-  // Is \p targetDecl accessible as an explictly imported SPI from this file?
+  // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
 
   bool shouldCrossImport() const;

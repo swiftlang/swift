@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library
 
 // This test case must be in a file with no other errors, otherwise we won't
-// compute caputures.
+// compute captures.
 
 class C {
   lazy var foo: String = {

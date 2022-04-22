@@ -444,8 +444,8 @@ public:
   bool IncludeSPISymbolsInSymbolGraph = false;
 
   /// Whether to reuse a frontend (i.e. compiler instance) for multiple
-  /// compiletions. This prevents ASTContext being freed.
-  bool ReuseFrontendForMutipleCompilations = false;
+  /// compilations. This prevents ASTContext being freed.
+  bool ReuseFrontendForMultipleCompilations = false;
 
   /// This is used to obfuscate the serialized search paths so we don't have
   /// to encode the actual paths into the .swiftmodule file.

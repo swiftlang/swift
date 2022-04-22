@@ -1855,6 +1855,32 @@ public:
   /// Flags for the existential shape.
   ExtendedExistentialTypeShapeFlags Flags;
 
+  /// The mangling of the generalized existential type, expressed
+  /// (if necessary) in terms of the type parameters of the
+  /// generalization signature.
+  ///
+  /// If this shape is non-unique, this is always a flat string, not a
+  /// "symbolic" mangling which can contain relative references.  This
+  /// allows uniquing to simply compare the string content.
+  ///
+  /// In principle, the content of the requirement signature and type
+  /// expression are derivable from this type.  We store them separately
+  /// so that code which only needs to work with the logical content of
+  /// the type doesn't have to break down the existential type string.
+  /// This both (1) allows those operations to work substantially more
+  /// efficiently (and without needing code to produce a requirement
+  /// signature from an existential type to exist in the runtime) and
+  /// (2) potentially allows old runtimes to support new existential
+  /// types without as much invasive code.
+  ///
+  /// The content of this string is *not* necessarily derivable from
+  /// the requirement signature.  This is because there may be multiple
+  /// existential types that have equivalent logical content but which
+  /// we nonetheless distinguish at compile time.  Storing this also
+  /// allows us to far more easily produce a formal type from this
+  /// shape reflectively.
+  RelativeStringPointer ExistentialType;
+
   /// The header describing the requirement signature of the existential.
   TargetGenericContextDescriptorHeader<Runtime> ReqSigHeader;
 
@@ -2024,6 +2050,9 @@ struct UniqueHash {
 
 /// A descriptor for an extended existential type descriptor which
 /// needs to be uniqued at runtime.
+///
+/// Uniquing is performed by comparing the existential type strings
+/// of the shapes.
 template <typename Runtime>
 struct TargetNonUniqueExtendedExistentialTypeShape {
   /// A reference to memory that can be used to cache a globally-unique
@@ -2032,10 +2061,12 @@ struct TargetNonUniqueExtendedExistentialTypeShape {
     std::atomic<ConstTargetMetadataPointer<Runtime,
                   TargetExtendedExistentialTypeShape>>> UniqueCache;
 
-  /// A hash of the mangling of the existential shape.
-  ///
-  /// TODO: describe that mangling here
-  UniqueHash Hash;
+  llvm::StringRef getExistentialTypeStringForUniquing() const {
+    // When we have a non-unique shape, we're guaranteed that
+    // ExistentialType contains no symbolic references, so we can just
+    // recover it this way rather than having to parse it.
+    return LocalCopy.ExistentialType.get();
+  }
 
   /// The local copy of the existential shape descriptor.
   TargetExtendedExistentialTypeShape<Runtime> LocalCopy;

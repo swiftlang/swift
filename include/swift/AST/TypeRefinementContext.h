@@ -164,7 +164,7 @@ private:
 
   SourceRange SrcRange;
 
-  /// A canonical availiability info for this context, computed top-down from the root
+  /// A canonical availability info for this context, computed top-down from the root
   /// context (compilation deployment target).
   AvailabilityContext AvailabilityInfo;
 

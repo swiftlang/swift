@@ -469,20 +469,12 @@ public:
   }
 
   void appendExtendedExistentialTypeShape(CanGenericSignature genSig,
-                                          CanExistentialType type,
-                                          unsigned metatypeDepth);
+                                          CanType shapeType);
 
   /// Mangle the symbol name for an extended existential type shape.
   std::string mangleExtendedExistentialTypeShape(bool isUnique,
                                                  CanGenericSignature genSig,
-                                                 CanExistentialType type,
-                                                 unsigned metatypeDepth);
-
-  /// Mangle an extended existential type shape for the uniquing hash.
-  std::string mangleExtendedExistentialTypeShapeForUniquing(
-                                                 CanGenericSignature genSig,
-                                                 CanExistentialType type,
-                                                 unsigned metatypeDepth);
+                                                 CanType shapeType);
 
   std::string mangleCoroutineContinuationPrototype(CanSILFunctionType type) {
     return mangleTypeSymbol(type, "TC");
@@ -600,6 +592,14 @@ public:
   std::string mangleTypeForForeignMetadataUniquing(Type type) {
     return mangleTypeWithoutPrefix(type);
   }
+
+  void configureForSymbolicMangling() {
+    OptimizeProtocolNames = false;
+    UseObjCRuntimeNames = true;
+  }
+
+  SymbolicMangling mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
+                                                  CanType ty);
 
   SymbolicMangling mangleTypeForReflection(IRGenModule &IGM,
                                            CanGenericSignature genericSig,

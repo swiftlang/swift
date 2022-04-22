@@ -164,7 +164,7 @@ public:
   /// its children.
   bool findIf(llvm::function_ref<bool(TypeRepr *)> pred);
 
-  /// Check recursively whether this type repr or any of its decendants are
+  /// Check recursively whether this type repr or any of its descendants are
   /// opaque return type reprs.
   bool hasOpaque();
 

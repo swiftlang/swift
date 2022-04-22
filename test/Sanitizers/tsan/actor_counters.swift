@@ -8,6 +8,8 @@
 // UNSUPPORTED: linux
 // UNSUPPORTED: windows
 
+// REQUIRES: rdar83246843
+
 @available(SwiftStdlib 5.1, *)
 actor Counter {
   private var value = 0

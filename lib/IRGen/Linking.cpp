@@ -516,11 +516,10 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::ExtendedExistentialTypeShape: {
     auto genSig = getExtendedExistentialTypeShapeGenSig();
     auto existentialType = getExtendedExistentialTypeShapeType();
-    auto metatypeDepth = getExtendedExistentialTypeShapeMetatypeDepth();
     auto isUnique = isExtendedExistentialTypeShapeUnique();
 
     return mangler.mangleExtendedExistentialTypeShape(
-                     isUnique, genSig, existentialType, metatypeDepth);
+                     isUnique, genSig, existentialType);
   }
   }
   llvm_unreachable("bad entity kind!");
@@ -667,7 +666,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
       // The full class stub object is private to the containing module,
-      // excpet for foreign types.
+      // except for foreign types.
       return SILLinkage::Private;
     case TypeMetadataAddress::AddressPoint: {
       auto *classDecl = cast<ClassDecl>(getDecl());

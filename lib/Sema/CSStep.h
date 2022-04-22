@@ -116,7 +116,7 @@ public:
   virtual void setup() {}
 
   /// Try to move solver forward by simplifying constraints if possible.
-  /// Such simplication might lead to either producing a solution, or
+  /// Such simplification might lead to either producing a solution, or
   /// creating a set of "follow-up" more granular steps to execute.
   ///
   /// \param prevFailed Indicate whether previous step

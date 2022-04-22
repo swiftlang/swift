@@ -148,7 +148,7 @@ func SR12689_2(_ u: Int) {}
 SR12689_2(SR12689_1(1 as Double)) // expected-error {{no exact matches in call to global function 'SR12689_1'}}
 SR12689_1(1 as Double) as Int // expected-error {{no exact matches in call to global function 'SR12689_1'}}
 
-// Ambiguos OverloadRefExpr
+// Ambiguous OverloadRefExpr
 func SR12689_O(_ p: Int) {} // expected-note {{found candidate with type '(Int) -> ()'}}
 func SR12689_O(_ p: Double) {} // expected-note {{found candidate with type '(Double) -> ()'}}
 func SR12689_3(_ param: (String)-> Void) {}

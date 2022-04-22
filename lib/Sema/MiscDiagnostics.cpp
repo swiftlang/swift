@@ -64,14 +64,10 @@ bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
   if (closure->isSeparatelyTypeChecked())
     return false;
 
-  auto &opts = D->getASTContext().TypeCheckerOpts;
-
-  // If multi-statement inference is enabled, let's not walk
-  // into declarations contained in a multi-statement closure
-  // because they'd be handled via `typeCheckDecl` that runs
+  // Let's not walk into declarations contained in a multi-statement
+  // closure because they'd be handled via `typeCheckDecl` that runs
   // syntactic diagnostics.
-  if (opts.EnableMultiStatementClosureInference &&
-      !closure->hasSingleExpressionBody()) {
+  if (!closure->hasSingleExpressionBody()) {
     // Since pattern bindings get their types through solution application,
     // `typeCheckDecl` doesn't touch initializers (because they are already
     // fully type-checked), so pattern bindings have to be allowed to be
@@ -325,7 +321,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return { true, E };
     }
 
-    /// Visit each component of the keypath and emit a diganostic if they
+    /// Visit each component of the keypath and emit a diagnostic if they
     /// refer to a member that has effects.
     void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
       for (const auto &component : keyPath->getComponents()) {
@@ -532,7 +528,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // `*SpelledAsFile` cases and various other File-related cases.
       //
       // The way we're going to do this is a bit magical. We will arrange the
-      // cases in MagicIdentifierLiteralExpr::Kind so that that they sort in
+      // cases in MagicIdentifierLiteralExpr::Kind so that they sort in
       // this order:
       //
       //     #fileID < Swift 6 #file < #filePath < Swift 5 #file < others
@@ -1691,7 +1687,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       //   1. There is an existing capture list which already has some
       //      entries. We need to insert 'self' into the capture list along
       //      with a separating comma.
-      //   2. There is an existing capture list, but it is empty (jusr '[]').
+      //   2. There is an existing capture list, but it is empty (just '[]').
       //      We can just insert 'self'.
       //   3. Arguments or types are already specified in the signature,
       //      but there is no existing capture list. We will need to insert
@@ -2096,7 +2092,7 @@ static void diagnoseUnownedImmediateDeallocationImpl(ASTContext &ctx,
   if (varDecl->getDeclContext()->isTypeContext())
     storageKind = SK_Property;
 
-  // TODO: The DiagnoseLifetimeIssuesPass prints a similiar warning in this
+  // TODO: The DiagnoseLifetimeIssuesPass prints a similar warning in this
   // situation. We should only print one warning.
 
   ctx.Diags.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
@@ -2331,7 +2327,7 @@ static bool fixItOverrideDeclarationTypesImpl(
 }
 }
 
-bool swift::computeFixitsForOverridenDeclaration(
+bool swift::computeFixitsForOverriddenDeclaration(
     ValueDecl *decl, const ValueDecl *base,
     llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag) {
   SmallVector<std::tuple<NoteKind_t, SourceRange, std::string>, 4> Notes;
@@ -2704,7 +2700,7 @@ public:
       return;
     }
 
-    SmallVector<Candidate, 4> universalyUniqueCandidates;
+    SmallVector<Candidate, 4> universallyUniqueCandidates;
 
     for (const auto &entry : Candidates) {
       AvailabilityContext availability = entry.first;
@@ -2712,11 +2708,11 @@ public:
 
       // Unique candidate without availability context.
       if (!availability && std::get<2>(candidate))
-        universalyUniqueCandidates.push_back(candidate);
+        universallyUniqueCandidates.push_back(candidate);
     }
 
     // TODO(diagnostics): Need a tailored diagnostic for this case.
-    if (universalyUniqueCandidates.empty()) {
+    if (universallyUniqueCandidates.empty()) {
       Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
       return;
     }
@@ -2724,8 +2720,8 @@ public:
     // If there is a single universally available unique candidate
     // the underlying type would have to be determined at runtime
     // based on the results of availability checks.
-    if (universalyUniqueCandidates.size() == 1) {
-      finalizeOpaque(universalyUniqueCandidates.front());
+    if (universallyUniqueCandidates.size() == 1) {
+      finalizeOpaque(universallyUniqueCandidates.front());
       return;
     }
 
@@ -2742,7 +2738,7 @@ public:
 
       Type underlyingType = Type(genericParam).subst(underlyingSubs);
       bool found = false;
-      for (const auto &candidate : universalyUniqueCandidates) {
+      for (const auto &candidate : universallyUniqueCandidates) {
         Type otherType = Type(genericParam).subst(std::get<1>(candidate));
 
         if (!underlyingType->isEqual(otherType)) {
@@ -2774,7 +2770,7 @@ public:
           .highlight(opaqueRepr->getSourceRange());
     }
 
-    for (const auto &candidate : universalyUniqueCandidates) {
+    for (const auto &candidate : universallyUniqueCandidates) {
       Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
                          diag::opaque_type_underlying_type_candidate_here,
                          Type(mismatch->second).subst(std::get<1>(candidate)));
@@ -2885,7 +2881,9 @@ public:
       // If this is `if #available` statement with no other dynamic
       // conditions, let's check if it returns opaque type directly.
       if (llvm::all_of(If->getCond(), [&](const auto &condition) {
-            return condition.getKind() == StmtConditionElement::CK_Availability;
+            return condition.getKind() ==
+                       StmtConditionElement::CK_Availability &&
+                   !condition.getAvailability()->isUnavailability();
           })) {
         // Check return statement directly with availability context set.
         if (auto *Then = dyn_cast<BraceStmt>(If->getThenStmt())) {
@@ -5050,7 +5048,7 @@ void swift::checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl) {
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt,
-                                            bool disableExprAvailabiltyChecking) {
+                                            bool disableExprAvailabilityChecking) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -5062,7 +5060,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseComparisonWithNaN(E, DC);
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
-  if (!ctx.LangOpts.DisableAvailabilityChecking && !disableExprAvailabiltyChecking)
+  if (!ctx.LangOpts.DisableAvailabilityChecking && !disableExprAvailabilityChecking)
     diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);

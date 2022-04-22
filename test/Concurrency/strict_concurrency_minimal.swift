@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=off
+// RUN: %target-typecheck-verify-swift -strict-concurrency=minimal
 // REQUIRES: concurrency
 
 class C1 { }

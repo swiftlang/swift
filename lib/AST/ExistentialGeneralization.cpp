@@ -232,7 +232,7 @@ private:
     return decl->getDeclaredInterfaceType().subst(newSubs);
   }
 
-  /// Generalize the given type by preserving its top-level strcture
+  /// Generalize the given type by preserving its top-level structure
   /// but generalizing its component types.
   Type generalizeComponentTypes(CanType type) {
     return type.transformRec([&](TypeBase *componentType) -> Optional<Type> {

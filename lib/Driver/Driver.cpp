@@ -980,7 +980,7 @@ Driver::buildCompilation(const ToolChain &TC,
   computeArgsHash(ArgsHash, *TranslatedArgList);
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
   InputInfoMap outOfDateMap;
-  std::string whyIgnoreIncrementallity =
+  std::string whyIgnoreIncrementality =
       !Incremental
           ? ""
           : buildRecordPath.empty()
@@ -1079,7 +1079,7 @@ Driver::buildCompilation(const ToolChain &TC,
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
   buildActions(TopLevelActions, TC, OI,
-               whyIgnoreIncrementallity.empty() ? &outOfDateMap : nullptr, *C);
+               whyIgnoreIncrementality.empty() ? &outOfDateMap : nullptr, *C);
 
   if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
@@ -1110,8 +1110,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // This has to happen after building jobs, because otherwise we won't even
   // emit .swiftdeps files for the next build.
-  if (!whyIgnoreIncrementallity.empty())
-    C->disableIncrementalBuild(whyIgnoreIncrementallity);
+  if (!whyIgnoreIncrementality.empty())
+    C->disableIncrementalBuild(whyIgnoreIncrementality);
 
   if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
@@ -1816,7 +1816,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_recover_EQ)) {
     // Just validate the args. The frontend will parse these again and actually
-    // use them. To avoid emitting warnings multiple times we surpress warnings
+    // use them. To avoid emitting warnings multiple times we suppress warnings
     // here but not in the frontend.
     (void)parseSanitizerRecoverArgValues(A, OI.SelectedSanitizers, Diags,
                                          /*emitWarnings=*/false);

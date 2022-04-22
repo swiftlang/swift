@@ -389,7 +389,7 @@ void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
     
     // @transparent is always ok on implicitly generated accessors: they can
     // be dispatched (even in classes) when the references are within the
-    // class themself.
+    // class themselves.
     if (!(isa<AccessorDecl>(D) && D->isImplicit()))
       diagnoseAndRemoveAttr(attr, diag::transparent_in_classes_not_supported);
   }
@@ -2559,7 +2559,7 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
   }
 }
 
-/// Lookup the replaced decl in the replacments scope.
+/// Lookup the replaced decl in the replacements scope.
 static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                const DeclAttribute  *attr,
                                const ValueDecl *replacement,
@@ -3755,7 +3755,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       isa<AccessorDecl>(D))
     return;
 
-  // Don't add dynamic if decl is inlinable or tranparent.
+  // Don't add dynamic if decl is inlinable or transparent.
   if (shouldBlockImplicitDynamic(D))
    return;
 

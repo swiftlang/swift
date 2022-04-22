@@ -208,7 +208,7 @@ public:
   llvm::DISubprogram *emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
                                    SILFunctionTypeRepresentation Rep,
                                    SILType Ty, DeclContext *DeclCtx = nullptr,
-                                   StringRef oulinedFromName = StringRef());
+                                   StringRef outlinedFromName = StringRef());
   llvm::DISubprogram *emitFunction(SILFunction &SILFn, llvm::Function *Fn);
   void emitArtificialFunction(IRBuilder &Builder, llvm::Function *Fn,
                               SILType SILTy);
@@ -1440,7 +1440,7 @@ private:
       auto L = getFilenameAndLocation(*this, Decl);
       auto *File = getOrCreateFile(L.filename);
       // No line numbers are attached to type forward declarations.  This is
-      // intentional: It interfers with the efficacy of incremental builds. We
+      // intentional: It interferes with the efficacy of incremental builds. We
       // don't want a whitespace change to an secondary file trigger a
       // recompilation of the debug info of a primary source file.
       unsigned FwdDeclLine = 0;
@@ -1969,7 +1969,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // command line. This does not include any macros defined by ClangImporter.
   llvm::raw_svector_ostream OS(ConfigMacros);
   unsigned I = 0;
-  // Translate the macro definitions back into a commmand line.
+  // Translate the macro definitions back into a command line.
   for (auto &Macro : Opts.ClangDefines) {
     if (++I > 1)
       OS << ' ';
@@ -2796,7 +2796,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // in the entry block of each funclet.
     if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare) {
       // Function arguments in async functions are emitted without a shadow copy
-      // (that would interfer with coroutine splitting) but with a
+      // (that would interfere with coroutine splitting) but with a
       // llvm.dbg.declare to give CoroSplit.cpp license to emit a shadow copy
       // for them pointing inside the Swift Context argument that is valid
       // throughout the function.

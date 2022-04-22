@@ -14,7 +14,7 @@ import SwiftShims
 import Foundation
 
 
-// CHECK-LABEL: sil @testSwiftToSwift : $@convention(thin) (@in Set<Int>, @guaranteed Set<Int>)
+// CHECK-LABEL: sil {{.*}}@testSwiftToSwift : $@convention(thin) (@in Set<Int>, @guaranteed Set<Int>)
 // CHECK: bb0
 // CHECK-NOT: checked_cast_addr_br
 // CHECK-NOT: _bridgeToObjectiveC
@@ -41,7 +41,7 @@ bb3:
   br bb2(%1 : $Set<Int>)
 }
 
-// CHECK-LABEL: sil @testObjCToObjC : $@convention(thin) (NSSet, NSSet)
+// CHECK-LABEL: sil {{.*}}@testObjCToObjC : $@convention(thin) (NSSet, NSSet)
 // CHECK: bb0
 // CHECK-NOT: checked_cast_br
 // CHECK-NOT: BridgeFromObjectiveC
@@ -63,7 +63,7 @@ bb3:
 
 sil @fail : $@convention(thin) () -> Never
 
-// CHECK-LABEL: sil @testCFToObjC
+// CHECK-LABEL: sil {{.*}}@testCFToObjC
 // CHECK: bb0(
 // CHECK-NEXT: [[T0:%.*]] = load %1 : $*CFString
 // CHECK-NEXT: [[T1:%.*]] = unchecked_ref_cast [[T0]] : $CFString to $NSString
@@ -82,7 +82,7 @@ bb2:
   unreachable
 }
 
-// CHECK-LABEL: sil @testCFToSwift
+// CHECK-LABEL: sil {{.*}}@testCFToSwift
 // CHECK: bb0(
 // CHECK-NEXT: [[T0:%.*]] = load %1 : $*CFString
 // CHECK-NEXT: [[T1:%.*]] = unchecked_ref_cast [[T0]] : $CFString to $NSString

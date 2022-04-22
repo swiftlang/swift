@@ -291,7 +291,7 @@ enum class TypeMatchFlags {
   AllowABICompatible = 1 << 3,
   /// Allow escaping function parameters to override optional non-escaping ones.
   ///
-  /// This is necessary because Objective-C allows optional function paramaters
+  /// This is necessary because Objective-C allows optional function parameters
   /// to be non-escaping, but Swift currently does not.
   IgnoreNonEscapingForOptionalFunctionParam = 1 << 4,
   /// Allow compatible opaque archetypes.
@@ -5722,7 +5722,7 @@ enum class OpaqueSubstitutionKind {
   // Can be done if the underlying type is accessible from the context we
   // substitute into. Private types cannot be accessed from a different TU.
   SubstituteSameModuleMaximalResilience,
-  // Substitute in a different module from the opaque definining decl. Can only
+  // Substitute in a different module from the opaque defining decl. Can only
   // be done if the underlying type is public.
   SubstituteNonResilientModule
 };

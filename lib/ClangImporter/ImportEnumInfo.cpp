@@ -258,7 +258,7 @@ void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
     return;
   }
 
-  // If there are no enumers, there is no prefix to compute.
+  // If there are no enumerators, there is no prefix to compute.
   auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
   if (ec == ecEnd)
     return;

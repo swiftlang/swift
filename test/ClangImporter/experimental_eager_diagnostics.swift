@@ -185,7 +185,7 @@ import macros
 // CHECK-NEXT: {{^}}        ^
 
 // CHECK:      macros.h:{{[0-9]+}}:9: note: macro 'INVALID_ARITHMETIC_1' not imported: structure not supported
-// CHECK-NEXT:      #define INVALID_ARITHMETIC_1 5 + INVALID_INTERGER_LITERAL_1
+// CHECK-NEXT:      #define INVALID_ARITHMETIC_1 5 + INVALID_INTEGER_LITERAL_1
 // CHECK-NEXT: {{^}}        ^
 
 // CHECK:      macros.h:{{[0-9]+}}:9: note: macro 'INVALID_ARITHMETIC_2' not imported: structure not supported

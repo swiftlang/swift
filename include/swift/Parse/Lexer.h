@@ -231,7 +231,7 @@ public:
   }
 
   /// Lex a token. If \c TriviaRetentionMode is \c WithTrivia, passed pointers
-  /// to trivias are populated.
+  /// to trivia are populated.
   void lex(Token &Result, StringRef &LeadingTriviaResult,
            StringRef &TrailingTriviaResult) {
     Result = NextToken;
@@ -423,7 +423,7 @@ public:
   /// source location.
   ///
   /// If \c ExtraIndentation is not null, it will be set to an appropriate
-  /// additional intendation for adding code in a smaller scope "within" \c Loc.
+  /// additional indentation for adding code in a smaller scope "within" \c Loc.
   static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc,
                                          StringRef *ExtraIndentation = nullptr);
 
@@ -661,7 +661,7 @@ private:
 /// A lexer that can lex trivia into its pieces
 class TriviaLexer {
 public:
-  /// Decompose the triva in \p TriviaStr into their pieces.
+  /// Decompose the trivia in \p TriviaStr into their pieces.
   static ParsedTrivia lexTrivia(StringRef TriviaStr);
 };
 

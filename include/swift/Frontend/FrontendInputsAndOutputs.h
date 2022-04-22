@@ -142,7 +142,7 @@ public:
   assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeChecksHaveBeenBypassed()
       const;
 
-  // Count-dependend readers:
+  // Count-dependent readers:
 
   /// \return the unique primary input, if one exists.
   const InputFile *getUniquePrimaryInput() const;

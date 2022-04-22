@@ -506,9 +506,8 @@ public:
   {
     // Allocate space to receive the resume value when the continuation is
     // resumed.
-    opaqueResumeType =
-        SGF.getLoweredType(AbstractionPattern(calleeTypeInfo.substResultType),
-                           calleeTypeInfo.substResultType);
+    opaqueResumeType = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                          calleeTypeInfo.substResultType);
     resumeBuf = SGF.emitTemporaryAllocation(loc, opaqueResumeType);
   }
   
@@ -707,14 +706,12 @@ public:
     // The incoming value is the maximally-abstracted result type of the
     // continuation. Move it out of the resume buffer and reabstract it if
     // necessary.
-    auto resumeResult = SGF.emitLoad(loc, resumeBuf,
-      calleeTypeInfo.origResultType
-         ? *calleeTypeInfo.origResultType
-         : AbstractionPattern(calleeTypeInfo.substResultType),
-                 calleeTypeInfo.substResultType,
-                 SGF.getTypeLowering(calleeTypeInfo.substResultType),
-                 SGFContext(), IsTake);
-    
+    auto resumeResult =
+        SGF.emitLoad(loc, resumeBuf, AbstractionPattern::getOpaque(),
+                     calleeTypeInfo.substResultType,
+                     SGF.getTypeLowering(calleeTypeInfo.substResultType),
+                     SGFContext(), IsTake);
+
     return RValue(SGF, loc, calleeTypeInfo.substResultType, resumeResult);
   }
 };

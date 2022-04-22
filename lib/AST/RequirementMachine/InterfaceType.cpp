@@ -38,7 +38,7 @@
 // The rewrite system's reduction order differs from the canonical type order
 // used by Swift's ABI and name mangling. What this means in practice is that
 // converting a canonical type to a term does not necessarily produce a
-// canonical term; the term must further be simplifed to produce a canonical
+// canonical term; the term must further be simplified to produce a canonical
 // term. Converting a canonical term back to a type, however, does produce a
 // canonical type.
 //
@@ -373,7 +373,7 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
     if (assocType == nullptr) {
       llvm::errs() << "Cannot build interface type for term "
                    << MutableTerm(begin, end) << "\n";
-      llvm::errs() << "Prefix term does not not have a nested type named "
+      llvm::errs() << "Prefix term does not have a nested type named "
                    << symbol.getName() << ": "
                    << prefix << "\n";
       llvm::errs() << "Property map entry: ";

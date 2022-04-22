@@ -128,7 +128,7 @@ public:
   /// by user.
   virtual void completePostfixExprBeginning(CodeCompletionExpr *E) {};
 
-  /// Complete the beginning of expr-postfix in a for-each loop sequqence
+  /// Complete the beginning of expr-postfix in a for-each loop sequence
   /// -- no tokens provided by user.
   virtual void completeForEachSequenceBeginning(CodeCompletionExpr *E) {};
 
@@ -212,7 +212,7 @@ public:
 
   /// Complete a yield statement.  A missing yield index means that the
   /// completion immediately follows the 'yield' keyword; it may be either
-  /// an expresion or a parenthesized expression list.  A present yield
+  /// an expression or a parenthesized expression list.  A present yield
   /// index means that the completion is within the parentheses and is
   /// for a specific yield value.
   virtual void completeYieldStmt(CodeCompletionExpr *E,

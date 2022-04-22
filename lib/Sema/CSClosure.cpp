@@ -149,7 +149,7 @@ public:
 
 // MARK: Constraint generation
 
-/// Check whether it makes sense to convert this element into a constrant.
+/// Check whether it makes sense to convert this element into a constraint.
 static bool isViableElement(ASTNode element) {
   if (auto *decl = element.dyn_cast<Decl *>()) {
     // - Ignore variable declarations, they are handled by pattern bindings;
@@ -192,7 +192,7 @@ static void createConjunction(ConstraintSystem &cs,
     referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
     // Body of the closure is always isolated from its context, only
     // its individual elements are allowed access to type information
-    // from the ouside e.g. parameters/result type.
+    // from the outside e.g. parameters/result type.
     isIsolated = true;
   }
 

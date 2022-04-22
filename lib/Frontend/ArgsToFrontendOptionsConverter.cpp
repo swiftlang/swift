@@ -169,7 +169,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
 
-  // None here means error, not just "no inputs". Propagage unconditionally.
+  // None here means error, not just "no inputs". Propagate unconditionally.
   if (!inputsAndOutputs)
     return true;
 

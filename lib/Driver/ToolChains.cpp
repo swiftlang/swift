@@ -318,7 +318,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
-  // Pass on module names whose symbols should be embeded in tbd.
+  // Pass on module names whose symbols should be embedded in tbd.
   inputArgs.AddAllArgs(arguments, options::OPT_embed_tbd_for_module);
 
   if (auto *A = inputArgs.getLastArg(options::OPT_working_directory)) {

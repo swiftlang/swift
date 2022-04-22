@@ -205,7 +205,7 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   // Check for Unicode BOM at start of file (Only UTF-8 BOM supported now).
   size_t BOMLength = contents.startswith("\xEF\xBB\xBF") ? 3 : 0;
 
-  // Keep information about existance of UTF-8 BOM for transparency source code
+  // Keep information about existence of UTF-8 BOM for transparency source code
   // editing with libSyntax.
   ContentStart = BufferStart + BOMLength;
 
@@ -1359,7 +1359,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   case '"':
   case '\'':
     if (CurPtr[-1] == StopQuote) {
-      // Mutliline and custom escaping are only enabled for " quote.
+      // Multiline and custom escaping are only enabled for " quote.
       if (LLVM_UNLIKELY(StopQuote != '"'))
         return ~0U;
       if (!IsMultilineString && !CustomDelimiterLen)
@@ -1908,7 +1908,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
 
   if (QuoteChar == '\'') {
     assert(!IsMultilineString && CustomDelimiterLen == 0 &&
-           "Single quoted string cannot have custom delimitor, nor multiline");
+           "Single quoted string cannot have custom delimiter, nor multiline");
     diagnoseSingleQuoteStringLiteral(TokStart, CurPtr);
   }
 
@@ -2722,7 +2722,7 @@ Restart:
     goto Restart;
   case '/':
     if (IsForTrailingTrivia || isKeepingComments()) {
-      // Don't lex comments as trailing trivias (for now).
+      // Don't lex comments as trailing trivia (for now).
       // Don't try to lex comments here if we are lexing comments as Tokens.
       break;
     } else if (*CurPtr == '/') {

@@ -210,7 +210,7 @@ public:
   filter(llvm::function_ref<bool(LookupResultEntry, /*isOuter*/ bool)> pred);
 
   /// Shift down results by dropping inner results while keeping outer
-  /// results (if any), the innermost of which are recogized as inner
+  /// results (if any), the innermost of which are recognized as inner
   /// results afterwards.
   void shiftDownResults();
 };
@@ -548,6 +548,11 @@ SmallVector<InheritedNominalEntry, 4> getDirectlyInheritedNominalTypeDecls(
 SelfBounds getSelfBoundsFromWhereClause(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl);
 
+/// Retrieve the set of nominal type declarations that appear as the
+/// constraint type of any "Self" constraints in the generic signature of the
+/// given protocol or protocol extension.
+SelfBounds getSelfBoundsFromGenericSignature(const ExtensionDecl *extDecl);
+
 /// Retrieve the TypeLoc at the given \c index from among the set of
 /// type declarations that are directly "inherited" by the given declaration.
 inline const TypeLoc &getInheritedTypeLocAtIndex(
@@ -623,7 +628,7 @@ private:
 };
   
   
-/// The bridge between the legacy UnqualifedLookupFactory and the new ASTScope
+/// The bridge between the legacy UnqualifiedLookupFactory and the new ASTScope
 /// lookup system
 class AbstractASTScopeDeclConsumer {
 public:

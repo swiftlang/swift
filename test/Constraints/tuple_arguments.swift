@@ -1673,7 +1673,7 @@ public extension Optional {
 
 // https://bugs.swift.org/browse/SR-6837
 
-// FIXME: Can't overlaod local functions so these must be top-level
+// FIXME: Can't overload local functions so these must be top-level
 func takePairOverload(_ pair: (Int, Int?)) {}
 func takePairOverload(_: () -> ()) {}
 

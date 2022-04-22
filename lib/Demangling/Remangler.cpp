@@ -3445,64 +3445,24 @@ ManglingError Remangler::mangleUniquable(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
                                                             unsigned depth) {
-  NodePointer reqSig, genSig, type, storage;
-  reqSig = node->getChild(0);
-  if (node->getNumChildren() == 3) {
+  NodePointer genSig, type;
+  if (node->getNumChildren() == 1) {
     genSig = nullptr;
-    type = node->getChild(1);
-    storage = node->getChild(2);
+    type = node->getChild(0);
   } else {
-    genSig = node->getChild(1);
-    type = node->getChild(2);
-    storage = node->getChild(3);
+    genSig = node->getChild(0);
+    type = node->getChild(1);
   }
 
-  RETURN_IF_ERROR(mangle(reqSig, depth + 1));
   if (genSig) {
     RETURN_IF_ERROR(mangle(genSig, depth + 1));  
   }
+  RETURN_IF_ERROR(mangle(type, depth + 1));
 
-  // Recognize the special case of a type expression that's just the
-  // unique requirement type parameter.
-  {
-    if (type->getKind() != Node::Kind::Type)
-      return MANGLING_ERROR(ManglingError::WrongNodeType, type);
-    auto typeNode = type->getChild(0);
-
-    if (typeNode->getKind() == Node::Kind::DependentGenericParamType) {
-      auto paramDepth = typeNode->getChild(0)->getIndex();
-      auto index = typeNode->getChild(1)->getIndex();
-      if (paramDepth == (genSig ? 1 : 0) && index == 0)
-        type = nullptr;
-    }
-  }
-  if (type)
-    RETURN_IF_ERROR(mangle(type, depth + 1));
-
-  if (genSig && type)
-    Buffer << "XH";
-  else if (type)
-    Buffer << "Xh";
-  else if (genSig)
+  if (genSig)
     Buffer << "XG";
   else
     Buffer << "Xg";
-
-  RETURN_IF_ERROR(mangle(storage, depth + 1));
-
-  return ManglingError::Success;
-}
-
-ManglingError Remangler::mangleExtendedExistentialValueStorage(Node *node,
-                                                           unsigned depth) {
-  if (node->getText() == "opaque")
-    Buffer << "o";
-  else if (node->getText() == "class")
-    Buffer << "c";
-  else if (node->getText() == "metatype")
-    Buffer << "m";
-  else
-    return MANGLING_ERROR(ManglingError::UnknownEncoding, node);
 
   return ManglingError::Success;
 }

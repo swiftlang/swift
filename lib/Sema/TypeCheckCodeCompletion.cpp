@@ -157,7 +157,7 @@ public:
         }
       }
 
-      // Substitute OpaqueValue with its representing existental.
+      // Substitute OpaqueValue with its representing existential.
       if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
         auto value = OpenExistentials.find(OVE);
 
@@ -212,10 +212,6 @@ public:
       // If this is a closure, only walk into its children if they
       // are type-checked in the context of the enclosing expression.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        // TODO: This has to be deleted once `EnableMultiStatementClosureInference`
-        //       is enabled by default.
-        if (!closure->hasSingleExpressionBody())
-          return { false, expr };
         for (auto &Param : *closure->getParameters()) {
           Param->setSpecifier(swift::ParamSpecifier::Default);
         }
@@ -593,7 +589,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     return false;
 
   // Interpolation components are type-checked separately.
-  if (contextAnalyzer.locatedInStringIterpolation())
+  if (contextAnalyzer.locatedInStringInterpolation())
     return false;
 
   // FIXME: There is currently no way to distinguish between

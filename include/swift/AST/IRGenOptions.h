@@ -392,7 +392,7 @@ public:
   unsigned InternalizeSymbols : 1;
 
   /// Whether to avoid emitting zerofill globals as preallocated type metadata
-  /// and prototol conformance caches.
+  /// and protocol conformance caches.
   unsigned NoPreallocatedInstantiationCaches : 1;
 
   /// The number of threads for multi-threaded code generation.

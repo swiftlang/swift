@@ -141,7 +141,7 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
                   Type witnessType, bool witnessTypeIsIUO,
                   VarianceKind variance) {
   // If the witness type is noescape but the requirement type is not,
-  // adjust the witness type to be escaping; likewisse for sendability. This
+  // adjust the witness type to be escaping; likewise for sendability. This
   // permits a limited form of covariance.
   auto applyAdjustment = [&](TypeAdjustment adjustment) {
     // Sometimes the witness has a function type, but the requirement has
@@ -2038,10 +2038,10 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
 
   if (Proto->isObjC()) {
     // Foreign classes cannot conform to objc protocols.
-    if (auto clas = canT->getClassOrBoundGenericClass()) {
+    if (auto clazz = canT->getClassOrBoundGenericClass()) {
       Optional<decltype(diag::cf_class_cannot_conform_to_objc_protocol)>
       diagKind;
-      switch (clas->getForeignClassKind()) {
+      switch (clazz->getForeignClassKind()) {
         case ClassDecl::ForeignKind::Normal:
           break;
         case ClassDecl::ForeignKind::CFType:
@@ -2097,8 +2097,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     // conditional conformances involving them. Check the full stack of nested
     // types for any obj-c ones.
     while (nestedType) {
-      if (auto clas = nestedType->getClassOrBoundGenericClass()) {
-        if (clas->isTypeErasedGenericClass()) {
+      if (auto clazz = nestedType->getClassOrBoundGenericClass()) {
+        if (clazz->isTypeErasedGenericClass()) {
           C.Diags.diagnose(ComplainLoc,
                            diag::objc_generics_cannot_conditionally_conform, T,
                            ProtoType);
@@ -2578,7 +2578,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
   case MatchKind::TypeConflict: {
     if (!isa<TypeDecl>(req) && !isa<EnumElementDecl>(match.Witness)) {
-      computeFixitsForOverridenDeclaration(match.Witness, req, [&](bool){
+      computeFixitsForOverriddenDeclaration(match.Witness, req, [&](bool){
         return diags.diagnose(match.Witness,
                               diag::protocol_witness_type_conflict,
                               getTypeForDisplay(module, match.Witness),

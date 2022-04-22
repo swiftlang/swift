@@ -60,15 +60,16 @@ namespace swift {
 
   /// Describes how strict concurrency checking should be.
   enum class StrictConcurrency {
-    /// Turns off strict checking, which disables (e.g.) Sendable checking in
-    /// most cases.
-    Off,
-    /// Enables concurrency checking in a limited manner that is intended to
-    /// only affect code that has already adopted the concurrency model.
-    Limited,
-    /// Enables strict concurrency checking throughout the entire model,
-    /// providing an approximation of the fully-checked model.
-    On
+    /// Enforce Sendable constraints where it has been explicitly adopted and
+    /// perform actor-isolation checking wherever code has adopted concurrency.
+    Minimal,
+    /// Enforce Sendable constraints and perform actor-isolation checking
+    /// wherever code has adopted concurrency, including code that has
+    /// explicitly adopted Sendable.
+    Targeted,
+    /// Enforce Sendable constraints and actor-isolation checking throughout
+    /// the entire module.
+    Complete,
   };
 
   /// Access or distribution level of a library.
@@ -280,6 +281,9 @@ namespace swift {
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
 
+    /// Imports getters and setters as computed properties.
+    bool CxxInteropGettersSettersAsProperties = false;
+
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
     /// classes instead of the stable ABI's bit. This is needed when
     /// targeting OSes prior to macOS 10.14.4 and iOS 12.2, where
@@ -324,7 +328,7 @@ namespace swift {
     bool UseMalloc = false;
 
     /// Specifies how strict concurrency checking will be.
-    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Limited;
+    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Targeted;
 
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
@@ -758,10 +762,6 @@ namespace swift {
     /// Enable experimental support for one-way constraints for the
     /// parameters of closures.
     bool EnableOneWayClosureParameters = false;
-
-    /// Enable experimental support for type inference through multi-statement
-    /// closures.
-    bool EnableMultiStatementClosureInference = true;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;

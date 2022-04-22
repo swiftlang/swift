@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -experimental-multi-statement-closures
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 func callClosure(closure: () -> ()) {  
   closure()

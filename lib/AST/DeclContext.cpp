@@ -30,6 +30,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "clang/AST/ASTContext.h"
 using namespace swift;
 
 #define DEBUG_TYPE "Name lookup"
@@ -734,6 +735,14 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
   }
   }
 
+  if (auto decl = getAsDecl())
+    if (decl->getClangNode().getLocation().isValid()) {
+      auto &clangSM = getASTContext().getClangModuleLoader()
+                          ->getClangASTContext().getSourceManager();
+      OS << " clang_loc=";
+      decl->getClangNode().getLocation().print(OS, clangSM);
+    }
+
   if (!onlyAPartialLine)
     OS << "\n";
   return Depth + 1;
@@ -1285,7 +1294,7 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   case DeclContextKind::SerializedLocal:
     return extractNearestSourceLoc(dc->getParent());
   }
-  llvm_unreachable("Unhandled DeclCopntextKindin switch");
+  llvm_unreachable("Unhandled DeclContextKindIn switch");
 }
 
 #define DECL(Id, Parent) \

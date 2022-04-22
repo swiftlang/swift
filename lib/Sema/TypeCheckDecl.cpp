@@ -322,7 +322,7 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
   return true;
 }
 
-/// Runtime-replacable accessors are dynamic when their storage declaration
+/// Runtime-replaceable accessors are dynamic when their storage declaration
 /// is dynamic and they were explicitly defined or they are implicitly defined
 /// getter/setter because no accessor was defined.
 static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
@@ -907,7 +907,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   }
 
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
-    // Runtime-replacable accessors are dynamic when their storage declaration
+    // Runtime-replaceable accessors are dynamic when their storage declaration
     // is dynamic and they were explicitly defined or they are implicitly defined
     // getter/setter because no accessor was defined.
     return doesAccessorNeedDynamicAttribute(accessor);
@@ -1911,7 +1911,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       for (DeclContext *CurContext = FD->getLocalContext();
            !isa<SourceFile>(CurContext);
            CurContext = CurContext->getParent()) {
-        // Skip over non-decl contexts (e.g. closure expresssions)
+        // Skip over non-decl contexts (e.g. closure expressions)
         if (auto *D = CurContext->getAsDecl())
             insertionLoc = D->getStartLoc();
       }

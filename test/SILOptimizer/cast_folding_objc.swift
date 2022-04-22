@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=PerfInliner -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=PerfInliner -emit-sil %s | %FileCheck %s
 
 // We want to check two things here:
 // - Correctness
@@ -79,7 +78,7 @@ public func castObjCToSwift<T>(_ t: T) -> Int {
 }
 
 // Check that compiler understands that this cast always fails
-// CHECK-LABEL: sil [noinline] @$s17cast_folding_objc37testFailingBridgedCastFromObjCtoSwiftySiSo8NSStringCF
+// CHECK-LABEL: sil [noinline] {{.*}}@$s17cast_folding_objc37testFailingBridgedCastFromObjCtoSwiftySiSo8NSStringCF
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
@@ -89,7 +88,7 @@ public func testFailingBridgedCastFromObjCtoSwift(_ ns: NSString) -> Int {
 }
 
 // Check that compiler understands that this cast always fails
-// CHECK-LABEL: sil [noinline] @$s17cast_folding_objc37testFailingBridgedCastFromSwiftToObjCySiSSF
+// CHECK-LABEL: sil [noinline] {{.*}}@$s17cast_folding_objc37testFailingBridgedCastFromSwiftToObjCySiSSF
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
@@ -233,57 +232,57 @@ public func testCastProtocolCompositionProtocolToProtocolType () -> P.Type? {
 print("test0=\(test0())")
 
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastNSObjectToEveryType{{.*}}
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastNSObjectToEveryType{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastNSObjectToNonClassType
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastNSObjectToNonClassType
 // CHECK:         builtin "int_trap"
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyObjectToEveryType{{.*}}
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastAnyObjectToEveryType{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyObjectToNonClassType
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastAnyObjectToNonClassType
 // CHECK-NOT:         builtin "int_trap"
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToAny2Class{{.*}}
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastAnyToAny2Class{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToClassObject{{.*}}
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastAnyToClassObject{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToAny2Type{{.*}}
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastAnyToAny2Type{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToEveryType{{.*}}
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastAnyToEveryType{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToNonClassType
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastAnyToNonClassType
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToAnyClass{{.*}}
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastEveryToAnyClass{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToClassObject{{.*}}
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastEveryToClassObject{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToAnyType{{.*}}
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastEveryToAnyType{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToEvery2Type{{.*}}
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastEveryToEvery2Type{{.*}}
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToNonClassType
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastEveryToNonClassType
 // CHECK:         unconditional_checked_cast_addr
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastPProtocolToPType
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastPProtocolToPType
 // CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
 // CHECK-NEXT: return %0
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastObjCPProtocolTo{{.*}}PType
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastObjCPProtocolTo{{.*}}PType
 // CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
 // CHECK-NEXT: return %0
 
-// CHECK-LABEL: sil [noinline] @{{.*}}testCastProtocolComposition{{.*}}Type
+// CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastProtocolComposition{{.*}}Type
 // CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
 // CHECK-NEXT: return %0
 

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -compute-effects -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -245,7 +245,7 @@ bb2:
   return %t : $()
 }
 
-// CHECK-LABEL: sil @dont_promote_use_before_alloc
+// CHECK-LABEL: sil {{.*}}@dont_promote_use_before_alloc
 // CHECK: alloc_ref $XX
 // CHECK-NOT: dealloc_ref
 // CHECK: return
@@ -859,7 +859,7 @@ final class UnownedLink {
   @_hasStorage unowned var link: @sil_unowned UnownedLink
 }
 
-// CHECK-LABEL: sil @dont_promote_escaping_through_unowned
+// CHECK-LABEL: sil {{.*}}@dont_promote_escaping_through_unowned
 // CHECK:         alloc_ref $UnownedLink
 // CHECK-NOT:     dealloc_ref
 // CHECK-LABEL: } // end sil function 'dont_promote_escaping_through_unowned'

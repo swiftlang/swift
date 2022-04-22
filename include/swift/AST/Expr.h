@@ -958,7 +958,7 @@ public:
     return Loc;
   }
   
-  /// Could also be computed by relexing.
+  /// Could also be computed by relaxing.
   SourceLoc getTrailingQuoteLoc() const {
     return TrailingQuoteLoc;
   }
@@ -4285,7 +4285,7 @@ public:
          bool isAutoClosure = false);
 
   /// The original wrappedValue initialization expression provided via
-  /// \c = on a proprety with attached property wrappers.
+  /// \c = on a property with attached property wrappers.
   Expr *getOriginalWrappedValue() const {
     return WrappedValue;
   }

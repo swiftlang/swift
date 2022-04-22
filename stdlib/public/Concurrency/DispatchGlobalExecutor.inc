@@ -225,44 +225,7 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
   dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
 }
 
-// TODO: The following is cribbed from libdispatch, we should replace it with an official API
-typedef enum {
-  DISPATCH_CLOCK_UPTIME,
-  DISPATCH_CLOCK_MONOTONIC,
-  DISPATCH_CLOCK_WALL,
-#define DISPATCH_CLOCK_COUNT  (DISPATCH_CLOCK_WALL + 1)
-} dispatch_clock_t;
-
 #define DISPATCH_UP_OR_MONOTONIC_TIME_MASK  (1ULL << 63)
-#define DISPATCH_WALLTIME_MASK  (1ULL << 62)
-#define DISPATCH_TIME_MAX_VALUE (DISPATCH_WALLTIME_MASK - 1)
-static inline uint64_t
-_dispatch_time_nano2mach(uint64_t value) {
-#if HAS_MACH_TIME
-  struct mach_timebase_info info = calculateTimebase();
-  return (value * info.denom) / info.numer;
-#else
-  return value;
-#endif
-}
-
-static inline dispatch_time_t
-_dispatch_clock_and_value_to_time(dispatch_clock_t clock, uint64_t value)
-{
-  if (value >= DISPATCH_TIME_MAX_VALUE) {
-    return DISPATCH_TIME_FOREVER;
-  }
-  switch (clock) {
-  case DISPATCH_CLOCK_WALL:
-    return -_dispatch_time_nano2mach(value);
-  case DISPATCH_CLOCK_UPTIME:
-    return _dispatch_time_nano2mach(value);
-  case DISPATCH_CLOCK_MONOTONIC:
-    return _dispatch_time_nano2mach(value) | DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
-  }
-  __builtin_unreachable();
-}
-// END: REPLACEMENT
 
 SWIFT_CC(swift)
 static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
@@ -282,18 +245,16 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
   job->SchedulerPrivate[Job::DispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
-  dispatch_time_t when;
-  switch (clock) {
-    case swift_clock_id_continuous: {
-      uint64_t q = sec * NSEC_PER_SEC + nsec;
-      when = _dispatch_clock_and_value_to_time(DISPATCH_CLOCK_MONOTONIC, q);
-      break;
-    }
-    case swift_clock_id_suspending: {
-      uint64_t q = sec * NSEC_PER_SEC + nsec;
-      when = _dispatch_clock_and_value_to_time(DISPATCH_CLOCK_UPTIME, q);
-      break;
-    }
+  long long nowSec;
+  long long nowNsec;
+  swift_get_time(&nowSec, &nowNsec, (swift_clock_id)clock);
+
+  uint64_t delta = (sec - nowSec) * NSEC_PER_SEC + nsec - nowNsec;
+
+  dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delta);
+
+  if (clock == swift_clock_id_continuous) {
+    when |= DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
   }
   // TODO: this should pass the leeway/tolerance along when it is not -1 nanoseconds
   // either a dispatch_source can be created or a better dispatch_after_f can be made for this

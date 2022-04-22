@@ -292,13 +292,13 @@ public:
 
 void constraints::performSyntacticDiagnosticsForTarget(
     const SolutionApplicationTarget &target,
-    bool isExprStmt, bool disableExprAvailabiltyChecking) {
+    bool isExprStmt, bool disableExprAvailabilityChecking) {
   auto *dc = target.getDeclContext();
   switch (target.kind) {
   case SolutionApplicationTarget::Kind::expression: {
     // First emit diagnostics for the main expression.
     performSyntacticExprDiagnostics(target.getAsExpr(), dc,
-                                    isExprStmt, disableExprAvailabiltyChecking);
+                                    isExprStmt, disableExprAvailabilityChecking);
 
     // If this is a for-in statement, we also need to check the where clause if
     // present.
@@ -484,7 +484,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // First, let's check whether:
   //  - Parameter type is a generic parameter; and
   //  - It's only used in the current position in the parameter list
-  //    or result. This check makes sure that that generic argument
+  //    or result. This check makes sure that generic argument
   //    could only come from an explicit argument or this expression.
   //
   // If both of aforementioned conditions are true, let's attempt
@@ -577,7 +577,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   auto *requirementBaseLocator = cs.getConstraintLocator(
       locator, LocatorPathElt::OpenedGeneric(signature));
 
-  // Let's check all of the requirements this parameter is invoved in,
+  // Let's check all of the requirements this parameter is involved in,
   // If it's connected to any other generic types (directly or through
   // a dependent member type), that means it could be inferred through
   // them e.g. `T: X.Y` or `T == U`.
@@ -2083,16 +2083,16 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   // The runtime doesn't support casts to CF types and always lets them succeed.
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
-  auto clas = toType->getClassOrBoundGenericClass();
-  if (clas && clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
+  auto clazz = toType->getClassOrBoundGenericClass();
+  if (clazz && clazz->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return CheckedCastKind::ValueCast;
   
   // Don't warn on casts that change the generic parameters of ObjC generic
   // classes. This may be necessary to force-fit ObjC APIs that depend on
   // covariance, or for APIs where the generic parameter annotations in the
   // ObjC headers are inaccurate.
-  if (clas && clas->isTypeErasedGenericClass()) {
-    if (fromType->getClassOrBoundGenericClass() == clas)
+  if (clazz && clazz->isTypeErasedGenericClass()) {
+    if (fromType->getClassOrBoundGenericClass() == clazz)
       return CheckedCastKind::ValueCast;
   }
 

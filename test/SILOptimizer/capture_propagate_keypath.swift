@@ -30,9 +30,9 @@ struct GenStr<T> {
 
 
 
-// CHECK-LABEL: sil {{.*}} @$s4test0A6SimpleyyySiAA3StrVXEXEF
+// CHECK-LABEL: sil {{.*}} @$s4test0A6SimpleyyySiAA3StrVXEXEF :
 // CHECK-NOT:     keypath
-// CHECK:       } // end sil function '$s4test0A6SimpleyyySiAA3StrVXEXEF'
+// CHECK-LABEL:  } // end sil function '$s4test0A6SimpleyyySiAA3StrVXEXEF'
 @inline(never)
 func testSimple(_ mymap: ((Str)->Int) -> ()) {
   mymap(\.i)
@@ -40,9 +40,9 @@ func testSimple(_ mymap: ((Str)->Int) -> ()) {
   mymap(\.c)
 }
 
-// CHECK-LABEL: sil {{.*}} @$s4test0A6GenStryyySiAA0bC0VySiGXEXEF
+// CHECK-LABEL: sil {{.*}} @$s4test0A6GenStryyySiAA0bC0VySiGXEXEF :
 // CHECK-NOT:     keypath
-// CHECK:       } // end sil function '$s4test0A6GenStryyySiAA0bC0VySiGXEXEF'
+// CHECK-LABEL:  } // end sil function '$s4test0A6GenStryyySiAA0bC0VySiGXEXEF'
 @inline(never)
 func testGenStr(_ mymap: ((GenStr<Int>)->Int) -> ()) {
   mymap(\.i)
@@ -50,7 +50,7 @@ func testGenStr(_ mymap: ((GenStr<Int>)->Int) -> ()) {
   mymap(\.c)
 }
 
-// CHECK-LABEL: sil {{.*}} @$s4test0A7GenericyyyxAA6GenStrVyxGXEXElF
+// CHECK-LABEL: sil {{.*}} @$s4test0A7GenericyyyxAA6GenStrVyxGXEXElF :
 // CHECK:         keypath
 // CHECK:         keypath
 // CHECK:         keypath

@@ -12,7 +12,6 @@
 
 if(NOT swift_concurrency_extra_sources)
   set(swift_concurrency_extra_sources
-    Clock.cpp
     Clock.swift
     ContinuousClock.swift
     SuspendingClock.swift
@@ -76,6 +75,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncLet.cpp
   AsyncLet.swift
   CheckedContinuation.swift
+  Clock.cpp
   GlobalExecutor.cpp
   Errors.swift
   Error.cpp

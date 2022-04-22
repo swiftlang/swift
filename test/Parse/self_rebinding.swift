@@ -102,7 +102,7 @@ struct TypeWithSelfComputedVar {
     }
 }
 
-/// Test fix_unqualified_access_member_named_self doesn't appear appear for property called `self`
+/// Test fix_unqualified_access_member_named_self doesn't appear for property called `self`
 /// it can't currently be referenced as a static member -- unlike a method with the same name
 struct TypeWithSelfProperty {
     

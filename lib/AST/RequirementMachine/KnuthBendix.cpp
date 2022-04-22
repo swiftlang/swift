@@ -184,7 +184,7 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     // into TYW without immediately reducing some subterm of TUW first.
     //
     // While completion will eventually simplify all such rules down into
-    // property rules, their existance in the first place breaks subtle
+    // property rules, their existence in the first place breaks subtle
     // invariants in the minimal conformances algorithm, which expects
     // homotopy generators describing redundant protocol conformance rules
     // to have a certain structure.
@@ -298,7 +298,7 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     // into T.W without immediately reducing some subterm of T first.
     //
     // While completion will eventually simplify all such rules down into
-    // property rules, their existance in the first place breaks subtle
+    // property rules, their existence in the first place breaks subtle
     // invariants in the minimal conformances algorithm, which expects
     // homotopy generators describing redundant protocol conformance rules
     // to have a certain structure.

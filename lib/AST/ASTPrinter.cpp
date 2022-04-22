@@ -2227,8 +2227,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 // intentionally implemented only in the printer and should *only* be used for
 // debugging, testing, generating module dumps, etc. (In other words, if you're
 // trying to get all the members of a namespace in another part of the compiler,
-// you're probably doing somethign wrong. This is a very expensive operation,
-// so we want to do it only when absolutely nessisary.)
+// you're probably doing something wrong. This is a very expensive operation,
+// so we want to do it only when absolutely necessary.)
 static void addNamespaceMembers(Decl *decl,
                                 llvm::SmallVector<Decl *, 16> &members) {
   auto &ctx = decl->getASTContext();
@@ -2239,7 +2239,7 @@ static void addNamespaceMembers(Decl *decl,
   for (auto redecl : namespaceDecl->redecls()) {
     for (auto member : redecl->decls()) {
       if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
-        // Add all specializtaions to a worklist so we don't accidently mutate
+        // Add all specializations to a worklist so we don't accidently mutate
         // the list of decls we're iterating over.
         llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *, 16> specWorklist;
         for (auto spec : classTemplate->specializations())
@@ -2563,7 +2563,7 @@ void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
     // base NominalDecl itself (which can't). E.g:
     //
     //   protocol Foo {}
-    //   extension Foo where <requirments from ExtDecl> { ... }
+    //   extension Foo where <requirements from ExtDecl> { ... }
     //   struct Bar {}
     //   extension Bar: Foo where <requirements from TransformContext> { ... }
     //

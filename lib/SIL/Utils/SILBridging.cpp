@@ -371,6 +371,12 @@ SwiftInt SILType_isReferenceCounted(BridgedType type, BridgedFunction function) 
   return castToSILType(type).isReferenceCounted(f->getModule()) ? 1 : 0;
 }
 
+SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType type,
+                                                  BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  return castToSILType(type).isNonTrivialOrContainsRawPointer(*f);
+}
+
 SwiftInt SILType_isNominal(BridgedType type) {
   return castToSILType(type).getNominalOrBoundGenericNominal() ? 1 : 0;
 }
@@ -518,6 +524,11 @@ bool SILInstruction_mayRelease(BridgedInstruction inst) {
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result) {
   return {static_cast<MultipleValueInstructionResult *>(result.obj)->getParent()};
+}
+
+SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result) {
+  auto *rs = static_cast<MultipleValueInstructionResult *>(result.obj);
+  return (SwiftInt)rs->getIndex();
 }
 
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst) {
