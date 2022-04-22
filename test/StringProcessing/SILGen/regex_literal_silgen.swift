@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-bare-slash-regex %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-bare-slash-regex -disable-availability-checking %s | %FileCheck %s
 // REQUIRES: swift_in_compiler
 
 var s = #/abc/#
