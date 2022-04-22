@@ -165,7 +165,7 @@ static void enumerateStoredPropertiesAndMissing(
     ASTContext &ctx = decl->getASTContext();
     for (auto *member : decl->getMembers()) {
       if (auto *var = dyn_cast<VarDecl>(member)) {
-        if (!var->isStatic() && var->hasStorage())) {
+        if (!var->isStatic() && var->hasStorage()) {
           if (var->getName() == ctx.Id_id) {
             distributedActorId = var;
           } else if (var->getName() == ctx.Id_actorSystem) {
