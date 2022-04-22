@@ -23,12 +23,15 @@ static const ModuleContextDescriptor *module() {
   });
 }
 
-template <unsigned N>
-static ProtocolSpecifier globalProtocol() {
+static ProtocolSpecifier P() {
   return protocol(buildGlobalProtocolDescriptor(module(), [] {
-    std::ostringstream str;
-    str << "Anonymous" << N;
-    return str.str();
+    return "P";
+  }));
+}
+
+static ProtocolSpecifier Q() {
+  return protocol(buildGlobalProtocolDescriptor(module(), [] {
+    return "Q";
   }));
 }
 
@@ -209,32 +212,32 @@ TEST(TestExtendedExistential, shapeUniquing) {
     return shape(
       genSig(param()),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()),
-             sameType(member(reqParam(0), "Element"), genParam(0)))
+             conforms(reqParam(0), P()),
+             sameType(member(reqParam(0), P(), "Element"), genParam(0)))
     );
   });
   auto shape1 = buildGlobalNonUniqueShape(567, []{
     return shape(
       genSig(param()),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()),
-             sameType(member(reqParam(0), "Element"), genParam(0)))
+             conforms(reqParam(0), P()),
+             sameType(member(reqParam(0), P(), "Element"), genParam(0)))
     );
   });
   auto shape2 = buildGlobalNonUniqueShape(1123, []{
     return shape(
       genSig(param()),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<1>()),
-             sameType(member(reqParam(0), "Element"), genParam(0)))
+             conforms(reqParam(0), Q()),
+             sameType(member(reqParam(0), Q(), "Element"), genParam(0)))
     );
   });
   auto shape3 = buildGlobalNonUniqueShape(1123, []{
     return shape(
       genSig(param()),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<1>()),
-             sameType(member(reqParam(0), "Element"), genParam(0)))
+             conforms(reqParam(0), Q()),
+             sameType(member(reqParam(0), Q(), "Element"), genParam(0)))
     );
   });
 
@@ -265,7 +268,7 @@ TEST(TestExtendedExistential, nullaryMetadata) {
   auto shape1 = buildGlobalShape([]{
     return shape(
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()))
+             conforms(reqParam(0), P()))
     );
   });
   auto metadata1 = swift_getExtendedExistentialTypeMetadata_unique(shape1, nullptr);
@@ -281,14 +284,14 @@ TEST(TestExtendedExistential, unaryMetadata) {
     return shape(
       genSig(param()),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()))
+             conforms(reqParam(0), P()))
     );
   });
   auto shape2 = buildGlobalShape([]{
     return shape(
       genSig(param()),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<1>()))
+             conforms(reqParam(0), Q()))
     );
   });
 
@@ -328,7 +331,7 @@ TEST(TestExtendedExistential, binaryMetadata) {
     return shape(
       genSig(param(), param()),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()))
+             conforms(reqParam(0), P()))
     );
   });
 
@@ -396,7 +399,7 @@ TEST(TestExtendedExistential, defaultOpaqueValueWitnessses) {
   auto shape1 = buildGlobalShape([]{
     return shape(
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()))
+             conforms(reqParam(0), P()))
     );
   });
   auto metadata1 = swift_getExtendedExistentialTypeMetadata_unique(shape1, nullptr);
@@ -408,8 +411,8 @@ TEST(TestExtendedExistential, defaultOpaqueValueWitnessses) {
   auto shape2 = buildGlobalShape([]{
     return shape(
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()),
-             conforms(reqParam(0), globalProtocol<1>()))
+             conforms(reqParam(0), P()),
+             conforms(reqParam(0), Q()))
     );
   });
   auto metadata2 = swift_getExtendedExistentialTypeMetadata_unique(shape2, nullptr);
@@ -438,7 +441,7 @@ TEST(TestExtendedExistential, defaultClassValueWitnessses) {
     return shape(
       special(SpecialKind::Class),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()))
+             conforms(reqParam(0), P()))
     );
   });
   auto metadata1 = swift_getExtendedExistentialTypeMetadata_unique(shape1, nullptr);
@@ -451,8 +454,8 @@ TEST(TestExtendedExistential, defaultClassValueWitnessses) {
     return shape(
       special(SpecialKind::Class),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()),
-             conforms(reqParam(0), globalProtocol<1>()))
+             conforms(reqParam(0), P()),
+             conforms(reqParam(0), Q()))
     );
   });
   auto metadata2 = swift_getExtendedExistentialTypeMetadata_unique(shape2, nullptr);
@@ -481,7 +484,7 @@ TEST(TestExtendedExistential, defaultMetatypeValueWitnessses) {
     return shape(
       special(SpecialKind::Metatype),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()))
+             conforms(reqParam(0), P()))
     );
   });
   auto metadata1 = swift_getExtendedExistentialTypeMetadata_unique(shape1, nullptr);
@@ -494,8 +497,8 @@ TEST(TestExtendedExistential, defaultMetatypeValueWitnessses) {
     return shape(
       special(SpecialKind::Metatype),
       reqSig(param(),
-             conforms(reqParam(0), globalProtocol<0>()),
-             conforms(reqParam(0), globalProtocol<1>()))
+             conforms(reqParam(0), P()),
+             conforms(reqParam(0), Q()))
     );
   });
   auto metadata2 = swift_getExtendedExistentialTypeMetadata_unique(shape2, nullptr);
