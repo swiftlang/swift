@@ -548,20 +548,22 @@ func sr10988() {
   }
   func test2() -> some Numeric {
     // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
-    let x = "s" // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    let x = "s"
+    x // expected-warning {{expression of type 'String' is unused}}
   }
-  struct S2: P1, P2 {
+  struct S1: P1, P2 {
   }
-  struct S3: P1 {
+  struct S2: P1 {
   }
   func test3() -> some P1 & P2 {
     // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
-    let x = S2()
+    let x = S1()
     x // expected-note {{did you mean to return the last expression?}} {{5-5=return }}
-    // expected-warning@-1 {{expression of type 'S2' is unused}}
+    // expected-warning@-1 {{expression of type 'S1' is unused}}
   }
   func test4() -> some P1 & P2 {
     // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
-    let x = S2() // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    let x = S2()
+    x // expected-warning {{expression of type 'S2' is unused}}
   }
 }
