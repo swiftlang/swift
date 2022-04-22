@@ -167,7 +167,7 @@ extension _StringGuts {
       result = idx
     } else {
       // TODO(String performance): isASCII check
-      result = scalarAlignSlow(idx)._scalarAligned._copyEncoding(from: idx)
+      result = scalarAlignSlow(idx)._scalarAligned._copyingEncoding(from: idx)
     }
 
     _internalInvariant(isOnUnicodeScalarBoundary(result),
