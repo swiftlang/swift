@@ -8826,6 +8826,22 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       }
 
       if (isMutabilityAttr(swiftAttr)) {
+
+        // Check if 'nonmutating' attr is applicable
+        if (swiftAttr->getAttribute() == "nonmutating") {
+          if (auto *method = dyn_cast<clang::CXXMethodDecl>(ClangDecl)) {
+            if (!method->isConst()) {
+              diagnose(HeaderLoc(swiftAttr->getLocation()),
+                       diag::nonmutating_without_const);
+            }
+            if (!method->getParent()->hasMutableFields()) {
+              diagnose(HeaderLoc(swiftAttr->getLocation()),
+                       diag::nonmutating_without_mutable_fields);
+            }
+          }
+        }
+
+        // Check for contradicting mutability attr
         if (seenMutabilityAttr) {
           StringRef seenAttribute =
               seenMutabilityAttr.getValue()->getAttribute();

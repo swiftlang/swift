@@ -13,3 +13,7 @@ let _ = objWMutableProperty.annotatedNonMutating()
 let _ = objWMutableProperty.noAnnotation() // expected-error {{cannot use mutating member on immutable value: 'objWMutableProperty' is a 'let' constant}}
 let _ = objWMutableProperty.contradictingAnnotations() // expected-error {{cannot use mutating member on immutable value: 'objWMutableProperty' is a 'let' constant}}
 let _ = objWMutableProperty.duplicateAnnotations()
+
+let objWithoutMutableProperty = NoMutableProperty(a: 42) // expected-note {{change 'let' to 'var' to make it mutable}}
+let _ = objWithoutMutableProperty.isConst()
+let _ = objWithoutMutableProperty.nonConst() // expected-error {{cannot use mutating member on immutable value: 'objWithoutMutableProperty' is a 'let' constant}}

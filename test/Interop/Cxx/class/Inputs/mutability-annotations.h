@@ -35,4 +35,17 @@ struct HasMutableProperty {
   }
 };
 
+struct NoMutableProperty {
+  int a;
+
+  // expected-warning@+1 {{attribute 'nonmutating' has no effect without any mutable fields}}
+  int isConst() const __attribute__((__swift_attr__("nonmutating"))) {
+    return a;
+  }
+
+  // expected-warning@+2 {{attribute 'nonmutating' has no effect without any mutable fields}}
+  // expected-warning@+1 {{attribute 'nonmutating' has no effect on non-const method}}
+  int nonConst() __attribute__((__swift_attr__("nonmutating"))) { return a; }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_MUTABILITY_ANNOTATIONS_H

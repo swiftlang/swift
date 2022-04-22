@@ -109,6 +109,12 @@ WARNING(import_multiple_mainactor_attr,none,
 WARNING(contradicting_mutation_attrs,none,
         "attribute 'nonmutating' is ignored when combined with attribute 'mutating'", ())
 
+WARNING(nonmutating_without_const,none,
+        "attribute 'nonmutating' has no effect on non-const method", ())
+
+WARNING(nonmutating_without_mutable_fields,none,
+        "attribute 'nonmutating' has no effect without any mutable fields", ())
+
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
 NOTE(macro_not_imported_unsupported_operator, none, "operator not supported in macro arithmetic", ())
