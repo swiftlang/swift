@@ -583,6 +583,12 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
 
   // Don't record effectively internal declarations if specified
   if (D->hasUnderscoredNaming()) {
+    // Some implicit decls from Clang with underscored names sneak in, so throw those out
+    if (const auto *clangD = D->getClangDecl()) {
+      if (clangD->isImplicit())
+        return true;
+    }
+
     AccessLevel symLevel = AccessLevel::Public;
     if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
       symLevel = VD->getFormalAccess();
