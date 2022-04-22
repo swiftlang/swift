@@ -5,6 +5,22 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* References to `optional` methods on a protocol metatype, as well as references to dynamically looked up methods on the `AnyObject` metatype are now supported. These references always have the type of a function that accepts a single argument and returns an optional value of function type:
+
+  ```swift
+  class Object {
+    @objc func getTag() -> Int
+  }
+
+  @objc protocol P {
+    @objc optional func didUpdateObject(withTag tag: Int)
+  }
+
+  let getTag: (AnyObject) -> (() -> Int)? = AnyObject.getTag
+
+  let didUpdateObject: (any P) -> ((Int) -> Void)? = P.didUpdateObject
+  ```
+
 * [SE-0349][]:
 
   Loading data from raw memory represented by `UnsafeRawPointer`,
@@ -98,7 +114,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   It's now possible to use a default value expression with a generic parameter type
   to default the argument and its type:
 
-  ```
+  ```swift
   func compute<C: Collection>(_ values: C = [0, 1, 2]) {
     ...
   }
