@@ -1072,7 +1072,10 @@ public:
       isObjCDirect = objcDecl->isDirectMethod();
     }
 
-    if (isObjCDirect) {
+    // Methods on unsafe foreign objects are always called directly.
+    bool isUFO = isa_and_nonnull<ClassDecl>(afd->getDeclContext()) &&
+        cast<ClassDecl>(afd->getDeclContext())->isForeignReferenceType();
+    if (isObjCDirect || isUFO) {
       setCallee(Callee::forDirect(SGF, constant, subs, e));
     } else {
       setCallee(Callee::forClassMethod(SGF, constant, subs, e));

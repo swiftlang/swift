@@ -38,6 +38,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Lex/Preprocessor.h"
@@ -2077,6 +2078,17 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
   }
 
+  // Specialized templates need to match the args/result exactly (i.e.,
+  // ptr -> ptr not ptr -> Optional<ptr>).
+  if (clangDecl->getReturnType()->isPointerType() &&
+      clangDecl->getPrimaryTemplate() &&
+      clangDecl
+          ->getPrimaryTemplate()
+          ->getAsFunction()
+          ->getReturnType()
+          ->isTemplateTypeParmType())
+    OptionalityOfReturn = OTK_None;
+
   // Import the result type.
   return importType(clangDecl->getReturnType(),
                     (isAuditedResult ? ImportTypeKind::AuditedResult
@@ -2240,9 +2252,12 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       continue;
     }
 
+    bool knownNonNull = !nonNullArgs.empty() && nonNullArgs[index];
+    // Specialized templates need to match the args/result exactly.
+    knownNonNull |= clangDecl->isFunctionTemplateSpecialization();
+
     // Check nullability of the parameter.
-    OptionalTypeKind OptionalityOfParam =
-        getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[index]);
+    OptionalTypeKind OptionalityOfParam = getParamOptionality(param, knownNonNull);
 
     ImportTypeKind importKind = ImportTypeKind::Parameter;
     if (param->hasAttr<clang::CFReturnsRetainedAttr>())
