@@ -737,6 +737,13 @@ VarDecl *GetDistributedActorIDPropertyRequest::evaluate(
   if (!classDecl)
     return nullptr;
 
+  // We may enter this request multiple times, e.g. in multi-file projects,
+  // so in order to avoid synthesizing a property many times, first perform
+  // a lookup and return if it already exists.
+  if (auto existingProp = lookupDistributedActorProperty(classDecl, C.Id_id)) {
+    return existingProp;
+  }
+
   return addImplicitDistributedActorIDProperty(classDecl);
 }
 
