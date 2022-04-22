@@ -906,7 +906,7 @@ func rdar78781552() {
   }
 }
 
-// rdar://79757320 - failured to produce a diagnostic when unresolved dependent member is used in function result position
+// rdar://79757320 - failed to produce a diagnostic when unresolved dependent member is used in function result position
 
 protocol R_79757320 {
   associatedtype In
