@@ -102,14 +102,18 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 
 // .. Thread local storage ...................................................
 
-#if __cplusplus >= 201103L || __has_feature(cxx_thread_local)
-#define SWIFT_THREAD_LOCAL thread_local
+#ifdef __clang__
+# if __has_feature(cxx_thread_local)
+#   define SWIFT_THREAD_LOCAL thread_local
+# endif
+#elif __cplusplus >= 201103L
+# define SWIFT_THREAD_LOCAL thread_local
 #endif
 
 #define SWIFT_TLS_DECLARE_DTOR(name) void NTAPI name(void *)
 
 using tls_key = DWORD;
-using tls_dtor = void NTAPI (*)(void *);
+using tls_dtor = PFLS_CALLBACK_FUNCTION;
 
 inline bool tls_alloc(tls_key &key, tls_dtor dtor) {
   key = FlsAlloc(dtor);
