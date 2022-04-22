@@ -3000,11 +3000,16 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static bool isRequired(
-      ConstraintSystem &cs, Type resultTy,
-      SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>>
-          &openedExistentials,
-      ConstraintLocatorBuilder locator);
+  static bool
+  isRequired(ConstraintSystem &cs, Type resultTy,
+             ArrayRef<std::pair<TypeVariableType *, OpenedArchetypeType *>>
+                 openedExistentials,
+             ConstraintLocatorBuilder locator);
+
+  static bool isRequired(ConstraintSystem &cs, Type resultTy,
+                         llvm::function_ref<Optional<Type>(TypeVariableType *)>
+                             findExistentialType,
+                         ConstraintLocatorBuilder locator);
 
   static AddExplicitExistentialCoercion *create(ConstraintSystem &cs,
                                                 Type resultTy,

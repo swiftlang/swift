@@ -786,7 +786,8 @@ do {
     _ = arg.method3 // expected-error {{member 'method3' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
     _ = arg.property1 // expected-error {{member 'property1' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
     // Covariant 'Self' erasure works in conjunction with concrete associated types.
-    let _: (Bool, any ConcreteAssocTypes) = arg.property2 // ok
+    let _: (Bool, any ConcreteAssocTypes) = arg.property2 // expected-error {{inferred result type '(Bool, any ConcreteAssocTypes)' requires explicit coercion due to loss of generic requirements}} {{58-58=as (Bool, any ConcreteAssocTypes)}}
+    let _: (Bool, any ConcreteAssocTypes) = arg.property2 as (Bool, any ConcreteAssocTypes) // Ok
     _ = arg.property3 // expected-error {{member 'property3' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
     _ = arg[subscript1: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
     _ = arg[subscript2: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}

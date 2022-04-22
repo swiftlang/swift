@@ -216,14 +216,24 @@ protocol B {
   associatedtype D: P
 }
 
-func testExplicitCoercionRequirement(v: any B) {
+protocol D {
+  associatedtype E
+}
+
+extension B {
+  var testVar: (Int, [C]) { get { fatalError() } }
+
+  func getC() -> C { fatalError() }
+}
+
+func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
   func getC<T: B>(_: T) -> T.C { fatalError() }
   func getTuple<T: B>(_: T) -> (T, T.C) { fatalError() }
   func getNoError<T: B>(_: T) -> T.C.A { fatalError() }
   func getComplex<T: B>(_: T) -> ([(x: (a: T.C, b: Int), y: Int)], [Int: T.C]) { fatalError() }
 
   func overloaded<T: B>(_: T) -> (x: Int, y: T.C) { fatalError() }
-  // expected-note@-1 {{inferred result type '(x: Int, y: any P)' requires explicit coercion due to loss of generic requirements}} {{241:20-20=as (x: Int, y: any P)}}
+  // expected-note@-1 {{inferred result type '(x: Int, y: any P)' requires explicit coercion due to loss of generic requirements}} {{251:20-20=as (x: Int, y: any P)}}
   func overloaded<T: P>(_: T) -> Int { 42 }
   // expected-note@-1 {{candidate requires that 'any B' conform to 'P' (requirement specified as 'T' : 'P')}}
 
@@ -240,7 +250,37 @@ func testExplicitCoercionRequirement(v: any B) {
 
   _ = overloaded(v) // expected-error {{no exact matches in call to local function 'overloaded'}}
 
+  func acceptsAny<T>(_: T) {}
+
+  acceptsAny(getC(v)) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{21-21=as any P}}
+  acceptsAny(getC(v) as any P) // Ok
+
+  acceptsAny(getComplex(v)) // expected-error {{inferred result type '([(x: (a: any P, b: Int), y: Int)], [Int : any P])' requires explicit coercion due to loss of generic requirements}} {{27-27=as ([(x: (a: any P, b: Int), y: Int)], [Int : any P])}}
+  acceptsAny(getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]))
+
   func getAssocNoRequirements<T: B>(_: T) -> (Int, [T.D]) { fatalError() }
 
   _ = getAssocNoRequirements(v) // Ok, `D` doesn't have any requirements
+
+  // Test existential opening from protocol extension access
+  _ = v.getC() // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{13-13=as any P}}
+  _ = v.getC() as any P // Ok
+
+  _ = v.testVar // expected-error {{inferred result type '(Int, [any P])' requires explicit coercion due to loss of generic requirements}} {{16-16=as (Int, [any P])}}
+  _ = v.testVar as (Int, [any P])
+
+  func getE<T: D>(_: T) -> T.E { fatalError() }
+
+  _ = getE(otherV) // Ok `E` doesn't have a `where` clause
+
+  func getSelf<T: B>(_: T) -> T { fatalError() } // expected-note {{found this candidate}}
+  func getSelf<T: D>(_: T) -> T { fatalError() } // expected-note {{found this candidate}}
+
+  _ = getSelf(v) // expected-error {{inferred result type 'any B' requires explicit coercion due to loss of generic requirements}} {{17-17=as any B}}
+  _ = getSelf(v) as any B // Ok
+  _ = getSelf(otherV) as any B & D // expected-error {{ambiguous use of 'getSelf'}}
+
+  func getBDSelf<T: D>(_: T) -> T { fatalError() }
+  _ = getBDSelf(otherV) // expected-error {{inferred result type 'any B & D' requires explicit coercion due to loss of generic requirements}} {{24-24=as any B & D}}
+  _ = getBDSelf(otherV) as any B & D // Ok
 }
