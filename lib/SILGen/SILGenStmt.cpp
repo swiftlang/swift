@@ -58,6 +58,12 @@ SILBasicBlock *SILGenFunction::createBasicBlock() {
   }
 }
 
+SILBasicBlock *SILGenFunction::createBasicBlock(llvm::StringRef debugName) {
+  auto block = createBasicBlock();
+  block->setDebugName(debugName);
+  return block;
+}
+
 SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
   switch (section) {
   case FunctionSection::Ordinary: {

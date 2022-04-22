@@ -32,7 +32,7 @@ list(REMOVE_ITEM SWIFT_SDK_OSX_ARCHITECTURES "arm64e")
 # The back-deployed library can only be shared.
 list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
 
-# Link aginst the libswiftCore in the SDK. This intentionally avoids using
+# Link against the libswiftCore in the SDK. This intentionally avoids using
 # the locally-built libswiftCore.
 foreach(sdk ${SWIFT_SDKS})
     set(sdk_name ${SWIFT_SDK_${sdk}_LIB_SUBDIR})
@@ -57,5 +57,12 @@ set(swift_concurrency_extra_sources
   "../BackDeployConcurrency/Metadata.cpp"
   "../stubs/SwiftNativeNSObject.mm")
 set(swift_concurrency_async_fp_mode "never")
+
+set(LLVM_OPTIONAL_SOURCES
+  Clock.cpp
+  Clock.swift
+  ContinuousClock.swift
+  SuspendingClock.swift
+  TaskSleepDuration.swift)
 
 add_subdirectory(../Concurrency stdlib/public/BackDeployConcurrency)

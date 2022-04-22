@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Numeric.h"
 #include "MetadataImpl.h"
@@ -40,19 +41,19 @@ OpaqueValue *swift::swift_copyPOD(OpaqueValue *dest, OpaqueValue *src,
 namespace {
   // A type sized and aligned the way Swift wants Int128 (and Float80/Float128)
   // to be sized and aligned.
-  struct alignas(16) int128_like {
+  struct alignas(16) int128_like : swift::aligned_alloc<16> {
     char data[16];
   };
 
   static_assert(MaximumAlignment == 16, "max alignment was hardcoded");
-  struct alignas(16) int256_like {
+  struct alignas(16) int256_like : swift::aligned_alloc<16> {
     char data[32];
   };
-  struct alignas(16) int512_like {
+  struct alignas(16) int512_like : swift::aligned_alloc<16> {
     char data[64];
   };
 
-  struct alignas(16) float80_like {
+  struct alignas(16) float80_like : swift::aligned_alloc<16> {
     char data[10];
   };
 } // end anonymous namespace
@@ -89,7 +90,8 @@ namespace ctypes {
     // Types that are defined in the _Concurrency library
 
     // Default actor storage type.
-    struct alignas(2 * alignof(void*)) BD {
+    struct alignas(2 * alignof(void*)) BD
+        : swift::aligned_alloc<2 * alignof(void*)> {
       void *storage[NumWords_DefaultActor];
     };
 
@@ -184,11 +186,15 @@ const ValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) =                     \
 const ValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) =     \
   ValueWitnessTableForBox<pointer_types::Symbol>::table;
 
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
 #define BUILTIN_VECTOR_TYPE(ElementSymbol, _, Width)                           \
   const ValueWitnessTable                                                      \
   swift::VALUE_WITNESS_SYM(VECTOR_BUILTIN_SYMBOL_NAME(ElementSymbol,Width)) =  \
   ValueWitnessTableForBox<NativeBox<SIMDVectorType<ctypes::ElementSymbol,      \
                                                    Width>>>::table;
+#else
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
+#endif
 
 #include "swift/Runtime/BuiltinTypes.def"
 
@@ -262,6 +268,9 @@ const ValueWitnessTable swift::VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING) =
   };
 #define BUILTIN_TYPE(Symbol, Name) \
   OPAQUE_METADATA(Symbol)
+#if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
+#endif
 #include "swift/Runtime/BuiltinTypes.def"
 
 /// The standard metadata for the empty tuple.

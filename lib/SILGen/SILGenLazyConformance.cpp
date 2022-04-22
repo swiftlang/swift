@@ -183,13 +183,6 @@ public:
     SGM.useConformancesFromObjectiveCType(CCABI->getTargetFormalType());
   }
 
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CCVBI) {
-    SGM.useConformancesFromType(CCVBI->getSourceFormalType());
-    SGM.useConformancesFromType(CCVBI->getTargetFormalType());
-    SGM.useConformancesFromObjectiveCType(CCVBI->getSourceFormalType());
-    SGM.useConformancesFromObjectiveCType(CCVBI->getTargetFormalType());
-  }
-
   void visitCopyAddrInst(CopyAddrInst *CAI) {
     SGM.useConformancesFromType(CAI->getSrc()->getType().getASTType());
     SGM.useConformancesFromType(CAI->getDest()->getType().getASTType());
@@ -351,7 +344,7 @@ void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
       useConformancesFromType(superclass->getCanonicalType(genericSig));
 
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-    for (auto reqt : PD->getRequirementSignature()) {
+    for (auto reqt : PD->getRequirementSignature().getRequirements()) {
       if (reqt.getKind() != RequirementKind::Layout)
         useConformancesFromType(reqt.getSecondType()->getCanonicalType());
     }

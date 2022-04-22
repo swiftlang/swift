@@ -13,7 +13,7 @@ bb0:
   return %1 : $()
 }
 
-sil public_external @bar : $@convention(thin) () -> () {
+sil public_external [serialized] @bar : $@convention(thin) () -> () {
 bb0:
   %1 = tuple ()
   return %1 : $()

@@ -165,18 +165,22 @@ protocol ProtocolWillSetDidSet4 {
 }
 
 class DidSetInSubscript {
-  subscript(_: Int) -> Int {
+  subscript(x: Int) -> Bool {
     didSet { // expected-error {{'didSet' is not allowed in subscripts}}
       print("eek")
+      // Make sure implicit observer parameters pick up the right type.
+      let _: Int = x
     }
     get {}
   }
 }
 
 class WillSetInSubscript {
-  subscript(_: Int) -> Int {
+  subscript(x: Int) -> Bool {
     willSet { // expected-error {{'willSet' is not allowed in subscripts}}
       print("eek")
+      // Make sure implicit observer parameters pick up the right type.
+      let _: Int = x
     }
     get {}
   }

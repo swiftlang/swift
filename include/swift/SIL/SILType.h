@@ -46,8 +46,8 @@ namespace swift {
 /// It checks only the type itself, but does not try to
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
-/// \returns The found archetype or empty type otherwise.
-CanArchetypeType getOpenedArchetypeOf(CanType Ty);
+/// \returns The found opened archetype or empty type otherwise.
+CanOpenedArchetypeType getOpenedArchetypeOf(CanType Ty);
 
 /// How an existential type container is represented.
 enum class ExistentialRepresentation {
@@ -231,6 +231,14 @@ public:
   EnumDecl *getEnumOrBoundGenericEnum() const {
     return getASTType().getEnumOrBoundGenericEnum();
   }
+  
+  /// Returns true if this type is an enum or contains an enum.
+  bool isOrHasEnum() const {
+    return getASTType().findIf([](Type ty) {
+      return ty->getEnumOrBoundGenericEnum() != nullptr;
+    });
+  }
+
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
@@ -299,6 +307,15 @@ public:
   /// be trivially copied, moved or detroyed. Returns false for address types
   /// even though they are technically trivial.
   bool isTrivial(const SILFunction &F) const;
+
+  /// True if the type is the Builtin.RawPointer or a struct/tuple/enum which
+  /// contains a Builtin.RawPointer.
+  /// Returns false for types for which this property is not known, e.g. generic
+  /// types.
+  bool isOrContainsRawPointer(const SILFunction &F) const;
+
+  /// An efficient implementation of `!isTrivial() && isOrContainsRawPointer()`.
+  bool isNonTrivialOrContainsRawPointer(const SILFunction &F) const;
 
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.

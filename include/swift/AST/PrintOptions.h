@@ -301,6 +301,9 @@ struct PrintOptions {
   /// Whether to print generic requirements in a where clause.
   bool PrintGenericRequirements = true;
 
+  /// Suppress emitting @available(*, noasync)
+  bool SuppressNoAsyncAvailabilityAttr = false;
+
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.
@@ -387,6 +390,12 @@ struct PrintOptions {
 
   /// Whether to use an empty line to separate two members in a single decl.
   bool EmptyLineBetweenMembers = false;
+
+  /// Whether to print empty members of a declaration on a single line, e.g.:
+  /// ```
+  /// extension Foo: Bar {}
+  /// ```
+  bool PrintEmptyMembersOnSameLine = false;
 
   /// Whether to print the extensions from conforming protocols.
   bool PrintExtensionFromConformingProtocols = false;
@@ -486,6 +495,10 @@ struct PrintOptions {
   /// Whether to print inheritance lists for types.
   bool PrintInherited = true;
 
+  /// Whether to print a space before the `:` of an inheritance list in a type
+  /// decl.
+  bool PrintSpaceBeforeInheritance = true;
+
   /// Whether to print feature checks for compatibility with older Swift
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
@@ -506,6 +519,12 @@ struct PrintOptions {
   /// part of the context).
   QualifyNestedDeclarations ShouldQualifyNestedDeclarations =
       QualifyNestedDeclarations::Never;
+
+  /// If true, we print a protocol's primary associated types using the
+  /// primary associated type syntax: protocol Foo<Type1, ...>.
+  ///
+  /// If false, we print them as ordinary associated types.
+  bool PrintPrimaryAssociatedTypes = true;
 
   /// If this is not \c nullptr then function bodies (including accessors
   /// and constructors) will be printed by this function.
@@ -535,6 +554,13 @@ struct PrintOptions {
     result.PrintRegularClangComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
     result.AlwaysTryPrintParameterLabels = true;
+    return result;
+  }
+
+  /// The print options used for formatting diagnostic arguments.
+  static PrintOptions forDiagnosticArguments() {
+    PrintOptions result;
+    result.PrintExplicitAny = true;
     return result;
   }
 

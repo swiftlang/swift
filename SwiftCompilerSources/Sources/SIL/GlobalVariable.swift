@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
 import SILBridging
 
 final public class GlobalVariable : CustomStringConvertible, HasName {

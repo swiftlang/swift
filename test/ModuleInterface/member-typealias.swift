@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -module-name MyModule | %FileCheck %s --check-prefix CHECK
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name MyModule
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name MyModule
+// RUN: %FileCheck %s < %t.swiftinterface
 
 public struct MyStruct<T> {
 // CHECK-LABEL: public struct MyStruct<T> {

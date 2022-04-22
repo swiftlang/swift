@@ -271,7 +271,7 @@ public struct TF_269: TF_269_Layer {
 // Test errors.
 
 // Test manually customizing vector space types.
-// Thees should fail. Synthesis is semantically unsupported if vector space
+// These should fail. Synthesis is semantically unsupported if vector space
 // types are customized.
 // expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
 struct VectorSpaceTypeAlias: AdditiveArithmetic, Differentiable {

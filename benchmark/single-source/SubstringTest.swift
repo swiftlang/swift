@@ -63,11 +63,15 @@ public func run_SubstringFromLongStringGeneric(_ n: Int) {
   }
 }
 
-@inline(never)
-public func run_StringFromLongWholeSubstring(_ n: Int) {
+private func getLongWideRealBuffer() -> String {
   var s0 = longWide
   s0 += "!" // ensure the string has a real buffer
-  let s = Substring(s0)
+  return s0
+}
+
+@inline(never)
+public func run_StringFromLongWholeSubstring(_ n: Int) {
+  let s = Substring(getLongWideRealBuffer())
   for _ in 1...n*500 {
     blackHole(String(s))
   }
@@ -75,9 +79,7 @@ public func run_StringFromLongWholeSubstring(_ n: Int) {
 
 @inline(never)
 public func run_StringFromLongWholeSubstringGeneric(_ n: Int) {
-  var s0 = longWide
-  s0 += "!" // ensure the string has a real buffer
-  let s = Substring(s0)
+  let s = Substring(getLongWideRealBuffer())
   for _ in 1...n*500 {
     create(String.self, from: s)
   }

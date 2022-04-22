@@ -200,7 +200,7 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   SubLocationMap subLocationMap;
   if (!analyzeLocationUsesRecursively(loc, currentLocIdx, collectedVals,
                                       subLocationMap)) {
-    locations.set_size(currentLocIdx);
+    locations.truncate(currentLocIdx);
     for (SILValue V : collectedVals) {
       addr2LocIdx.erase(V);
     }

@@ -144,6 +144,22 @@ SILBasicBlock *splitBasicBlockAndBranch(SILBuilder &builder,
                                         DominanceInfo *domInfo,
                                         SILLoopInfo *loopInfo);
 
+/// A version of splitBasicBlockAndBranch that takes a SILBuilderContext instead
+/// of a SILBuilder. We generally are trying to eliminate APIs that take in
+/// SILBuilder directly since that can cause weird downstream mistakes around
+/// debug info scopes. So this provides a better choice for engineers.
+///
+/// TODO: Migrate all callers of splitBasicBlockAndBranch to use this entry
+/// point.
+inline SILBasicBlock *splitBasicBlockAndBranch(SILBuilderContext &builderCtx,
+                                               SILInstruction *splitBeforeInst,
+                                               DominanceInfo *domInfo,
+                                               SILLoopInfo *loopInfo) {
+  // Make sure we have the right debug scope from split before inst.
+  SILBuilderWithScope builder(splitBeforeInst, builderCtx);
+  return splitBasicBlockAndBranch(builder, splitBeforeInst, domInfo, loopInfo);
+}
+
 /// Return true if the function has a critical edge, false otherwise.
 bool hasCriticalEdges(SILFunction &f, bool onlyNonCondBr);
 

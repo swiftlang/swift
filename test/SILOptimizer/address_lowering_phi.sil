@@ -1,0 +1,472 @@
+// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -emit-sorted-sil -module-name Swift -sil-verify-all %s | %FileCheck %s
+//
+// Test the PhiStorageOptimizer within the AddressLowering pass.
+
+import Builtin
+
+sil_stage raw
+
+typealias AnyObject = Builtin.AnyObject
+typealias Int = Builtin.Int64
+typealias Bool = Builtin.Int1
+
+enum Optional<T> {
+  case none
+  case some(T)
+}
+
+struct SRef<T> {
+  @_hasStorage var object: AnyObject { get set }
+  @_hasStorage var element: T { get set }
+  init(object: AnyObject, element: T)
+}
+
+enum InnerEnum<T> {
+  case payload(T, AnyObject)
+}
+enum OuterEnum<T> {
+  case inner(InnerEnum<T>, AnyObject)
+}
+
+struct InnerStruct<T> {
+  var t: T
+  var object: AnyObject
+}
+struct OuterStruct<T> {
+  var inner: InnerStruct<T>
+  var object: AnyObject
+}
+
+sil [ossa] @getOut : $@convention(thin) <T> () -> @out T
+
+// Test BBArgs allocation.
+
+// No projection from incoming values. No interference.
+// CHECK-LABEL: sil [ossa] @f010_testBBArgSelect : $@convention(thin) <T> () -> @out T {
+// CHECK: bb0(%0 : $*T):
+// CHECK:   [[F:%.*]] = function_ref @getOut : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+// CHECK:   cond_br undef, bb2, bb1
+// CHECK: bb1:
+// CHECK:   [[GET0:%.*]] = apply [[F]]<T>(%0) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+// CHECK:   br bb3
+// CHECK: bb2:
+// CHECK:   [[GET1:%.*]] = apply [[F]]<T>(%0) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK:   %{{.*}} = tuple ()
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'f010_testBBArgSelect'
+sil [ossa] @f010_testBBArgSelect : $@convention(thin) <T> () -> @out T {
+bb0:
+  %get = function_ref @getOut : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %get0 = apply %get<T>() : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+  br bb3(%get0 : $T)
+
+bb2:
+  %get1 = apply %get<T>() : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+  br bb3(%get1 : $T)
+
+// %15
+bb3(%15 : @owned $T):
+  return %15 : $T
+}
+
+// One projection from incoming values. One interference.
+//
+// CHECK-LABEL: sil [ossa] @f020_testBBArgProjectOne : $@convention(thin) <T> () -> @out T {
+// CHECK: bb0(%0 : $*T):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $T
+// CHECK:   apply %{{.*}}<T>(%0) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+// CHECK:   apply %{{.*}}<T>([[ALLOC]]) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+// CHECK:   cond_br undef, bb2, bb1
+// CHECK: bb1:
+// CHECK:   destroy_addr %0 : $*T
+// CHECK:   copy_addr [take] %1 to [initialization] %0 : $*T
+// CHECK:   br bb3
+// CHECK: bb2:
+// CHECK:   destroy_addr %1 : $*T
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK:   dealloc_stack [[ALLOC]] : $*T
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'f020_testBBArgProjectOne'
+sil [ossa] @f020_testBBArgProjectOne : $@convention(thin) <T> () -> @out T {
+bb0:
+  %get = function_ref @getOut : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+  %get0 = apply %get<T>() : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+  %get1 = apply %get<T>() : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+  cond_br undef, bb2, bb1
+
+bb1:
+  destroy_value %get0 : $T
+  br bb3(%get1 : $T)
+
+bb2:
+  destroy_value %get1 : $T
+  br bb3(%get0 : $T)
+
+bb3(%arg : @owned $T):
+  return %arg : $T
+}
+
+// Projection from incoming values. No interference.
+// CHECK-LABEL: sil [ossa] @f030_testBBArgProjectIn : $@convention(thin) <T> (@in T, @in T) -> @out T {
+// CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
+// CHECK:   cond_br undef, bb2, bb1
+// CHECK: bb1:
+// CHECK:   destroy_addr %2 : $*T
+// CHECK:   copy_addr [take] %1 to [initialization] %0 : $*T
+// CHECK:   br bb3
+// CHECK: bb2:
+// CHECK:   destroy_addr %1 : $*T
+// CHECK:   copy_addr [take] %2 to [initialization] %0 : $*T
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK-LABEL: } // end sil function 'f030_testBBArgProjectIn'
+sil [ossa] @f030_testBBArgProjectIn : $@convention(thin) <T> (@in T, @in T) -> @out T {
+bb0(%0 : @owned $T, %1 : @owned $T):
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %0 : $T
+  br bb3(%1 : $T)
+
+bb2:
+  destroy_value %1 : $T
+  br bb3(%0 : $T)
+
+bb3(%arg : @owned $T):
+  return %arg : $T
+}
+
+// CHECK-LABEL: sil [ossa] @f040_testInSwapOut : $@convention(thin) <T> (@in T, @in T) -> (@out T, @out T) {
+// CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T, %3 : $*T):
+// CHECK:   cond_br undef, bb2, bb1
+// CHECK: bb1:
+// CHECK:   copy_addr [take] %2 to [initialization] %1 : $*T
+// CHECK:   copy_addr [take] %3 to [initialization] %0 : $*T
+// CHECK:   br bb3
+// CHECK: bb2:
+// CHECK:   copy_addr [take] %2 to [initialization] %0 : $*T
+// CHECK:   copy_addr [take] %3 to [initialization] %1 : $*T
+// CHECK:   br bb3
+// CHECK-LABEL: } // end sil function 'f040_testInSwapOut'
+sil [ossa] @f040_testInSwapOut : $@convention(thin) <T> (@in T, @in T) -> (@out T, @out T) {
+bb0(%0 : @owned $T, %1 : @owned $T):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $T, %1 : $T)
+
+bb2:
+  br bb3(%1 : $T, %0 : $T)
+
+bb3(%arg0 : @owned $T, %arg1 : @owned $T):
+  %result = tuple (%arg0 : $T, %arg1 : $T)
+  return %result : $(T, T)
+}
+
+// CHECK-LABEL: sil [ossa] @f050_testCombine : $@convention(thin) <T> (@in T, @in T) -> (@out T, @out T) {
+// CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T, %3 : $*T):
+// CHECK:   cond_br undef, bb2, bb1
+// CHECK: bb1:
+// CHECK:   copy_addr [take] %2 to [initialization] %0 : $*T
+// CHECK:   copy_addr [take] %3 to [initialization] %1 : $*T
+// CHECK:   br bb3
+// CHECK: bb2:
+// CHECK:   copy_addr %2 to [initialization] %1 : $*T
+// CHECK:   destroy_addr %3 : $*T
+// CHECK:   copy_addr [take] %2 to [initialization] %0 : $*T
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK-LABEL: } // end sil function 'f050_testCombine'
+sil [ossa] @f050_testCombine : $@convention(thin) <T> (@in T, @in T) -> (@out T, @out T) {
+bb0(%0 : @owned $T, %1 : @owned $T):
+  cond_br undef, bb2, bb1
+
+bb1:
+  br bb3(%0 : $T, %1 : $T)
+
+bb2:
+  %copy = copy_value %0 : $T
+  destroy_value %1 : $T  
+  br bb3(%0 : $T, %copy : $T)
+
+bb3(%arg0 : @owned $T, %arg1 : @owned $T):
+  %result = tuple (%arg0 : $T, %arg1 : $T)
+  return %result : $(T, T)
+}
+
+// Test cyclic anti-dependence on phi copies.
+//
+// CHECK-LABEL: sil [ossa] @f060_testInoutSwap : $@convention(thin) <T> (@inout T, @inout T) -> () {
+// CHECK: bb0(%0 : $*T, %1 : $*T):
+// CHECK:   [[ALLOC0:%.*]] = alloc_stack $T
+// CHECK:   [[ALLOC1:%.*]] = alloc_stack $T
+// CHECK:   copy_addr [take] %0 to [initialization] [[ALLOC1]] : $*T
+// CHECK:   copy_addr [take] %1 to [initialization] [[ALLOC0]] : $*T
+// CHECK:   cond_br undef, bb2, bb1
+// CHECK: bb1:
+// CHECK:   [[TMP:%.*]] = alloc_stack $T
+// CHECK:   copy_addr [take] [[ALLOC0]] to [initialization] [[TMP]] : $*T
+// CHECK:   copy_addr [take] [[ALLOC1]] to [initialization] [[ALLOC0]] : $*T
+// CHECK:   copy_addr [take] [[TMP]] to [initialization] [[ALLOC1]] : $*T
+// CHECK:   dealloc_stack [[TMP]] : $*T
+// CHECK:   br bb3
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK:   copy_addr [take] [[ALLOC0]] to [initialization] %0 : $*T
+// CHECK:   copy_addr [take] [[ALLOC1]] to [initialization] %1 : $*T
+// CHECK:   dealloc_stack [[ALLOC1]] : $*T
+// CHECK:   dealloc_stack [[ALLOC0]] : $*T
+// CHECK-LABEL: } // end sil function 'f060_testInoutSwap'
+sil [ossa] @f060_testInoutSwap : $@convention(thin) <T> (@inout T, @inout T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %2 = load [take] %0 : $*T
+  %3 = load [take] %1 : $*T
+  cond_br undef, bb2, bb1
+
+bb1:
+  br bb3(%2 : $T, %3 : $T)
+
+bb2:
+  br bb3(%3 : $T, %2 : $T)
+
+bb3(%phi0 : @owned $T, %phi1 : @owned $T):
+  store %phi0 to [init] %0 : $*T
+  store %phi1 to [init] %1 : $*T
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test phi copies that project into their use.
+//
+// CHECK-LABEL: sil [ossa] @f070_testInoutFieldSwap : $@convention(thin) <T> (@inout SRef<T>, @inout SRef<T>) -> () {
+// CHECK: bb0(%0 : $*SRef<T>, %1 : $*SRef<T>):
+// CHECK:   [[ALLOCA:%.*]] = alloc_stack $SRef<T>
+// CHECK:   [[ALLOCB:%.*]] = alloc_stack $SRef<T>
+// CHECK:   [[ALLOCSA:%.*]] = alloc_stack $SRef<T>
+// CHECK:   [[ALLOCSB:%.*]] = alloc_stack $SRef<T>
+// CHECK:   copy_addr [take] %0 to [initialization] [[ALLOCA]] : $*SRef<T>
+// CHECK:   copy_addr [take] %1 to [initialization] [[ALLOCB]] : $*SRef<T>
+// CHECK:   cond_br undef, bb2, bb1
+// CHECK: bb1:
+// CHECK:   [[A1OADR:%.*]] = struct_element_addr [[ALLOCA]] : $*SRef<T>, #SRef.object
+// CHECK:   [[A1O:%.*]] = load [take] [[A1OADR]] : $*AnyObject
+// CHECK:   [[A1EADR:%.*]] = struct_element_addr [[ALLOCA]] : $*SRef<T>, #SRef.element
+// CHECK:   [[B1OADR:%.*]] = struct_element_addr [[ALLOCB]] : $*SRef<T>, #SRef.object
+// CHECK:   [[B1O:%.*]] = load [take] [[B1OADR]] : $*AnyObject
+// CHECK:   [[B1EADR:%.*]] = struct_element_addr [[ALLOCB]] : $*SRef<T>, #SRef.element
+// CHECK:   destroy_value [[B1O]] : $AnyObject
+// CHECK:   [[CP1:%.*]] = copy_value [[A1O]] : $AnyObject
+// CHECK:   [[SA1EADR:%.*]] = struct_element_addr [[ALLOCSA]] : $*SRef<T>, #SRef.element
+// CHECK:   copy_addr [take] [[A1EADR]] to [initialization] [[SA1EADR]] : $*T
+// CHECK:   [[SB1EADR:%.*]] = struct_element_addr [[ALLOCSB]] : $*SRef<T>, #SRef.element
+// CHECK:   copy_addr [take] [[B1EADR]] to [initialization] [[SB1EADR]] : $*T
+// CHECK:   br bb3([[A1O]] : $AnyObject, [[CP1]] : $AnyObject)
+// CHECK: bb2:
+// CHECK:   [[A2OADR:%.*]] = struct_element_addr [[ALLOCA]] : $*SRef<T>, #SRef.object
+// CHECK:   [[A2O:%.*]] = load [take] [[A2OADR]] : $*AnyObject
+// CHECK:   [[A2EADR:%.*]] = struct_element_addr [[ALLOCA]] : $*SRef<T>, #SRef.element
+// CHECK:   [[B2OADR:%.*]] = struct_element_addr [[ALLOCB]] : $*SRef<T>, #SRef.object
+// CHECK:   [[B2O:%.*]] = load [take] [[B2OADR]] : $*AnyObject
+// CHECK:   [[B2EADR:%.*]] = struct_element_addr [[ALLOCB]] : $*SRef<T>, #SRef.element
+// CHECK:   destroy_value [[B2O]] : $AnyObject
+// CHECK:   [[CP2:%.*]] = copy_value [[A2O]] : $AnyObject
+// CHECK:   [[SB2EADR:%.*]] = struct_element_addr [[ALLOCSB]] : $*SRef<T>, #SRef.element
+// CHECK:   copy_addr [take] [[A2EADR]] to [initialization] [[SB2EADR]] : $*T
+// CHECK:   [[SA2EADR:%.*]] = struct_element_addr [[ALLOCSA]] : $*SRef<T>, #SRef.element
+// CHECK:   copy_addr [take] [[B2EADR]] to [initialization] [[SA2EADR]] : $*T
+// CHECK:   br bb3([[A2O]] : $AnyObject, [[CP2]] : $AnyObject)
+// CHECK: bb3([[PHI0:%.*]] : @owned $AnyObject, [[PHI1:%.*]] : @owned $AnyObject):
+// CHECK:   [[SA3EADR:%.*]] = struct_element_addr [[ALLOCSA]] : $*SRef<T>, #SRef.object
+// CHECK:   store [[PHI0]] to [init] [[SA3EADR]] : $*AnyObject
+// CHECK:   [[SA3EADR:%.*]] = struct_element_addr [[ALLOCSB]] : $*SRef<T>, #SRef.object
+// CHECK:   store [[PHI1]] to [init] [[SA3EADR]] : $*AnyObject
+// CHECK:   copy_addr [take] [[ALLOCSA]] to [initialization] %0 : $*SRef<T>
+// CHECK:   copy_addr [take] [[ALLOCSB]] to [initialization] %1 : $*SRef<T>
+// CHECK-LABEL: } // end sil function 'f070_testInoutFieldSwap'
+sil [ossa] @f070_testInoutFieldSwap : $@convention(thin) <T> (@inout SRef<T>, @inout SRef<T>) -> () {
+bb0(%0 : $*SRef<T>, %1 : $*SRef<T>):
+  %la = load [take] %0 : $*SRef<T>
+  %lb = load [take] %1 : $*SRef<T>
+  cond_br undef, bb2, bb1
+
+bb1:
+  (%da1o, %da1e) = destructure_struct %la : $SRef<T>
+  (%db1o, %db1e) = destructure_struct %lb : $SRef<T>
+  destroy_value %db1o : $AnyObject
+  %ca1o = copy_value %da1o : $AnyObject
+  br bb3(%da1o : $AnyObject, %ca1o : $AnyObject, %da1e : $T, %db1e : $T)
+
+bb2:
+  (%da2o, %da2e) = destructure_struct %la : $SRef<T>
+  (%db2o, %db2e) = destructure_struct %lb : $SRef<T>
+  destroy_value %db2o : $AnyObject
+  %ca2o = copy_value %da2o : $AnyObject
+  br bb3(%da2o : $AnyObject, %ca2o : $AnyObject, %db2e : $T, %da2e : $T)
+
+bb3(%phio0 : @owned $AnyObject, %phio1 : @owned $AnyObject, %phie0 : @owned $T, %phie1 : @owned $T):
+  %sa = struct $SRef<T> (%phio0 : $AnyObject, %phie0 : $T)
+  %sb = struct $SRef<T> (%phio1 : $AnyObject, %phie1 : $T)
+  store %sa to [init] %0 : $*SRef<T>
+  store %sb to [init] %1 : $*SRef<T>
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f080_testNestedComposeEnumPhi : $@convention(thin) <T> (@in T, @in T, @owned AnyObject, @owned AnyObject) -> @out OuterEnum<T> {
+// CHECK: bb0(%0 : $*OuterEnum<T>, %1 : $*T, %2 : $*T, %3 : @owned $AnyObject, %4 : @owned $AnyObject):
+// CHECK:   cond_br undef, bb2, bb1
+// CHECK: bb1:
+// CHECK:   destroy_addr %2 : $*T
+// CHECK:   [[TUPLE1:%.*]] = init_enum_data_addr [[INNER1:%.*]] : $*InnerEnum<T>, #InnerEnum.payload!enumelt
+// CHECK:   [[TUPLE1_0:%.*]] = tuple_element_addr [[TUPLE1]] : $*(T, AnyObject), 0
+// CHECK:   copy_addr [take] %1 to [initialization] [[TUPLE1_0]] : $*T
+// CHECK:   [[TUPLE1_1:%.*]] = tuple_element_addr [[TUPLE1]] : $*(T, AnyObject), 1
+// CHECK:   store %3 to [init] [[TUPLE1_1]] : $*AnyObject
+// CHECK:   inject_enum_addr [[INNER1]] : $*InnerEnum<T>, #InnerEnum.payload!enumelt
+// CHECK:   copy_addr [take] [[INNER1]] to [initialization] [[PHI6:%.*]] : $*InnerEnum<T>
+// CHECK:   br bb6
+// CHECK: bb2:
+// CHECK:   cond_br undef, bb4, bb3
+// CHECK: bb3:
+// CHECK:   destroy_addr %1 : $*T
+// CHECK:   copy_addr [take] %2 to [initialization] [[PHI5:%.*]] : $*T
+// CHECK:   br bb5
+// CHECK: bb4:
+// CHECK:   destroy_addr %2 : $*T
+// CHECK:   copy_addr [take] %1 to [initialization] [[PHI5]] : $*T
+// CHECK:   br bb5
+// CHECK: bb5:
+// CHECK:   [[TUPLE5:%.*]] = init_enum_data_addr [[INNER5:%.*]] : $*InnerEnum<T>, #InnerEnum.payload!enumelt
+// CHECK:   [[TUPLE5_0:%.*]] = tuple_element_addr [[TUPLE5]] : $*(T, AnyObject), 0
+// CHECK:   copy_addr [take] [[PHI5]] to [initialization] [[TUPLE5_0]] : $*T
+// CHECK:   [[TUPLE5_1:%.*]] = tuple_element_addr [[TUPLE5]] : $*(T, AnyObject), 1
+// CHECK:   store %3 to [init] [[TUPLE5_1]] : $*AnyObject
+// CHECK:   inject_enum_addr [[INNER5]] : $*InnerEnum<T>, #InnerEnum.payload!enumelt
+// CHECK:   copy_addr [take] [[INNER5]] to [initialization] [[PHI6:%.*]] : $*InnerEnum<T>
+// CHECK:   br bb6
+// CHECK: bb6:
+// CHECK:   [[TUPLE6:%.*]] = init_enum_data_addr %0 : $*OuterEnum<T>, #OuterEnum.inner!enumelt
+// CHECK:   [[TUPLE6_0:%.*]] = tuple_element_addr [[TUPLE6]] : $*(InnerEnum<T>, AnyObject), 0
+// CHECK:   copy_addr [take] [[PHI6]] to [initialization] [[TUPLE6_0]] : $*InnerEnum<T>
+// CHECK:   [[TUPLE6_1:%.*]] = tuple_element_addr [[TUPLE6]] : $*(InnerEnum<T>, AnyObject), 1
+// CHECK:   store %4 to [init] [[TUPLE6_1]] : $*AnyObject
+// CHECK:   inject_enum_addr %0 : $*OuterEnum<T>, #OuterEnum.inner!enumelt
+// CHECK-LABEL: } // end sil function 'f080_testNestedComposeEnumPhi'
+sil [ossa] @f080_testNestedComposeEnumPhi : $@convention(thin) <T> (@in T, @in T, @owned AnyObject, @owned AnyObject) -> @out OuterEnum<T> {
+bb0(%0 : @owned $T, %1 : @owned $T, %2 : @owned $AnyObject, %3 : @owned $AnyObject):
+  cond_br undef, bb2, bb1
+bb1:
+  destroy_value %1 : $T
+  %tuple1 = tuple (%0 : $T, %2 : $AnyObject)
+  %inner1 = enum $InnerEnum<T>, #InnerEnum.payload, %tuple1 : $(T, AnyObject)
+  br bb6(%inner1 : $InnerEnum<T>)
+bb2:
+  cond_br undef, bb4, bb3
+bb3:
+  destroy_value %0 : $T
+  br bb5(%1 : $T)
+bb4:
+  destroy_value %1 : $T
+  br bb5(%0 : $T)
+bb5(%phi5 : @owned $T):
+  %tuple5 = tuple (%phi5 : $T, %2 : $AnyObject)
+  %inner5 = enum $InnerEnum<T>, #InnerEnum.payload, %tuple5 : $(T, AnyObject)
+  br bb6(%inner5 : $InnerEnum<T>)
+bb6(%phi6 : @owned $InnerEnum<T>):
+  %tuple6 = tuple (%phi6 : $InnerEnum<T>, %3 : $AnyObject)
+  %outer = enum $OuterEnum<T>, #OuterEnum.inner, %tuple6 : $(InnerEnum<T>, AnyObject)
+  return %outer : $OuterEnum<T>
+}
+
+// CHECK-LABEL: sil [ossa] @f080_testNestedComposeStructWithPhi : $@convention(thin) <T> (@in T, @in T, @owned AnyObject, @owned AnyObject) -> @out OuterStruct<T> {
+// CHECK: bb0(%0 : $*OuterStruct<T>, %1 : $*T, %2 : $*T, %3 : @owned $AnyObject, %4 : @owned $AnyObject):
+// CHECK-NOT: alloc
+// CHECK:   cond_br undef, bb2, bb1
+// CHECK: bb1:
+// CHECK:   destroy_addr %2 : $*T
+// CHECK:   [[INNER1:%.*]] = struct_element_addr %0 : $*OuterStruct<T>, #OuterStruct.inner
+// CHECK:   [[T2:%.*]] = struct_element_addr [[INNER1]] : $*InnerStruct<T>, #InnerStruct.t
+// CHECK:   copy_addr [take] %1 to [initialization] [[T2]] : $*T
+// CHECK:   [[O2:%.*]] = struct_element_addr [[INNER1]] : $*InnerStruct<T>, #InnerStruct.object
+// CHECK:   store %3 to [init] [[O2]] : $*AnyObject
+// CHECK:   br bb6
+// CHECK: bb2:
+// CHECK:   cond_br undef, bb4, bb3
+// CHECK: bb3:
+// CHECK:   destroy_addr %1 : $*T
+// CHECK:   [[INNER3:%.*]] = struct_element_addr %0 : $*OuterStruct<T>, #OuterStruct.inner
+// CHECK:   [[T3:%.*]] = struct_element_addr [[INNER3]] : $*InnerStruct<T>, #InnerStruct.t
+// CHECK:   copy_addr [take] %2 to [initialization] [[T3]] : $*T
+// CHECK:   br bb5
+// CHECK: bb4:
+// CHECK:   destroy_addr %2 : $*T
+// CHECK:   [[INNER4:%.*]] = struct_element_addr %0 : $*OuterStruct<T>, #OuterStruct.inner
+// CHECK:   [[T4:%.*]] = struct_element_addr [[INNER4]] : $*InnerStruct<T>, #InnerStruct.t
+// CHECK:   copy_addr [take] %1 to [initialization] [[T4]] : $*T
+// CHECK:   br bb5
+// CHECK: bb5:
+// CHECK:   [[INNER5:%.*]] = struct_element_addr %0 : $*OuterStruct<T>, #OuterStruct.inner
+// CHECK:   [[O5:%.*]] = struct_element_addr [[INNER5]] : $*InnerStruct<T>, #InnerStruct.object
+// CHECK:   store %3 to [init] [[O5]] : $*AnyObject
+// CHECK:   br bb6
+// CHECK: bb6:
+// CHECK:   [[O6:%.*]] = struct_element_addr %0 : $*OuterStruct<T>, #OuterStruct.object
+// CHECK:   store %4 to [init] [[O6]] : $*AnyObject
+// CHECK-NOT: dealloc
+// CHECK-LABEL: } // end sil function 'f080_testNestedComposeStructWithPhi'
+sil [ossa] @f080_testNestedComposeStructWithPhi : $@convention(thin) <T> (@in T, @in T, @owned AnyObject, @owned AnyObject) -> @out OuterStruct<T> {
+bb0(%0 : @owned $T, %1 : @owned $T, %2 : @owned $AnyObject, %3 : @owned $AnyObject):
+  cond_br undef, bb2, bb1
+bb1:
+  destroy_value %1 : $T
+  %inner2 = struct $InnerStruct<T> (%0 : $T, %2 : $AnyObject)
+  br bb6(%inner2 : $InnerStruct<T>)
+bb2:
+  cond_br undef, bb4, bb3
+bb3:
+  destroy_value %0 : $T
+  br bb5(%1 : $T)
+bb4:
+  destroy_value %1 : $T
+  br bb5(%0 : $T)
+bb5(%phi5 : @owned $T):
+  %inner5 = struct $InnerStruct<T> (%phi5 : $T, %2 : $AnyObject)
+  br bb6(%inner5 : $InnerStruct<T>)
+bb6(%phi6 : @owned $InnerStruct<T>):
+  %outer = struct $OuterStruct<T> (%phi6 : $InnerStruct<T>, %3 : $AnyObject)
+  return %outer : $OuterStruct<T>
+}
+
+// CHECK-LABEL: sil [ossa] @f090_payloadPhiOperand : $@convention(thin) <T> (@in Optional<T>, @in T) -> @out T {
+// CHECK: bb0(%0 : $*T, %1 : $*Optional<T>, %2 : $*T):
+// CHECK:   cond_br undef, bb2, bb1
+// CHECK: bb1:
+// CHECK:   destroy_addr %2 : $*T
+// CHECK:   [[P:%.*]] = unchecked_take_enum_data_addr %1 : $*Optional<T>, #Optional.some!enumelt
+// CHECK:   copy_addr [take] [[P]] to [initialization] %0 : $*T
+// CHECK:   br bb3
+// CHECK: bb2:
+// CHECK:   destroy_addr %1 : $*Optional<T>
+// CHECK:   copy_addr [take] %2 to [initialization] %0 : $*T
+// CHECK:   br bb3
+// CHECK-LABEL: } // end sil function 'f090_payloadPhiOperand'
+sil [ossa] @f090_payloadPhiOperand : $@convention(thin) <T> (@in Optional<T>, @in T) -> @out T {
+bb0(%0 : @owned $Optional<T>, %1 : @owned $T):
+  cond_br undef, bb2, bb1
+bb1:
+  destroy_value %1 : $T
+  %payload = unchecked_enum_data %0 : $Optional<T>, #Optional.some!enumelt
+  br bb3(%payload : $T)
+bb2:
+  destroy_value %0 : $Optional<T>
+  br bb3(%1 : $T)
+bb3(%phi : @owned $T):
+  return %phi : $T
+}

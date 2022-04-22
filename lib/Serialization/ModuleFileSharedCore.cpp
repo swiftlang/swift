@@ -308,8 +308,8 @@ static ValidationInfo validateControlBlock(
       break;
     }
     case control_block::REVISION: {
-      // Tagged compilers should load only resilient modules if they were
-      // produced by the exact same version.
+      // Tagged compilers should only load modules if they were
+      // produced by the exact same compiler tag.
 
       // Disable this restriction for compiler testing by setting this
       // env var to any value.
@@ -328,7 +328,7 @@ static ValidationInfo validateControlBlock(
         !version::Version::getCurrentCompilerVersion().empty();
 
       StringRef moduleRevision = blobData;
-      if (isCompilerTagged && !moduleRevision.empty()) {
+      if (isCompilerTagged) {
         StringRef compilerRevision = forcedDebugRevision ?
           forcedDebugRevision : version::getSwiftRevision();
         if (moduleRevision != compilerRevision)
@@ -801,9 +801,9 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(SubstitutionMaps, scratch);
         break;
-      case index_block::NORMAL_CONFORMANCE_OFFSETS:
+      case index_block::PROTOCOL_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
-        allocateBuffer(NormalConformances, scratch);
+        allocateBuffer(Conformances, scratch);
         break;
       case index_block::SIL_LAYOUT_OFFSETS:
         assert(blobData.empty());
@@ -1350,6 +1350,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           bool shouldForceLink;
           input_block::LinkLibraryLayout::readRecord(scratch, rawKind,
                                                      shouldForceLink);
+          if (Bits.IsStaticLibrary)
+            shouldForceLink = false;
           if (auto libKind = getActualLibraryKind(rawKind))
             LinkLibraries.push_back({blobData, *libKind, shouldForceLink});
           // else ignore the dependency...it'll show up as a linker error.

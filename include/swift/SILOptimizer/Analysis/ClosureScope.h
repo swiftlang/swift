@@ -52,6 +52,7 @@
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/iterator.h"
@@ -80,40 +81,15 @@ inline bool isNonEscapingClosure(CanSILFunctionType funcTy) {
   return llvm::any_of(funcTy->getParameters(), isInoutAliasable);
 }
 
-class ClosureScopeData;
+class ClosureGraph;
 
 class ClosureScopeAnalysis : public SILAnalysis {
-  friend class ClosureScopeData;
+  friend class ClosureGraph;
 
-  // Get a closure's scope function from its index. This functor is compatible
-  // with OptionalTransformRange. Unfortunately it exposes the internals of the
-  // analysis data.
-  struct IndexLookupFunc {
-    // A reference to all closure parent scopes ordered by their index.
-    const std::vector<SILFunction *> &indexedScopes;
-
-    IndexLookupFunc(const std::vector<SILFunction *> &indexedScopes)
-        : indexedScopes(indexedScopes) {}
-
-    Optional<SILFunction *> operator()(int idx) const {
-      if (auto funcPtr = indexedScopes[idx]) {
-        return funcPtr;
-      }
-      return None;
-    }
-  };
-  using IndexRange = iterator_range<int *>;
-
-public:
-  // A range of SILFunction scopes converted from their scope indices and
-  // filtered to remove any erased functions.
-  using ScopeRange = OptionalTransformRange<IndexRange, IndexLookupFunc, int *>;
-
-private:
   SILModule *M;
 
   // The analysis data. nullptr if it has never been computed.
-  std::unique_ptr<ClosureScopeData> scopeData;
+  std::unique_ptr<ClosureGraph> scopeGraph;
 
 public:
   ClosureScopeAnalysis(SILModule *M);
@@ -125,13 +101,20 @@ public:
 
   SILModule *getModule() const { return M; }
 
-  // Return true if the given function is the parent scope for any closures.
-  bool isClosureScope(SILFunction *scopeFunc);
+  /// Visit the parent scopes of \p closure if it has any. If \p visitor returns
+  /// false, exit early and return false. Otherwise return true.
+  bool visitClosureScopes(SILFunction *closure,
+                          std::function<bool(SILFunction *scopeFunc)> visitor);
 
-  // Return a range of scopes for the given closure. The elements of the
-  // returned range have type `SILFunction *` and are non-null. Returns an
-  // empty range for a SILFunction that is not a closure or is a dead closure.
-  ScopeRange getClosureScopes(SILFunction *closureFunc);
+  /// Visit the closures directly referenced by \p scopeFunc.
+  bool visitClosures(SILFunction *scopeFunc,
+                     std::function<bool(SILFunction *closure)> visitor);
+
+  /// Return true if this function is a reachable closure.
+  bool isReachableClosure(SILFunction *function) {
+    // This visitor returns false immediately on the first scope.
+    return !visitClosureScopes(function, [](SILFunction *) { return false; });
+  }
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() override;
@@ -159,25 +142,50 @@ public:
   }
 
 protected:
-  ClosureScopeData *getOrComputeScopeData();
+  ClosureScopeAnalysis(const ClosureScopeAnalysis &) = delete;
+  ClosureScopeAnalysis &operator=(const ClosureScopeAnalysis &) = delete;
+
+  ClosureGraph *getOrComputeGraph();
 };
 
-// ClosureScopeAnalysis utility for visiting functions top down in closure scope
-// order.
-class TopDownClosureFunctionOrder {
-  ClosureScopeAnalysis *CSA;
+// ClosureScopeAnalysis utility for visiting functions top-down or bottom-up in
+// closure scope order.
+class ClosureFunctionOrder {
+  class ClosureDFS;
+  friend class ClosureDFS;
 
-  llvm::SmallSet<SILFunction *, 16> visited;
+  ClosureScopeAnalysis *csa;
 
-  BlotSetVector<SILFunction *> closureWorklist;
+  // All functions in this module in top-down order (RPO) following the closure
+  // scope graph. Functions that define a closure occur before the closure.
+  std::vector<SILFunction *> topDownFunctions;
+
+  // If the closure scope graph has any cycles, record each function at the
+  // head of a cycle. This does not include all the functions in the
+  // strongly-connected component. This is extremely rare. It is always a local
+  // function that refers to itself either directly or indirectly.
+  SmallPtrSet<SILFunction *, 4> closureCycleHeads;
 
 public:
-  TopDownClosureFunctionOrder(ClosureScopeAnalysis *CSA) : CSA(CSA) {}
+  ClosureFunctionOrder(ClosureScopeAnalysis *csa) : csa(csa) {}
 
-  // Visit all functions in a module, visiting each closure scope function
-  // before
-  // the closure function itself.
-  void visitFunctions(llvm::function_ref<void(SILFunction *)> visitor);
+  void compute();
+
+  ArrayRef<SILFunction *> getTopDownFunctions() const {
+    assert(!topDownFunctions.empty()
+           || llvm::empty(csa->getModule()->getFunctions()));
+    return topDownFunctions;
+  }
+
+  bool isHeadOfClosureCycle(SILFunction *function) const {
+    return closureCycleHeads.contains(function);
+  }
+
+  SWIFT_ASSERT_ONLY_DECL(void dump());
+
+protected:
+  ClosureFunctionOrder(const ClosureFunctionOrder &) = delete;
+  ClosureFunctionOrder &operator=(const ClosureFunctionOrder &) = delete;
 };
 
 } // end namespace swift

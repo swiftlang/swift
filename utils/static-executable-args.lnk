@@ -6,6 +6,8 @@
 -undefined=pthread_once
 -Xlinker
 -undefined=pthread_key_create
+-ldispatch
+-lBlocksRuntime
 -lpthread
 -licui18nswift
 -licuucswift

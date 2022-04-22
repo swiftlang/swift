@@ -1,12 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module-interface-path %t/Lib.swiftinterface -emit-module -o %t/unused.swiftmodule -enable-library-evolution -Xfrontend -enable-objc-interop -Xfrontend -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift -module-name Lib
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK-MULTI-FILE %S/Inputs/enums-layout-helper.swift < %t/Lib.swiftinterface
+// RUN: %target-swift-frontend -enable-objc-interop -compile-module-from-interface %t/Lib.swiftinterface -o  %t/compiled-from-interface.swiftmodule -module-name Lib
 // RUN: %target-swift-frontend -enable-objc-interop -O -emit-ir -primary-file %s -I %t -Xllvm -swiftmergefunc-threshold=0 | %FileCheck %s
 
 // Try again using a single-frontend build.
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -whole-module-optimization -emit-module-interface-path %t/Lib.swiftinterface -emit-module -o %t/unused.swiftmodule -enable-library-evolution -Xfrontend -enable-objc-interop -Xfrontend -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift -module-name Lib
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK-SINGLE-FRONTEND %S/Inputs/enums-layout-helper.swift < %t/Lib.swiftinterface
+// RUN: %target-swift-frontend -enable-objc-interop -compile-module-from-interface %t/Lib.swiftinterface -o  %t/compiled-from-interface.swiftmodule -module-name Lib
 // RUN: %target-swift-frontend -enable-objc-interop -O -emit-ir -primary-file %s -I %t -Xllvm -swiftmergefunc-threshold=0 | %FileCheck %s
 
 
@@ -41,6 +43,16 @@ func testFrozenObjCEnum() -> FrozenObjCEnum {
   // CHECK: ret i{{32|64}} 10
   return .b
 } // CHECK-NEXT: {{^}$}}
+
+// CHECK-LABEL: define{{.+}}testFutureproofUnicodeScalarEnum
+func testFutureproofUnicodeScalarEnum() -> FutureproofUnicodeScalarEnum {
+  // CHECK: [[CASE:%.+]] = load i32, i32* @"$s3Lib28FutureproofUnicodeScalarEnumO1ayA2CmFWC"
+  // CHECK: [[METADATA_RESPONSE:%.+]] = tail call swiftcc %swift.metadata_response @"$s3Lib28FutureproofUnicodeScalarEnumOMa"
+  // CHECK: [[METADATA:%.+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
+  // CHECK: call void {{%.+}}(%swift.opaque* noalias %0, i32 [[CASE]], %swift.type* [[METADATA]])
+  // CHECK-NEXT: ret void
+  return .a
+}
 
 // CHECK-LABEL: define{{.+}}testFutureproofIndirectEnum
 func testFutureproofIndirectEnum() -> FutureproofIndirectEnum {

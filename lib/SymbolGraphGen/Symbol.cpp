@@ -16,7 +16,12 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Unicode.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/Basic/SourceManager.h"
 #include "AvailabilityMixin.h"
 #include "JSON.h"
 #include "Symbol.h"
@@ -193,6 +198,41 @@ const ValueDecl *Symbol::getDeclInheritingDocs() const {
 }
 
 void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
+  if (ClangNode ClangN = VD->getClangNode()) {
+    if (!Graph->Walker.Options.IncludeClangDocs)
+      return;
+
+    if (auto *ClangD = ClangN.getAsDecl()) {
+      const clang::ASTContext &ClangContext = ClangD->getASTContext();
+      const clang::RawComment *RC =
+          ClangContext.getRawCommentForAnyRedecl(ClangD);
+      if (!RC || !RC->isDocumentation())
+        return;
+
+      // TODO: Replace this with `getFormattedLines` when it's in and add the
+      // line and column ranges. Also consider handling cross-language
+      // hierarchies, ie. if there's no comment on the ObjC decl we should
+      // look up the hierarchy (and vice versa).
+      std::string Text = RC->getFormattedText(ClangContext.getSourceManager(),
+                                              ClangContext.getDiagnostics());
+      Text = unicode::sanitizeUTF8(Text);
+
+      SmallVector<StringRef, 8> Lines;
+      splitIntoLines(Text, Lines);
+
+      OS.attributeObject("docComment", [&]() {
+        OS.attributeArray("lines", [&]() {
+          for (StringRef Line : Lines) {
+            OS.object([&](){
+              OS.attribute("text", Line);
+            });
+          }
+        });
+      });
+    }
+    return;
+  }
+
   const auto *DocCommentProvidingDecl = VD;
   if (!Graph->Walker.Options.SkipInheritedDocs) {
     DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(
@@ -370,6 +410,30 @@ void Symbol::serializeAccessLevelMixin(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
+  if (ClangNode ClangN = VD->getClangNode()) {
+    if (!Graph->Walker.Options.IncludeClangDocs)
+      return;
+
+    if (auto *ClangD = ClangN.getAsDecl()) {
+      clang::SourceManager &ClangSM =
+          ClangD->getASTContext().getSourceManager();
+
+      clang::PresumedLoc Loc = ClangSM.getPresumedLoc(ClangD->getLocation());
+      if (Loc.isValid()) {
+        // TODO: We should use a common function to fill in the location
+        // information for both cursor info and symbol graph gen, then also
+        // include position here.
+        OS.attributeObject("location", [&](){
+          SmallString<1024> FileURI("file://");
+          FileURI.append(Loc.getFilename());
+          OS.attribute("uri", FileURI.str());
+        });
+      }
+    }
+
+    return;
+  }
+
   auto Loc = VD->getLoc(/*SerializedOK=*/true);
   if (Loc.isInvalid()) {
     return;

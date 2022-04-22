@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # The following script takes as input a SIL fragment and changes all
 # SSA variables into FileCheck variables. This significantly reduces

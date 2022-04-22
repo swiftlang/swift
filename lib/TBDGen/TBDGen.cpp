@@ -718,9 +718,10 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-  if (AFD->isDistributed()) {
-    addSymbol(SILDeclRef(AFD).asDistributed());
-    addAsyncFunctionPointerSymbol(SILDeclRef(AFD).asDistributed());
+  if (auto distributedThunk = AFD->getDistributedThunk()) {
+    auto thunk = SILDeclRef(distributedThunk).asDistributed();
+    addSymbol(thunk);
+    addAsyncFunctionPointerSymbol(thunk);
   }
 
   // Add derivative function symbols.
@@ -846,6 +847,11 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   }
 
   visitAbstractStorageDecl(VD);
+}
+
+void TBDGenVisitor::visitSubscriptDecl(SubscriptDecl *SD) {
+  visitDefaultArguments(SD, SD->getIndices());
+  visitAbstractStorageDecl(SD);
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {

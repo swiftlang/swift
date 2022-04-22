@@ -653,6 +653,8 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     return std::next(si->getIterator());
   }
 
+  bool isOrHasEnum = tempObj->getType().isOrHasEnum();
+
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
   // to the value initialized by this copy. It is sufficient to check that the
   // only users that modify memory are the copy_addr [initialization] and
@@ -663,6 +665,16 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
 
     if (user == si)
       continue;
+
+    // For enums we require that all uses are in the same block.
+    // Otherwise it could be a switch_enum of an optional where the none-case
+    // does not have a destroy of the enum value.
+    // After transforming such an alloc_stack the value would leak in the none-
+    // case block.
+    if (isOrHasEnum && user->getParent() != si->getParent() &&
+        !isa<DeallocStackInst>(user)) {
+      return std::next(si->getIterator());
+    }
 
     // Bail if there is any kind of user which is not handled in the code below.
     switch (user->getKind()) {

@@ -35,9 +35,10 @@ using namespace swift;
 
 void
 swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
-                                  SmallVectorImpl<Decl*> &Results) {
+                                  SmallVectorImpl<Decl*> &Results,
+                                  bool Recursive) {
   auto startingSize = Results.size();
-  M->getDisplayDecls(Results);
+  M->getDisplayDecls(Results, Recursive);
 
   // Force Sendable on all types, which might synthesize some extensions.
   // FIXME: We can remove this if @_nonSendable stops creating extensions.
@@ -49,7 +50,7 @@ swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
   // Remove what we fetched and fetch again, possibly now with additional
   // extensions.
   Results.resize(startingSize);
-  M->getDisplayDecls(Results);
+  M->getDisplayDecls(Results, Recursive);
 }
 
 static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {

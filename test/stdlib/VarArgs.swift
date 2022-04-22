@@ -171,4 +171,4 @@ test_varArgs6()
 
 
 // CHECK: done.
-print("done.")
+my_printf("done.")

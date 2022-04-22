@@ -15,7 +15,11 @@
 // UNSUPPORTED: OS=watchos
 
 // rdar://86825277
-// UNSUPPORTED: CPU=arm64e
+// SR-15805
+// UNSUPPORTED: CPU=arm64 || CPU=arm64e
+
+// Disabled because this test is flaky rdar://76542113
+// REQUIRES: rdar76542113
 
 func fib(_ n: Int) -> Int {
   var first = 0

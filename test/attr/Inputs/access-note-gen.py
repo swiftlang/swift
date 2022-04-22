@@ -1,12 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding=utf8
 
 """
 Convert selected @objc attributes in a source file into access notes, removing
 the originals in the process.
 """
-
-from __future__ import print_function
 
 import io
 import re

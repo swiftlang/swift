@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 @available(SwiftStdlib 5.5, *)
@@ -18,7 +18,8 @@ struct Logger {
 
 distributed actor Philosopher {
   let log: Logger
-  // expected-note@-1{{distributed actor state is only available within the actor instance}}
+  // expected-note@-1{{access to property 'log' is only permitted within distributed actor 'Philosopher'}}
+
   var variable = 12
   var variable_fromDetach = 12
   let INITIALIZED: Int
@@ -62,7 +63,7 @@ distributed actor Philosopher {
 
 func test_outside(system: FakeActorSystem) async throws {
   _ = try await Philosopher(system: system).dist()
-  _ = Philosopher(system: system).log // expected-error{{distributed actor-isolated property 'log' can only be referenced inside the distributed actor}}
+  _ = Philosopher(system: system).log // expected-error{{distributed actor-isolated property 'log' can not be accessed from a non-isolated context}}
 
   _ = Philosopher(system: system).id
   _ = Philosopher(system: system).actorSystem

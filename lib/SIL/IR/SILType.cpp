@@ -34,14 +34,14 @@ using namespace swift::Lowering;
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
-CanArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
+CanOpenedArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
   if (!Ty)
-    return CanArchetypeType();
+    return CanOpenedArchetypeType();
   while (auto MetaTy = dyn_cast<AnyMetatypeType>(Ty))
     Ty = MetaTy.getInstanceType();
   if (Ty->isOpenedExistential())
-    return cast<ArchetypeType>(Ty);
-  return CanArchetypeType();
+    return cast<OpenedArchetypeType>(Ty);
+  return CanOpenedArchetypeType();
 }
 
 SILType SILType::getExceptionType(const ASTContext &C) {
@@ -108,7 +108,23 @@ bool SILType::isTrivial(const SILFunction &F) const {
   return F.getTypeLowering(contextType).isTrivial();
 }
 
+bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  return F.getTypeLowering(contextType).isOrContainsRawPointer();
+}
+
+bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  const TypeLowering &tyLowering = F.getTypeLowering(contextType);
+  return !tyLowering.isTrivial() || tyLowering.isOrContainsRawPointer();
+}
+
 bool SILType::isEmpty(const SILFunction &F) const {
+  // Infinite types are never empty.
+  if (F.getTypeLowering(*this).getRecursiveProperties().isInfinite()) {
+    return false;
+  }
+  
   if (auto tupleTy = getAs<TupleType>()) {
     // A tuple is empty if it either has no elements or if all elements are
     // empty.
@@ -501,10 +517,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
 }
 
 SILModuleConventions::SILModuleConventions(SILModule &M)
-    : M(&M),
-      loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues
-                       || M.getStage() == SILStage::Lowered)
-{}
+    : M(&M), loweredAddresses(M.useLoweredAddresses()) {}
 
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {

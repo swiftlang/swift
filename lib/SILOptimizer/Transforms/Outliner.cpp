@@ -334,7 +334,7 @@ BridgedProperty::outline(SILModule &M) {
 
   auto *Fun = FuncBuilder.getOrCreateFunction(
       ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
-      IsNotTransparent, IsSerializable, IsNotDynamic, IsNotDistributed);
+      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed);
   bool NeedsDefinition = Fun->empty();
 
   if (Release) {
@@ -1046,7 +1046,7 @@ ObjCMethodCall::outline(SILModule &M) {
 
   auto *Fun = FuncBuilder.getOrCreateFunction(
       ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
-      IsNotTransparent, IsSerializable, IsNotDynamic, IsNotDistributed);
+      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed);
   bool NeedsDefinition = Fun->empty();
 
   // Call the outlined function.

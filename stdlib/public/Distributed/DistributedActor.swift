@@ -13,17 +13,6 @@
 import Swift
 import _Concurrency
 
-// ==== Any Actor -------------------------------------------------------------
-
-/// Shared "base" protocol for both (local) `Actor` and (potentially remote)
-/// `DistributedActor`.
-///
-/// FIXME(distributed): We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
-@_marker
-@available(SwiftStdlib 5.6, *)
-public protocol AnyActor: Sendable, AnyObject {
-}
-
 // ==== Distributed Actor -----------------------------------------------------
 
 /// Common protocol to which all distributed actors conform implicitly.
@@ -34,18 +23,33 @@ public protocol AnyActor: Sendable, AnyObject {
 ///
 /// The 'DistributedActor' protocol provides the core functionality of any
 /// distributed actor.
-@available(SwiftStdlib 5.6, *)
-public protocol DistributedActor:
-    AnyActor,
-    Identifiable,
-    Hashable, Codable
-  where ID == ActorSystem.ActorID {
+///
+/// ## Implicit `Codable` conformance
+/// If created with an actor system whose `ActorID` is `Codable`, the
+/// compiler will synthesize code for the concrete distributed actor to conform
+/// to `Codable` as well. This is necessary to support distributed calls where
+/// the `SerializationRequirement` is `Codable` and thus users may want to pass
+/// actors as arguments to remote calls.
+///
+/// The synthesized implementations use a single `SingleValueContainer` to
+/// encode/decode the `self.id` property of the actor. The `Decoder` required
+/// `init(from:)` is implemented by retrieving an actor system from the
+/// decoders' `userInfo`, effectively like this:
+/// `decoder.userInfo[.actorSystemKey] as? ActorSystem`. The obtained actor
+/// system is then used to `resolve(id:using:)` the decoded ID.
+///
+/// Use the `CodingUserInfoKey.actorSystemKey` to provide the necessary
+/// actor system for the decoding initializer when decoding a distributed actor.
+@available(SwiftStdlib 5.7, *)
+public protocol DistributedActor: AnyActor, Identifiable, Hashable
+  where ID == ActorSystem.ActorID,
+        SerializationRequirement == ActorSystem.SerializationRequirement {
   
   /// The type of transport used to communicate with actors of this type.
   associatedtype ActorSystem: DistributedActorSystem
 
   /// The serialization requirement to apply to all distributed declarations inside the actor.
-  typealias SerializationRequirement = ActorSystem.SerializationRequirement
+  associatedtype SerializationRequirement
 
   /// Logical identity of this distributed actor.
   ///
@@ -84,7 +88,7 @@ public protocol DistributedActor:
 
 // ==== Hashable conformance ---------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 extension DistributedActor {
   nonisolated public func hash(into hasher: inout Hasher) {
     self.id.hash(into: &hasher)
@@ -98,12 +102,12 @@ extension DistributedActor {
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
-  @available(SwiftStdlib 5.6, *)
+  @available(SwiftStdlib 5.7, *)
   public static let actorSystemKey = CodingUserInfoKey(rawValue: "$distributed_actor_system")!
 }
 
-@available(SwiftStdlib 5.6, *)
-extension DistributedActor {
+@available(SwiftStdlib 5.7, *)
+extension DistributedActor /*: implicitly Decodable */ where Self.ID: Decodable {
   nonisolated public init(from decoder: Decoder) throws {
     guard let system = decoder.userInfo[.actorSystemKey] as? ActorSystem else {
       throw DistributedActorCodingError(message:
@@ -114,7 +118,10 @@ extension DistributedActor {
     let id: ID = try Self.ID(from: decoder)
     self = try Self.resolve(id: id, using: system)
   }
+}
 
+@available(SwiftStdlib 5.7, *)
+extension DistributedActor /*: implicitly Encodable */ where Self.ID: Encodable {
   nonisolated public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.id)
@@ -123,12 +130,12 @@ extension DistributedActor {
 
 // ==== Local actor special handling -------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 extension DistributedActor {
 
   /// Executes the passed 'body' only when the distributed actor is local instance.
   ///
-  /// The `Self` passed to the the body closure is isolated, meaning that the
+  /// The `Self` passed to the body closure is isolated, meaning that the
   /// closure can be used to call non-distributed functions, or even access actor
   /// state.
   ///
@@ -151,9 +158,9 @@ extension DistributedActor {
 // ==== isRemote / isLocal -----------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
+public func __isRemoteActor(_ actor: AnyObject) -> Bool
 
-func __isLocalActor(_ actor: AnyObject) -> Bool {
+public func __isLocalActor(_ actor: AnyObject) -> Bool {
   return !__isRemoteActor(actor)
 }
 

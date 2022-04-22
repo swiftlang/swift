@@ -195,9 +195,49 @@ func testSlowServerFromMain(slowServer: SlowServer) async throws {
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]]
   // CHECK: [[RESUME]]:
   // CHECK: [[RESULT:%.*]] = load [trivial] [[RESUME_BUF]]
+  // CHECK: hop_to_executor %6 : $MainActor
   // CHECK: fix_lifetime [[COPY]]
   // CHECK: destroy_value [[COPY]]
-  // CHECK: hop_to_executor %6 : $MainActor
   // CHECK: dealloc_stack [[RESUME_BUF]]
   let _: Int = await slowServer.doSomethingSlow("mail")
+}
+
+// CHECK-LABEL: sil {{.*}}@${{.*}}26testThrowingMethodFromMain
+@MainActor
+func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
+// CHECK:  [[RESULT_BUF:%.*]] = alloc_stack $String
+// CHECK:  [[STRING_ARG:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@guaranteed String) -> @owned NSString
+// CHECK:  [[METH:%.*]] = objc_method {{%.*}} : $SlowServer, #SlowServer.doSomethingDangerous!foreign
+// CHECK:  [[RAW_CONT:%.*]] = get_async_continuation_addr [throws] String, [[RESULT_BUF]] : $*String
+// CHECK:  [[CONT:%.*]] = struct $UnsafeContinuation<String, Error> ([[RAW_CONT]] : $Builtin.RawUnsafeContinuation)
+// CHECK:  [[STORE_ALLOC:%.*]] = alloc_stack $@block_storage UnsafeContinuation<String, Error>
+// CHECK:  [[PROJECTED:%.*]] = project_block_storage [[STORE_ALLOC]] : $*@block_storage
+// CHECK:  store [[CONT]] to [trivial] [[PROJECTED]] : $*UnsafeContinuation<String, Error>
+// CHECK:  [[INVOKER:%.*]] = function_ref @$sSo8NSStringCSgSo7NSErrorCSgIeyByy_SSTz_
+// CHECK:  [[BLOCK:%.*]] = init_block_storage_header [[STORE_ALLOC]] {{.*}}, invoke [[INVOKER]]
+// CHECK:  [[OPTIONAL_BLK:%.*]] = enum {{.*}}, #Optional.some!enumelt, [[BLOCK]]
+// CHECK:  %28 = apply [[METH]]([[STRING_ARG]], [[OPTIONAL_BLK]], {{%.*}}) : $@convention(objc_method) (NSString, Optional<@convention(block) (Optional<NSString>, Optional<NSError>) -> ()>, SlowServer) -> ()
+// CHECK:  [[STRING_ARG_COPY:%.*]] = copy_value [[STRING_ARG]] : $NSString
+// CHECK:  dealloc_stack [[STORE_ALLOC]] : $*@block_storage UnsafeContinuation<String, Error>
+// CHECK:  destroy_value [[STRING_ARG]] : $NSString
+// CHECK:  await_async_continuation [[RAW_CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+
+// CHECK: [[RESUME]]
+// CHECK:   {{.*}} = load [take] [[RESULT_BUF]] : $*String
+// CHECK:   hop_to_executor {{%.*}} : $MainActor
+// CHECK:   fix_lifetime [[STRING_ARG_COPY]] : $NSString
+// CHECK:   destroy_value [[STRING_ARG_COPY]] : $NSString
+// CHECK:   dealloc_stack [[RESULT_BUF]] : $*String
+
+// CHECK: [[ERROR]]
+// CHECK:   hop_to_executor {{%.*}} : $MainActor
+// CHECK:   fix_lifetime [[STRING_ARG_COPY]] : $NSString
+// CHECK:   destroy_value [[STRING_ARG_COPY]] : $NSString
+// CHECK:   dealloc_stack [[RESULT_BUF]] : $*String
+
+  do {
+    return try await slowServer.doSomethingDangerous("run-with-scissors")
+  } catch {
+    return "none"
+  }
 }

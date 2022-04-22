@@ -290,3 +290,7 @@ public struct StructWithClosure {
   public static let c = { (x: Int) -> Int in return x }
 }
 
+public func getEmptySet() -> Set<Int> {
+  return Set()
+}
+

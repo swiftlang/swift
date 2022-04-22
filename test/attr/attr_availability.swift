@@ -149,7 +149,7 @@ let _: Int
 @available(*, renamed: "a(:b:)") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
 let _: Int
 
-@available(*, deprecated, unavailable, message: "message") // expected-error{{'available' attribute cannot be both unconditionally 'unavailable' and 'deprecated'}}
+@available(*, deprecated, unavailable, message: "message") // expected-error{{'available' attribute cannot be both 'unavailable' and 'deprecated'}}
 struct BadUnconditionalAvailability { };
 
 @available(*, unavailable, message="oh no you don't") // expected-error {{'=' has been replaced with ':' in attribute arguments}} {{35-36=: }}

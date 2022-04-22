@@ -226,7 +226,7 @@ struct A1 {
 
 class A2 {
   let x: B2 = B2()
-  // CHECK-LABEL: sil hidden @$s15let_propagation2A2C2af{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden {{.*}}@$s15let_propagation2A2C2af{{[_0-9a-zA-Z]*}}F
   // bb0
   // CHECK: %[[X:[0-9]+]] = ref_element_addr {{.*}}A2.x
   // CHECK-NEXT: load %[[X]]

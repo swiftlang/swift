@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 %{
-from __future__ import division
 from SwiftIntTypes import all_integer_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 storagescalarCounts = [2,4,8,16,32,64]
@@ -73,7 +72,7 @@ extension SIMDMask where Storage == ${Vector} {
     )))
   }
     
-  /// Replaces `a` with the pointwise logical conjuction of `a` and `b`.
+  /// Replaces `a` with the pointwise logical conjunction of `a` and `b`.
   ///
   /// Equivalent to:
   /// ```

@@ -161,5 +161,5 @@ $ utils/build-script \
   --android \                        # Build for Android.
   --android-ndk ~/android-ndk-r23b \  # Path to an Android NDK.
   --android-arch armv7 \             # Optionally specify Android architecture, alternately aarch64
-  --android-ndk-version 21
+  --android-api-level 21
 ```

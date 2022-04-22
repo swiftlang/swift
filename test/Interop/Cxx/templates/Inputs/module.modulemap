@@ -33,7 +33,7 @@ module ExplicitClassSpecialization {
   requires cplusplus
 }
 
-module ClassTemplateInstantionExistingSpecialization {
+module ClassTemplateInstantiationExistingSpecialization {
   header "class-template-instantiation-existing-specialization.h"
   requires cplusplus
 }
@@ -130,5 +130,10 @@ module TemplateTypeParameterNotInSignature {
 
 module DefineReferencedInline {
   header "define-referenced-inline.h"
+  requires cplusplus
+}
+
+module DependentTypes {
+  header "dependent-types.h"
   requires cplusplus
 }

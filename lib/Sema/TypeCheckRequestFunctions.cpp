@@ -142,8 +142,8 @@ Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
     auto &inheritedType = *inheritedTypeResult;
     if (!inheritedType) continue;
 
-    // Skip existential types.
-    if (inheritedType->isExistentialType()) continue;
+    // Skip protocol conformances.
+    if (inheritedType->isConstraintType()) continue;
 
     // We found a raw type; return it.
     return inheritedType;

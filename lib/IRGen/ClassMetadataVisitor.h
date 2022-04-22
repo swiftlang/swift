@@ -93,7 +93,7 @@ public:
     asImpl().addIVarDestroyer();
 
     // Class members.
-    addClassMembers(Target);
+    addClassMembers(Target, Target);
   }
 
   /// Notes the beginning of the field offset vector for a particular ancestor
@@ -110,13 +110,24 @@ public:
         
 private:
   /// Add fields associated with the given class and its bases.
-  void addClassMembers(ClassDecl *theClass) {
+  void addClassMembers(ClassDecl *theClass,
+                       ClassDecl *rootClass) {
     // Visit the superclass first.
     if (auto *superclassDecl = theClass->getSuperclassDecl()) {
+
       if (superclassDecl->hasClangNode()) {
         // Nothing to do; Objective-C classes do not add new members to
         // Swift class metadata.
-      } else if (IGM.hasResilientMetadata(superclassDecl, ResilienceExpansion::Maximal)) {
+
+      // Super class metadata is resilient if
+      // the superclass is resilient when viewed from the current module.
+      // But not if the current class is defined in an external module and
+      //    not publically accessible (e.g private or internal). This would
+      //    normally not happen except if we compile theClass's module with
+      //    enable-testing.
+      } else if (IGM.hasResilientMetadata(superclassDecl,
+                                          ResilienceExpansion::Maximal,
+                                          rootClass)) {
         // Runtime metadata instantiation will initialize our field offset
         // vector and vtable entries.
         //
@@ -127,7 +138,8 @@ private:
         // NB: We don't apply superclass substitutions to members because we want
         // consistent metadata layout between generic superclasses and concrete
         // subclasses.
-        addClassMembers(superclassDecl);
+        addClassMembers(superclassDecl,
+                        rootClass);
       }
     }
 
@@ -141,7 +153,8 @@ private:
 
     // If the class has resilient storage, we cannot make any assumptions about
     // its storage layout, so skip the rest of this method.
-    if (IGM.isResilient(theClass, ResilienceExpansion::Maximal))
+    if (IGM.isResilient(theClass, ResilienceExpansion::Maximal,
+                        rootClass))
       return;
 
     // A class only really *needs* a field-offset vector in the
@@ -165,7 +178,8 @@ private:
 
     // If the class has resilient metadata, we cannot make any assumptions
     // about its metadata layout, so skip the rest of this method.
-    if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal))
+    if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal,
+                                 rootClass))
       return;
 
     // Add vtable entries.

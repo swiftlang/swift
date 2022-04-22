@@ -18,6 +18,8 @@ public struct ApplyOperands {
 public protocol ApplySite : AnyObject {
   var operands: OperandArray { get }
   var numArguments: Int { get }
+  func calleeArgIndex(callerArgIndex: Int) -> Int
+  func callerArgIndex(calleeArgIndex: Int) -> Int?
 }
 
 extension ApplySite {
@@ -46,4 +48,9 @@ extension ApplySite {
 
 public protocol FullApplySite : ApplySite {
   var singleDirectResult: Value? { get }
+}
+
+extension FullApplySite {
+  public func calleeArgIndex(callerArgIndex: Int) -> Int { callerArgIndex }
+  public func callerArgIndex(calleeArgIndex: Int) -> Int? { calleeArgIndex }
 }

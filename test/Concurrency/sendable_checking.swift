@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -strict-concurrency=targeted
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
 
@@ -72,4 +72,14 @@ public protocol MyProto {
 public actor MyActor: MyProto {
   public func foo<F>(aFoo: F) async where F: Sendable { }
   public func bar<B>(aBar: B) async where B: Sendable { }
+}
+
+// rdar://82452688 - make sure sendable checking doesn't fire for a capture
+// of a value of error-type
+@available(SwiftStdlib 5.1, *)
+func f() async {
+  let n = wobble() // expected-error{{cannot find 'wobble' in scope}}
+  @Sendable func nested() {
+    n.pointee += 1
+  }
 }

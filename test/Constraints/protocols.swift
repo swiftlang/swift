@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -enable-explicit-existential-types
 
 protocol Fooable { func foo() }
 protocol Barable { func bar() }
@@ -43,7 +42,7 @@ f0(b)
 f1(i)
 
 f1(f) // expected-error{{argument type 'Float' does not conform to expected type 'Fooable'}}
-f1(b) // expected-error{{argument type 'Barable' does not conform to expected type 'Fooable'}}
+f1(b) // expected-error{{argument type 'any Barable' does not conform to expected type 'Fooable'}}
 
 //===----------------------------------------------------------------------===//
 // Subtyping
@@ -51,13 +50,13 @@ f1(b) // expected-error{{argument type 'Barable' does not conform to expected ty
 g(f0) // okay (subtype)
 g(f1) // okay (exact match)
 
-g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expected argument type '(Barable & Fooable) -> ()'}}
+g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expected argument type '(any Barable & Fooable) -> ()'}}
 g(nilFunc ?? f0)
 
 gc(fc0) // okay
 gc(fc1) // okay
 gc(fc2) // okay
-gc(fc3) // expected-error{{cannot convert value of type '(SomeArbitraryClass) -> ()' to expected argument type '(Classable & Fooable) -> ()'}}
+gc(fc3) // expected-error{{cannot convert value of type '(SomeArbitraryClass) -> ()' to expected argument type '(any Classable & Fooable) -> ()'}}
 
 // rdar://problem/19600325
 func getAnyObject() -> AnyObject? {
@@ -185,17 +184,17 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
 
   let ppp: P = p.init()
 
-  _ = pp() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
-  _ = pp().bar // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
-  _ = pp().bar(2) // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+  _ = pp() // expected-error{{value of type '(any P).Type' is a protocol; it cannot be instantiated}}
+  _ = pp().bar // expected-error{{value of type '(any P).Type' is a protocol; it cannot be instantiated}}
+  _ = pp().bar(2) // expected-error{{value of type '(any P).Type' is a protocol; it cannot be instantiated}}
 
-  _ = pp.init() // expected-error{{protocol type 'P' cannot be instantiated}}
-  _ = pp.init().bar // expected-error{{protocol type 'P' cannot be instantiated}}
-  _ = pp.init().bar(3) // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = pp.init() // expected-error{{type 'any P' cannot be instantiated}}
+  _ = pp.init().bar // expected-error{{type 'any P' cannot be instantiated}}
+  _ = pp.init().bar(3) // expected-error{{type 'any P' cannot be instantiated}}
 
-  _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
-  _ = P().bar // expected-error{{protocol type 'P' cannot be instantiated}}
-  _ = P().bar(4) // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = P() // expected-error{{type 'any P' cannot be instantiated}}
+  _ = P().bar // expected-error{{type 'any P' cannot be instantiated}}
+  _ = P().bar(4) // expected-error{{type 'any P' cannot be instantiated}}
 
   // Instance member of metatype
   let _: (P) -> (Int) -> () = P.bar
@@ -216,8 +215,8 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   // expected-error@-1 {{cannot reference 'mutating' method as function value}}
 
   // Static member of metatype -- not allowed
-  _ = pp.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
-  _ = P.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
+  _ = pp.tum // expected-error{{static member 'tum' cannot be used on protocol metatype '(any P).Type'}}
+  _ = P.tum // expected-error{{static member 'tum' cannot be used on protocol metatype '(any P).Type'}}
 
   // Access typealias through protocol and existential metatypes
   _ = pp.E.self
@@ -235,10 +234,10 @@ protocol StaticP {
 }
 extension StaticP {
   func bar() {
-    _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype 'StaticP.Protocol'}} {{9-16=Self}}
+    _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype '(any StaticP).Type'}} {{9-16=Self}}
 
     func nested() {
-      _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype 'StaticP.Protocol'}} {{11-18=Self}}
+      _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype '(any StaticP).Type'}} {{11-18=Self}}
     }
   }
 }
@@ -371,8 +370,8 @@ func testClonableExistential(_ v: Clonable, _ vv: Clonable.Type) {
   let _: (Bool) -> Clonable? = id(vv.returnSelfIUOStatic as (Bool) -> Clonable?)
   let _: Clonable! = id(vv.returnSelfIUOStatic(true))
 
-  let _ = v.badClonerFn() // expected-error {{member 'badClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
-  let _ = v.veryBadClonerFn() // expected-error {{member 'veryBadClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
+  let _ = v.badClonerFn() // expected-error {{member 'badClonerFn' cannot be used on value of type 'any Clonable'; consider using a generic constraint instead}}
+  let _ = v.veryBadClonerFn() // expected-error {{member 'veryBadClonerFn' cannot be used on value of type 'any Clonable'; consider using a generic constraint instead}}
 
 }
 
@@ -519,4 +518,16 @@ case test(cond: Bool, v: Int64)
       return ["obj": ["a": v, "b": cond ? 0 : 42]] // Ok
     }
   }
+}
+
+// SR-15970
+protocol SR15970_P {}
+struct SR15970_S {}
+
+func SR15970_F(x: Int) -> SR15970_P {
+  return SR15970_S() // expected-error{{return expression of type 'SR15970_S' does not conform to 'SR15970_P'}}
+}
+
+func SR15970_F1(x: Int) -> SR15970_P? {
+  return SR15970_S() // expected-error{{return expression of type 'SR15970_S' does not conform to 'SR15970_P'}}
 }

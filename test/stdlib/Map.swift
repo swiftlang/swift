@@ -39,18 +39,29 @@ print("testing...")
 // Test mapping a collection
 // CHECK-NEXT: [6, 9, 12, 15, 18, 21]
 let a = Array((2..<8).lazy.map { $0 * 3 })
-print(a)
+do {
+  var output = ""
+  var prefix = ""
+  for x in a {
+    output += "\(prefix)\(x)"
+    prefix = ", "
+  }
+  print("[\(output)]")
+}
+
 
 // Test mapping a sequence
 let s = a.makeIterator().lazy.map { $0 / 3 }
 // CHECK-NEXT: <2, 3, 4, 5, 6, 7>
-print("<", terminator: "")
-var prefix = ""
-for x in s {
-  print("\(prefix)\(x)", terminator: "")
-  prefix = ", "
+do {
+  var output = ""
+  var prefix = ""
+  for x in s {
+    output += "\(prefix)\(x)"
+    prefix = ", "
+  }
+  print("<\(output)>")
 }
-print(">")
 
 //===--- Avoid creating gratuitously self-destructive sequences -----------===//
 
@@ -94,11 +105,27 @@ struct IntRange : Sequence {
 // consuming it.
 let m1 = IntRange(start: 1, end: 5).lazy.map { $0 * 2 }
 // CHECK-NEXT: [2, 4, 6, 8]
-print(Array(m1))
+do {
+  var output = ""
+  var prefix = ""
+  for x in m1 {
+    output += "\(prefix)\(x)"
+    prefix = ", "
+  }
+  print("[\(output)]")
+}
 
 // A second iteration produces the same result.
 // CHECK-NEXT: [2, 4, 6, 8]
-print(Array(m1))
+do {
+  var output = ""
+  var prefix = ""
+  for x in m1 {
+    output += "\(prefix)\(x)"
+    prefix = ", "
+  }
+  print("[\(output)]")
+}
 
 // CHECK-NEXT: all done.
 print("all done.")

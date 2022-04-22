@@ -74,7 +74,7 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
 
   unsigned bufferID = *sf->getBufferID();
 
-  // Lexer diaganostics have been emitted during skipping, so we disable lexer's
+  // Lexer diagnostics have been emitted during skipping, so we disable lexer's
   // diagnostic engine here.
   Parser parser(bufferID, *sf, /*No Lexer Diags*/nullptr, nullptr, nullptr);
   // Disable libSyntax creation in the delayed parsing.

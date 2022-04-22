@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # symbolicate-linux-fatal - Symbolicate Linux stack traces -*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -21,8 +21,6 @@
 # * search symbols by name for the not <unavailable> ones
 #
 # ----------------------------------------------------------------------------
-
-from __future__ import print_function
 
 import argparse
 import datetime

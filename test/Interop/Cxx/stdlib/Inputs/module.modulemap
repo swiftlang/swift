@@ -1,3 +1,9 @@
 module StdVector {
   header "std-vector.h"
+  requires cplusplus
+}
+
+module StdString {
+  header "std-string.h"
+  requires cplusplus
 }

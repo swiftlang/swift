@@ -105,14 +105,17 @@ static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
                                    llvm::MemoryBuffer *InputBuf);
 static std::pair<unsigned, unsigned>
 resolveToLineCol(unsigned Offset, StringRef Filename,
-                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
-static std::pair<unsigned, unsigned> resolveToLineCol(unsigned Offset,
-                                                  llvm::MemoryBuffer *InputBuf);
+                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
+                 bool ExitOnError = true);
+static std::pair<unsigned, unsigned>
+resolveToLineCol(unsigned Offset, llvm::MemoryBuffer *InputBuf,
+                 bool ExitOnError = true);
 static std::pair<unsigned, unsigned> resolveToLineColFromBuf(unsigned Offset,
                                                       const char *Buf);
 static llvm::MemoryBuffer *
 getBufferForFilename(StringRef Filename,
-                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
+                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
+                     bool ExitOnError = true);
 
 static void notification_receiver(sourcekitd_response_t resp);
 
@@ -1142,6 +1145,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
           "-disable-implicit-concurrency-module-import");
     }
+    if (Opts.DisableImplicitStringProcessingModuleImport &&
+        !compilerArgsAreClang) {
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          "-Xfrontend");
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+          "-disable-implicit-string-processing-module-import");
+    }
 
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);
@@ -1842,8 +1852,11 @@ struct ResponseSymbolInfo {
       if (CurrentFilename != StringRef(FilePath))
         OS << FilePath << ':';
 
-      auto LineCol = resolveToLineCol(Offset, FilePath, VFSFiles);
-      if (LineCol.first != Line || LineCol.second != Column) {
+      auto LineCol =
+          resolveToLineCol(Offset, FilePath, VFSFiles, /*ExitOnError=*/false);
+      if (LineCol.first == 0 && LineCol.second == 0) {
+        OS << "*missing file*";
+      } else if (LineCol.first != Line || LineCol.second != Column) {
         OS << "*offset does not match line/column in response*";
       } else {
         OS << LineCol.first << ':' << LineCol.second;
@@ -2579,13 +2592,23 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
 
 static std::pair<unsigned, unsigned>
 resolveToLineCol(unsigned Offset, StringRef Filename,
-                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
-  return resolveToLineCol(Offset, getBufferForFilename(Filename, VFSFiles));
+                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
+                 bool ExitOnError) {
+  return resolveToLineCol(Offset,
+                          getBufferForFilename(Filename, VFSFiles, ExitOnError),
+                          ExitOnError);
 }
 
+/// Maps \p Offset to the {Line, Col} position in \p InputBuf. If it could not
+/// be resolved and \p ExitOnError is \c true, the process exits with an error
+/// message. Otherwise, {0, 0} is returned.
 static std::pair<unsigned, unsigned>
-resolveToLineCol(unsigned Offset, llvm::MemoryBuffer *InputBuf) {
+resolveToLineCol(unsigned Offset, llvm::MemoryBuffer *InputBuf,
+                 bool ExitOnError) {
   if (Offset >= InputBuf->getBufferSize()) {
+    if (!ExitOnError)
+      return {0, 0};
+
     llvm::errs() << "offset " << Offset << " for filename '"
         << InputBuf->getBufferIdentifier() << "' is too large\n";
     exit(1);
@@ -2653,9 +2676,14 @@ static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
 
 static llvm::StringMap<llvm::MemoryBuffer*> Buffers;
 
+/// Opens \p Filename, first checking \p VFSFiles and then falling back to the
+/// filesystem otherwise. If the file could not be opened and \p ExitOnError is
+/// true, the process exits with an error message. Otherwise a buffer
+/// containing "<missing file>" is returned.
 static llvm::MemoryBuffer *
 getBufferForFilename(StringRef Filename,
-                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
+                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
+                     bool ExitOnError) {
   auto VFSFileIt = VFSFiles.find(Filename);
   auto MappedFilename =
       VFSFileIt == VFSFiles.end() ? Filename : StringRef(VFSFileIt->second.path);
@@ -2665,11 +2693,18 @@ getBufferForFilename(StringRef Filename,
     return It->second;
 
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(MappedFilename);
+  std::unique_ptr<llvm::MemoryBuffer> Buffer;
   if (!FileBufOrErr) {
-    llvm::errs() << "error opening input file '" << MappedFilename << "' ("
-                 << FileBufOrErr.getError().message() << ")\n";
-    exit(1);
+    if (ExitOnError) {
+      llvm::errs() << "error opening input file '" << MappedFilename << "' ("
+                   << FileBufOrErr.getError().message() << ")\n";
+      exit(1);
+    }
+
+    Buffer = llvm::MemoryBuffer::getMemBuffer("<missing file>");
+  } else {
+    Buffer = std::move(FileBufOrErr.get());
   }
 
-  return Buffers[MappedFilename] = FileBufOrErr.get().release();
+  return Buffers[MappedFilename] = Buffer.release();
 }

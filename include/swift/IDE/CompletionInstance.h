@@ -15,8 +15,12 @@
 
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CancellableResult.h"
-#include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionContext.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/IDE/CodeCompletionResultSink.h"
 #include "swift/IDE/ConformingMethodList.h"
+#include "swift/IDE/ImportDepth.h"
+#include "swift/IDE/SwiftCompletionInfo.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -55,6 +59,7 @@ struct CompletionInstanceResult {
 struct CodeCompleteResult {
   CodeCompletionResultSink &ResultSink;
   SwiftCompletionInfo &Info;
+  ImportDepth ImportDep;
 };
 
 /// The results returned from \c CompletionInstance::typeContextInfo.
@@ -104,6 +109,7 @@ class CompletionInstance {
   bool performCachedOperationIfPossible(
       llvm::hash_code ArgsHash,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      const SearchPathOptions &SearchPathOpts,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,

@@ -16,6 +16,7 @@
 // RUN: %line-directive %t/SIMDConcreteFP.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: rdar76545659
+// UNSUPPORTED: freestanding
 
 import StdlibUnittest
 

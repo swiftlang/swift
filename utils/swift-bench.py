@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # ===--- swift-bench.py ------------------------------*- coding: utf-8 -*-===//
 #
 # This source file is part of the Swift.org open source project
@@ -31,8 +31,6 @@
 #
 # Ideas for the harness improvement and development are welcomed here:
 # rdar://problem/18072938
-
-from __future__ import print_function
 
 import argparse
 import math
@@ -146,7 +144,7 @@ func _opaqueGetInt64(x: Int) -> Int
 
 @inline(never)
 public func getInt(x: Int) -> Int {
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if arch(i386) || arch(arm) || arch(arm64_32)|| arch(powerpc)
   return _opaqueGetInt32(x)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || \
 arch(powerpc64le) || arch(s390x)

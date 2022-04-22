@@ -12,6 +12,8 @@
 // FIXME: rdar://problem/79626782 (test fails for watchsimulator-i386)
 // UNSUPPORTED: CPU=armv7s || CPU=armv7k || CPU=i386
 
+// REQUIRES: rdar88581116
+
 import Darwin
 import Foundation
 import StdlibUnittest

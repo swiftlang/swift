@@ -45,9 +45,10 @@ extension AsyncSequence {
   ///   of the base sequence that satisfy the given predicate. If the predicate
   ///   throws an error, the sequence contains only values produced prior to
   ///   the error.
+  @preconcurrency
   @inlinable
   public __consuming func filter(
-    _ isIncluded: @escaping (Element) async throws -> Bool
+    _ isIncluded: @Sendable @escaping (Element) async throws -> Bool
   ) -> AsyncThrowingFilterSequence<Self> {
     return AsyncThrowingFilterSequence(self, isIncluded: isIncluded)
   }
@@ -136,3 +137,13 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), isIncluded: isIncluded)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingFilterSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingFilterSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

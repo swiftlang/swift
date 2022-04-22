@@ -146,7 +146,7 @@ namespace {
 /// a task access set, those accesses must have completed while the task was
 /// running since the access set is empty when we pop.
 ///
-/// Case 6: Task has initial accesses, sync does not have initial accesss, and
+/// Case 6: Task has initial accesses, sync does not have initial access, and
 /// Task access set is modified while running (T, F, T)
 ///
 /// In this case, TBegin and TEnd are both initially set to non-null

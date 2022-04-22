@@ -1,20 +1,20 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/pre_specialized_module.swiftmodule %S/Inputs/pre_specialized_module.swift
-// RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT -check-prefix=OPT-%target-os
+// RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s --check-prefix=OPT -check-prefix=OPT-%target-os
 // RUN: %target-swift-frontend -I %t -Onone -emit-sil %s | %FileCheck %s --check-prefix=NONE -check-prefix=NONE-%target-os
 
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -O -emit-module-path %t/pre_specialized_module.swiftmodule %S/Inputs/pre_specialized_module.swift
-// RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -O -enable-library-evolution -emit-module-path %t/pre_specialized_module.swiftmodule %S/Inputs/pre_specialized_module.swift
-// RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module.swiftinterface %S/Inputs/pre_specialized_module.swift -module-name pre_specialized_module
-// RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 import pre_specialized_module
 
@@ -103,7 +103,7 @@ public func usePrespecializedEntryPoints() {
 public func usePrespecializedEntryPointsAvailability() {
   publicPrespecialized(SomeData())
 }
-// OPT: sil [signature_optimized_thunk] [always_inline] @$s22pre_specialized_module16publicInlineableyyxlFSd_Ts5 : $@convention(thin) (Double) -> () {
+// OPT: sil @$s22pre_specialized_module16publicInlineableyyxlFSd_Ts5 : $@convention(thin) (Double) -> () {
 // NONE: sil @$s22pre_specialized_module16publicInlineableyyxlFSd_Ts5 : $@convention(thin) (Double) -> () {
 @_specialize(exported: true, target: publicInlineable(_:), where T == Double)
 public func specializeTarget<T>(_ t: T) {}

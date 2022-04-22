@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -verify -emit-ir %s
 
-// Ideally this would type check successfully; we should be able to
-// infer that X == Int using the same-type constraint 'A.X == X'.
+// Works with experimental associated type inference.
+// RUN: %target-swift-frontend -enable-experimental-associated-type-inference -emit-ir %s
 
 protocol P1 {
     associatedtype X

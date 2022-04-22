@@ -1,9 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop -Xcc -fno-exceptions)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -fno-exceptions)
 //
 // REQUIRES: executable_test
-//
-// Enable this everywhere once we have a solution for modularizing libstdc++: rdar://87654514
-// REQUIRES: OS=macosx
 
 import DefineReferencedInline
 import StdlibUnittest

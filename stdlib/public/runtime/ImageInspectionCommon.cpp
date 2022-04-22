@@ -24,68 +24,71 @@
 #include "../SwiftShims/Visibility.h"
 #include "../SwiftShims/MetadataSections.h"
 #include "ImageInspection.h"
+#include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Concurrent.h"
 
+#include <algorithm>
+#include <atomic>
+#include <cstdlib>
 
 namespace swift {
 
-#ifndef NDEBUG
-static swift::MetadataSections *registered = nullptr;
+static Lazy<ConcurrentReadableArray<swift::MetadataSections *>> registered;
 
-static void record(swift::MetadataSections *sections) {
-  if (registered == nullptr) {
-    registered = sections;
-    sections->next = sections->prev = sections;
-  } else {
-    registered->prev->next = sections;
-    sections->next = registered;
-    sections->prev = registered->prev;
-    registered->prev = sections;
-  }
-}
-#endif
+/// Adjust the \c baseAddress field of a metadata sections structure.
+///
+/// \param sections A pointer to a valid \c swift::MetadataSections structure.
+///
+/// This function should be called at least once before the structure or its
+/// address is passed to code outside this file to ensure that the structure's
+/// \c baseAddress field correctly points to the base address of the image it
+/// is describing.
+static void fixupMetadataSectionBaseAddress(swift::MetadataSections *sections) {
+  bool fixupNeeded = false;
 
-static const void *
-getMetadataSectionBaseAddress(swift::MetadataSections *sections) {
-  // If the base address was not set by the caller of swift_addNewDSOImage()
-  // then we can assume that the caller was built against an older version of
-  // the runtime that did not capture a value for this field. Currently nothing
-  // is actively using the image's base address outside of tests that are built
-  // with the runtime/stdlib, so there's no need to try to fix up the value. If
-  // something in the runtime starts using it, we will want to either:
-  // 1. Resolve the address from a known-good address like swift5_protocols when
-  //    the image is first loaded (in this function);
-  // 1. Resolve the address from a known-good address like swift5_protocols when
-  //    the address is first used (and atomically swap the address back so we
-  //    don't incur the cost of lookupSymbol() each time we need it; or
-  // 3. Introduce an ABI-breaking change so that all binaries are rebuilt and
-  //    start supplying a value for this field.
-
-#ifndef NDEBUG
 #if defined(__ELF__)
   // If the base address was set but the image is an ELF image, it is going to
   // be __dso_handle which is not the value we expect (Dl_info::dli_fbase), so
-  // we need to fix it up. Since the base address is currently unused by the
-  // runtime outside tests, we don't normally do this work.
-  if (auto baseAddress = sections->baseAddress) {
-    swift::SymbolInfo symbolInfo;
-    if (lookupSymbol(baseAddress, &symbolInfo) && symbolInfo.baseAddress) {
-      sections->baseAddress = symbolInfo.baseAddress;
-    }
+  // we need to fix it up.
+  fixupNeeded = true;
+#elif !defined(__MACH__)
+  // For non-ELF, non-Apple platforms, if the base address is nullptr, it
+  // implies that this image was built against an older version of the runtime
+  // that did not capture any value for the base address.
+  auto oldBaseAddress = sections->baseAddress.load(std::memory_order_relaxed);
+  if (!oldBaseAddress) {
+    fixupNeeded = true;
   }
 #endif
-#endif
 
-  return sections->baseAddress;
+  if (fixupNeeded) {
+    // We need to fix up the base address. We'll need a known-good address in
+    // the same image: `sections` itself will work nicely.
+    swift::SymbolInfo symbolInfo;
+    if (lookupSymbol(sections, &symbolInfo) && symbolInfo.baseAddress) {
+        sections->baseAddress.store(symbolInfo.baseAddress,
+                                    std::memory_order_relaxed);
+    }
+  }
 }
 }
 
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(swift::MetadataSections *sections) {
-#ifndef NDEBUG
-  record(sections);
+#if 0
+  // Ensure the base address of the sections structure is correct.
+  //
+  // Currently disabled because none of the registration functions below
+  // actually do anything with the baseAddress field. Instead,
+  // swift_enumerateAllMetadataSections() is called by other individual
+  // functions, lower in this file, that yield metadata section pointers.
+  //
+  // If one of these registration functions starts needing the baseAddress
+  // field, this call should be enabled and the calls elsewhere in the file can
+  // be removed.
+  swift::fixupMetadataSectionBaseAddress(sections);
 #endif
-
-  auto baseAddress = swift::getMetadataSectionBaseAddress(sections);
+  auto baseAddress = sections->baseAddress.load(std::memory_order_relaxed);
 
   const auto &protocols_section = sections->swift5_protocols;
   const void *protocols = reinterpret_cast<void *>(protocols_section.start);
@@ -125,6 +128,29 @@ void swift_addNewDSOImage(swift::MetadataSections *sections) {
   if (accessible_funcs_section.length)
     swift::addImageAccessibleFunctionsBlockCallback(
         baseAddress, functions, accessible_funcs_section.length);
+
+  // Register this section for future enumeration by clients. This should occur
+  // after this function has done all other relevant work to avoid a race
+  // condition when someone calls swift_enumerateAllMetadataSections() on
+  // another thread.
+  swift::registered->push_back(sections);
+}
+
+SWIFT_RUNTIME_EXPORT
+void swift_enumerateAllMetadataSections(
+  bool (* body)(const swift::MetadataSections *sections, void *context),
+  void *context
+) {
+  auto snapshot = swift::registered->snapshot();
+  for (swift::MetadataSections *sections : snapshot) {
+    // Ensure the base address is fixed up before yielding the pointer.
+    swift::fixupMetadataSectionBaseAddress(sections);
+
+    // Yield the pointer and (if the callback returns false) break the loop.
+    if (!(* body)(sections, context)) {
+      return;
+    }
+  }
 }
 
 void swift::initializeProtocolLookup() {
@@ -146,19 +172,19 @@ void swift::initializeAccessibleFunctionsLookup() {
 
 SWIFT_RUNTIME_EXPORT
 const swift::MetadataSections *swift_getMetadataSection(size_t index) {
-  if (swift::registered == nullptr) {
-    return nullptr;
+  swift::MetadataSections *result = nullptr;
+
+  auto snapshot = swift::registered->snapshot();
+  if (index < snapshot.count()) {
+    result = snapshot[index];
   }
 
-  auto selected = swift::registered;
-  while (index > 0) {
-    selected = selected->next;
-    if (selected == swift::registered) {
-      return nullptr;
-    }
-    --index;
+  if (result) {
+    // Ensure the base address is fixed up before returning it.
+    swift::fixupMetadataSectionBaseAddress(result);
   }
-  return selected;
+
+  return result;
 }
 
 SWIFT_RUNTIME_EXPORT
@@ -184,19 +210,16 @@ void swift_getMetadataSectionBaseAddress(const swift::MetadataSections *section,
     *out_actual = nullptr;
   }
 
-  *out_expected = section->baseAddress;
+  // fixupMetadataSectionBaseAddress() was already called by
+  // swift_getMetadataSection(), presumably on the same thread, so we don't need
+  // to call it again here.
+  *out_expected = section->baseAddress.load(std::memory_order_relaxed);
 }
 
 SWIFT_RUNTIME_EXPORT
 size_t swift_getMetadataSectionCount() {
-  if (swift::registered == nullptr)
-    return 0;
-
-  size_t count = 1;
-  for (const auto *current = swift::registered->next;
-       current != swift::registered; current = current->next, ++count);
-
-  return count;
+  auto snapshot = swift::registered->snapshot();
+  return snapshot.count();
 }
 
 #endif // NDEBUG

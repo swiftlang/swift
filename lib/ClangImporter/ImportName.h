@@ -226,11 +226,14 @@ class ImportedName {
 
     unsigned hasAsyncInfo : 1;
 
+    unsigned hasAsyncAlternateInfo: 1;
+
     Info()
         : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
           accessorKind(ImportedAccessorKind::None), hasCustomName(false),
           droppedVariadic(false), importAsMember(false), hasSelfIndex(false),
-          hasErrorInfo(false), hasAsyncInfo(false) {}
+          hasErrorInfo(false), hasAsyncInfo(false),
+          hasAsyncAlternateInfo(false) {}
   } info;
 
 public:
@@ -267,8 +270,27 @@ public:
   /// For names that map Objective-C methods with completion handlers into
   /// async Swift methods, describes how the mapping is performed.
   Optional<ForeignAsyncConvention::Info> getAsyncInfo() const {
-    if (info.hasAsyncInfo)
+    if (info.hasAsyncInfo) {
+      assert(!info.hasAsyncAlternateInfo
+             && "both regular and alternate async info?");
       return info.asyncInfo;
+    }
+    return None;
+  }
+
+  /// For names with a variant that maps Objective-C methods with completion
+  /// handlers into async Swift methods, describes how the mapping is performed.
+  ///
+  /// That is, if the method imports as both an async method and a completion
+  /// handler method, this value is set on the completion handler method's name
+  /// and gives you the contents of \c getAsyncInfo() on the async method's
+  /// name. It is not set on the async method's name, and it is not set if a
+  /// non-async method doesn't have an async equivalent.
+  Optional<ForeignAsyncConvention::Info> getAsyncAlternateInfo() const {
+    if (info.hasAsyncAlternateInfo) {
+      assert(!info.hasAsyncInfo && "both regular and alternate async info?");
+      return info.asyncInfo;
+    }
     return None;
   }
 
@@ -390,7 +412,7 @@ public:
   /// If \p action returns false, the current name will \e not be added to the
   /// set of seen names.
   ///
-  /// The active name for \p activeVerion is always first, followed by the
+  /// The active name for \p activeVersion is always first, followed by the
   /// other names in the order of
   /// ImportNameVersion::forEachOtherImportNameVersion.
   ///

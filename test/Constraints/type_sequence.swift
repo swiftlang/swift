@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-variadic-generics
 
 struct TupleStruct<First, @_typeSequence Rest> {
   var first: First

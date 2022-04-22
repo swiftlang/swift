@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -experimental-performance-annotations -emit-sil %s -o /dev/null -verify
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: rdar90495704
 
 protocol P {
   func protoMethod(_ a: Int) -> Int
@@ -83,6 +84,11 @@ func dynamicCast(_ a: AnyObject) -> Cl? {
 @_noAllocation
 func testUnsafePerformance(_ idx: Int) -> [Int] {
   return _unsafePerformance { [10, 20, 30, 40] }
+}
+
+@_noAllocation
+func testMemoryLayout() -> Int {
+  return MemoryLayout<Int>.size + MemoryLayout<Int>.stride + MemoryLayout<Int>.alignment
 }
 
 class MyError : Error {}

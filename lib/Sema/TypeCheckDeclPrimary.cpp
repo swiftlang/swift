@@ -212,7 +212,15 @@ static void checkInheritanceClause(
       inheritedAnyObject = { i, inherited.getSourceRange() };
     }
 
-    if (inheritedTy->isExistentialType()) {
+    if (inheritedTy->is<ParameterizedProtocolType>()) {
+      if (!isa<ProtocolDecl>(decl)) {
+        decl->diagnose(diag::inheritance_from_parameterized_protocol,
+                       inheritedTy);
+      }
+      continue;
+    }
+
+    if (inheritedTy->isConstraintType()) {
       auto layout = inheritedTy->getExistentialLayout();
 
       // Subclass existentials are not allowed except on classes and
@@ -227,10 +235,7 @@ static void checkInheritanceClause(
       // AnyObject is not allowed except on protocols.
       if (layout.hasExplicitAnyObject &&
           !isa<ProtocolDecl>(decl)) {
-        decl->diagnose(canHaveSuperclass
-                       ? diag::inheritance_from_non_protocol_or_class
-                       : diag::inheritance_from_non_protocol,
-                       inheritedTy);
+        decl->diagnose(diag::inheritance_from_anyobject);
         continue;
       }
 
@@ -345,7 +350,7 @@ static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
   (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
 }
 
-// TODO: same ugly hack as Codable does...
+// TODO(distributed): same ugly hack as Codable does...
 static void installDistributedActorIfNecessary(NominalTypeDecl *NTD) {
   auto req =
     ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveDistributedActor};
@@ -852,7 +857,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           }
 
           if (declToDiagnose) {
-            // Figure out if the the declaration we've redeclared is a
+            // Figure out if the declaration we've redeclared is a
             // synthesized witness for a protocol requirement.
             bool isProtocolRequirement = false;
             if (auto VD = dyn_cast<ValueDecl>(current->isImplicit() ? current
@@ -1034,7 +1039,10 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   auto *initExpr = param->getStructuralDefaultExpr();
   assert(initExpr);
 
-  if (paramTy->hasError())
+  // If the param has an error type, there's no point type checking the default
+  // expression, unless we are type checking for code completion, in which case
+  // the default expression might contain the code completion token.
+  if (paramTy->hasError() && !ctx.CompletionCallback)
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
 
   auto *dc = param->getDefaultArgumentInitContext();
@@ -1053,6 +1061,15 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   TypeChecker::checkInitializerEffects(dc, initExpr);
 
   return initExpr;
+}
+
+Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
+                                          ParamDecl *param) const {
+  if (auto *expr = param->getTypeCheckedDefaultExpr()) {
+    // If the request failed, let's not propagate ErrorType up.
+    return isa<ErrorExpr>(expr) ? Type() : expr->getType();
+  }
+  return Type();
 }
 
 Initializer *
@@ -1656,6 +1673,63 @@ ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   return {};
 }
 
+static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
+                                            const Pattern *P,
+                                            Expr *init) {
+  // Make sure we have a user-written type annotation.
+  auto *TP = dyn_cast<TypedPattern>(P);
+  if (!TP || !TP->getTypeRepr()) {
+    return;
+  }
+
+  auto *repr = TP->getTypeRepr()->getWithoutParens();
+  if (auto *PTR = dyn_cast<PlaceholderTypeRepr>(repr)) {
+    Ctx.Diags.diagnose(P->getLoc(),
+                       diag::placeholder_type_not_allowed_in_pattern)
+        .highlight(P->getSourceRange());
+    if (init && !init->getType()->hasError()) {
+      auto initTy = init->getType()->mapTypeOutOfContext();
+      Ctx.Diags
+          .diagnose(PTR->getLoc(),
+                    diag::replace_placeholder_with_inferred_type, initTy)
+          .fixItReplace(PTR->getSourceRange(), initTy.getString());
+    }
+  }
+}
+
+/// Make sure that every protocol conformance requirement on 'Self' is
+/// directly stated in the protocol's inheritance clause.
+///
+/// This disallows protocol declarations where a conformance requirement on
+/// 'Self' is implied by some other requirement, such as this:
+///
+///    protocol Other { ... }
+///    protocol Foo { associatedtype A : Other }
+///    protocol Bar {
+///      associatedtype A : Foo where Self == A.A
+///    }
+///
+/// Since name lookup is upstream of generic signature computation, we
+/// want 'Other' to appear in the inheritance clause of 'Bar', so that
+/// name lookup on Bar can find members of Other.
+static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
+  auto requiredProtos = proto->getGenericSignature()->getRequiredProtocols(
+      proto->getSelfInterfaceType());
+
+  for (auto *otherProto : requiredProtos) {
+    // Every protocol 'P' has an implied requirement 'Self : P'; skip it.
+    if (otherProto == proto)
+      continue;
+
+    // GenericSignature::getRequiredProtocols() canonicalizes the protocol
+    // list by dropping protocols that are inherited by other protocols in
+    // the list. Any protocols that remain in the list other than 'proto'
+    // itself are implied by a conformance requirement on 'Self', but are
+    // not (transitively) inherited by 'proto'.
+    proto->diagnose(diag::missing_protocol_refinement, proto, otherProto);
+  }
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2070,6 +2144,11 @@ public:
                                              PBD->getEqualLoc(i),
                                              init);
 
+        // Written placeholder types are banned in the signatures of pattern
+        // bindings. If there's a valid initializer, try to offer its type
+        // as a replacement.
+        diagnoseWrittenPlaceholderTypes(Ctx, PBD->getPattern(i), init);
+
         // If we entered an initializer context, contextualize any
         // auto-closures we might have created.
         // Note that we don't contextualize the initializer for a property
@@ -2227,7 +2306,7 @@ public:
     auto kind = DC->getFragileFunctionKind();
     if (kind.kind != FragileFunctionKind::None) {
       NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getName(),
-                    static_cast<unsigned>(kind.kind));
+                    kind.getSelector());
     }
 
     // We don't support protocols outside the top level of a file.
@@ -2362,6 +2441,12 @@ public:
 
   /// Check that all stored properties have in-class initializers.
   void checkRequiredInClassInits(ClassDecl *cd) {
+    // Initializers may be omitted from property declarations in module
+    // interface files so don't diagnose in them.
+    SourceFile *sourceFile = cd->getDeclContext()->getParentSourceFile();
+    if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+      return;
+
     ClassDecl *source = nullptr;
     for (auto member : cd->getMembers()) {
       auto pbd = dyn_cast<PatternBindingDecl>(member);
@@ -2458,7 +2543,7 @@ public:
     }
 
     if (CD->isDistributedActor()) {
-      TypeChecker::checkDistributedActor(CD);
+      TypeChecker::checkDistributedActor(SF, CD);
     }
 
     // Force lowering of stored properties.
@@ -2494,7 +2579,7 @@ public:
 
         for (auto *member : superclass->getMembers()) {
           if (auto *vd = dyn_cast<ValueDecl>(member)) {
-            if (vd->isPotentiallyOverridable()) {
+            if (vd->isSyntacticallyOverridable()) {
               (void) vd->isObjC();
             }
           }
@@ -2553,6 +2638,10 @@ public:
         if (!isInvalidSuperclass) {
           CD->diagnose(diag::inheritance_from_class_with_missing_vtable_entries,
                        Super->getName());
+          for (const auto &member : Super->getMembers())
+            if (const auto *MMD = dyn_cast<MissingMemberDecl>(member))
+              CD->diagnose(diag::inheritance_from_class_with_missing_vtable_entry,
+                           MMD->getName());
           isInvalidSuperclass = true;
         }
       }
@@ -2600,9 +2689,19 @@ public:
     checkUnsupportedNestedType(PD);
 
     // Check for circular inheritance within the protocol.
-    (void)PD->hasCircularInheritedProtocols();
+    (void) PD->hasCircularInheritedProtocols();
 
     TypeChecker::checkDeclAttributes(PD);
+
+    // Check that all named primary associated types are valid.
+    if (!PD->getPrimaryAssociatedTypeNames().empty())
+      (void) PD->getPrimaryAssociatedTypes();
+
+    // Explicitly compute the requirement signature to detect errors.
+    // Do this before visiting members, to avoid a request cycle if
+    // a member references another declaration whose generic signature
+    // has a conformance requirement to this protocol.
+    auto reqSig = PD->getRequirementSignature();
 
     // Check the members.
     for (auto Member : PD->getMembers())
@@ -2612,17 +2711,20 @@ public:
 
     checkInheritanceClause(PD);
 
+    if (PD->getASTContext().LangOpts.RequirementMachineProtocolSignatures
+        == RequirementMachineMode::Enabled) {
+      checkProtocolRefinementRequirements(PD);
+    }
+
     TypeChecker::checkDeclCircularity(PD);
     if (PD->isResilient())
       if (!SF || SF->Kind != SourceFileKind::Interface)
         TypeChecker::inferDefaultWitnesses(PD);
 
-    // Explicity compute the requirement signature to detect errors.
-    auto reqSig = PD->getRequirementSignature();
-
     if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
-      auto requirementsSig =
-        GenericSignature::get({PD->getProtocolSelfType()}, reqSig);
+      auto sig =
+        GenericSignature::get({PD->getProtocolSelfType()},
+                              reqSig.getRequirements());
 
       llvm::errs() << "\n";
       llvm::errs() << "Protocol requirement signature:\n";
@@ -2631,25 +2733,33 @@ public:
       llvm::errs() << "Requirement signature: ";
       PrintOptions Opts;
       Opts.ProtocolQualifiedDependentMemberTypes = true;
-      requirementsSig->print(llvm::errs(), Opts);
+      sig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
 
       llvm::errs() << "Canonical requirement signature: ";
-      auto canRequirementSig =
-        CanGenericSignature::getCanonical(requirementsSig.getGenericParams(),
-                                          requirementsSig.getRequirements());
-      canRequirementSig->print(llvm::errs(), Opts);
+      auto canSig =
+        CanGenericSignature::getCanonical(sig.getGenericParams(),
+                                          sig.getRequirements());
+      canSig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
 
-
-#ifndef NDEBUG
-    // In asserts builds, also verify some invariants of the requirement
-    // signature.
-    PD->getGenericSignature().verify(reqSig);
-#endif
-
-    (void) reqSig;
+    if (!reqSig.getErrors()) {
+      if (getASTContext().LangOpts.RequirementMachineProtocolSignatures ==
+          RequirementMachineMode::Disabled) {
+    #ifndef NDEBUG
+        // The GenericSignatureBuilder outputs incorrectly-minimized signatures
+        // sometimes, so only check invariants in asserts builds.
+        PD->getGenericSignature().verify(reqSig.getRequirements());
+    #endif
+      } else {
+        // When using the Requirement Machine, always verify signatures.
+        // An incorrect signature indicates a serious problem which can cause
+        // miscompiles or inadvertent ABI dependencies on compiler bugs, so
+        // we really want to avoid letting one slip by.
+        PD->getGenericSignature().verify(reqSig.getRequirements());
+      }
+    }
 
     checkExplicitAvailability(PD);
   }
@@ -2735,7 +2845,7 @@ public:
 
   /// FIXME: This is an egregious hack to turn off availability checking
   /// for specific functions that were missing availability in older versions
-  /// of existing libraries that we must nonethess still support.
+  /// of existing libraries that we must nonetheless still support.
   static bool hasHistoricallyWrongAvailability(FuncDecl *func) {
     return func->getName().isCompoundName("swift_deletedAsyncMethodError", { });
   }
@@ -3003,7 +3113,7 @@ public:
     checkExplicitAvailability(ED);
 
     if (nominal->isDistributedActor())
-      TypeChecker::checkDistributedActor(dyn_cast<ClassDecl>(nominal));
+      TypeChecker::checkDistributedActor(SF, nominal);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
@@ -3210,6 +3320,44 @@ void TypeChecker::checkParameterList(ParameterList *params,
       }
     }
 
+    // Opaque types cannot occur in parameter position.
+    Type interfaceType = param->getInterfaceType();
+    if (interfaceType->hasTypeParameter()) {
+      interfaceType.findIf([&](Type type) {
+        if (auto fnType = type->getAs<FunctionType>()) {
+          for (auto innerParam : fnType->getParams()) {
+            auto paramType = innerParam.getPlainType();
+            if (!paramType->hasTypeParameter())
+              continue;
+
+            bool hadError = paramType.findIf([&](Type innerType) {
+              auto genericParam = innerType->getAs<GenericTypeParamType>();
+              if (!genericParam)
+                return false;
+
+              auto genericParamDecl = genericParam->getDecl();
+              if (!genericParamDecl)
+                return false;
+
+              if (!genericParamDecl->isOpaqueType())
+                return false;
+
+              param->diagnose(
+                 diag::opaque_type_in_parameter, true, interfaceType);
+              return true;
+            });
+
+            if (hadError)
+              return true;
+          }
+
+          return false;
+        }
+
+        return false;
+      });
+    }
+
     if (param->hasAttachedPropertyWrapper())
       (void) param->getPropertyWrapperInitializerInfo();
 
@@ -3222,7 +3370,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     }
   }
 
-  // For source compatibilty, allow duplicate internal parameter names
+  // For source compatibility, allow duplicate internal parameter names
   // on protocol requirements.
   //
   // FIXME: Consider turning this into a warning or error if we do

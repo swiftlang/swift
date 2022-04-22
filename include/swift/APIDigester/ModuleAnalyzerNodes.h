@@ -63,8 +63,10 @@ namespace api {
 ///
 /// When the json format changes in a way that requires version-specific handling, this number should be incremented.
 /// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
-const uint8_t DIGESTER_JSON_VERSION = 6; // Add initkind for constructors
+const uint8_t DIGESTER_JSON_VERSION = 7; // push SDKNodeRoot to lower-level
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
+const StringRef ABIRootKey = "ABIRoot";
+const StringRef ConstValuesKey = "ConstValues";
 
 class SDKNode;
 typedef SDKNode* NodePtr;
@@ -736,6 +738,8 @@ struct TypeInitInfo {
   StringRef ValueOwnership;
 };
 
+struct PayLoad;
+
 class SwiftDeclCollector: public VisibleDeclConsumer {
   SDKContext &Ctx;
   SDKNode *RootNode;
@@ -756,7 +760,7 @@ public:
 
   // Serialize the content of all roots to a given file using JSON format.
   void serialize(StringRef Filename);
-  static void serialize(StringRef Filename, SDKNode *Root);
+  static void serialize(StringRef Filename, SDKNode *Root, PayLoad otherInfo);
 
   // After collecting decls, either from imported modules or from a previously
   // serialized JSON file, using this function to get the root of the SDK.
@@ -805,13 +809,14 @@ SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
 
 SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
 
+void dumpSDKRoot(SDKNodeRoot *Root, PayLoad load, StringRef OutputFile);
 void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,
                    StringRef OutputFile, CheckerOptions Opts);
 
-void dumpModuleContent(ModuleDecl *MD, StringRef OutputFile, bool ABI);
+void dumpModuleContent(ModuleDecl *MD, StringRef OutputFile, bool ABI, bool Empty);
 
 /// Mostly for testing purposes, this function de-serializes the SDK dump in
 /// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,
@@ -826,5 +831,14 @@ void nodeSetDifference(ArrayRef<SDKNode*> Left, ArrayRef<SDKNode*> Right,
 } // end of abi namespace
 } // end of ide namespace
 } // end of Swift namespace
+
+namespace swift {
+namespace json {
+template <> struct ObjectTraits<ide::api::SDKNodeRoot> {
+  static void mapping(Output &out, ide::api::SDKNodeRoot &contents) {
+    contents.jsonize(out);
+  }
+};
+}}
 
 #endif

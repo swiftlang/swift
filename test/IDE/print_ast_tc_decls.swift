@@ -1231,7 +1231,7 @@ extension GenericParams1 where StructGenericBaz: FooProtocol {
   // PASS_PRINT_AST: static func contextualWhereClause2() where StructGenericBaz : FooClass{{$}}
 
   typealias ContextualWhereClause3 = Never where StructGenericBaz: QuxProtocol, StructGenericBaz.Qux == Void
-  // PASS_PRINT_AST: typealias ContextualWhereClause3 = Never where StructGenericBaz : QuxProtocol, StructGenericBaz.Qux == Void{{$}}
+  // PASS_PRINT_AST: typealias ContextualWhereClause3 = Never where StructGenericBaz : QuxProtocol, StructGenericBaz.Qux == (){{$}}
 }
 
 struct GenericParams2<T : FooProtocol> where T : BarProtocol {}

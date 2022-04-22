@@ -132,7 +132,6 @@ include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(DarwinSDKs)
 
-find_package(Python2 COMPONENTS Interpreter REQUIRED)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 # Without this line, installing components is broken. This needs refactoring.

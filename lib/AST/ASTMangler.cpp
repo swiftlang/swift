@@ -857,6 +857,8 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::DistributedThunk: return appendOperator("TE");
     case SymbolKind::DistributedAccessor: return appendOperator("TF");
     case SymbolKind::AccessibleFunctionRecord: return appendOperator("HF");
+    case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
+    case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
   }
 }
 
@@ -910,7 +912,7 @@ static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
 }
 
 /// If the declaration is an @objc protocol defined in Swift and the
-/// Objective-C name has been overrridden from the default, return the
+/// Objective-C name has been overridden from the default, return the
 /// specified name.
 ///
 /// \param useObjCProtocolNames When false, always returns \c None.
@@ -1043,8 +1045,7 @@ void ASTMangler::appendExistentialLayout(
   bool First = true;
   bool DroppedRequiresClass = false;
   bool SawRequiresClass = false;
-  for (Type protoTy : layout.getProtocols()) {
-    auto proto = protoTy->castTo<ProtocolType>()->getDecl();
+  for (auto proto : layout.getProtocols()) {
     // If we aren't allowed to emit marker protocols, suppress them here.
     if (!AllowMarkerProtocols && proto->isMarkerProtocol()) {
       if (proto->requiresClass())
@@ -1056,7 +1057,7 @@ void ASTMangler::appendExistentialLayout(
     if (proto->requiresClass())
       SawRequiresClass = true;
 
-    appendProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
+    appendProtocolName(proto);
     appendListSeparator(First);
   }
   if (First)
@@ -1256,7 +1257,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::Protocol: {
       return appendExistentialLayout(
-          ExistentialLayout(cast<ProtocolType>(tybase)), sig, forDecl);
+          ExistentialLayout(CanProtocolType(cast<ProtocolType>(tybase))),
+          sig, forDecl);
     }
 
     case TypeKind::ProtocolComposition: {
@@ -1264,6 +1266,14 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       // same production:
       auto layout = type->getExistentialLayout();
       return appendExistentialLayout(layout, sig, forDecl);
+    }
+
+    case TypeKind::ParameterizedProtocol: {
+      auto layout = type->getExistentialLayout();
+      appendExistentialLayout(layout, sig, forDecl);
+      bool isFirstArgList = true;
+      appendBoundGenericArgs(type, sig, isFirstArgList, forDecl);
+      return appendOperator("XP");
     }
 
     case TypeKind::Existential: {
@@ -1313,9 +1323,15 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       // type ::= archetype
     case TypeKind::PrimaryArchetype:
-    case TypeKind::OpenedArchetype:
     case TypeKind::SequenceArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
+
+    case TypeKind::OpenedArchetype: {
+      // Opened archetypes have always been mangled via their interface type,
+      // although those manglings aren't used in any stable manner.
+      auto openedType = cast<OpenedArchetypeType>(tybase);
+      return appendType(openedType->getInterfaceType(), sig, forDecl);
+    }
 
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
@@ -1567,6 +1583,9 @@ void ASTMangler::appendBoundGenericArgs(Type type, GenericSignature sig,
     if (Type parent = nominalType->getParent())
       appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
                              forDecl);
+  } else if (auto *ppt = dyn_cast<ParameterizedProtocolType>(typePtr)) {
+    assert(!ppt->getBaseType()->getParent());
+    genericArgs = ppt->getArgs();
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
@@ -1989,7 +2008,7 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
         auto *clangDC = clangDecl->getDeclContext();
-        // In C, "nested" structs, unions, enums, etc. will become sibilings:
+        // In C, "nested" structs, unions, enums, etc. will become siblings:
         //   struct Foo { struct Bar { }; }; -> struct Foo { }; struct Bar { };
         // Whereas in C++, nested records will actually be nested. So if this is
         // a C++ record, simply treat it like a namespace and exit early.
@@ -3011,7 +3030,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   // If this declaration predates concurrency, adjust its type to not
   // contain type features that were not available pre-concurrency. This
   // cannot alter the ABI in any way.
-  if (decl->predatesConcurrency()) {
+  if (decl->preconcurrency()) {
     ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true);
   }
 
@@ -3279,9 +3298,8 @@ void ASTMangler::appendDependentProtocolConformance(
 
     // Conformances are relative to the current protocol's requirement
     // signature.
-    auto index =
-      conformanceRequirementIndex(entry,
-                                  currentProtocol->getRequirementSignature());
+    auto reqs = currentProtocol->getRequirementSignature().getRequirements();
+    auto index = conformanceRequirementIndex(entry, reqs);
 
     // Inherited conformance.
     bool isInheritedConformance =
@@ -3438,4 +3456,12 @@ ASTMangler::mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl) {
   appendOpaqueDeclName(decl);
   appendOperator("Ho");
   return finalize();
+}
+
+std::string ASTMangler::mangleDistributedThunk(const FuncDecl *thunk) {
+  // Marker protocols cannot be checked at runtime, so there is no point
+  // in recording them for distributed thunks.
+  llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(AllowMarkerProtocols,
+                                                       false);
+  return mangleEntity(thunk, SymbolKind::DistributedThunk);
 }

@@ -24,6 +24,12 @@
 
 using namespace swift;
 
+// So remote inspection/debugging tools can obtain
+// information about this process.
+SWIFT_RUNTIME_STDLIB_SPI
+const uint64_t _swift_debug_multiPayloadEnumPointerSpareBitsMask
+  = _swift_abi_SwiftSpareBitsMask;
+
 static EnumValueWitnessTable *getMutableVWTableForInit(EnumMetadata *self,
                                                        EnumLayoutFlags flags) {
   auto oldTable =
@@ -319,7 +325,7 @@ swift::swift_storeEnumTagMultiPayload(OpaqueValue *value,
     } else {
       unsigned numPayloadBits = layout.payloadSize * CHAR_BIT;
       whichTag = numPayloads + (whichEmptyCase >> numPayloadBits);
-      whichPayloadValue = whichEmptyCase & ((1U << numPayloads) - 1U);
+      whichPayloadValue = whichEmptyCase & ((1U << numPayloadBits) - 1U);
     }
     storeMultiPayloadTag(value, layout, whichTag);
     storeMultiPayloadValue(value, layout, whichPayloadValue);

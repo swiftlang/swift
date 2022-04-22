@@ -89,7 +89,7 @@ bb0(%0 : $*Outer):
 
 sil @throwing_func : $@convention(thin) () -> (@out T, @error Error)
 
-// CHECK: SIL memory lifetime failure in @test_try_apply_return: memory is initialized, but shouldn't
+// CHECK: SIL memory lifetime failure in @test_try_apply_return: memory is initialized, but shouldn't be
 sil [ossa] @test_try_apply_return : $@convention(thin) () -> ((), @error Error) {
 bb0:
   %0 = alloc_stack $T
@@ -107,7 +107,7 @@ bb2(%4 : @owned $Error):
 
 }
 
-// CHECK: SIL memory lifetime failure in @test_try_apply_throw: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_try_apply_throw: memory is not initialized, but should be
 sil [ossa] @test_try_apply_throw : $@convention(thin) () -> ((), @error Error) {
 bb0:
   %0 = alloc_stack $T
@@ -127,7 +127,7 @@ bb2(%4 : @owned $Error):
 
 }
 
-// CHECK: SIL memory lifetime failure in @test_single_block: memory is initialized, but shouldn't
+// CHECK: SIL memory lifetime failure in @test_single_block: memory is initialized, but shouldn't be
 sil [ossa] @test_single_block : $@convention(thin) (@owned T) -> () {
 bb0(%0 : @owned $T):
   %2 = alloc_stack $T
@@ -137,7 +137,7 @@ bb0(%0 : @owned $T):
   return %r : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_mixed: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_mixed: memory is not initialized, but should be
 sil [ossa] @test_mixed : $@convention(thin) (@in Mixed, Int) -> Int {
 bb0(%0 : $*Mixed, %1 : $Int):
   %2 = struct_element_addr %0 : $*Mixed, #Mixed.i
@@ -147,7 +147,7 @@ bb0(%0 : $*Mixed, %1 : $Int):
   return %3 : $Int
 }
 
-// CHECK: SIL memory lifetime failure in @test_missing_store_to_trivial: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_missing_store_to_trivial: memory is not initialized, but should be
 sil [ossa] @test_missing_store_to_trivial : $@convention(thin) () -> Int {
 bb0:
   %1 = alloc_stack $Mixed
@@ -157,7 +157,7 @@ bb0:
   return %3 : $Int
 }
 
-// CHECK: SIL memory lifetime failure in @test_load_after_dealloc: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_load_after_dealloc: memory is not initialized, but should be
 sil [ossa] @test_load_after_dealloc : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = alloc_stack $Mixed
@@ -224,7 +224,7 @@ bb3:
   return %r : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_store_to_enum: memory is initialized, but shouldn't
+// CHECK: SIL memory lifetime failure in @test_store_to_enum: memory is initialized, but shouldn't be
 sil [ossa] @test_store_to_enum : $@convention(thin) (@owned T) -> () {
 bb0(%0 : @owned $T):
   %1 = alloc_stack $Optional<T>
@@ -238,7 +238,7 @@ bb0(%0 : @owned $T):
   return %r : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_select_enum_addr: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_select_enum_addr: memory is not initialized, but should be
 sil [ossa] @test_select_enum_addr : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %0 = alloc_stack $Optional<T>
@@ -271,7 +271,7 @@ bb0(%0 :  $*T):
   return %res : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_store_borrow_destroy: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_store_borrow_destroy: memory is not initialized, but should be
 sil [ossa] @test_store_borrow_destroy : $@convention(thin) (@guaranteed T) -> () {
 bb0(%0 :  @guaranteed $T):
   %s = alloc_stack $T
@@ -361,7 +361,7 @@ bb0(%0 :  @guaranteed $Optional<T>):
   return %res : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_cast_br_take_always: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_cast_br_take_always: memory is not initialized, but should be
 sil [ossa] @test_cast_br_take_always : $@convention(thin) <U, V> (@in U) -> () {
 bb0(%0 : $*U):
   %s = alloc_stack $V
@@ -411,7 +411,7 @@ bb3:
   return %res : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_unconditional_checked_cast_1: memory is initialized, but shouldn't
+// CHECK: SIL memory lifetime failure in @test_unconditional_checked_cast_1: memory is initialized, but shouldn't be
 sil [ossa] @test_unconditional_checked_cast_1 : $@convention(thin) <U, V> (@in U) -> () {
 bb0(%0 : $*U):
   %s = alloc_stack $V
@@ -421,7 +421,7 @@ bb0(%0 : $*U):
   return %5 : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_unconditional_checked_cast_2: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_unconditional_checked_cast_2: memory is not initialized, but should be
 sil [ossa] @test_unconditional_checked_cast_2 : $@convention(thin) <U, V> (@in_guaranteed U) -> () {
 bb0(%0 : $*U):
   %u = alloc_stack $U
@@ -434,7 +434,7 @@ bb0(%0 : $*U):
   return %5 : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_unchecked_ref_cast_1: memory is initialized, but shouldn't
+// CHECK: SIL memory lifetime failure in @test_unchecked_ref_cast_1: memory is initialized, but shouldn't be
 sil [ossa] @test_unchecked_ref_cast_1 : $@convention(thin) <U : AnyObject, V : AnyObject> (@in U) -> () {
 bb0(%0 : $*U):
   %s = alloc_stack $V
@@ -444,7 +444,7 @@ bb0(%0 : $*U):
   return %5 : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_unchecked_ref_cast_2: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_unchecked_ref_cast_2: memory is not initialized, but should be
 sil [ossa] @test_unchecked_ref_cast_2 : $@convention(thin) <U : AnyObject, V : AnyObject> (@in_guaranteed U) -> () {
 bb0(%0 : $*U):
   %u = alloc_stack $U
@@ -459,7 +459,7 @@ bb0(%0 : $*U):
 
 protocol P {}
 
-// CHECK: SIL memory lifetime failure in @test_init_existential: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_init_existential: memory is not initialized, but should be
 sil [ossa] @test_init_existential : $@convention(thin) <U: P> (@in_guaranteed U) -> () {
 bb0(%0 : $*U):
   %s = alloc_stack $P
@@ -470,7 +470,7 @@ bb0(%0 : $*U):
   return %5 : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_open_existential: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_open_existential: memory is not initialized, but should be
 sil [ossa] @test_open_existential : $@convention(thin) <U: P> (@in_guaranteed U) -> () {
 bb0(%0 : $*U):
   %s = alloc_stack $P
@@ -485,7 +485,7 @@ bb0(%0 : $*U):
   return %5 : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_existential_metatype: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_existential_metatype: memory is not initialized, but should be
 sil [ossa] @test_existential_metatype : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $P
@@ -495,7 +495,7 @@ bb0:
   return %5 : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_value_metatype: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_value_metatype: memory is not initialized, but should be
 sil [ossa] @test_value_metatype : $@convention(thin) <U> (@in_guaranteed U) -> () {
 bb0(%0 : $*U):
   %1 = alloc_stack $U
@@ -505,7 +505,7 @@ bb0(%0 : $*U):
   return %5 : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_is_unique: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_is_unique: memory is not initialized, but should be
 sil [ossa] @test_is_unique : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $T
@@ -515,7 +515,7 @@ bb0:
   return %5 : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_fix_lifetime: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_fix_lifetime: memory is not initialized, but should be
 sil [ossa] @test_fix_lifetime : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $T
@@ -527,7 +527,7 @@ bb0:
 
 sil @modify_bool : $@convention(thin) (@inout_aliasable Bool) -> ()
 
-// CHECK: SIL memory lifetime failure in @test_trivial_alloc_stack: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_trivial_alloc_stack: memory is not initialized, but should be
 sil [ossa] @test_trivial_alloc_stack : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %1 = alloc_stack $Bool
@@ -555,7 +555,7 @@ bb2:
   return %r : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_load_borrow2: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_load_borrow2: memory is not initialized, but should be
 sil [ossa] @test_load_borrow2 : $@convention(thin) (@in Optional<T>) -> () {
 bb0(%0 : $*Optional<T>):
   destroy_addr %0 : $*Optional<T>
@@ -575,7 +575,7 @@ enum Result<T1, T2>{
 
 sil @try_get_error : $@convention(thin) () -> @error Error
 
-// CHECK: SIL memory lifetime failure in @test_init_enum_trivial_case: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_init_enum_trivial_case: memory is not initialized, but should be
 sil [ossa] @test_init_enum_trivial_case : $@convention(thin) () -> @error Error {
 bb0:
   %0 = alloc_stack $Result<Int, Error>
@@ -601,7 +601,7 @@ bb3:
   return %15 : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_double_enum_destroy: memory is not initialized, but should
+// CHECK: SIL memory lifetime failure in @test_double_enum_destroy: memory is not initialized, but should be
 sil [ossa] @test_double_enum_destroy : $@convention(thin) (@in Optional<String>) -> () {
 bb0(%0 : $*Optional<String>):
   %l = load_borrow %0 : $*Optional<String>

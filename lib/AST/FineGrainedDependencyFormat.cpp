@@ -51,7 +51,7 @@ public:
 } // end namespace
 
 bool Deserializer::readSignature() {
-  for (unsigned char byte : FINE_GRAINED_DEPDENENCY_FORMAT_SIGNATURE) {
+  for (unsigned char byte : FINE_GRAINED_DEPENDENCY_FORMAT_SIGNATURE) {
     if (Cursor.AtEndOfStream())
       return true;
     if (auto maybeRead = Cursor.Read(8)) {
@@ -365,7 +365,7 @@ void Serializer::emitRecordID(unsigned ID, StringRef name,
 }
 
 void Serializer::writeSignature() {
-  for (auto c : FINE_GRAINED_DEPDENENCY_FORMAT_SIGNATURE)
+  for (auto c : FINE_GRAINED_DEPENDENCY_FORMAT_SIGNATURE)
     Out.Emit((unsigned) c, 8);
 }
 

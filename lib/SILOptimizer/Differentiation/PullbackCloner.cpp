@@ -549,6 +549,10 @@ private:
     if (auto adjProj = getAdjointProjection(origBB, originalValue))
       return (bufferMap[{origBB, originalValue}] = adjProj);
 
+    LLVM_DEBUG(getADDebugStream() << "Creating new adjoint buffer for"
+               << originalValue
+               << "in bb" << origBB->getDebugID() << '\n');
+
     auto bufType = getRemappedTangentType(originalValue->getType());
     // Set insertion point for local allocation builder: before the last local
     // allocation, or at the start of the pullback function's entry if no local
@@ -583,6 +587,12 @@ private:
     assert(originalValue->getFunction() == &getOriginal());
     assert(rhsAddress->getFunction() == &getPullback());
     auto adjointBuffer = getAdjointBuffer(origBB, originalValue);
+
+    LLVM_DEBUG(getADDebugStream() << "Adding"
+               << rhsAddress << "to adjoint of "
+               << originalValue
+               << "in bb" << origBB->getDebugID() << '\n');
+
     builder.emitInPlaceAdd(loc, adjointBuffer, rhsAddress);
   }
 
@@ -2085,35 +2095,36 @@ bool PullbackCloner::Implementation::run() {
 
   // Collect differentiation parameter adjoints.
   // Do a first pass to collect non-inout values.
-  unsigned pullbackInoutArgumentIndex = 0;
   for (auto i : getConfig().parameterIndices->getIndices()) {
-    auto isParameterInout = conv.getParameters()[i].isIndirectMutating();
-    if (!isParameterInout) {
-      addRetElt(i);
-    }
+    if (!conv.getParameters()[i].isIndirectMutating()) {
+       addRetElt(i);
+     }
   }
 
-  // Do a second pass for all inout parameters.
-  for (auto i : getConfig().parameterIndices->getIndices()) {
-    // Skip non-inout parameters.
-    auto isParameterInout = conv.getParameters()[i].isIndirectMutating();
-    if (!isParameterInout)
-      continue;
+  // Do a second pass for all inout parameters, however this is only necessary
+  // for functions with multiple basic blocks.  For functions with a single
+  // basic block adjoint accumulation for those parameters is already done by
+  // per-instruction visitors.
+  if (getOriginal().size() > 1) {
+    const auto &pullbackConv = pullback.getConventions();
+    SmallVector<SILArgument *, 1> pullbackInOutArgs;
+    for (auto pullbackArg : enumerate(pullback.getArgumentsWithoutIndirectResults())) {
+      if (pullbackConv.getParameters()[pullbackArg.index()].isIndirectMutating())
+        pullbackInOutArgs.push_back(pullbackArg.value());
+    }
 
-    // Skip `inout` parameters for functions with a single basic block:
-    // adjoint accumulation for those parameters is already done by
-    // per-instruction visitors.
-    if (getOriginal().size() == 1)
-      continue;
+    unsigned pullbackInoutArgumentIdx = 0;
+    for (auto i : getConfig().parameterIndices->getIndices()) {
+      // Skip non-inout parameters.
+      if (!conv.getParameters()[i].isIndirectMutating())
+        continue;
 
-    // For functions with multiple basic blocks, accumulation is needed
-    // for `inout` parameters because pullback basic blocks have different
-    // adjoint buffers.
-    auto pullbackInoutArgument =
-        getPullback()
-            .getArgumentsWithoutIndirectResults()[pullbackInoutArgumentIndex++];
-    pullbackIndirectResults.push_back(pullbackInoutArgument);
-    addRetElt(i);
+      // For functions with multiple basic blocks, accumulation is needed
+      // for `inout` parameters because pullback basic blocks have different
+      // adjoint buffers.
+      pullbackIndirectResults.push_back(pullbackInOutArgs[pullbackInoutArgumentIdx++]);
+      addRetElt(i);
+    }
   }
 
   // Copy them to adjoint indirect results.
@@ -2339,7 +2350,9 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
   for (auto activeValue : predBBActiveValues) {
     LLVM_DEBUG(getADDebugStream()
                << "Propagating adjoint of active value " << activeValue
-               << " to predecessors' pullback blocks\n");
+               << "from bb" << origBB->getDebugID()
+               << " to predecessors' (bb" << origPredBB->getDebugID()
+               << ") pullback blocks\n");
     switch (getTangentValueCategory(activeValue)) {
     case SILValueCategory::Object: {
       auto activeValueAdj = getAdjointValue(origBB, activeValue);
@@ -2510,14 +2523,13 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
     case SILValueCategory::Address: {
       auto bbArgAdjBuf = getAdjointBuffer(bb, bbArg);
       for (auto pair : incomingValues) {
-        auto *predBB = std::get<0>(pair);
         auto incomingValue = std::get<1>(pair);
         // Handle `switch_enum` on `Optional`.
         auto termInst = bbArg->getSingleTerminator();
         if (isSwitchEnumInstOnOptional(termInst))
           accumulateAdjointForOptional(bb, incomingValue, bbArgAdjBuf);
         else
-          addToAdjointBuffer(predBB, incomingValue, bbArgAdjBuf, pbLoc);
+          addToAdjointBuffer(bb, incomingValue, bbArgAdjBuf, pbLoc);
       }
       break;
     }

@@ -26,7 +26,7 @@ sil @witness_defined_in_module_vjp : $@convention(thin) (Float) -> (Float, @owne
 
 sil @witness_definition_not_available : $@convention(thin) (Float) -> Float
 
-sil public_external [transparent] [serialized] @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+sil public_external [transparent] @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 
 sil @test : $@convention(thin) (Float) -> () {
 bb0(%0 : $Float):

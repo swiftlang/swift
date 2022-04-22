@@ -116,7 +116,7 @@ public:
   virtual void setup() {}
 
   /// Try to move solver forward by simplifying constraints if possible.
-  /// Such simplication might lead to either producing a solution, or
+  /// Such simplification might lead to either producing a solution, or
   /// creating a set of "follow-up" more granular steps to execute.
   ///
   /// \param prevFailed Indicate whether previous step
@@ -857,6 +857,15 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// The score established before conjunction is attempted.
   Score CurrentScore;
 
+  /// The number of constraint solver scopes already explored
+  /// before accepting this conjunction.
+  llvm::SaveAndRestore<unsigned> OuterScopeCount;
+
+  /// The number of milliseconds until outer constraint system
+  /// is considered "too complex" if timer is enabled.
+  Optional<std::pair<ExpressionTimer::AnchorType, unsigned>>
+      OuterTimeRemaining = None;
+
   /// Conjunction constraint associated with this step.
   Constraint *Conjunction;
   /// Position of the conjunction in the inactive constraints
@@ -889,13 +898,18 @@ public:
       : BindingStep(cs, {cs, conjunction},
                     conjunction->isIsolated() ? IsolatedSolutions : solutions),
         BestScore(getBestScore()), CurrentScore(getCurrentScore()),
-        Conjunction(conjunction), AfterConjunction(erase(conjunction)),
-        OuterSolutions(solutions) {
+        OuterScopeCount(cs.CountScopes, 0), Conjunction(conjunction),
+        AfterConjunction(erase(conjunction)), OuterSolutions(solutions) {
     assert(conjunction->getKind() == ConstraintKind::Conjunction);
 
     // Make a snapshot of the constraint system state before conjunction.
     if (conjunction->isIsolated())
       Snapshot.emplace(cs, conjunction);
+
+    if (cs.Timer) {
+      auto remainingTime = cs.Timer->getRemainingProcessTimeInMillis();
+      OuterTimeRemaining.emplace(cs.Timer->getAnchor(), remainingTime);
+    }
   }
 
   ~ConjunctionStep() override {
@@ -911,6 +925,12 @@ public:
     // successful outcome should keep a score set by `restoreOuterState`.
     if (HadFailure)
       restoreOriginalScores();
+
+    if (OuterTimeRemaining) {
+      auto anchor = OuterTimeRemaining->first;
+      auto remainingTime = OuterTimeRemaining->second;
+      CS.Timer.emplace(anchor, CS, remainingTime);
+    }
   }
 
   StepResult resume(bool prevFailed) override;

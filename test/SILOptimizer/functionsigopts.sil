@@ -644,8 +644,8 @@ bb3:
   return %4 : $()
 }
 
-// CHECK-NOT: sil hidden [serialized] @private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
-sil private [serialized] @private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-NOT: sil hidden @private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+sil private @private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
@@ -686,13 +686,13 @@ bb3:
   return %4 : $()
 }
 
-// CHECK-LABEL: sil [serialized] @dead_arg_callsite_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @dead_arg_callsite_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 // CHECK: bb0
 // CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @$s23dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: apply [[OPT_FUN]](
-// CHECK: [[PRIV_OPT_FUN:%[0-9]+]] = function_ref @$s31private_dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK: [[PRIV_OPT_FUN:%[0-9]+]] = function_ref @$s31private_dead_arg_with_callsitesTf4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: apply [[PRIV_OPT_FUN]]
-sil [serialized] @dead_arg_callsite_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+sil @dead_arg_callsite_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   %2 = function_ref @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
   %3 = apply %2(%0, %1) : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> ()
@@ -1446,7 +1446,7 @@ bb0(%0 : $Optional<(foo, foo)>):
 
 // Check if externally available functions are optimized.
 
-sil public_external [noinline] @externally_available_with_dead_arg : $@convention(thin) (@guaranteed foo) -> () {
+sil public_external [serialized] [noinline] @externally_available_with_dead_arg : $@convention(thin) (@guaranteed foo) -> () {
 bb0(%0 : $foo):
   %r = tuple()
   return %r : $()
@@ -1454,7 +1454,7 @@ bb0(%0 : $foo):
 
 // CHECK-LABEL: sil @call_externally_available
 // CHECK: bb{{[0-9]+}}([[FOO:%.*]] : $foo):
-// CHECK: [[F:%[0-9]+]] = function_ref @$s34externally_available_with_dead_argTf4d_n : $@convention(thin) () -> ()
+// CHECK: [[F:%[0-9]+]] = function_ref @$s34externally_available_with_dead_argTfq4d_n : $@convention(thin) () -> ()
 // CHECK: apply [[F]]()
 // CHECK: return
 // CHECK-LABEL: } // end sil function 'call_externally_available'
@@ -1848,7 +1848,7 @@ bb0(%0 : $*T):
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
-// CHECK-LABEL: sil shared [serialized] @$s31private_dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil private @$s31private_dead_arg_with_callsitesTf4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0(
 
 // CHECK-LABEL: sil shared [serialized] @$s37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error Error) {

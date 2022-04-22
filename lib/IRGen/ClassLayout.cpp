@@ -55,7 +55,7 @@ Size ClassLayout::getInstanceStart() const {
       return element.getByteOffset();
     } else {
       // We used to crash for classes that have an empty and a resilient field
-      // during intialization.
+      // during initialization.
       //   class CrashInInit {
       //     var empty = EmptyStruct()
       //     var resilient = ResilientThing()

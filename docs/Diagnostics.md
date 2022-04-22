@@ -141,6 +141,8 @@ If you run into any issues or have questions while following the steps above, fe
 (This section is specific to the Swift compiler's diagnostic engine.)
 
 If the `-verify` frontend flag is used, the Swift compiler will check emitted diagnostics against specially formatted comments in the source. This feature is used extensively throughout the test suite to ensure diagnostics are emitted with the correct message and source location.
+  
+`-verify` parses all ordinary source files passed as inputs to the compiler to look for expectation comments. If you'd like to check for diagnostics in additional files, like swiftinterfaces or even Objective-C headers, specify them with `-verify-additional-file <filename>`. By default, `-verify` considers any diagnostic at `<unknown>:0` (that is, any diagnostic emitted with an invalid source location) to be unexpected; you can disable this by passing `-verify-ignore-unknown`.
 
 An expected diagnostic is denoted by a comment which begins with `expected-error`, `expected-warning`, `expected-note`, or `expected-remark`. It is followed by:
 
@@ -150,6 +152,14 @@ An expected diagnostic is denoted by a comment which begins with `expected-error
 
 - (Required) The expected error message. The message should be enclosed in double curly braces and should not include the `error:`/`warning:`/`note:`/`remark:` prefix. For example, `// expected-error {{invalid redeclaration of 'y'}}` would match an error with that message on the same line. The expected message does not need to match the emitted message verbatim. As long as the expected message is a substring of the original message, they will match.
 
-- (Optional) Expected fix-its. These are each enclosed in double curly braces and appear after the expected message. An expected fix-it consists of a column range followed by the text it's expected to be replaced with. For example, `let r : Int i = j // expected-error{{consecutive statements}} {{12-12=;}}` will match a fix-it attached to the consecutive statements error which inserts a semicolon at column 12, just after the 't' in 'Int'. The special {{none}} specifier is also supported, which will cause the diagnostic match to fail if unexpected fix-its are produced.
+- (Optional) Expected fix-its. These are each enclosed in double curly braces and appear after the expected message. An expected fix-it consists of a column range followed by the text it's expected to be replaced with. For example, `let r : Int i = j // expected-error{{consecutive statements}} {{12-12=;}}` will match a fix-it attached to the consecutive statements error which inserts a semicolon at column 12, just after the 't' in 'Int'.
+  
+  * Insertions are represented by identical start and end locations: `{{3-3=@objc }}`. Deletions are represented by empty replacement text: `{{3-9=}}`.
+  
+  * Line offsets are also permitted; for instance, `{{-1:12-+1:42=}}` would specify a fix-it that deleted everything between column 12 on the previous line and column 42 on the next line. (If the sign is omitted, it specifies an absolute line number, not an offset.)
+  
+  * By default, the verifier ignores any fix-its that are *not* expected; the special `{{none}}` specifier tells it to verify that the diagnostic it's attached to has *only* the fix-its specified and no others.
+
+  * If two (or more) expected fix-its are juxtaposed with nothing (or whitespace) between them, then both must be present for the verifier to match. If two (or more) expected fix-its have `||` between them, then one of them must be present for the verifier to match. `||` binds more tightly than juxtaposition: `{{1-1=a}} {{2-2=b}} || {{2-2=c}} {{3-3=d}} {{none}}` will only match if there is either a set of three fix-its that insert `a`, `b`, and `d`, or a set of three fix-its that insert `a`, `c`, and `d`. (Without the `{{none}}`, it would also permit all four fix-its, but only because one of the four would be unmatched and ignored.)
 
 - (Optional) Expected educational notes. These appear as a comma separated list after the expected message, enclosed in double curly braces and prefixed by 'educational-notes='. For example, `{{educational-notes=some-note,some-other-note}}` will verify the educational notes with filenames `some-note` and `some-other-note` appear. Do not include the file extension when specifying note names.

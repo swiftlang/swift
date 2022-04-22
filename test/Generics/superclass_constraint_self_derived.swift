@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P {
   associatedtype T : Q
@@ -17,6 +17,8 @@ func takesR<T : R>(_: T) {}
 class C<T : Q> : P {}
 
 struct Outer<T : P> {
+  // CHECK-LABEL: .Inner@
+  // CHECK-NEXT: Generic signature: <T, U where T : C<U>, U : Q>
   struct Inner<U> where T : C<U> {
     func doStuff(_ u: U) {
       takesR(u.t)

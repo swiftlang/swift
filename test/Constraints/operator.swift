@@ -270,7 +270,7 @@ func rdar_60185506() {
 func rdar60727310() {
   func myAssertion<T>(_ a: T, _ op: ((T,T)->Bool), _ b: T) {}
   var e: Error? = nil
-  myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two 'Error?' operands}}
+  myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two '(any Error)?' operands}}
 }
 
 // FIXME(SR-12438): Bad diagnostic.

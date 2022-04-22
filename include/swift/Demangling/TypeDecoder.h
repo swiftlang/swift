@@ -710,6 +710,34 @@ protected:
                                                    forRequirement);
     }
 
+    case NodeKind::ParameterizedProtocol: {
+      if (Node->getNumChildren() < 2)
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "fewer children (%zu) than required (2)",
+                                    Node->getNumChildren());
+
+      auto protocolType = decodeMangledType(Node->getChild(0), depth + 1);
+      if (protocolType.isError())
+        return protocolType;
+
+      llvm::SmallVector<BuiltType, 8> args;
+
+      const auto &genericArgs = Node->getChild(1);
+      if (genericArgs->getKind() != NodeKind::TypeList)
+        return MAKE_NODE_TYPE_ERROR0(genericArgs, "is not TypeList");
+
+      for (auto genericArg : *genericArgs) {
+        auto paramType = decodeMangledType(genericArg, depth + 1,
+                                           /*forRequirement=*/false);
+        if (paramType.isError())
+          return paramType;
+        args.push_back(paramType.getType());
+      }
+
+      return Builder.createParameterizedProtocolType(protocolType.getType(),
+                                                     args);
+    }
+
     case NodeKind::Protocol:
     case NodeKind::ProtocolSymbolicReference: {
       if (auto Proto = decodeMangledProtocolType(Node, depth + 1)) {

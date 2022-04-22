@@ -16,7 +16,7 @@ extension Array: Conforms where Element: Conforms {}
 // expected-note@-1 7 {{requirement from conditional conformance of '[Fails]' to 'Conforms'}}
 extension Dictionary: Conforms where Value: Conforms {}
 // expected-note@-1 5 {{requirement from conditional conformance of '[Int : Fails]' to 'Conforms'}}
-// expected-note@-2 2 {{requirement from conditional conformance of '[Int : Conforms]' to 'Conforms'}}
+// expected-note@-2 2 {{requirement from conditional conformance of '[Int : any Conforms]' to 'Conforms'}}
 
 let works = Works()
 let fails = Fails()
@@ -128,9 +128,9 @@ func combined() {
 
     // Needs self conforming protocols:
     let _: Conforms = [[0: [1 : [works]] as Conforms]]
-    // expected-error@-1 {{protocol 'Conforms' as a type cannot conform to the protocol itself}} expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
+    // expected-error@-1 {{type 'any Conforms' cannot conform to 'Conforms'}} expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
     let _: Conforms = [[0: [1 : [fails]] as Conforms]]
     // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
-    // expected-error@-2 {{protocol 'Conforms' as a type cannot conform to the protocol itself}} expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+    // expected-error@-2 {{type 'any Conforms' cannot conform to 'Conforms'}} expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }

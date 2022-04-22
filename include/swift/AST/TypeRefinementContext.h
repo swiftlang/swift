@@ -58,6 +58,12 @@ public:
     /// function declaration or the contents of a class declaration).
     Decl,
 
+    /// The context was introduced by a resilience boundary; that is, we are in
+    /// a module with library evolution enabled and the parent context's
+    /// contents can be visible to the module's clients, but this context's
+    /// contents are not.
+    ResilienceBoundary,
+
     /// The context was introduced for the Then branch of an IfStmt.
     IfStmtThenBranch,
 
@@ -102,7 +108,10 @@ private:
 
   public:
     IntroNode(SourceFile *SF) : IntroReason(Reason::Root), SF(SF) {}
-    IntroNode(Decl *D) : IntroReason(Reason::Decl), D(D) {}
+    IntroNode(Decl *D, Reason introReason = Reason::Decl)
+        : IntroReason(introReason), D(D) {
+      (void)getAsDecl();    // check that assertion succeeds
+    }
     IntroNode(IfStmt *IS, bool IsThen) :
     IntroReason(IsThen ? Reason::IfStmtThenBranch : Reason::IfStmtElseBranch),
                 IS(IS) {}
@@ -122,7 +131,8 @@ private:
     }
 
     Decl *getAsDecl() const {
-      assert(IntroReason == Reason::Decl);
+      assert(IntroReason == Reason::Decl ||
+             IntroReason == Reason::ResilienceBoundary);
       return D;
     }
 
@@ -154,7 +164,7 @@ private:
 
   SourceRange SrcRange;
 
-  /// A canonical availiability info for this context, computed top-down from the root
+  /// A canonical availability info for this context, computed top-down from the root
   /// context (compilation deployment target).
   AvailabilityContext AvailabilityInfo;
 
@@ -182,7 +192,14 @@ public:
                                               const AvailabilityContext &Info,
                                               const AvailabilityContext &ExplicitInfo,
                                               SourceRange SrcRange);
-  
+
+  /// Create a refinement context for the given declaration.
+  static TypeRefinementContext *
+  createForResilienceBoundary(ASTContext &Ctx, Decl *D,
+                              TypeRefinementContext *Parent,
+                              const AvailabilityContext &Info,
+                              SourceRange SrcRange);
+
   /// Create a refinement context for the Then branch of the given IfStmt.
   static TypeRefinementContext *
   createForIfStmtThen(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,

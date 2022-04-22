@@ -22,10 +22,6 @@ struct PassContext {
 
   let _bridged: BridgedPassContext
 
-  var isSwift51RuntimeAvailable: Bool {
-    PassContext_isSwift51RuntimeAvailable(_bridged) != 0
-  }
-
   var aliasAnalysis: AliasAnalysis {
     let bridgedAA = PassContext_getAliasAnalysis(_bridged)
     return AliasAnalysis(bridged: bridgedAA)
@@ -114,10 +110,6 @@ struct PassContext {
   
   func fixStackNesting(function: Function) {
     PassContext_fixStackNesting(_bridged, function.bridged)
-  }
-
-  func getDestructor(ofClass type: Type) -> Function? {
-    PassContext_getDestructor(_bridged, type.bridged).function
   }
 
   func getContextSubstitutionMap(for type: Type) -> SubstitutionMap {

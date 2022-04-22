@@ -111,5 +111,12 @@ extension MyActor {
 // IN_ASYNCFUNC_OTHER_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(idx): Int#}][' async'][#Int#];
 // IN_ASYNCFUNC_OTHER_NODOT: End completions
     }
+
+    func testActorKind() {
+        let _ = #^GLOBAL^#
+// GLOBAL: Begin completions
+// GLOBAL: Decl[Actor]/CurrModule:             MyActor[#MyActor#]; name=MyActor
+// GLOBAL: End completions
+    }
 }
 

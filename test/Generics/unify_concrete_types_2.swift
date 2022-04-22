@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -dump-requirement-machine -disable-requirement-machine-merged-associated-types 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -dump-requirement-machine 2>&1 | %FileCheck %s
 
 struct Foo<A, B> {}
 
@@ -27,10 +27,9 @@ struct MergeTest<G : P1a & P2a> {
   func foo2(x: G.T.Z1) -> G.T.Z2 { return x }
 }
 
-// CHECK-LABEL: Adding generic signature <τ_0_0 where τ_0_0 : P1a, τ_0_0 : P2a> {
+// CHECK-LABEL: Requirement machine for fresh signature < G >
 // CHECK-LABEL: Rewrite system: {
 // CHECK: - τ_0_0.[P2a:T] => τ_0_0.[P1a:T]
 // CHECK: - τ_0_0.[P1a:T].[P2:Y2] => τ_0_0.[P1a:T].[P1:Y1]
 // CHECK: - τ_0_0.[P1a:T].[P2:Z2] => τ_0_0.[P1a:T].[P1:Z1]
-// CHECK: }
 // CHECK: }

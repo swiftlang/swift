@@ -118,11 +118,16 @@ public:
 
 /// Search for hop_to_executor instructions and add their operands to \p actors.
 void OptimizeHopToExecutor::collectActors(Actors &actors) {
+  int uniqueActorID = 0;
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       if (auto *hop = dyn_cast<HopToExecutorInst>(&inst)) {
-        int idx = actors.size();
-        actors[hop->getOperand()] = idx;
+        auto oper = hop->getOperand();
+
+        if (actors.count(oper))
+          continue;
+
+        actors[oper] = uniqueActorID++;
       }
     }
   }

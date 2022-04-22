@@ -1850,8 +1850,8 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   auto &existentialTL = SGF.getTypeLowering(E->getType());
   auto concreteFormalType = E->getSubExpr()->getType()->getCanonicalType();
 
-  auto archetype = OpenedArchetypeType::getAny(
-      E->getType()->getCanonicalType());
+  auto archetype = OpenedArchetypeType::getAny(E->getType()->getCanonicalType(),
+                                               SGF.F.getGenericSignature());
   AbstractionPattern abstractionPattern(archetype);
   auto &concreteTL = SGF.getTypeLowering(abstractionPattern,
                                          concreteFormalType);
@@ -2219,7 +2219,13 @@ RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
                                                 SGFContext C) {
   assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
   assert(!E->isImplicitlyThrows() && "an distributed-actor-isolated @objc member?");
-  return SGF.emitDynamicMemberRefExpr(E, C);
+
+  // Emit the operand (the base).
+  SILValue Operand = SGF.emitRValueAsSingleValue(E->getBase()).getValue();
+
+  // Emit the member reference.
+  return SGF.emitDynamicMemberRef(E, Operand, E->getMember(),
+                                  E->getType()->getCanonicalType(), C);
 }
 
 RValue RValueEmitter::
@@ -2242,7 +2248,24 @@ RValue RValueEmitter::visitDynamicSubscriptExpr(
                                       DynamicSubscriptExpr *E, SGFContext C) {
   assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
   assert(!E->isImplicitlyThrows() && "an distributed-actor-isolated @objc member?");
-  return SGF.emitDynamicSubscriptExpr(E, C);
+
+  // Emit the base operand.
+  SILValue Operand = SGF.emitRValueAsSingleValue(E->getBase()).getValue();
+
+  // Emit the indices.
+  //
+  // FIXME: This is apparently not true for Swift @objc subscripts.
+  // Objective-C subscripts only ever have a single parameter.
+  Expr *IndexExpr = E->getArgs()->getUnaryExpr();
+  assert(IndexExpr);
+
+  PreparedArguments IndexArgs(
+      FunctionType::Param(IndexExpr->getType()->getCanonicalType()));
+  IndexArgs.add(E, SGF.emitRValue(IndexExpr));
+
+  return SGF.emitDynamicSubscriptGetterApply(
+      E, Operand, E->getMember(), std::move(IndexArgs),
+      E->getType()->getCanonicalType(), C);
 }
 
 
@@ -2625,7 +2648,8 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
     // new one (which we'll upcast immediately below) for a class member.
     ArchetypeType *opened;
     if (storage->getDeclContext()->getSelfClassDecl()) {
-      opened = OpenedArchetypeType::get(baseType);
+      opened = OpenedArchetypeType::get(baseType,
+                                        subSGF.F.getGenericSignature());
     } else {
       opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
     }
@@ -2790,7 +2814,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent,
       (expansion == ResilienceExpansion::Minimal
-       ? IsSerializable
+       ? IsSerialized
        : IsNotSerialized),
       ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
   if (!thunk->empty())
@@ -2836,13 +2860,36 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto subscriptIndices =
     loadIndexValuesForKeyPathComponent(subSGF, loc, property,
                                        indexes, indexPtrArg);
-  
-  auto resultSubst = subSGF.emitRValueForStorageLoad(loc, baseSubstValue,
-                                   baseType, /*super*/false,
-                                   property, std::move(subscriptIndices),
-                                   subs, AccessSemantics::Ordinary,
-                                   propertyType, SGFContext())
-    .getAsSingleValue(subSGF, loc);
+
+  ManagedValue resultSubst;
+  {
+    RValue resultRValue;
+
+    // Emit a dynamic method branch if the storage decl is an @objc optional
+    // requirement, or just a load otherwise.
+    if (property->getAttrs().hasAttribute<OptionalAttr>()) {
+      const auto declRef = ConcreteDeclRef(property, subs);
+
+      if (isa<VarDecl>(property)) {
+        resultRValue =
+            subSGF.emitDynamicMemberRef(loc, baseSubstValue.getValue(), declRef,
+                                        propertyType, SGFContext());
+      } else {
+        assert(isa<SubscriptDecl>(property));
+
+        resultRValue = subSGF.emitDynamicSubscriptGetterApply(
+            loc, baseSubstValue.getValue(), declRef,
+            std::move(subscriptIndices), propertyType, SGFContext());
+      }
+    } else {
+      resultRValue = subSGF.emitRValueForStorageLoad(
+          loc, baseSubstValue, baseType, /*super*/ false, property,
+          std::move(subscriptIndices), subs, AccessSemantics::Ordinary,
+          propertyType, SGFContext());
+    }
+    resultSubst = std::move(resultRValue).getAsSingleValue(subSGF, loc);
+  }
+
   if (resultSubst.getType().getAddressType() != resultArg->getType())
     resultSubst = subSGF.emitSubstToOrigValue(loc, resultSubst,
                                          AbstractionPattern::getOpaque(),
@@ -2938,7 +2985,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent,
       (expansion == ResilienceExpansion::Minimal
-       ? IsSerializable
+       ? IsSerialized
        : IsNotSerialized),
       ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
   if (!thunk->empty())
@@ -3116,7 +3163,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     equals = builder.getOrCreateSharedFunction(
         loc, name, signature, IsBare, IsNotTransparent,
         (expansion == ResilienceExpansion::Minimal
-         ? IsSerializable
+         ? IsSerialized
          : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
     if (!equals->empty()) {
@@ -3293,7 +3340,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     hash = builder.getOrCreateSharedFunction(
         loc, name, signature, IsBare, IsNotTransparent,
         (expansion == ResilienceExpansion::Minimal
-         ? IsSerializable
+         ? IsSerialized
          : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
     if (!hash->empty()) {
@@ -3537,9 +3584,9 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     // supply the settability if needed. We only reference it here if the
     // setter is public.
     if (shouldUseExternalKeyPathComponent())
-      return storage->isSettable(useDC)
-        && storage->isSetterAccessibleFrom(useDC);
-    return storage->isSettable(storage->getDeclContext());
+      return storage->isSettableInSwift(useDC) &&
+             storage->isSetterAccessibleFrom(useDC);
+    return storage->isSettableInSwift(storage->getDeclContext());
   };
 
   if (auto var = dyn_cast<VarDecl>(storage)) {
@@ -3554,6 +3601,12 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
           ->mapTypeOutOfContext()
           ->getCanonicalType(
                       genericEnv ? genericEnv->getGenericSignature() : nullptr);
+
+      // The component type for an @objc optional requirement needs to be
+      // wrapped in an optional.
+      if (var->getAttrs().hasAttribute<OptionalAttr>()) {
+        componentTy = OptionalType::get(componentTy)->getCanonicalType();
+      }
     }
   
     if (canStorageUseStoredKeyPathComponent(var, expansion)) {
@@ -3591,8 +3644,14 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       baseSubscriptTy = genSubscriptTy->substGenericArgs(subs);
     auto baseSubscriptInterfaceTy = cast<AnyFunctionType>(
       baseSubscriptTy->mapTypeOutOfContext()->getCanonicalType());
+
     auto componentTy = baseSubscriptInterfaceTy.getResult();
-  
+    if (decl->getAttrs().hasAttribute<OptionalAttr>()) {
+      // The component type for an @objc optional requirement needs to be
+      // wrapped in an optional
+      componentTy = OptionalType::get(componentTy)->getCanonicalType();
+    }
+
     SmallVector<IndexTypePair, 4> indexTypes;
     lowerKeyPathSubscriptIndexTypes(*this, indexTypes,
                                     decl, subs,
@@ -4725,7 +4784,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
 
   // If optValue was loadable, we emitted a switch_enum. In such a case, return
   // the argument from hasValueBB.
-  if (optValue.getType().isLoadable(F)) {
+  if (optValue.getType().isLoadable(F) || !silConv.useLoweredAddresses()) {
     return emitManagedRValueWithCleanup(hasValueBB->getArgument(0));
   }
 

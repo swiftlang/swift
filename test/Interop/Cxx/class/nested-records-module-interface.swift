@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=NestedRecords -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=NestedRecords -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: struct S1 {
 // CHECK:   struct S2 {

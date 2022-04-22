@@ -15,19 +15,42 @@ import ObjCConcurrency
 
 // CHECK-LABEL: sil {{.*}}@{{.*}}15testSlowServing
 func testSlowServing(p: SlowServing) async throws {
+    // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Int) -> (), τ_0_0) -> ()
+    // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
     let _: Int = await p.requestInt()
+
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (NSString) -> (), τ_0_0) -> ()
+    // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
     let _: String = await p.requestString()
-    // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
-    let _: String = try await p.tryRequestString()
+
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Int, NSString) -> (), τ_0_0) -> ()
+    // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
     let _: (Int, String) = await p.requestIntAndString()
+
     // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Int, Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
+    // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
+    // CHECK:      builtin "willThrow"
+    // CHECK-NEXT: hop_to_executor [[GENERIC_EXECUTOR]] :
     let _: (Int, String) = try await p.tryRequestIntAndString()
 }
 
+// CHECK-LABEL: sil {{.*}}@{{.*}}20testSlowServingAgain
+func testSlowServingAgain(p: SlowServing) async throws {
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
+  // CHECK: objc_method {{.*}} $@convention(objc_method) <τ_0_0 where τ_0_0 : SlowServing> (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), τ_0_0) -> ()
+  // CHECK: hop_to_executor [[GENERIC_EXECUTOR]] :
+  // CHECK:      builtin "willThrow"
+  // CHECK-NEXT: hop_to_executor [[GENERIC_EXECUTOR]] :
+  let _: String = try await p.tryRequestString()
+}
+
 class SlowSwiftServer: NSObject, SlowServing {
+    // CHECK-LABEL: sil {{.*}} @$s21objc_async_from_swift15SlowSwiftServerC10requestIntSiyYaF
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
     // CHECK-LABEL: sil {{.*}} @${{.*}}10requestInt{{.*}}To :
     // CHECK:         [[BLOCK_COPY:%.*]] = copy_block %0
     // CHECK:         [[SELF:%.*]] = copy_value %1
@@ -42,6 +65,12 @@ class SlowSwiftServer: NSObject, SlowServing {
     // CHECK:         apply [[BLOCK_BORROW]]([[NATIVE_RESULT]])
     func requestInt() async -> Int { return 0 }
     func requestString() async -> String { return "" }
+    // CHECK-LABEL: sil {{.*}} @$s21objc_async_from_swift15SlowSwiftServerC13requestStringSSyYaF
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
+    // CHECK-LABEL: sil {{.*}} @$s21objc_async_from_swift15SlowSwiftServerC16tryRequestStringSSyYaKF
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
     // CHECK-LABEL: sil {{.*}} @${{.*}}16tryRequestString{{.*}}U_To :
     // CHECK:         [[BLOCK_COPY:%.*]] = copy_block %0
     // CHECK:         try_apply{{.*}}@async{{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
@@ -54,7 +83,15 @@ class SlowSwiftServer: NSObject, SlowServing {
     // CHECK:         [[NIL_NSSTRING:%.*]] = enum $Optional<NSString>, #Optional.none
     // CHECK:         apply [[BLOCK_BORROW]]([[NIL_NSSTRING]], {{%.*}})
     func tryRequestString() async throws -> String { return "" }
+
+    // CHECK-LABEL: sil {{.*}} @$s21objc_async_from_swift15SlowSwiftServerC19requestIntAndStringSi_SStyYaF
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
     func requestIntAndString() async -> (Int, String) { return (0, "") }
+
+    // CHECK-LABEL: sil {{.*}} @$s21objc_async_from_swift15SlowSwiftServerC22tryRequestIntAndStringSi_SStyYaKF
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
     func tryRequestIntAndString() async throws -> (Int, String) { return (0, "") }
 }
 
@@ -69,16 +106,30 @@ protocol NativelySlowServing {
 extension SlowServer: NativelySlowServing {}
 
 class SlowServerlet: SlowServer {
+    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}011doSomethingE8Nullably{{.*}}
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
     override func doSomethingSlowNullably(_: String) async -> Int {
         return 0
     }
+
+    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}18findAnswerNullably{{.*}}
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
     override func findAnswerNullably(_ x: String) async -> String {
         return x
     }
+
+    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}28doSomethingDangerousNullably{{.*}} :
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
     override func doSomethingDangerousNullably(_ x: String) async throws -> String {
         return x
     }
 
+    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}17doSomethingFlaggy{{.*}} :
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
     // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}17doSomethingFlaggy{{.*}}To :
     // CHECK:         try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
     // CHECK:       [[NORMAL_BB]]({{.*}}):
@@ -88,6 +139,10 @@ class SlowServerlet: SlowServer {
     override func doSomethingFlaggy() async throws -> String {
         return ""
     }
+
+    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}21doSomethingZeroFlaggy{{.*}} :
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
     // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}21doSomethingZeroFlaggy{{.*}}To :
     // CHECK:         try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
     // CHECK:       [[NORMAL_BB]]({{.*}}):
@@ -97,6 +152,10 @@ class SlowServerlet: SlowServer {
     override func doSomethingZeroFlaggy() async throws -> String {
         return ""
     }
+
+    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}28doSomethingMultiResultFlaggy{{.*}} :
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
     // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}28doSomethingMultiResultFlaggy{{.*}}To :
     // CHECK:         try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
     // CHECK:       [[NORMAL_BB]]({{.*}}):

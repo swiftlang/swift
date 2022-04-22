@@ -105,9 +105,10 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // parameter list.
     const bool isTypeSequence =
         attributes.getAttribute<TypeSequenceAttr>() != nullptr;
-    auto Param = new (Context) GenericTypeParamDecl(
+    auto Param = GenericTypeParamDecl::create(
         CurDeclContext, Name, NameLoc, isTypeSequence,
-        GenericTypeParamDecl::InvalidDepth, GenericParams.size());
+        GenericTypeParamDecl::InvalidDepth, GenericParams.size(),
+        /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
@@ -193,8 +194,6 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
                                               GenericParams) {
   if (GenericParams == nullptr || GenericParams->getWhereLoc().isInvalid())
     return;
-
-
 
   auto WhereRangeInsideBrackets = GenericParams->getWhereClauseSourceRange();
 

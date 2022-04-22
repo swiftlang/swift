@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P1 {
   associatedtype A
@@ -43,3 +43,5 @@ protocol P7 {
 // CHECK-LABEL: protocol_typealias_same_type_requirement.(file).P8@
 // CHECK-LABEL: Requirement signature: <Self where Self : P6, Self : P7, Self.[P7]X == Int>
 protocol P8 : P6, P7 {}
+
+func testP8<T : P8>(_: T, x: T.X) -> Int { return x }

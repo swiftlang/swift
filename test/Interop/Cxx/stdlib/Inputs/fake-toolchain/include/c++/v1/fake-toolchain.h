@@ -7,4 +7,8 @@ void foo(int x) {}
 
 }; // namespace FakeNamespace
 
+namespace std {
+typedef unsigned long size_t;
+} // namespace std
+
 #endif

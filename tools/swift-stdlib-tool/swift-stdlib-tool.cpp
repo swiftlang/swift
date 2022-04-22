@@ -604,7 +604,7 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
   magic = *(uint32_t *)buffer;
   if (magic == FAT_MAGIC || magic == FAT_CIGAM) {
     struct fat_header *fh;
-    uint32_t fat_magic, fat_nfat_arch;
+    uint32_t fat_nfat_arch;
     struct fat_arch *archs;
     uint32_t i;
 
@@ -613,7 +613,6 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
     }
 
     fh = (struct fat_header *)buffer;
-    fat_magic = OSSwapBigToHostInt32(fh->magic);
     fat_nfat_arch = OSSwapBigToHostInt32(fh->nfat_arch);
 
     size_t fat_arch_size;
@@ -645,14 +644,10 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
 
     for (i = 0; i < fat_nfat_arch; i++) {
       int ret;
-      uint32_t arch_cputype, arch_cpusubtype, arch_offset, arch_size,
-          arch_align;
+      uint32_t arch_offset, arch_size;
 
-      arch_cputype = OSSwapBigToHostInt32(archs[i].cputype);
-      arch_cpusubtype = OSSwapBigToHostInt32(archs[i].cpusubtype);
       arch_offset = OSSwapBigToHostInt32(archs[i].offset);
       arch_size = OSSwapBigToHostInt32(archs[i].size);
-      arch_align = OSSwapBigToHostInt32(archs[i].align);
 
       /* Check that slice data is after all fat headers and archs */
       if (arch_offset < fat_arch_size) {
@@ -953,7 +948,21 @@ std::vector<uint8_t> query_code_signature(std::string file) {
 }
 
 template <typename F>
-void enumerateDirectory(std::string directory, F &&func) {
+void listDirectoryContents(std::string directory, F &&func) {
+  DIR *dir = opendir(directory.c_str());
+  if (dir == NULL) {
+    return;
+  }
+
+  struct dirent *entry;
+  while ((entry = readdir(dir))) {
+    func(directory + "/" + entry->d_name);
+  }
+  closedir(dir);
+}
+
+template <typename F>
+void recursivelyListFiles(std::string directory, F &&func) {
   DIR *dir = opendir(directory.c_str());
   if (dir == NULL) {
     return;
@@ -975,7 +984,7 @@ void enumerateDirectory(std::string directory, F &&func) {
   }
   closedir(dir);
   for (const auto &path : subpaths) {
-    enumerateDirectory(path, func);
+    recursivelyListFiles(path, func);
   }
 }
 
@@ -1085,7 +1094,7 @@ int main(int argc, const char *argv[]) {
     std::string root_path =
         parentPath(parentPath(self_executable)) + "/" + "lib";
 
-    enumerateDirectory(root_path, [&](std::string entry) {
+    listDirectoryContents(root_path, [&](std::string entry) {
       if (filename(entry).compare(0, strlen("swift-"), "swift-") == 0) {
         src_dirs.push_back(entry + "/" + platform);
       }
@@ -1119,7 +1128,7 @@ int main(int argc, const char *argv[]) {
 
   // Collect executables from the --scan-folder locations.
   for (const auto &embedDir : embedDirs) {
-    enumerateDirectory(embedDir, [&](std::string entry) {
+    recursivelyListFiles(embedDir, [&](std::string entry) {
       if (0 == access(entry.c_str(), X_OK)) {
         executables.push_back(entry);
       } else {

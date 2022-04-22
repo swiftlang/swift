@@ -144,37 +144,44 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
 
 } // namespace
 
-bool swift::ide::getCompletionDiagnostics(
-    CodeCompletionResult::NotRecommendedReason reason, const ValueDecl *D,
-    CodeCompletionDiagnosticSeverity &severity, llvm::raw_ostream &Out) {
-  using NotRecommendedReason = CodeCompletionResult::NotRecommendedReason;
-
-  ASTContext &ctx = D->getASTContext();
-
-  CodeCompletionDiagnostics Diag(ctx);
-  switch (reason) {
-  case NotRecommendedReason::Deprecated:
-  case NotRecommendedReason::SoftDeprecated:
-    return Diag.getDiagnosticForDeprecated(D, severity, Out);
-  case NotRecommendedReason::InvalidAsyncContext:
-    // FIXME: Could we use 'diag::async_in_nonasync_function'?
-    return Diag.getDiagnostics(severity, Out, diag::ide_async_in_nonasync_context,
-                        D->getName());
-  case NotRecommendedReason::CrossActorReference:
-    return Diag.getDiagnostics(severity, Out, diag::ide_cross_actor_reference_swift5,
-                        D->getName());
-  case NotRecommendedReason::RedundantImport:
-    return Diag.getDiagnostics(severity, Out, diag::ide_redundant_import,
-                        D->getName());
-  case NotRecommendedReason::RedundantImportIndirect:
-    return Diag.getDiagnostics(severity, Out, diag::ide_redundant_import_indirect,
-                        D->getName());
-  case NotRecommendedReason::VariableUsedInOwnDefinition:
-    return Diag.getDiagnostics(severity, Out, diag::recursive_accessor_reference,
-                        D->getName().getBaseIdentifier(), /*"getter"*/ 0);
-  case NotRecommendedReason::None:
+bool swift::ide::getContextFreeCompletionDiagnostics(
+    ContextFreeNotRecommendedReason Reason, const ValueDecl *D,
+    CodeCompletionDiagnosticSeverity &Severity, llvm::raw_ostream &Out) {
+  CodeCompletionDiagnostics Diag(D->getASTContext());
+  switch (Reason) {
+  case ContextFreeNotRecommendedReason::Deprecated:
+  case ContextFreeNotRecommendedReason::SoftDeprecated:
+    return Diag.getDiagnosticForDeprecated(D, Severity, Out);
+  case ContextFreeNotRecommendedReason::None:
     llvm_unreachable("invalid not recommended reason");
   }
   return true;
 }
 
+bool swift::ide::getContextualCompletionDiagnostics(
+    ContextualNotRecommendedReason Reason, const ValueDecl *D,
+    CodeCompletionDiagnosticSeverity &Severity, llvm::raw_ostream &Out) {
+  CodeCompletionDiagnostics Diag(D->getASTContext());
+  switch (Reason) {
+  case ContextualNotRecommendedReason::InvalidAsyncContext:
+    // FIXME: Could we use 'diag::async_in_nonasync_function'?
+    return Diag.getDiagnostics(
+        Severity, Out, diag::ide_async_in_nonasync_context, D->getName());
+  case ContextualNotRecommendedReason::CrossActorReference:
+    return Diag.getDiagnostics(
+        Severity, Out, diag::ide_cross_actor_reference_swift5, D->getName());
+  case ContextualNotRecommendedReason::RedundantImport:
+    return Diag.getDiagnostics(Severity, Out, diag::ide_redundant_import,
+                               D->getName());
+  case ContextualNotRecommendedReason::RedundantImportIndirect:
+    return Diag.getDiagnostics(
+        Severity, Out, diag::ide_redundant_import_indirect, D->getName());
+  case ContextualNotRecommendedReason::VariableUsedInOwnDefinition:
+    return Diag.getDiagnostics(
+        Severity, Out, diag::recursive_accessor_reference,
+        D->getName().getBaseIdentifier(), /*"getter"*/ 0);
+  case ContextualNotRecommendedReason::None:
+    llvm_unreachable("invalid not recommended reason");
+  }
+  return true;
+}

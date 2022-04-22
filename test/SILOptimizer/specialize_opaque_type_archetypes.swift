@@ -48,7 +48,7 @@ func identity<T>(_ t: T) -> T {
   return t
 }
 
-// CHECK-LABEL: sil @$s1A10testFooBaryyxAA1PRzlF : $@convention(thin) <T where T : P> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil {{.*}}@$s1A10testFooBaryyxAA1PRzlF : $@convention(thin) <T where T : P> (@in_guaranteed T) -> () {
 // CHECK: bb3([[FOOS_INT:%.*]] : $Builtin.Int64):
 // CHECK:  [[FOO_RES:%.*]] = struct $Int64 ([[FOOS_INT]] : $Builtin.Int64)
 // CHECK:  [[ID:%.*]] = function_ref @$s1A8identityyxxlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> Int64

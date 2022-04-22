@@ -1066,7 +1066,10 @@ protocol CVarArgStub {}
 extension Int64 : CVarArgStub {}
 
 // _finalizeUninitializedArray<A>(_:)
-sil shared_external [serialized] [_semantics "array.finalize_intrinsic"] @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <Element> (@owned Array<Element>) -> @owned Array<Element>
+sil shared [serialized] [_semantics "array.finalize_intrinsic"] @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <Element> (@owned Array<Element>) -> @owned Array<Element> {
+bb0(%0 : $Array<Element>):
+  return %0 : $Array<Element>
+}
 
 // Test that the OSLogOptimization does not fail while attempting to
 // fold CVarArgStubs in animation signposts.

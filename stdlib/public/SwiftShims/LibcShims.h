@@ -45,14 +45,6 @@ static inline void _swift_stdlib_free(void *_Nullable ptr) {
   free(ptr);
 }
 
-// <unistd.h>
-SWIFT_RUNTIME_STDLIB_SPI
-__swift_ssize_t _swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_SPI
-__swift_ssize_t _swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_close(int fd);
-
 // String handling <string.h>
 SWIFT_READONLY
 static inline __swift_size_t _swift_stdlib_strlen(const char *s) {
@@ -68,10 +60,11 @@ static inline __swift_size_t _swift_stdlib_strlen_unsigned(const unsigned char *
 SWIFT_READONLY
 static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
                                        __swift_size_t n) {
-#if defined(__APPLE__)
-  extern int memcmp(const void * _Nullable, const void * _Nullable, __swift_size_t);
+// FIXME: Is there a way to identify Glibc specifically?
+#if defined(__gnu_linux__)
+  extern int memcmp(const void * _Nonnull, const void * _Nonnull, __swift_size_t);
 #else
-  extern int memcmp(const void *, const void *, __swift_size_t);
+  extern int memcmp(const void * _Null_unspecified, const void * _Null_unspecified, __swift_size_t);
 #endif
   return memcmp(s1, s2, n);
 }

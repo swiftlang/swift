@@ -96,6 +96,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureBodyElement:
   case ConstraintLocator::PackType:
   case ConstraintLocator::PackElement:
+  case ConstraintLocator::PatternBindingElement:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -576,6 +577,14 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     case PackElement: {
       auto packElt = elt.castTo<LocatorPathElt::PackElement>();
       out << "pack element #" << llvm::utostr(packElt.getIndex());
+      break;
+    }
+
+    case PatternBindingElement: {
+      auto patternBindingElt =
+          elt.castTo<LocatorPathElt::PatternBindingElement>();
+      out << "pattern binding element #"
+          << llvm::utostr(patternBindingElt.getIndex());
       break;
     }
     }

@@ -1047,7 +1047,7 @@ class ModuleInterfaceLoaderImpl {
       // file and removed the fallback interface file, we can rebuild the cache.
       fallbackBuilder.addExtraDependency(interfacePath);
       // Use cachedOutputPath as the output file path. This output path was
-      // calcualted using the canonical interface file path to make sure we
+      // calculated using the canonical interface file path to make sure we
       // can find it from the canonical interface file.
       auto failedAgain = fallbackBuilder.buildSwiftModule(cachedOutputPath,
           /*shouldSerializeDeps*/true, &moduleBuffer, remarkRebuild);
@@ -1347,8 +1347,9 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     SearchPathOpts.DeserializedPathRecoverer);
   SearchPathOpts.DeserializedPathRecoverer
     .forEachPair([&](StringRef lhs, StringRef rhs) {
-      GenericArgs.push_back(ArgSaver.save(llvm::Twine("-serialized-path-obfuscate ")
-        + lhs + "=" + rhs).str());
+      GenericArgs.push_back("-serialized-path-obfuscate");
+      std::string pair = (llvm::Twine(lhs) + "=" + rhs).str();
+      GenericArgs.push_back(ArgSaver.save(pair));
   });
 }
 
@@ -1463,9 +1464,9 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   }
   // Pass down -explicit-swift-module-map-file
   // FIXME: we shouldn't need this. Remove it?
-  StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
+  StringRef explicitSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   genericSubInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
-    explictSwiftModuleMap.str();
+    explicitSwiftModuleMap.str();
   auto &subClangImporterOpts = genericSubInvocation.getClangImporterOptions();
   // Respect the detailed-record preprocessor setting of the parent context.
   // This, and the "raw" clang module format it implicitly enables, are
@@ -1473,7 +1474,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   subClangImporterOpts.DetailedPreprocessingRecord =
     clangImporterOpts.DetailedPreprocessingRecord;
 
-  // We need to add these extra clang flags because explict module building
+  // We need to add these extra clang flags because explicit module building
   // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
   // and -fmodule-file=.
   // If we don't add these flags, the interface will be built with implicit
@@ -1490,6 +1491,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
       GenericArgs.push_back("-Xcc");
       GenericArgs.push_back(ArgSaver.save(arg));
     }
+  }
+
+  subClangImporterOpts.EnableClangSPI = clangImporterOpts.EnableClangSPI;
+  if (!subClangImporterOpts.EnableClangSPI) {
+    GenericArgs.push_back("-disable-clang-spi");
   }
 
   // Tell the genericSubInvocation to serialize dependency hashes if asked to do
@@ -1653,6 +1659,13 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
   SmallVector<const char *, 64> SubArgs;
+
+  // If the interface was emitted by a compiler that didn't print
+  // `-target-min-inlining-version` into it, default to using the version from
+  // the target triple, emulating previous behavior.
+  SubArgs.push_back("-target-min-inlining-version");
+  SubArgs.push_back("target");
+
   std::string CompilerVersion;
   // Extract compiler arguments from the interface file and use them to configure
   // the compiler invocation.

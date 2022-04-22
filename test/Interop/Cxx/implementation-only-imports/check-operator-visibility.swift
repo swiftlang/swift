@@ -8,6 +8,8 @@
 // that the operator decl can be found when at least one of the
 // modules is not `@_implementationOnly`.
 
+// XFAIL: *
+
 @_implementationOnly import UserA
 import UserB
 

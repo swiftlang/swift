@@ -54,9 +54,10 @@ extension AsyncSequence {
   ///   element from the modified sequence.
   /// - Returns: An asynchronous sequence that skips over values until the
   ///   provided closure returns `false` or throws an error.
+  @preconcurrency
   @inlinable
   public __consuming func drop(
-    while predicate: @escaping (Element) async throws -> Bool
+    while predicate: @Sendable @escaping (Element) async throws -> Bool
   ) -> AsyncThrowingDropWhileSequence<Self> {
     AsyncThrowingDropWhileSequence(self, predicate: predicate)
   }
@@ -154,3 +155,13 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), predicate: predicate)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingDropWhileSequence: @unchecked Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingDropWhileSequence.Iterator: @unchecked Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

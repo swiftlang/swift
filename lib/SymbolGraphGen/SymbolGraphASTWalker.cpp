@@ -22,9 +22,11 @@ using namespace swift;
 using namespace symbolgraphgen;
 
 SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
+                                           const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules,
                                            const SymbolGraphOptions &Options)
   : Options(Options),
     M(M),
+    ExportedImportedModules(ExportedImportedModules),
     MainGraph(*this, M, None, Ctx) {}
 
 /// Get a "sub" symbol graph for the parent module of a type that
@@ -51,6 +53,11 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     // should put actual extensions of that module into the main graph
     return &MainGraph;
   }
+  
+  if (isFromExportedImportedModule(D)) {
+    return &MainGraph;
+  }
+  
   auto Found = ExtendedModuleGraphs.find(M->getNameStr());
   if (Found != ExtendedModuleGraphs.end()) {
     return Found->getValue();
@@ -207,4 +214,12 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   SG->recordNode(Symbol(SG, VD, nullptr));
 
   return true;
+}
+
+bool SymbolGraphASTWalker::isFromExportedImportedModule(const Decl* D) const {
+    auto *M = D->getModuleContext();
+    
+    return llvm::any_of(ExportedImportedModules, [&M](const auto *MD) {
+        return M->getNameStr().equals(MD->getModuleContext()->getNameStr());
+    });
 }

@@ -102,6 +102,8 @@ documentation, please create a thread on the Swift forums under the
 - [DependencyAnalysis.md](/docs/DependencyAnalysis.md):
   Describes different kinds of dependencies across files in the same module,
   important for understanding incremental builds.
+- [DifferentiableProgrammingImplementation.md](/docs/DifferentiableProgrammingImplementation.md):
+  Describes how automatic differentiation is implemented in the Swift compiler.
 - C and ObjC interoperability: Clang Importer and PrintAsClang
   - [CToSwiftNameTranslation.md](/docs/CToSwiftNameTranslation.md):
     Describes how C and ObjC entities are imported into Swift
@@ -247,7 +249,7 @@ documentation, please create a thread on the Swift forums under the
     Describes the goals and design for Library Evolution.
 - [BuildManifesto.md](/docs/BuildManifesto.md):
   Provides an outline for modularizing the build system for the Swift toolchain.
-- [CppInteroperabilityManifesto.md](/docs/CppInteroperabilityManifesto.md):
+- [CppInteroperabilityManifesto.md](/docs/CppInteroperability/CppInteroperabilityManifesto.md):
   Describes the motivation and design for first-class Swift-C++ interoperability.
 - [DifferentiableProgramming.md](/docs/DifferentiableProgramming.md):
   Outlines a vision and design for first-class differentiable programming in Swift.

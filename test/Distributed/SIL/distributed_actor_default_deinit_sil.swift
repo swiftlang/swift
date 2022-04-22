@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -enable-experimental-distributed -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --color
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --color
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
@@ -15,6 +15,7 @@ distributed actor MyDistActor {
   let localOnlyField: SomeClass
 
   init(system: FakeActorSystem) {
+    self.actorSystem = system
     self.localOnlyField = SomeClass()
   }
 }
@@ -60,33 +61,34 @@ distributed actor MyDistActor {
 
 // *** only destroy the id and system if remote ***
 // CHECK: [[REMOTE_BB_DEALLOC]]:
-            // *** destroy system ***
-// SKIP:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
-// SKIP:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
-// SKIP:   destroy_addr [[ACCESS]] : $*FakeActorSystem
-// SKIP:   end_access [[ACCESS]]
             // *** destroy identity ***
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
 // CHECK:   destroy_addr [[ACCESS]] : $*ActorAddress
 // CHECK:   end_access [[ACCESS]]
+            // *** destroy system ***
+// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
+// CHECK:   destroy_addr [[ACCESS]] : $*FakeActorSystem
+// CHECK:   end_access [[ACCESS]]
 // CHECK:   br [[AFTER_DEALLOC:bb[0-9]+]]
 
 // *** destroy everything if local ***
 // CHECK: [[LOCAL_BB_DEALLOC]]:
-            // *** destroy the user-defined field ***
-// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.localOnlyField
+            // *** destroy identity ***
+// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
-// CHECK:   destroy_addr [[ACCESS]] : $*SomeClass
+// CHECK:   destroy_addr [[ACCESS]] : $*ActorAddress
 // CHECK:   end_access [[ACCESS]]
-            // *** the rest of this part is identical to the remote case ***
+            // *** destroy system ***
 // SKIP:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
 // SKIP:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
 // SKIP:   destroy_addr [[ACCESS]] : $*FakeActorSystem
 // SKIP:   end_access [[ACCESS]]
-// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
+            // *** destroy the user-defined field ***
+// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.localOnlyField
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
-// CHECK:   destroy_addr [[ACCESS]] : $*ActorAddress
+// CHECK:   destroy_addr [[ACCESS]] : $*SomeClass
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   br [[AFTER_DEALLOC]]
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
 
 import _Differentiation
 

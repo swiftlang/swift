@@ -16,7 +16,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
   return ErrorDomain(rawValue: str)
 }
 
-// CHECK-RAW-LABEL: sil shared [transparent] [serializable] [ossa] @$sSo14SNTErrorDomaina8rawValueABSS_tcfC
+// CHECK-RAW-LABEL: sil shared [transparent] [serialized] [ossa] @$sSo14SNTErrorDomaina8rawValueABSS_tcfC
 // CHECK-RAW: bb0([[STR:%[0-9]+]] : @owned $String,
 // CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }
 // CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
@@ -37,7 +37,7 @@ func getRawValue(ed: ErrorDomain) -> String {
   return ed.rawValue
 }
 
-// CHECK-RAW-LABEL: sil shared [serializable] [ossa] @$sSo14SNTErrorDomaina8rawValueSSvg
+// CHECK-RAW-LABEL: sil shared [serialized] [ossa] @$sSo14SNTErrorDomaina8rawValueSSvg
 // CHECK-RAW: bb0([[SELF:%[0-9]+]] : @guaranteed $ErrorDomain):
 // CHECK-RAW: [[STORED_VALUE:%[0-9]+]] = struct_extract [[SELF]] : $ErrorDomain, #ErrorDomain._rawValue
 // CHECK-RAW: [[STORED_VALUE_COPY:%.*]] = copy_value [[STORED_VALUE]]

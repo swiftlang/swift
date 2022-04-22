@@ -35,15 +35,8 @@ SourceRange ASTNode::getSourceRange() const {
     return P->getSourceRange();
   if (const auto *T = this->dyn_cast<TypeRepr *>())
     return T->getSourceRange();
-  if (const auto *C = this->dyn_cast<StmtCondition *>()) {
-    if (C->empty())
-      return SourceRange();
-
-    auto first = C->front();
-    auto last = C->back();
-
-    return {first.getStartLoc(), last.getEndLoc()};
-  }
+  if (const auto *C = this->dyn_cast<StmtConditionElement *>())
+    return C->getSourceRange();
   if (const auto *I = this->dyn_cast<CaseLabelItem *>()) {
     return I->getSourceRange();
   }
@@ -85,7 +78,7 @@ bool ASTNode::isImplicit() const {
     return P->isImplicit();
   if (const auto *T = this->dyn_cast<TypeRepr*>())
     return false;
-  if (const auto *C = this->dyn_cast<StmtCondition *>())
+  if (const auto *C = this->dyn_cast<StmtConditionElement *>())
     return false;
   if (const auto *I = this->dyn_cast<CaseLabelItem *>())
     return false;
@@ -103,10 +96,9 @@ void ASTNode::walk(ASTWalker &Walker) {
     P->walk(Walker);
   else if (auto *T = this->dyn_cast<TypeRepr*>())
     T->walk(Walker);
-  else if (auto *C = this->dyn_cast<StmtCondition *>()) {
-    for (auto &elt : *C)
-      elt.walk(Walker);
-  } else if (auto *I = this->dyn_cast<CaseLabelItem *>()) {
+  else if (auto *C = this->dyn_cast<StmtConditionElement *>())
+    C->walk(Walker);
+  else if (auto *I = this->dyn_cast<CaseLabelItem *>()) {
     if (auto *P = I->getPattern())
       P->walk(Walker);
 
@@ -127,9 +119,9 @@ void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
     P->dump(OS, Indent);
   else if (auto T = dyn_cast<TypeRepr*>())
     T->print(OS);
-  else if (auto C = dyn_cast<StmtCondition *>()) {
-    OS.indent(Indent) << "(statement conditions)";
-  } else if (auto *I = dyn_cast<CaseLabelItem *>()) {
+  else if (auto *C = dyn_cast<StmtConditionElement *>())
+    OS.indent(Indent) << "(statement condition)";
+  else if (auto *I = dyn_cast<CaseLabelItem *>()) {
     OS.indent(Indent) << "(case label item)";
   } else
     llvm_unreachable("unsupported AST node");

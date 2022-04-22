@@ -170,36 +170,24 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 
 /// Prints the Objective-C "generated header" interface for \p M to \p
 /// outputPath.
-///
-/// ...unless \p outputPath is empty, in which case it does nothing.
-///
-/// \returns true if there were any errors
-///
-/// \see swift::printAsObjC
-static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
-                                StringRef bridgingHeader) {
-  if (outputPath.empty())
-    return false;
-  return withOutputFile(M->getDiags(), outputPath,
-                        [&](raw_ostream &out) -> bool {
-    return printAsObjC(out, M, bridgingHeader);
-  });
-}
-
-/// Prints the C++  "generated header" interface for \p M to \p
+/// Print the exposed "generated header" interface for \p M to \p
 /// outputPath.
 ///
 /// ...unless \p outputPath is empty, in which case it does nothing.
 ///
 /// \returns true if there were any errors
 ///
-/// \see swift::printAsCXX
-static bool printAsCxxIfNeeded(StringRef outputPath, ModuleDecl *M) {
+/// \see swift::printAsClangHeader
+static bool printAsClangHeaderIfNeeded(StringRef outputPath, ModuleDecl *M,
+                                       StringRef bridgingHeader,
+                                       bool ExposePublicDeclsInClangHeader) {
   if (outputPath.empty())
     return false;
   return withOutputFile(
-      M->getDiags(), outputPath,
-      [&](raw_ostream &os) -> bool { return printAsCXX(os, M); });
+      M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
+        return printAsClangHeader(out, M, bridgingHeader,
+                                  ExposePublicDeclsInClangHeader);
+      });
 }
 
 /// Prints the stable module interface for \p M to \p outputPath.
@@ -824,7 +812,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   bool hadAnyError = false;
 
   if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
-      opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+      opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
     std::string BridgingHeaderPathForPrint;
     if (!opts.ImplicitObjCHeaderPath.empty()) {
       if (opts.BridgingHeaderDirForPrint.hasValue()) {
@@ -838,15 +826,10 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         BridgingHeaderPathForPrint = opts.ImplicitObjCHeaderPath;
       }
     }
-    hadAnyError |= printAsObjCIfNeeded(
-        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), BridgingHeaderPathForPrint);
-  }
-  if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
-      opts.InputsAndOutputs.hasCxxHeaderOutputPath()) {
-    hadAnyError |= printAsCxxIfNeeded(
-        Invocation.getCxxHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule());
+    hadAnyError |= printAsClangHeaderIfNeeded(
+        Invocation.getClangHeaderOutputPathForAtMostOnePrimary(),
+        Instance.getMainModule(), BridgingHeaderPathForPrint,
+        opts.ExposePublicDeclsInClangHeader);
   }
 
   // Only want the header if there's been any errors, ie. there's not much
@@ -866,6 +849,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     // Copy the settings from the module interface to add SPI printing.
     ModuleInterfaceOptions privOpts = Invocation.getModuleInterfaceOptions();
     privOpts.PrintSPIs = true;
+    privOpts.ModulesToSkipInPublicInterface.clear();
 
     hadAnyError |= printModuleInterfaceIfNeeded(
         Invocation.getPrivateModuleInterfaceOutputPathForWholeModule(),
@@ -1109,7 +1093,7 @@ static bool printSwiftFeature(CompilerInstance &instance) {
   out << "    \"LastOption\"\n";
   out << "  ],\n";
   out << "  \"SupportedFeatures\": [\n";
-  // Print supported featur names here.
+  // Print supported feature names here.
   out << "    \"LastFeature\"\n";
   out << "  ]\n";
   return false;
@@ -1117,7 +1101,8 @@ static bool printSwiftFeature(CompilerInstance &instance) {
 
 static bool
 withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
-                     llvm::function_ref<bool(CompilerInstance &)> cont) {
+                     llvm::function_ref<bool(CompilerInstance &)> cont,
+                     bool runDespiteErrors = false) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   assert(!FrontendOptions::shouldActionOnlyParse(opts.RequestedAction) &&
@@ -1140,11 +1125,12 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
-  if (Instance.getASTContext().hadError() &&
-      !opts.AllowModuleWithCompilerErrors)
+  bool hadError = Instance.getASTContext().hadError()
+                      && !opts.AllowModuleWithCompilerErrors;
+  if (hadError && !runDespiteErrors)
     return true;
 
-  return cont(Instance);
+  return cont(Instance) || hadError;
 }
 
 static bool performScanDependencies(CompilerInstance &Instance) {
@@ -1206,14 +1192,11 @@ static bool performAction(CompilerInstance &Instance,
   // MARK: Actions that Dump
   case FrontendOptions::ActionType::DumpParse:
     return dumpAST(Instance);
-  case FrontendOptions::ActionType::DumpAST: {
-    // FIXME: -dump-ast expects to be able to write output even if type checking
-    // fails which does not cleanly fit the model \c withSemanticAnalysis is
-    // trying to impose. Once there is a request for the "semantic AST", this
-    // point is moot.
-    Instance.performSema();
-    return dumpAST(Instance);
-  }
+  case FrontendOptions::ActionType::DumpAST:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          return dumpAST(Instance);
+        }, /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::PrintAST:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
@@ -1233,14 +1216,14 @@ static bool performAction(CompilerInstance &Instance,
         Instance, observer, [](CompilerInstance &Instance) {
           return dumpAndPrintScopeMap(Instance,
                                       getPrimaryOrMainSourceFile(Instance));
-        });
+        }, /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::DumpTypeRefinementContexts:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
           getPrimaryOrMainSourceFile(Instance).getTypeRefinementContext()->dump(
               llvm::errs(), Instance.getASTContext().SourceMgr);
           return Instance.getASTContext().hadError();
-        });
+        }, /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::DumpInterfaceHash:
     getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
     return Context.hadError();
@@ -1495,7 +1478,7 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // to live.
   if (Instance.getInvocation()
           .getFrontendOptions()
-          .ReuseFrontendForMutipleCompilations) {
+          .ReuseFrontendForMultipleCompilations) {
     return;
   }
 
@@ -1527,7 +1510,7 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
-  // If we emitted any errors while perfoming the end-of-pipeline actions, bail.
+  // If we emitted any errors while performing the end-of-pipeline actions, bail.
   if (Instance.getDiags().hadAnyError())
     return true;
 
@@ -1633,7 +1616,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILProcessing(*SM);
 
-  // Cancellation check after SILOptimzation.
+  // Cancellation check after SILOptimization.
   if (Instance.isCancellationRequested())
     return true;
 

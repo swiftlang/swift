@@ -244,7 +244,6 @@ namespace {
     IMPL(BuiltinInteger, Trivial)
     IMPL(BuiltinIntegerLiteral, Trivial)
     IMPL(BuiltinFloat, Trivial)
-    IMPL(BuiltinRawPointer, Trivial)
     IMPL(BuiltinRawUnsafeContinuation, Trivial)
     IMPL(BuiltinJob, Trivial)
     IMPL(BuiltinExecutor, Trivial)
@@ -258,6 +257,14 @@ namespace {
     IMPL(Module, Trivial)
 
 #undef IMPL
+
+    RetTy visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
+                                     AbstractionPattern orig,
+                                     IsTypeExpansionSensitive_t isSensitive) {
+      RecursiveProperties props = mergeIsTypeExpansionSensitive(isSensitive,
+                                          RecursiveProperties::forRawPointer());
+      return asImpl().handleTrivial(type, props);
+    }
 
     RetTy visitBuiltinUnsafeValueBufferType(
                                          CanBuiltinUnsafeValueBufferType type,
@@ -577,6 +584,11 @@ namespace {
     RetTy visitProtocolCompositionType(CanProtocolCompositionType type,
                                        AbstractionPattern origType,
                                        IsTypeExpansionSensitive_t isSensitive) {
+      return visitExistentialType(type, origType, isSensitive);
+    }
+    RetTy visitParameterizedProtocolType(CanParameterizedProtocolType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
       return visitExistentialType(type, origType, isSensitive);
     }
 
@@ -1600,10 +1612,6 @@ namespace {
   };
 
   /// Lower address only types as opaque values.
-  ///
-  /// Opaque values behave like loadable leaf types in SIL.
-  ///
-  /// FIXME: When you remove an unreachable, just delete the method.
   class OpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
     OpaqueValueTypeLowering(SILType type, RecursiveProperties properties,
@@ -1615,6 +1623,20 @@ namespace {
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
       llvm_unreachable("copy into");
+    }
+
+    // OpaqueValue store cannot be decoupled from a destroy because it is not
+    // bitwise-movable.
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      B.createStore(loc, value, addr, qual);
+    }
+
+    // OpaqueValue load cannot be decoupled from a copy because it is not
+    // bitwise-movable.
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      return B.createLoad(loc, addr, qual);
     }
 
     // --- Same as LeafLoadableTypeLowering.
@@ -1678,13 +1700,22 @@ namespace {
 
     TypeLowering *handleAddressOnly(CanType type,
                                     RecursiveProperties properties) {
-      if (!TC.Context.LangOpts.EnableSILOpaqueValues) {
+      if (!TC.Context.SILOpts.EnableSILOpaqueValues) {
         auto silType = SILType::getPrimitiveAddressType(type);
         return new (TC) AddressOnlyTypeLowering(silType, properties,
                                                            Expansion);
       }
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC) OpaqueValueTypeLowering(silType, properties, Expansion);
+    }
+    
+    TypeLowering *handleInfinite(CanType type,
+                                 RecursiveProperties properties) {
+      // Infinite types cannot actually be instantiated, so treat them as
+      // opaque for code generation purposes.
+      properties.setAddressOnly();
+      properties.setInfinite();
+      return handleAddressOnly(type, properties);
     }
 
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -1779,6 +1810,12 @@ namespace {
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
+      // Bail out if the struct layout relies on itself.
+      TypeConverter::LowerAggregateTypeRAII loweringStruct(TC, structType);
+      if (loweringStruct.IsInfinite) {
+        return handleInfinite(structType, properties);
+      }
+
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
 
@@ -1820,6 +1857,12 @@ namespace {
       RecursiveProperties properties;
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+
+      // Bail out if the enum layout relies on itself.
+      TypeConverter::LowerAggregateTypeRAII loweringEnum(TC, enumType);
+      if (loweringEnum.IsInfinite) {
+        return handleInfinite(enumType, properties);
+      }
 
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
@@ -2430,8 +2473,16 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      TypeConverter &TC,
                                                      SILDeclRef c) {
   auto *vd = c.getDecl();
-  auto resultTy = getParameterAt(vd,
-                                 c.defaultArgIndex)->getInterfaceType();
+  auto *pd = getParameterAt(vd, c.defaultArgIndex);
+
+  Type resultTy;
+
+  if (auto type = pd->getTypeOfDefaultExpr()) {
+    resultTy = type->mapTypeOutOfContext();
+  } else {
+    resultTy = pd->getInterfaceType();
+  }
+
   assert(resultTy && "Didn't find default argument?");
 
   // The result type might be written in terms of type parameters

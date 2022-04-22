@@ -142,13 +142,12 @@ public class SubKlass : Klass {
 }
 
 func lookThroughCast(x: SubKlass) -> Klass {
-    return x as Klass // expected-remark {{retain of type 'SubKlass'}}
-                      // expected-note @-2:22 {{of 'x'}}
+    return x as Klass // expected-remark {{retain of type 'Klass'}}
+                      // expected-note @-2:22 {{of 'x.upcast<$Klass>'}}
 }
 
 func lookThroughRefCast(x: Klass) -> SubKlass {
-    return x as! SubKlass // expected-remark {{retain of type 'Klass'}}
-                          // expected-note @-2:25 {{of 'x'}}
+    return x as! SubKlass // expected-remark {{retain of type 'SubKlass'}}
 }
 
 func lookThroughEnum(x: Klass?) -> Klass {

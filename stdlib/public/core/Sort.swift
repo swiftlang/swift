@@ -329,8 +329,12 @@ extension MutableCollection where Self: BidirectionalCollection {
   }
 }
 
+// FIXME(ABI): unused return value
 /// Merges the elements in the ranges `lo..<mid` and `mid..<hi` using `buffer`
 /// as out-of-place storage. Stable.
+///
+/// The unused return value is legacy ABI. It was originally added as a
+/// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
 ///
 /// - Precondition: `lo..<mid` and `mid..<hi` must already be sorted according
 ///   to `areInIncreasingOrder`.
@@ -506,15 +510,19 @@ internal func _findNextRun<C: RandomAccessCollection>(
 }
 
 extension UnsafeMutableBufferPointer {
+  // FIXME(ABI): unused return value
   /// Merges the elements at `runs[i]` and `runs[i - 1]`, using `buffer` as
   /// out-of-place storage.
+  ///
+  /// The unused return value is legacy ABI. It was originally added as a
+  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
   ///
   /// - Precondition: `runs.count > 1` and `i > 0`
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
   @discardableResult
   @inlinable
-  public mutating func _mergeRuns(
+  internal mutating func _mergeRuns(
     _ runs: inout [Range<Index>],
     at i: Int,
     buffer: UnsafeMutablePointer<Element>,
@@ -537,9 +545,13 @@ extension UnsafeMutableBufferPointer {
 
     return true
   }
-  
+
+  // FIXME(ABI): unused return value
   /// Merges upper elements of `runs` until the required invariants are
   /// satisfied.
+  ///
+  /// The unused return value is legacy ABI. It was originally added as a
+  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
   ///
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
@@ -547,7 +559,7 @@ extension UnsafeMutableBufferPointer {
   ///   any i, `runs[i].upperBound == runs[i + 1].lowerBound`.
   @discardableResult
   @inlinable
-  public mutating func _mergeTopRuns(
+  internal mutating func _mergeTopRuns(
     _ runs: inout [Range<Index>],
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -558,7 +570,7 @@ extension UnsafeMutableBufferPointer {
     // (b) - for c = runs.count - 1:
     //         - runs[c - 1].count > runs[c].count
     //
-    // Loop until the invariant is satisified for the top four elements of
+    // Loop until the invariant is satisfied for the top four elements of
     // `runs`. Because this method is called for every added run, and only
     // the top three runs are ever merged, this guarantees the invariant holds
     // for the whole array.
@@ -611,8 +623,12 @@ extension UnsafeMutableBufferPointer {
 
     return true
   }
-  
+
+  // FIXME(ABI): unused return value
   /// Merges elements of `runs` until only one run remains.
+  ///
+  /// The unused return value is legacy ABI. It was originally added as a
+  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
   ///
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
@@ -620,7 +636,7 @@ extension UnsafeMutableBufferPointer {
   ///   any i, `runs[i].upperBound == runs[i + 1].lowerBound`.
   @discardableResult
   @inlinable
-  public mutating func _finalizeRuns(
+  internal mutating func _finalizeRuns(
     _ runs: inout [Range<Index>],
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool

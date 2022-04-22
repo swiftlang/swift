@@ -162,6 +162,9 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   if (user->getModule().getASTContext().hadError())
     return true;
 
+  if (isIncidentalUse(user))
+    return true;
+
   // It is fine to call the partial apply
   switch (user->getKind()) {
   case SILInstructionKind::ApplyInst:
@@ -205,10 +208,6 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   case SILInstructionKind::CopyValueInst:
     return llvm::all_of(cast<CopyValueInst>(user)->getUses(),
                         hasExpectedUsesOfNoEscapePartialApply);
-
-  // End borrow is always ok.
-  case SILInstructionKind::EndBorrowInst:
-    return true;
 
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::StoreInst:

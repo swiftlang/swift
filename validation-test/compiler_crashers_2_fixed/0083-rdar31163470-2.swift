@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -emit-ir
 
 protocol C {
@@ -19,5 +20,7 @@ struct PEN<_S : PST> : SL {
 
 struct PE<N : SL> {
   let n: N
+  // CHECK-LABEL: .c@
+  // CHECK-NEXT: Generic signature: <N, S where N == PEN<S>, S : PST>
   static func c<S>(_: PE<N>) where N == PEN<S> {}
 }

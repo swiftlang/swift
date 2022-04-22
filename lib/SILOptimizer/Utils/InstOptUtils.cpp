@@ -216,9 +216,11 @@ bool swift::hasOnlyEndOfScopeOrEndOfLifetimeUses(SILInstruction *inst) {
     for (Operand *use : result->getUses()) {
       SILInstruction *user = use->getUser();
       bool isDebugUser = user->isDebugInstruction();
-      if (!isa<DestroyValueInst>(user) && !isa<EndLifetimeInst>(user) &&
-          !isEndOfScopeMarker(user) && !isDebugUser)
+      if (!isa<DestroyValueInst>(user) && !isa<EndLifetimeInst>(user)
+          && !isa<DeallocStackInst>(user) && !isEndOfScopeMarker(user)
+          && !isDebugUser) {
         return false;
+      }
       // Include debug uses only in Onone mode.
       if (isDebugUser && inst->getFunction()->getEffectiveOptimizationMode() <=
                              OptimizationMode::NoOptimization)

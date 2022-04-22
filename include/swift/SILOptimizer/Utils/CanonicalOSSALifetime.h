@@ -313,6 +313,23 @@ private:
   CanonicalOSSAConsumeInfo consumes;
 
 public:
+  /// When rewriting destroys, is this an instruction which destroys should not
+  /// be hoisted over to avoid churn and infinite looping.
+  static bool ignoredByDestroyHoisting(SILInstructionKind kind) {
+    switch (kind) {
+    case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::CopyValueInst:
+    case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::EndBorrowInst:
+    case SILInstructionKind::FunctionRefInst:
+    case SILInstructionKind::EnumInst:
+    case SILInstructionKind::StructInst:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   void maybeNotifyMoveOnlyCopy(Operand *use) {
     if (!moveOnlyCopyValueNotification)
       return;

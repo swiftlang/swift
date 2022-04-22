@@ -15,8 +15,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// XFAIL: windows
-
 import StdlibUnittest
 import resilient_class
 

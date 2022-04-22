@@ -109,7 +109,7 @@ devirtualizeReleaseOfObject(SILInstruction *ReleaseInst,
   LLVM_DEBUG(llvm::dbgs() << "  try to devirtualize " << *ReleaseInst);
 
   // Does the last release really release the allocated object?
-  AllocRefInst *ARI = deallocStackInst->getAllocRef();
+  auto *ARI = deallocStackInst->getAllocRef();
   SILValue rcRoot = RCIA->getRCIdentityRoot(ReleaseInst->getOperand(0));
   if (rcRoot != ARI)
     return false;

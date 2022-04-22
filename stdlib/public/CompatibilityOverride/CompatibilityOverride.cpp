@@ -1,4 +1,4 @@
-//===--- CompatibiltyOverride.cpp - Back-deploying compatibility fies ---s-===//
+//===--- CompatibilityOverride.cpp - Back-deploying compatibility fixes ---s-===//
 //
 // This source file is part of the Swift.org open source project
 //

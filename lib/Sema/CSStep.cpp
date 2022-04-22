@@ -616,7 +616,7 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
       genericSignatureB.getRequirements(),
       QueryTypeSubstitutionMap{ substMap });
 
-  if (result != RequirementCheckResult::Success)
+  if (result != CheckGenericArgumentsResult::Success)
     return false;
 
   return substTypeA->isEqual(substTypeB);
@@ -648,7 +648,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   if (choice.isDisabled())
     return skip("disabled");
 
-  // Skip unavailable overloads (unless in dignostic mode).
+  // Skip unavailable overloads (unless in diagnostic mode).
   if (choice.isUnavailable() && !CS.shouldAttemptFixes())
     return skip("unavailable");
 
@@ -816,6 +816,18 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // by dropping all scoring information.
   CS.CurrentScore = Score();
 
+  // Reset the scope counter to avoid "too complex" failures
+  // when closure has a lot of elements in the body.
+  CS.CountScopes = 0;
+
+  // If timer is enabled, let's reset it so that each element
+  // (expression) gets a fresh time slice to get solved. This
+  // is important for closures with large number of statements
+  // in them.
+  if (CS.Timer) {
+    CS.Timer.emplace(element.getLocator(), CS);
+  }
+
   auto success = element.attempt(CS);
 
   // If element attempt has failed, mark whole conjunction
@@ -962,7 +974,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
       // with information deduced from the conjunction.
       Snapshot->setupOuterContext(Solutions.pop_back_val());
 
-      // Pretend that conjunction never happend.
+      // Pretend that conjunction never happened.
       restoreOuterState();
 
       // Now that all of the information from the conjunction has

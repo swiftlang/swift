@@ -93,7 +93,7 @@ func invalidDiffWrtClass(_ x: Class) -> Class {
 }
 
 protocol Proto {}
-// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Proto' does not conform to 'Differentiable'}}
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'any Proto' does not conform to 'Differentiable'}}
 @differentiable(reverse, wrt: x)
 func invalidDiffWrtExistential(_ x: Proto) -> Proto {
   return x
@@ -565,7 +565,7 @@ public protocol HasRequirement {
 // expected-error @+1 {{type 'AttemptsToSatisfyRequirement' does not conform to protocol 'HasRequirement'}}
 public struct AttemptsToSatisfyRequirement: HasRequirement {
   // This `@differentiable` attribute does not satisfy the requirement because
-  // it is mroe constrained than the requirement's `@differentiable` attribute.
+  // it is more constrained than the requirement's `@differentiable` attribute.
   @differentiable(reverse where T: CustomStringConvertible)
   // expected-note @+1 {{candidate is missing explicit '@differentiable(reverse, wrt: (x, y))' attribute to satisfy requirement}}
   public func requirement<T: Differentiable>(_ x: T, _ y: T) -> T { x }

@@ -27,26 +27,22 @@ RUN: ls %t-REMOTE/output/nested/ | %FileCheck -check-prefix CHECK-REMOTE %s
 RUN: %debug-remote-run -v --output-prefix %t cp %t/nested/input %t/nested/output 2>&1 >/dev/null | %FileCheck -check-prefix VERBOSE %s
 
 VERBOSE: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/output/nested
-VERBOSE-NEXT: /usr/bin/sftp
-VERBOSE-DAG: -put '{{.+}}/nested/output' '{{.+}}-REMOTE/output/nested/output'
-VERBOSE-DAG: -put '{{.+}}/nested/input' '{{.+}}-REMOTE/output/nested/input'
-VERBOSE: /usr/bin/env cp
-VERBOSE-NEXT: {{^}}/bin/mkdir -p {{.+}}/nested
-VERBOSE-NEXT: /usr/bin/sftp
-VERBOSE-DAG: -get '{{.+}}-REMOTE/output/nested/output' '{{.+}}/nested/output'
-VERBOSE-DAG: -get '{{.+}}-REMOTE/output/nested/input' '{{.+}}/nested/input'
+VERBOSE: /usr/bin/rsync
+VERBOSE: /usr/bin/env {{.*}}cp
+VERBOSE-NEXT: {{^}}/bin/mkdir -p {{.+}}
+VERBOSE-NEXT: /usr/bin/rsync
 
 RUN: %empty-directory(%t)
 RUN: touch %t/xyz-1before
 RUN: %debug-remote-run --output-prefix %t/xyz cp %t/xyz-1before %t/xyz-2after
 RUN: ls %t | %FileCheck -check-prefix CHECK-PREFIXED %s
-RUN: ls %t-REMOTE/ | %FileCheck -check-prefix CHECK-PREFIXED-REMOTE %s
+RUN: ls %t-REMOTE/output | %FileCheck -check-prefix CHECK-PREFIXED-REMOTE %s
 
 CHECK-PREFIXED: {{^xyz-1before$}}
 CHECK-PREFIXED: {{^xyz-2after$}}
 
-CHECK-PREFIXED-REMOTE: {{^output-1before$}}
-CHECK-PREFIXED-REMOTE: {{^output-2after$}}
+CHECK-PREFIXED-REMOTE: {{^xyz-1before$}}
+CHECK-PREFIXED-REMOTE: {{^xyz-2after$}}
 
 RUN: %empty-directory(%t)
 RUN: %empty-directory(%t-REMOTE)

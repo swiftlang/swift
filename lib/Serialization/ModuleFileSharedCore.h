@@ -203,8 +203,8 @@ private:
   /// Local DeclContexts referenced by this module.
   ArrayRef<RawBitOffset> LocalDeclContexts;
 
-  /// Normal protocol conformances referenced by this module.
-  ArrayRef<RawBitOffset> NormalConformances;
+  /// Protocol conformances referenced by this module.
+  ArrayRef<RawBitOffset> Conformances;
 
   /// SILLayouts referenced by this module.
   ArrayRef<RawBitOffset> SILLayouts;

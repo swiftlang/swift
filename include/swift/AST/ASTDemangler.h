@@ -112,6 +112,8 @@ public:
                                      bool isClassBound,
                                      bool forRequirement = true);
 
+  Type createParameterizedProtocolType(Type base, ArrayRef<Type> args);
+
   Type createExistentialMetatypeType(Type instance,
                      Optional<Demangle::ImplMetatypeRepresentation> repr=None);
 

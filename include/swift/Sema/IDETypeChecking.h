@@ -21,6 +21,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/OptionSet.h"
 #include <memory>
 #include <tuple>
 
@@ -45,6 +46,14 @@ namespace swift {
   class Type;
   class ValueDecl;
   struct PrintOptions;
+
+  namespace constraints {
+  class ConstraintSystem;
+  class Solution;
+  class SolutionApplicationTarget;
+  enum class ConstraintSystemFlags;
+  using ConstraintSystemOptions = OptionSet<ConstraintSystemFlags>;
+  }
 
   /// Typecheck binding initializer at \p bindingIndex.
   void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex,
@@ -87,8 +96,9 @@ namespace swift {
   /// Unlike other member lookup functions, \c swift::resolveValueMember()
   /// should be used when you want to look up declarations with the same name as
   /// one you already have.
-  ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
-                                         DeclName Name);
+  ResolvedMemberResult
+  resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name,
+                     constraints::ConstraintSystemOptions Options = {});
 
   /// Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
@@ -134,8 +144,24 @@ namespace swift {
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
-  /// Type check a function body element which is at \p TagetLoc .
+  /// Type check a function body element which is at \p TargetLoc .
   bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
+
+  /// Thunk around \c TypeChecker::typeCheckForCodeCompletion to make it
+  /// available to \c swift::ide.
+  /// Type check the given expression and provide results back to code
+  /// completion via specified callback.
+  ///
+  /// This method is designed to be used for code completion which means that
+  /// it doesn't mutate given expression, even if there is a single valid
+  /// solution, and constraint solver is allowed to produce partially correct
+  /// solutions. Such solutions can have any number of holes in them.
+  ///
+  /// \returns `true` if target was applicable and it was possible to infer
+  /// types for code completion, `false` otherwise.
+  bool typeCheckForCodeCompletion(
+      constraints::SolutionApplicationTarget &target, bool needsPrecheck,
+      llvm::function_ref<void(const constraints::Solution &)> callback);
 
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
@@ -145,7 +171,7 @@ namespace swift {
   /// \c ModuleDecl::getDisplayDecls() would only return if previous
   /// work happened to have synthesized them.
   void
-  getTopLevelDeclsForDisplay(ModuleDecl *M, SmallVectorImpl<Decl*> &Results);
+  getTopLevelDeclsForDisplay(ModuleDecl *M, SmallVectorImpl<Decl*> &Results, bool Recursive = false);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.

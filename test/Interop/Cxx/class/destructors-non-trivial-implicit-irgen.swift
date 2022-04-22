@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-cxx-interop -I %S/Inputs %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-cxx-interop -I %S/Inputs %s -emit-ir | %FileCheck %s
 
 import Destructors
 

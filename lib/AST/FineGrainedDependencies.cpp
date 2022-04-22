@@ -292,7 +292,7 @@ bool DependencyKey::verify() const {
   return true;
 }
 
-/// Since I don't have Swift enums, ensure name corresspondence here.
+/// Since I don't have Swift enums, ensure name correspondence here.
 void DependencyKey::verifyNodeKindNames() {
   for (size_t i = 0; i < size_t(NodeKind::kindCount); ++i)
     switch (NodeKind(i)) {
@@ -313,7 +313,7 @@ void DependencyKey::verifyNodeKindNames() {
 #undef CHECK_NAME
 }
 
-/// Since I don't have Swift enums, ensure name corresspondence here.
+/// Since I don't have Swift enums, ensure name correspondence here.
 void DependencyKey::verifyDeclAspectNames() {
   for (size_t i = 0; i < size_t(DeclAspect::aspectCount); ++i)
     switch (DeclAspect(i)) {

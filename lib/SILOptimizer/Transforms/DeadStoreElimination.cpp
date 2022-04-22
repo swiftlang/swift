@@ -123,7 +123,7 @@ findDeallocStackInst(AllocStackInst *ASI) {
 /// Return the deallocate ref instructions corresponding to the given
 /// AllocRefInst.
 static llvm::SmallVector<SILInstruction *, 1>
-findDeallocStackRefInst(AllocRefInst *ARI) {
+findDeallocStackRefInst(AllocRefInstBase *ARI) {
   llvm::SmallVector<SILInstruction *, 1> DSIs;
   for (auto UI = ARI->use_begin(), E = ARI->use_end(); UI != E; ++UI) {
     if (auto *D = dyn_cast<DeallocStackRefInst>(UI->getUser()))
@@ -701,7 +701,7 @@ void BlockState::initStoreSetAtEndOfBlock(DSEContext &Ctx) {
         startTrackingLocation(BBDeallocateLocation, i);
       }
     }
-    if (auto *ARI = dyn_cast<AllocRefInst>(LocationVault[i].getBase())) {
+    if (auto *ARI = dyn_cast<AllocRefInstBase>(LocationVault[i].getBase())) {
       if (!ARI->isAllocatingStack())
         continue;
       for (auto X : findDeallocStackRefInst(ARI)) {

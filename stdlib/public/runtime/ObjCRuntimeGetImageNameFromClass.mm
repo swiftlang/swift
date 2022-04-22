@@ -149,7 +149,7 @@ namespace {
 /// Swift at all.
 ///
 /// Also, if the symbol being patched has references within the image where it
-/// was originaly defined, those references will \e not be patched.
+/// was originally defined, those references will \e not be patched.
 static void patchLazyPointers(const mach_header *mh, const char *symbolName,
                               const void *newValue) {
   // Get linkEditBase
@@ -269,7 +269,7 @@ static BOOL callUnpatchedGetImageNameFromClass(
 /// implementation.
 ///
 /// The Swift implementation is always set up to chain to another
-/// implementation, so on older OSs we just have to make sure that that chained
+/// implementation, so on older OSs we just have to make sure that chained
 /// implementation is the original system version. See
 /// callUnpatchedGetImageNameFromClass.
 static const char *patchedGetImageNameFromClassForOldOSs(Class _Nullable cls) {

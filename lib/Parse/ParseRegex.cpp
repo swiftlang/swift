@@ -21,7 +21,7 @@
 #include "swift/Syntax/SyntaxKind.h"
 
 // Regex parser delivered via Swift modules.
-#include "swift/Parse/ExperimentalRegexBridging.h"
+#include "swift/Parse/RegexParserBridging.h"
 static RegexLiteralParsingFn regexLiteralParsingFn = nullptr;
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn) {
   regexLiteralParsingFn = fn;
@@ -51,12 +51,11 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
   regexLiteralParsingFn(regexText.str().c_str(), &errorStr, &version,
                         /*captureStructureOut*/ capturesBuf.data(),
                         /*captureStructureSize*/ capturesBuf.size());
-  if (errorStr) {
-    diagnose(Tok, diag::regex_literal_parsing_error, errorStr);
-    return makeParserError();
-  }
-
   auto loc = consumeToken();
+  if (errorStr) {
+    diagnose(loc, diag::regex_literal_parsing_error, errorStr);
+    return makeParserResult(new (Context) ErrorExpr(loc));
+  }
   return makeParserResult(RegexLiteralExpr::createParsed(
       Context, loc, regexText, version, capturesBuf));
 }

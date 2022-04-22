@@ -769,6 +769,20 @@ erase_if(std::unordered_set<Key, Hash, KeyEqual, Alloc> &c, Pred pred) {
   return startingSize - c.size();
 }
 
+/// Call \c vector.emplace_back with each of the other arguments
+/// to this function, in order.  Constructing an intermediate
+/// \c std::initializer_list can be inefficient; more problematically,
+/// types such as \c std::vector copy out of the \c initializer_list
+/// instead of move.
+template <class VectorType, class ValueType, class... ValueTypes>
+void emplace_back_all(VectorType &vector, ValueType &&value,
+                      ValueTypes &&...values) {
+  vector.emplace_back(std::forward<ValueType>(value));
+  emplace_back_all(vector, std::forward<ValueTypes>(values)...);
+}
+template <class VectorType>
+void emplace_back_all(VectorType &vector) {}
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_INTERLEAVE_H

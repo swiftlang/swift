@@ -503,7 +503,7 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // arguments lifetime-extends the bridged pointer for the right duration.
 // <rdar://problem/16738050>
 
-// CHECK-LABEL: sil shared [serializable] [ossa] @$sSo7NSArrayC7objects5countABSPyyXlSgGSg_s5Int32VtcfC
+// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo7NSArrayC7objects5countABSPyyXlSgGSg_s5Int32VtcfC
 // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic
 // CHECK:         [[METHOD:%.*]] = function_ref @$sSo7NSArrayC7objects5countABSPyyXlSgGSg_s5Int32VtcfcTO
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]
@@ -613,7 +613,7 @@ func defineNonStandardBlock(x: Any) {
   let fn : @convention(block) (Any) -> Any = { y in takeTwoAnys(x, y) }
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sypypIegnr_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sypypIegnr_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
 // CHECK: bb0(%0 : $*@block_storage @callee_guaranteed (@in_guaranteed Any) -> @out Any, %1 : @unowned $AnyObject):
 // CHECK:   [[T0:%.*]] = copy_value %1 : $AnyObject
 // CHECK:   [[T1:%.*]] = open_existential_ref [[T0]] : $AnyObject

@@ -95,7 +95,9 @@ public:
   FunctionSignatureSpecializationMangler(SpecializationPass Pass,
                                          IsSerialized_t Serialized,
                                          SILFunction *F);
-  void setArgumentConstantProp(unsigned OrigArgIdx, LiteralInst *LI);
+  void setArgumentConstantProp(unsigned OrigArgIdx, SILInstruction *constInst);
+  void appendStringAsIdentifier(StringRef str);
+
   void setArgumentClosureProp(unsigned OrigArgIdx, PartialApplyInst *PAI);
   void setArgumentClosureProp(unsigned OrigArgIdx,
                               ThinToThickFunctionInst *TTTFI);
@@ -112,7 +114,7 @@ public:
   std::string mangle();
   
 private:
-  void mangleConstantProp(LiteralInst *LI);
+  void mangleConstantProp(SILInstruction *constInst);
   void mangleClosureProp(SILInstruction *Inst);
   void mangleArgument(ArgumentModifierIntBase ArgMod,
                       NullablePtr<SILInstruction> Inst);

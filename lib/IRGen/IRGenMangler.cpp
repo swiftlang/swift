@@ -84,8 +84,7 @@ SymbolicMangling
 IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
                                   llvm::function_ref<void ()> body) {
   Mod = IGM.getSwiftModule();
-  OptimizeProtocolNames = false;
-  UseObjCRuntimeNames = true;
+  configureForSymbolicMangling();
 
   llvm::SaveAndRestore<bool>
     AllowSymbolicReferencesLocally(AllowSymbolicReferences);
@@ -116,14 +115,14 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // Classes defined in Objective-C don't have descriptors.
       // TODO: We could assign a symbolic reference discriminator to refer
       // to objc class refs.
-      if (auto clas = dyn_cast<ClassDecl>(type)) {
+      if (auto clazz = dyn_cast<ClassDecl>(type)) {
         // Swift-defined classes can be symbolically referenced.
-        if (hasKnownSwiftMetadata(IGM, const_cast<ClassDecl*>(clas)))
+        if (hasKnownSwiftMetadata(IGM, const_cast<ClassDecl*>(clazz)))
           return true;
 
         // Foreign class types can be symbolically referenced.
-        if (clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType ||
-            const_cast<ClassDecl *>(clas)->isForeignReferenceType())
+        if (clazz->getForeignClassKind() == ClassDecl::ForeignKind::CFType ||
+            const_cast<ClassDecl *>(clazz)->isForeignReferenceType())
           return true;
 
         // Otherwise no.
@@ -173,7 +172,22 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   });
 }
 
+SymbolicMangling
+IRGenMangler::mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
+                                             CanType type) {
+  // Use runtime information like we would for a symbolic mangling,
+  // just don't allow actual symbolic references anywhere in the
+  // mangled name.
+  configureForSymbolicMangling();
 
+  // We don't make the substitution adjustments above because they're
+  // target-specific and so would break the goal of getting a unique
+  // string.
+  appendType(type, sig);
+
+  assert(SymbolicReferences.empty());
+  return {finalize(), {}};
+}
 
 std::string IRGenMangler::mangleProtocolConformanceDescriptor(
                                  const RootProtocolConformance *conformance) {
@@ -241,7 +255,7 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
     Buffer << 'T';
     auto protocols = layout.getProtocols();
     for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-      appendProtocolName(protocols[i]->getDecl());
+      appendProtocolName(protocols[i]);
       if (i == 0)
         appendOperator("_");
     }
@@ -279,6 +293,11 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
   case MangledTypeRefRole::Metadata:
   case MangledTypeRefRole::Reflection:
     prefix = "symbolic ";
+    break;
+
+  case MangledTypeRefRole::FlatUnique:
+    prefix = "flat unique ";
+    assert(mangling.SymbolicReferences.empty());
     break;
   }
   auto prefixLen = strlen(prefix);
@@ -355,6 +374,41 @@ std::string IRGenMangler::mangleSymbolNameForMangledConformanceAccessorString(
   return finalize();
 }
 
+std::string IRGenMangler::mangleSymbolNameForUnderlyingTypeAccessorString(
+    OpaqueTypeDecl *opaque, unsigned index) {
+  beginManglingWithoutPrefix();
+  Buffer << "get_underlying_type_ref ";
+
+  appendContextOf(opaque);
+  appendOpaqueDeclName(opaque);
+
+  if (index == 0) {
+    appendOperator("Qr");
+  } else {
+    appendOperator("QR", Index(index));
+  }
+
+  return finalize();
+}
+
+std::string
+IRGenMangler::mangleSymbolNameForUnderlyingWitnessTableAccessorString(
+    OpaqueTypeDecl *opaque, const Requirement &req, ProtocolDecl *protocol) {
+  beginManglingWithoutPrefix();
+  Buffer << "get_underlying_witness ";
+
+  appendContextOf(opaque);
+  appendOpaqueDeclName(opaque);
+
+  appendType(req.getFirstType()->getCanonicalType(), opaque->getGenericSignature());
+
+  appendProtocolName(protocol);
+
+  appendOperator("HC");
+
+  return finalize();
+}
+
 std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
                                               CanGenericSignature genericSig) {
   beginManglingWithoutPrefix();
@@ -362,3 +416,33 @@ std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
   appendGenericSignature(genericSig);
   return finalize();
 }
+
+std::string
+IRGenMangler::mangleExtendedExistentialTypeShape(bool isUnique,
+                                                 CanGenericSignature genSig,
+                                                 CanType shapeType) {
+  beginMangling();
+
+  appendExtendedExistentialTypeShape(genSig, shapeType);
+
+  // If this is non-unique, add a suffix to avoid accidental misuse
+  // (and to make it easier to analyze in an image).
+  if (!isUnique)
+    appendOperator("Mq");
+
+  return finalize();
+}
+
+void
+IRGenMangler::appendExtendedExistentialTypeShape(CanGenericSignature genSig,
+                                                 CanType shapeType) {
+  // Append the generalization signature.
+  if (genSig) appendGenericSignature(genSig);
+
+  // Append the existential type.
+  appendType(shapeType, genSig);
+
+  // Append the shape operator.
+  appendOperator(genSig ? "XG" : "Xg");
+}
+

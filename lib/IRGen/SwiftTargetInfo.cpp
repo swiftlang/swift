@@ -36,10 +36,17 @@ static void setToMask(SpareBitVector &bits, unsigned size, uint64_t mask) {
 /// Configures target-specific information for arm64 platforms.
 static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
                            SwiftTargetInfo &target) {
-  setToMask(target.PointerSpareBits, 64,
-            SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK);
-  setToMask(target.ObjCPointerReservedBits, 64,
-            SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK);
+  if (triple.isAndroid()) {
+    setToMask(target.PointerSpareBits, 64,
+              SWIFT_ABI_ANDROID_ARM64_SWIFT_SPARE_BITS_MASK);
+    setToMask(target.ObjCPointerReservedBits, 64,
+              SWIFT_ABI_ANDROID_ARM64_OBJC_RESERVED_BITS_MASK);
+  } else {
+    setToMask(target.PointerSpareBits, 64,
+              SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK);
+    setToMask(target.ObjCPointerReservedBits, 64,
+              SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK);
+  }
   setToMask(target.IsObjCPointerBit, 64, SWIFT_ABI_ARM64_IS_OBJC_BIT);
 
   if (triple.isOSDarwin()) {
@@ -144,6 +151,13 @@ static void configureARM(IRGenModule &IGM, const llvm::Triple &triple,
   setToMask(target.IsObjCPointerBit, 32, SWIFT_ABI_ARM_IS_OBJC_BIT);
 }
 
+/// Configures target-specific information for powerpc platforms.
+static void configurePowerPC(IRGenModule &IGM, const llvm::Triple &triple,
+                               SwiftTargetInfo &target) {
+  setToMask(target.PointerSpareBits, 32,
+            SWIFT_ABI_POWERPC_SWIFT_SPARE_BITS_MASK);
+}
+
 /// Configures target-specific information for powerpc64 platforms.
 static void configurePowerPC64(IRGenModule &IGM, const llvm::Triple &triple,
                                SwiftTargetInfo &target) {
@@ -219,6 +233,10 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
       configureARM64_32(IGM, triple, target);
     else
       configureARM64(IGM, triple, target);
+    break;
+  
+  case llvm::Triple::ppc:
+    configurePowerPC(IGM, triple, target);
     break;
 
   case llvm::Triple::ppc64:

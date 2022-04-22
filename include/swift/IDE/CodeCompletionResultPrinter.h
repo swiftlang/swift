@@ -13,12 +13,18 @@
 #ifndef SWIFT_IDE_CODECOMPLETIONRESULTPRINTER_H
 #define SWIFT_IDE_CODECOMPLETIONRESULTPRINTER_H
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
+
+class NullTerminatedStringRef;
+
 namespace ide {
 
 class CodeCompletionResult;
+class CodeCompletionString;
 
 void printCodeCompletionResultDescription(const CodeCompletionResult &Result,
                                           llvm::raw_ostream &OS,
@@ -37,8 +43,11 @@ void printCodeCompletionResultTypeNameAnnotated(
 void printCodeCompletionResultSourceText(
     const CodeCompletionResult &Result, llvm::raw_ostream &OS);
 
-void printCodeCompletionResultFilterName(
-    const CodeCompletionResult &Result, llvm::raw_ostream &OS);
+/// Print 'FilterName' from \p str into memory managed by \p Allocator and
+/// return it as \c NullTerminatedStringRef .
+NullTerminatedStringRef
+getCodeCompletionResultFilterName(const CodeCompletionString *Str,
+                                  llvm::BumpPtrAllocator &Allocator);
 
 } // namespace ide
 } // namespace swift

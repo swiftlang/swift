@@ -102,6 +102,35 @@ bool TypeRepr::hasOpaque() {
     findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
 }
 
+TypeRepr *TypeRepr::getWithoutParens() const {
+  auto *repr = const_cast<TypeRepr *>(this);
+  while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(repr)) {
+    if (!tupleRepr->isParenType())
+      break;
+    repr = tupleRepr->getElementType(0);
+  }
+  return repr;
+}
+
+CollectedOpaqueReprs TypeRepr::collectOpaqueReturnTypeReprs() {
+  class Walker : public ASTWalker {
+    CollectedOpaqueReprs &Reprs;
+
+  public:
+    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
+
+    bool walkToTypeReprPre(TypeRepr *repr) override {
+      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
+        Reprs.push_back(opaqueRepr);
+      return true;
+    }
+  };
+
+  CollectedOpaqueReprs reprs;
+  walk(Walker(reprs));
+  return reprs;
+}
+
 SourceLoc TypeRepr::findUncheckedAttrLoc() const {
   auto typeRepr = this;
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
@@ -182,6 +211,8 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@autoclosure") << " ";
   if (hasAttr(TAK_escaping))
     Printer.printSimpleAttr("@escaping") << " ";
+  if (hasAttr(TAK_Sendable))
+    Printer.printSimpleAttr("@Sendable") << " ";
   if (hasAttr(TAK_noDerivative))
     Printer.printSimpleAttr("@noDerivative") << " ";
 

@@ -1,6 +1,6 @@
 // RUN: not %target-swift-frontend -primary-filelist 2>&1 | %FileCheck -check-prefix=CHECK-EXPECTEDARGUMENT %s
 // CHECK-EXPECTEDARGUMENT: error: missing argument value for '-primary-filelist', expected 1 argument(s)
-// RUN: not %target-swift-frontend -primary-filelist nonexistant 2>&1 | %FileCheck -check-prefix=CHECK-BADFILE %s
+// RUN: not %target-swift-frontend -primary-filelist nonexistent 2>&1 | %FileCheck -check-prefix=CHECK-BADFILE %s
 // CHECK-BADFILE: error: cannot open file
 
 // RUN: %empty-directory(%t)

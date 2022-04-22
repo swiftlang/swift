@@ -1,7 +1,10 @@
 // RUN: %target-typecheck-verify-swift
 
-let x: _ = 0
+let x: _ = 0 // expected-error {{placeholder type may not appear as type of a variable}} expected-note {{replace the placeholder with the inferred type 'Int'}} {{8-9=Int}}
 let x2 = x
+var x3: _ { // expected-error {{type placeholder not allowed here}}
+  get { 42 }
+}
 let dict1: [_: Int] = ["hi": 0]
 let dict2: [Character: _] = ["h": 0]
 
@@ -112,10 +115,10 @@ let _: () -> Int = { _() } // expected-error 2 {{type placeholder not allowed he
 let _: Int = _.init() // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
 let _: () -> Int = { _.init() } // expected-error 2 {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
 
-func returnsInt() -> Int { _() } // expected-error {{type of expression is ambiguous without more context}}
-func returnsIntClosure() -> () -> Int { { _() } } // expected-error {{unable to infer closure type in the current context}}
-func returnsInt2() -> Int { _.init() }  // expected-error {{could not infer type for placeholder}}
-func returnsIntClosure2() -> () -> Int { { _.init() } } // expected-error {{could not infer type for placeholder}}
+func returnsInt() -> Int { _() } // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
+func returnsIntClosure() -> () -> Int { { _() } } // expected-error 2 {{type placeholder not allowed here}} expected-error {{unable to infer closure type in the current context}}
+func returnsInt2() -> Int { _.init() }  // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
+func returnsIntClosure2() -> () -> Int { { _.init() } } // expected-error 2 {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
 
 let _: Int.Type = _ // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
 let _: Int.Type = _.self // expected-error {{type placeholder not allowed here}}
@@ -144,13 +147,13 @@ let _ = [_].otherStaticMember.method()
 func f(x: Any, arr: [Int]) {
     // FIXME: Better diagnostics here. Maybe we should suggest replacing placeholders with 'Any'?
 
-    if x is _ {} // expected-error {{type of expression is ambiguous without more context}}
+    if x is _ {} // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
     if x is [_] {} // expected-error {{type of expression is ambiguous without more context}}
     if x is () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    if let y = x as? _ {} // expected-error {{type of expression is ambiguous without more context}}
+    if let y = x as? _ {} // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
     if let y = x as? [_] {} // expected-error {{type of expression is ambiguous without more context}}
     if let y = x as? () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    let y1 = x as! _ // expected-error {{type of expression is ambiguous without more context}}
+    let y1 = x as! _ // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
     let y2 = x as! [_] // expected-error {{type of expression is ambiguous without more context}}
     let y3 = x as! () -> _ // expected-error {{type of expression is ambiguous without more context}}
 
@@ -163,13 +166,13 @@ func f(x: Any, arr: [Int]) {
     case let y as () -> _: break // expected-error {{type placeholder not allowed here}}
     }
 
-    if arr is _ {} // expected-error {{type of expression is ambiguous without more context}}
+    if arr is _ {} // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
     if arr is [_] {} // expected-error {{type of expression is ambiguous without more context}}
     if arr is () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    if let y = arr as? _ {} // expected-error {{type of expression is ambiguous without more context}}
+    if let y = arr as? _ {} // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
     if let y = arr as? [_] {} // expected-error {{type of expression is ambiguous without more context}}
     if let y = arr as? () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    let y1 = arr as! _ // expected-error {{type of expression is ambiguous without more context}}
+    let y1 = arr as! _ // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
     let y2 = arr as! [_] // expected-error {{type of expression is ambiguous without more context}}
     let y3 = arr as! () -> _ // expected-error {{type of expression is ambiguous without more context}}
 
@@ -208,8 +211,9 @@ let _: SetFailureType<Int, (String, Double)> = Just<Int>().setFailureType(to: (_
 // TODO: Better error message here? Would be nice if we could point to the placeholder...
 let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self).setFailureType(to: String.self) // expected-error {{type placeholder not allowed here}} expected-error {{generic parameter 'T' could not be inferred}}
 
-let _: (_) = 0 as Int
-let _: Int = 0 as (_)
+let _: (_) = 0 as Int // expected-error {{placeholder type may not appear as type of a variable}} expected-note {{replace the placeholder with the inferred type 'Int'}} {{9-10=Int}}
+let _: Int = 0 as (_) // expected-error {{type placeholder not allowed here}}
+let _: Int = 0 as (((((_))))) // expected-error {{type placeholder not allowed here}}
 
 _ = (1...10)
     .map {
@@ -254,3 +258,11 @@ enum EnumWithPlaceholders {
   // expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
 }
 
+func deferredInit(_ c: Bool) {
+  let x: _ // expected-error {{type placeholder not allowed here}}
+  if c {
+    x = "Hello"
+  } else {
+    x = "Goodbye"
+  }
+}

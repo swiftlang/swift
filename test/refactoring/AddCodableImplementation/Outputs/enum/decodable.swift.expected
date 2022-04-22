@@ -1,0 +1,49 @@
+
+enum Payload: Codable {
+  case plain(String)
+  case pair(key: String, value: String)
+}
+
+enum Payload_D: Decodable {
+  case plain(String)
+  case pair(key: String, value: String)
+
+  enum CodingKeys: CodingKey {
+    case plain
+    case pair
+  }
+  enum PlainCodingKeys: CodingKey {
+    case _0
+  }
+  enum PairCodingKeys: CodingKey {
+    case key
+    case value
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: Payload_D.CodingKeys.self)
+
+    var allKeys = ArraySlice(container.allKeys)
+
+    guard let onlyKey = allKeys.popFirst(), allKeys.isEmpty else {
+      throw DecodingError.typeMismatch(Payload_D.self, DecodingError.Context.init(codingPath: container.codingPath, debugDescription: "Invalid number of keys found, expected one.", underlyingError: nil))
+    }
+    switch onlyKey {
+    case .plain:
+
+      let nestedContainer = try container.nestedContainer(keyedBy: Payload_D.PlainCodingKeys.self, forKey: Payload_D.CodingKeys.plain)
+
+      self = Payload_D.plain(try nestedContainer.decode(String.self, forKey: Payload_D.PlainCodingKeys._0))
+      case .pair:
+
+      let nestedContainer = try container.nestedContainer(keyedBy: Payload_D.PairCodingKeys.self, forKey: Payload_D.CodingKeys.pair)
+
+      self = Payload_D.pair(key: try nestedContainer.decode(String.self, forKey: Payload_D.PairCodingKeys.key), value: try nestedContainer.decode(String.self, forKey: Payload_D.PairCodingKeys.value))
+    }
+  }
+}
+
+enum Payload_E: Encodable {
+  case plain(String)
+  case pair(key: String, value: String)
+}

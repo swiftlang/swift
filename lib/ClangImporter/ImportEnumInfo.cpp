@@ -69,8 +69,16 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
   // underlying type of the enum, because there is no way to conjure up a
   // name for the Swift type.
   if (!decl->hasNameForLinkage()) {
-    kind = EnumKind::Constants;
-    return;
+    // If this enum comes from a typedef, we can find a name.
+    if (!isa<clang::TypedefType>(decl->getIntegerType().getTypePtr()) ||
+        // If the typedef is available in Swift, the user will get ambiguity.
+        // It also means they may not have intended this API to be imported like this.
+        !importer::isUnavailableInSwift(
+            cast<clang::TypedefType>(decl->getIntegerType().getTypePtr())->getDecl(),
+            nullptr, true)) {
+      kind = EnumKind::Constants;
+      return;
+    }
   }
 
   // First, check for attributes that denote the classification.
@@ -250,7 +258,7 @@ void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
     return;
   }
 
-  // If there are no enumers, there is no prefix to compute.
+  // If there are no enumerators, there is no prefix to compute.
   auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
   if (ec == ecEnd)
     return;
@@ -339,7 +347,16 @@ void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
 
     // Don't use importFullName() here, we want to ignore the swift_name
     // and swift_private attributes.
-    StringRef enumNameStr = decl->getName();
+    StringRef enumNameStr;
+    // If there's no name, this must be typedef. So use the typedef's name.
+    if (!decl->hasNameForLinkage()) {
+      auto typedefDecl = cast<clang::TypedefType>(
+                             decl->getIntegerType().getTypePtr())->getDecl();
+      enumNameStr = typedefDecl->getName();
+    } else {
+      enumNameStr = decl->getName();
+    }
+
     if (enumNameStr.empty())
       enumNameStr = decl->getTypedefNameForAnonDecl()->getName();
     assert(!enumNameStr.empty() && "should have been classified as Constants");

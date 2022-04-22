@@ -39,9 +39,9 @@ class C2 {
   }
 }
 
-// RUN: %target-swift-ide-test -print-type-interface -pos=37:6 -source-filename %s | %FileCheck %s -check-prefix=TYPE2
+// RUN: %target-swift-ide-test -print-type-interface -pos=37:6 -module-name print_type_interface -source-filename %s | %FileCheck %s -check-prefix=TYPE2
 // RUN: %target-swift-ide-test -print-type-interface -usr=_TtGC20print_type_interface1DCS_2T1_ -module-name print_type_interface -source-filename %s | %FileCheck %s -check-prefix=TYPE2
-// RUN: %target-swift-ide-test -print-type-interface -pos=38:6 -source-filename %s | %FileCheck %s -check-prefix=TYPE3
+// RUN: %target-swift-ide-test -print-type-interface -pos=38:6 -module-name print_type_interface -source-filename %s | %FileCheck %s -check-prefix=TYPE3
 // RUN: %target-swift-ide-test -print-type-interface -usr=_TtGC20print_type_interface1DSi_ -module-name print_type_interface -source-filename %s | %FileCheck %s -check-prefix=TYPE3
 
 extension D where T : P1 {
@@ -54,12 +54,12 @@ extension D {
   public func unconditionalFunc2(t : T) -> T {return t}
 }
 
-// TYPE2: public class D<T1> {
+// TYPE2: public class D<print_type_interface.T1> {
 // TYPE2:    public func foo()
 // TYPE2:    public func conditionalFunc1()
-// TYPE2:    public func conditionalFunc2(t: T1) -> T1
+// TYPE2:    public func conditionalFunc2(t: print_type_interface.T1) -> print_type_interface.T1
 // TYPE2:    public func unconditionalFunc1()
-// TYPE2:    public func unconditionalFunc2(t: T1) -> T1
+// TYPE2:    public func unconditionalFunc2(t: print_type_interface.T1) -> print_type_interface.T1
 // TYPE2: }
 
 // TYPE3: public class D<Int> {

@@ -22,7 +22,7 @@
   @_cdecl("main")
   func main() -> Int32 {
     print("Hello")
-    print(Bool(_builtinBooleanLiteral: ifdefFooBar()))
+    print("\(Bool(_builtinBooleanLiteral: ifdefFooBar()))")
     // CHECK: Hello
     // CHECK: false
 

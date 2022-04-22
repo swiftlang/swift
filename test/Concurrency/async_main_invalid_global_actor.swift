@@ -12,7 +12,7 @@ var poof: Int = 1337 // expected-note{{var declared here}}
 @main struct Doggo {
   @Kat
   static func main() { // expected-error{{main() must be '@MainActor'}}
-    // expected-error@+1{{var 'poof' isolated to global actor 'Kat' can not be referenced from different global actor 'MainActor' in a synchronous context}}
+    // expected-error@+1{{global actor 'Kat'-isolated var 'poof' can not be referenced from the main actor}}
     print("Kat value: \(poof)")
   }
 }

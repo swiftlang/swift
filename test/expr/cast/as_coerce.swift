@@ -118,14 +118,18 @@ func sr6022() -> Any { return 0 }
 func sr6022_1() { return; }
 protocol SR6022_P {}
 
-_ = sr6022 as! SR6022_P // expected-warning {{cast from '() -> Any' to unrelated type 'SR6022_P' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{11-11=()}}
-_ = sr6022 as? SR6022_P // expected-warning {{cast from '() -> Any' to unrelated type 'SR6022_P' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'}}{{11-11=()}}
-_ = sr6022_1 as! SR6022_P // expected-warning {{cast from '() -> ()' to unrelated type 'SR6022_P' always fails}}
-_ = sr6022_1 as? SR6022_P // expected-warning {{cast from '() -> ()' to unrelated type 'SR6022_P' always fails}}
+_ = sr6022 is SR6022_P // expected-warning {{cast from '() -> Any' to unrelated type 'any SR6022_P' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{11-11=()}}
+_ = sr6022 as! SR6022_P // expected-warning {{cast from '() -> Any' to unrelated type 'any SR6022_P' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{11-11=()}}
+_ = sr6022 as? SR6022_P // expected-warning {{cast from '() -> Any' to unrelated type 'any SR6022_P' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'}}{{11-11=()}}
+_ = sr6022_1 is SR6022_P // expected-warning {{cast from '() -> ()' to unrelated type 'any SR6022_P' always fails}}
+_ = sr6022_1 as! SR6022_P // expected-warning {{cast from '() -> ()' to unrelated type 'any SR6022_P' always fails}}
+_ = sr6022_1 as? SR6022_P // expected-warning {{cast from '() -> ()' to unrelated type 'any SR6022_P' always fails}}
 
 func testSR6022_P<T: SR6022_P>(_: T.Type) {
+  _ = sr6022 is T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{13-13=()}}
   _ = sr6022 as! T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{13-13=()}}
   _ = sr6022 as? T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{13-13=()}}
+  _ = sr6022_1 is T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
   _ = sr6022_1 as! T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
   _ = sr6022_1 as? T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
 }

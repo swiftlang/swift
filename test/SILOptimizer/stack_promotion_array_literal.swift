@@ -5,7 +5,7 @@
 // stack promoted.
 
 // CHECK-LABEL: sil @{{.*}}testit
-// CHECK:  alloc_ref [stack] [tail_elems
+// CHECK:  alloc_ref{{.*}} [stack] [tail_elems
 
 public func testit(_ N: Int, _ x: Int) {
   for _ in 0..<N {

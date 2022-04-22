@@ -377,20 +377,6 @@ public:
         ccbi->getTrueBBCount(), ccbi->getFalseBBCount());
   }
 
-  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *ccvbi) {
-    Builder.setCurrentDebugScope(getOpScope(ccvbi->getDebugScope()));
-    // Build pullback struct value for original block.
-    auto *pbStructVal = buildPullbackValueStructValue(ccvbi);
-    // Create a new `checked_cast_value_branch` instruction.
-    getBuilder().createCheckedCastValueBranch(
-        ccvbi->getLoc(), getOpValue(ccvbi->getOperand()),
-        getOpASTType(ccvbi->getSourceFormalType()),
-        getOpType(ccvbi->getTargetLoweredType()),
-        getOpASTType(ccvbi->getTargetFormalType()),
-        createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getSuccessBB()),
-        createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getFailureBB()));
-  }
-
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *ccabi) {
     Builder.setCurrentDebugScope(getOpScope(ccabi->getDebugScope()));
     // Build pullback struct value for original block.

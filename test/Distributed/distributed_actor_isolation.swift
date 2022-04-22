@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 // TODO(distributed): rdar://82419661 remove -verify-ignore-unknown here, no warnings should be emitted for our
 //  generated code but right now a few are, because of Sendability checks -- need to track it down more.
 
-import _Distributed
+import Distributed
 import FakeDistributedActorSystems
 
 @available(SwiftStdlib 5.5, *)
@@ -28,8 +28,8 @@ struct NotCodableValue { }
 
 distributed actor DistributedActor_1 {
 
-  let name: String = "alice" // expected-note{{distributed actor state is only available within the actor instance}}
-  var mutable: String = "alice" // expected-note{{distributed actor state is only available within the actor instance}}
+  let name: String = "alice" // expected-note{{access to property 'name' is only permitted within distributed actor 'DistributedActor_1'}}
+  var mutable: String = "alice" // expected-note{{access to property 'mutable' is only permitted within distributed actor 'DistributedActor_1'}}
   var computedMutable: String {
     get {
       "hey"
@@ -39,16 +39,13 @@ distributed actor DistributedActor_1 {
     }
   }
 
-  distributed let letProperty: String = "" // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-  distributed var varProperty: String = "" // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-  distributed var computedProperty: String { // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-    ""
-  }
+  distributed let letProperty: String = "" // expected-error{{property 'letProperty' cannot be 'distributed', only computed properties can}}
+  distributed var varProperty: String = "" // expected-error{{property 'varProperty' cannot be 'distributed', only computed properties can}}
 
   distributed static func distributedStatic() {} // expected-error{{'distributed' method cannot be 'static'}}
   distributed class func distributedClass() {}
   // expected-error@-1{{class methods are only allowed within classes; use 'static' to declare a static method}}
-  // expected-error@-2{{'distributed' method cannot be 'static'}} // TODO(distributed): should call out 'class' instead?
+  // expected-error@-2{{'distributed' method cannot be 'static'}}
 
   func hello() {} // expected-note{{distributed actor-isolated instance method 'hello()' declared here}}
   func helloAsync() async {} // expected-note{{distributed actor-isolated instance method 'helloAsync()' declared here}}
@@ -64,10 +61,10 @@ distributed actor DistributedActor_1 {
   distributed func distIntString(int: Int, two: String) async throws -> (String) { "\(int) + \(two)" } // ok
 
   distributed func dist(notCodable: NotCodableValue) async throws {
-    // expected-error@-1 {{parameter 'notCodable' of type 'NotCodableValue' in distributed instance method does not conform to 'Codable'}}
+    // expected-error@-1 {{parameter 'notCodable' of type 'NotCodableValue' in distributed instance method does not conform to serialization requirement 'Codable'}}
   }
   distributed func distBadReturn(int: Int) async throws -> NotCodableValue {
-    // expected-error@-1 {{result type 'NotCodableValue' of distributed instance method does not conform to 'Codable'}}
+    // expected-error@-1 {{result type 'NotCodableValue' of distributed instance method 'distBadReturn' does not conform to serialization requirement 'Codable'}}
     fatalError()
   }
 
@@ -76,7 +73,7 @@ distributed actor DistributedActor_1 {
   }
 
   distributed func closure(close: () -> String) {
-    // expected-error@-1{{parameter 'close' of type '() -> String' in distributed instance method does not conform to 'Codable'}}
+    // expected-error@-1{{parameter 'close' of type '() -> String' in distributed instance method does not conform to serialization requirement 'Codable'}}
   }
 
   distributed func noInout(inNOut burger: inout String) {
@@ -90,7 +87,7 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
   distributed func distBadReturnGeneric<T: Sendable>(int: Int) async throws -> T {
-    // expected-error@-1 {{result type 'T' of distributed instance method does not conform to 'Codable'}}
+    // expected-error@-1 {{result type 'T' of distributed instance method 'distBadReturnGeneric' does not conform to serialization requirement 'Codable'}}
     fatalError()
   }
 
@@ -101,7 +98,7 @@ distributed actor DistributedActor_1 {
     value
   }
   distributed func distBadGenericParam<T: Sendable>(int: T) async throws {
-    // expected-error@-1 {{parameter 'int' of type 'T' in distributed instance method does not conform to 'Codable'}}
+    // expected-error@-1 {{parameter 'int' of type 'T' in distributed instance method does not conform to serialization requirement 'Codable'}}
     fatalError()
   }
 
@@ -146,8 +143,8 @@ func test_outside(
 
   _ = local.name // ok, special case that let constants are okey
   let _: String = local.mutable // ok, special case that let constants are okey
-  _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can only be referenced inside the distributed actor}}
-  _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can only be referenced inside the distributed actor}}
+  _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can not be accessed from a non-isolated context}}
+  _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can not be accessed from a non-isolated context}}
 
   // ==== special properties (nonisolated, implicitly replicated)
   // the distributed actor's special fields may always be referred to
@@ -197,7 +194,7 @@ distributed actor DijonMustard {
 
   func f() {} // expected-note {{distributed actor-isolated instance method 'f()' declared here}}
 
-  nonisolated convenience init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+  nonisolated convenience init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
     self.init(system: conv2)
   }
 }

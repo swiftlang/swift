@@ -1,6 +1,9 @@
 #ifndef TEST_INTEROP_CXX_OPERATORS_INPUTS_MEMBER_INLINE_H
 #define TEST_INTEROP_CXX_OPERATORS_INPUTS_MEMBER_INLINE_H
 
+template <class From, class To>
+To __swift_interopStaticCast(From from) { return from; }
+
 struct LoadableIntWrapper {
   int value;
   LoadableIntWrapper operator-(LoadableIntWrapper rhs) {
@@ -15,6 +18,13 @@ struct LoadableIntWrapper {
   }
   int operator()(int x, int y) {
     return value + x * y;
+  }
+};
+
+struct LoadableBoolWrapper {
+  bool value;
+  LoadableBoolWrapper operator!() {
+    return LoadableBoolWrapper{.value = !value};
   }
 };
 
@@ -242,5 +252,13 @@ struct ConstPtrByVal {
 private:
   int a = 64;
 };
+
+struct DerivedFromAddressOnlyIntWrapper : AddressOnlyIntWrapper {
+  DerivedFromAddressOnlyIntWrapper(int value) : AddressOnlyIntWrapper(value) { }
+};
+
+struct DerivedFromReadWriteIntArray : ReadWriteIntArray {};
+
+struct DerivedFromNonTrivialArrayByVal : NonTrivialArrayByVal {};
 
 #endif

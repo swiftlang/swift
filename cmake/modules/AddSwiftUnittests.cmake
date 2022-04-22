@@ -37,7 +37,7 @@ function(add_swift_unittest test_dirname)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
       target_compile_options(${test_dirname} PRIVATE
         -march=core2)
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv6|armv7|i686")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv5|armv6|armv7|i686")
       set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_LIBRARIES
         "atomic")
     endif()

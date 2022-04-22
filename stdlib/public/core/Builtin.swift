@@ -182,6 +182,12 @@ internal func _conditionallyUnreachable() -> Never {
 @_silgen_name("_swift_isClassOrObjCExistentialType")
 internal func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 
+@available(SwiftStdlib 5.7, *)
+@usableFromInline
+@_silgen_name("_swift_setClassMetadata")
+internal func _swift_setClassMetadata<T>(_ x: T.Type,
+                                         onObject: AnyObject) -> Bool
+
 /// Returns `true` if `T` is a class type or an `@objc` existential such as
 /// `AnyObject`; otherwise, returns `false`.
 @inlinable
@@ -388,7 +394,7 @@ internal var _objectPointerLowSpareBitShift: UInt {
     }
 }
 
-#if arch(i386) || arch(arm) || arch(wasm32) || arch(powerpc64) || arch(
+#if arch(i386) || arch(arm) || arch(wasm32) || arch(powerpc) || arch(powerpc64) || arch(
   powerpc64le) || arch(s390x) || arch(arm64_32)
 @inlinable
 internal var _objectPointerIsObjCBit: UInt {

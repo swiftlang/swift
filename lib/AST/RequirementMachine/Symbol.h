@@ -12,6 +12,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 
 #ifndef SWIFT_RQM_SYMBOL_H
@@ -40,7 +41,7 @@ class Term;
 /// enum Symbol {
 ///   case conformance(CanType, substitutions: [Term], proto: Protocol)
 ///   case protocol(Protocol)
-///   case associatedType([Protocol], Identifier)
+///   case associatedType(Protocol, Identifier)
 ///   case genericParam(index: Int, depth: Int)
 ///   case name(Identifier)
 ///   case layout(LayoutConstraint)
@@ -55,7 +56,7 @@ class Term;
 ///
 /// This transformation allows DependentMemberTypes to be manipulated as
 /// terms, with the actual concrete type structure remaining opaque to
-/// the requirement machine. This tranformation is implemented in
+/// the requirement machine. This transformation is implemented in
 /// RewriteContext::getConcreteSubstitutionSchema().
 ///
 /// For example, the superclass requirement
@@ -99,8 +100,8 @@ public:
     ////// "Type-like" symbol kinds:
     //////
 
-    /// An associated type [P:T] or [P&Q&...:T]. The parent term
-    /// must be known to conform to P (or P, Q, ...).
+    /// An associated type [P:T]. The parent term must be known to
+    /// conform to P.
     AssociatedType,
 
     /// A generic parameter, uniquely identified by depth and
@@ -169,13 +170,9 @@ public:
 
   const ProtocolDecl *getProtocol() const;
 
-  ArrayRef<const ProtocolDecl *> getProtocols() const;
-
   GenericTypeParamType *getGenericParam() const;
 
   LayoutConstraint getLayoutConstraint() const;
-
-  CanType getSuperclass() const;
 
   CanType getConcreteType() const;
 
@@ -200,10 +197,6 @@ public:
                                   Identifier name,
                                   RewriteContext &ctx);
 
-  static Symbol forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
-                                  Identifier name,
-                                  RewriteContext &ctx);
-
   static Symbol forGenericParam(GenericTypeParamType *param,
                                 RewriteContext &ctx);
 
@@ -223,9 +216,9 @@ public:
                                        const ProtocolDecl *proto,
                                        RewriteContext &ctx);
 
-  ArrayRef<const ProtocolDecl *> getRootProtocols() const;
+  const ProtocolDecl *getRootProtocol() const;
 
-  int compare(Symbol other, RewriteContext &ctx) const;
+  Optional<int> compare(Symbol other, RewriteContext &ctx) const;
 
   Symbol withConcreteSubstitutions(
       ArrayRef<Term> substitutions,

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name=test -O -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name=test -O -enable-ossa-modules -emit-sil  %s | %FileCheck %s
 
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
@@ -21,7 +21,7 @@ internal struct AddressOnlyPayload {
 public struct TestStruct {
   internal var e: Either<AddressOnlyPayload, Int>
 
-  // CHECK-LABEL: sil [noinline] @$s4test10TestStructVyACyp_SitcfC
+  // CHECK-LABEL: sil [noinline] {{.*}}@$s4test10TestStructVyACyp_SitcfC
   // CHECK: [[E:%[0-9]+]] = struct_element_addr %0 : $*TestStruct, #TestStruct.e
   // CHECK: [[LEFT:%[0-9]+]] = init_enum_data_addr [[E]] : $*Either<AddressOnlyPayload, Int>, #Either.left!enumelt
   // CHECK: [[A:%[0-9]+]] = struct_element_addr [[LEFT]] : $*AddressOnlyPayload, #AddressOnlyPayload.a
@@ -36,7 +36,7 @@ public struct TestStruct {
   }
 }
 
-// CHECK-LABEL: sil [noinline] @$s4test13createAnyLeftyAA6EitherOyypSgSiGypF
+// CHECK-LABEL: sil [noinline] {{.*}}@$s4test13createAnyLeftyAA6EitherOyypSgSiGypF
 // CHECK:  [[E:%[0-9]+]] = init_enum_data_addr %0 : $*Either<Optional<Any>, Int>, #Either.left!enumelt
 // CHECK:  [[SOME:%[0-9]+]] = init_enum_data_addr [[E]] : $*Optional<Any>, #Optional.some!enumelt
 // CHECK:  copy_addr %1 to [initialization] [[SOME]] : $*Any

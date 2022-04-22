@@ -41,6 +41,7 @@ class AccessorDecl;
 enum class AccessorKind;
 class ContextualPattern;
 class DefaultArgumentExpr;
+class DefaultArgumentType;
 class ClosureExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
@@ -313,6 +314,26 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Find the list of primary associated types of the given protocol.
+class PrimaryAssociatedTypesRequest :
+    public SimpleRequest<PrimaryAssociatedTypesRequest,
+                         ArrayRef<AssociatedTypeDecl *>(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<AssociatedTypeDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 class PolymorphicEffectRequirementsRequest :
     public SimpleRequest<PolymorphicEffectRequirementsRequest,
                          PolymorphicEffectRequirementList(EffectKind, ProtocolDecl *),
@@ -456,7 +477,7 @@ public:
 /// be folded into RequirementSignatureRequest.
 class RequirementSignatureRequestRQM :
     public SimpleRequest<RequirementSignatureRequestRQM,
-                         ArrayRef<Requirement>(ProtocolDecl *),
+                         RequirementSignature(ProtocolDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -465,7 +486,28 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<Requirement>
+  RequirementSignature
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Compute a protocol's requirement signature using the GenericSignatureBuilder.
+/// This is temporary; once the GenericSignatureBuilder goes away this will
+/// be removed.
+class RequirementSignatureRequestGSB :
+    public SimpleRequest<RequirementSignatureRequestGSB,
+                         RequirementSignature(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  RequirementSignature
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
@@ -475,7 +517,7 @@ public:
 /// Compute the requirements that describe a protocol.
 class RequirementSignatureRequest :
     public SimpleRequest<RequirementSignatureRequest,
-                         ArrayRef<Requirement>(ProtocolDecl *),
+                         RequirementSignature(ProtocolDecl *),
                          RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -484,14 +526,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<Requirement>
+  RequirementSignature
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<ArrayRef<Requirement>> getCachedResult() const;
-  void cacheResult(ArrayRef<Requirement> value) const;
+  Optional<RequirementSignature> getCachedResult() const;
+  void cacheResult(RequirementSignature value) const;
 };
 
 /// Compute the default definition type of an associated type.
@@ -562,7 +604,6 @@ struct WhereClauseOwner {
     return !(lhs == rhs);
   }
 
-public:
   /// Retrieve the array of requirements.
   MutableArrayRef<RequirementRepr> getRequirements() const;
 
@@ -854,6 +895,7 @@ private:
 public:
   // Caching.
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
 /// Request the fragile function kind for the context.
@@ -1017,10 +1059,13 @@ public:
     bool isCached() const { return true; }
 };
 
-/// Obtain the 'remote' counterpart of a 'distributed func'.
-class GetDistributedRemoteFuncRequest :
-    public SimpleRequest<GetDistributedRemoteFuncRequest,
-                         AbstractFunctionDecl *(AbstractFunctionDecl *),
+/// Retrieve the implicit conformance for the given distributed actor type to
+/// the Codable protocol protocol.
+///
+/// Similar to 'GetImplicitSendableRequest'.
+class GetDistributedActorImplicitCodableRequest :
+    public SimpleRequest<GetDistributedActorImplicitCodableRequest,
+                         NormalProtocolConformance *(NominalTypeDecl *, KnownProtocolKind),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1028,17 +1073,65 @@ public:
 private:
   friend SimpleRequest;
 
-  AbstractFunctionDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+  NormalProtocolConformance *evaluate(
+      Evaluator &evaluator,
+      NominalTypeDecl *nominal,
+      KnownProtocolKind protoKind) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Check a distributed function declaration and cache if it was valid or not.
+///
+/// This is used because we not only type-check to emit errors, but also use
+/// the information to potentially avoid emitting the distributed thunk for
+/// methods which are invalid (e.g. their parameters dont conform to
+/// SerializationRequirement), as otherwise we'd be causing errors in synthesized
+/// code which looks very confusing to end-users.
+///
+class CheckDistributedFunctionRequest :
+    public SimpleRequest<CheckDistributedFunctionRequest,
+                         bool(AbstractFunctionDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  /// \returns \c true if there was a problem with the function declaration,
+  /// \c false otherwise.
+  bool evaluate(Evaluator &evaluator, AbstractFunctionDecl *) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Obtain the 'remoteCall' function of a 'DistributedActorSystem'.
+class GetDistributedActorSystemRemoteCallFunctionRequest :
+    public SimpleRequest<GetDistributedActorSystemRemoteCallFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *, bool voidReturn),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actorSystem, bool voidReturn) const;
 
 public:
     // Caching
     bool isCached() const { return true; }
 };
 
-/// Obtain the 'id' property of a 'distributed actor'.
-class GetDistributedActorIDPropertyRequest :
-    public SimpleRequest<GetDistributedActorIDPropertyRequest,
-                         ValueDecl *(NominalTypeDecl *),
+/// Obtain the 'recordArgument' function of a 'DistributedTargetInvocationEncoder'.
+class GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1046,11 +1139,215 @@ public:
 private:
   friend SimpleRequest;
 
-  ValueDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
 
 public:
     // Caching
     bool isCached() const { return true; }
+};
+
+/// Obtain the 'recordReturnType' function of a 'DistributedTargetInvocationEncoder'.
+class GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'recordErrorType' function of a 'DistributedTargetInvocationEncoder'.
+class GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'decodeNextArgument' function of a 'DistributedTargetInvocationDecoder'.
+class GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'onReturn' function of a 'DistributedTargetInvocationResultHandler'.
+class GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'actorSystem' property of a 'distributed actor'.
+class GetDistributedActorSystemPropertyRequest :
+    public SimpleRequest<GetDistributedActorSystemPropertyRequest,
+                         VarDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the constructor of the 'RemoteCallTarget' type.
+class GetDistributedRemoteCallTargetInitFunctionRequest :
+    public SimpleRequest<GetDistributedRemoteCallTargetInitFunctionRequest,
+                         ConstructorDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ConstructorDecl *evaluate(Evaluator &evaluator,
+                            NominalTypeDecl *nominal) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the constructor of the 'RemoteCallArgument' type.
+class GetDistributedRemoteCallArgumentInitFunctionRequest :
+    public SimpleRequest<GetDistributedRemoteCallArgumentInitFunctionRequest,
+                         ConstructorDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ConstructorDecl *evaluate(Evaluator &evaluator,
+                            NominalTypeDecl *nominal) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'distributed thunk' for the passed-in function.
+///
+/// The thunk is responsible for invoking 'remoteCall' when invoked on a remote
+/// 'distributed actor'.
+class GetDistributedThunkRequest :
+    public SimpleRequest<GetDistributedThunkRequest,
+                         FuncDecl *(AbstractFunctionDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *distributedFunc) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Obtain the 'id' property of a 'distributed actor'.
+class GetDistributedActorIDPropertyRequest :
+    public SimpleRequest<GetDistributedActorIDPropertyRequest,
+                         VarDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the invocation decoder associated with the given distributed actor.
+class GetDistributedActorInvocationDecoderRequest :
+  public SimpleRequest<GetDistributedActorInvocationDecoderRequest,
+                       NominalTypeDecl *(NominalTypeDecl *),
+                       RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NominalTypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Obtain the method that could be used to decode argument values passed
+/// to a particular actor invocation type.
+class GetDistributedActorArgumentDecodingMethodRequest :
+  public SimpleRequest<GetDistributedActorArgumentDecodingMethodRequest,
+                       FuncDecl *(NominalTypeDecl *),
+                       RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
 };
 
 /// Retrieve the static "shared" property within a global actor that provides
@@ -1495,12 +1792,6 @@ public:
 
 void simple_display(llvm::raw_ostream &out, AncestryFlags value);
 
-/// AbstractGenericSignatureRequest and InferredGenericSignatureRequest
-/// return this type, which stores a GenericSignature together with a bit
-/// indicating if there were any errors detected in the original
-/// requirements.
-using GenericSignatureWithError = llvm::PointerIntPair<GenericSignature, 1>;
-
 class AbstractGenericSignatureRequest :
     public SimpleRequest<AbstractGenericSignatureRequest,
                          GenericSignatureWithError (const GenericSignatureImpl *,
@@ -1535,6 +1826,37 @@ public:
 /// AbstractGenericSignatureRequest.
 class AbstractGenericSignatureRequestRQM :
     public SimpleRequest<AbstractGenericSignatureRequestRQM,
+                         GenericSignatureWithError (const GenericSignatureImpl *,
+                                                    SmallVector<GenericTypeParamType *, 2>,
+                                                    SmallVector<Requirement, 2>),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  GenericSignatureWithError
+  evaluate(Evaluator &evaluator,
+           const GenericSignatureImpl *baseSignature,
+           SmallVector<GenericTypeParamType *, 2> addedParameters,
+           SmallVector<Requirement, 2> addedRequirements) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+
+  /// Abstract generic signature requests never have source-location info.
+  SourceLoc getNearestLoc() const {
+    return SourceLoc();
+  }
+};
+
+/// Build a generic signature using the GenericSignatureBuilder. This is temporary;
+/// once the GenericSignatureBuilder goes away this will be removed.
+class AbstractGenericSignatureRequestGSB :
+    public SimpleRequest<AbstractGenericSignatureRequestGSB,
                          GenericSignatureWithError (const GenericSignatureImpl *,
                                                     SmallVector<GenericTypeParamType *, 2>,
                                                     SmallVector<Requirement, 2>),
@@ -1607,6 +1929,46 @@ public:
 /// InferredGenericSignatureRequest.
 class InferredGenericSignatureRequestRQM :
     public SimpleRequest<InferredGenericSignatureRequestRQM,
+                         GenericSignatureWithError (const GenericSignatureImpl *,
+                                                    GenericParamList *,
+                                                    WhereClauseOwner,
+                                                    SmallVector<Requirement, 2>,
+                                                    SmallVector<TypeLoc, 2>,
+                                                    bool),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  GenericSignatureWithError
+  evaluate(Evaluator &evaluator,
+           const GenericSignatureImpl *baseSignature,
+           GenericParamList *genericParams,
+           WhereClauseOwner whereClause,
+           SmallVector<Requirement, 2> addedRequirements,
+           SmallVector<TypeLoc, 2> inferenceSources,
+           bool allowConcreteGenericParams) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+
+  /// Inferred generic signature requests don't have source-location info.
+  SourceLoc getNearestLoc() const {
+    return SourceLoc();
+  }
+
+  // Cycle handling.
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Build a generic signature using the GenericSignatureBuilder. This is temporary;
+/// once the GenericSignatureBuilder goes away this will be removed.
+class InferredGenericSignatureRequestGSB :
+    public SimpleRequest<InferredGenericSignatureRequestGSB,
                          GenericSignatureWithError (ModuleDecl *,
                                                     const GenericSignatureImpl *,
                                                     GenericParamList *,
@@ -2419,7 +2781,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Checks if the _Distributed module is available.
+/// Checks if the Distributed module is available.
 class DistributedModuleIsAvailableRequest
     : public SimpleRequest<DistributedModuleIsAvailableRequest, bool(Decl *),
                            RequestFlags::Cached> {
@@ -2478,6 +2840,26 @@ public:
   bool isCached() const { return true; }
   Optional<Expr *> getCachedResult() const;
   void cacheResult(Expr *expr) const;
+};
+
+/// Computes the type of the default expression for a given parameter.
+class DefaultArgumentTypeRequest
+    : public SimpleRequest<DefaultArgumentTypeRequest, Type(ParamDecl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, ParamDecl *param) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type type) const;
 };
 
 /// Computes the fully type-checked caller-side default argument within the
@@ -2830,7 +3212,7 @@ void simple_display(llvm::raw_ostream &out, ConformanceLookupKind kind);
 
 /// Lookup and expand all conformances in the given context.
 ///
-/// This request specifically accomodates algorithms for retrieving all
+/// This request specifically accommodates algorithms for retrieving all
 /// conformances in the primary, even those that are unstated in source but
 /// are implied by other conformances, inherited from other types, or synthesized
 /// by the compiler. A simple case of this is the following:
@@ -3203,6 +3585,21 @@ private:
 
   FunctionType::ExtInfo evaluate(
       Evaluator &evaluator, ClosureExpr *closure) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class GetSourceFileAsyncNode
+    : public SimpleRequest<GetSourceFileAsyncNode, ASTNode(const SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ASTNode evaluate(Evaluator &evaluator, const SourceFile *) const;
 
 public:
   bool isCached() const { return true; }

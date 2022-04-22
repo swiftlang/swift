@@ -18,7 +18,8 @@ add_sourcekit_library(sourcekitdAPI
 target_link_libraries(sourcekitdAPI PRIVATE
   swiftBasic
   SourceKitSupport
-  SourceKitSwiftLang)
+  SourceKitSwiftLang
+  swiftCompilerModules)
 
 if(APPLE AND HAVE_XPC_H)
   target_sources(sourcekitdAPI PRIVATE

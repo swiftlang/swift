@@ -304,3 +304,16 @@ public func dump<T, TargetStream: TextOutputStream>(_ value: T, to target: inout
 }
 
 #endif
+
+#if SWIFT_STDLIB_STATIC_PRINT
+
+public func print(_ s: Any, terminator: String = "\n") {
+  let data = Array("\(s)\(terminator)".utf8)
+  write(STDOUT_FILENO, data, data.count)
+}
+
+public func print<Target>(_ s: Any, terminator: String = "\n", to output: inout Target) where Target : TextOutputStream {
+  output.write("\(s)\(terminator)")
+}
+
+#endif

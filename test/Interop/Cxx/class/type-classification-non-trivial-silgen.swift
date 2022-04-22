@@ -31,7 +31,7 @@ public func testStructWithSubobjectDestructor() {
   let d = StructWithSubobjectDestructor()
 }
 
-// CHECK-LABLE: sil [ossa] @$s4main37testStructWithCopyConstructorAndValueSbyF
+// CHECK-LABEL: sil [ossa] @$s4main37testStructWithCopyConstructorAndValueSbyF
 // CHECK: [[AS:%.*]] = alloc_stack [lexical] $StructWithCopyConstructorAndValue
 // CHECK: [[FN:%.*]] = function_ref @{{_ZN33StructWithCopyConstructorAndValueC1Ei|\?\?0StructWithCopyConstructorAndValue@@QEAA@H@Z}} : $@convention(c) (Int32) -> @out StructWithCopyConstructorAndValue
 // CHECK: apply [[FN]]([[AS]], %{{.*}}) : $@convention(c) (Int32) -> @out StructWithCopyConstructorAndValue
@@ -44,7 +44,7 @@ public func testStructWithSubobjectDestructor() {
 // CHECK: [[OUT:%.*]] = apply [[CMP_FN]]([[OBJ_VAL]], [[INT_42]], %{{.*}}) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
 // CHECK: destroy_addr [[AS]] : $*StructWithCopyConstructorAndValue
 // CHECK: return [[OUT]] : $Bool
-// CHECK-LABLE: end sil function '$s4main37testStructWithCopyConstructorAndValueSbyF'
+// CHECK-LABEL: end sil function '$s4main37testStructWithCopyConstructorAndValueSbyF'
 
 // CHECK-LABEL: sil [clang StructWithCopyConstructorAndValue.init] @{{_ZN33StructWithCopyConstructorAndValueC1Ei|\?\?0StructWithCopyConstructorAndValue@@QEAA@H@Z}} : $@convention(c) (Int32) -> @out StructWithCopyConstructorAndValue
 public func testStructWithCopyConstructorAndValue() -> Bool {
@@ -80,7 +80,7 @@ public func testStructWithSubobjectCopyConstructorAndValue() -> Bool {
 }
 
 // StructWithSubobjectCopyConstructorAndValue.init(member:)
-// CHECK-LABEL: sil shared [transparent] [serializable] [ossa] @$sSo42StructWithSubobjectCopyConstructorAndValueV6memberABSo0abdefG0V_tcfC : $@convention(method) (@in StructWithCopyConstructorAndValue, @thin StructWithSubobjectCopyConstructorAndValue.Type) -> @out StructWithSubobjectCopyConstructorAndValue
+// CHECK-LABEL: sil shared [transparent] [serialized] [ossa] @$sSo42StructWithSubobjectCopyConstructorAndValueV6memberABSo0abdefG0V_tcfC : $@convention(method) (@in StructWithCopyConstructorAndValue, @thin StructWithSubobjectCopyConstructorAndValue.Type) -> @out StructWithSubobjectCopyConstructorAndValue
 // CHECK: [[MEMBER:%.*]] = struct_element_addr %0 : $*StructWithSubobjectCopyConstructorAndValue, #StructWithSubobjectCopyConstructorAndValue.member
 // CHECK: copy_addr [take] %1 to [initialization] [[MEMBER]] : $*StructWithCopyConstructorAndValue
 // CHECK-LABEL: end sil function '$sSo42StructWithSubobjectCopyConstructorAndValueV6memberABSo0abdefG0V_tcfC'

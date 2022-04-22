@@ -21,7 +21,7 @@ func orange(_ x: Int) -> Int {
   return x
 }
 
-// CHECK-LABEL: sil [serializable] [thunk] [ossa] @cauliflower : $@convention(c)
+// CHECK-LABEL: sil [serialized] [thunk] [ossa] @cauliflower : $@convention(c)
 // CHECK:         function_ref @$s5cdecl8broccoli{{[_0-9a-zA-Z]*}}F
 // CHECK-LABEL: sil [ossa] @$s5cdecl8broccoli{{[_0-9a-zA-Z]*}}F
 @_cdecl("cauliflower")

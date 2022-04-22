@@ -53,7 +53,7 @@ slice[7] = f // expected-error{{cannot assign value of type 'Y' to subscript of 
 
 slice[7] = nil // expected-error{{'nil' cannot be assigned to subscript of type 'X'}}
 
-ps[7] = i // expected-error{{value of type 'X' does not conform to 'Z' in subscript assignment}}
+ps[7] = i // expected-error{{cannot assign value of type 'X' to subscript of type 'any Z'}}
 
 slice[7] = _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 

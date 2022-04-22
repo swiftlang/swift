@@ -161,7 +161,7 @@ public:
 
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
-  
+
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
   bool empty() const { return getNumElements() == 0; }
@@ -182,7 +182,9 @@ public:
   ArrayRef<ASTNode> getElements() const {
     return {getTrailingObjects<ASTNode>(), Bits.BraceStmt.NumElements};
   }
-  
+
+  ASTNode findAsyncNode();
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
 
@@ -393,7 +395,7 @@ public:
 /// the "x" binding, one for the "y" binding, one for the where clause, one for
 /// "z"'s binding.  A simple "if" statement is represented as a single binding.
 ///
-class StmtConditionElement {
+class alignas(1 << PatternAlignInBits) StmtConditionElement {
   /// If this is a pattern binding, it may be the first one in a declaration, in
   /// which case this is the location of the var/let/case keyword.  If this is
   /// the second pattern (e.g. for 'y' in "var x = ..., y = ...") then this
@@ -816,7 +818,7 @@ public:
 };
 
 /// A pattern and an optional guard expression used in a 'case' statement.
-class CaseLabelItem {
+class alignas(1 << PatternAlignInBits) CaseLabelItem {
   enum class Kind {
     /// A normal pattern
     Normal = 0,

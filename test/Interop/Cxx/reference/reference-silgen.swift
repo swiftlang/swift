@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -I %S/Inputs -enable-cxx-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
 
 import Reference
 
@@ -44,13 +44,13 @@ func setCxxRef() {
 // CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()
 
 func setCxxConstRef() {
-  var val: CInt = 21
-  setConstStaticIntRef(&val)
+  let val: CInt = 21
+  setConstStaticIntRef(val)
 }
 
 // CHECK: sil hidden @$s4main14setCxxConstRefyyF : $@convention(thin) () -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z20setConstStaticIntRefRKi|\?setConstStaticIntRef@@YAXAEBH@Z}} : $@convention(c) (@inout Int32) -> ()
-// CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()
+// CHECK: [[REF:%.*]] = function_ref @{{_Z20setConstStaticIntRefRKi|\?setConstStaticIntRef@@YAXAEBH@Z}} : $@convention(c) (@in Int32) -> ()
+// CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@in Int32) -> ()
 
 func setCxxRvalueRef() {
   var val: CInt = 21
@@ -62,10 +62,10 @@ func setCxxRvalueRef() {
 // CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()
 
 func setCxxConstRvalueRef() {
-  var val: CInt = 21
-  setConstStaticIntRvalueRef(&val)
+  let val: CInt = 21
+  setConstStaticIntRvalueRef(val)
 }
 
 // CHECK: sil hidden @$s4main20setCxxConstRvalueRefyyF : $@convention(thin) () -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z26setConstStaticIntRvalueRefOKi|\?setConstStaticIntRvalueRef@@YAX\$\$QEBH@Z}} : $@convention(c) (@inout Int32) -> ()
-// CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()
+// CHECK: [[REF:%.*]] = function_ref @{{_Z26setConstStaticIntRvalueRefOKi|\?setConstStaticIntRvalueRef@@YAX\$\$QEBH@Z}} : $@convention(c) (@in Int32) -> ()
+// CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@in Int32) -> ()

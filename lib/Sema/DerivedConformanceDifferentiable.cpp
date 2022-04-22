@@ -130,7 +130,7 @@ static Type getTangentVectorInterfaceType(Type contextualType,
 /// `TangentVector` as `Self` in the given conformance context.
 static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
                                          DeclContext *DC) {
-  // `Self` must not be a class declaraiton.
+  // `Self` must not be a class declaration.
   if (nominal->getSelfClassDecl())
     return false;
 
@@ -376,7 +376,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   auto localProtos = cast<IterableDeclContext>(derived.ConformanceDecl)
       ->getLocalProtocols();
   for (auto proto : localProtos) {
-    for (auto req : proto->getRequirementSignature()) {
+    for (auto req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
       auto *firstType = req.getFirstType()->getAs<DependentMemberType>();
@@ -651,7 +651,7 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
       return deriveDifferentiable_move(*this);
   }
 
-  // Otheriwse, return nullptr.
+  // Otherwise, return nullptr.
   return nullptr;
 }
 

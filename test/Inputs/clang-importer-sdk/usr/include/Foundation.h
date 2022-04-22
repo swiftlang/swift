@@ -947,7 +947,7 @@ __attribute__((availability(macosx, introduced = 10.52)))
 @end
 
 @interface NSObject (Silly)
--(void)doSelector:(SEL)selector;
+- (void)doSelector:(nonnull SEL)selector;
 @end
 
 @interface Bee (Gerunds)
@@ -1071,7 +1071,7 @@ extern NSString *NSHTTPRequestKey;
 @end
 
 @interface NSObject (Selectors)
--(void)messageSomeObject:(nonnull id)object selector:(SEL)selector;
+- (void)messageSomeObject:(nonnull id)object selector:(nonnull SEL)selector;
 @end
 
 @interface NSOperation : NSObject

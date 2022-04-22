@@ -288,7 +288,7 @@ void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
     // Re-infer bindings for the current representative.
     resetBindingSet();
 
-    // Re-infer bindings all all of the newly made representatives.
+    // Re-infer bindings all of the newly made representatives.
     for (auto *typeVar : disconnectedVars)
       CG[typeVar].notifyReferencingVars();
   }
@@ -390,7 +390,7 @@ void ConstraintGraphNode::retractFromInference(
   notifyReferencingVars();
 
   // TODO: This might be an overkill but it's (currently)
-  // the simpliest way to reliably ensure that all of the
+  // the simplest way to reliably ensure that all of the
   // no longer related constraints have been retracted.
   for (auto *referencedVar : referencedVars) {
     auto &node = CG[referencedVar];

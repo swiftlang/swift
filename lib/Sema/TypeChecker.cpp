@@ -264,19 +264,29 @@ void swift::performTypeChecking(SourceFile &SF) {
                                  TypeCheckSourceFileRequest{&SF}, {});
 }
 
-/// If any of the imports in this source file was @_predatesConcurrency but
+/// If any of the imports in this source file was @preconcurrency but
 /// there were no diagnostics downgraded or suppressed due to that
-/// @_predatesConcurrency, suggest that the attribute be removed.
-static void diagnoseUnnecessaryPredatesConcurrencyImports(SourceFile &sf) {
+/// @preconcurrency, suggest that the attribute be removed.
+static void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
+  switch (sf.Kind) {
+  case SourceFileKind::Interface:
+  case SourceFileKind::SIL:
+    return;
+
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    break;
+  }
+
   ASTContext &ctx = sf.getASTContext();
   for (const auto &import : sf.getImports()) {
-    if (import.options.contains(ImportFlags::PredatesConcurrency) &&
+    if (import.options.contains(ImportFlags::Preconcurrency) &&
         import.importLoc.isValid() &&
-        !sf.hasImportUsedPredatesConcurrency(import)) {
+        !sf.hasImportUsedPreconcurrency(import)) {
       ctx.Diags.diagnose(
           import.importLoc, diag::remove_predates_concurrency_import,
           import.module.importedModule->getName())
-        .fixItRemove(import.predatesConcurrencyRange);
+        .fixItRemove(import.preconcurrencyRange);
     }
   }
 }
@@ -322,7 +332,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     typeCheckDelayedFunctions(*SF);
   }
 
-  diagnoseUnnecessaryPredatesConcurrencyImports(*SF);
+  diagnoseUnnecessaryPreconcurrencyImports(*SF);
 
   // Check to see if there's any inconsistent @_implementationOnly imports.
   evaluateOrDefault(
@@ -488,6 +498,13 @@ bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
                             true);
 }
 
+bool swift::typeCheckForCodeCompletion(
+    constraints::SolutionApplicationTarget &target, bool needsPrecheck,
+    llvm::function_ref<void(const constraints::Solution &)> callback) {
+  return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
+                                                 callback);
+}
+
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
   if (C.TypeCheckerOpts.DebugForbidTypecheckPrefix.empty())
     return;
@@ -536,6 +553,12 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                               Optional<FunctionTypeRepr *>repr,
                                               DeclContext *dc,
                                               Optional<TypeResolutionStage> stage) {
+  // Some of the below checks trigger cycles if we don't have a generic
+  // signature yet; we'll run the checks again in
+  // TypeResolutionStage::Interface.
+  if (stage == TypeResolutionStage::Structural)
+    return false;
+
   // If the type has a placeholder, don't try to diagnose anything now since
   // we'll produce a better diagnostic when (if) the expression successfully
   // typechecks.
@@ -575,8 +598,7 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
 
   // `@differentiable` function types must return a differentiable type and have
   // differentiable (or `@noDerivative`) parameters.
-  if (extInfo.isDifferentiable() &&
-      stage != TypeResolutionStage::Structural) {
+  if (extInfo.isDifferentiable()) {
     auto result = fnTy->getResult();
     auto params = fnTy->getParams();
     auto diffKind = extInfo.getDifferentiabilityKind();

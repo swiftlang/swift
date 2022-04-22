@@ -87,14 +87,14 @@
 // CHECK-FOUNDATION-NEXT: case binary
 
 // Note: Make sure initialisms work in various places
-// CHECK-FOUNDATION: open(_: URL!, completionHandler: ((Bool) -> Void)!)
-// CHECK-FOUNDATION: open(_: NSGUID!, completionHandler: ((Bool) -> Void)!)
+// CHECK-FOUNDATION: open(_: URL!, completionHandler: (@Sendable (Bool) -> Void)!)
+// CHECK-FOUNDATION: open(_: NSGUID!, completionHandler: (@Sendable (Bool) -> Void)!)
 
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercased: String
 
 // Note: ok to map base name down to a keyword.
-// CHECK-FOUNDATION: func `do`(_: Selector!)
+// CHECK-FOUNDATION: func `do`(_: Selector)
 
 // Note: Strip names preceded by a gerund.
 // CHECK-FOUNDATION: func startSquashing(_: Bee)
@@ -137,7 +137,7 @@
 // CHECK-FOUNDATION: func enumerateObjects(options: NSEnumerationOptions = [], using: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(block: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(block: (@Sendable (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomething(with: NSCopying)

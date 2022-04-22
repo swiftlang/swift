@@ -282,7 +282,7 @@ public:
   }
 
   void log(raw_ostream &OS) const override {
-    OS << message << "\n";
+    OS << message << " (" << name << ")\n";
     path.print(OS);
 
     if (!notes.empty()) {
