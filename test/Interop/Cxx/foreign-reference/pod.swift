@@ -148,4 +148,18 @@ PODTestSuite.test("BigType") {
   expectEqual(x.test(), 1)
 }
 
+PODTestSuite.test("DerivedRef") {
+  var x = DerivedRef.create()
+  expectEqual(x.test(), 1)
+  expectEqual(x.testMutating(), 1)
+  expectEqual(x.testDerived(), 2)
+  expectEqual(x.testDerivedMutating(), 2)
+}
+
+PODTestSuite.test("BaseRef") {
+  var x = BaseRef.create()
+  expectEqual(x.test(), 1)
+  expectEqual(x.testMutating(), 1)
+}
+
 runAllTests()
