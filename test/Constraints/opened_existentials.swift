@@ -210,3 +210,32 @@ func testTakeValueAndClosure(p: any P) {
     // expected-note@-1{{did you mean to use 'as!' to force downcast?}}
     p)
 }
+
+protocol B {
+  associatedtype C: P where C.A == Double
+}
+
+func testExplicitCoercionRequirement(v: any B) {
+  func getC<T: B>(_: T) -> T.C { fatalError() }
+  func getTuple<T: B>(_: T) -> (T, T.C) { fatalError() }
+  func getNoError<T: B>(_: T) -> T.C.A { fatalError() }
+  func getComplex<T: B>(_: T) -> ([(x: (a: T.C, b: Int), y: Int)], [Int: T.C]) { fatalError() }
+
+  func overloaded<T: B>(_: T) -> (x: Int, y: T.C) { fatalError() }
+  // expected-note@-1 {{inferred result type '(x: Int, y: any P)' requires explicit coercion due to loss of generic requirements}} {{240:20-20=as (x: Int, y: any P)}}
+  func overloaded<T: P>(_: T) -> Int { 42 }
+  // expected-note@-1 {{candidate requires that 'any B' conform to 'P' (requirement specified as 'T' : 'P')}}
+
+  _ = getC(v) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{14-14=as any P}}
+  _ = getC(v) as any P // Ok
+
+  _ = getTuple(v) // expected-error {{inferred result type '(any B, any P)' requires explicit coercion due to loss of generic requirements}} {{18-18=as (any B, any P)}}
+  _ = getTuple(v) as (any B, any P) // Ok
+
+  _ = getNoError(v) // Ok because T.C.A == Double
+
+  _ = getComplex(v) // expected-error {{inferred result type '([(x: (a: any P, b: Int), y: Int)], [Int : any P])' requires explicit coercion due to loss of generic requirements}} {{20-20=as ([(x: (a: any P, b: Int), y: Int)], [Int : any P])}}
+  _ = getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]) // Ok
+
+  _ = overloaded(v) // expected-error {{no exact matches in call to local function 'overloaded'}}
+}

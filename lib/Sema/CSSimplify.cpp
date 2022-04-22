@@ -11449,6 +11449,18 @@ ConstraintSystem::simplifyApplicableFnConstraint(
             result2, opened.second->getExistentialType(), opened.first,
             TypePosition::Covariant);
       }
+
+      // If result type has any erased existential types it requires explicit
+      // `as` coercion.
+      if (AddExplicitExistentialCoercion::isRequired(
+              *this, func2->getResult(), openedExistentials, locator)) {
+        if (!shouldAttemptFixes())
+          return SolutionKind::Error;
+
+        if (recordFix(AddExplicitExistentialCoercion::create(
+                *this, result2, getConstraintLocator(locator))))
+          return SolutionKind::Error;
+      }
     }
 
     // The result types are equivalent.
