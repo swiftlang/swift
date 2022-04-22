@@ -176,7 +176,7 @@ final class C2:C {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return7driver1ys5Int32VAA2C1CF
+// CHECK-LABEL: sil hidden [noinline] {{.*}}@$s23devirt_covariant_return7driver1ys5Int32VAA2C1CF
 // CHECK: integer_literal $Builtin.Int32, 2
 // CHECK: struct $Int32 (%{{.*}} : $Builtin.Int32)
 // CHECK-NOT: class_method

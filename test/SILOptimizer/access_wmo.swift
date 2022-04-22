@@ -163,7 +163,7 @@ public func testAccessProp(c: C, v: Int) {
 // PRIMARY-NOT: begin_{{.*}}access
 // PRIMARY-LABEL:  } // end sil function '$s10access_wmo8readProp1cSiAA1CC_tF'
 //
-// WMO-LABEL: sil @$s10access_wmo8readProp1cSiAA1CC_tF : $@convention(thin) (@guaranteed C) -> Int {
+// WMO-LABEL: sil {{.*}}@$s10access_wmo8readProp1cSiAA1CC_tF : $@convention(thin) (@guaranteed C) -> Int {
 // WMO: [[E1:%.*]] = ref_element_addr %0 : $C, #C.setterProp
 // WMO: [[A1:%.*]] = begin_access [read] [static] [no_nested_conflict] [[E1]] : $*Int
 // WMO: end_access [[A1]] : $*Int
