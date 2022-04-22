@@ -3558,17 +3558,78 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
 
   // Replace all type variables (which must come from placeholders) by their
   // generic parameters. Because we call into simplifyTypeImpl
-  Ty = CS.simplifyTypeImpl(Ty, [](TypeVariableType *typeVar) -> Type {
-    if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-      // Code completion depends on generic parameter type being
-      // represented in terms of `ArchetypeType` since it's easy
-      // to extract protocol requirements from it.
-      if (auto *GPD = GP->getDecl()) {
-        return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
+  Ty = CS.simplifyTypeImpl(Ty, [&CS](TypeVariableType *typeVar) -> Type {
+    // Code completion depends on generic parameter type being represented in
+    // terms of `ArchetypeType` since it's easy to extract protocol requirements
+    // from it.
+    auto getTypeVarAsArchetype = [](TypeVariableType *typeVar) -> Type {
+      if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+        if (auto *GPD = GP->getDecl()) {
+          return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
+        }
+      }
+      return Type();
+    };
+
+    if (auto archetype = getTypeVarAsArchetype(typeVar)) {
+      return archetype;
+    }
+
+    // When applying the logic below to get contextual types inside result
+    // builders, the code completion type variable is connected by a one-way
+    // constraint to a type variable in the buildBlock call, but that is not the
+    // type variable that represents the argument type. We need to find the type
+    // variable representing the argument to retrieve protocol requirements from
+    // it. Look for a ArgumentConversion constraint that allows us to retrieve
+    // the argument type var.
+    for (auto argConstraint :
+         CS.getConstraintGraph()[typeVar].getConstraints()) {
+      if (argConstraint->getKind() == ConstraintKind::ArgumentConversion &&
+          argConstraint->getFirstType()->getRValueType()->isEqual(typeVar)) {
+        if (auto argTV =
+                argConstraint->getSecondType()->getAs<TypeVariableType>()) {
+          if (auto archetype = getTypeVarAsArchetype(argTV)) {
+            return archetype;
+          }
+        }
       }
     }
+
     return typeVar;
   });
+
+  // Logic to determine the contextual type inside buildBlock result builders:
+  //
+  // When completing inside a result builder, the result builder
+  //   @ViewBuilder var body: some View {
+  //     Text("Foo")
+  //     #^COMPLETE^#
+  //   }
+  // gets rewritten to
+  //   @ViewBuilder var body: some View {
+  //     let $__builder2: Text
+  //     let $__builder0 = Text("Foo")
+  //     let $__builder1 = #^COMPLETE^#
+  //     $__builder2 = ViewBuilder.buildBlock($__builder0, $__builder1)
+  //     return $__builder2
+  //   }
+  // Inside the constraint system
+  //     let $__builder1 = #^COMPLETE^#
+  // gets type checked without context, so we can't know the contexutal type for
+  // the code completion token. But we know that $__builder1 (and thus the type
+  // of #^COMPLETE^#) is used as the second argument to ViewBuilder.buildBlock,
+  // so we can extract the contextual type from that call. To do this, figure
+  // out the type variable that is used for $__builder1 in the buildBlock call.
+  // This type variable is connected to the type variable of $__builder1's
+  // definition by a one-way constraint.
+  if (auto TV = Ty->getAs<TypeVariableType>()) {
+    for (auto constraint : CS.getConstraintGraph()[TV].getConstraints()) {
+      if (constraint->getKind() == ConstraintKind::OneWayEqual &&
+          constraint->getSecondType()->isEqual(TV)) {
+        return simplifyTypeForCodeCompletion(constraint->getFirstType());
+      }
+    }
+  }
 
   // Remove any remaining type variables and placeholders
   Ty = simplifyType(Ty);
