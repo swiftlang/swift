@@ -540,19 +540,19 @@ protocol P1 {
 protocol P2 {
 }
 func sr10988() {
-  struct S {
-    func test() -> some Numeric {
-      // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
-      let x = 0
-      x // expected-note {{did you mean to return the last expression?}} {{7-7=return }}
-      // expected-warning@-1 {{expression of type 'Int' is unused}}
-    }
-    func test2() -> some Numeric {
-      // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
-      let x = "s" // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
-    }
+  func test() -> some Numeric {
+    // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+    let x = 0
+    x // expected-note {{did you mean to return the last expression?}} {{5-5=return }}
+    // expected-warning@-1 {{expression of type 'Int' is unused}}
+  }
+  func test2() -> some Numeric {
+    // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+    let x = "s" // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
   }
   struct S2: P1, P2 {
+  }
+  struct S3: P1 {
   }
   func test3() -> some P1 & P2 {
     // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
@@ -560,10 +560,8 @@ func sr10988() {
     x // expected-note {{did you mean to return the last expression?}} {{5-5=return }}
     // expected-warning@-1 {{expression of type 'S2' is unused}}
   }
-  struct S3: P1 {
-    func test3() -> some P1 & P2 {
-      // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
-      let x = S2() // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
-    }
+  func test4() -> some P1 & P2 {
+    // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+    let x = S2() // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
   }
 }
