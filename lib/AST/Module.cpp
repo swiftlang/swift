@@ -1746,7 +1746,9 @@ bool ModuleDecl::isBuiltinModule() const {
   return this == getASTContext().TheBuiltinModule;
 }
 
-bool SourceFile::registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc) {
+bool SourceFile::registerMainDecl(ValueDecl *mainDecl,
+                                  DeclContext *mainDeclContext,
+                                  SourceLoc diagLoc) {
   assert(mainDecl);
   if (mainDecl == MainDecl)
     return false;
@@ -1756,6 +1758,7 @@ bool SourceFile::registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc) {
     return true;
 
   MainDecl = mainDecl;
+  MainDeclContext = mainDeclContext;
   MainDeclDiagLoc = diagLoc;
 
   return false;

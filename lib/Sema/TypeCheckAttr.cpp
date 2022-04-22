@@ -1993,7 +1993,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
 
   // Register the class as the main class in the module. If there are multiples
   // they will be diagnosed.
-  if (SF->registerMainDecl(CD, attr->getLocation()))
+  if (SF->registerMainDecl(CD, CD, attr->getLocation()))
     attr->setInvalid();
 }
 
@@ -2225,6 +2225,13 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   SourceFile *file = D->getDeclContext()->getParentSourceFile();
   assert(file);
 
+  // The main function must be declared in a decl-context
+  // `@main` cannot go on a non-decl-context decl.
+  DeclContext *dCtx = dyn_cast<DeclContext>(D);
+  assert(dCtx && "main must be declared in a decl context");
+  if (!dCtx)
+    return;
+
   auto *func = evaluateOrDefault(context.evaluator,
                                  SynthesizeMainFunctionRequest{D},
                                  nullptr);
@@ -2234,7 +2241,7 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
 
   // Register the func as the main decl in the module. If there are multiples
   // they will be diagnosed.
-  if (file->registerMainDecl(func, attr->getLocation()))
+  if (file->registerMainDecl(func, dCtx, attr->getLocation()))
     attr->setInvalid();
 }
 
