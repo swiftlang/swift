@@ -1185,6 +1185,7 @@ namespace {
       : super(IGM), Type(Type),
         HasMetadata(requireMetadata),
         MetadataInitialization(computeMetadataInitialization()) {
+      llvm::errs() << "TypeContextDescriptorBuilderBase for type '" << Type->getName().str() << "'.\n";
     }
     
     void layout() {
@@ -1240,6 +1241,10 @@ namespace {
         } else {
           abiName = clangDecl->getName().str();
         }
+
+        llvm::dbgs() << "Clang name: '" << clangDecl->getName().str()
+                     << "', Swift name: '" << Type->getName().str().str()
+                     << "', ABI name: '" << abiName << "'.\n";
 
         // Typedefs and compatibility aliases that have been promoted to
         // their own nominal types need to be marked specially.
