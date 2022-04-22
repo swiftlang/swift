@@ -575,6 +575,9 @@ enum class MangledTypeRefRole {
   /// The mangled type reference is used for a default associated type
   /// witness.
   DefaultAssociatedTypeWitness,
+  /// The mangled type reference must be a flat string (i.e. no
+  /// symbolic references) and unique for the target type.
+  FlatUnique,
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
