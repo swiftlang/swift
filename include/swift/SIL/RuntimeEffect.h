@@ -46,7 +46,7 @@ enum class RuntimeEffect : unsigned {
 
   /// The runtime function performs exclusivity checking.
   /// This does not have any observable runtime effect like locking or
-  /// allocation, but it's modelled separatly.
+  /// allocation, but it's modelled separately.
   ExclusivityChecking = 0x100,
 
   /// The runtime function calls ObjectiveC methods.

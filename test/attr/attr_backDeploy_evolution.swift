@@ -37,7 +37,7 @@
 // RUN: %empty-directory(%t/SDK_ABI)
 // RUN: %empty-directory(%t/SDK_BD)
 
-// ---- (1) Build famework with BackDeploy 2.0 in the past
+// ---- (1) Build framework with BackDeploy 2.0 in the past
 // RUN: mkdir -p %t/SDK_ABI/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule
 // RUN: %target-build-swift-dylib(%t/SDK_ABI/Frameworks/BackDeployHelper.framework/BackDeployHelper) \
 // RUN:   -emit-module-path %t/SDK_ABI/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule/%module-target-triple.swiftmodule \
@@ -64,7 +64,7 @@
 // RUN: %target-codesign %t/test_ABI
 // RUN: %target-run %t/test_ABI %t/SDK_ABI/Frameworks/BackDeployHelper.framework/BackDeployHelper | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-ABI %s
 
-// ---- (4) Build famework with BackDeploy 2.0 in the future
+// ---- (4) Build framework with BackDeploy 2.0 in the future
 // RUN: mkdir -p %t/SDK_BD/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule
 // RUN: %target-build-swift-dylib(%t/SDK_BD/Frameworks/BackDeployHelper.framework/BackDeployHelper) \
 // RUN:   -emit-module-path %t/SDK_BD/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule/%module-target-triple.swiftmodule \
@@ -91,7 +91,7 @@
 // RUN: %target-codesign %t/test_BD
 // RUN: %target-run %t/test_BD %t/SDK_BD/Frameworks/BackDeployHelper.framework/BackDeployHelper | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-BD %s
 
-// ---- (7) Re-build famework with the back deployed APIs stripped
+// ---- (7) Re-build framework with the back deployed APIs stripped
 // RUN: mkdir -p %t/SDK_BD/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule
 // RUN: %target-build-swift-dylib(%t/SDK_BD/Frameworks/BackDeployHelper.framework/BackDeployHelper) \
 // RUN:   -emit-module-path %t/SDK_BD/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule/%module-target-triple.swiftmodule \

@@ -3,7 +3,7 @@
 // This test checks that the compiler uses well-known witness tables for types
 // that have the appropriate size/shape (for example, { i8 x 4 } -> i32).
 
-// These witness tables look very differnt on Windows so it doesn't make sense
+// These witness tables look very different on Windows so it doesn't make sense
 // to test them in the same file.
 // XFAIL: OS=windows-msvc
 

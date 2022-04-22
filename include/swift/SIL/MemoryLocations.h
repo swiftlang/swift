@@ -113,7 +113,7 @@ public:
     ///    location 4 (Inner.b):     [           4]
     /// \endcode
     ///
-    /// Bit 2 is never set because Inner is completly represented by its
+    /// Bit 2 is never set because Inner is completely represented by its
     /// sub-locations 3 and 4. But bit 0 is set in location 0 (the "self" bit),
     /// because it represents the untracked field ``Outer.z``.
     ///

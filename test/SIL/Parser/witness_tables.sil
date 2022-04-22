@@ -108,7 +108,7 @@ extension ConditionalStruct : P where T : P {
 
 // CHECK-LABEL: sil_witness_table hidden <T where T : P> ConditionalStruct<T>: P module witness_tables {
 // CHECK-NEXT:    conditional_conformance (T: P): dependent
-// CHECL-NEXT:   }
+// CHECK-NEXT:   }
 sil_witness_table hidden <T where T : P> ConditionalStruct<T>: P module t4 {
   conditional_conformance (T: P): dependent
 }

@@ -36,10 +36,10 @@ template <class T>
 void functionTemplateWithDefaultedParam(T = 0) {}
 
 template <class T = void>
-void defaultedTemplateTypeParamUsedInSignatureAndUnrealtedParam(int, T) {}
+void defaultedTemplateTypeParamUsedInSignatureAndUnrelatedParam(int, T) {}
 
 template <class = void>
-void defaultedTemplateTypeParamAndUnrealtedParam(int) {}
+void defaultedTemplateTypeParamAndUnrelatedParam(int) {}
 
 template <class T = int>
 void overloadedDefaultedTemplate(T) {}

@@ -170,7 +170,7 @@ public:
     /// Link functions with shared linkage. Used by the mandatory pipeline.
     LinkNormal,
 
-    /// Link all functions. Used by the performance pipeine.
+    /// Link all functions. Used by the performance pipeline.
     LinkAll
   };
 
@@ -274,7 +274,7 @@ private:
   /// Declarations which are externally visible.
   ///
   /// These are method declarations which are referenced from inlinable
-  /// functions due to cross-module-optimzation. Those declarations don't have
+  /// functions due to cross-module-optimization. Those declarations don't have
   /// any attributes or linkage which mark them as externally visible by
   /// default.
   /// Currently this table is not serialized.
@@ -334,7 +334,7 @@ private:
   /// A mapping from root opened archetypes to the instructions which define
   /// them.
   ///
-  /// The value is either a SingleValueInstrution or a PlaceholderValue, in case
+  /// The value is either a SingleValueInstruction or a PlaceholderValue, in case
   /// an opened archetype definition is looked up during parsing or
   /// deserializing SIL, where opened archetypes can be forward referenced.
   ///
@@ -431,7 +431,7 @@ public:
   /// e.g. an open_existential_addr.
   ///
   /// In case the opened archetype is not defined yet (e.g. during parsing or
-  /// deserilization), a PlaceholderValue is returned. This should not be the
+  /// deserialization), a PlaceholderValue is returned. This should not be the
   /// case outside of parsing or deserialization.
   SILValue getRootOpenedArchetypeDef(CanOpenedArchetypeType archetype,
                                      SILFunction *inFunction);
@@ -684,7 +684,7 @@ public:
 
   // This is currently limited to VarDecl because the visibility of global
   // variables and class properties is straightforward, while the visibility of
-  // class methods (ValueDecls) depends on the subclass scope. "Visiblity" has
+  // class methods (ValueDecls) depends on the subclass scope. "Visibility" has
   // a different meaning when vtable layout is at stake.
   bool isVisibleExternally(const VarDecl *decl) {
     return isPossiblyUsedExternally(getDeclSILLinkage(decl), isWholeModule());
@@ -935,7 +935,7 @@ public:
   /// See scheduledForDeletion for details.
   void scheduleForDeletion(SILInstruction *I);
 
-  /// Deletes all scheuled instructions for real.
+  /// Deletes all scheduled instructions for real.
   /// See scheduledForDeletion for details.
   void flushDeletedInsts();
 

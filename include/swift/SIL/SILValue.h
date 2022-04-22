@@ -309,7 +309,7 @@ struct ValueOwnershipKind {
   OperandOwnership getForwardingOperandOwnership(bool allowUnowned) const;
 
   /// Returns true if \p Other can be merged successfully with this, implying
-  /// that the two ownership kinds are "compatibile".
+  /// that the two ownership kinds are "compatible".
   ///
   /// The reason why we do not compare directy is to allow for
   /// OwnershipKind::None to merge into other forms of ValueOwnershipKind.

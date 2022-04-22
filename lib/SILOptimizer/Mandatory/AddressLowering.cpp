@@ -822,6 +822,11 @@ static Operand *getReusedStorageOperand(SILValue value) {
       if (auto *switchEnum = dyn_cast<SwitchEnumInst>(term)) {
         return &switchEnum->getAllOperands()[0];
       }
+      if (auto *checkedCastBr = dyn_cast<CheckedCastBranchInst>(term)) {
+        if (value->getParentBlock() == checkedCastBr->getFailureBB()) {
+          return &checkedCastBr->getAllOperands()[0];
+        }
+      }
     }
     break;
   }
@@ -2561,36 +2566,10 @@ protected:
   }
 
   void visitUnconditionalCheckedCastInst(
-      UnconditionalCheckedCastInst *uncondCheckedCast) {
-    SILValue srcVal = uncondCheckedCast->getOperand();
-    assert(srcVal->getType().isAddressOnly(*pass.function));
-    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+      UnconditionalCheckedCastInst *uncondCheckedCast);
 
-    if (uncondCheckedCast->getType().isAddressOnly(*pass.function)) {
-      // When cast destination has address only type, use the storage address
-      SILValue destAddr = addrMat.materializeAddress(uncondCheckedCast);
-      markRewritten(uncondCheckedCast, destAddr);
-      builder.createUnconditionalCheckedCastAddr(
-          uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
-          destAddr, destAddr->getType().getASTType());
-      return;
-    }
-    // For loadable cast destination type, create a stack temporary
-    SILValue destAddr = builder.createAllocStack(uncondCheckedCast->getLoc(),
-                                                 uncondCheckedCast->getType());
-    builder.createUnconditionalCheckedCastAddr(
-        uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
-        destAddr, destAddr->getType().getASTType());
-    auto nextBuilder =
-        pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
-    auto dest = nextBuilder.createLoad(
-        uncondCheckedCast->getLoc(), destAddr,
-        destAddr->getType().isTrivial(*uncondCheckedCast->getFunction())
-            ? LoadOwnershipQualifier::Trivial
-            : LoadOwnershipQualifier::Copy);
-    nextBuilder.createDeallocStack(uncondCheckedCast->getLoc(), destAddr);
-    uncondCheckedCast->replaceAllUsesWith(dest);
-  }
+  void visitCheckedCastBranchInst(CheckedCastBranchInst *checkedCastBranch);
+
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *enumDataInst);
 };
 } // end anonymous namespace
@@ -2832,6 +2811,89 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
                                defaultCounter);
 }
 
+void UseRewriter::visitCheckedCastBranchInst(
+    CheckedCastBranchInst *checkedCastBranch) {
+  auto loc = checkedCastBranch->getLoc();
+  auto *func = checkedCastBranch->getFunction();
+  auto *successBB = checkedCastBranch->getSuccessBB();
+  auto *failureBB = checkedCastBranch->getFailureBB();
+  auto *oldSuccessVal = successBB->getArgument(0);
+  auto *oldFailureVal = failureBB->getArgument(0);
+  auto termBuilder = pass.getTermBuilder(checkedCastBranch);
+  auto successBuilder = pass.getBuilder(successBB->begin());
+  auto failureBuilder = pass.getBuilder(failureBB->begin());
+  bool isAddressOnlyTarget = oldSuccessVal->getType().isAddressOnly(*func);
+
+  auto srcAddr = pass.valueStorageMap.getStorage(use->get()).storageAddress;
+
+  if (isAddressOnlyTarget) {
+    // If target is opaque, use the storage address mapped to success
+    // block's argument as the destination for checked_cast_addr_br.
+    SILValue destAddr =
+        pass.valueStorageMap.getStorage(oldSuccessVal).storageAddress;
+
+    termBuilder.createCheckedCastAddrBranch(
+        loc, CastConsumptionKind::TakeOnSuccess, srcAddr,
+        checkedCastBranch->getSourceFormalType(), destAddr,
+        checkedCastBranch->getTargetFormalType(), successBB, failureBB,
+        checkedCastBranch->getTrueBBCount(),
+        checkedCastBranch->getFalseBBCount());
+
+    // In this case, since both success and failure block's args are opaque,
+    // create dummy loads from their storage addresses that will later be
+    // rewritten to copy_addr in DefRewriter::visitLoadInst
+    auto newSuccessVal = successBuilder.createTrivialLoadOr(
+        loc, destAddr, LoadOwnershipQualifier::Take);
+    oldSuccessVal->replaceAllUsesWith(newSuccessVal);
+    successBB->eraseArgument(0);
+
+    pass.valueStorageMap.replaceValue(oldSuccessVal, newSuccessVal);
+
+    auto newFailureVal = failureBuilder.createTrivialLoadOr(
+        loc, srcAddr, LoadOwnershipQualifier::Take);
+    oldFailureVal->replaceAllUsesWith(newFailureVal);
+    failureBB->eraseArgument(0);
+
+    pass.valueStorageMap.replaceValue(oldFailureVal, newFailureVal);
+    markRewritten(newFailureVal, srcAddr);
+  } else {
+    // If the target is loadable, create a stack temporary to be used as the
+    // destination for checked_cast_addr_br.
+    SILValue destAddr = termBuilder.createAllocStack(
+        loc, checkedCastBranch->getTargetLoweredType());
+
+    termBuilder.createCheckedCastAddrBranch(
+        loc, CastConsumptionKind::TakeOnSuccess, srcAddr,
+        checkedCastBranch->getSourceFormalType(), destAddr,
+        checkedCastBranch->getTargetFormalType(), successBB, failureBB,
+        checkedCastBranch->getTrueBBCount(),
+        checkedCastBranch->getFalseBBCount());
+
+    // Replace the success block arg with loaded value from destAddr, and delete
+    // the success block arg.
+    auto newSuccessVal = successBuilder.createTrivialLoadOr(
+        loc, destAddr, LoadOwnershipQualifier::Take);
+    oldSuccessVal->replaceAllUsesWith(newSuccessVal);
+    successBB->eraseArgument(0);
+
+    successBuilder.createDeallocStack(loc, destAddr);
+    failureBuilder.createDeallocStack(loc, destAddr);
+
+    // Since failure block arg is opaque, create dummy load from its storage
+    // address. This will be replaced later with copy_addr in
+    // DefRewriter::visitLoadInst.
+    auto newFailureVal = failureBuilder.createTrivialLoadOr(
+        loc, srcAddr, LoadOwnershipQualifier::Take);
+    oldFailureVal->replaceAllUsesWith(newFailureVal);
+    failureBB->eraseArgument(0);
+
+    pass.valueStorageMap.replaceValue(oldFailureVal, newFailureVal);
+    markRewritten(newFailureVal, srcAddr);
+  }
+
+  pass.deleter.forceDelete(checkedCastBranch);
+}
+
 void UseRewriter::visitUncheckedEnumDataInst(
     UncheckedEnumDataInst *enumDataInst) {
   assert(use == getReusedStorageOperand(enumDataInst));
@@ -2850,6 +2912,38 @@ void UseRewriter::visitUncheckedEnumDataInst(
       builder.createUncheckedTakeEnumDataAddr(loc, srcAddr, elt, destTy);
 
   markRewritten(enumDataInst, enumAddrInst);
+}
+
+void UseRewriter::visitUnconditionalCheckedCastInst(
+    UnconditionalCheckedCastInst *uncondCheckedCast) {
+  SILValue srcVal = uncondCheckedCast->getOperand();
+  assert(srcVal->getType().isAddressOnly(*pass.function));
+  SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+  if (uncondCheckedCast->getType().isAddressOnly(*pass.function)) {
+    // When cast destination has address only type, use the storage address
+    SILValue destAddr = addrMat.materializeAddress(uncondCheckedCast);
+    markRewritten(uncondCheckedCast, destAddr);
+    builder.createUnconditionalCheckedCastAddr(
+        uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+        destAddr, destAddr->getType().getASTType());
+    return;
+  }
+  // For loadable cast destination type, create a stack temporary
+  SILValue destAddr = builder.createAllocStack(uncondCheckedCast->getLoc(),
+                                               uncondCheckedCast->getType());
+  builder.createUnconditionalCheckedCastAddr(
+      uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+      destAddr, destAddr->getType().getASTType());
+  auto nextBuilder =
+      pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
+  auto dest = nextBuilder.createLoad(
+      uncondCheckedCast->getLoc(), destAddr,
+      destAddr->getType().isTrivial(*uncondCheckedCast->getFunction())
+          ? LoadOwnershipQualifier::Trivial
+          : LoadOwnershipQualifier::Copy);
+  nextBuilder.createDeallocStack(uncondCheckedCast->getLoc(), destAddr);
+  uncondCheckedCast->replaceAllUsesWith(dest);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2881,7 +2975,6 @@ public:
   static void rewriteValue(SILValue value, AddressLoweringState &pass) {
     if (auto *inst = value->getDefiningInstruction()) {
       DefRewriter(pass, value, inst->getIterator()).visit(inst);
-
     } else {
       // function args are already rewritten.
       auto *blockArg = cast<SILPhiArgument>(value);

@@ -24,7 +24,7 @@ template <class R, class T, class U> R templateParameterReturnType(T a, U b) {
 // Same here:
 template <class T> void cannotInferTemplate() {}
 
-struct HasVariadicMemeber {
+struct HasVariadicMember {
   void test1(...) {}
   void test2(int, ...) {}
 };

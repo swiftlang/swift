@@ -422,7 +422,7 @@ bool MemoryLocations::analyzeAddrProjection(
              isa<InitExistentialAddrInst>(projection));
              
       // We can only handle a single enum payload type for a location or or a
-      // single concrete existential type. Mismatching types can have a differnt
+      // single concrete existential type. Mismatching types can have a different
       // number of (non-trivial) sub-locations and we cannot handle this.
       // But we ignore opened existential types, because those cannot have
       // sub-locations (there cannot be an address projection on an
