@@ -241,7 +241,7 @@
                 "swift-cmark-gfm": "release/5.7-gfm",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
-                "swift-experimental-string-processing": "swift/release/5.7"
+                "swift-experimental-string-processing": "swift/release/5.7-04182022"
             }
         },
         "release/5.6": {
