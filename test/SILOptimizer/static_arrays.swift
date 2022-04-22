@@ -91,7 +91,7 @@
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}}, {{[^,]*}})
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: sil {{.*}}@main
+// CHECK-LABEL: sil @main
 // CHECK:   global_value @{{.*}}main{{.*}}
 // CHECK:   return
 public let globalVariable = [ 100, 101, 102 ]

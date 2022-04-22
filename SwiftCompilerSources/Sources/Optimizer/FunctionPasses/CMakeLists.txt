@@ -8,8 +8,6 @@
 
 swift_compiler_sources(Optimizer
   AssumeSingleThreaded.swift
-  ComputeEffects.swift
-  EscapeInfoDumper.swift
   SILPrinter.swift
   MergeCondFails.swift
   RangeDumper.swift

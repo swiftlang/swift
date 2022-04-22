@@ -308,15 +308,6 @@ public:
   /// even though they are technically trivial.
   bool isTrivial(const SILFunction &F) const;
 
-  /// True if the type is the Builtin.RawPointer or a struct/tuple/enum which
-  /// contains a Builtin.RawPointer.
-  /// Returns false for types for which this property is not known, e.g. generic
-  /// types.
-  bool isOrContainsRawPointer(const SILFunction &F) const;
-
-  /// An efficient implementation of `!isTrivial() && isOrContainsRawPointer()`.
-  bool isNonTrivialOrContainsRawPointer(const SILFunction &F) const;
-
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
   bool isEmpty(const SILFunction &F) const;

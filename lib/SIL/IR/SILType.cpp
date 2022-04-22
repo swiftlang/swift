@@ -108,17 +108,6 @@ bool SILType::isTrivial(const SILFunction &F) const {
   return F.getTypeLowering(contextType).isTrivial();
 }
 
-bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
-  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  return F.getTypeLowering(contextType).isOrContainsRawPointer();
-}
-
-bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction &F) const {
-  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  const TypeLowering &tyLowering = F.getTypeLowering(contextType);
-  return !tyLowering.isTrivial() || tyLowering.isOrContainsRawPointer();
-}
-
 bool SILType::isEmpty(const SILFunction &F) const {
   // Infinite types are never empty.
   if (F.getTypeLowering(*this).getRecursiveProperties().isInfinite()) {
