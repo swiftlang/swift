@@ -2677,8 +2677,6 @@ public:
         }
       }
 
-      // We have not found any candidates for where adding a `return` would fix
-      // the issue.
       return;
     }
 
