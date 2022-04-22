@@ -220,8 +220,16 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (!checkConformance(proto))
       return false;
 
-    // Now check any additional bounds on 'Self' from the where clause.
-    auto bounds = getSelfBoundsFromWhereClause(extension);
+    // Source file and module file have different ways to get self bounds.
+    // Source file extension will have trailing where clause which can avoid
+    // computing a generic signature. Module file will not have
+    // trailing where clause, so it will compute generic signature to get
+    // self bounds which might result in slow performance.
+    SelfBounds bounds;
+    if (extension->getParentSourceFile() != nullptr)
+      bounds = getSelfBoundsFromWhereClause(extension);
+    else
+      bounds = getSelfBoundsFromGenericSignature(extension);
     for (auto *decl : bounds.decls) {
       if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
         if (!checkConformance(proto))
