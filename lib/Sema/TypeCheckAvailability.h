@@ -220,14 +220,16 @@ diagnoseConformanceAvailability(SourceLoc loc,
                                 ProtocolConformanceRef conformance,
                                 const ExportContext &context,
                                 Type depTy=Type(),
-                                Type replacementTy=Type());
+                                Type replacementTy=Type(),
+                                bool useConformanceAvailabilityErrorsOption = false);
 
 bool
 diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                     SubstitutionMap subs,
                                     const ExportContext &context,
                                     Type depTy=Type(),
-                                    Type replacementTy=Type());
+                                    Type replacementTy=Type(),
+                                    bool useConformanceAvailabilityErrorsOption = false);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
@@ -261,7 +263,8 @@ bool diagnoseExplicitUnavailability(
     SourceLoc loc,
     const RootProtocolConformance *rootConf,
     const ExtensionDecl *ext,
-    const ExportContext &where);
+    const ExportContext &where,
+    bool useConformanceAvailabilityErrorsOption = false);
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
