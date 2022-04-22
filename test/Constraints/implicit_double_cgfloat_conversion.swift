@@ -149,7 +149,7 @@ func test_narrowing_is_delayed(x: Double, y: CGFloat) {
   // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
   // CHECK: @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
-  let _: CGFloat = overloaded(x, overloaded(x, y)) // Prefers `overloaded(Double, Double) -> Double` in both occurances.
+  let _: CGFloat = overloaded(x, overloaded(x, y)) // Prefers `overloaded(Double, Double) -> Double` in both occurrences.
 
   // Calls should behave exactly the same as contextual conversions.
 
