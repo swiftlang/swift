@@ -429,13 +429,13 @@ extension String.UnicodeScalarIndex {
     within unicodeScalars: String.UnicodeScalarView
   ) {
     guard
-      unicodeScalars._guts.hasMatchingEncoding(sourcePosition),
-      sourcePosition._encodedOffset <= unicodeScalars._guts.count,
-      unicodeScalars._guts.isOnUnicodeScalarBoundary(sourcePosition)
+      let i = unicodeScalars._guts.ensureMatchingEncodingNoTrap(sourcePosition),
+      i._encodedOffset <= unicodeScalars._guts.count,
+      unicodeScalars._guts.isOnUnicodeScalarBoundary(i)
     else {
       return nil
     }
-    self = sourcePosition
+    self = i
   }
 
   /// Returns the position in the given string that corresponds exactly to this

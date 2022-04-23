@@ -34,7 +34,7 @@ func min<T : MethodLessComparable>(_ x: T, y: T) -> T {
 //===----------------------------------------------------------------------===//
 
 func existential<T : EqualComparable, U : EqualComparable>(_ t1: T, t2: T, u: U) {
-  var eqComp : EqualComparable = t1 // expected-warning {{use of protocol 'EqualComparable' as a type must be written 'any EqualComparable'}}
+  var eqComp : any EqualComparable = t1
   eqComp = u
   if t1.isEqual(eqComp) {} // expected-error{{cannot convert value of type 'any EqualComparable' to expected argument type 'T'}}
   if eqComp.isEqual(t2) {}

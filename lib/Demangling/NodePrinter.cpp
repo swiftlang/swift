@@ -595,7 +595,6 @@ private:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
     case Node::Kind::ExtendedExistentialTypeShape:
-    case Node::Kind::ExtendedExistentialValueStorage:
     case Node::Kind::Uniquable:
       return false;
     }
@@ -2975,9 +2974,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     auto savedDisplayWhereClauses = Options.DisplayWhereClauses;
     Options.DisplayWhereClauses = true;
 
-    NodePointer reqSig = Node->getChild(0);
     NodePointer genSig = nullptr, type = nullptr;
-    if (Node->getNumChildren() == 4) {
+    if (Node->getNumChildren() == 2) {
       genSig = Node->getChild(1);
       type = Node->getChild(2);
     } else {
@@ -2989,17 +2987,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       print(genSig, depth + 1);
       Printer << " ";
     }
-    Printer << "any";
-    print(reqSig, depth + 1);
-    Printer << " ";
+    Printer << "any ";
     print(type, depth + 1);
 
     Options.DisplayWhereClauses = savedDisplayWhereClauses;
     return nullptr;
   }
-  case Node::Kind::ExtendedExistentialValueStorage:
-    Printer << Node->getText();
-    return nullptr;
   }
 
   printer_unreachable("bad node kind!");

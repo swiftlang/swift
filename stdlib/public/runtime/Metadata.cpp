@@ -4183,10 +4183,14 @@ public:
 
   struct Key {
     const NonUniqueExtendedExistentialTypeShape *Candidate;
+    llvm::StringRef TypeString;
+
+    Key(const NonUniqueExtendedExistentialTypeShape *candidate)
+      : Candidate(candidate),
+        TypeString(candidate->getExistentialTypeStringForUniquing()) {}
 
     friend llvm::hash_code hash_value(const Key &key) {
-      auto &candidate = *key.Candidate;
-      return hash_value(candidate.Hash);
+      return hash_value(key.TypeString);
     }
   };
 
@@ -4201,13 +4205,12 @@ public:
     auto self = Data;
     auto other = key.Candidate;
     if (self == other) return true;
-    return other->Hash == self->Hash;
+    return self->getExistentialTypeStringForUniquing() == key.TypeString;
   }
 
   friend llvm::hash_code hash_value(
                         const ExtendedExistentialTypeShapeCacheEntry &value) {
-    Key key = {value.Data};
-    return hash_value(key);
+    return hash_value(Key(value.Data));
   }
 
   static size_t getExtraAllocationSize(Key key) {
@@ -4251,7 +4254,7 @@ swift::swift_getExtendedExistentialTypeShape(
 
   // Find the unique entry.
   auto uniqueEntry = ExtendedExistentialTypeShapes.getOrInsert(
-      ExtendedExistentialTypeShapeCacheEntry::Key{ nonUnique });
+      ExtendedExistentialTypeShapeCacheEntry::Key(nonUnique));
 
   const ExtendedExistentialTypeShape *unique =
     &uniqueEntry.first->Data->LocalCopy;

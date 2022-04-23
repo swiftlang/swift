@@ -150,6 +150,59 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
   }
 }
 
+/// Enumerate both the stored properties and missing members,
+/// in a deterministic order.
+static void enumerateStoredPropertiesAndMissing(
+    NominalTypeDecl *decl,
+    llvm::function_ref<void(VarDecl *)> addStoredProperty,
+    llvm::function_ref<void(MissingMemberDecl *)> addMissing) {
+  // If we have a distributed actor, find the id and actorSystem
+  // properties. We always want them first, and in a specific
+  // order.
+  VarDecl *distributedActorId = nullptr;
+  VarDecl *distributedActorSystem = nullptr;
+  if (decl->isDistributedActor()) {
+    ASTContext &ctx = decl->getASTContext();
+    for (auto *member : decl->getMembers()) {
+      if (auto *var = dyn_cast<VarDecl>(member)) {
+        if (!var->isStatic() && var->hasStorage()) {
+          if (var->getName() == ctx.Id_id) {
+            distributedActorId = var;
+          } else if (var->getName() == ctx.Id_actorSystem) {
+            distributedActorSystem = var;
+          }
+        }
+
+        if (distributedActorId && distributedActorSystem)
+          break;
+      }
+    }
+
+    if (distributedActorId)
+      addStoredProperty(distributedActorId);
+    if (distributedActorSystem)
+      addStoredProperty(distributedActorSystem);
+  }
+
+  for (auto *member : decl->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      if (!var->isStatic() && var->hasStorage()) {
+        // Skip any properties that we already emitted explicitly
+        if (var == distributedActorId)
+          continue;
+        if (var == distributedActorSystem)
+          continue;
+
+        addStoredProperty(var);
+      }
+    }
+
+    if (auto missing = dyn_cast<MissingMemberDecl>(member))
+      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
+        addMissing(missing);
+  }
+}
+
 ArrayRef<VarDecl *>
 StoredPropertiesRequest::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
@@ -163,12 +216,11 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
   if (isa<SourceFile>(decl->getModuleScopeContext()))
     computeLoweredStoredProperties(decl);
 
-  for (auto *member : decl->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
-      if (!var->isStatic() && var->hasStorage()) {
-        results.push_back(var);
-      }
-  }
+  enumerateStoredPropertiesAndMissing(decl,
+    [&](VarDecl *var) {
+      results.push_back(var);
+    },
+    [](MissingMemberDecl *missing) { });
 
   return decl->getASTContext().AllocateCopy(results);
 }
@@ -186,15 +238,13 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
   if (isa<SourceFile>(decl->getModuleScopeContext()))
     computeLoweredStoredProperties(decl);
 
-  for (auto *member : decl->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
-      if (!var->isStatic() && var->hasStorage())
-        results.push_back(var);
-
-    if (auto missing = dyn_cast<MissingMemberDecl>(member))
-      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
-        results.push_back(missing);
-  }
+  enumerateStoredPropertiesAndMissing(decl,
+    [&](VarDecl *var) {
+      results.push_back(var);
+    },
+    [&](MissingMemberDecl *missing) {
+      results.push_back(missing);
+    });
 
   return decl->getASTContext().AllocateCopy(results);
 }

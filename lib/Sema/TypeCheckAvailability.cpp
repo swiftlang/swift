@@ -2958,6 +2958,13 @@ public:
         maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
       }
     }
+    if (auto *RLE = dyn_cast<RegexLiteralExpr>(E)) {
+      // Regex literals require both the Regex<Output> type to be available, as
+      // well as the initializer that is implicitly called.
+      auto Range = RLE->getSourceRange();
+      diagnoseDeclRefAvailability(Context.getRegexDecl(), Range);
+      diagnoseDeclRefAvailability(RLE->getInitializer(), Range);
+    }
     if (auto KP = dyn_cast<KeyPathExpr>(E)) {
       maybeDiagKeyPath(KP);
     }
