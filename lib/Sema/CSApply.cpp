@@ -5401,7 +5401,7 @@ collectExistentialConformances(Type fromType, Type toType,
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : layout.getProtocols()) {
     conformances.push_back(TypeChecker::containsProtocol(
-        fromType, proto, module));
+        fromType, proto, module, false, /*allowMissing=*/true));
   }
 
   return toType->getASTContext().AllocateCopy(conformances);
