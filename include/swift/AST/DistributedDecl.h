@@ -31,9 +31,6 @@ class DeclContext;
 class FuncDecl;
 class NominalTypeDecl;
 
-/// Obtain a distributed actor's well-known property by name.
-VarDecl* lookupDistributedActorProperty(NominalTypeDecl *decl, DeclName name);
-
 /// Determine the concrete type of 'ActorSystem' as seen from the member.
 /// E.g. when in a protocol, and trying to determine what the actor system was
 /// constrained to.
