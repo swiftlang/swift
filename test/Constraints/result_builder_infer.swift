@@ -74,6 +74,7 @@ struct DoNotTupleMe {
   var tuple: some Any { // expected-error{{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
     "hello" // expected-warning{{string literal is unused}}
     "world" // expected-warning{{string literal is unused}}
+    // expected-note@-1 {{did you mean to return the last expression?}} {{5-5=return }}
   }
 }
 
