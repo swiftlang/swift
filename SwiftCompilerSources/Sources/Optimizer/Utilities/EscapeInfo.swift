@@ -78,7 +78,6 @@ struct EscapeInfo {
     case ignore
     case markEscaping
     case continueWalking
-    case continueWithNewPath(Path)
   }
 
   /// Called for all operands with the current path and `followStores` when walking down.
@@ -119,18 +118,11 @@ struct EscapeInfo {
   mutating func isEscaping(object: Value, path: Path = Path(),
                            visitUse: UseCallback = { _, _, _ in .continueWalking },
                            visitDef: DefCallback = { _, _, _ in .continueWalkingUp }) -> Bool {
-    start()
+    start(forAnalyzingAddresses: false)
     defer { cleanup() }
 
-    let function = object.function
     return walkUpAndCache(object, path: path, followStores: false,
-      visitUse: { op, opPath, followStores in
-        if !op.value.type.isNonTrivialOrContainsRawPointer(in: function) {
-          return .ignore
-        }
-        return visitUse(op, opPath, followStores)
-      },
-      visitDef: visitDef)
+                          visitUse: visitUse, visitDef: visitDef)
   }
 
   /// Returns true if the definition of `value` is escaping.
@@ -140,18 +132,11 @@ struct EscapeInfo {
                       path: Path = Path(),
                       visitUse: UseCallback = { _, _, _ in .continueWalking },
                       visitDef: DefCallback = { _, _, _ in .continueWalkingUp }) -> Bool {
-    start()
+    start(forAnalyzingAddresses: false)
     defer { cleanup() }
 
-    let function = object.function
     return walkDownAndCache(object, path: path, followStores: false, knownType: nil,
-      visitUse: { op, path, followStores in
-        if !op.value.type.isNonTrivialOrContainsRawPointer(in: function) {
-          return .ignore
-        }
-        return visitUse(op, path, followStores)
-      },
-      visitDef: visitDef)
+                            visitUse: visitUse, visitDef: visitDef)
   }
 
   /// Returns true if any address of `value`, which is selected by `path`, can escape.
@@ -171,74 +156,12 @@ struct EscapeInfo {
   /// * Addresses with trivial types are _not_ ignored.
   mutating
   func isEscaping(addressesOf value: Value, path: Path = Path(.anyValueFields),
-                  visitUse: UseCallback = { _, _, _ in .continueWalking }) -> Bool {
-    start()
+                  visitUse: UseCallback = { _, _, _ in .continueWalking },
+                  visitDef: DefCallback = { _, _, _ in .continueWalkingUp }) -> Bool {
+    start(forAnalyzingAddresses: true)
     defer { cleanup() }
 
-    let function = value.function
-
-    func isInteresting(_ type: Type, at p: Path) -> Bool {
-      if type.isNonTrivialOrContainsRawPointer(in: function) { return true }
-      // For selected addresses we also need to consider trivial types (the current value
-      // is an selected address if the path does not contain any class projections).
-      if type.isAddress && !p.hasClassProjection { return true }
-      return false
-    }
-
-    return walkUpAndCache(value, path: path,
-      followStores: false,
-      visitUse: { operand, usePath, followStores in
-        if !isInteresting(operand.value.type, at: usePath) {
-          return .ignore
-        }
-        switch visitUse(operand, usePath, followStores) {
-          case .ignore:       return .ignore
-          case .markEscaping: return .markEscaping
-          case .continueWithNewPath(_): fatalError("not supported")
-          case .continueWalking: break
-        }
-
-        switch operand.instruction {
-          case is ApplySite, is StrongReleaseInst, is DestroyValueInst, is ReleaseValueInst:
-            if usePath.hasNoClassProjection {
-              // Passing the selected address (or a value loaded from the selected address) directly
-              // to a function, cannot let the selected address escape:
-              //  * if it's passed as address: indirect parameters cannot escape a function
-              //  * a load from the address does not let the address escape
-              //
-              // Example (continued from the previous example):
-              //    apply %other_func1(%selected_addr)    // cannot let %selected_addr escape (path == v**)
-              //    %l = load %selected_addr
-              //    apply %other_func2(%l)                // cannot let %selected_addr escape (path == v**)
-              //    apply %other_func3(%ref)              // can let %selected_addr escape!   (path == c*.v**)
-              //
-              // The same is true for destroys/releases.
-              return .ignore
-            }
-            return .continueWithNewPath(usePath.popLastClassAndValuesFromTail())
-          case is CopyAddrInst, is LoadInst, is LoadWeakInst, is LoadUnownedInst:
-            if usePath.hasNoClassProjection {
-              // Loads+copies from the selected address cannot let escape the selected address.
-              return .ignore
-            }
-          default:
-            break
-        }
-        return .continueWalking
-      },
-      visitDef: { def, defPath, followStores in
-        guard let arg = def as? FunctionArgument else {
-          return .continueWalkingUp
-        }
-        if !isInteresting(arg.type, at: defPath) {
-          return .ignore
-        }
-        if arg.isExclusiveIndirectParameter && defPath.hasNoClassProjection && !followStores {
-          // Non-aliasing indirect arguments cannot alias to anything unrelated.
-          return .continueWalkingDown
-        }
-        return .markEscaping
-      })
+    return walkUpAndCache(value, path: path, followStores: false, visitUse: visitUse, visitDef: visitDef)
   }
 
   /// Returns true if the selected address(es) of `lhs`/`lhsPath` can reference the same field as
@@ -329,19 +252,66 @@ struct EscapeInfo {
   private var walkedDownCache = Dictionary<HashableValue, CacheEntry>()
   private var walkedUpCache = Dictionary<HashableValue, CacheEntry>()
 
+  /// Differences when analyzing address-escapes (instead of value-escapes):
+  /// * also addresses with trivial types are tracked
+  /// * loads of addresses are ignored
+  /// * it can be assumed that addresses cannot escape a function (e.g. indirect parameters)
+  private var analyzeAddresses = false
+
   private let calleeAnalysis: CalleeAnalysis
   
   //===--------------------------------------------------------------------===//
   //                          private utility functions
   //===--------------------------------------------------------------------===//
 
-  private func start() {
+  private mutating func start(forAnalyzingAddresses: Bool) {
     precondition(walkedDownCache.isEmpty && walkedUpCache.isEmpty)
+    analyzeAddresses = forAnalyzingAddresses
   }
 
   private mutating func cleanup() {
     walkedDownCache.removeAll(keepingCapacity: true)
     walkedUpCache.removeAll(keepingCapacity: true)
+  }
+
+  /// Returns true if the type of `value` at `path` is relevant and should be tracked.
+  private func hasRelevantType(_ value: Value, at path: Path) -> Bool {
+    let type = value.type
+    if type.isNonTrivialOrContainsRawPointer(in: value.function) { return true }
+    
+    // For selected addresses we also need to consider trivial types (`value`
+    // is a selected address if the path does not contain any class projections).
+    if analyzeAddresses && type.isAddress && !path.hasClassProjection { return true }
+    return false
+  }
+
+  /// Returns true if the selected address/value at `path` can be ignored for loading from
+  /// that address or for passing that address/value to a called function.
+  ///
+  /// Passing the selected address (or a value loaded from the selected address) directly
+  /// to a function, cannot let the selected address escape:
+  ///  * if it's passed as address: indirect parameters cannot escape a function
+  ///  * a load from the address does not let the address escape
+  ///
+  /// Example (continued from the previous example):
+  ///    apply %other_func1(%selected_addr)    // cannot let %selected_addr escape (path == v**)
+  ///    %l = load %selected_addr
+  ///    apply %other_func2(%l)                // cannot let %selected_addr escape (path == v**)
+  ///    apply %other_func3(%ref)              // can let %selected_addr escape!   (path == c*.v**)
+  ///
+  /// Also, we can ignore loads from the selected address, because a loaded value does not
+  /// let the address escape.
+  private func canIgnoreForLoadOrArgument(_ path: Path) -> Bool {
+    return analyzeAddresses && path.hasNoClassProjection
+  }
+
+  /// Tries to pop the given projection from path, if the projected `value` has a relevant type.
+  private func pop(_ kind: Path.FieldKind, index: Int? = nil, from path: Path, yielding value: Value) -> Path? {
+    if let newPath = path.popIfMatches(kind, index: index),
+       hasRelevantType(value, at: newPath) {
+      return newPath
+    }
+    return nil
   }
 
   // Set a breakpoint here to debug when a value is escaping.
@@ -377,41 +347,38 @@ struct EscapeInfo {
   ///
   /// Returns true if the `value` escapes.
   private mutating
-  func walkDown(_ value: Value, path origPath: Path, followStores: Bool, knownType: Type?,
+  func walkDown(_ value: Value, path: Path, followStores: Bool, knownType: Type?,
                 visitUse: UseCallback, visitDef: DefCallback) -> Bool {
     for use in value.uses {
       if use.isTypeDependent { continue}
 
-      let path: Path
-      switch visitUse(use, origPath, followStores) {
+      switch visitUse(use, path, followStores) {
         case .ignore:
           continue
         case .markEscaping:
           return isEscaping
         case .continueWalking:
-          path = origPath
-        case .continueWithNewPath(let newPath):
-          path = newPath
+          break
       }
 
       let user = use.instruction
       switch user {
         case let rta as RefTailAddrInst:
-          if let newPath = path.popIfMatches(.tailElements) {
+          if let newPath = pop(.tailElements, from: path, yielding: rta) {
             if walkDown(rta, path: newPath, followStores: followStores, knownType: nil,
                         visitUse: visitUse, visitDef: visitDef) {
               return true
             }
           }
         case let rea as RefElementAddrInst:
-          if let newPath = path.popIfMatches(.classField, index: rea.fieldIndex) {
+          if let newPath = pop(.classField, index: rea.fieldIndex, from: path, yielding: rea) {
             if walkDown(rea, path: newPath, followStores: followStores, knownType: nil,
                         visitUse: visitUse, visitDef: visitDef) {
               return true
             }
           }
         case let pb as ProjectBoxInst:
-          if let newPath = path.popIfMatches(.classField, index: pb.fieldIndex) {
+          if let newPath = pop(.classField, index: pb.fieldIndex, from: path, yielding: pb) {
             if walkDown(pb, path: newPath, followStores: followStores, knownType: nil,
                         visitUse: visitUse, visitDef: visitDef) {
               return true
@@ -424,7 +391,7 @@ struct EscapeInfo {
             return true
           }
         case let se as StructExtractInst:
-          if let newPath = path.popIfMatches(.structField, index: se.fieldIndex) {
+          if let newPath = pop(.structField, index: se.fieldIndex, from: path, yielding: se) {
             if walkDown(se, path: newPath, followStores: followStores, knownType: knownType,
                         visitUse: visitUse, visitDef: visitDef) {
               return true
@@ -443,7 +410,7 @@ struct EscapeInfo {
             return true
           }
         case let sea as StructElementAddrInst:
-          if let newPath = path.popIfMatches(.structField, index: sea.fieldIndex) {
+          if let newPath = pop(.structField, index: sea.fieldIndex, from: path, yielding: sea) {
             if walkDown(sea, path: newPath, followStores: followStores, knownType: nil,
                         visitUse: visitUse, visitDef: visitDef) {
               return true
@@ -456,14 +423,14 @@ struct EscapeInfo {
             return true
           }
         case let te as TupleExtractInst:
-          if let newPath = path.popIfMatches(.tupleField, index: te.fieldIndex) {
+          if let newPath = pop(.tupleField, index: te.fieldIndex, from: path, yielding: te) {
             if walkDown(te, path: newPath, followStores: followStores, knownType: knownType,
                         visitUse: visitUse, visitDef: visitDef) {
               return true
             }
           }
         case let tea as TupleElementAddrInst:
-          if let newPath = path.popIfMatches(.tupleField, index: tea.fieldIndex) {
+          if let newPath = pop(.tupleField, index: tea.fieldIndex, from: path, yielding: tea) {
             if walkDown(tea, path: newPath, followStores: followStores, knownType: nil,
                         visitUse: visitUse, visitDef: visitDef) {
               return true
@@ -476,9 +443,10 @@ struct EscapeInfo {
             return true
           }
         case is UncheckedEnumDataInst, is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst:
-          if let newPath = path.popIfMatches(.enumCase, index: (user as! EnumInstruction).caseIndex) {
-            if walkDown(user as! SingleValueInstruction, path: newPath, followStores: followStores,
-                        knownType: knownType,
+          let svi = user as! SingleValueInstruction
+          let caseIdx = (user as! EnumInstruction).caseIndex
+          if let newPath = pop(.enumCase, index: caseIdx, from: path, yielding: svi) {
+            if walkDown(svi, path: newPath, followStores: followStores, knownType: knownType,
                         visitUse: visitUse, visitDef: visitDef) {
               return true
             }
@@ -509,9 +477,8 @@ struct EscapeInfo {
         case is StoreInst, is StoreWeakInst, is StoreUnownedInst:
           let store = user as! StoringInstruction
           if use == store.sourceOperand {
-            if walkUp(store.destination, path: path,
-                          followStores: followStores,
-                          visitUse: visitUse, visitDef: visitDef) {
+            if walkUp(store.destination, path: path, followStores: followStores,
+                      visitUse: visitUse, visitDef: visitDef) {
               return true
             }
           } else {
@@ -529,6 +496,7 @@ struct EscapeInfo {
             }
           }
         case let copyAddr as CopyAddrInst:
+          if canIgnoreForLoadOrArgument(path) { continue }
           if use == copyAddr.sourceOperand {
             if walkUp(copyAddr.destination, path: path, followStores: followStores,
                       visitUse: visitUse, visitDef: visitDef) {
@@ -563,6 +531,7 @@ struct EscapeInfo {
           }
         case let cbr as CondBranchInst:
           // Same here: we need to check the cache.
+          assert(use.index != 0, "should not visit trivial non-address values")
           if walkDownAndCache(cbr.getArgument(for: use), path: path,
                               followStores: followStores, knownType: knownType,
                               visitUse: visitUse, visitDef: visitDef) {
@@ -590,8 +559,19 @@ struct EscapeInfo {
             return true
           }
 
-        case is LoadInst, is LoadWeakInst, is LoadUnownedInst,
-             is InitExistentialAddrInst, is OpenExistentialAddrInst, is BeginAccessInst,
+        case is LoadInst, is LoadWeakInst, is LoadUnownedInst:
+          if canIgnoreForLoadOrArgument(path) { continue }
+          let svi = user as! SingleValueInstruction
+          
+          // Even when analyzing addresses, a loaded trivial value can be ignored.
+          if !svi.type.isNonTrivialOrContainsRawPointer(in: svi.function) { continue }
+
+          if walkDown(svi, path: path,
+                      followStores: followStores, knownType: nil,
+                      visitUse: visitUse, visitDef: visitDef) {
+            return true
+          }
+        case is InitExistentialAddrInst, is OpenExistentialAddrInst, is BeginAccessInst,
              is PointerToAddressInst, is AddressToPointerInst, is IndexAddrInst:
           if walkDown(user as! SingleValueInstruction, path: path,
                       followStores: followStores, knownType: nil,
@@ -660,8 +640,8 @@ struct EscapeInfo {
     }
     if path.topMatchesAnyValueField {
       // We don't know the struct/tuple field: we have to continue with _all_ fields.
-      for elem in results {
-        if walkDown(elem, path: path, followStores: followStores, knownType: nil,
+      for result in results where hasRelevantType(result, at: path) {
+        if walkDown(result, path: path, followStores: followStores, knownType: nil,
                     visitUse: visitUse, visitDef: visitDef) {
           return true
         }
@@ -681,6 +661,8 @@ struct EscapeInfo {
       return false
     }
 
+    if canIgnoreForLoadOrArgument(path) { return false }
+
     // Argument effects do not consider any potential stores to the argument (or it's content).
     // Therefore, if we need to track stores, the argument effects do not correctly describe what we need.
     // For example, argument 0 in the following function is marked as not-escaping, although there
@@ -697,9 +679,15 @@ struct EscapeInfo {
       return isEscaping
     }
 
+    let calleeArgIdx = apply.calleeArgIndex(callerArgIndex: argIdx)
+
     for callee in callees {
-      if walkDownArgument(argIdx: argIdx, argPath: path, knownType: knownType,
-                          apply: apply, callee: callee,
+      let effects = callee.effects
+      if !effects.canEscape(argumentIndex: calleeArgIdx, path: path, analyzeAddresses: analyzeAddresses) {
+        continue
+      }
+      if walkDownArgument(calleeArgIdx: calleeArgIdx, argPath: path, knownType: knownType,
+                          apply: apply, effects: effects,
                           visitUse: visitUse, visitDef: visitDef) {
         return true
       }
@@ -707,91 +695,96 @@ struct EscapeInfo {
     return false
   }
   
-  /// Handle an apply argument during the walk-down.
+  /// Handle `.escaping` effects for an apply argument during the walk-down.
   private mutating
-  func walkDownArgument(argIdx: Int, argPath: Path, knownType: Type?,
-                      apply: ApplySite, callee: Function,
-                      visitUse: UseCallback, visitDef: DefCallback) -> Bool {
+  func walkDownArgument(calleeArgIdx: Int, argPath: Path, knownType: Type?,
+                        apply: ApplySite, effects: FunctionEffects,
+                        visitUse: UseCallback, visitDef: DefCallback) -> Bool {
     var matched = false
-    let calleeArgIdx = apply.calleeArgIndex(callerArgIndex: argIdx)
-    
-    for effect in callee.effects.argumentEffects {
-      switch effect.kind {
-      case .notEscaping:
-        if effect.selectedArg.matches(.argument(calleeArgIdx), argPath) {
-          return false
-        }
-      case .escaping(let to, let exclusive):
-        if effect.selectedArg.matches(.argument(calleeArgIdx), argPath) {
-          matched = true
+    for effect in effects.argumentEffects {
+      guard case .escaping(let to, let exclusive) = effect.kind else {
+        continue
+      }
+      if effect.selectedArg.matches(.argument(calleeArgIdx), argPath) {
+        matched = true
+        
+        switch to.value {
+        case .returnValue:
+          guard let fas = apply as? FullApplySite, let result = fas.singleDirectResult else { return isEscaping }
           
-          switch to.value {
-          case .returnValue:
-            guard let fas = apply as? FullApplySite, let result = fas.singleDirectResult else { return isEscaping }
-            
-            if walkDown(result, path: to.pathPattern, followStores: false,
-                        knownType: exclusive ? knownType : nil,
-                        visitUse: visitUse, visitDef: visitDef) {
-              return true
-            }
-          case .argument(let toArgIdx):
-            guard let callerToIdx = apply.callerArgIndex(calleeArgIndex: toArgIdx) else {
-              return isEscaping
-            }
-  
-            // Continue at the destination of an arg-to-arg escape.
-            if walkUp(apply.arguments[callerToIdx], path: to.pathPattern, followStores: false,
+          if walkDown(result, path: to.pathPattern, followStores: false,
+                      knownType: exclusive ? knownType : nil,
                       visitUse: visitUse, visitDef: visitDef) {
-              return true
-            }
+            return true
           }
-        } else if to.matches(.argument(calleeArgIdx), argPath) {
-          // The reverse direction of an arg-to-arg escape.
-          guard let callerArgIdx = apply.callerArgIndex(calleeArgIndex: effect.selectedArg.argumentIndex) else {
+        case .argument(let toArgIdx):
+          guard let callerToIdx = apply.callerArgIndex(calleeArgIndex: toArgIdx) else {
             return isEscaping
           }
-          if !exclusive { return isEscaping }
 
-          matched = true
-
-          if walkUp(apply.arguments[callerArgIdx], path: effect.selectedArg.pathPattern, followStores: false,
+          // Continue at the destination of an arg-to-arg escape.
+          if walkUp(apply.arguments[callerToIdx], path: to.pathPattern, followStores: false,
                     visitUse: visitUse, visitDef: visitDef) {
             return true
           }
         }
+        continue
+      }
+      // Handle the reverse direction of an arg-to-arg escape.
+      if to.matches(.argument(calleeArgIdx), argPath) {
+        guard let callerArgIdx = apply.callerArgIndex(calleeArgIndex: effect.selectedArg.argumentIndex) else {
+          return isEscaping
+        }
+        if !exclusive { return isEscaping }
+
+        matched = true
+
+        if walkUp(apply.arguments[callerArgIdx], path: effect.selectedArg.pathPattern, followStores: false,
+                  visitUse: visitUse, visitDef: visitDef) {
+          return true
+        }
+        continue
       }
     }
-    if !matched {
-      return isEscaping
-    }
+    if !matched { return isEscaping }
     return false
   }
   
   private func handleDestroy(of value: Value, path: Path, followStores: Bool, knownType: Type?) -> Bool {
-    // Destroying cannot escape the value/reference itself, but its
-    // contents (in the destructor).
-    let unwrappedClassPath = path.popAllValueFields()
-    if let _ = unwrappedClassPath.popIfMatches(.anyClassField) {
-      if followStores {
+
+    // Even if this is a destroy_value of a struct/tuple/enum, the called destructor(s) only take a
+    // single class reference as parameter.
+    let p = path.popAllValueFields()
+
+    if p.isEmpty {
+      // The object to destroy (= the argument of the destructor) cannot escape itself.
+      return false
+    }
+    if analyzeAddresses && p.matches(pattern: Path(.anyValueFields).push(.anyClassField)) {
+      // Any address of a class property of the object to destroy cannot esacpe the destructor.
+      // (Whereas a value stored in such a property could escape.)
+      return false
+    }
+
+    if followStores {
+      return isEscaping
+    }
+    if let exactTy = knownType {
+      guard let destructor = calleeAnalysis.getDestructor(ofExactType: exactTy) else {
         return isEscaping
       }
-      if let exactTy = knownType {
-        guard let destructor = calleeAnalysis.getDestructor(ofExactType: exactTy) else {
+      if destructor.effects.canEscape(argumentIndex: 0, path: p, analyzeAddresses: analyzeAddresses) {
+        return isEscaping
+      }
+    } else {
+      // We don't know the exact type, so get all possible called destructure from
+      // the callee analysis.
+      guard let destructors = calleeAnalysis.getDestructors(of: value.type) else {
+        return isEscaping
+      }
+      for destructor in destructors {
+        if destructor.effects.canEscape(argumentIndex: 0, path: p, analyzeAddresses: analyzeAddresses) {
           return isEscaping
-        }
-        if destructor.effects.canEscape(path: unwrappedClassPath) {
-          return isEscaping
-        }
-      } else {
-        // We don't know the exact type, so get all possible called destructure from
-        // the callee analysis.
-        guard let destructors = calleeAnalysis.getDestructors(of: value.type) else {
-          return isEscaping
-        }
-        for destructor in destructors {
-          if destructor.effects.canEscape(path: unwrappedClassPath) {
-            return isEscaping
-          }
         }
       }
     }
@@ -843,7 +836,12 @@ struct EscapeInfo {
         case is AllocRefInst, is AllocRefDynamicInst, is AllocStackInst, is AllocBoxInst:
           return walkDownAndCache(val, path: p, followStores: fSt, knownType: nil,
                                   visitUse: visitUse, visitDef: visitDef)
-        case is FunctionArgument:
+        case let arg as FunctionArgument:
+          if canIgnoreForLoadOrArgument(path) && arg.isExclusiveIndirectParameter && !fSt {
+            // The address of an indirect argument passed to the current function cannot escape.
+            return walkDownAndCache(val, path: p, followStores: fSt, knownType: nil,
+                                    visitUse: visitUse, visitDef: visitDef)
+          }
           return isEscaping
         case let arg as BlockArgument:
           if arg.isPhiArgument {
@@ -881,7 +879,7 @@ struct EscapeInfo {
             p = poppedPath
           } else if p.topMatchesAnyValueField {
             // We don't know the struct field: we have to continue with _all_ operands.
-            for op in str.operands {
+            for op in str.operands where hasRelevantType(op.value, at: p) {
               if walkUpAndCache(op.value, path: p, followStores: fSt, visitUse: visitUse, visitDef: visitDef) {
                 return true
               }
@@ -899,7 +897,7 @@ struct EscapeInfo {
             p = poppedPath
           } else if p.topMatchesAnyValueField {
             // We don't know the tuple element: we have to continue with _all_ operands.
-            for op in t.operands {
+            for op in t.operands where hasRelevantType(op.value, at: p) {
               if walkUpAndCache(op.value, path: p, followStores: fSt, visitUse: visitUse, visitDef: visitDef) {
                 return true
               }
