@@ -628,6 +628,22 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
         activeAttr = decodeAttr(nameAttr);
     }
 
+    if (auto enumDecl = dyn_cast<clang::EnumDecl>(decl)) {
+      // Intentionally don't get the cannonical type here.
+      if (auto typedefType = dyn_cast<clang::TypedefType>(enumDecl->getIntegerType().getTypePtr())) {
+        // If the typedef is available in Swift, the user will get ambiguity.
+        // It also means they may not have intended this API to be imported like this.
+        if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
+          if (auto asyncAttr = typedefType->getDecl()->getAttr<clang::SwiftAsyncNameAttr>())
+            activeAttr = decodeAttr(asyncAttr);
+          if (!activeAttr) {
+            if (auto nameAttr = typedefType->getDecl()->getAttr<clang::SwiftNameAttr>())
+              activeAttr = decodeAttr(nameAttr);
+          }
+        }
+      }
+    }
+
     Optional<AnySwiftNameAttr> result = activeAttr;
     llvm::VersionTuple bestSoFar;
     for (auto *attr : decl->attrs()) {

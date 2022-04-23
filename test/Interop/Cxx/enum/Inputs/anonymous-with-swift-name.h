@@ -22,6 +22,22 @@ typedef CF_OPTIONS(unsigned, CFColorMask) {
 inline SOColorMask useSOColorMask(SOColorMask mask) { return mask; }
 inline CFColorMask useCFColorMask(CFColorMask mask) { return mask; }
 
+struct ParentStruct { };
+
+typedef __attribute__((availability(swift, unavailable))) __attribute__((swift_name("ParentStruct.NewName"))) unsigned OldName;
+
+enum __attribute__((flag_enum,enum_extensibility(open))) : OldName {
+  kOldNameOne = (1 << 1),
+  kOldNameTwo = (1 << 2)
+};
+
+typedef __attribute__((availability(swift, unavailable))) __attribute__((swift_name("GlobalNewName"))) unsigned GlobalOldName;
+
+enum __attribute__((flag_enum,enum_extensibility(open))) : GlobalOldName {
+  kGlobalOldNameOne = (1 << 1),
+  kGlobalOldNameTwo = (1 << 2)
+};
+
 #if __OBJC__
 @interface ColorMaker
 - (void)makeColorWithOptions:(SOColorMask)opts;
