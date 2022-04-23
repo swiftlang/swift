@@ -2632,7 +2632,7 @@ public:
   void check() {
     Body->walk(*this);
 
-    // If given function has any invalid returns in the body
+    // If given function has any invalid `return`s in the body
     // let's not try to validate the types, since it wouldn't
     // be accurate.
     if (HasInvalidReturn)
@@ -2642,6 +2642,41 @@ public:
     // we have nothing to infer the underlying type from.
     if (Candidates.empty()) {
       Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
+
+      // We try to find if the last element of the `Body` multi element
+      // `BraceStmt` is an expression that produces a value that satisfies all
+      // the opaque type requirements and if that is the case, it means we can
+      // suggest a fix-it note to add an explicit `return`.
+      if (Body->getNumElements() > 1) {
+        auto element = Body->getLastElement();
+        // Let's see if the last statement would make for a valid return value.
+        if (auto expr = element.dyn_cast<Expr *>()) {
+          bool conforms = llvm::all_of(OpaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements(),
+                                       [&expr, this](auto requirement) {
+            if (requirement.getKind() == RequirementKind::Conformance) {
+              auto conformance =
+                  TypeChecker::conformsToProtocol(expr->getType()->getRValueType(),
+                                                  requirement.getProtocolDecl(),
+                                                  Implementation->getModuleContext(),
+                                                  /*allowMissing=*/ false);
+              return !conformance.isInvalid();
+            }
+            // If we encounter any requirements other than `Conformance`, we do
+            // not attempt to type check the expression.
+            return false;
+          });
+
+          // If all requirements are fulfilled, we offer to insert `return` to
+          // fix the issue.
+          if (conforms) {
+            Ctx.Diags
+                .diagnose(expr->getStartLoc(),
+                          diag::opaque_type_missing_return_last_expr_note)
+                .fixItInsert(expr->getStartLoc(), "return ");
+          }
+        }
+      }
+
       return;
     }
 
