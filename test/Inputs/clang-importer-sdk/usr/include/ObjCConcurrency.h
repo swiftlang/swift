@@ -265,6 +265,11 @@ typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE;
 typedef NSString *SendableStringStruct NS_EXTENSIBLE_STRING_ENUM;
 typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE;
 
+SENDABLE
+typedef struct {
+  void *ptr;
+} SendableStructWithNonSendable;
+
 ASSUME_NONSENDABLE_END
 
 typedef id ObjectTypedef;
