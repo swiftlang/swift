@@ -64,17 +64,12 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
     SGF.B.createCopyAddr(loc, value, fieldAddr, IsNotTake, IsInitialization);
   } else {
     if (value->getType().isAddress()) {
-      value = SGF.B.createTrivialLoadOr(
-          loc, value, LoadOwnershipQualifier::Take);
+      SGF.emitSemanticLoadInto(loc, value, SGF.F.getTypeLowering(value->getType()),
+          fieldAddr, SGF.getTypeLowering(loweredType), IsTake, IsInitialization);
     } else {
       value = SGF.B.emitCopyValueOperation(loc, value);
-    }
-
-    SGF.B.emitStoreValueOperation(
+      SGF.B.emitStoreValueOperation(
         loc, value, fieldAddr, StoreOwnershipQualifier::Init);
-
-    if (value->getType().isAddress()) {
-      SGF.B.createDestroyAddr(loc, value);
     }
   }
 }
