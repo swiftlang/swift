@@ -390,7 +390,7 @@ StringTests.test("Regression/corelibs-foundation") {
     }
     //If we come here, then the range has created unpaired surrogates on either end.
     //An unpaired surrogate is replaced by OXFFFD - the Unicode Replacement Character.
-    //The CRLF ("\r\n") sequence is also treated like a surrogate pair, but its constinuent
+    //The CRLF ("\r\n") sequence is also treated like a surrogate pair, but its constituent
     //characters "\r" and "\n" can exist outside the pair!
 
     let replacementCharacter = String(describing: UnicodeScalar(0xFFFD)!)

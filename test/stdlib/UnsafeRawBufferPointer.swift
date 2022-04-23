@@ -446,7 +446,7 @@ UnsafeRawBufferPointerTestSuite.test("copyMemory.overflow") {
 #endif
 
 // Use copyBytes without contiguous storage
-UnsafeRawBufferPointerTestSuite.test("copyBytes.withoutContiguouseStorage") {
+UnsafeRawBufferPointerTestSuite.test("copyBytes.withoutContiguousStorage") {
   let ranges: [Range<UInt8>] = [0..<2, 1..<3, 2..<4, 3..<5]
   var array = [UInt8](repeating: 0, count: 2)
   for range in ranges {
