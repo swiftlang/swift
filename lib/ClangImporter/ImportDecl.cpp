@@ -8795,74 +8795,86 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
   Optional<const clang::SwiftAttrAttr *> SeenMainActorAttr;
   PatternBindingInitializer *initContext = nullptr;
 
-  //
-  // __attribute__((swift_attr("attribute")))
-  //
-  for (auto swiftAttr : ClangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
-    // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
-    // point at which to do name lookup for imported entities.
-    if (isMainActorAttr(swiftAttr)) {
-      if (SeenMainActorAttr) {
-        // Cannot add main actor annotation twice. We'll keep the first
-        // one and raise a warning about the duplicate.
-        HeaderLoc attrLoc(swiftAttr->getLocation());
-        diagnose(attrLoc, diag::import_multiple_mainactor_attr,
-                 swiftAttr->getAttribute(),
-                 SeenMainActorAttr.getValue()->getAttribute());
+  auto importAttrsFromDecl = [&](const clang::NamedDecl *ClangDecl) {
+    //
+    // __attribute__((swift_attr("attribute")))
+    //
+    for (auto swiftAttr : ClangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
+      // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
+      // point at which to do name lookup for imported entities.
+      if (isMainActorAttr(swiftAttr)) {
+        if (SeenMainActorAttr) {
+          // Cannot add main actor annotation twice. We'll keep the first
+          // one and raise a warning about the duplicate.
+          HeaderLoc attrLoc(swiftAttr->getLocation());
+          diagnose(attrLoc, diag::import_multiple_mainactor_attr,
+                   swiftAttr->getAttribute(),
+                   SeenMainActorAttr.getValue()->getAttribute());
+          continue;
+        }
+
+        if (Type mainActorType = SwiftContext.getMainActorType()) {
+          auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
+          auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
+          MappedDecl->getAttrs().add(attr);
+          SeenMainActorAttr = swiftAttr;
+        }
+
         continue;
       }
 
-      if (Type mainActorType = SwiftContext.getMainActorType()) {
-        auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
-        auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
+      // Hard-code @actorIndependent, until Objective-C clients start
+      // using nonisolated.
+      if (swiftAttr->getAttribute() == "@actorIndependent") {
+        auto attr = new (SwiftContext) NonisolatedAttr(/*isImplicit=*/true);
         MappedDecl->getAttrs().add(attr);
-        SeenMainActorAttr = swiftAttr;
+        continue;
       }
 
-      continue;
+      // Dig out a buffer with the attribute text.
+      unsigned bufferID = getClangSwiftAttrSourceBuffer(
+          swiftAttr->getAttribute());
+
+      // Dig out a source file we can use for parsing.
+      auto &sourceFile = getClangSwiftAttrSourceFile(
+          *MappedDecl->getDeclContext()->getParentModule());
+
+      // Spin up a parser.
+      swift::Parser parser(
+          bufferID, sourceFile, &SwiftContext.Diags, nullptr, nullptr);
+      // Prime the lexer.
+      parser.consumeTokenWithoutFeedingReceiver();
+
+      bool hadError = false;
+      SourceLoc atLoc;
+      if (parser.consumeIf(tok::at_sign, atLoc)) {
+        hadError = parser.parseDeclAttribute(
+            MappedDecl->getAttrs(), atLoc, initContext,
+            /*isFromClangAttribute=*/true).isError();
+      } else {
+        SourceLoc staticLoc;
+        StaticSpellingKind staticSpelling;
+        hadError = parser.parseDeclModifierList(
+            MappedDecl->getAttrs(), staticLoc, staticSpelling,
+            /*isFromClangAttribute=*/true);
+      }
+
+      if (hadError) {
+        // Complain about the unhandled attribute or modifier.
+        HeaderLoc attrLoc(swiftAttr->getLocation());
+        diagnose(attrLoc, diag::clang_swift_attr_unhandled,
+                 swiftAttr->getAttribute());
+      }
     }
+  };
+  importAttrsFromDecl(ClangDecl);
 
-    // Hard-code @actorIndependent, until Objective-C clients start
-    // using nonisolated.
-    if (swiftAttr->getAttribute() == "@actorIndependent") {
-      auto attr = new (SwiftContext) NonisolatedAttr(/*isImplicit=*/true);
-      MappedDecl->getAttrs().add(attr);
-      continue;
-    }
-
-    // Dig out a buffer with the attribute text.
-    unsigned bufferID = getClangSwiftAttrSourceBuffer(
-        swiftAttr->getAttribute());
-
-    // Dig out a source file we can use for parsing.
-    auto &sourceFile = getClangSwiftAttrSourceFile(
-        *MappedDecl->getDeclContext()->getParentModule());
-
-    // Spin up a parser.
-    swift::Parser parser(
-        bufferID, sourceFile, &SwiftContext.Diags, nullptr, nullptr);
-    // Prime the lexer.
-    parser.consumeTokenWithoutFeedingReceiver();
-
-    bool hadError = false;
-    SourceLoc atLoc;
-    if (parser.consumeIf(tok::at_sign, atLoc)) {
-      hadError = parser.parseDeclAttribute(
-          MappedDecl->getAttrs(), atLoc, initContext,
-          /*isFromClangAttribute=*/true).isError();
-    } else {
-      SourceLoc staticLoc;
-      StaticSpellingKind staticSpelling;
-      hadError = parser.parseDeclModifierList(
-          MappedDecl->getAttrs(), staticLoc, staticSpelling,
-          /*isFromClangAttribute=*/true);
-    }
-
-    if (hadError) {
-      // Complain about the unhandled attribute or modifier.
-      HeaderLoc attrLoc(swiftAttr->getLocation());
-      diagnose(attrLoc, diag::clang_swift_attr_unhandled,
-               swiftAttr->getAttribute());
+  // If the Clang declaration is from an anonymous tag that was given a
+  // name via a typedef, look for attributes on the typedef as well.
+  if (auto tag = dyn_cast<clang::TagDecl>(ClangDecl)) {
+    if (tag->getName().empty()) {
+      if (auto typedefDecl = tag->getTypedefNameForAnonDecl())
+        importAttrsFromDecl(typedefDecl);
     }
   }
 
