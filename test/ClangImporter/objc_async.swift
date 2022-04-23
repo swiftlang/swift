@@ -354,7 +354,7 @@ func testSender(
 
   sender.sendAnyArray([sendableObject])
   sender.sendAnyArray([nonSendableObject])
-  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable; this is an error in Swift 6}}
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
 
   sender.sendGeneric(sendableGeneric)
   // expected-warning@-1{{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
