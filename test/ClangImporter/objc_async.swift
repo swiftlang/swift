@@ -177,8 +177,16 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
 
 // Sendable conformance inference for imported types.
 func acceptCV<T: Sendable>(_: T) { }
-func testCV(r: NSRange) {
+
+struct MyStruct: Sendable {
+  var range: NSRange
+  var inner: SendableStructWithNonSendable
+}
+
+@available(SwiftStdlib 5.5, *)
+func testCV(r: NSRange, someStruct: SendableStructWithNonSendable) async {
   acceptCV(r)
+  acceptCV(someStruct)
 }
 
 // Global actor (unsafe) isolation.
