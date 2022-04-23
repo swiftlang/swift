@@ -1423,6 +1423,25 @@ public struct UInt64Wrapper {
 //
 // The store inside the loop is deleted, and the load is hoisted such
 // that it now loads the UInt64Wrapper instead of Builtin.Int64
+// CHECK-LABEL: sil @testTailProjection : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[A:%.*]] = index_addr %4 : $*UInt64Wrapper, %1 : $Builtin.Word
+// CHECK:   store %{{.*}} to [[A]] : $*UInt64Wrapper
+// CHECK:   load %5 : $*UInt64Wrapper
+// CHECK:   br bb1
+// CHECK: bb1(%{{.*}} : $Builtin.Int64, %{{.*}} : $UInt64Wrapper, [[PHI:%.*]] : $UInt64Wrapper):
+// CHECK:   cond_br undef, bb3, bb2
+// CHECK: bb2:
+// CHECK-NOT: (load|store)
+// CHECK:   struct_extract [[PHI]] : $UInt64Wrapper, #UInt64Wrapper.rawValue
+// CHECK:   struct_extract
+// CHECK:   struct $UInt64
+// CHECK:   struct $UInt64Wrapper
+// CHECK-NOT: (load|store)
+// CHECK:   br bb1
+// CHECK: bb3:
+// CHECK:   store [[PHI]] to [[A]] : $*UInt64Wrapper
+// CHECK-LABEL: } // end sil function 'testTailProjection'
 sil @testTailProjection : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int64, 0
