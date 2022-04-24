@@ -180,6 +180,7 @@ jobs:
       TOOLCHAIN_CHANNEL: DEVELOPMENT
       DEVELOPER_DIR: /Applications/Xcode_13.0.app/Contents/Developer/
     needs: [build-matrix]
+    if: ${{ always() }}
     strategy:
       matrix:
         include: ${{ fromJSON(needs.build-matrix.outputs.entries) }}
