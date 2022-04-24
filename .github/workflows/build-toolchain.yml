@@ -225,12 +225,12 @@ jobs:
         run: |
           xcodebuild -version
 
-      - uses: actions/cache@v1
+      - uses: actions/cache@v3
         with:
           path: build-cache
-          key: ${{ matrix.target }}-sccache-v11-${{ steps.cache_timestamp.outputs.timestamp }}
+          key: ${{ matrix.target }}-sccache-v12-${{ steps.cache_timestamp.outputs.timestamp }}
           restore-keys: |
-            ${{ matrix.target }}-sccache-v11-
+            ${{ matrix.target }}-sccache-v12-
 
       - name: Clean build directory
         if: ${{ matrix.clean_build_dir }}
