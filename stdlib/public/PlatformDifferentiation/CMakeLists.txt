@@ -10,6 +10,41 @@
 #
 #===----------------------------------------------------------------------===#
 
+if("${SWIFT_STDLIB_BUILD_TYPE}" STREQUAL "Debug")
+  set(bin_dir_path_extension "Debug")
+else()
+  set(bin_dir_path_extension ".")
+endif()
+
+set(swift_lib_products_dir 
+  "${SWIFT_BINARY_DIR}/${bin_dir_path_extension}/lib/swift/${SWIFT_HOST_VARIANT}")
+
+if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(platform_lib_name Darwin)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+  set(platform_lib_name Glibc)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
+  set(platform_lib_name Glibc)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OPENBSD")
+  set(platform_lib_name Glibc)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
+  set(platform_lib_name Glibc)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
+  set(platform_lib_name Glibc)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+  set(platform_lib_name Glibc)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASI")
+  set(platform_lib_name WASILibc)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+  set(platform_lib_name CRT)
+else()
+  message(FATAL_ERROR "Unsupported platform")
+endif()
+
+file(WRITE 
+  "${swift_lib_products_dir}/${platform_lib_name}.swiftcrossimport/_Differentiation.swiftoverlay" 
+  "version: 1\nmodules:\n- name: _${platform_lib_name}_Differentiation\n")
+
 add_swift_target_library(swift_Darwin_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 

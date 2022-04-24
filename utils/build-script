@@ -717,12 +717,6 @@ def main():
 
 if __name__ == "__main__":
     try:
-        output = main()
-        
-        os.makedirs(SWIFT_SOURCE_ROOT + "/build/Ninja-RelWithDebInfoAssert/swift-macosx-arm64/lib/swift/macosx/Darwin.swiftcrossimport", exist_ok=True)
-        with open(SWIFT_SOURCE_ROOT + "/build/Ninja-RelWithDebInfoAssert/swift-macosx-arm64/lib/swift/macosx/Darwin.swiftcrossimport/_Differentiation.swiftoverlay", "w") as f:
-            f.write("version: 1\nmodules:\n- name: _Darwin_Differentiation\n")
-        
-        sys.exit(output)
+        sys.exit(main())
     except KeyboardInterrupt:
         sys.exit(1)
